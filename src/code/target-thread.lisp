@@ -1603,9 +1603,12 @@ subject to change."
         (error 'join-thread-error :thread thread :problem problem))))
 
 (defun destroy-thread (thread)
-  #!+sb-doc
-  "Deprecated. Same as TERMINATE-THREAD."
   (terminate-thread thread))
+
+#-sb-xc-host
+(declaim (sb!ext:deprecated
+          :late ("SBCL" "1.2.15")
+          (function destroy-thread :replacement terminate-thread)))
 
 #!+sb-thread
 (defun enter-foreign-callback (arg1 arg2 arg3)

@@ -114,5 +114,9 @@ Examples:
         (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 1)))))
 
 (defun make-inet-socket (type protocol)
-  "Make an INET socket.  Deprecated in favour of make-instance"
+  "Make an INET socket."
   (make-instance 'inet-socket :type type :protocol protocol))
+
+(declaim (sb-ext:deprecated
+          :late ("SBCL" "1.2.15")
+          (function make-inet-socket :replacement make-instance)))

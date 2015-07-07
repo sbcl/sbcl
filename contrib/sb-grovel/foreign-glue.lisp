@@ -412,5 +412,8 @@ deeply nested structures."
 ;; on the principle that sb-grovel should only have to be loaded in
 ;; order to do an actual groveling run.
 (defun foreign-nullp (c)
-  "Deprecated.  Use SB-ALIEN:NULL-ALIEN instead."
   (null-alien c))
+
+(declaim (sb-ext:deprecated
+          :late ("SBCL" "1.2.15")
+          (function foreign-nullp :replacement sb-alien:null-alien)))

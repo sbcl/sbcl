@@ -22,10 +22,12 @@
 ;;; implemented as identity) for user code which might have had to peek
 ;;; into our internals in past versions when we hadn't been using
 ;;; handles yet. -- DFL, 2012
-(sb-impl::define-deprecated-function :late "1.2.10" handle->fd nil (handle flags)
+(sb-int:define-deprecated-function :late ("SBCL" "1.2.10")
+    handle->fd nil (handle flags)
   (declare (ignore flags))
   handle)
-(sb-impl::define-deprecated-function :late "1.2.10" fd->handle nil (fd)
+(sb-int:define-deprecated-function :late ("SBCL" "1.2.10")
+    fd->handle nil (fd)
   fd)
 
 (defun socket (af type proto)
@@ -39,8 +41,8 @@
     ((define-socket-fd-arg-routines (&rest names)
        (flet ((make-definition (name)
                 (let ((deprecated-name (sb-int:symbolicate "WIN32-" name)))
-                  `(sb-impl::define-deprecated-function
-                       :early "1.2.10" ,deprecated-name (,name)
+                  `(sb-int:define-deprecated-function
+                       :early ("SBCL" "1.2.10") ,deprecated-name (,name)
                        (handle &rest options)
                      (apply #',name handle options)))))
          `(progn

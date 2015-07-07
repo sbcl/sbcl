@@ -619,13 +619,18 @@
           (%sf 'dc 'write-chars (ef-name format)))))
   stream)
 
-;; Deprecated -- use install-string-{input,output}-character-strategy instead!
 (defun install-string-character-strategy (stream)
   (when (any-stream-instance-flags stream :input)
     (install-string-input-character-strategy stream))
   (when (any-stream-instance-flags stream :output)
     (install-string-output-character-strategy stream))
   stream)
+
+(declaim (sb-ext:deprecated
+          :early ("SBCL" "1.2.15")
+          (function install-string-character-strategy
+                    :replacement (install-string-input-character-strategy
+                                  install-string-output-character-strategy))))
 
 (defun install-string-input-character-strategy (stream)
   #| implement me |#
