@@ -21,9 +21,6 @@
   (int nil :type unsigned-byte :read-only t))
 
 ;;; cross-compilation-host analogues of target-CMU CL primitive SAP operations
-(defun sap+ (sap offset)
-  (declare (type system-area-pointer sap) (type sap-int offset))
-  (make-sap :int (+ (sap-int sap) offset)))
 #.`(progn
      ,@(mapcar (lambda (info)
                  (destructuring-bind (sap-fun int-fun) info
