@@ -1529,11 +1529,7 @@
      (proclaim '(deprecated
                  ,state ,since
                  (variable ,name ,@(when replacement
-                                     `(:replacement ,replacement)))))
-     #!+sb-doc
-     (setf (fdocumentation ',name 'variable)
-           ,(print-deprecation-message
-             'variable name "SBCL" since (list replacement)))))
+                                     `(:replacement ,replacement)))))))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:

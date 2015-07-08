@@ -62,39 +62,83 @@
                documentation)))
   documentation)
 
+;;; Deprecation note
+
+(defun maybe-add-deprecation-note (namespace name documentation)
+  (unless (member namespace '(function variable type))
+    (return-from maybe-add-deprecation-note documentation))
+  (binding* (((state since replacements)
+              (deprecated-thing-p namespace name))
+             (note (when state
+                     (with-output-to-string (stream)
+                       (sb-impl::print-deprecation-message
+                        'function name (first since) (second since)
+                        replacements stream)))))
+    (cond
+      ((and documentation note)
+       (concatenate
+        'string note #.(format nil "~2%") documentation))
+      (documentation)
+      (note))))
+
+(defmethod documentation :around ((x t) (doc-type t))
+  (let ((namespace (cond
+                     ((typep x 'function)
+                      'function)
+                     ((eq doc-type 'compiler-macro)
+                      'function)
+                     ((typep x 'class)
+                      'type)
+                     ((eq doc-type 'structure)
+                      'type)
+                     (t
+                      doc-type)))
+        (name (cond
+                ((typep x 'function)
+                 (fun-name x))
+                ((typep x 'class)
+                 (class-name x))
+                (t
+                 x)))
+        (documentation (call-next-method)))
+    (maybe-add-deprecation-note namespace name documentation)))
+
 ;;; functions, macros, and special forms
-(defmethod documentation ((x function) (doc-type (eql 't)))
-  (fun-doc x))
 
-(defmethod documentation ((x function) (doc-type (eql 'function)))
-  (fun-doc x))
+(flet ((maybe-function-documentation (name)
+         (cond
+           ((not (legal-fun-name-p name)))
+           ((random-documentation name 'function))
+           ;; Nothing under the name, check the function object.
+           ((fboundp name)
+            (fun-doc (cond
+                       ((and (symbolp name) (special-operator-p name))
+                        (fdefinition name))
+                       ((and (symbolp name) (macro-function name)))
+                       ((fdefinition name))))))))
 
-(defmethod documentation ((x list) (doc-type (eql 'compiler-macro)))
-  (awhen (compiler-macro-function x)
-    (documentation it t)))
+  (defmethod documentation ((x function) (doc-type (eql 't)))
+    (fun-doc x))
 
-(defmethod documentation ((x list) (doc-type (eql 'function)))
-  (when (legal-fun-name-p x)
-    (or (random-documentation x 'function)
-        (when (fboundp x)
-          (fun-doc (fdefinition x))))))
+  (defmethod documentation ((x function) (doc-type (eql 'function)))
+    (fun-doc x))
 
-(defmethod documentation ((x symbol) (doc-type (eql 'function)))
-  (when (legal-fun-name-p x)
-    (or (random-documentation x 'function)
-        ;; Nothing under the name, check the function object.
-        (when (fboundp x)
-          (fun-doc (if (special-operator-p x)
-                       (fdefinition x)
-                       (or (macro-function x)
-                           (fdefinition x))))))))
+  (defmethod documentation ((x list) (doc-type (eql 'compiler-macro)))
+    (awhen (compiler-macro-function x)
+      (documentation it t)))
 
-(defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
-  (awhen (compiler-macro-function x)
-    (documentation it t)))
+  (defmethod documentation ((x list) (doc-type (eql 'function)))
+    (maybe-function-documentation x))
 
-(defmethod documentation ((x symbol) (doc-type (eql 'setf)))
-  (fdocumentation x 'setf))
+  (defmethod documentation ((x symbol) (doc-type (eql 'function)))
+    (maybe-function-documentation x))
+
+  (defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
+    (awhen (compiler-macro-function x)
+      (documentation it t)))
+
+  (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
+    (fdocumentation x 'setf)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'optimize)))
   (random-documentation x 'optimize))
@@ -216,9 +260,8 @@
 
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (fdocumentation x 'type)
-      (let ((class (find-class x nil)))
-        (when class
-          (slot-value class '%documentation)))))
+      (awhen (find-class x nil)
+        (slot-value it '%documentation))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
   (fdocumentation x 'structure))
