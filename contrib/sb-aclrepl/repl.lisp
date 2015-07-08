@@ -491,7 +491,7 @@
   (values))
 
 (defun bt-cmd (&optional (n most-positive-fixnum))
-  (sb-debug::backtrace n))
+  (sb-debug:print-backtrace n))
 
 (defun current-cmd ()
   (sb-debug::describe-debug-command))
@@ -580,7 +580,7 @@
       (if found
           (progn
             (format *output* "~&Destroying thread ~A" thread)
-            (sb-thread:destroy-thread found))
+            (sb-thread:terminate-thread found))
           (format *output* "~&Thread ~A not found" thread))))
   #-sb-thread
   (declare (ignore selected-threads))
