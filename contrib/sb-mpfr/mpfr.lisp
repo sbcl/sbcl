@@ -1,5 +1,5 @@
 (defpackage :sb-mpfr
-  (:use "COMMON-LISP" "SB-ALIEN" "SB-C-CALL")
+  (:use "COMMON-LISP" "SB-ALIEN")
   (:import-from "SB-GMP"
                 #:make-gmp-rstate
                 #:make-gmp-rstate-lc
