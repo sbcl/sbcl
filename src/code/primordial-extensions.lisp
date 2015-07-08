@@ -194,42 +194,53 @@
     (apply #'symbolicate things)))
 
 ;;; Access *PACKAGE* in a way which lets us recover when someone has
-;;; done something silly like (SETF *PACKAGE* :CL-USER). (Such an
-;;; assignment is undefined behavior, so it's sort of reasonable for
+;;; done something silly like (SETF *PACKAGE* :CL-USER) in unsafe code.
+;;; (Such an assignment is undefined behavior, so it's sort of reasonable for
 ;;; it to cause the system to go totally insane afterwards, but it's a
-;;; fairly easy mistake to make, so let's try to recover gracefully
-;;; instead.)
+;;; fairly easy mistake to make, so let's try to recover gracefully instead.)
 ;;; This function is called while compiling this file because DO-ANONYMOUS
 ;;; is a delayed-def!macro, the constructor for which calls SANE-PACKAGE.
 (eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
 (defun sane-package ()
-  (let ((maybe-package *package*))
-    (cond ((and (packagep maybe-package)
+  ;; Perhaps it's possible for *PACKAGE* to be set to a non-package in some
+  ;; host Lisp, but in SBCL it isn't, and the PACKAGEP test below would be
+  ;; elided unless forced to be NOTINLINE.
+  (declare (notinline packagep))
+  (let* ((maybe-package *package*)
+         (packagep (packagep maybe-package)))
+    ;; And if we don't also always check for deleted packages - as was true
+    ;; when the "#+sb-xc-host" reader condition was absent - then half of the
+    ;; COND becomes unreachable, making this function merely return *PACKAGE*
+    ;; in the cross-compiler, producing a code deletion note.
+    (cond ((and packagep
                 ;; For good measure, we also catch the problem of
                 ;; *PACKAGE* being bound to a deleted package.
                 ;; Technically, this is not undefined behavior in itself,
                 ;; but it will immediately lead to undefined to behavior,
                 ;; since almost any operation on a deleted package is
                 ;; undefined.
-                #-sb-xc-host
-                (package-%name maybe-package))
+                ;; The "%" accessor avoids calling %FIND-PACKAGE-OR-LOSE,
+                ;; though it probably does not make much difference, if any.
+                (#+sb-xc-host package-name #-sb-xc-host package-%name
+                 maybe-package))
            maybe-package)
           (t
            ;; We're in the undefined behavior zone. First, munge the
            ;; system back into a defined state.
-           (let ((really-package (find-package :cl-user)))
+           (let ((really-package
+                  (load-time-value (find-package :cl-user) t)))
              (setf *package* really-package)
              ;; Then complain.
              (error 'simple-type-error
                     :datum maybe-package
                     :expected-type '(and package (satisfies package-name))
                     :format-control
-                    "~@<~S can't be a ~A: ~2I~_~S has been reset to ~S.~:>"
+                    "~@<~S can't be a ~A: ~2I~_It has been reset to ~S.~:>"
                     :format-arguments (list '*package*
-                                            (if (packagep maybe-package)
+                                            (if packagep
                                                 "deleted package"
                                                 (type-of maybe-package))
-                                            '*package* really-package))))))))
+                                            really-package))))))))
 
 ;;; Access *DEFAULT-PATHNAME-DEFAULTS*, issuing a warning if its value
 ;;; is silly. (Unlike the vaguely-analogous SANE-PACKAGE, we don't

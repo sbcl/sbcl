@@ -11,6 +11,14 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(defun set-bad-package (x)
+  (declare (optimize (safety 0)))
+  (setq *package* x))
+
+(with-test (:name :set-bad-package)
+  (set-bad-package :cl-user)
+  (assert-error (intern "FRED") type-error))
+
 (with-test (:name :packages-sanely-nicknamed)
   (dolist (p (list-all-packages))
     (let* ((nicks (package-nicknames p))
@@ -300,7 +308,7 @@ if a restart was invoked."
 ;; This used to fail with "NIL does not name a package"
 (with-test (:name :with-package-iterator-nil-list)
   (with-package-iterator (iter '() :internal)
-    (print (nth-value 1 (iter)))))
+    (assert (null (iter)))))
 
 ;;; MAKE-PACKAGE error in another thread blocking FIND-PACKAGE & FIND-SYMBOL
 (with-test (:name :bug-511072 :skipped-on '(not :sb-thread))
@@ -313,10 +321,18 @@ if a restart was invoked."
                                                          (sb-thread:wait-on-semaphore sem2)
                                                          (abort c))))
                                    (make-package :bug-511072))))))
+    (declare (ignore p t2))
     (sb-thread:wait-on-semaphore sem1)
     (with-timeout 10
       (assert (eq 'cons (read-from-string "CL:CONS"))))
     (sb-thread:signal-semaphore sem2)))
+
+(defmacro handling ((condition restart-name) form)
+  `(handler-bind ((,condition (lambda (c)
+                                (declare (ignore c))
+                                (invoke-restart ',restart-name))))
+     ,form))
+
 
 (with-test (:name :quick-name-conflict-resolution-import)
   (let (p1 p2)
@@ -325,12 +341,10 @@ if a restart was invoked."
            (setf p1 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-IMPORT.1")
                  p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-IMPORT.2"))
            (intern "FOO" p1)
-           (handler-bind ((name-conflict (lambda (c)
-                                           (invoke-restart 'sb-impl::dont-import-it))))
+           (handling (name-conflict sb-impl::dont-import-it)
              (import (intern "FOO" p2) p1))
            (assert (not (eq (intern "FOO" p1) (intern "FOO" p2))))
-           (handler-bind ((name-conflict (lambda (c)
-                                           (invoke-restart 'sb-impl::shadowing-import-it))))
+           (handling (name-conflict sb-impl::shadowing-import-it)
              (import (intern "FOO" p2) p1))
            (assert (eq (intern "FOO" p1) (intern "FOO" p2))))
       (when p1 (delete-package p1))
@@ -344,8 +358,7 @@ if a restart was invoked."
                  p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-EXPORT.2a"))
            (intern "FOO" p1)
            (use-package p2 p1)
-           (handler-bind ((name-conflict (lambda (c)
-                                           (invoke-restart 'sb-impl::keep-old))))
+           (handling (name-conflict sb-impl::keep-old)
              (export (intern "FOO" p2) p2))
            (assert (not (eq (intern "FOO" p1) (intern "FOO" p2)))))
       (when p1 (delete-package p1))
@@ -359,8 +372,7 @@ if a restart was invoked."
                  p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-EXPORT.2b"))
            (intern "FOO" p1)
            (use-package p2 p1)
-           (handler-bind ((name-conflict (lambda (c)
-                                           (invoke-restart 'sb-impl::take-new))))
+           (handling (name-conflict sb-impl::take-new)
              (export (intern "FOO" p2) p2))
            (assert (eq (intern "FOO" p1) (intern "FOO" p2))))
       (when p1 (delete-package p1))
@@ -376,8 +388,7 @@ if a restart was invoked."
            (intern "BAR" p1)
            (export (intern "FOO" p2) p2)
            (export (intern "BAR" p2) p2)
-           (handler-bind ((name-conflict (lambda (c)
-                                           (invoke-restart 'sb-impl::keep-old))))
+           (handling (name-conflict sb-impl::keep-old)
              (use-package p2 p1))
            (assert (not (eq (intern "FOO" p1) (intern "FOO" p2))))
            (assert (not (eq (intern "BAR" p1) (intern "BAR" p2)))))
@@ -394,8 +405,7 @@ if a restart was invoked."
            (intern "BAR" p1)
            (export (intern "FOO" p2) p2)
            (export (intern "BAR" p2) p2)
-           (handler-bind ((name-conflict (lambda (c)
-                                           (invoke-restart 'sb-impl::take-new))))
+           (handling (name-conflict sb-impl::take-new)
              (use-package p2 p1))
            (assert (eq (intern "FOO" p1) (intern "FOO" p2)))
            (assert (eq (intern "BAR" p1) (intern "BAR" p2))))
@@ -410,15 +420,11 @@ if a restart was invoked."
            (setf p (eval `(defpackage :package-at-variance-restarts.1
                             (:use :cl)
                             (:shadow "CONS"))))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::keep-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::keep-them)
              (eval `(defpackage :package-at-variance-restarts.1
                       (:use :cl))))
            (assert (not (eq 'cl:cons (intern "CONS" p))))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::drop-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::drop-them)
              (eval `(defpackage :package-at-variance-restarts.1
                       (:use :cl))))
            (assert (eq 'cl:cons (intern "CONS" p))))
@@ -431,15 +437,11 @@ if a restart was invoked."
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.2
                             (:use :cl))))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::keep-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::keep-them)
              (eval `(defpackage :package-at-variance-restarts.2
                       (:use))))
            (assert (eq 'cl:cons (intern "CONS" p)))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::drop-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::drop-them)
              (eval `(defpackage :package-at-variance-restarts.2
                       (:use))))
            (assert (not (eq 'cl:cons (intern "CONS" p)))))
@@ -452,14 +454,10 @@ if a restart was invoked."
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.4
                             (:export "FOO"))))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::keep-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::keep-them)
              (eval `(defpackage :package-at-variance-restarts.4)))
            (assert (eq :external (nth-value 1 (find-symbol "FOO" p))))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::drop-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::drop-them)
              (eval `(defpackage :package-at-variance-restarts.4)))
            (assert (eq :internal (nth-value 1 (find-symbol "FOO" p)))))
       (when p (delete-package p)))))
@@ -471,14 +469,10 @@ if a restart was invoked."
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.5
                             (:implement :sb-int))))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::keep-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::keep-them)
              (eval `(defpackage :package-at-variance-restarts.5)))
            (assert (member p (package-implemented-by-list :sb-int)))
-           (handler-bind ((sb-kernel::package-at-variance-error
-                            (lambda (c)
-                              (invoke-restart 'sb-impl::drop-them))))
+           (handling (sb-kernel::package-at-variance-error sb-impl::drop-them)
              (eval `(defpackage :package-at-variance-restarts.5)))
            (assert (not (member p (package-implemented-by-list :sb-int)))))
       (when p (delete-package p)))))
