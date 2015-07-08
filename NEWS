@@ -1,4 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.14:
+  * new feature: DEPRECATION declaration for functions, variables and types
+    causes {EARLY,LATE,FINAL}-DEPRECATION-WARNING to be signaled when subject
+    of the declaration is used. Integrated with DESCRIBE, DOCUMENTATION and
+    SB-CLTL2:{VARIABLE,FUNCTION}-INFORMATION. Documented in the "Deprecation"
+    section of the manual.
+
 changes in sbcl-1.2.14 relative to sbcl-1.2.13:
   * minor incompatible change: The name of a compiled anonymous lambda
     as returned by the third value of FUNCTION-LAMBDA-EXPRESSION can have
