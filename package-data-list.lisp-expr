@@ -725,11 +725,21 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "IMPLICIT-GENERIC-FUNCTION-NAME"
                "IMPLICIT-GENERIC-FUNCTION-WARNING"
                "INVALID-FASL"
-               "DEPRECATION-CONDITION"
 
                "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
                "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
                "RESOLVE-CONFLICT"
+
+               ;; Deprecation stuff
+               "DEPRECATION-CONDITION"
+               "DEPRECATION-CONDITION-NAME"
+               "DEPRECATION-CONDITION-SINCE"
+               "DEPRECATION-CONDITION-REPLACEMENTS"
+               "DEPRECATION-CONDITION-RUNTIME-ERROR"
+               "EARLY-DEPRECATION-WARNING"
+               "LATE-DEPRECATION-WARNING"
+               "FINAL-DEPRECATION-WARNING"
+               "DEPRECATION-ERROR" ; condition and function
 
                "PRINT-UNREADABLY"
 
@@ -1072,13 +1082,10 @@ possibly temporarily, because it might be used internally."
                ;; Deprecating stuff
                "DEFINE-DEPRECATED-FUNCTION"
                "DEFINE-DEPRECATED-VARIABLE"
+               "PRINT-DEPRECATION-MESSAGE"
                "CHECK-DEPRECATED-VARIABLE"
-               "EARLY-DEPRECATION-WARNING"
-               "LATE-DEPRECATION-WARNING"
-               "FINAL-DEPRECATION-WARNING"
-               "DEPRECATION-WARNING"
-               "DEPRECATION-ERROR"
                "DEPRECATED-THING-P"
+               "DEPRECATION-WARN"
                "LOADER-DEPRECATION-WARN"
 
                ;; miscellaneous non-standard but handy user-level functions..

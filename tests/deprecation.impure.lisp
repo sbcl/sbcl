@@ -36,15 +36,15 @@
                        (compile nil `(lambda ()
                                        ,@(funcall make-body name))))))
       (assert (typep condition (ecase state
-                                 (:early 'sb-int:early-deprecation-warning)
-                                 (:late 'sb-int:late-deprecation-warning)
-                                 (:final 'sb-int:final-deprecation-warning))))
+                                 (:early 'early-deprecation-warning)
+                                 (:late 'late-deprecation-warning)
+                                 (:final 'final-deprecation-warning))))
       (search-string (princ-to-string condition))
       (ecase state
         ((:early :late)
          (assert (eq :deprecated (funcall function))))
         (:final
-         (assert-error (funcall function) sb-int:deprecation-error))))
+         (assert-error (funcall function) deprecation-error))))
     ;; Check the documentation.
     (search-string (documentation name kind))))
 

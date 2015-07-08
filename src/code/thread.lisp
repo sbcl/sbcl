@@ -93,7 +93,7 @@ stale value, use MUTEX-OWNER instead."
 (deftype spinlock ()
   #!+sb-doc
   "Spinlock type."
-  (deprecation-warning :early "1.0.53.11" 'spinlock 'mutex)
+  (deprecation-warn :early "1.0.53.11" 'spinlock 'mutex)
   'mutex)
 
 (define-deprecated-function :early "1.0.53.11" make-spinlock make-mutex (&key name)
@@ -115,12 +115,12 @@ stale value, use MUTEX-OWNER instead."
   (release-mutex lock))
 
 (sb!xc:defmacro with-recursive-spinlock ((lock) &body body)
-  (deprecation-warning :early "1.0.53.11" 'with-recursive-spinlock 'with-recursive-lock)
+  (deprecation-warn :early "1.0.53.11" 'with-recursive-spinlock 'with-recursive-lock)
   `(with-recursive-lock (,lock)
      ,@body))
 
 (sb!xc:defmacro with-spinlock ((lock) &body body)
-  (deprecation-warning :early "1.0.53.11" 'with-spinlock 'with-mutex)
+  (deprecation-warn :early "1.0.53.11" 'with-spinlock 'with-mutex)
   `(with-mutex (,lock)
      ,@body))
 

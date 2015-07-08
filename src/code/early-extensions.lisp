@@ -1252,12 +1252,12 @@
 
 (defun deprecation-error (since name replacements)
   (error 'deprecation-error
-          :name name
-          :replacements (normalize-deprecation-replacements replacements)
-          :since since))
+         :name name
+         :replacements (normalize-deprecation-replacements replacements)
+         :since since))
 
-(defun deprecation-warning (state since name replacements
-                            &key (runtime-error (neq :early state)))
+(defun deprecation-warn (state since name replacements
+                         &key (runtime-error (neq :early state)))
   (warn (ecase state
           (:early 'early-deprecation-warning)
           (:late 'late-deprecation-warning)
@@ -1290,7 +1290,7 @@
   ;; this lambda's name is significant - see DEPRECATED-THING-P
   (named-lambda .deprecation-warning. (form env)
     (declare (ignore env))
-    (deprecation-warning state since name replacements)
+    (deprecation-warn state since name replacements)
     form))
 
 ;; Return the stage of deprecation of thing identified by KIND and NAME, or NIL.
@@ -1427,7 +1427,7 @@
 (defun check-deprecated-variable (name)
   (let ((info (info :variable :deprecated name)))
     (when info
-      (deprecation-warning (first info) (second info) name (third info))
+      (deprecation-warn (first info) (second info) name (third info))
       (values-list info))))
 
 (defmacro define-deprecated-variable (state since name

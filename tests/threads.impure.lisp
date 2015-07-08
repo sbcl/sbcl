@@ -1507,7 +1507,7 @@
                                (sb-thread::get-spinlock lock)))
                (compile nil `(lambda (lock)
                                (sb-thread::release-spinlock lock))))
-         sb-int:early-deprecation-warning 4)
+         early-deprecation-warning 4)
       (let ((lock (funcall make)))
         (funcall get lock)
         (funcall release lock)

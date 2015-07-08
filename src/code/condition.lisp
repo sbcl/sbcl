@@ -1526,17 +1526,30 @@ the usual naming convention (names like *FOO*) for special variables"
 ;;;; deprecation conditions
 
 (define-condition deprecation-condition ()
-  ((name :initarg :name :reader deprecated-name)
-   (replacements :initarg :replacements :reader deprecated-name-replacements)
-   (since :initarg :since :reader deprecated-since)
-   (runtime-error :initarg :runtime-error :reader deprecated-name-runtime-error)))
+  ((name          :initarg :name
+                  :reader deprecation-condition-name)
+   (replacements  :initarg :replacements
+                  :reader deprecation-condition-replacements)
+   (since         :initarg :since
+                  :reader deprecation-condition-since)
+   (runtime-error :initarg :runtime-error
+                  :reader deprecation-condition-runtime-error
+                  :initform nil))
+  (:default-initargs
+   :name (missing-arg)
+   :replacements (missing-arg)
+   :since (missing-arg))
+  #!+sb-doc
+  (:documentation
+   "Superclass for deprecation-related error and warning
+conditions."))
 
 (def!method print-object ((condition deprecation-condition) stream)
   (flet ((print-it (stream)
-           (sb!impl::print-deprecation-message
-            (deprecated-name condition)
-            (deprecated-since condition)
-            (deprecated-name-replacements condition)
+           (print-deprecation-message
+            (deprecation-condition-name condition)
+            (deprecation-condition-since condition)
+            (deprecation-condition-replacements condition)
             stream)))
     (if *print-escape*
         (print-unreadable-object (condition stream :type t)
@@ -1544,36 +1557,59 @@ the usual naming convention (names like *FOO*) for special variables"
         (print-it stream))))
 
 (macrolet ((define-deprecation-warning
-               (name superclass check-runtime-error format-string)
+               (name superclass check-runtime-error format-string
+                &optional documentation)
              `(progn
-                (define-condition ,name (,superclass deprecation-condition) ())
+                (define-condition ,name (,superclass deprecation-condition)
+                  ()
+                  ,@(when documentation
+                      `((:documentation ,documentation))))
 
                 (def!method print-object :after ((condition ,name) stream)
                   (when (and (not *print-escape*)
                              ,@(when check-runtime-error
-                                `((deprecated-name-runtime-error condition))))
+                                `((deprecation-condition-runtime-error condition))))
                     (format stream ,format-string
-                            (deprecated-name condition)))))))
+                            (deprecation-condition-name condition)))))))
 
   (define-deprecation-warning early-deprecation-warning style-warning nil
     (!uncross-format-control
      "~%~@<~:@_In future SBCL versions ~
       ~/sb!impl:print-symbol-with-prefix/ will signal a full warning ~
-      at compile-time.~:@>"))
+      at compile-time.~:@>")
+    #!+sb-doc
+    "This warning is signaled when the use of a variable,
+function, type, etc. in :EARLY deprecation is detected at
+compile-time. The use will work at run-time with no warning or
+error.")
 
   (define-deprecation-warning late-deprecation-warning warning t
     (!uncross-format-control
      "~%~@<~:@_In future SBCL versions ~
       ~/sb!impl:print-symbol-with-prefix/ will signal a runtime ~
-      error.~:@>"))
+      error.~:@>")
+    #!+sb-doc
+    "This warning is signaled when the use of a variable,
+function, type, etc. in :LATE deprecation is detected at
+compile-time. The use will work at run-time with no warning or
+error.")
 
   (define-deprecation-warning final-deprecation-warning warning t
     (!uncross-format-control
      "~%~@<~:@_An error will be signaled at runtime for ~
-      ~/sb!impl:print-symbol-with-prefix/.~:@>")))
+      ~/sb!impl:print-symbol-with-prefix/.~:@>")
+    #!+sb-doc
+    "This warning is signaled when the use of a variable,
+function, type, etc. in :FINAL deprecation is detected at
+compile-time. An error will be signaled at run-time."))
 
 (define-condition deprecation-error (error deprecation-condition)
-  ())
+  ()
+  #!+sb-doc
+  (:documentation
+   "This error is signaled at run-time when an attempt is made to use
+a thing that is in :FINAL deprecation, i.e. call a function or access
+a variable."))
 
 ;;;; restart definitions
 
