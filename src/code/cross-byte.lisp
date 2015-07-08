@@ -12,6 +12,9 @@
 
 (in-package "SB!INT")
 
+;; Inlining these allows type inference to work.
+(declaim (inline sb!xc:dpb sb!xc:ldb sb!xc:mask-field))
+
 (defun sb!xc:byte (size position)
   (cons size position))
 
@@ -39,6 +42,7 @@
 (defun sb!xc:deposit-field (new cross-byte int)
   (cl:deposit-field new (uncross-byte cross-byte) int))
 
+(declaim (ftype function bug))
 (define-setf-expander sb!xc:ldb (cross-byte int &environment env)
   (multiple-value-bind (temps vals stores store-form access-form)
       (get-setf-expansion int env)

@@ -26,3 +26,5 @@
 (defmacro barrier ((kind) &body body)
   (declare (ignore kind))
   `(progn ,@body))
+
+(defun thread-yield () nil)

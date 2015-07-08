@@ -342,6 +342,6 @@
 ;;; function condition on SIMPLE-READER-ERROR.
 #+sb-xc-host ; proper definition happens for the target
 (defun simple-reader-error (stream format-string &rest format-args)
-  (bug "READER-ERROR on stream ~S: ~?" stream format-string format-args))
+  (error "READER-ERROR on stream ~S: ~?" stream format-string format-args))
 
 (/show0 "done with backq.lisp")

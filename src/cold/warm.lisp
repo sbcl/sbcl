@@ -107,7 +107,7 @@
                 "SRC;PCL;MACROS"
                 "SRC;PCL;COMPILER-SUPPORT"
                 "SRC;PCL;LOW"
-                "SRC;PCL;SLOT-NAME"
+                #+nil "SRC;PCL;SLOT-NAME" ; moved to build-order.lisp-expr
                 "SRC;PCL;DEFCLASS"
                 "SRC;PCL;DEFS"
                 "SRC;PCL;FNGEN"

@@ -136,6 +136,13 @@
   ;; If the back-end breaks tail-recursion for some reason, then it
   ;; can null out this slot.
   (tail-p nil :type boolean))
+(defun %with-ir1-environment-from-node (node fun)
+  (declare (type node node) (type function fun))
+  (let ((*current-component* (node-component node))
+        (*lexenv* (node-lexenv node))
+        (*current-path* (node-source-path node)))
+    (aver-live-component *current-component*)
+    (funcall fun)))
 
 (def!struct (valued-node (:conc-name node-)
                          (:include node)

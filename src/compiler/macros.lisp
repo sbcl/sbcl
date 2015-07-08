@@ -721,13 +721,6 @@
      (%with-ir1-environment-from-node
       ,node
       #'closure-needing-ir1-environment-from-node)))
-(defun %with-ir1-environment-from-node (node fun)
-  (declare (type node node) (type function fun))
-  (let ((*current-component* (node-component node))
-        (*lexenv* (node-lexenv node))
-        (*current-path* (node-source-path node)))
-    (aver-live-component *current-component*)
-    (funcall fun)))
 
 (defmacro with-source-paths (&body forms)
   (with-unique-names (source-paths)

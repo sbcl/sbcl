@@ -15,6 +15,10 @@
 ;;; but such nuance isn't hugely important.
 (in-package "SB!C")
 
+(declaim (ftype (function (t t t) (values t t &optional)) info)
+         (ftype (function (t t t) (values t &optional)) clear-info)
+         (ftype (function (t t t t) (values t &optional)) (setf info)))
+
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]
 ;;; CLISP, and maybe others, need EVAL-WHEN because without it, the constant
@@ -62,6 +66,12 @@
 ;; Refer to info-vector.lisp for the meaning of this constant.
 (defconstant +no-auxilliary-key+ 0)
 
+;;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;;; But in the host Lisp, there is no such thing as a symbol-info slot.
+;;; Instead, symbol-info is kept in the host symbol's plist.
+#+sb-xc-host
+(defmacro symbol-info-vector (symbol) `(get ,symbol :sb-xc-globaldb-info))
+
 ;; Perform the equivalent of (GET-INFO-VALUE KIND +INFO-METAINFO-TYPE-NUM+)
 ;; but skipping the defaulting logic.
 ;; Return zero or more META-INFOs that match on KIND, which is usually
@@ -74,6 +84,14 @@
                      (packed-info-value-index info-vector +no-auxilliary-key+
                                               +info-metainfo-type-num+))))
      (if index (svref info-vector index))))
+
+;; (UNSIGNED-BYTE 16) is an arbitrarily generous limit on the number of
+;; cells in an info-vector. Most vectors have a fewer than a handful of things,
+;; and performance would need to be re-thought if more than about a dozen
+;; cells were in use. (It would want to become hash-based probably)
+(declaim (ftype (function (simple-vector (or (eql 0) symbol) info-number)
+                          (or null (unsigned-byte 16)))
+                packed-info-value-index))
 
 ;; Return the META-INFO object for CATEGORY and KIND, signaling an error
 ;; if not found and ERRORP is non-nil. Note that the two-level logical hierarchy

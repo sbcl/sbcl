@@ -81,9 +81,9 @@
  ;;; cross-compiler-only replacements for stuff which in target Lisp would be
  ;;; supplied by basic machinery
 
+ ("src/code/cross-byte"  :not-target)
  ("src/code/cross-misc"  :not-target)
  ("src/code/cross-char"  :not-target)
- ("src/code/cross-byte"  :not-target)
  ("src/code/cross-boole" :not-target)
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
@@ -128,6 +128,7 @@
  ;; required for some code in 'early-extensions'
  ("src/code/barrier" :not-host)
  ("src/code/parse-body")       ; on host for PARSE-BODY
+ ("src/code/unportable-float")
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/parse-lambda-list")
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
@@ -164,8 +165,6 @@
 
  ("src/code/defbangstruct")
 
- ("src/code/unportable-float")
-
  ("src/code/funutils" :not-host)
 
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
@@ -199,6 +198,7 @@
  ;; FIXME: more informative and up-to-date comment?
  ("src/code/toplevel"    :not-host)
  ("src/code/cold-error"  :not-host)
+ ("src/pcl/slot-name") ; for calls from 'info-vector'
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
  ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
  ("src/compiler/info-vector")

@@ -21,8 +21,8 @@
 (progn
   ;; a description of the DEF!MACRO call to be stored until we get enough
   ;; of the system running to finish processing it
-  (defstruct delayed-def!macro
-    (args (missing-arg) :type cons)
+  (defstruct (delayed-def!macro (:constructor make-delayed-def!macro (args)))
+    (args nil :type cons)
     (package (sane-package) :type package))
   ;; a list of DELAYED-DEF!MACROs stored until we get DEF!MACRO working fully
   ;; so that we can apply it to them. After DEF!MACRO is made to work, this
@@ -41,7 +41,7 @@
                   (defmacro ,name ,@rest)
                   ,(let ((uncrossed-args `(,(uncross name) ,@rest)))
                      (if (boundp '*delayed-def!macros*)
-                         `(push (make-delayed-def!macro :args ',uncrossed-args)
+                         `(push (make-delayed-def!macro ',uncrossed-args)
                                 *delayed-def!macros*)
                          `(sb!xc:defmacro ,@uncrossed-args))))
   ;; When cross-compiling, we don't want the DEF!MACRO to have any

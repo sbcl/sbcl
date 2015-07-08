@@ -1226,6 +1226,10 @@
         :runtime-error runtime-error))
 
 (defun deprecated-function (since name replacements &optional doc)
+  (declare (ignorable since name replacements doc))
+  #+sb-xc-host
+  (error "Can't define deprecated functions on the host")
+  #-sb-xc-host
   (let ((closure
          ;; setting the name is mildly redundant since the closure captures
          ;; its name. However %FUN-DOC can't make use of that fact.
@@ -1238,6 +1242,8 @@
       (setf (%fun-doc closure) doc))
     closure))
 
+;; Note: Naming a lambda does not work on the host, so we can't actually
+;; detect deprecated functions.
 (defun deprecation-compiler-macro (state since name replacements)
   ;; this lambda's name is significant - see DEPRECATED-THING-P
   (named-lambda .deprecation-warning. (form env)
@@ -1247,8 +1253,11 @@
 
 ;; Return the stage of deprecation of thing identified by KIND and NAME, or NIL.
 (defun deprecated-thing-p (kind name)
+  (declare (ignorable kind name))
   (ecase kind
     (:function
+     ;; This can't work on the host due to CLOSUREP,%FUN-NAME, etc.
+     #-sb-xc-host
      (let ((macro-fun (info :function :compiler-macro-function name)))
        (and (closurep macro-fun)
             (eq (%fun-name macro-fun) '.deprecation-warning.)
