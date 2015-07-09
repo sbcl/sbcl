@@ -77,16 +77,8 @@ stale value, use MUTEX-OWNER instead."
 
 (defsetf mutex-value set-mutex-value)
 
-(declaim (inline set-mutex-value))
-(defun set-mutex-value (mutex value)
-  (declare (ignore mutex value))
-  (error "~S is no longer supported." '(setf mutex-value)))
-
-(define-compiler-macro set-mutex-value (&whole form mutex value)
-  (declare (ignore mutex value))
-  (warn "~S is no longer supported, and will signal an error at runtime."
-        '(setf mutex-value))
-  form)
+#-sb-xc-host
+(declaim (sb!ext:deprecated :final ("SBCL" "1.2.15") #'set-mutex-value))
 
 ;;; SPINLOCK no longer exists as a type -- provided for backwards compatibility.
 
