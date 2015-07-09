@@ -1294,19 +1294,21 @@
                     (deprecation-info-version info))
               (deprecation-info-replacements info)))))
 
-(defun deprecation-error (software version name replacements)
+(defun deprecation-error (software version namespace name replacements)
   (error 'deprecation-error
+         :namespace namespace
          :name name
          :software software
          :version version
          :replacements (normalize-deprecation-replacements replacements)))
 
-(defun deprecation-warn (state software version name replacements
+(defun deprecation-warn (state software version namespace name replacements
                          &key (runtime-error (neq :early state)))
   (warn (ecase state
           (:early 'early-deprecation-warning)
           (:late 'late-deprecation-warning)
           (:final 'final-deprecation-warning))
+        :namespace namespace
         :name name
         :software software
         :version version
@@ -1318,7 +1320,7 @@
       (deprecated-thing-p namespace name)
     (when state
       (deprecation-warn
-       state (first since) (second since) name replacements)
+       state (first since) (second since) namespace name replacements)
       (values state since replacements))))
 
 ;;; For-effect-only variant of CHECK-DEPRECATED-THING for
@@ -1379,7 +1381,7 @@
          (set-closure-name
           (lambda (&rest deprecated-function-args)
             (declare (ignore deprecated-function-args))
-            (deprecation-error software version name replacements))
+            (deprecation-error software version 'function name replacements))
           name)))
     (when doc
       (setf (%fun-doc closure) doc))
@@ -1457,11 +1459,11 @@
 ;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
 ;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
 
-(defun print-deprecation-message (name software version
+(defun print-deprecation-message (namespace name software version
                                   &optional replacements stream)
   (apply #'format stream
          (!uncross-format-control
-         "~/sb!impl:print-symbol-with-prefix/ has been ~
+         "The ~(~A~) ~/sb!impl:print-symbol-with-prefix/ has been ~
           deprecated as of ~A ~A.~
           ~#[~;~
             ~2%Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
@@ -1470,7 +1472,7 @@
             ~2%Use~@{~#[~; or~] ~
             ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
           ~]")
-         name software version replacements))
+         namespace name software version replacements))
 
 (defmacro define-deprecated-function (state since name replacements lambda-list
                                       &body body)
@@ -1480,7 +1482,7 @@
            (type (or function-name list) replacements)
            (type list lambda-list))
   (let ((doc (print-deprecation-message
-              name "SBCL" since
+              'function name "SBCL" since
               (normalize-deprecation-replacements replacements))))
     (declare (ignorable doc))
     `(prog1
@@ -1516,7 +1518,8 @@
                                      `(:replacement ,replacement)))))
      #!+sb-doc
      (setf (fdocumentation ',name 'variable)
-           ,(print-deprecation-message name "SBCL" since (list replacement)))))
+           ,(print-deprecation-message
+             'variable name "SBCL" since (list replacement)))))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:

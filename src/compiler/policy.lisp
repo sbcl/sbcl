@@ -178,11 +178,11 @@ EXPERIMENTAL INTERFACE: Subject to change."
 (defun policy-quality-deprecation-warning (quality)
   (case quality
     ((stack-allocate-dynamic-extent stack-allocate-vector stack-allocate-value-cells)
-     (deprecation-warn :late "SBCL" "1.0.19.7" quality '*stack-allocate-dynamic-extent*
+     (deprecation-warn :late "SBCL" "1.0.19.7" 'policy quality '*stack-allocate-dynamic-extent*
                        :runtime-error nil)
      t)
     ((merge-tail-calls)
-     (deprecation-warn :early "SBCL" "1.0.53.74" quality nil :runtime-error nil)
+     (deprecation-warn :early "SBCL" "1.0.53.74" 'policy quality nil :runtime-error nil)
      t)
     (otherwise
      nil)))

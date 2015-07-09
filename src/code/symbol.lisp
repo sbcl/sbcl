@@ -23,8 +23,8 @@
     (multiple-value-bind (state since replacements)
         (check-deprecated-thing 'variable name)
       (when (eq state :final)
-        `(deprecation-error ,(first since) ,(second since)
-                            ',name '(,@replacements))))))
+        `(deprecation-error ,(first since) ,(second since) 'variable ',name
+                            '(,@replacements))))))
 
 (defun symbol-value (symbol)
   #!+sb-doc

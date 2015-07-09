@@ -733,6 +733,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; Deprecation stuff
                "DEPRECATED" ; declaration
                "DEPRECATION-CONDITION"
+               "DEPRECATION-CONDITION-NAMESPACE"
                "DEPRECATION-CONDITION-NAME"
                "DEPRECATION-CONDITION-SOFTWARE"
                "DEPRECATION-CONDITION-VERSION"

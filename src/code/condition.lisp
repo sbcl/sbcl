@@ -1526,7 +1526,9 @@ the usual naming convention (names like *FOO*) for special variables"
 ;;;; deprecation conditions
 
 (define-condition deprecation-condition ()
-  ((name          :initarg :name
+  ((namespace     :initarg :namespace
+                  :reader deprecation-condition-namespace)
+   (name          :initarg :name
                   :reader deprecation-condition-name)
    (replacements  :initarg :replacements
                   :reader deprecation-condition-replacements)
@@ -1538,6 +1540,7 @@ the usual naming convention (names like *FOO*) for special variables"
                   :reader deprecation-condition-runtime-error
                   :initform nil))
   (:default-initargs
+   :namespace (missing-arg)
    :name (missing-arg)
    :replacements (missing-arg)
    :software (missing-arg)
@@ -1550,6 +1553,7 @@ conditions."))
 (def!method print-object ((condition deprecation-condition) stream)
   (flet ((print-it (stream)
            (print-deprecation-message
+            (deprecation-condition-namespace condition)
             (deprecation-condition-name condition)
             (deprecation-condition-software condition)
             (deprecation-condition-version condition)
