@@ -530,6 +530,13 @@
     (assert (sb-kernel:type/= (sb-kernel:array-type-specialized-element-type intersection)
                               (sb-kernel:specifier-type 'bit)))))
 
+;; lp#1333731
+(with-test (:name :adjust-array-changes-type-of)
+  (let ((a (make-array 10 :adjustable t)))
+    (assert (equal (type-of a) '(vector t 10)))
+    (adjust-array a 20)
+    (assert (equal (type-of a) '(vector t 20)))))
+
 (in-package "SB-KERNEL")
 (test-util:with-test (:name :partition-array-into-simple/hairy)
   ;; Some tests that (simple-array | hairy-array) = array

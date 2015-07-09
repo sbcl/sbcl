@@ -6,6 +6,8 @@ changes relative to sbcl-1.2.13:
     of default forms for unsupplied &OPTIONAL and &KEY arguments
     when nested destructuring patterns are involved.
     (lp#707556, lp#707573, lp#707578, lp#708051)
+  * (TYPE-OF ARRAY) for a non-simple array is subject to change
+    after a call of ADJUST-ARRAY. (lp#1333731)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
