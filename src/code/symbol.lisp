@@ -17,14 +17,30 @@
 
 (declaim (maybe-inline get get3 %put getf remprop %putf get-properties keywordp))
 
+;;; Used by [GLOBAL-]SYMBOL-VALUE compiler-macros:
+;;;
+;;; When SYMBOL is constant, check whether it names a deprecated
+;;; variable, potentially signaling a {EARLY,LATE}-DEPRECATION-WARNING
+;;; in the process. Furthermore, if the deprecation state is :FINAL,
+;;; replace FORM by SYMBOL, causing the symbol-macro on SYMBOL to
+;;; expand into a call to DEPRECATION-ERROR.
+;;;
+;;; See SB-IMPL:SETUP-VARIABLE-IN-FINAL-DEPRECATION.
 #-sb-xc-host
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun handle-deprecated-global-variable (name)
-    (multiple-value-bind (state since replacements)
-        (check-deprecated-thing 'variable name)
-      (when (eq state :final)
-        `(deprecation-error ,(first since) ,(second since) 'variable ',name
-                            '(,@replacements))))))
+  (defun maybe-handle-deprecated-global-variable (symbol env)
+    (when (sb!xc:constantp symbol env)
+      (let ((name (constant-form-value symbol env)))
+        (when (symbolp name)
+          (case (deprecated-thing-p 'variable name)
+            ((:early :late)
+             (check-deprecated-thing 'variable name)
+             nil)
+            ;; In this case, there is a symbol-macro for NAME that
+            ;; will signal the FINAL-DEPRECATION-WARNING when
+            ;; ir1converted and the DEPRECATION-ERROR at runtime.
+            (:final
+             name)))))))
 
 (defun symbol-value (symbol)
   #!+sb-doc
@@ -34,10 +50,7 @@
 
 #-sb-xc-host
 (define-compiler-macro symbol-value (&whole form symbol &environment env)
-  (or (when (sb!xc:constantp symbol env)
-        (let ((name (constant-form-value symbol env)))
-          (and (symbolp name) (handle-deprecated-global-variable name))))
-      form))
+  (or (maybe-handle-deprecated-global-variable symbol env) form))
 
 (defun boundp (symbol)
   #!+sb-doc
@@ -63,12 +76,9 @@ distinct from the global value. Can also be SETF."
   (symbol-global-value symbol))
 
 #-sb-xc-host
-(define-compiler-macro symbol-global-value (&whole form symbol &environment env)
-  (when (sb!xc:constantp symbol env)
-    (let ((name (constant-form-value symbol env)))
-      (awhen (and (symbolp name) (handle-deprecated-global-variable name))
-        (return-from symbol-global-value it))))
-  form)
+(define-compiler-macro symbol-global-value (&whole form symbol
+                                            &environment env)
+  (or (maybe-handle-deprecated-global-variable symbol env) form))
 
 (defun set-symbol-global-value (symbol new-value)
   (about-to-modify-symbol-value symbol 'set new-value)

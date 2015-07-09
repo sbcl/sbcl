@@ -269,9 +269,9 @@
   (or (gethash name *free-vars*)
       (let ((kind (info :variable :kind name))
             (type (info :variable :type name))
-            (where-from (info :variable :where-from name)))
-        (when (and (eq kind :unknown)
-                   (not (check-deprecated-thing 'variable name)))
+            (where-from (info :variable :where-from name))
+            (deprecation-state (deprecated-thing-p 'variable name)))
+        (when (and (eq kind :unknown) (not deprecation-state))
           (note-undefined-reference name :variable))
         (setf (gethash name *free-vars*)
               (case kind
@@ -705,15 +705,18 @@
                 #+sb-xc-host
                 (warn "reading an ignored variable: ~S" name)))
              (t
-              (multiple-value-bind (state since replacements)
-                  (check-deprecated-thing 'variable name)
-                (when (eq state :final)
-                  (ir1-convert
-                   start next result
-                   `(deprecation-error ,since ',name '(,@replacements)))
-                  (return-from ir1-convert-var (values))))))
+              ;; This case signals {EARLY,LATE}-DEPRECATION-WARNING
+              ;; for CONSTANT nodes in :EARLY and :LATE deprecation
+              ;; (constants in :FINAL deprecation are represented as
+              ;; symbol-macros).
+              (aver (memq (check-deprecated-thing 'variable name)
+                          '(nil :early :late)))))
            (reference-leaf start next result var name))
           ((cons (eql macro)) ; symbol-macro
+           ;; This case signals {EARLY,LATE,FINAL}-DEPRECATION-WARNING
+           ;; for symbol-macros. Includes variables, constants,
+           ;; etc. in :FINAL deprecation.
+           (check-deprecated-thing 'variable name)
            ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
            (ir1-convert start next result (cdr var)))
           (heap-alien-info

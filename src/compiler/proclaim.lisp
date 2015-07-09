@@ -214,11 +214,20 @@
     (let ((info (make-deprecation-info state software version replacement)))
       (ecase namespace
         (function
+         (when (eq state :final)
+           (sb!impl::setup-function-in-final-deprecation
+            software version name replacement))
          (setf (info :function :deprecated name) info))
         (variable
          ;; TODO (check-variable-name name "deprecated variable declaration")
+         (when (eq state :final)
+           (sb!impl::setup-variable-in-final-deprecation
+            software version name replacement))
          (setf (info :variable :deprecated name) info))
         (type
+         (when (eq state :final)
+           (sb!impl::setup-type-in-final-deprecation
+            software version name replacement))
          (setf (info :type :deprecated name) info))))))
 
 (defun process-declaration-declaration (name form)

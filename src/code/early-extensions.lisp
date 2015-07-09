@@ -1370,23 +1370,6 @@
          (%check-deprecated-type name)))))
   (values))
 
-(defun deprecated-function (software version name replacements &optional doc)
-  (declare (ignorable software version name replacements doc))
-  #+sb-xc-host
-  (error "Can't define deprecated functions on the host")
-  #-sb-xc-host
-  (let ((closure
-         ;; setting the name is mildly redundant since the closure captures
-         ;; its name. However %FUN-DOC can't make use of that fact.
-         (set-closure-name
-          (lambda (&rest deprecated-function-args)
-            (declare (ignore deprecated-function-args))
-            (deprecation-error software version 'function name replacements))
-          name)))
-    (when doc
-      (setf (%fun-doc closure) doc))
-    closure))
-
 ;; This is the moral equivalent of a warning from /usr/bin/ld that
 ;; "gets() is dangerous." You're informed by both the compiler and linker.
 (defun loader-deprecation-warn (stuff whence)
@@ -1474,6 +1457,40 @@
           ~]")
          namespace name software version replacements))
 
+(defconstant-eqx +function-in-final-deprecation-type+
+    '(function * nil) #'equal)
+
+(defun setup-function-in-final-deprecation
+    (software version name replacement-spec)
+  (sb!c:proclaim-ftype
+   name
+   (specifier-type +function-in-final-deprecation-type+)
+   +function-in-final-deprecation-type+
+   :declared)
+  (let ((fun (lambda (&rest deprecated-function-args)
+               (declare (ignore deprecated-function-args))
+               (deprecation-error software version 'function name replacement-spec))))
+    #-sb-xc-host (setf (%fun-name fun) name)
+    (setf (fdefinition name) fun)))
+
+(defun setup-variable-in-final-deprecation
+    (software version name replacement-spec)
+  (sb!c::%define-symbol-macro
+   name
+   `(deprecation-error
+     ,software ,version 'variable ',name
+     (list ,@(mapcar
+              (lambda (replacement)
+                `',replacement)
+              (normalize-deprecation-replacements replacement-spec))))
+   (sb!c:source-location)))
+
+(defun setup-type-in-final-deprecation
+    (software version name replacement-spec)
+  (declare (ignore software version replacement-spec))
+  (%compiler-deftype name nil (constant-type-expander t)
+                     (sb!c:source-location)))
+
 (defmacro define-deprecated-function (state since name replacements lambda-list
                                       &body body)
   (declare (type deprecation-state state)
@@ -1481,27 +1498,17 @@
            (type function-name name)
            (type (or function-name list) replacements)
            (type list lambda-list))
-  (let ((doc (print-deprecation-message
-              'function name "SBCL" since
-              (normalize-deprecation-replacements replacements))))
-    (declare (ignorable doc))
-    `(prog1
-         ,(ecase state
-            ((:early :late)
-             `(defun ,name ,lambda-list
-                #!+sb-doc ,doc
-                ,@body))
-            ((:final)
-             `(progn
-                (declaim (ftype (function * nil) ,name))
-                (setf (fdefinition ',name)
-                      (deprecated-function
-                       "SBCL" ,since ',name ',replacements #!+sb-doc ,doc))
-                ',name)))
-       (proclaim '(deprecated
-                   ,state ,since
-                   (function ,name ,@(when replacements
-                                       `(:replacement ,replacements))))))))
+  `(prog1
+       ,(ecase state
+          ((:early :late)
+           `(defun ,name ,lambda-list
+              ,@body))
+          ((:final)
+           `',name))
+     (proclaim '(deprecated
+                 ,state ,since
+                 (function ,name ,@(when replacements
+                                     `(:replacement ,replacements)))))))
 
 (defmacro define-deprecated-variable (state since name
                                       &key (value nil valuep) replacement)
