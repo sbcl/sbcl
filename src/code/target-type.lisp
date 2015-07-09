@@ -135,7 +135,8 @@
 ;;; type checking, rather than trying to come up with the one that the
 ;;; user might find most informative.
 (declaim (ftype (function (t) ctype) ctype-of))
-(defun-cached (ctype-of :hash-function #'sxhash :hash-bits 9)
+(defun-cached (ctype-of :hash-function #'sxhash :hash-bits 9
+                        :flush-function ctype-of-cache-evict)
               ((x eq))
   (typecase x
     (function

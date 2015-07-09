@@ -673,7 +673,7 @@
 
 (defmacro !define-hash-cache (name args
                              &key hash-function hash-bits memoizer
-                                  (values 1))
+                                  flush-function (values 1))
   (declare (ignore memoizer))
   (dolist (arg args)
     (unless (= (length arg) 2)
@@ -702,42 +702,54 @@
          (cache-type `(simple-vector ,size))
          (line-type (let ((n (+ nargs values)))
                       (if (<= n 3) 'cons `(simple-vector ,n))))
-         (binds
-          (case (length temps)
-            (2 `((,(first temps) (car ,entry))
-                 (,(second temps) (cdr ,entry))))
-            (3 (let ((arg-temp (sb!xc:gensym "ARGS")))
-                 `((,arg-temp (cdr ,entry))
-                   (,(first temps) (car ,entry))
-                   (,(second temps) (car (truly-the cons ,arg-temp)))
-                   (,(third temps) (cdr ,arg-temp)))))
-            (t (loop for i from 0 for x in temps
-                     collect `(,x (svref ,entry ,i))))))
+         (bind-hashval
+          `((,hashval (the (signed-byte #.sb!vm:n-fixnum-bits)
+                           (funcall ,hash-function ,@arg-vars)))
+            (,cache ,var-name)))
+         (probe-it
+          (lambda (result)
+            `(when ,cache
+               (let ((,hashval ,hashval) ; gets clobbered in probe loop
+                     (,cache (truly-the ,cache-type ,cache)))
+                 ;; FIXME: redundant?
+                 (declare (type (signed-byte #.sb!vm:n-fixnum-bits) ,hashval))
+                 (loop repeat 2
+                    do (let ((,entry
+                              (svref ,cache
+                                     (ldb (byte ,hash-bits 0) ,hashval))))
+                         (unless (eql ,entry 0)
+                           ;; This barrier is a no-op on all multi-threaded SBCL
+                           ;; architectures. No CPU except Alpha will move a
+                           ;; load prior to a load on which it depends.
+                           (sb!thread:barrier (:data-dependency))
+                           (locally (declare (type ,line-type ,entry))
+                             (let* ,(case (length temps)
+                                     (2 `((,(first temps) (car ,entry))
+                                          (,(second temps) (cdr ,entry))))
+                                     (3 (let ((arg-temp (sb!xc:gensym "ARGS")))
+                                          `((,arg-temp (cdr ,entry))
+                                            (,(first temps) (car ,entry))
+                                            (,(second temps)
+                                             (car (truly-the cons ,arg-temp)))
+                                            (,(third temps) (cdr ,arg-temp)))))
+                                     (t (loop for i from 0 for x in temps
+                                              collect `(,x (svref ,entry ,i)))))
+                               ;; KLUDGE: if there's a flush function,
+                               ;; it ignores all results. I hate this kind
+                               ;; of sloppiness. I know when to ignore,
+                               ;; and which.
+                               ,@(when flush-function
+                                   `((declare (ignorable ,@temps))))
+                               (when (and ,@tests) ,result))))
+                         (setq ,hashval (ash ,hashval ,(- hash-bits)))))))))
          (fun
           `(defun ,fun-name (,thunk ,@arg-vars)
              ,@(when *profile-hash-cache* ; count seeks
                  `((when (boundp ',statistics-name)
                      (incf (aref ,statistics-name 0)))))
-             (let ((,hashval (the (signed-byte #.sb!vm:n-fixnum-bits)
-                                  (funcall ,hash-function ,@arg-vars)))
-                   (,cache ,var-name))
-               (when ,cache
-                 (let ((,hashval ,hashval))
-                   (declare (type (signed-byte #.sb!vm:n-fixnum-bits) ,hashval))
-                   (loop repeat 2 do
-                     (let ((,entry (svref (truly-the ,cache-type ,cache)
-                                          (ldb (byte ,hash-bits 0) ,hashval))))
-                       (unless (eql ,entry 0)
-                         ;; This barrier is a no-op on all multi-threaded SBCL
-                         ;; architectures. No CPU except Alpha will move a read
-                         ;; prior to a read on which it depends.
-                         (sb!thread:barrier (:data-dependency))
-                         (locally (declare (type ,line-type ,entry))
-                           (let* ,binds
-                             (when (and ,@tests)
-                               (return-from ,fun-name
-                                 (values ,@result-temps))))))
-                       (setq ,hashval (ash ,hashval ,(- hash-bits)))))))
+             (let ,bind-hashval
+               ,(funcall probe-it
+                         `(return-from ,fun-name (values ,@result-temps)))
                (multiple-value-bind ,result-temps (funcall ,thunk)
                  (let ((,entry
                         (,(hash-cache-line-allocator (+ nargs values))
@@ -771,6 +783,13 @@
              (defvar ,statistics-name)))
        (declaim (type (or null ,cache-type) ,var-name))
        (defun ,(symbolicate name "-CACHE-CLEAR") () (setq ,var-name nil))
+       ,@(when flush-function
+           `((defun ,flush-function ,arg-vars
+               (let ,bind-hashval
+                 ,(funcall probe-it
+                   `(return (setf (svref ,cache
+                                         (ldb (byte ,hash-bits 0) ,hashval))
+                                  0)))))))
        (declaim (inline ,fun-name))
        ,fun)))
 
@@ -787,6 +806,8 @@
 ;;;   Manual control over memoization is useful if there are cases for
 ;;;   which computing the result is simpler than cache lookup.
 
+;;; FIXME: this macro holds onto the DEFINE-HASH-CACHE macro,
+;;; but should not.
 (defmacro defun-cached ((name &rest options &key
                               (memoizer (make-symbol "MEMOIZE")
                                         memoizer-supplied-p)
