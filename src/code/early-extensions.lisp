@@ -1402,45 +1402,26 @@
 ;;; deprecated.texinfo.
 ;;;
 ;;; EARLY:
-;;; - SOCKINT::WIN32-BIND                          since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-GETSOCKNAME                   since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-LISTEN                        since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-RECV                          since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-RECVFROM                      since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-SEND                          since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-SENDTO                        since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-CLOSE                         since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-CONNECT                       since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-GETPEERNAME                   since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-IOCTL                         since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-SETSOCKOPT                    since 1.2.10 (03/2015) -> Late: 08/2015
-;;; - SOCKINT::WIN32-GETSOCKOPT                    since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-BIND                          since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-GETSOCKNAME                   since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-LISTEN                        since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-RECV                          since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-RECVFROM                      since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-SEND                          since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-SENDTO                        since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-CLOSE                         since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-CONNECT                       since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-GETPEERNAME                   since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-IOCTL                         since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-SETSOCKOPT                    since 1.2.10 (03/2015)    -> Late: 08/2015
+;;; - SOCKINT::WIN32-GETSOCKOPT                    since 1.2.10 (03/2015)    -> Late: 08/2015
 ;;;
-;;; - SB-THREAD::GET-MUTEX, since 1.0.37.33 (04/2010)               -> Late: 01/2013
-;;;   ^- initially deprecated without compile-time warning, hence the schedule
-;;; - SB-THREAD::SPINLOCK (type), since 1.0.53.11 (08/2011)         -> Late: 08/2012
-;;; - SB-THREAD::MAKE-SPINLOCK, since 1.0.53.11 (08/2011)           -> Late: 08/2012
-;;; - SB-THREAD::WITH-SPINLOCK, since 1.0.53.11 (08/2011)           -> Late: 08/2012
-;;; - SB-THREAD::WITH-RECURSIVE-SPINLOCK, since 1.0.53.11 (08/2011) -> Late: 08/2012
-;;; - SB-THREAD::GET-SPINLOCK, since 1.0.53.11 (08/2011)            -> Late: 08/2012
-;;; - SB-THREAD::RELEASE-SPINLOCK, since 1.0.53.11 (08/2011)        -> Late: 08/2012
-;;; - SB-THREAD::SPINLOCK-VALUE, since 1.0.53.11 (08/2011)          -> Late: 08/2012
-;;; - SB-THREAD::SPINLOCK-NAME, since 1.0.53.11 (08/2011)           -> Late: 08/2012
-;;; - SETF SB-THREAD::SPINLOCK-NAME, since 1.0.53.11 (08/2011)      -> Late: 08/2012
-;;; - SB-C::MERGE-TAIL-CALLS (policy), since 1.0.53.74 (11/2011)    -> Late: 11/2012
-;;; - SB-EXT:QUIT, since 1.0.56.55 (05/2012)                        -> Late: 05/2013
-;;; - SB-UNIX:UNIX-EXIT, since 1.0.56.55 (05/2012)                  -> Late: 05/2013
-;;; - SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*, since 1.1.4.9 (02/2013)  -> Late: 02/2014
+;;; - SB-C::MERGE-TAIL-CALLS (policy)              since 1.0.53.74 (11/2011) -> Late: 11/2012
 ;;;
 ;;; LATE:
-;;; - SB-SYS:OUTPUT-RAW-BYTES, since 1.0.8.16 (06/2007)                 -> Final: anytime
-;;;   Note: make sure CLX doesn't use it anymore!
-;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy), since 1.0.19.7      -> Final: anytime
-;;; - SB-C::STACK-ALLOCATE-VECTOR (policy), since 1.0.19.7              -> Final: anytime
-;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy), since 1.0.19.7         -> Final: anytime
-;;; - SB-INTROSPECT:FUNCTION-ARGLIST, since 1.0.24.5 (01/2009)          -> Final: anytime
-;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
-;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
+;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy) since 1.0.19.7            -> Final: anytime
+;;; - SB-C::STACK-ALLOCATE-VECTOR (policy)         since 1.0.19.7            -> Final: anytime
+;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy)    since 1.0.19.7            -> Final: anytime
 
 (defun print-deprecation-replacements (stream replacements &optional colonp atp)
   (declare (ignore colonp atp))
