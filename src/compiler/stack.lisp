@@ -95,9 +95,9 @@
   (let* ((use-blocks (mapcar #'node-block (find-uses dx-lvar)))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
-    (labels ((mark-lvar-live-on-path (block-list)
-               (dolist (block block-list)
-                 (let ((2block (block-info block)))
+    (labels ((mark-lvar-live-on-path (arc-list)
+               (dolist (arc arc-list)
+                 (let ((2block (block-info (car arc))))
                    (pushnew dx-lvar (ir2-block-end-stack 2block))
                    (pushnew dx-lvar (ir2-block-start-stack 2block)))))
              (back-propagate-pathwise (current-block path)
@@ -108,13 +108,16 @@
                   (pushnew dx-lvar (ir2-block-end-stack
                                     (block-info current-block)))
                   (mark-lvar-live-on-path path))
-                 ;; Don't go back past START-BLOCK, and don't loop.
-                 ((and (not (eq current-block start-block))
-                       (not (member current-block path)))
-                  (let ((new-path (list* current-block path)))
-                    (declare (dynamic-extent new-path))
-                    (dolist (pred-block (block-pred current-block))
-                      (back-propagate-pathwise pred-block new-path)))))))
+                 ;; Don't go back past START-BLOCK.
+                 ((not (eq current-block start-block))
+                  (dolist (pred-block (block-pred current-block))
+                    (let ((new-arc (cons current-block pred-block)))
+                      (declare (dynamic-extent new-arc))
+                      ;; Never follow the same path segment twice.
+                      (unless (member new-arc path :test #'equal)
+                        (let ((new-path (list* new-arc path)))
+                          (declare (dynamic-extent new-path))
+                          (back-propagate-pathwise pred-block new-path)))))))))
       (back-propagate-pathwise block nil))))
 
 (defun back-propagate-dx-lvars (block dx-lvars)

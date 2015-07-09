@@ -1001,7 +1001,28 @@
         (return (bar))))))
 (with-test (:name :bug-681092)
   (assert (= 10 (bug-681092))))
-
+
+;;;; Including a loop in the flow graph between a DX-allocation and
+;;;; the start of its environment would, for a while, cause executing
+;;;; any of the code in the loop to discard the value.  Found via
+;;;; attempting to DX-allocate an array, which triggered the FILL
+;;;; transform, which inserted such a loop.
+(defun bug-1472785 (x)
+  (let ((y (let ((z (cons nil nil)))
+             (let ((i 0))
+               (tagbody
+                b1
+                  (when (= x i) (go b2))
+                  (incf i)
+                  (go b1)
+                b2))
+             z))
+        (w (cons t t)))
+    (declare (dynamic-extent y w))
+    (eq y w)))
+(with-test (:name :bug-1472785)
+  (assert (null (bug-1472785 1))))
+
 ;;;; &REST lists should stop DX propagation -- not required by ANSI,
 ;;;; but required by sanity.
 

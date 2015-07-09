@@ -8,6 +8,9 @@ changes relative to sbcl-1.2.13:
     (lp#707556, lp#707573, lp#707578, lp#708051)
   * (TYPE-OF ARRAY) for a non-simple array is subject to change
     after a call of ADJUST-ARRAY. (lp#1333731)
+  * Dynamic-extent allocation with a loop between allocating a value and the
+    start of its environment no longer discards the allocated data when the
+    loop is taken. (lp#1472785)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
