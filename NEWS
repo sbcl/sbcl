@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.13:
-  * ehnancement: DESTRUCTURING-BIND has been totally reimplemented from
+  * enhancement: DESTRUCTURING-BIND has been totally reimplemented from
     scratch to address a handful of performance and correctness issues.
     Some minor behavioral differences exist regarding order of evaluation
     of default forms for unsupplied &OPTIONAL and &KEY arguments
