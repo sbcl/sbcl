@@ -1,16 +1,16 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.13:
-  * DESTRUCTURING-BIND has been totally reimplemented from scratch
-    to address a handful of performance and correctness issues.
+  * ehnancement: DESTRUCTURING-BIND has been totally reimplemented from
+    scratch to address a handful of performance and correctness issues.
     Some minor behavioral differences exist regarding order of evaluation
     of default forms for unsupplied &OPTIONAL and &KEY arguments
     when nested destructuring patterns are involved.
     (lp#707556, lp#707573, lp#707578, lp#708051)
-  * (TYPE-OF ARRAY) for a non-simple array is subject to change
+  * bug fix: (TYPE-OF ARRAY) for a non-simple array is subject to change
     after a call of ADJUST-ARRAY. (lp#1333731)
-  * Dynamic-extent allocation with a loop between allocating a value and the
-    start of its environment no longer discards the allocated data when the
-    loop is taken. (lp#1472785)
+  * bug fix: Dynamic-extent allocation with a loop between allocating a value
+    and the start of its environment no longer discards the allocated data
+    when the loop is taken. (lp#1472785)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
