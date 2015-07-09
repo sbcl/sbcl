@@ -192,6 +192,48 @@
   (defattr block-type-asserted)
   (defattr block-test-modified))
 
+(defstruct (cloop (:conc-name loop-)
+                  (:predicate loop-p)
+                  (:constructor make-loop)
+                  (:copier copy-loop))
+  ;; The kind of loop that this is.  These values are legal:
+  ;;
+  ;;    :OUTER
+  ;;        This is the outermost loop structure, and represents all the
+  ;;        code in a component.
+  ;;
+  ;;    :NATURAL
+  ;;        A normal loop with only one entry.
+  ;;
+  ;;    :STRANGE
+  ;;        A segment of a "strange loop" in a non-reducible flow graph.
+  (kind (missing-arg) :type (member :outer :natural :strange))
+  ;; The first and last blocks in the loop.  There may be more than one tail,
+  ;; since there may be multiple back branches to the same head.
+  (head nil :type (or cblock null))
+  (tail nil :type list)
+  ;; A list of all the blocks in this loop or its inferiors that have a
+  ;; successor outside of the loop.
+  (exits nil :type list)
+  ;; The loop that this loop is nested within.  This is null in the outermost
+  ;; loop structure.
+  (superior nil :type (or cloop null))
+  ;; A list of the loops nested directly within this one.
+  (inferiors nil :type list)
+  (depth 0 :type fixnum)
+  ;; The head of the list of blocks directly within this loop.  We must recurse
+  ;; on INFERIORS to find all the blocks.
+  (blocks nil :type (or null cblock))
+  ;; Backend saves the first emitted block of each loop here.
+  (info nil))
+
+(defprinter (cloop :conc-name loop-)
+  kind
+  head
+  tail
+  exits
+  depth)
+
 ;;; The CBLOCK structure represents a basic block. We include
 ;;; SSET-ELEMENT so that we can have sets of blocks. Initially the
 ;;; SSET-ELEMENT-NUMBER is null, DFO analysis numbers in reverse DFO.
@@ -418,25 +460,6 @@
   ;; IR1-FINALIZE hasn't happened yet?
   (aver (not (eql (component-info component) :dead))))
 
-;;; Before sbcl-0.7.0, there were :TOPLEVEL things which were magical
-;;; in multiple ways. That's since been refactored into the orthogonal
-;;; properties "optimized for locall with no arguments" and "externally
-;;; visible/referenced (so don't delete it)". The code <0.7.0 did a lot
-;;; of tests a la (EQ KIND :TOP_LEVEL) in the "don't delete it?" sense;
-;;; this function is a sort of literal translation of those tests into
-;;; the new world.
-;;;
-;;; FIXME: After things settle down, bare :TOPLEVEL might go away, at
-;;; which time it might be possible to replace the COMPONENT-KIND
-;;; :TOPLEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
-;;; along the lines of FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P.
-(defun lambda-toplevelish-p (clambda)
-  (or (eql (lambda-kind clambda) :toplevel)
-      (lambda-has-external-references-p clambda)))
-(defun component-toplevelish-p (component)
-  (member (component-kind component)
-          '(:toplevel :complex-toplevel)))
-
 ;;; A CLEANUP structure represents some dynamic binding action. Blocks
 ;;; are annotated with the current CLEANUP so that dynamic bindings
 ;;; can be removed when control is transferred out of the binding
@@ -660,21 +683,6 @@
 (defun leaf-source-name (leaf)
   (aver (leaf-has-source-name-p leaf))
   (leaf-%source-name leaf))
-(defun leaf-debug-name (leaf)
-  (if (functional-p leaf)
-      ;; FUNCTIONALs have additional %DEBUG-NAME behavior.
-      (functional-debug-name leaf)
-      ;; Other objects just use their source name.
-      ;;
-      ;; (As of sbcl-0.pre7.85, there are a few non-FUNCTIONAL
-      ;; anonymous objects, (anonymous constants..) and those would
-      ;; fail here if we ever tried to get debug names from them, but
-      ;; it looks as though it's never interesting to get debug names
-      ;; from them, so it's moot. -- WHN)
-      (leaf-source-name leaf)))
-(defun leaf-%debug-name (leaf)
-  (when (functional-p leaf)
-    (functional-%debug-name leaf)))
 
 ;;; The CONSTANT structure is used to represent known constant values.
 ;;; Since the same constant leaf may be shared between named and anonymous
@@ -712,6 +720,10 @@
   (defined-type :test (not (eq defined-type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   kind)
+(defun fun-locally-defined-p (name env)
+  (and env
+       (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
+         (and fun (not (global-var-p fun))))))
 
 ;;; A DEFINED-FUN represents a function that is defined in the same
 ;;; compilation block, or that has an inline expansion, or that has a
@@ -895,6 +907,22 @@
   %debug-name
   #!+sb-show id)
 
+(defun leaf-debug-name (leaf)
+  (if (functional-p leaf)
+      ;; FUNCTIONALs have additional %DEBUG-NAME behavior.
+      (functional-debug-name leaf)
+      ;; Other objects just use their source name.
+      ;;
+      ;; (As of sbcl-0.pre7.85, there are a few non-FUNCTIONAL
+      ;; anonymous objects, (anonymous constants..) and those would
+      ;; fail here if we ever tried to get debug names from them, but
+      ;; it looks as though it's never interesting to get debug names
+      ;; from them, so it's moot. -- WHN)
+      (leaf-source-name leaf)))
+(defun leaf-%debug-name (leaf)
+  (when (functional-p leaf)
+    (functional-%debug-name leaf)))
+
 ;;; Is FUNCTIONAL LET-converted? (where we're indifferent to whether
 ;;; it returns one value or multiple values)
 (defun functional-letlike-p (functional)
@@ -1002,6 +1030,25 @@
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (vars :prin1 (mapcar #'leaf-source-name vars)))
+
+;;; Before sbcl-0.7.0, there were :TOPLEVEL things which were magical
+;;; in multiple ways. That's since been refactored into the orthogonal
+;;; properties "optimized for locall with no arguments" and "externally
+;;; visible/referenced (so don't delete it)". The code <0.7.0 did a lot
+;;; of tests a la (EQ KIND :TOP_LEVEL) in the "don't delete it?" sense;
+;;; this function is a sort of literal translation of those tests into
+;;; the new world.
+;;;
+;;; FIXME: After things settle down, bare :TOPLEVEL might go away, at
+;;; which time it might be possible to replace the COMPONENT-KIND
+;;; :TOPLEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
+;;; along the lines of FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P.
+(defun lambda-toplevelish-p (clambda)
+  (or (eql (lambda-kind clambda) :toplevel)
+      (lambda-has-external-references-p clambda)))
+(defun component-toplevelish-p (component)
+  (member (component-kind component)
+          '(:toplevel :complex-toplevel)))
 
 ;;; The OPTIONAL-DISPATCH leaf is used to represent hairy lambdas. It
 ;;; is a FUNCTIONAL, like LAMBDA. Each legal number of arguments has a
@@ -1408,25 +1455,6 @@
   #!+sb-show id
   (entry :test entry)
   (value :test value))
-
-;;;; miscellaneous IR1 structures
-
-(def!struct (undefined-warning
-            #-no-ansi-print-object
-            (:print-object (lambda (x s)
-                             (print-unreadable-object (x s :type t)
-                               (prin1 (undefined-warning-name x) s))))
-            (:copier nil))
-  ;; the name of the unknown thing
-  (name nil :type (or symbol list))
-  ;; the kind of reference to NAME
-  (kind (missing-arg) :type (member :function :type :variable))
-  ;; the number of times this thing was used
-  (count 0 :type unsigned-byte)
-  ;; a list of COMPILER-ERROR-CONTEXT structures describing places
-  ;; where this thing was used. Note that we only record the first
-  ;; *UNDEFINED-WARNING-LIMIT* calls.
-  (warnings () :type list))
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined

@@ -424,48 +424,6 @@
   home
   save-sp
   dynamic-state)
-
-(defstruct (cloop (:conc-name loop-)
-                  (:predicate loop-p)
-                  (:constructor make-loop)
-                  (:copier copy-loop))
-  ;; The kind of loop that this is.  These values are legal:
-  ;;
-  ;;    :OUTER
-  ;;        This is the outermost loop structure, and represents all the
-  ;;        code in a component.
-  ;;
-  ;;    :NATURAL
-  ;;        A normal loop with only one entry.
-  ;;
-  ;;    :STRANGE
-  ;;        A segment of a "strange loop" in a non-reducible flow graph.
-  (kind (missing-arg) :type (member :outer :natural :strange))
-  ;; The first and last blocks in the loop.  There may be more than one tail,
-  ;; since there may be multiple back branches to the same head.
-  (head nil :type (or cblock null))
-  (tail nil :type list)
-  ;; A list of all the blocks in this loop or its inferiors that have a
-  ;; successor outside of the loop.
-  (exits nil :type list)
-  ;; The loop that this loop is nested within.  This is null in the outermost
-  ;; loop structure.
-  (superior nil :type (or cloop null))
-  ;; A list of the loops nested directly within this one.
-  (inferiors nil :type list)
-  (depth 0 :type fixnum)
-  ;; The head of the list of blocks directly within this loop.  We must recurse
-  ;; on INFERIORS to find all the blocks.
-  (blocks nil :type (or null cblock))
-  ;; Backend saves the first emitted block of each loop here.
-  (info nil))
-
-(defprinter (cloop :conc-name loop-)
-  kind
-  head
-  tail
-  exits
-  depth)
 
 ;;;; VOPs and templates
 

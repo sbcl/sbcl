@@ -337,6 +337,10 @@
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node")
 
+ ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
+ ;; and LABEL, needed by IR2-NLX-INFO
+ ("src/compiler/early-assem")
+
  ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
  ("src/compiler/vop")
 
@@ -470,9 +474,6 @@
  ("src/compiler/generic/interr")
 
  ("src/compiler/bit-util")
-
- ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
- ("src/compiler/early-assem")
 
  ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
  ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
