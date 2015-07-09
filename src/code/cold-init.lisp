@@ -172,7 +172,6 @@
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
   (show-and-call !type-class-cold-init)
-  (show-and-call !typedefs-cold-init)
   (show-and-call !world-lock-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)

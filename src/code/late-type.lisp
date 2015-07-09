@@ -987,6 +987,18 @@
   (declare (type ctype type))
   (funcall (type-class-unparse (type-class-info type)) type))
 
+;;; Don't try to define a print method until it's actually gonna work!
+;;; (Otherwise this would be near the DEFSTRUCT)
+(def!method print-object ((ctype ctype) stream)
+  (print-unreadable-object (ctype stream :type t)
+    (prin1 (type-specifier ctype) stream)))
+
+;;; Same here.
+;;; Just dump it as a specifier. (We'll convert it back upon loading.)
+(defun make-type-load-form (type)
+  (declare (type ctype type))
+  `(specifier-type ',(type-specifier type)))
+
 (defun-cached (type-negation :hash-function #'type-hash-value
                              :hash-bits 8
                              :values 1)
