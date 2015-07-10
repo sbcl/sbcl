@@ -11,6 +11,8 @@ changes relative to sbcl-1.2.13:
   * bug fix: Dynamic-extent allocation with a loop between allocating a value
     and the start of its environment no longer discards the allocated data
     when the loop is taken. (lp#1472785)
+  * bug fix: Variable-reference elimination no longer generates incorrect code
+    under certain circumstances. (lp#1446891)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
