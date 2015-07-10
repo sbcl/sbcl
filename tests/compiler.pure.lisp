@@ -219,13 +219,14 @@
 
 ;;; feature: we shall complain if functions which are only useful for
 ;;; their result are called and their result ignored.
-(loop for (form expected-des) in
+(with-test (:name :discarded-result)
+  (loop for (form expected-des) in
         '(((progn (nreverse (list 1 2)) t)
            "The return value of NREVERSE should not be discarded.")
           ((progn (nreconc (list 1 2) (list 3 4)) t)
            "The return value of NRECONC should not be discarded.")
           ((locally
-             (declare (inline sort))
+               (declare (inline sort))
              (sort (list 1 2) #'<) t)
            ;; FIXME: it would be nice if this warned on non-inlined sort
            ;; but the current simple boolean function attribute
@@ -257,28 +258,28 @@
            "The return value of NSET-DIFFERENCE should not be discarded.")
           ((progn (nset-exclusive-or (list 1 3) (list 2 4)) t)
            "The return value of NSET-EXCLUSIVE-OR should not be discarded."))
-      for expected = (sb-int:ensure-list expected-des)
-      do
-  (multiple-value-bind (fun warnings-p failure-p)
-      (handler-bind ((style-warning (lambda (c)
-                      (if expected
-                        (let ((expect-one (pop expected)))
-                          (assert (search expect-one
-                                          (with-standard-io-syntax
-                                            (let ((*print-right-margin* nil))
-                                              (princ-to-string c))))
-                                  ()
-                                  "~S should have warned ~S, but instead warned: ~A"
-                                  form expect-one c))
-                        (error "~S shouldn't give a(nother) warning, but did: ~A" form c)))))
-        (compile nil `(lambda () ,form)))
-  (declare (ignore warnings-p))
-  (assert (functionp fun))
-  (assert (null expected)
-          ()
-          "~S should have warned ~S, but didn't."
-          form expected)
-  (assert (not failure-p))))
+        for expected = (sb-int:ensure-list expected-des)
+        do
+        (multiple-value-bind (fun warnings-p failure-p)
+            (handler-bind ((style-warning (lambda (c)
+                                            (if expected
+                                                (let ((expect-one (pop expected)))
+                                                  (assert (search expect-one
+                                                                  (with-standard-io-syntax
+                                                                    (let ((*print-right-margin* nil))
+                                                                      (princ-to-string c))))
+                                                          ()
+                                                          "~S should have warned ~S, but instead warned: ~A"
+                                                          form expect-one c))
+                                                (error "~S shouldn't give a(nother) warning, but did: ~A" form c)))))
+              (compile nil `(lambda () ,form)))
+          (declare (ignore warnings-p))
+          (assert (functionp fun))
+          (assert (null expected)
+                  ()
+                  "~S should have warned ~S, but didn't."
+                  form expected)
+          (assert (not failure-p)))))
 
 ;;; a bug in the MAP deftransform caused non-VECTOR array specifiers
 ;;; to cause errors in the compiler.  Fixed by CSR in 0.7.8.10
@@ -5541,3 +5542,22 @@
             2))
   (assert-error
    (funcall (compile nil `(lambda (x) (/ 1 x nil))) 4)))
+
+(with-test (:name :eager-substitute-single-use-lvar)
+  (assert (= (funcall
+              (compile nil
+                       `(lambda (a)
+                          (declare (optimize (debug 0) (safety 0)))
+                          (let ((a (the fixnum a))
+                                (x 1)
+                                z)
+                            (tagbody
+                               (flet ((jump () (go loop)))
+                                 (jump))
+                             loop
+                               (setf z (the fixnum (if (= x 1) #xFFF a)))
+                               (unless (= x 0)
+                                 (setf x 0)
+                                 (go loop)))
+                            z)))
+              2))))
