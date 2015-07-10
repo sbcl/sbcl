@@ -251,6 +251,34 @@
       forms
       `(eval ',forms)))
 
+(defun %defstruct-package-locks (dd)
+  (let ((name (dd-name dd)))
+    (with-single-package-locked-error
+        (:symbol name "definining ~S as a structure"))
+    (when (dd-predicate-name dd)
+      (with-single-package-locked-error
+          (:symbol (dd-predicate-name dd)
+                   "defining ~s as a predicate for ~s structure"
+                   name)))
+
+    (when (dd-copier-name dd)
+      (with-single-package-locked-error
+          (:symbol (dd-copier-name dd)
+                   "defining ~s as a copier for ~s structure"
+                   name)))
+    (dolist (const (dd-constructors dd))
+      (when (car const)
+        (with-single-package-locked-error
+            (:symbol (car const)
+                     "defining ~s as a constructor for ~s structure"
+                     name))))
+    (dolist (dsd (dd-slots dd))
+      (when (dsd-accessor-name dsd)
+        (with-single-package-locked-error
+            (:symbol (dsd-accessor-name dsd)
+                     "defining ~s as an accessor for ~s structure"
+                     name))))))
+
 ;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
 (defun %expander-for-defstruct (name-and-options slot-descriptions
@@ -286,21 +314,21 @@
                 (funcall #',fname ,x ,s
                          ,@(if depthp `(*current-level-in-print*)))))))))
     `(progn
-                ;; Note we intentionally enforce package locks and
-                ;; call %DEFSTRUCT first, and especially before
-                ;; %COMPILER-DEFSTRUCT. %DEFSTRUCT has the tests (and
-                ;; resulting CERROR) for collisions with LAYOUTs which
-                ;; already exist in the runtime. If there are any
-                ;; collisions, we want the user's response to CERROR
-                ;; to control what happens. Especially, if the user
-                ;; responds to the collision with ABORT, we don't want
-                ;; %COMPILER-DEFSTRUCT to modify the definition of the
-                ;; class.
-       ,@(when (eq expanding-into-code-for :target)
-           `((with-single-package-locked-error
-                 (:symbol ',name "defining ~A as a structure"))))
        ,@(if (dd-class-p dd)
-             `((%defstruct ',dd ',inherits (sb!c:source-location))
+             `(,@(when (eq expanding-into-code-for :target)
+                   `((eval-when (:compile-toplevel :load-toplevel :execute)
+                       ;; Note we intentionally enforce package locks and
+                       ;; call %DEFSTRUCT first, and especially before
+                       ;; %COMPILER-DEFSTRUCT. %DEFSTRUCT has the tests (and
+                       ;; resulting CERROR) for collisions with LAYOUTs which
+                       ;; already exist in the runtime. If there are any
+                       ;; collisions, we want the user's response to CERROR
+                       ;; to control what happens. Especially, if the user
+                       ;; responds to the collision with ABORT, we don't want
+                       ;; %COMPILER-DEFSTRUCT to modify the definition of the
+                       ;; class.
+                       (%defstruct-package-locks ',dd))))
+               (%defstruct ',dd ',inherits (sb!c:source-location))
                (eval-when (:compile-toplevel :load-toplevel :execute)
                  (%compiler-defstruct ',dd ',inherits))
                ,@(unless (eq expanding-into-code-for :host)

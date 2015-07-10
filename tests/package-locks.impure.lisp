@@ -394,15 +394,17 @@
 ;;; test restarts.
 (reset-test t)
 
-(dolist (form *illegal-runtime-forms*)
-  (with-error-info ("one error per form ~S~%" form)
-    (let ((errorp nil))
-      (handler-bind ((package-lock-violation (lambda (e)
-                                               (when errorp
-                                                 (error "multiple errors"))
-                                               (setf errorp t)
-                                               (continue e))))
-        (eval form)))))
+(with-test (:name :illegal-runtime-forms)
+ (dolist (form *illegal-runtime-forms*)
+   (with-error-info ("one error per form ~S~%" form)
+     (let ((errorp nil))
+       (handler-bind ((package-lock-violation (lambda (e)
+                                                (when errorp
+                                                  (error "multiple errors ~%~a~% and ~%~a"
+                                                         errorp e))
+                                                (setf errorp e)
+                                                (continue e))))
+         (eval form))))))
 
 (dolist (form *illegal-double-forms*)
   (with-error-info ("two errors per form: ~S~%" form)
@@ -582,6 +584,27 @@
    symbol-package-locked-error))
 
 (with-test (:name :defcostant-locks)
-  (assert-error (defconstant test:constant 100)))
+  (assert-error (defconstant test:constant 100)
+                symbol-package-locked-error))
 
-;;; WOOT! Done.
+(with-test (:name :defstruct-compile-time-locks)
+  (assert-error (ctu:file-compile
+                 `((defstruct test:nostruct)))
+      symbol-package-locked-error)
+  (assert-error (ctu:file-compile
+                 `((defstruct (a-struct-test.1
+                               (:conc-name))
+                     test:nostruct)))
+      symbol-package-locked-error)
+  (assert-error (ctu:file-compile
+                 `((defstruct (a-struct-test.2
+                               (:predicate test:nostruct)))))
+      symbol-package-locked-error)
+  (assert-error (ctu:file-compile
+                 `((defstruct (a-struct-test.3
+                               (:copier test:nostruct)))))
+      symbol-package-locked-error)
+  (assert-error (ctu:file-compile
+                 `((defstruct (a-struct-test.4
+                               (:constructor test:nostruct)))))
+      symbol-package-locked-error))

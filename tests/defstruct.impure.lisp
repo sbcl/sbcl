@@ -937,11 +937,11 @@ redefinition."
 ;;; Tests begin.
 ;; Base case: recklessly-continue.
 (with-defstruct-redefinition-test :defstruct/recklessly
-    (((defstruct ctor pred) :class-name redef-test-1 :slots (a))
-     ((defstruct*) :class-name redef-test-1 :slots (a b)))
-    ((path1 defstruct)
-     (path2 defstruct*))
-    recklessly-continue-from-incompatible-defstruct-error
+  (((defstruct ctor pred) :class-name redef-test-1 :slots (a))
+   ((defstruct*) :class-name redef-test-1 :slots (a b)))
+  ((path1 defstruct)
+   (path2 defstruct*))
+  recklessly-continue-from-incompatible-defstruct-error
   (load path1)
   (let ((instance (funcall ctor)))
     (load path2)
