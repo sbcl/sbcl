@@ -90,9 +90,8 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Timers::
 * Networking::
 * Profiling::
-* Deprecation Declaration and Conditions::
 * Contributed Modules::
-* Deprecated Interfaces::
+* Deprecation::
 * Concept Index::
 * Function Index::
 * Variable Index::
@@ -117,9 +116,8 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include timers.texinfo
 @include sb-bsd-sockets/sb-bsd-sockets.texinfo
 @include profiling.texinfo
-@include deprecation.texinfo
 @include contrib-modules.texinfo
-@include deprecated.texinfo
+@include deprecation.texinfo
 @include backmatter.texinfo
 
 @bye
