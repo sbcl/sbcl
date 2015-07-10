@@ -443,3 +443,10 @@
                                 (sb-debug::list-backtrace))))))
        (sb-kernel::arg-count-error 'destructuring-bind 'nil
                                    '(1 2) '(a b c) 3 3))))))
+
+(with-test (:name :destructuring-optional/key-warn-once-only)
+  (let ((count 0))
+    (handler-bind ((warning (lambda (c) (incf count) (muffle-warning c))))
+      (macroexpand-1
+       '(defmacro defx (name ll &optional (types '*) &key node) 1)))
+    (assert (= count 1))))

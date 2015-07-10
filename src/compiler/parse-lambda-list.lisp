@@ -1050,7 +1050,11 @@
                :accept (logior
                         (if envp (lambda-list-keyword-mask '&environment) 0)
                         (lambda-list-keyword-mask 'destructuring-bind))
-               :context :macro))
+               ;; Why :silent? We first parse to deconstruct and reconstruct
+               ;; without &WHOLE and &ENV, which is an implementation detail.
+               ;; When it comes to actually processing the entire lambda
+               ;; list again, that's when any warning(s) will be issued.
+               :context :macro :silent t))
              ((outer-decls decls) (extract-var-decls decls (append env whole)))
              (ll-env (when (eq envp t) (or env (list (make-symbol "ENV")))))
              ;; We want a hidden WHOLE arg for the lambda - not the user's -
