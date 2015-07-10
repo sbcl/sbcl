@@ -581,4 +581,7 @@
     :foo :bar)
    symbol-package-locked-error))
 
+(with-test (:name :defcostant-locks)
+  (assert-error (defconstant test:constant 100)))
+
 ;;; WOOT! Done.
