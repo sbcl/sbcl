@@ -65,6 +65,9 @@
   ;; keys ... data ...
   )
 
+(declaim (ftype (sfunction (unsigned-byte)
+                           (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
+                primify))
 (defun make-info-storage (n-cells-min &optional (load-factor .7))
   ;; If you ask for 40 entries at 50% load, you get (PRIMIFY 80) entries.
   (let* ((n-cells (primify (ceiling n-cells-min load-factor)))
@@ -79,6 +82,8 @@
     (fill a nil :start end)
     a))
 
+(declaim (ftype (sfunction (t) (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
+                globaldb-sxhashoid))
 (defstruct (info-hashtable (:conc-name info-env-))
   (storage (make-info-storage 30) :type simple-vector)
   (comparator #'equal :type function)
@@ -98,10 +103,7 @@
 ;; or info-puthash, but that's fine because there's only one thread.
 (defmacro info-cas (storage index oldval newval)
   #+sb-xc-host
-  `(let ((actual-old (svref ,storage ,index)))
-     (if (eq actual-old ,oldval)
-         (progn (setf (svref ,storage ,index) ,newval) actual-old)
-         (error "xc bug. CAS expected ~S got ~S" actual-old ,oldval)))
+  `(xc-compare-and-swap-svref ,storage ,index ,oldval ,newval)
   #-sb-xc-host
   `(cas (svref ,storage ,index) ,oldval ,newval))
 
@@ -127,6 +129,11 @@
 ;; never present as a value.
 #+sb-xc-host
 (progn
+  (defun xc-compare-and-swap-svref (vector index old new)
+    (let ((actual-old (svref vector index)))
+      (if (eq old actual-old)
+          (progn (setf (svref vector index) new) old)
+          (error "xc bug. CAS expected ~S got ~S" old actual-old))))
   (defun make-info-forwarding-pointer (index) index)
   (defun info-forwarding-pointer-target (pointer) pointer)
   (defun info-value-moved-p (val) (fixnump val)))

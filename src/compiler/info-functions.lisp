@@ -190,6 +190,7 @@ only."
                   :name symbol))
          fun-name)))
 
+(declaim (ftype (sfunction (t t) boolean) fun-locally-defined-p))
 (defun sb!xc:compiler-macro-function (name &optional env)
   #!+sb-doc
   "If NAME names a compiler-macro in ENV, return the expansion function, else
@@ -241,6 +242,10 @@ return NIL. Can be set with SETF when ENV is NIL."
 ;;; all the BDOCUMENTATION entries in a *BDOCUMENTATION* hash table
 ;;; and slamming them into PCL once PCL gets going.
 (defun fdocumentation (x doc-type)
+  ;; In the cross-compiler, %FUN-DOC is just plain wrong, and while it
+  ;; might "work" to fetch strings using INFO, it really doesn't make sense.
+  #+sb-xc-host (declare (ignore x doc-type))
+  #-sb-xc-host
   (case doc-type
     (variable
      (typecase x
@@ -277,6 +282,8 @@ return NIL. Can be set with SETF when ENV is NIL."
 
 (defun (setf fdocumentation) (string name doc-type)
   (declare (type (or null string) string))
+  #+sb-xc-host (declare (ignore name doc-type))
+  #-sb-xc-host
   (let ((info-number
          (macrolet ((info-number (class type)
                       (meta-info-number (meta-info class type))))

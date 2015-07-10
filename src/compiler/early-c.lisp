@@ -256,6 +256,7 @@ the stack without triggering overflow protection.")
 (setf *debug-name-sharp* (make-debug-name-marker)
       *debug-name-ellipsis* (make-debug-name-marker))
 
+(declaim (ftype (sfunction () list) name-context))
 (defun debug-name (type thing &optional context)
   (let ((*debug-name-punt* nil))
     (labels ((walk (x)

@@ -182,8 +182,23 @@
   ;; fasls. That's not true now, probably never was. A compiler is permitted to
   ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
   (let ((form
-         `(!%define-info-type ,category ,kind ',type-spec
-           ,(if (eq type-spec 't) '#'identity `(lambda (x) (the ,type-spec x)))
+         `(!%define-info-type
+           ,category ,kind ',type-spec
+           ,(cond ((eq type-spec 't) '#'identity)
+                  ;; evil KLUDGE to avoid "undefined type" warnings
+                  ;; when building the cross-compiler.
+                  #+sb-xc-host
+                  ((member type-spec
+                           '((or fdefn null) (or fun-info null) (or layout null)
+                             (or alien-type null) (or heap-alien-info null))
+                           :test 'equal)
+                   `(lambda (x)
+                      (declare (notinline typep))
+                      (if (typep x ',type-spec)
+                          x
+                          (error "~S is not a ~S" x ',type-spec))))
+                  (t
+                   `(lambda (x) (the ,type-spec x))))
            ,validate-function ,default
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
            ,(or (and (eq category :function) (eq kind :definition)

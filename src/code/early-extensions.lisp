@@ -1669,6 +1669,8 @@ to :INTERPRET, an interpreter will be used.")
        (file-position stream pos)
        (file-position stream))))
 
+(declaim (ftype (function (t &optional t) (values cons &optional))
+                line/col-from-charpos))
 (defun stream-error-position-info (stream &optional position)
   (when (and (not position) (form-tracking-stream-p stream))
     (let ((line/col (line/col-from-charpos stream)))

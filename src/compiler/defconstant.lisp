@@ -40,8 +40,11 @@
                          ,@(and docp
                                 `(,doc)))))
 
+(declaim (ftype (function (symbol t &optional t t) (values null &optional))
+                about-to-modify-symbol-value))
 ;;; the guts of DEFCONSTANT
 (defun sb!c::%defconstant (name value source-location &optional (doc nil docp))
+  #+sb-xc-host (declare (ignore doc docp))
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
   (when (looks-like-name-of-special-var-p name)
@@ -90,10 +93,11 @@
   ;; :macro-expansion of something that is getting defined as constant.
   (clear-info :variable :macro-expansion name)
   (clear-info :source-location :symbol-macro name)
-  (when docp
-    (setf (fdocumentation name 'variable) doc))
   #-sb-xc-host
-  (%set-symbol-value name value)
+  (progn
+    (when docp
+      (setf (fdocumentation name 'variable) doc))
+    (%set-symbol-value name value))
   #+sb-xc-host
   (progn
     ;; Redefining our cross-compilation host's CL symbols would be poor form.

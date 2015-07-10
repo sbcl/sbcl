@@ -15,6 +15,8 @@
 ;;; Forward declarations
 
 (declaim (ftype (function (t &rest t) nil) sb!c::compiler-error)
+         (ftype (function (t &rest t) (values &optional))
+                sb!c::compiler-warn sb!c::compiler-style-warn)
          (ftype function
                 bad-type
                 parse-body
