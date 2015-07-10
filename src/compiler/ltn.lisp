@@ -461,7 +461,17 @@
              (return t))))
         (:constant
          (cond (lvar
-                (and (constant-lvar-p lvar)
+                ;; Can't use constant-lvar-p, because it returns T for
+                ;; things for which the derived type is an EQL type,
+                ;; but there may be already a variable allocated for
+                ;; it, which can cause problems when there's a closure
+                ;; over it.
+                ;; See  :vop-on-eql-type test in compiler.pure for an example.
+                ;;
+                ;; And the value is already loaded into a register,
+                ;; which is usually cheaper/more compactly encoded
+                ;; than a constant.
+                (and (strictly-constant-lvar-p lvar)
                      (funcall (second restr) (lvar-value lvar))))
                (tn
                 (and (eq (tn-kind tn) :constant)

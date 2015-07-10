@@ -5561,3 +5561,15 @@
                                  (go loop)))
                             z)))
               2))))
+
+(with-test (:name :vop-on-eql-type)
+  (assert (= (funcall
+              (funcall (compile nil
+                                `(lambda (b)
+                                   (declare ((eql -7) b)
+                                            (optimize debug))
+                                   (lambda (x)
+                                     (logior x b))))
+                       -7)
+              3)
+             -5)))

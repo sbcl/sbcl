@@ -13,6 +13,9 @@ changes relative to sbcl-1.2.13:
     when the loop is taken. (lp#1472785)
   * bug fix: Variable-reference elimination no longer generates incorrect code
     under certain circumstances. (lp#1446891)
+  * bug fix: variables with EQL types are no logner treated as constants by
+    VOPs, which caused problems with closures being allocated for such
+    variables, but they remaned unused. (lp#1390149)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
@@ -23,7 +26,7 @@ changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * enhancement: On Windows DBG_PRINTEXCEPTION_C is handled and its message is
     printed. (lp#1437947)
   * bug-fix: TRUENAME works properly on broken symlinks presented as
-    directories. (lp#1458164)
+    directories. (lp#1400003)
   * bug fix: Inlined DPB and DEPOSIT-FIELD don't interfere with left-to-right
     order of argument evaluation. (lp#1458190)
   * bug fix: (SETF (LDB (BYTE 1 2 JUNK) X) 0) is rightly rejected.
