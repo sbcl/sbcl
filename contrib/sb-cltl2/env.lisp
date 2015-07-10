@@ -155,6 +155,11 @@
     nil))
 
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmacro list-cons-when (test car cdr)
+    `(when ,test
+       (list (cons ,car ,cdr)))))
+
 (declaim (ftype (sfunction ((or symbol cons) &optional (or null lexenv))
                            (values (member nil :function :macro :special-form)
                                    boolean
@@ -240,17 +245,16 @@ appear."
                 inlinep (info :function :inlinep name))))))
     (values binding
             localp
-            (let (alist)
-              (when (and ftype (neq *universal-fun-type* ftype))
-                (push (cons 'ftype (type-specifier ftype)) alist))
-              (ecase inlinep
-                ((:inline :maybe-inline) (push (cons 'inline 'inline) alist))
-                (:notinline (push (cons 'inline 'notinline) alist))
-                ((nil)))
-              (when dx (push (cons 'dynamic-extent t) alist))
-              (append alist (extra-pairs :function name fun *lexenv*))))))
-
-
+            (nconc (ecase inlinep
+                     ((:inline :maybe-inline)
+                      (list '(inline . inline)))
+                     (:notinline
+                      (list '(inline . notinline)))
+                     ((nil)))
+                   (list-cons-when (and ftype (neq *universal-fun-type* ftype))
+                     'ftype (type-specifier ftype))
+                   (list-cons-when dx 'dynamic-extent t)
+                   (extra-pairs :function name fun *lexenv*)))))
 
 (declaim (ftype (sfunction
                  (symbol &optional (or null lexenv))
@@ -358,14 +362,13 @@ appear."
                 localp nil))))
     (values binding
             localp
-            (let (alist)
-              (when ignorep (push (cons 'ignore t) alist))
-              (when (and type (neq *universal-type* type))
-                (push (cons 'type (type-specifier type)) alist))
-              (when dx (push (cons 'dynamic-extent t) alist))
-              (when (info :variable :always-bound name)
-                (push (cons 'sb-ext:always-bound t) alist))
-              (append alist (extra-pairs :variable name var *lexenv*))))))
+            (nconc (list-cons-when ignorep 'ignore t)
+                   (list-cons-when (and type (neq *universal-type* type))
+                     'type (type-specifier type))
+                   (list-cons-when dx 'dynamic-extent t)
+                   (list-cons-when (info :variable :always-bound name)
+                     'sb-ext:always-bound t)
+                   (extra-pairs :variable name var *lexenv*)))))
 
 (declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)
                 declaration-information))
