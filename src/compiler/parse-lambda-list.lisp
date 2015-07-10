@@ -1020,18 +1020,6 @@
                                    ''*))
      ,@body))
 
-(defvar *macro-policy* nil)
-;; Turn the macro policy into an OPTIMIZE declaration for insertion
-;; into a macro body for DEFMACRO, MACROLET, or DEFINE-COMPILER-MACRO.
-;; Note that despite it being a style-warning to insert a duplicate,
-;; we need no precaution against that even though users may write
-;;  (DEFMACRO FOO (X) (DECLARE (OPTIMIZE (SAFETY 1))) ...)
-;; The expansion of macro-defining forms is such that the macro-policy
-;; appears in a different lexical scope from the user's declarations.
-(defun macro-policy-decls ()
-  (and *macro-policy*
-       `((declare (optimize ,@(policy-to-decl-spec *macro-policy*))))))
-
 ;;; Make a lambda expression that receives an s-expression, destructures it
 ;;; according to LAMBDA-LIST, and executes BODY.
 ;;; NAME and KIND provide error-reporting context.

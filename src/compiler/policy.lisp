@@ -15,6 +15,7 @@
 (def!type policy-quality () '(integer 0 3))
 
 (defvar *policy*)
+(defvar *macro-policy* nil)
 ;;; global policy restrictions as a POLICY object or nil
 (!defvar *policy-restrictions* nil)
 
@@ -97,7 +98,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;; Each primary and dependent quality policy is assigned a small integer index.
 ;; The POLICY struct represents a set of policies in an order-insensitive way
 ;; that facilitates quicker lookup than scanning an alist.
-(def!struct (policy (:constructor make-policy
+(defstruct (policy (:constructor make-policy
                                  (primary-qualities &optional presence-bits)))
   ;; Mask with a 1 for each quality that has an explicit value in this policy.
   ;; Primary qualities fill the mask from left-to-right and dependent qualities
@@ -137,12 +138,6 @@ EXPERIMENTAL INTERFACE: Subject to change."
                  ;; Otherwise take the adjusted quality.
                  (%policy-quality policy index)))))
 
-(defmethod print-object ((self policy) stream)
-  (if *print-readably*
-      (call-next-method)
-      (print-unreadable-object (self stream :type t)
-        (write (policy-to-decl-spec self) :stream stream))))
-
 ;; Return T if P1 and P2 are policies which are specified to be the same.
 ;; A result of NIL does not imply that definitely P1 /= P2
 ;; because a multitude of policies can be effectively equal.
@@ -179,6 +174,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
   policy)
 
 ;;; Is it deprecated?
+(declaim (ftype function deprecation-warning))
 (defun policy-quality-deprecation-warning (quality)
   (case quality
     ((stack-allocate-dynamic-extent stack-allocate-vector stack-allocate-value-cells)
@@ -230,9 +226,8 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;;; called by compiler code for known-valid QUALITY-NAMEs, e.g. SPEED;
 ;;; it's an error if it's called for a quality which isn't defined.
 (defun policy-quality (policy quality-name)
-  (let ((number (policy-quality-name-p quality-name)))
-    (aver number)
-    (%policy-quality policy number)))
+  (%policy-quality policy
+                   (the fixnum (policy-quality-name-p quality-name))))
 
 (define-compiler-macro policy-quality (&whole form policy quality-name)
   (acond ((and (constantp quality-name)
@@ -290,7 +285,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;;; Forward declaration of %COERCE-TO-POLICY.
 ;;; Definition is in 'node' so that FUNCTIONAL and NODE types are defined.
 ;;; Arg is declared of type T because the function explicitly checks it.
-(declaim (ftype (sfunction (t) policy) %coerce-to-policy))
+(declaim (ftype (function (t) (values policy &optional)) %coerce-to-policy))
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;
@@ -342,6 +337,42 @@ EXPERIMENTAL INTERFACE: Subject to change."
      ,@(when documentation `((setf (fdocumentation ',name 'optimize) ,documentation)))
      ',name))
 
+;;; Return a new POLICY containing the policy information represented
+;;; by the optimize declaration SPEC. Any parameters not specified are
+;;; defaulted from the POLICY argument.
+(declaim (ftype (function (list (or policy null)) (values policy list))
+                process-optimize-decl))
+(defun process-optimize-decl (spec policy)
+  (let ((result (copy-policy (or policy **baseline-policy**)))
+        (specified-qualities))
+    ;; Add new entries from SPEC.
+    (dolist (q-and-v-or-just-q (cdr spec) (values result specified-qualities))
+      (multiple-value-bind (quality raw-value)
+          (if (atom q-and-v-or-just-q)
+              (values q-and-v-or-just-q 3)
+            (destructuring-bind (quality raw-value) q-and-v-or-just-q
+              (values quality raw-value)))
+        (let ((index (policy-quality-name-p quality)))
+          (cond ((not index)
+                 (or (policy-quality-deprecation-warning quality)
+                     (compiler-warn
+                      "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
+                      quality spec)))
+                ((not (typep raw-value 'policy-quality))
+                 (compiler-warn
+                  "~@<Ignoring bad optimization value ~S in:~_ ~S~:>"
+                  raw-value spec))
+                (t
+                 ;; we can't do this yet, because CLOS macros expand
+                 ;; into code containing INHIBIT-WARNINGS.
+                 #+nil
+                 (when (eql quality 'inhibit-warnings)
+                   (compiler-style-warn "~S is deprecated: use ~S instead"
+                                        quality 'muffle-conditions))
+                 (push (cons quality raw-value) specified-qualities)
+                 (alter-policy result index raw-value))))))))
+
+(defvar *macro-policy* nil)
 ;; Set an alternate policy that is used to compile all code within DEFMACRO,
 ;; MACROLET, DEFINE-COMPILER-MARO - whether they occur at toplevel or not -
 ;; as well as execute all toplevel code in eval-when situation :COMPILE-TOPLEVEL,
@@ -365,3 +396,14 @@ EXPERIMENTAL INTERFACE: Subject to change."
   ;; But most probably the current behavior is entirely reasonable.
   (setq *macro-policy* (process-optimize-decl `(optimize ,@list)
                                               **baseline-policy**)))
+
+;; Turn the macro policy into an OPTIMIZE declaration for insertion
+;; into a macro body for DEFMACRO, MACROLET, or DEFINE-COMPILER-MACRO.
+;; Note that despite it being a style-warning to insert a duplicate,
+;; we need no precaution against that even though users may write
+;;  (DEFMACRO FOO (X) (DECLARE (OPTIMIZE (SAFETY 1))) ...)
+;; The expansion of macro-defining forms is such that the macro-policy
+;; appears in a different lexical scope from the user's declarations.
+(defun macro-policy-decls ()
+  (and *macro-policy*
+       `((declare (optimize ,@(policy-to-decl-spec *macro-policy*))))))

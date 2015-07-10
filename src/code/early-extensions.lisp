@@ -1425,20 +1425,6 @@
      (setf (fdocumentation ',name 'variable)
            ,(print-deprecation-message name since (list replacement)))))
 
-;;; Anaphoric macros
-(defmacro awhen (test &body body)
-  `(let ((it ,test))
-     (when it ,@body)))
-
-(defmacro acond (&rest clauses)
-  (if (null clauses)
-      `()
-      (destructuring-bind ((test &body body) &rest rest) clauses
-        (once-only ((test test))
-          `(if ,test
-               (let ((it ,test)) (declare (ignorable it)),@body)
-               (acond ,@rest))))))
-
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:
 ;; those which pertain to the variables and those which don't.

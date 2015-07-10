@@ -129,6 +129,7 @@
  ("src/code/barrier" :not-host)
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/unportable-float")
+ ("src/compiler/policy")
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/parse-lambda-list")
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
@@ -317,7 +318,6 @@
  ;;; convenient to stick them here)
 
  ("src/compiler/early-c")
- ("src/compiler/policy")
  ("src/compiler/lexenv")
  ("src/compiler/policies")
 

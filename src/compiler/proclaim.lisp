@@ -31,40 +31,6 @@
       (let ((old (gethash name *free-vars*)))
         (when old (vars old))))))
 
-;;; Return a new POLICY containing the policy information represented
-;;; by the optimize declaration SPEC. Any parameters not specified are
-;;; defaulted from the POLICY argument.
-(declaim (ftype (function (list (or policy null)) (values policy list))
-                process-optimize-decl))
-(defun process-optimize-decl (spec policy)
-  (let ((result (copy-policy (or policy **baseline-policy**)))
-        (specified-qualities))
-    ;; Add new entries from SPEC.
-    (dolist (q-and-v-or-just-q (cdr spec) (values result specified-qualities))
-      (binding* (((quality raw-value)
-                  (if (atom q-and-v-or-just-q)
-                      (values q-and-v-or-just-q 3)
-                      (destructuring-bind (quality raw-value) q-and-v-or-just-q
-                        (values quality raw-value))))
-                 (index (policy-quality-name-p quality)))
-        (cond ((not index)
-               (or (policy-quality-deprecation-warning quality)
-                   (compiler-warn
-                    "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
-                    quality spec)))
-              ((not (typep raw-value 'policy-quality))
-               (compiler-warn "~@<Ignoring bad optimization value ~S in:~_ ~S~:>"
-                              raw-value spec))
-              (t
-               ;; we can't do this yet, because CLOS macros expand
-               ;; into code containing INHIBIT-WARNINGS.
-               #+nil
-               (when (eql quality 'inhibit-warnings)
-                 (compiler-style-warn "~S is deprecated: use ~S instead"
-                                      quality 'muffle-conditions))
-               (push (cons quality raw-value) specified-qualities)
-               (alter-policy result index raw-value)))))))
-
 (declaim (ftype (function (list list) list)
                 process-handle-conditions-decl))
 (defun process-handle-conditions-decl (spec list)

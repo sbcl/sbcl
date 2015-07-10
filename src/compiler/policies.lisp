@@ -11,6 +11,13 @@
 
 (in-package "SB!C")
 
+;; The print method is here on account of it not working in 'policy.lisp'
+(defmethod print-object ((self policy) stream)
+  (if *print-readably*
+      (call-next-method)
+      (print-unreadable-object (self stream :type t)
+        (write (policy-to-decl-spec self) :stream stream))))
+
 (define-optimization-quality check-constant-modification
     safety
   ("no" "maybe" "yes" "yes")

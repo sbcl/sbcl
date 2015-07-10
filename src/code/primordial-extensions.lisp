@@ -382,3 +382,18 @@
 ;;; This is like DO, except it has no implicit NIL block.
 (def!macro do-anonymous (varlist endlist &rest body)
   (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
+
+;;; Anaphoric macros
+(defmacro awhen (test &body body)
+  `(let ((it ,test))
+     (when it ,@body)))
+
+(defmacro acond (&rest clauses)
+  (if (null clauses)
+      `()
+      (destructuring-bind ((test &body body) &rest rest) clauses
+        (let ((it (copy-symbol 'it)))
+          `(let ((,it ,test))
+             (if ,it
+                 (let ((it ,it)) (declare (ignorable it)) ,@body)
+                 (acond ,@rest)))))))
