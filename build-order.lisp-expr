@@ -320,6 +320,7 @@
 
  ("src/compiler/macros")
 
+ ("src/compiler/fun-info")
  ("src/compiler/globaldb")
  ("src/compiler/info-functions")
 

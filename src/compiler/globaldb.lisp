@@ -189,7 +189,7 @@
                   ;; when building the cross-compiler.
                   #+sb-xc-host
                   ((member type-spec
-                           '((or fdefn null) (or fun-info null) (or layout null)
+                           '((or fdefn null) (or layout null)
                              (or alien-type null) (or heap-alien-info null))
                            :test 'equal)
                    `(lambda (x)
@@ -391,6 +391,9 @@
   :default
   #+sb-xc-host nil
   #-sb-xc-host (lambda (name) (if (fboundp name) :function nil)))
+
+(declaim (ftype (sfunction (t) ctype)
+                specifier-type ctype-of sb!kernel::ctype-of-array))
 
 ;;; The type specifier for this function.
 (define-info-type (:function :type)

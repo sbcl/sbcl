@@ -130,9 +130,6 @@
   (drop-all-hash-caches)
   (values))
 
-(declaim (ftype (sfunction (t) ctype)
-                specifier-type ctype-of ctype-of-array))
-
 ;;; This is like TYPE-OF, only we return a CTYPE structure instead of
 ;;; a type specifier, and we try to return the type most useful for
 ;;; type checking, rather than trying to come up with the one that the
