@@ -424,7 +424,8 @@
            (aref **character-low-pages**
                  (* 2 (+ (ldb (byte 8 0) cp) (ash high-index 8))))))))
 
-(declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category))
+(declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category)
+         (inline ucd-general-category))
 (defun ucd-general-category (char)
   (aref **character-misc-database** (misc-index char)))
 
