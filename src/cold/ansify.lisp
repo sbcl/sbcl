@@ -88,6 +88,17 @@
 (unless (ignore-errors (funcall (constantly t) 1 2 3))
   (error "please find a binary that understands CONSTANTLY to build from"))
 
+;;;; Self-hosted issues
+
+#+sbcl
+(progn
+  (defun optional+key-style-warn-p (condition)
+    (and (typep condition '(and simple-condition style-warning))
+         (search "&OPTIONAL and &KEY found"
+                 (simple-condition-format-control condition))))
+  ;; Let's just say we never care to see this.
+  (declaim (sb-ext:muffle-conditions (satisfies optional+key-style-warn-p))))
+
 ;;;; general non-ANSI-ness
 
 (in-package :sb-cold)
