@@ -671,12 +671,12 @@
   (def 5)
   (def 6))
 
-(defmacro !define-hash-cache (name args
-                             &key hash-function hash-bits memoizer
-                                  flush-function (values 1))
+(defmacro !define-hash-cache (name args aux-vars
+                              &key hash-function hash-bits memoizer
+                              flush-function (values 1))
   (declare (ignore memoizer))
   (dolist (arg args)
-    (unless (= (length arg) 2)
+    (unless (<= 2 (length arg) 3)
       (error "bad argument spec: ~S" arg)))
   (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
   (let* ((fun-name (symbolicate name "-MEMO-WRAPPER"))
@@ -691,23 +691,28 @@
          (entry (make-symbol "LINE"))
          (thunk (make-symbol "THUNK"))
          (arg-vars (mapcar #'first args))
-         (result-temps (loop for i from 1 to values
-                             collect (make-symbol (format nil "RES~D" i))))
+         (nvalues (if (listp values) (length values) values))
+         (result-temps
+          (if (listp values)
+              values ; use the names provided by the user
+              (loop for i from 1 to nvalues ; else invent some names
+                    collect (make-symbol (format nil "R~D" i)))))
          (temps (append (mapcar (lambda (x) (make-symbol (string x)))
                                 arg-vars)
                         result-temps))
-         (tests (mapcar (lambda (arg temp) ; -> (EQx ARG #:ARG)
-                          `(,(cadr arg) ,(car arg) ,temp))
+         ;; Mnemonic: (FIND x SEQ :test #'f) calls f with x as the LHS
+         (tests (mapcar (lambda (spec temp) ; -> (EQx ARG #:ARG)
+                          `(,(cadr spec) ,(car spec) ,temp))
                         args temps))
          (cache-type `(simple-vector ,size))
-         (line-type (let ((n (+ nargs values)))
+         (line-type (let ((n (+ nargs nvalues)))
                       (if (<= n 3) 'cons `(simple-vector ,n))))
          (bind-hashval
           `((,hashval (the (signed-byte #.sb!vm:n-fixnum-bits)
                            (funcall ,hash-function ,@arg-vars)))
             (,cache ,var-name)))
          (probe-it
-          (lambda (result)
+          (lambda (ignore action)
             `(when ,cache
                (let ((,hashval ,hashval) ; gets clobbered in probe loop
                      (,cache (truly-the ,cache-type ,cache)))
@@ -734,26 +739,23 @@
                                             (,(third temps) (cdr ,arg-temp)))))
                                      (t (loop for i from 0 for x in temps
                                               collect `(,x (svref ,entry ,i)))))
-                               ;; KLUDGE: if there's a flush function,
-                               ;; it ignores all results. I hate this kind
-                               ;; of sloppiness. I know when to ignore,
-                               ;; and which.
-                               ,@(when flush-function
-                                   `((declare (ignorable ,@temps))))
-                               (when (and ,@tests) ,result))))
+                               ,@ignore
+                               (when (and ,@tests) ,action))))
                          (setq ,hashval (ash ,hashval ,(- hash-bits)))))))))
          (fun
-          `(defun ,fun-name (,thunk ,@arg-vars)
+          `(defun ,fun-name (,thunk ,@arg-vars ,@aux-vars)
              ,@(when *profile-hash-cache* ; count seeks
                  `((when (boundp ',statistics-name)
                      (incf (aref ,statistics-name 0)))))
              (let ,bind-hashval
-               ,(funcall probe-it
+               ,(funcall probe-it nil
                          `(return-from ,fun-name (values ,@result-temps)))
                (multiple-value-bind ,result-temps (funcall ,thunk)
                  (let ((,entry
-                        (,(hash-cache-line-allocator (+ nargs values))
-                         ,@arg-vars ,@result-temps))
+                        (,(hash-cache-line-allocator (+ nargs nvalues))
+                         ,@(mapcar (lambda (spec) (or (caddr spec) (car spec)))
+                                   args)
+                         ,@result-temps))
                        (,cache
                         (truly-the ,cache-type
                          (or ,cache (alloc-hash-cache ,size ',var-name))))
@@ -787,6 +789,7 @@
            `((defun ,flush-function ,arg-vars
                (let ,bind-hashval
                  ,(funcall probe-it
+                   `((declare (ignore ,@result-temps)))
                    `(return (setf (svref ,cache
                                          (ldb (byte ,hash-bits 0) ,hashval))
                                   0)))))))
@@ -804,19 +807,37 @@
 ;;;   attempt cache lookup, and on miss, execute the body code and
 ;;;   insert into the cache.
 ;;;   Manual control over memoization is useful if there are cases for
-;;;   which computing the result is simpler than cache lookup.
+;;;   which it is undesirable to pollute the cache.
 
 ;;; FIXME: this macro holds onto the DEFINE-HASH-CACHE macro,
 ;;; but should not.
+;;;
+;;; Possible FIXME: if the function has a type proclamation, it forces
+;;; a type-check every time the cache finds something. Instead, values should
+;;; be checked once only when inserted into the cache, and not when read out.
+;;;
+;;; N.B.: it is not obvious that the intended use of an explicit MEMOIZE macro
+;;; is to call it exactly once or not at all. If you call it more than once,
+;;; then you inline all of its logic every time. Probably the code generated
+;;; by DEFINE-HASH-CACHE should be an FLET inside the body of DEFUN-CACHED,
+;;; but the division of labor is somewhat inverted at present.
+;;; Since we don't have caches that aren't in direct support of DEFUN-CACHED
+;;; - did we ever? - this should be possible to change.
+;;;
 (defmacro defun-cached ((name &rest options &key
                               (memoizer (make-symbol "MEMOIZE")
                                         memoizer-supplied-p)
                               &allow-other-keys)
                         args &body body-decls-doc)
   (binding* (((forms decls doc) (parse-body body-decls-doc))
-             (arg-names (mapcar #'car args)))
+             ((inputs aux-vars)
+              (let ((aux (member '&aux args)))
+                (if aux
+                    (values (ldiff args aux) aux)
+                    (values args nil))))
+             (arg-names (mapcar #'car inputs)))
     `(progn
-        (!define-hash-cache ,name ,args ,@options)
+        (!define-hash-cache ,name ,inputs ,aux-vars ,@options)
         (defun ,name ,arg-names
           ,@decls
           ,@(if doc (list doc))
