@@ -575,46 +575,43 @@ disappears when accents are placed on top of it. and NIL otherwise"
             (char-decomposition char info callback))
         (funcall callback char))))
 
-(defun decompose-string (string kind filter)
-  (let ((compatibility (ecase kind
-                         (:compatibility t)
-                         (:canonical nil))))
-    (let (chars
-          (length 0)
-          (previous-combining-class 0))
-      (declare (type index length))
-      (dx-flet ((callback (char)
-                  (let ((combining-class (combining-class char)))
-                    (incf length)
-                    (cond ((< 0 combining-class previous-combining-class)
-                           ;; Ensure it's sorted
-                           (loop for cons on chars
-                                 for next-char = (cadr cons)
-                                 when (or (not next-char)
-                                          (<= 0 (combining-class next-char) combining-class))
-                                 do (setf (cdr cons)
-                                          (cons char (cdr cons)))
-                                    (return)))
-                          (t
-                           (push char chars)
-                           (setf previous-combining-class combining-class))))))
-        (sb!kernel:with-array-data ((string string) (start) (end))
-          (declare (ignore start))
-          (let ((calback (if filter
-                             (let ((filter (sb!kernel:%coerce-callable-to-fun filter)))
-                               (lambda (char)
-                                 (when (funcall filter char)
-                                   (callback char))))
-                             #'callback)))
-            (loop for i below end
-                  for char = (schar string i)
-                  do
-                  (decompose-char char compatibility calback))))
-        (let ((result (make-string length)))
-          (loop for char in chars
-                for i from (1- length) downto 0
-                do (setf (schar result i) char))
-          result)))))
+(defun decompose-string (string compatibility filter)
+  (let (chars
+        (length 0)
+        (previous-combining-class 0))
+    (declare (type index length))
+    (dx-flet ((callback (char)
+                        (let ((combining-class (combining-class char)))
+                          (incf length)
+                          (cond ((< 0 combining-class previous-combining-class)
+                                 ;; Ensure it's sorted
+                                 (loop for cons on chars
+                                       for next-char = (cadr cons)
+                                       when (or (not next-char)
+                                                (<= 0 (combining-class next-char) combining-class))
+                                       do (setf (cdr cons)
+                                                (cons char (cdr cons)))
+                                          (return)))
+                                (t
+                                 (push char chars)
+                                 (setf previous-combining-class combining-class))))))
+      (sb!kernel:with-array-data ((string string) (start) (end))
+        (declare (ignore start))
+        (let ((calback (if filter
+                           (let ((filter (sb!kernel:%coerce-callable-to-fun filter)))
+                             (lambda (char)
+                               (when (funcall filter char)
+                                 (callback char))))
+                           #'callback)))
+          (loop for i below end
+                for char = (schar string i)
+                do
+                (decompose-char char compatibility calback))))
+      (let ((result (make-string length)))
+        (loop for char in chars
+              for i from (1- length) downto 0
+              do (setf (schar result i) char))
+        result))))
 
 (defun composition-hangul-syllable-type (cp)
   (cond
@@ -758,13 +755,13 @@ only characters for which it returns T are collected."
     ((array character (*))
      (ecase form
        ((:nfc)
-        (canonically-compose (decompose-string string :canonical filter)))
+        (canonically-compose (decompose-string string nil filter)))
        ((:nfd)
-        (decompose-string string :canonical filter))
+        (decompose-string string nil filter))
        ((:nfkc)
-        (canonically-compose (decompose-string string :compatibility filter)))
+        (canonically-compose (decompose-string string t filter)))
        ((:nfkd)
-        (decompose-string string :compatibility filter))))
+        (decompose-string string t filter))))
     ((array nil (*)) string)))
 
 (defun normalized-p (string &optional (form :nfd))
