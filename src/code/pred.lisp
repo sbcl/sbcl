@@ -189,6 +189,8 @@
 (defun type-of (object)
   #!+sb-doc
   "Return the type of OBJECT."
+  ;; We have special logic for everything except arrays.
+  ;; Arrays use CTYPE-OF and then convert the answer to a specifier.
   (typecase object
     (fixnum
      (cond

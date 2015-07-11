@@ -130,40 +130,94 @@
   (drop-all-hash-caches)
   (values))
 
+(declaim (ftype (sfunction (t) ctype)
+                specifier-type ctype-of ctype-of-array))
+
 ;;; This is like TYPE-OF, only we return a CTYPE structure instead of
 ;;; a type specifier, and we try to return the type most useful for
 ;;; type checking, rather than trying to come up with the one that the
 ;;; user might find most informative.
-(declaim (ftype (function (t) ctype) ctype-of))
-(defun-cached (ctype-of :hash-function #'sxhash :hash-bits 9
-                        :flush-function ctype-of-cache-evict)
-              ((x eq))
-  (typecase x
-    (function
-     (if (funcallable-instance-p x)
-         (classoid-of x)
-         (specifier-type (sb!impl::%fun-type x))))
-    (symbol
-     (make-member-type :members (list x)))
-    (number
-     (ctype-of-number x))
-    (array
-     (let ((etype (specifier-type (array-element-type x))))
-       (make-array-type (array-dimensions x)
-                        :complexp (not (typep x 'simple-array))
-                        :element-type etype
-                        :specialized-element-type etype)))
-    (cons
-     (make-cons-type *universal-type* *universal-type*))
-    (character
-     (specifier-type 'character))
-    #!+sb-simd-pack
-    (simd-pack
-     (let ((type (nth (%simd-pack-tag x) *simd-pack-element-types*)))
-       (if type
-           (specifier-type `(simd-pack ,type))
-           (specifier-type 'simd-pack))))
-    (t
-     (classoid-of x))))
+;;;
+;;; To avoid inadvertent memory retention we avoid using arrays
+;;; and functions as keys.
+;;; During cross-compilation, the CTYPE-OF function is not memoized.
+;;; Constants get their type stored in their LEAF, so it's ok.
+
+(defun-cached (ctype-of :hash-bits 7 :hash-function #'sxhash
+                        :memoizer memoize)
+;; an unfortunate aspect of using EQ is that several appearances
+;; of the = double-float can be in the cache, but it's
+;; probably more efficient overall to use object identity.
+    ((x eq))
+  (flet ((try-cache (x)
+           (memoize
+            ;; For functions, the input is a type specifier
+            ;; of the form (FUNCTION (...) ...)
+            (cond ((listp x) (specifier-type x)) ; NIL can't occur
+                  ((symbolp x) (make-member-type :members (list x)))
+                  (t (ctype-of-number x))))))
+    (typecase x
+      (function
+       (if (funcallable-instance-p x)
+           (classoid-of x)
+           (let ((type (sb!impl::%fun-type x)))
+             (if (typep type '(cons (eql function))) ; sanity test
+                 (try-cache type)
+                 (classoid-of x)))))
+      (symbol (if x (try-cache x) *null-type*))
+      (number (try-cache x))
+      (array (ctype-of-array x))
+      (cons *cons-t-t-type*)
+      ;; This makes no distinction for BASE/EXTENDED-CHAR. Should it?
+      (character *character-type*)
+      #!+sb-simd-pack
+      (simd-pack
+       (let ((tag (%simd-pack-tag x)))
+         (svref (load-time-value
+                 (coerce (cons (specifier-type 'simd-pack)
+                               (mapcar (lambda (x) (specifier-type `(simd-pack ,x)))
+                                       *simd-pack-element-types*))
+                         'vector)
+                 t)
+                (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
+                    (1+ tag)
+                    0))))
+      (t
+       (classoid-of x)))))
+
+;; Helper function that implements (CTYPE-OF x) when X is an array.
+(defun-cached (ctype-of-array
+               :values (ctype) ; Bind putative output to this when probing.
+               :hash-bits 7
+               :hash-function (lambda (a &aux (hash cookie))
+                                (if header-p
+                                    (dotimes (axis rank hash)
+                                      (mixf hash (%array-dimension a axis)))
+                                    (mixf hash (length a)))))
+    ;; "type-key" is a perfect hash of rank + widetag + simple-p.
+    ;; If it matches, then compare dims, which are read from the output.
+    ;; The hash of the type-key + dims can have collisions.
+    ((array (lambda (array type-key)
+              (and (eq type-key cookie)
+                   (let ((dims (array-type-dimensions ctype)))
+                     (if header-p
+                         (dotimes (axis rank t)
+                           (unless (eq (pop (truly-the list dims))
+                                       (%array-dimension array axis))
+                             (return nil)))
+                         (eq (length array) (car dims))))))
+            cookie) ; Store COOKIE as the single key.
+     &aux (rank (array-rank array))
+          (simple-p (if (simple-array-p array) 1 0))
+          (header-p (array-header-p array)) ; non-simple or rank <> 1 or both
+          (cookie (the fixnum (logior (ash (logior (ash rank 1) simple-p)
+                                           sb!vm:n-widetag-bits)
+                                      (array-underlying-widetag array)))))
+  ;; The value computed on cache miss.
+  (let ((etype (specifier-type (array-element-type array))))
+    (make-array-type (array-dimensions array)
+                     :complexp (not (simple-array-p array))
+                     :element-type etype
+                     :specialized-element-type etype)))
 
 (!defun-from-collected-cold-init-forms !target-type-cold-init)

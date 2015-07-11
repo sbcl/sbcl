@@ -1393,7 +1393,6 @@ of specialized arrays is supported."
         (setf (%array-dimension array axis) (pop dimensions)))
       (setf (%array-dimension array 0) dimensions))
   (setf (%array-displaced-p array) displacedp)
-  (sb!kernel::ctype-of-cache-evict array)
   array)
 
 ;;; User visible extension

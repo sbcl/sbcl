@@ -204,12 +204,6 @@
  ("src/compiler/info-vector")
  ("src/code/fdefinition" :not-host)
 
- ;; In classic CMU CL, code/type was here. I've since split that into
- ;; lots of smaller pieces, some of which are here and some of which
- ;; are handled later in the sequence, when the cross-compiler is
- ;; built. -- WHN 19990620
- ("src/code/target-type" :not-host)
-
  ("src/code/pred" :not-host)
 
  ("src/code/target-alieneval" :not-host)
@@ -398,6 +392,9 @@
  ;; and because they define
  ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
  ("src/code/late-type")
+ ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
+ ;; and all type-classes are defined.
+ ("src/code/target-type" :not-host)
  ("src/code/pprint" :not-host)
  ("src/code/deftypes-for-target")
 

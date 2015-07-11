@@ -450,6 +450,9 @@
 #!+sb-unicode
 (progn (defglobal *base-char-type* -1)
        (defglobal *extended-char-type* -1))
+#+sb-xc (declaim (type ctype *character-type*
+                       #!+sb-unicode *base-char-type*
+                       #!+sb-unicode *extended-char-type*))
 
 (defun !intern-important-character-set-type-instances ()
   (flet ((range (low high)
@@ -571,6 +574,10 @@
           (incf index 3))))
     (setq *rank-1-array-ctypes* (cons data-vector hashtable))))
 
+(declaim (ftype (sfunction (t &key (:complexp t)
+                                   (:element-type t)
+                                   (:specialized-element-type t))
+                           ctype) make-array-type))
 (defun make-array-type (dimensions &key (complexp :maybe) element-type
                                         (specialized-element-type *wild-type*))
   (or (and (eq element-type specialized-element-type)
@@ -581,10 +588,11 @@
                                   (mod (type-hash-value element-type)
                                        +canon-array-ctype-hash-divisor+)))
                (when (eq (car cell) element-type)
-                 (return (svref (car table)
+                 (return (truly-the ctype
+                          (svref (car table)
                                 (+ (cdr cell)
                                    (ecase complexp
-                                     ((nil) 0) ((:maybe) 1) ((t) 2)))))))))
+                                     ((nil) 0) ((:maybe) 1) ((t) 2))))))))))
       (%make-array-type dimensions
                         complexp element-type specialized-element-type)))
 
@@ -602,6 +610,7 @@
 (defglobal *null-type* -1)    ; = (MEMBER NIL)
 (defglobal *eql-t-type* -1)   ; = (MEMBER T)
 (defglobal *boolean-type* -1) ; = (MEMBER T NIL)
+#+sb-xc (declaim (type ctype *null-type*))
 
 (defun !intern-important-member-type-instances ()
   (flet ((make-it (list)
@@ -611,6 +620,8 @@
           *eql-t-type* (make-it '(t))
           *boolean-type* (make-it '(t nil)))))
 
+(declaim (ftype (sfunction (&key (:xset t) (:fp-zeroes t) (:members t)) ctype)
+                make-member-type))
 (defun make-member-type (&key xset fp-zeroes members)
   (unless xset
     (aver (not fp-zeroes))
@@ -770,6 +781,7 @@
 ;; The function caches work significantly better when there
 ;; is a unique object that stands for the specifier (CONS T T).
 (defglobal *cons-t-t-type* -1)
+#+sb-xc (declaim (type ctype *cons-t-t-type*))
 
 (defun !intern-important-cons-type-instances ()
   (setf *cons-t-t-type*

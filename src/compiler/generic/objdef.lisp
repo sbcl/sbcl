@@ -285,6 +285,7 @@
                                        :lowtag other-pointer-lowtag
                                        :widetag weak-pointer-widetag
                                        :alloc-trans make-weak-pointer)
+  ;; FIXME: SB!C should be almost *anything* but that. Probably SB!KERNEL
   (value :ref-trans sb!c::%weak-pointer-value :ref-known (flushable)
          :init :arg)
   (broken :type (member t nil)
