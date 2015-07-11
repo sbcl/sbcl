@@ -82,18 +82,33 @@
                     (bound-test object)))))))
     (array-type
      (and (arrayp object)
-          (ecase (array-type-complexp type)
-            ((t) (not (typep object 'simple-array)))
-            ((nil) (typep object 'simple-array))
-            ((:maybe) t))
-          (or (eq (array-type-dimensions type) '*)
-              (do ((want (array-type-dimensions type) (cdr want))
-                   (got (array-dimensions object) (cdr got)))
-                  ((and (null want) (null got)) t)
-                (unless (and want got
-                             (or (eq (car want) '*)
-                                 (= (car want) (car got))))
-                  (return nil))))
+          (or (eq (array-type-complexp type) :maybe)
+              (eq (not (simple-array-p object))
+                  (array-type-complexp type)))
+          (let ((want (array-type-dimensions type)))
+            (or (eq want '*)
+                (if (array-header-p object)
+                    (do ((rank (array-rank object))
+                         (axis 0 (1+ axis))
+                         (want want (cdr want)))
+                        ((= axis rank) (null want))
+                     (let ((dim (car want)))
+                       (unless (or (eq dim '*)
+                                   (eq dim (%array-dimension object axis)))
+                         (return nil))))
+                    (let ((dim (car want)))
+                      (and (or (eq dim '*) (eq dim (length object)))
+                           (not (cdr want)))))))
+          ;; FIXME: treatment of compound types involving unknown types
+          ;; is generally bogus throughout the system, e.g.
+          ;;   (TYPEP MY-ARRAY '(ARRAY (OR BAD1 BAD2) *)) => T
+          ;; because (OR BAD1 BAD2) is not represented as an UNKNOWN-TYPE,
+          ;; and has specialized type '*.
+          ;; One way to fix this is that every CTYPE needs a bit to indicate
+          ;; whether any subpart of it is unknown, or else when parsing,
+          ;; we should always return an UNKNOWN if any subpart is unknown,
+          ;; or else any time we use a CTYPE, we do a deep traversal
+          ;; to detect embedded UNKNOWNs (which seems bad for performance).
           (if (unknown-type-p (array-type-element-type type))
               ;; better to fail this way than to get bogosities like
               ;;   (TYPEP (MAKE-ARRAY 11) '(ARRAY SOME-UNDEFINED-TYPE)) => T
@@ -102,6 +117,7 @@
               t)
           (or (eq (array-type-specialized-element-type type) *wild-type*)
               (values (type= (array-type-specialized-element-type type)
+                             ;; FIXME: not the most efficient.
                              (specifier-type (array-element-type
                                               object)))))))
     (member-type
