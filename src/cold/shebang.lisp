@@ -26,6 +26,10 @@
   (labels ((sane-expr-p (x)
              (typecase x
                (symbol (and (string/= x "SB-XC") (string/= x "SB-XC-HOST")))
+               ;; This allows you to write #!+(host-feature sbcl) <stuff>
+               ;; to muffle conditions, bypassing the "probable XC bug" check.
+               ;; Using the escape hatch is assumed never to be a mistake.
+               ((cons (eql :host-feature)) t)
                (cons (every #'sane-expr-p (cdr x))))))
     (unless (sane-expr-p feature)
       (error "Target feature expression ~S looks screwy" feature)))
@@ -36,11 +40,14 @@
             (ecase (first feature)
               (:or  (some  #'subfeature-in-list-p (rest feature)))
               (:and (every #'subfeature-in-list-p (rest feature)))
-              (:not (let ((rest (cdr feature)))
-                      (if (or (null (car rest)) (cdr rest))
-                        (error "wrong number of terms in compound feature ~S"
-                               feature)
-                        (not (subfeature-in-list-p (second feature)))))))))))
+              ((:host-feature :not)
+               (destructuring-bind (subexpr) (cdr feature)
+                 (cond ((eq (first feature) :host-feature)
+                        ;; (:HOST-FEATURE :sym) looks in *FEATURES* for :SYM
+                        (check-type subexpr symbol)
+                        (member subexpr *features* :test #'eq))
+                       (t
+                        (not (subfeature-in-list-p subexpr)))))))))))
 (compile 'feature-in-list-p)
 
 (defun shebang-reader (stream sub-character infix-parameter)

@@ -490,18 +490,12 @@
         (if (eql value #c(0d0 0d0))
             'fp-complex-double-zero
             'fp-complex-double-immediate)))
-    #!+sb-simd-pack
-    (#+sb-xc-host nil
-     #-sb-xc-host (simd-pack double-float)
-        (sc-number-or-lose 'double-sse-immediate))
-    #!+sb-simd-pack
-    (#+sb-xc-host nil
-     #-sb-xc-host (simd-pack single-float)
-     (sc-number-or-lose 'single-sse-immediate))
-    #!+sb-simd-pack
-    (#+sb-xc-host nil
-     #-sb-xc-host simd-pack
-     (sc-number-or-lose 'int-sse-immediate))))
+    #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
+    ((simd-pack double-float) (sc-number-or-lose 'double-sse-immediate))
+    #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
+    ((simd-pack single-float) (sc-number-or-lose 'single-sse-immediate))
+    #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
+    (simd-pack (sc-number-or-lose 'int-sse-immediate))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc (sc-number-or-lose 'immediate)))
