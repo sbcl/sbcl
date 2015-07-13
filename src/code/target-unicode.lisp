@@ -743,6 +743,8 @@ If FILTER is a function it is called on each decomposed character and
 only characters for which it returns T are collected."
   (declare (type (member :nfd :nfkd :nfc :nfkc) form))
   #!-sb-unicode
+  (declare (ignore filter))
+  #!-sb-unicode
   (etypecase string
     ((array nil (*)) string)
     (string
