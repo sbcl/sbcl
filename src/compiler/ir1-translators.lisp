@@ -489,7 +489,7 @@ Return VALUE without evaluating it."
                                      (neq :catch (cleanup-kind (entry-cleanup (pop b)))))))
                             (lexenv-blocks *lexenv*) :from-end t))
               *source-namestring*
-              (let* ((p (or *compile-file-truename* *load-truename*)))
+              (let* ((p (or sb!xc:*compile-file-truename* *load-truename*)))
                 (when p
                   #+sb-xc-host (lpnify-namestring (namestring p) (pathname-directory p) (pathname-type p))
                   #-sb-xc-host (namestring p))))))
