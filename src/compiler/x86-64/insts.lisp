@@ -1123,26 +1123,15 @@
   (op    :field (byte 4 0))
   (label :field (byte 8 8) :type 'displacement))
 
-(sb!disassem:define-instruction-format (near-cond-jump 16)
+(sb!disassem:define-instruction-format (near-cond-jump 48)
   (op    :fields (list (byte 8 0) (byte 4 12)) :value '(#b00001111 #b1000))
   (cc    :field (byte 4 8) :type 'condition-code)
-  ;; The disassembler currently doesn't let you have an instruction > 32 bits
-  ;; long, so we fake it by using a prefilter to read the offset.
-  (label :type 'displacement
-         :prefilter (lambda (value dstate)
-                      (declare (ignore value)) ; always nil anyway
-                      (sb!disassem:read-signed-suffix 32 dstate))))
+  (label :field (byte 32 16) :type 'displacement))
 
-(sb!disassem:define-instruction-format (near-jump 8
+(sb!disassem:define-instruction-format (near-jump 40
                                      :default-printer '(:name :tab label))
   (op    :field (byte 8 0))
-  ;; The disassembler currently doesn't let you have an instruction > 32 bits
-  ;; long, so we fake it by using a prefilter to read the address.
-  (label :type 'displacement
-         :prefilter (lambda (value dstate)
-                      (declare (ignore value)) ; always nil anyway
-                      (sb!disassem:read-signed-suffix 32 dstate))))
-
+  (label :field (byte 32 8) :type 'displacement))
 
 (sb!disassem:define-instruction-format (cond-set 24
                                      :default-printer '('set cc :tab reg/mem))
