@@ -2659,3 +2659,8 @@
    1)
   (catch-compiled-program-error
    '(lambda () (declare (sb-ext:muffle-conditions 10)))))
+
+(with-test (:name :coverage-and-errors)
+  (ctu:file-compile
+   '((locally (declare (optimize sb-c:store-coverage-data))
+       (1)))))

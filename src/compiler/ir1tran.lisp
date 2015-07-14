@@ -559,15 +559,15 @@
            (ir1-error-bailout ((start next result form) &body body)
              (with-unique-names (skip condition)
                `(block ,skip
-                 (let ((,condition (catch 'ir1-error-abort
-                                     (let ((*compiler-error-bailout*
-                                            (lambda (&optional e)
-                                              (throw 'ir1-error-abort e))))
-                                       ,@body
-                                       (return-from ,skip nil)))))
-                   (ir1-convert ,start ,next ,result
-                                (make-compiler-error-form ,condition
-                                                          ,form)))))))
+                  (let ((,condition (catch 'ir1-error-abort
+                                      (let ((*compiler-error-bailout*
+                                              (lambda (&optional e)
+                                                (throw 'ir1-error-abort e))))
+                                        ,@body
+                                        (return-from ,skip nil)))))
+                    (ir1-convert ,start ,next ,result
+                                 (make-compiler-error-form ,condition
+                                                           ,form)))))))
 
   ;; Translate FORM into IR1. The code is inserted as the NEXT of the
   ;; CTRAN START. RESULT is the LVAR which receives the value of the
@@ -580,9 +580,9 @@
   ;; references, without having to introduce dummy names into the
   ;; namespace.
   (defun ir1-convert (start next result form)
-    (ir1-error-bailout (start next result form)
-      (let* ((*current-path* (ensure-source-path form))
-             (start (instrument-coverage start nil form)))
+    (let* ((*current-path* (ensure-source-path form))
+           (start (instrument-coverage start nil form)))
+      (ir1-error-bailout (start next result form)
         (cond ((atom form)
                (cond ((and (symbolp form) (not (keywordp form)))
                       (ir1-convert-var start next result form))
