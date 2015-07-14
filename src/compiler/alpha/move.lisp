@@ -121,21 +121,6 @@
   (any-reg descriptor-reg null zero)
   (any-reg descriptor-reg))
 
-;;;; ILLEGAL-MOVE
-
-;;; This VOP exists just to begin the lifetime of a TN that couldn't
-;;; be written legally due to a type error. An error is signalled
-;;; before this VOP is so we don't need to do anything (not that there
-;;; would be anything sensible to do anyway.)
-(define-vop (illegal-move)
-  (:args (x) (type))
-  (:results (y))
-  (:ignore y)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 666
-    (error-call vop object-not-type-error x type)))
-
 ;;;; moves and coercions
 ;;;;
 ;;;; These MOVE-TO-WORD VOPs move a tagged integer to a raw full-word
