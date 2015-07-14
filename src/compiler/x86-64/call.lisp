@@ -1380,7 +1380,8 @@
                     `((:policy :fast-safe)
                       (:translate ,translate)))
                 (:args ,@(mapcar (lambda (arg)
-                                   `(,arg :scs (any-reg descriptor-reg)))
+                                   `(,arg :scs (any-reg descriptor-reg
+                                                control-stack constant)))
                                  args))
                 (:vop-var vop)
                 (:save-p :compute-only)

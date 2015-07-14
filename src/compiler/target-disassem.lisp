@@ -1671,7 +1671,6 @@
 ;;; constant area of the code-object in the current segment and T, or
 ;;; NIL and NIL if there is no code-object in the current segment.
 (defun get-code-constant (byte-offset dstate)
-  #!+sb-doc
   (declare (type offset byte-offset)
            (type disassem-state dstate))
   (let ((code (seg-code (dstate-segment dstate))))
@@ -1987,18 +1986,26 @@
     (when stream
       (setf (dstate-cur-offs dstate)
             (dstate-next-offs dstate))
-      (flet ((emit-err-arg (note)
+      (flet ((emit-err-arg ()
                (let ((num (pop lengths)))
                  (print-notes-and-newline stream dstate)
                  (print-current-address stream dstate)
                  (print-inst num stream dstate)
                  (print-bytes num stream dstate)
-                 (incf (dstate-cur-offs dstate) num)
-                 (when note
-                   (note note dstate)))))
-        (emit-err-arg nil)
-        (emit-err-arg (symbol-name (get-internal-error-name errnum)))
+                 (incf (dstate-cur-offs dstate) num)))
+             (emit-note (note)
+               (when note
+                 (note note dstate))))
+        (emit-err-arg)
+        (emit-err-arg)
+        (emit-note (symbol-name (get-internal-error-name errnum)))
         (dolist (sc-offs sc-offsets)
-          (emit-err-arg (get-sc-name sc-offs)))))
+          (emit-err-arg)
+          (if (= (sb!c:sc-offset-scn sc-offs)
+                 sb!vm:constant-sc-number)
+              (note-code-constant (* (1- (sb!c:sc-offset-offset sc-offs))
+                                     sb!vm:n-word-bytes)
+                                  dstate)
+              (emit-note (get-sc-name sc-offs))))))
     (incf (dstate-next-offs dstate)
           adjust)))

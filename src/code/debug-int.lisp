@@ -2244,7 +2244,15 @@ register."
          (signed-sap-ref-word nfp (stack-frame-offset 1 0))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
-         (sap-ref-sap nfp (stack-frame-offset 1 0)))))))
+         (sap-ref-sap nfp (stack-frame-offset 1 0))))
+      (#.constant-sc-number
+       (if escaped
+           (code-header-ref
+            (component-from-component-ptr
+             (component-ptr-from-pc
+              (sb!vm:context-pc escaped)))
+            (sb!c:sc-offset-offset sc-offset))
+           :invalid-value-for-unescaped-register-storage)))))
 
 ;;; This stores value as the value of DEBUG-VAR in FRAME. In the
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if
