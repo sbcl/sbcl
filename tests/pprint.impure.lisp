@@ -352,11 +352,13 @@
                             (let ((*print-pretty* nil))
                               (format stream "[frood: ~D]" obj))))
      warning)
+    ;; We expect multiple warnings since the type specifier references
+    ;; multiple undefined things.
     (assert-signal
      (set-pprint-dispatch '(or weasel (and woodle (satisfies thing)))
                           (lambda (stream obj)
                             (format stream "hi ~A!" (type-of obj))))
-     warning)
+     warning 3)
     (write-to-string (macroexpand '(setf (values a b) (floor x y)))
                      :pretty t)
     ;; yay, we're not dead

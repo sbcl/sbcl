@@ -31,21 +31,43 @@
 (defmacro assert-error (form &optional (error-subtype-spec 'error))
   `(assert (typep (nth-value 1 (ignore-errors ,form)) ',error-subtype-spec)))
 
-(defmacro assert-signal (form &optional (signal-type 'condition))
-  (let ((signal (gensym)))
-    `(let (,signal)
-       (handler-bind ((,signal-type (lambda (c)
-                                      (setf ,signal c))))
-         ,form)
-       (assert ,signal))))
+(defun %assert-signal (thunk condition-type
+                       expected-min-count expected-max-count)
+  (declare (ignore condition-type))
+  (let ((count 0))
+    (prog1
+        (funcall thunk (lambda (condition)
+                         (incf count)
+                         (when (typep condition 'warning)
+                           (muffle-warning condition))))
+      (assert (<= expected-min-count count expected-max-count)))))
 
-(defmacro assert-no-signal (form &optional (signal-type 'condition))
-  (let ((signal (gensym)))
-    `(let (,signal)
-       (handler-bind ((,signal-type (lambda (c)
-                                      (setf ,signal c))))
-         ,form)
-       (assert (not ,signal)))))
+(defmacro assert-signal (form &optional
+                              (condition-type 'condition)
+                              (expected-min-count 1)
+                              (expected-max-count expected-min-count))
+  (let ((handle (gensym)))
+    `(%assert-signal
+      (lambda (,handle)
+        (handler-bind ((,condition-type ,handle)) ,form))
+      ',condition-type ,expected-min-count ,expected-max-count)))
+
+(defun %assert-no-signal (thunk condition-type)
+  (declare (ignore condition-type))
+  (let ((signaled-condition))
+    (prog1
+        (funcall thunk (lambda (condition)
+                         (setf signaled-condition condition)
+                         (when (typep condition 'warning)
+                           (muffle-warning condition))))
+      (assert (not signaled-condition)))))
+
+(defmacro assert-no-signal (form &optional (condition-type 'condition))
+  (let ((handle (gensym)))
+    `(%assert-no-signal
+      (lambda (,handle)
+        (handler-bind ((,condition-type ,handle)) ,form))
+      ',condition-type)))
 
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of

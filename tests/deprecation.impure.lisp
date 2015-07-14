@@ -177,12 +177,20 @@
                        :if-does-not-exist :create :if-exists :supersede)
       (write-string "(defun a () (quit))" f)
       ;; a full warning even though the PLEASE-DONT- function is only :early
-      (write-string "(defun b () (please-dont-use-this) (really-dont-do-it))" f)
-      (write-string "(defun c () (you-cant-use-this))" f))
+      (write-string "(defun b () (please-dont-use-this 1) (really-dont-do-it 2))" f)
+      (write-string "(defun c () (you-cant-use-this 3))" f))
+    ;; We expect four deprecation warnings from compiling the source
+    ;; (four uses of deprecated things) and three from loading it
+    ;; (loading three functions that contain uses of deprecated
+    ;; things).
     (unwind-protect
          (progn (setq fasl
-                      (let ((*error-output* (make-broadcast-stream)))
-                        (compile-file source :verbose nil :print nil)))
-                (assert-signal (load fasl) warning))
+                      (assert-signal
+                       (compile-file source :verbose nil :print nil)
+                       (or early-deprecation-warning
+                           late-deprecation-warning
+                           final-deprecation-warning)
+                       4))
+                (assert-signal (load fasl) warning 3))
       (delete-file fasl)
       (delete-file source))))

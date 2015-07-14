@@ -39,10 +39,12 @@
 (test-util:with-test (:name :compiler-macro-order-bug)
   ;; There is one explicit NOTINLINE, but we still get a warning.
   (assert-signal
-   (define-compiler-macro f-with-macro (arg) `(list ,arg)))
+   (define-compiler-macro f-with-macro (arg) `(list ,arg))
+   sb-c:compiler-macro-application-missed-warning)
   ;; To exercise both cases of the ~:P directive in the warning message.
   (assert-signal
-   (define-compiler-macro f2-with-macro (a b) `(list ,a ,b)))
+   (define-compiler-macro f2-with-macro (a b) `(list ,a ,b))
+   sb-c:compiler-macro-application-missed-warning)
 
   ;; There is a local notinline decl, so no warning about a compiler-macro.
   (assert-no-signal
@@ -57,7 +59,7 @@
 (defun use-h (x) (list (h x) (h x)))
 (with-test (:name :inline-failure-1)
   (assert-signal (declaim (inline g h))
-                 sb-c:inlining-dependency-failure))
+                 sb-c:inlining-dependency-failure 2))
 
 (declaim (inline fast-guy))
 (with-test (:name :inline-failure-2a)
@@ -66,7 +68,9 @@
 
 (defun zippy (y) y)
 (with-test (:name :inline-failure-2b)
-  (defun baz (arg) (declare (inline zippy)) (zippy arg)))
+  (assert-signal
+   (eval '(defun baz (arg) (declare (inline zippy)) (zippy arg)))
+   sb-c:inlining-dependency-failure))
 
 (locally (declare (muffle-conditions style-warning))
   (defun foofy1 (x) (and (somestruct-p x) 'hi)))
