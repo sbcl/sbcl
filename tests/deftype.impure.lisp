@@ -32,6 +32,12 @@
 (assert (subtypep 'deftype-with-empty-body nil))
 (assert (subtypep nil 'deftype-with-empty-body))
 
+;;; atom body
+(deftype deftype.atom-body () t)
+(with-test (:name (deftype atom :body))
+  (assert (subtypep 'deftype.atom-body t))
+  (assert (subtypep t 'deftype.atom-body)))
+
 ;; Ensure that DEFTYPE can successfully replace a DEFSTRUCT type
 ;; definition.
 (defstruct foo)
