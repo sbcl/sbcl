@@ -867,6 +867,7 @@
                                   :lambda-list lambda-list
                                   :minimum min
                                   :maximum ,effective-max))
+                 #!+sb-eval
                  (:eval
                   (error 'sb!eval::arg-count-program-error
                          ;; This is stupid. Maybe we should just say
