@@ -1255,8 +1255,9 @@
       (setf (car l) (cdar l)))
     (setq res (apply fun args))
     (case accumulate
-      (:nconc (setf (cdr temp) res
-                    temp (last res)))
+      (:nconc (when res
+                (setf (cdr temp) res
+                      temp (last res))))
       (:list (setf (cdr temp) (list res)
                    temp (cdr temp))))))
 
