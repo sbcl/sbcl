@@ -815,14 +815,14 @@ of specialized arrays is supported."
                       length rank))
              (loop for i below length
                    for s = (fast-&rest-nth i subscripts)
-                   always (and (fixnump s)
+                   always (and (typep s '(and fixnum unsigned-byte))
                                (< s (%array-dimension array i))))))
           ((/= length 1)
            (error "Wrong number of subscripts, ~W, for array of rank 1."
                   length))
           (t
            (let ((subscript (fast-&rest-nth 0 subscripts)))
-             (and (fixnump subscript)
+             (and (typep subscript '(and fixnum unsigned-byte))
                   (< subscript
                      (length (truly-the (simple-array * (*)) array)))))))))
 

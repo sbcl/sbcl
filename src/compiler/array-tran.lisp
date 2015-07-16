@@ -165,7 +165,7 @@
              (cond ((= (length subscripts) 1)
                     (let ((arg (sb!xc:gensym)))
                       `(lambda (array ,arg)
-                         (and (fixnump ,arg)
+                         (and (typep ,arg '(and fixnum unsigned-byte))
                               (< ,arg (array-dimension array 0))))))
                    (t
                     (give-up-ir1-transform
