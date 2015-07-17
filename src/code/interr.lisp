@@ -14,28 +14,27 @@
 
 ;;;; internal errors
 
-(defvar *internal-errors*
-  #.(map 'vector
-         (lambda (x) (if (typep (car x) '(or symbol cons)) (car x) 0))
-         sb!c:*backend-internal-errors*))
+(macrolet ((def-it ()
+             (let ((n (1+ (position-if 'stringp sb!c:+backend-internal-errors+
+                                       :key #'car :from-end t))))
+               `(progn
+                  (declaim ((simple-vector ,n) **internal-error-handlers**))
+                  (defglobal **internal-error-handlers**
+                    (make-array ,n :initial-element 0))))))
+  (def-it))
 
 (eval-when (:compile-toplevel :execute)
 (sb!xc:defmacro deferr (name args &rest body)
-  (let ((n (length args)))
-    (unless (<= n 3)
-      (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" n)))
-  `(progn
-     (setf (svref *internal-errors* ,(error-number-or-lose name))
+  (multiple-value-bind (llks required optional rest)
+      (parse-lambda-list args)
+    (aver (not rest))
+    (let ((max (+ (length required) (length rest))))
+      (unless (<= max 3)
+        (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" max))))
+  `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
          (lambda (name ,@args)
            (declare (optimize (sb!c::verify-arg-count 0)) (ignorable name))
-           ,@body))
-     ;; general KLUDGE: refer to each error symbol. Can't just return ',NAME
-     ;; - the compiler knows an effectless form when it sees one.
-     (locally (declare (notinline string)) (string ',name))))
-) ; EVAL-WHEN
-
-;; special KLUDGE for UNKNOWN-ERROR, which has no DEFERR at all
-(locally (declare (notinline string)) (string 'unknown-error))
+           ,@body)))) ; EVAL-WHEN
 
 (deferr undefined-fun-error (fdefn-or-symbol)
   (error 'undefined-function
@@ -266,10 +265,21 @@
             (/show0 "back from FIND-INTERRUPTED-NAME")
             (let ((*current-internal-error* error-number)
                   (fp (int-sap (sb!vm:context-register alien-context
-                                                       sb!vm::cfp-offset)))
-                  (handler (and (< -1 error-number (length *internal-errors*))
-                                (svref *internal-errors* error-number))))
-              (cond ((and (functionp handler)
+                                                       sb!vm::cfp-offset))))
+              (if (and (>= error-number (length **internal-error-handlers**))
+                       (< error-number (length sb!c:+backend-internal-errors+)))
+                  (error 'type-error
+                         :datum (sb!di::sub-access-debug-var-slot
+                                 fp (first arguments) alien-context)
+                         :expected-type
+                         (car (svref sb!c:+backend-internal-errors+
+                                     error-number)))
+                  (let ((handler
+                         (and (typep error-number
+                                     '#.`(mod ,(length **internal-error-handlers**)))
+                              (svref **internal-error-handlers** error-number))))
+                   (cond
+                    ((and (functionp handler)
                           (internal-error-args-ok arguments handler))
                      (macrolet ((arg (n)
                                   `(sb!di::sub-access-debug-var-slot
@@ -279,11 +289,6 @@
                          (1 (funcall handler name (arg 0)))
                          (2 (funcall handler name (arg 0) (arg 1)))
                          (3 (funcall handler name (arg 0) (arg 1) (arg 2))))))
-                    ((typep handler '(or symbol cons))
-                     (error 'type-error
-                            :datum (sb!di::sub-access-debug-var-slot
-                                    fp (first arguments) alien-context)
-                            :expected-type handler))
                     ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
                      (error 'simple-error
                             :format-control
@@ -303,7 +308,7 @@
                                   (mapcar (lambda (sc-offset)
                                             (sb!di::sub-access-debug-var-slot
                                              fp sc-offset alien-context))
-                                          arguments)))))))))))))
+                                          arguments)))))))))))))))
 
 (defun control-stack-exhausted-error ()
   (let ((sb!debug:*stack-top-hint* nil))

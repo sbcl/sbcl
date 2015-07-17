@@ -1260,9 +1260,10 @@ register."
   (when (and (compiled-frame-p frame)
              (compiled-frame-escaped frame)
              sb!kernel::*current-internal-error*
-             (array-in-bounds-p sb!c:*backend-internal-errors*
+             (array-in-bounds-p sb!c:+backend-internal-errors+
                                 sb!kernel::*current-internal-error*))
-    (cdr (svref sb!c:*backend-internal-errors* sb!kernel::*current-internal-error*))))
+    (cdr (svref sb!c:+backend-internal-errors+
+                sb!kernel::*current-internal-error*))))
 
 (defun tl-invalid-arg-count-error-p (frame)
   (and (eq (interrupted-frame-error frame)

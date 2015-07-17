@@ -1946,7 +1946,7 @@
       (return (note (lambda (s) (prin1 symbol s)) dstate)))))
 
 (defun get-internal-error-name (errnum)
-  (cdr (svref sb!c:*backend-internal-errors* errnum)))
+  (cdr (svref sb!c:+backend-internal-errors+ errnum)))
 
 (defun get-sc-name (sc-offs)
   (sb!c:location-print-name

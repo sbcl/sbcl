@@ -432,7 +432,7 @@
                    (lambda (entry)
                      (cons (type-specifier (specifier-type (car entry)))
                            (cdr entry)))
-                   (remove-if #'stringp sb!c:*backend-internal-errors*
+                   (remove-if #'stringp sb!c:+backend-internal-errors+
                               :key #'car)))
            ;; This is effectively a compact read-only binned hashtable.
            (hashtable (make-array (logior (length entries) 1)
