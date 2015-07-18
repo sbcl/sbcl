@@ -882,6 +882,10 @@ core and return a descriptor to it."
                     #!+sb-thruption
                     sb!sys:*thruption-pending*))
 
+;;; Symbol print names are coalesced by string=.
+;;; This is valid because it is an error to modify a print name.
+(defvar *symbol-name-strings* (make-hash-table :test 'equal))
+
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (name &key (gspace *dynamic*))
   (declare (simple-string name))
@@ -891,7 +895,9 @@ core and return a descriptor to it."
     (write-wordindexed symbol sb!vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-info-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
-                       (base-string-to-core name *dynamic*))
+                       (or (gethash name *symbol-name-strings*)
+                           (setf (gethash name *symbol-name-strings*)
+                                 (base-string-to-core name *dynamic*))))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
     symbol))
 
