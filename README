@@ -27,6 +27,8 @@ system, please send mail to one of the mailing lists:
 Note that as a spam reduction measure you must subscribe to the lists
 before you can post.
 
+The "HACKING" file has more details regarding hacking on and
+contributing to SBCL.
 
 SYSTEM-SPECIFIC HINTS
 
