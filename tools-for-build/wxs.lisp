@@ -21,24 +21,34 @@
 (defun print-xml (sexp &optional (stream *standard-output*))
   (destructuring-bind (tag &optional attributes &body children) sexp
     (when attributes (assert (evenp (length attributes))))
-    (format stream "~VT<~A~{ ~A='~A'~}~@[/~]>~%"
+    (format stream "~V@T<~A~{ ~A='~A'~}~@[/~]>~%"
             *indent-level* tag attributes (not children))
-      (let ((*indent-level* (+ *indent-level* 3)))
-        (dolist (child children)
-          (unless (listp child)
-            (error "Malformed child: ~S in ~S" child children))
-          (print-xml child stream)))
-      (when children
-        (format stream "~VT</~A>~%" *indent-level* tag))))
+    (let ((*indent-level* (+ *indent-level* 3)))
+      (dolist (child children)
+        (unless (listp child)
+          (error "Malformed child: ~S in ~S" child children))
+        (print-xml child stream)))
+    (when children
+      (format stream "~V@T</~A>~%" *indent-level* tag))))
 
 (defun xml-1.0 (pathname sexp)
   (with-open-file (xml pathname :direction :output :if-exists :supersede
                        :external-format :ascii)
-     (format xml "<?xml version='1.0'?>")
+     (format xml "<?xml version='1.0'?>~%")
      (print-xml sexp xml)))
 
 (defun application-name ()
-  (format nil "Steel Bank Common Lisp ~A (~A)" (lisp-implementation-version) (machine-type)))
+  "Steel Bank Common Lisp")
+
+(defun application-name/version+machine-type ()
+  (format nil "~A ~A (~A)"
+          (application-name) (lisp-implementation-version) (machine-type)))
+
+(defun manufacturer-name ()
+  "http://www.sbcl.org")
+
+(defun upgrade-code ()
+  "BFF1D4CA-0153-4AAC-BB21-06DC4B8EAD7D")
 
 (defun version-digits (&optional (horrible-thing (lisp-implementation-version)))
   "Turns something like 0.pre7.14.flaky4.13 (see version.lisp-expr)
@@ -183,13 +193,13 @@
    pathname
    `("Wix" ("xmlns" "http://schemas.microsoft.com/wix/2006/wi")
      ("Product" ("Id" "*"
-                 "Name" ,(application-name)
+                 "Name" ,(application-name/version+machine-type)
                  "Version" ,(version-digits)
-                 "Manufacturer" "http://www.sbcl.org"
-                 "UpgradeCode" "BFF1D4CA-0153-4AAC-BB21-06DC4B8EAD7D"
+                 "Manufacturer" ,(manufacturer-name)
+                 "UpgradeCode" ,(upgrade-code)
                  "Language" 1033)
       ("Package" ("Id" "*"
-                  "Manufacturer" "http://www.sbcl.org"
+                  "Manufacturer" ,(manufacturer-name)
                   "InstallerVersion" 200
                   "Compressed" "yes"
                   #+x86-64 "Platform" #+x86-64 "x64"
@@ -199,7 +209,7 @@
                 "EmbedCab" "yes"))
       ("Property" ("Id" "PREVIOUSVERSIONSINSTALLED"
                    "Secure" "yes"))
-      ("Upgrade" ("Id" "BFF1D4CA-0153-4AAC-BB21-06DC4B8EAD7D")
+      ("Upgrade" ("Id" ,(upgrade-code))
        ("UpgradeVersion" ("Minimum" "1.0.0"
                           "Maximum" "99.0.0"
                           "Property" "PREVIOUSVERSIONSINSTALLED"
@@ -211,7 +221,7 @@
                     "Name" "SourceDir")
        ("Directory" ("Id" "ProgramMenuFolder")
         ("Directory" ("Id" "ProgramMenuDir"
-                      "Name" ,(application-name))
+                      "Name" ,(application-name/version+machine-type))
          ("Component" ("Id" "ProgramMenuDir"
                        "Guid" ,(make-guid))
           ("RemoveFolder" ("Id" "ProgramMenuDir"
@@ -224,7 +234,7 @@
        ("Directory" ("Id" #-x86-64 "ProgramFilesFolder" #+x86-64 "ProgramFiles64Folder"
                      "Name" "PFiles")
         ("Directory" ("Id" "BaseFolder"
-                      "Name" "Steel Bank Common Lisp")
+                      "Name" ,(application-name))
          ("Directory" ("Id" "VersionFolder"
                        "Name" ,(lisp-implementation-version))
           ("Directory" ("Id" "INSTALLDIR")
@@ -269,7 +279,7 @@
                      "KeyPath" "yes")
                     ("Shortcut" ("Id" "sbcl.lnk"
                                  "Advertise" "yes"
-                                 "Name" ,(application-name)
+                                 "Name" ,(application-name/version+machine-type)
                                  "Directory" "ProgramMenuDir"
                                  "Arguments" "--core \"[#sbcl.core]\""))))
            ,@(collect-contrib-components))))))
