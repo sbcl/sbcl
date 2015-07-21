@@ -21,6 +21,8 @@ changes relative to sbcl-1.2.13:
   * bug fix: variables with EQL types are no longer treated as constants by
     VOPs, which caused problems with closures being allocated for such
     variables, but they remained unused. (lp#1390149)
+  * bug fix: Windows installer generates registry key name
+    correctly. (lp#1476447)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE

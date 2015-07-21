@@ -217,7 +217,7 @@
           ("RemoveFolder" ("Id" "ProgramMenuDir"
                            "On" "uninstall"))
           ("RegistryValue" ("Root" "HKCU"
-                            "Key" "Software\[Manufacturer]\[ProductName]"
+                            "Key" "Software\\[Manufacturer]\\[ProductName]"
                             "Type" "string"
                             "Value" ""
                             "KeyPath" "yes")))))
