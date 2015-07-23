@@ -1247,11 +1247,11 @@
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type)))
     (cond
-      ((eql element-ctype *empty-type*)
+      ((eq element-ctype *empty-type*)
        `(data-nil-vector-ref array index))
       ((and (array-type-p type)
             (null (array-type-complexp type))
-            (not (eql element-ctype *wild-type*))
+            (neq element-ctype *wild-type*)
             (eql (length (array-type-dimensions type)) 1))
        (let* ((declared-element-ctype (array-type-declared-element-type type))
               (bare-form
@@ -1283,7 +1283,7 @@
                   ;; use that information it for type checking (even
                   ;; if the access can't be optimized due to the array
                   ;; not being simple).
-                  (when (and (eql element-type *wild-type*)
+                  (when (and (eq element-type *wild-type*)
                              ;; This type logic corresponds to the special
                              ;; case for strings in HAIRY-DATA-VECTOR-REF
                              ;; (generic/vm-tran.lisp)

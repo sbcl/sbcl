@@ -42,9 +42,9 @@
 (assert (type= *empty-type*
                (type-intersection (specifier-type 'list)
                                   (specifier-type 'vector))))
-(assert (eql *empty-type*
-             (type-intersection (specifier-type 'list)
-                                (specifier-type 'vector))))
+(assert (type= *empty-type*
+               (type-intersection (specifier-type 'list)
+                                  (specifier-type 'vector))))
 (assert (type= (specifier-type 'null)
                (type-intersection (specifier-type 'list)
                                   (specifier-type '(or vector null)))))
@@ -60,9 +60,9 @@
 (assert (type= (specifier-type 'list)
                (type-intersection (specifier-type 'sequence)
                                   (specifier-type 'list))))
-(assert (eql *empty-type*
-             (type-intersection (specifier-type '(satisfies keywordp))
-                                *empty-type*)))
+(assert (type= *empty-type*
+               (type-intersection (specifier-type '(satisfies keywordp))
+                                  *empty-type*)))
 
 (assert (type= (specifier-type 'list)
                (type-union (specifier-type 'cons) (specifier-type 'null))))
@@ -102,20 +102,20 @@
   (/show type-specifier)
   (let ((ctype (specifier-type type-specifier)))
 
-    (assert (eql *empty-type* (type-intersection ctype *empty-type*)))
-    (assert (eql *empty-type* (type-intersection *empty-type* ctype)))
-    (assert (eql *empty-type* (type-intersection2 ctype *empty-type*)))
-    (assert (eql *empty-type* (type-intersection2 *empty-type* ctype)))
+    (assert (type= *empty-type* (type-intersection ctype *empty-type*)))
+    (assert (type= *empty-type* (type-intersection *empty-type* ctype)))
+    (assert (type= *empty-type* (type-intersection2 ctype *empty-type*)))
+    (assert (type= *empty-type* (type-intersection2 *empty-type* ctype)))
 
     (assert (type= ctype (type-intersection ctype *universal-type*)))
     (assert (type= ctype (type-intersection *universal-type* ctype)))
     (assert (type= ctype (type-intersection2 ctype *universal-type*)))
     (assert (type= ctype (type-intersection2 *universal-type* ctype)))
 
-    (assert (eql *universal-type* (type-union ctype *universal-type*)))
-    (assert (eql *universal-type* (type-union *universal-type* ctype)))
-    (assert (eql *universal-type* (type-union2 ctype *universal-type*)))
-    (assert (eql *universal-type* (type-union2 *universal-type* ctype)))
+    (assert (type= *universal-type* (type-union ctype *universal-type*)))
+    (assert (type= *universal-type* (type-union *universal-type* ctype)))
+    (assert (type= *universal-type* (type-union2 ctype *universal-type*)))
+    (assert (type= *universal-type* (type-union2 *universal-type* ctype)))
 
     (assert (type= ctype (type-union ctype *empty-type*)))
     (assert (type= ctype (type-union *empty-type* ctype)))

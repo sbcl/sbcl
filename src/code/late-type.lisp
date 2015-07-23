@@ -1658,7 +1658,7 @@
          (nseltype (array-type-specialized-element-type ntype))
          (neltype (array-type-element-type ntype)))
     (if (and (eql ndims '*) (null ncomplexp)
-             (eql neltype *wild-type*) (eql nseltype *wild-type*))
+             (eq neltype *wild-type*) (eq nseltype *wild-type*))
         (make-array-type (array-type-dimensions type1)
                          :complexp t
                          :element-type (array-type-element-type type1)

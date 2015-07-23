@@ -982,7 +982,7 @@
                   (nil (lambda-var-constraints var) :exit-if-null))
          (when (policy node (and (= speed 3) (> speed compilation-speed)))
            (let ((type (lambda-var-type var)))
-             (unless (eql *universal-type* type)
+             (unless (eq *universal-type* type)
                (do-eql-vars (other (var gen))
                  (unless (eql other var)
                    (conset-add-constraint gen 'typep other type nil))))))
