@@ -56,7 +56,8 @@
         ;; make-load-form processing then we need to do it now (bug
         ;; 310132).
         (setf (entry-info-arguments info)
-              (constant-value (find-constant args))))
+              (constant-value
+               (find-constant (strip-lambda-list args :arglist)))))
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
   (values))
 

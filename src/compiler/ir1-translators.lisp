@@ -501,9 +501,9 @@ Return VALUE without evaluating it."
   (case (car thing)
     ((named-lambda)
      (or (second thing)
-         `(lambda ,(third thing) ,(name-context))))
+         `(lambda ,(strip-lambda-list (third thing) :name) ,(name-context))))
     ((lambda)
-     `(lambda ,(second thing) ,@(name-context)))
+     `(lambda ,(strip-lambda-list (second thing) :name) ,@(name-context)))
     ((lambda-with-lexenv)
      ;; FIXME: Get the original DEFUN name here.
      `(lambda ,(fifth thing)))

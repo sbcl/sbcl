@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.13:
+  * minor incompatible change: The name of a compiled anonymous lambda
+    as returned by the third value of FUNCTION-LAMBDA-EXPRESSION can have
+    a lambda-list-like list following the introductory LAMBDA that is not
+    in general a syntactically valid lambda list. Specifically, it won't
+    retain default values, supplied-p variables, or &KEY or &AUX bindings.
   * enhancement: DESTRUCTURING-BIND has been totally reimplemented from
     scratch to address a handful of performance and correctness issues.
     Some minor behavioral differences exist regarding order of evaluation

@@ -1124,4 +1124,32 @@
          :minimum minimum
          :maximum maximum))
 
+;;; Functions should probably not retain &AUX variables as part
+;;; of their reflected lambda list, but this is selectable
+;;; because some users might claim that dropping &AUX is wrong.
+;;; For system code, it's a measurably large waste of space,
+;;; given how DEFTRANSFORM and a few other macros expand such
+;;; that argument parsing is performed in &AUX var initforms.
+(defvar *strip-lamba-list-retain-aux* #+sb-xc t #-sb-xc nil)
+
+;;; Return LAMBDA-LIST with some pieces removed.
+(defun strip-lambda-list (lambda-list how)
+  (handler-case (parse-lambda-list lambda-list :silent t)
+   (error () lambda-list)
+   (:no-error (llks req opt rest keys aux &rest ignore)
+     (declare (ignore ignore))
+     (multiple-value-bind (opt keys aux)
+         (ecase how
+          (:arglist
+           (values opt keys (if *strip-lamba-list-retain-aux* aux nil)))
+          ;; The name of an anonymous lambda is an arbitrary list,
+          ;; not necessarily the original list.
+          (:name (values (mapcar #'parse-optional-arg-spec opt); Keep name.
+                         (mapcar #'parse-key-arg-spec keys) ; Keep keyword.
+                         nil))) ; Discard &AUX vars
+       (let ((new (make-lambda-list llks nil req opt rest keys aux)))
+         ;; It is harmful to the space-saving effect of this function
+         ;; if reconstituting the list results in an unnecessary copy.
+         (if (equal new lambda-list) lambda-list new))))))
+
 (/show0 "parse-lambda-list.lisp end of file")
