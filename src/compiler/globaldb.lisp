@@ -625,9 +625,6 @@
 (define-info-type (:type :compiler-layout)
   :type-spec (or layout null)
   :default (lambda (name)
-             ;; The IR1-transform for FIND-CLASSOID hasn't been defined yet,
-             ;; but that's ok because the first arg is non-constant
-             ;; and so the call wouldn't be transformed.
              (let ((class (find-classoid name nil)))
                (when class (classoid-layout class)))))
 
