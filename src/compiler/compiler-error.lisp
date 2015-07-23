@@ -182,7 +182,7 @@
                           ,(or pos (1- (file-position
                                         (stream-error-stream condition)))))))
                       (pos
-                       (sb!kernel::stream-error-position-info
+                       (stream-error-position-info
                         (stream-error-stream condition) pos))))))))
 
 (define-condition input-error-in-load (input-error-in-compile-file) ()

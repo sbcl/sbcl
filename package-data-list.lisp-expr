@@ -1018,6 +1018,7 @@ possibly temporarily, because it might be used internally."
                "SIMPLE-STREAM-ERROR"
                "SIMPLE-STORAGE-CONDITION"
                "SIMPLE-STYLE-WARNING"
+               "STREAM-ERROR-POSITION-INFO"
                "TRY-RESTART"
 
                ;; error-signalling facilities
