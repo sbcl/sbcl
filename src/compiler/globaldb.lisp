@@ -198,7 +198,7 @@
                           x
                           (error "~S is not a ~S" x ',type-spec))))
                   (t
-                   `(lambda (x) (the ,type-spec x))))
+                   `(named-lambda "check-type" (x) (the ,type-spec x))))
            ,validate-function ,default
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
            ,(or (and (eq category :function) (eq kind :definition)

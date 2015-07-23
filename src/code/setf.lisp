@@ -467,7 +467,8 @@
          `(eval-when (:compile-toplevel :load-toplevel :execute)
             (%defsetf ',access-fn
                       (cons ,(length stores)
-                            (lambda (,subforms ,env-var ,@stores)
+                            (named-lambda (%defsetf ,access-fn)
+                                          (,subforms ,env-var ,@stores)
                               ,@(if outer-decls (list outer-decls))
                               ,@(unless env `((declare (ignore ,env-var))))
                               (apply (lambda ,lambda-list

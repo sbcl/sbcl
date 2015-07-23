@@ -459,7 +459,8 @@
                 ,(if eval-name
                      ``(function ,,arg-types ,,result-type)
                      `'(function ,arg-types ,result-type))
-                (lambda ,@stuff)
+                (named-lambda ,(if eval-name "xform" `(deftransform ,name))
+                              ,@stuff)
                 ,doc
                 ,important)))))))
 

@@ -32,7 +32,7 @@
       (unless (<= max 3)
         (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" max))))
   `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
-         (lambda (name ,@args)
+         (named-lambda ,(string name) (name ,@args)
            (declare (optimize (sb!c::verify-arg-count 0)) (ignorable name))
            ,@body)))) ; EVAL-WHEN
 

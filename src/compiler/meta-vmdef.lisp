@@ -777,7 +777,7 @@
                     (tn-ref-tn ,(operand-parse-temp op)))))
           ((:more-argument :more-result))))
 
-      `(lambda (,n-vop)
+      `(named-lambda (vop ,(vop-parse-name parse)) (,n-vop)
          (let* (,@(access-operands (vop-parse-args parse)
                                    (vop-parse-more-args parse)
                                    `(vop-args ,n-vop))
@@ -1344,7 +1344,7 @@
                                 `(primitive-type-or-lose ',type))
                               (rest type))))
            (:constant
-            ``(:constant ,#'(lambda (x)
+            ``(:constant ,(named-lambda (vop-arg-typep) (x)
                               ;; Can't handle SATISFIES during XC
                               ,(if (and (consp (second type))
                                         (eq (caadr type) 'satisfies))

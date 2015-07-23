@@ -531,12 +531,11 @@
           (:report
            (let ((arg (second option)))
              (setq report
-                   (if (stringp arg)
-                       `#'(lambda (condition stream)
-                            (declare (ignore condition))
-                            (write-string ,arg stream))
-                       `#'(lambda (condition stream)
-                            (funcall #',arg condition stream))))))
+                   `#'(named-lambda (condition-report ,name) (condition stream)
+                        ,@(if (stringp arg)
+                              `((declare (ignore condition))
+                                (write-string ,arg stream))
+                              `((funcall #',arg condition stream)))))))
           (:default-initargs
            (doplist (initarg initform) (rest option)
              (push ``(,',initarg ,',initform ,#'(lambda () ,initform))

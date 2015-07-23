@@ -320,7 +320,8 @@ EXPERIMENTAL INTERFACE: Subject to change."
                   :name ',name
                   :expression ',expression
                   ;; DESCRIBE-COMPILER-POLICY uses the getter
-                  :getter (lambda (policy) (policy policy ,expression))
+                  :getter (named-lambda ,(string name) (policy)
+                            (policy policy ,expression))
                   :values-documentation ',values-documentation)))
        (if number
            (setf (svref **policy-dependent-qualities** number) item)
