@@ -585,6 +585,13 @@
        ;; Delay the type transform to give type propagation a chance.
        (delay-ir1-transform node :constraint)
 
+       ;; FIXME: (TYPEP X 'ERROR) - or any condition - checks whether X
+       ;; has the lowtag of either an ordinary or funcallable instance.
+       ;; But you can not define a class that is both CONDITION and FUNCTION
+       ;; because CONDITION-CLASS and FUNCALLABLE-STANDARD-CLASS are
+       ;; incompatible metaclasses. Thus the type test is less efficient than
+       ;; could be, since fun-pointer-lowtag can not occur in the "true" case.
+
        ;; Otherwise transform the type test.
        (binding* (((pred get-layout)
                    (cond ((csubtypep class (specifier-type 'funcallable-instance))
