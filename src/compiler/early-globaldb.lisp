@@ -175,3 +175,22 @@
 
   (def clear-info (category kind name)
     `(clear-info-values ,name '(,(meta-info-number meta-info)))))
+
+;; Perform the approximate equivalent operations of retrieving
+;; (INFO :CATEGORY :KIND NAME), but if no info is found, invoke CREATION-FORM
+;; to produce an object that becomes the value for that piece of info, storing
+;; and returning it. The entire sequence behaves atomically but with a proviso:
+;; the creation form's result may be discarded, and another object returned
+;; instead (presumably) from another thread's execution of the creation form.
+;; If constructing the object has either non-trivial cost, or deleterious
+;; side-effects from making and discarding its result, do NOT use this macro.
+;; A mutex-guarded table would probably be more appropriate in such cases.
+;;
+(defmacro get-info-value-initializing (category kind name creation-form)
+  (with-unique-names (info-number proc)
+    `(let ((,info-number
+            ,(if (and (keywordp category) (keywordp kind))
+                 (meta-info-number (meta-info category kind))
+                 `(meta-info-number (meta-info ,category ,kind)))))
+       (dx-flet ((,proc () ,creation-form))
+         (%get-info-value-initializing ,name ,info-number #',proc)))))

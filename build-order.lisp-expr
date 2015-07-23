@@ -131,6 +131,8 @@
  ("src/code/unportable-float")
  ("src/compiler/policy")
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
+ ;; ERROR should be known as a condition subtype as soon as possible.
+ ("src/code/condition-boot" :not-host)
  ("src/compiler/parse-lambda-list")
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
@@ -321,6 +323,7 @@
  ("src/compiler/macros")
 
  ("src/compiler/fun-info")
+ ("src/code/early-classoid")
  ("src/compiler/globaldb")
  ("src/compiler/info-functions")
 
@@ -329,6 +332,8 @@
 
  ;; needed by "compiler/vop"
  ("src/compiler/sset")
+ ("src/code/xset") ; for representation of MEMBER type
+ ("src/code/early-type")
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node")
@@ -361,16 +366,12 @@
 
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/target/vm")
- ("src/code/xset")
- ;; for e.g. SPECIFIER-TYPE, needed by primtype.lisp
- ("src/code/early-type")
 
  ;; FIXME: Classic CMU CL had (OPTIMIZE (SAFETY 2) (DEBUG 2) declared
  ;; around the compilation of "code/class". Why?
  ("src/code/class")
 
- ;; The definition of CONDITION-CLASS depends on SLOT-CLASS, defined
- ;; in class.lisp.
+ ("src/code/early-condition")
  ("src/code/condition" :not-host)
 
  ("src/compiler/generic/primtype")

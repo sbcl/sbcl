@@ -189,7 +189,7 @@
                   ;; when building the cross-compiler.
                   #+sb-xc-host
                   ((member type-spec
-                           '((or fdefn null) (or layout null)
+                           '((or fdefn null)
                              (or alien-type null) (or heap-alien-info null))
                            :test 'equal)
                    `(lambda (x)
@@ -314,25 +314,6 @@
       (when hookp
         (funcall (truly-the function (cdr hook)) name info-number answer nil))
       (values answer nil))))
-
-;; Perform the approximate equivalent operations of retrieving
-;; (INFO :CATEGORY :KIND NAME), but if no info is found, invoke CREATION-FORM
-;; to produce an object that becomes the value for that piece of info, storing
-;; and returning it. The entire sequence behaves atomically but with a proviso:
-;; the creation form's result may be discarded, and another object returned
-;; instead (presumably) from another thread's execution of the creation form.
-;; If constructing the object has either non-trivial cost, or deleterious
-;; side-effects from making and discarding its result, do NOT use this macro.
-;; A mutex-guarded table would probably be more appropriate in such cases.
-;;
-(def!macro get-info-value-initializing (category kind name creation-form)
-  (with-unique-names (info-number proc)
-    `(let ((,info-number
-            ,(if (and (keywordp category) (keywordp kind))
-                 (meta-info-number (meta-info category kind))
-                 `(meta-info-number (meta-info ,category ,kind)))))
-       (dx-flet ((,proc () ,creation-form))
-         (%get-info-value-initializing ,name ,info-number #',proc)))))
 
 ;; interface to %ATOMIC-SET-INFO-VALUE
 ;; GET-INFO-VALUE-INITIALIZING is a restricted case of this,
@@ -619,10 +600,34 @@
 ;;; The classoid-cell for this type
 (define-info-type (:type :classoid-cell) :type-spec t)
 
+(defun find-classoid-cell (name &key create)
+  (let ((real-name (uncross name)))
+    (cond ((info :type :classoid-cell real-name))
+          (create
+           (get-info-value-initializing
+            :type :classoid-cell real-name
+            (sb!kernel::make-classoid-cell real-name))))))
+
+;;; Return the classoid with the specified NAME. If ERRORP is false,
+;;; then NIL is returned when no such class exists.
+(defun find-classoid (name &optional (errorp t))
+  (declare (type symbol name))
+  (let ((cell (find-classoid-cell name)))
+    (cond ((and cell (classoid-cell-classoid cell)))
+          (errorp
+           (error 'simple-type-error
+                  :datum nil
+                  :expected-type 'class
+                  :format-control "Class not yet defined: ~S"
+                  :format-arguments (list name))))))
+
 ;;; layout for this type being used by the compiler
 (define-info-type (:type :compiler-layout)
   :type-spec (or layout null)
   :default (lambda (name)
+             ;; The IR1-transform for FIND-CLASSOID hasn't been defined yet,
+             ;; but that's ok because the first arg is non-constant
+             ;; and so the call wouldn't be transformed.
              (let ((class (find-classoid name nil)))
                (when class (classoid-layout class)))))
 

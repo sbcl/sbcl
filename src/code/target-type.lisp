@@ -218,3 +218,65 @@
                      :specialized-element-type etype)))
 
 (!defun-from-collected-cold-init-forms !target-type-cold-init)
+
+;;;; Some functions for examining the type system
+;;;; which are not needed during self-build.
+
+(defun typexpand-all (type-specifier &optional env)
+  #!+sb-doc
+  "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
+  (declare (type type-specifier type-specifier))
+  (declare (ignore env))
+  ;; I first thought this would not be a good implementation because
+  ;; it signals an error on e.g. (CONS 1 2) until I realized that
+  ;; walking and calling TYPEXPAND would also result in errors, and
+  ;; it actually makes sense.
+  ;;
+  ;; There's still a small problem in that
+  ;;   (TYPEXPAND-ALL '(CONS * FIXNUM)) => (CONS T FIXNUM)
+  ;; whereas walking+typexpand would result in (CONS * FIXNUM).
+  ;;
+  ;; Similiarly, (TYPEXPAND-ALL '(FUNCTION (&REST T) *)) => FUNCTION.
+  (type-specifier (values-specifier-type type-specifier)))
+
+(defun defined-type-name-p (name &optional env)
+  #!+sb-doc
+  "Returns T if NAME is known to name a type specifier, otherwise NIL."
+  (declare (symbol name))
+  (declare (ignore env))
+  (and (info :type :kind name) t))
+
+(defun valid-type-specifier-p (type-specifier &optional env)
+  #!+sb-doc
+  "Returns T if TYPE-SPECIFIER is a valid type specifier, otherwise NIL.
+
+There may be different metrics on what constitutes a \"valid type
+specifier\" depending on context. If this function does not suit your
+exact need, you may be able to craft a particular solution using a
+combination of DEFINED-TYPE-NAME-P and the TYPEXPAND functions.
+
+The definition of \"valid type specifier\" employed by this function
+is based on the following mnemonic:
+
+          \"Would TYPEP accept it as second argument?\"
+
+Except that unlike TYPEP, this function fully supports compound
+FUNCTION type specifiers, and the VALUES type specifier, too.
+
+In particular, VALID-TYPE-SPECIFIER-P will return NIL if
+TYPE-SPECIFIER is not a class, not a symbol that is known to name a
+type specifier, and not a cons that represents a known compound type
+specifier in a syntactically and recursively correct way.
+
+Examples:
+
+  (valid-type-specifier-p '(cons * *))     => T
+  (valid-type-specifier-p '#:foo)          => NIL
+  (valid-type-specifier-p '(cons * #:foo)) => NIL
+  (valid-type-specifier-p '(cons 1 *)      => NIL
+
+Experimental."
+  (declare (ignore env))
+  (handler-case (prog1 t (values-specifier-type type-specifier))
+    (parse-unknown-type () nil)
+    (error () nil)))

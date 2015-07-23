@@ -109,67 +109,7 @@
 
 ;;; The DEFSTRUCT-DESCRIPTION structure holds compile-time information
 ;;; about a structure type.
-(def!struct (defstruct-description
-             (:conc-name dd-)
-             (:make-load-form-fun just-dump-it-normally)
-             #-sb-xc-host (:pure t)
-             (:constructor make-defstruct-description (name)))
-  ;; name of the structure
-  (name (missing-arg) :type symbol :read-only t)
-  ;; documentation on the structure
-  (doc nil :type (or string null))
-  ;; prefix for slot names. If NIL, none.
-  (conc-name nil :type (or string null))
-  ;; the name of the primary standard keyword constructor, or NIL if none
-  (default-constructor nil :type symbol)
-  ;; all the explicit :CONSTRUCTOR specs, with name defaulted
-  (constructors () :type list)
-  ;; name of copying function
-  (copier-name nil :type symbol)
-  ;; name of type predicate
-  (predicate-name nil :type symbol)
-  ;; the arguments to the :INCLUDE option, or NIL if no included
-  ;; structure
-  (include nil :type list)
-  ;; properties used to define structure-like classes with an
-  ;; arbitrary superclass and that may not have STRUCTURE-CLASS as the
-  ;; metaclass. Syntax is:
-  ;;    (superclass-name metaclass-name metaclass-constructor)
-  (alternate-metaclass nil :type list)
-  ;; a list of DEFSTRUCT-SLOT-DESCRIPTION objects for all slots
-  ;; (including included ones)
-  (slots () :type list)
-  ;; a list of (NAME . INDEX) pairs for accessors of included structures
-  (inherited-accessor-alist () :type list)
-  ;; number of elements we've allocated (See also RAW-LENGTH, which is not
-  ;; included in LENGTH.)
-  (length 0 :type index)
-  ;; General kind of implementation.
-  (type 'structure :type (member structure vector list
-                                 funcallable-structure))
-
-  ;; The next three slots are for :TYPE'd structures (which aren't
-  ;; classes, DD-CLASS-P = NIL)
-  ;;
-  ;; vector element type
-  (element-type t)
-  ;; T if :NAMED was explicitly specified, NIL otherwise
-  (named nil :type boolean)
-  ;; any INITIAL-OFFSET option on this direct type
-  (offset nil :type (or index null))
-
-  ;; which :PRINT-mumble option was given, if either was.
-  (print-option nil :type (member nil :print-function :print-object))
-  ;; the argument to the PRINT-FUNCTION or PRINT-OBJECT option.
-  ;; NIL if the option was given with no argument.
-  (printer-fname nil :type (or cons symbol))
-
-  ;; The number of untagged slots at the end.
-  #!-interleaved-raw-slots (raw-length 0 :type index)
-  ;; the value of the :PURE option, or :UNSPECIFIED. This is only
-  ;; meaningful if DD-CLASS-P = T.
-  (pure :unspecified :type (member t nil :unspecified)))
-#!-sb-fluid (declaim (freeze-type defstruct-description))
+;;; Its definition occurs in 'early-classoid.lisp'
 (def!method print-object ((x defstruct-description) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (prin1 (dd-name x) stream)))

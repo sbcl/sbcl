@@ -11,6 +11,14 @@
 
 (!begin-collecting-cold-init-forms)
 
+;;; the description of a &KEY argument
+(defstruct (key-info #-sb-xc-host (:pure t)
+                     (:copier nil))
+  ;; the key (not necessarily a keyword in ANSI Common Lisp)
+  (name (missing-arg) :type symbol :read-only t)
+  ;; the type of the argument value
+  (type (missing-arg) :type ctype :read-only t))
+
 ;;;; representations of types
 
 ;;; A HAIRY-TYPE represents anything too weird to be described
@@ -788,6 +796,8 @@
         (mark-ctype-interned
          (%make-cons-type *universal-type* *universal-type*))))
 
+#+sb-xc-host
+(declaim (ftype (sfunction (ctype ctype) (values t t)) type=))
 (defun make-cons-type (car-type cdr-type)
   (aver (not (or (eq car-type *wild-type*)
                  (eq cdr-type *wild-type*))))
@@ -801,23 +811,6 @@
          *cons-t-t-type*)
         (t
          (%make-cons-type car-type cdr-type))))
-
-(defun cons-type-length-info (type)
-  (declare (type cons-type type))
-  (do ((min 1 (1+ min))
-       (cdr (cons-type-cdr-type type) (cons-type-cdr-type cdr)))
-      ((not (cons-type-p cdr))
-       (cond
-         ((csubtypep cdr (specifier-type 'null))
-          (values min t))
-         ((csubtypep *universal-type* cdr)
-          (values min nil))
-         ((type/= (type-intersection (specifier-type 'cons) cdr) *empty-type*)
-          (values min nil))
-         ((type/= (type-intersection (specifier-type 'null) cdr) *empty-type*)
-          (values min t))
-         (t (values min :maybe))))
-    ()))
 
 ;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
 #!+sb-simd-pack
@@ -963,65 +956,6 @@ expansion happened."
     (if flag
         (values (typexpand expansion env) t)
         (values expansion flag))))
-
-(defun typexpand-all (type-specifier &optional env)
-  #!+sb-doc
-  "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
-  (declare (type type-specifier type-specifier))
-  (declare (ignore env))
-  ;; I first thought this would not be a good implementation because
-  ;; it signals an error on e.g. (CONS 1 2) until I realized that
-  ;; walking and calling TYPEXPAND would also result in errors, and
-  ;; it actually makes sense.
-  ;;
-  ;; There's still a small problem in that
-  ;;   (TYPEXPAND-ALL '(CONS * FIXNUM)) => (CONS T FIXNUM)
-  ;; whereas walking+typexpand would result in (CONS * FIXNUM).
-  ;;
-  ;; Similiarly, (TYPEXPAND-ALL '(FUNCTION (&REST T) *)) => FUNCTION.
-  (type-specifier (values-specifier-type type-specifier)))
-
-(defun defined-type-name-p (name &optional env)
-  #!+sb-doc
-  "Returns T if NAME is known to name a type specifier, otherwise NIL."
-  (declare (symbol name))
-  (declare (ignore env))
-  (and (info :type :kind name) t))
-
-(defun valid-type-specifier-p (type-specifier &optional env)
-  #!+sb-doc
-  "Returns T if TYPE-SPECIFIER is a valid type specifier, otherwise NIL.
-
-There may be different metrics on what constitutes a \"valid type
-specifier\" depending on context. If this function does not suit your
-exact need, you may be able to craft a particular solution using a
-combination of DEFINED-TYPE-NAME-P and the TYPEXPAND functions.
-
-The definition of \"valid type specifier\" employed by this function
-is based on the following mnemonic:
-
-          \"Would TYPEP accept it as second argument?\"
-
-Except that unlike TYPEP, this function fully supports compound
-FUNCTION type specifiers, and the VALUES type specifier, too.
-
-In particular, VALID-TYPE-SPECIFIER-P will return NIL if
-TYPE-SPECIFIER is not a class, not a symbol that is known to name a
-type specifier, and not a cons that represents a known compound type
-specifier in a syntactically and recursively correct way.
-
-Examples:
-
-  (valid-type-specifier-p '(cons * *))     => T
-  (valid-type-specifier-p '#:foo)          => NIL
-  (valid-type-specifier-p '(cons * #:foo)) => NIL
-  (valid-type-specifier-p '(cons 1 *)      => NIL
-
-Experimental."
-  (declare (ignore env))
-  (handler-case (prog1 t (values-specifier-type type-specifier))
-    (parse-unknown-type () nil)
-    (error () nil)))
 
 ;;; Note that the type NAME has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.

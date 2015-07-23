@@ -1065,12 +1065,16 @@ core and return a descriptor to it."
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name
           (gethash name *cold-layouts*) result)))
 
-;; This is called to backpatch two small sets of objects:
+;; This is called to backpatch three small sets of objects:
 ;;  - layouts which are made before layout-of-layout is made (4 of them)
 ;;  - packages, which are made before layout-of-package is made (all of them)
+;;  - a small number of classoid-cells (probably 3 or 4).
 (defun patch-instance-layout (thing layout)
   ;; Layout pointer is in the word following the header
   (write-wordindexed thing sb!vm:instance-slots-offset layout))
+
+(defun cold-layout-of (cold-struct)
+  (read-wordindexed cold-struct sb!vm:instance-slots-offset))
 
 (defun initialize-layouts ()
   (clrhash *cold-layouts*)
@@ -1118,10 +1122,12 @@ core and return a descriptor to it."
       (lambda (name &key create)
         (aver (eq create t))
         (or (gethash name *classoid-cells*)
-            (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)))
+            (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*))
+                  (host-layout (find-layout 'sb!kernel::classoid-cell)))
               (setf (gethash name *classoid-cells*)
-                    (write-slots (allocate-struct *dynamic* layout)
-                                 (find-layout 'sb!kernel::classoid-cell)
+                    (write-slots (allocate-struct *dynamic* layout
+                                                  (layout-length host-layout))
+                                 host-layout
                                  :name name
                                  :pcl-class *nil-descriptor*
                                  :classoid *nil-descriptor*))))))
@@ -1719,9 +1725,20 @@ core and return a descriptor to it."
                  sym nil offset desired))))))
 
 (defun attach-classoid-cells-to-symbols (hashtable)
-  (let ((num (sb!c::meta-info-number (sb!c::meta-info :type :classoid-cell))))
+  (let ((num (sb!c::meta-info-number (sb!c::meta-info :type :classoid-cell)))
+        (layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)))
+    (when (plusp (hash-table-count *classoid-cells*))
+      (aver layout))
     ;; Iteration order is immaterial. The symbols will get sorted later.
     (maphash (lambda (symbol cold-classoid-cell)
+               ;; Some classoid-cells are dumped before the cold layout
+               ;; of classoid-cell has been made, so fix those cases now.
+               ;; Obviously it would be better if, in general, ALLOCATE-STRUCT
+               ;; knew when something later must backpatch a cold layout
+               ;; so that it could make a note to itself to do those ASAP
+               ;; after the cold layout became known.
+               (when (cold-null (cold-layout-of cold-classoid-cell))
+                 (patch-instance-layout cold-classoid-cell layout))
                (setf (gethash symbol hashtable)
                      (packed-info-insert
                       (gethash symbol hashtable +nil-packed-infos+)

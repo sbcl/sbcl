@@ -17,48 +17,6 @@
 
 (/show0 "condition.lisp 20")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-(/show0 "condition.lisp 24")
-
-(def!struct (condition-classoid (:include classoid)
-                                (:constructor make-condition-classoid))
-  ;; list of CONDITION-SLOT structures for the direct slots of this
-  ;; class
-  (slots nil :type list)
-  ;; list of CONDITION-SLOT structures for all of the effective class
-  ;; slots of this class
-  (class-slots nil :type list)
-  ;; report function or NIL
-  (report nil :type (or function null))
-  ;; list of specifications of the form
-  ;;
-  ;;   (INITARG INITFORM THUNK)
-  ;;
-  ;; where THUNK, when called without arguments, returns the value for
-  ;; INITARG.
-  (direct-default-initargs () :type list)
-  ;; class precedence list as a list of CLASS objects, with all
-  ;; non-CONDITION classes removed
-  (cpl () :type list)
-  ;; a list of all the effective instance allocation slots of this
-  ;; class that have a non-constant initform or default-initarg.
-  ;; Values for these slots must be computed in the dynamic
-  ;; environment of MAKE-CONDITION.
-  (hairy-slots nil :type list))
-
-(/show0 "condition.lisp 49")
-
-) ; EVAL-WHEN
-
-(!defstruct-with-alternate-metaclass condition
-  :slot-names (actual-initargs assigned-slots)
-  :boa-constructor %make-condition-object
-  :superclass-name t
-  :metaclass-name condition-classoid
-  :metaclass-constructor make-condition-classoid
-  :dd-type structure)
-
 (defstruct (condition-slot (:copier nil))
   (name (missing-arg) :type symbol)
   ;; list of all applicable initargs
@@ -273,58 +231,6 @@
 
 
 ;;;; DEFINE-CONDITION
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-(defun %compiler-define-condition (name direct-supers layout
-                                   all-readers all-writers)
-  (with-single-package-locked-error
-      (:symbol name "defining ~A as a condition")
-    (sb!xc:proclaim `(ftype (function (t) t) ,@all-readers))
-    (sb!xc:proclaim `(ftype (function (t t) t) ,@all-writers))
-    (multiple-value-bind (class old-layout)
-        (insured-find-classoid name
-                               #'condition-classoid-p
-                               #'make-condition-classoid)
-      (setf (layout-classoid layout) class)
-      (setf (classoid-direct-superclasses class)
-            (mapcar #'find-classoid direct-supers))
-      (cond ((not old-layout)
-             (register-layout layout))
-            ((not *type-system-initialized*)
-             (setf (layout-classoid old-layout) class)
-             (setq layout old-layout)
-             (unless (eq (classoid-layout class) layout)
-               (register-layout layout)))
-            ((redefine-layout-warning "current"
-                                      old-layout
-                                      "new"
-                                      (layout-length layout)
-                                      (layout-inherits layout)
-                                      (layout-depthoid layout)
-                                      (layout-raw-slot-metadata layout))
-             (register-layout layout :invalidate t))
-            ((not (classoid-layout class))
-             (register-layout layout)))
-
-      ;; This looks totally bogus - it essentially means that the LAYOUT-INFO
-      ;; of a condition is good for nothing, because it describes something
-      ;; that is not the condition class being defined.
-      ;; In addition to which, the INFO for CONDITION itself describes
-      ;; slots which do not exist, viz:
-      ;;  (dd-slots (layout-info (classoid-layout (find-classoid 'condition))))
-      ;; => (#<DEFSTRUCT-SLOT-DESCRIPTION ACTUAL-INITARGS>
-      ;;     #<DEFSTRUCT-SLOT-DESCRIPTION ASSIGNED-SLOTS>)
-      (setf (layout-info layout)
-            (layout-info (classoid-layout (find-classoid 'condition))))
-
-      (setf (find-classoid name) class)
-
-      ;; Initialize CPL slot.
-      (setf (condition-classoid-cpl class)
-            (remove-if-not #'condition-classoid-p
-                           (std-compute-class-precedence-list class)))))
-  (values))
-) ; EVAL-WHEN
 
 ;;; Compute the effective slots of CLASS, copying inherited slots and
 ;;; destructively modifying direct slots.
