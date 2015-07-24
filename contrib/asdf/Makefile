@@ -23,4 +23,4 @@ UPSTREAM=../../obj/asdf-upstream
 up::
 	sh pull-asdf.sh
 	ln -f $(UPSTREAM)/doc/asdf.texinfo asdf.texinfo
-	ln -f $(UPSTREAM)/README README
+	ln -f $(UPSTREAM)/README.md README.md

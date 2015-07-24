@@ -1,11 +1,12 @@
-The copies of asdf.lisp, asdf.texinfo, README, and LICENSE in this
+The copies of asdf.lisp, asdf.texinfo, README.md, and LICENSE in this
 directory are complete and unchanged from the canonical versions at
 
-  http://common-lisp.net/project/asdf/asdf.git 
+  https://gitlab.common-lisp.net/asdf/asdf
 
-They may lag the upstream version by a few revisions (but shouldn't
-usually) but unless we've fouled up horribly, are not forked.
+They may lag behind the upstream version by a few revisions (but
+shouldn't usually) but unless we've fouled up horribly, are not
+forked.
 
-The README file thus applies in its entirety apart from the scary
+The README.md file thus applies in its entirety apart from the scary
 warnings about making sure you have the right version and it has not
 been mutilated.

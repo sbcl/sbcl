@@ -1,5 +1,5 @@
 SBCLTEXI:=sbcl.texinfo
-ASDFTEXI:=asdf.texinfo
+ASDFTEXI:=asdf.texinfo version.texinfo
 DOCFILES:=*.texinfo $(ASDFTEXI)
 TMPTYPES:=aux cp cps fn fns ky log pg toc tp tps vr vrs
 TMPFILES:=$(foreach target,asdf sbcl,$(foreach type,$(TMPTYPES),$(target).$(type)))
@@ -44,7 +44,7 @@ ifeq ($(DVIPS),)
 endif
 
 .PHONY: all
-all: asdf.texinfo ps pdf info html
+all: $(ASDFTEXI) ps pdf info html
 
 .PHONY: dist
 dist: html pdf
@@ -52,6 +52,10 @@ dist: html pdf
 asdf.texinfo:
 	rm -f asdf.texinfo
 	ln -s ../../contrib/asdf/asdf.texinfo
+
+version.texinfo:
+	rm -f version.texinfo
+	ln -s ../../contrib/asdf/version.texinfo
 
 # html documentation; output in $(HTMLDIRS)
 .PHONY: html
