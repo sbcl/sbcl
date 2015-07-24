@@ -291,7 +291,7 @@ static inline struct thread *arch_os_get_current_thread(void)
 
 #elif defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_WIN32)
     register struct thread *me=0;
-    __asm__ ("movl %%fs:0xE10+(4*63), %0" : "=r"(me) :);
+    __asm__ volatile ("movl %%fs:0xE10+(4*63), %0" : "=r"(me) :);
     return me;
 
 #else
