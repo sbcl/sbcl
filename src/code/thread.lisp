@@ -160,7 +160,7 @@ and the MUTEX is not immediately available, sleep until it is available.
 If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
 the system should try to acquire the lock in the contested case.
 
-If the mutex isn't acquired succesfully due to either WAIT-P or TIMEOUT, the
+If the mutex isn't acquired successfully due to either WAIT-P or TIMEOUT, the
 body is not executed, and WITH-MUTEX returns NIL.
 
 Otherwise body is executed with the mutex held by current thread, and
@@ -201,7 +201,7 @@ held by the current thread, sleep until it is available.
 If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
 the system should try to acquire the lock in the contested case.
 
-If the mutex isn't acquired succesfully due to either WAIT-P or TIMEOUT, the
+If the mutex isn't acquired successfully due to either WAIT-P or TIMEOUT, the
 body is not executed, and WITH-RECURSIVE-LOCK returns NIL.
 
 Otherwise body is executed with the mutex held by current thread, and

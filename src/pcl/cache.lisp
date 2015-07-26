@@ -282,7 +282,7 @@
             ;; The place was already taken, and doesn't match our key.
             (return-from try-update-cache-line nil))
           (unless layouts
-            ;; All keys match or succesfully saved, save our value --
+            ;; All keys match or successfully saved, save our value --
             ;; just smash it in. Until the first time it is written
             ;; there is ..EMPTY.. here, which probes look for, so we
             ;; don't get bogus hits. This is necessary because we want
