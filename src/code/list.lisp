@@ -1249,7 +1249,7 @@
             (cdr ret-list)
             non-acc-result))
     (do ((l arglists (cdr l))
-         (arg args (cdr args)))
+         (arg args (cdr arg)))
         ((null l))
       (setf (car arg) (if take-car (caar l) (car l)))
       (setf (car l) (cdar l)))
