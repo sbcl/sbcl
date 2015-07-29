@@ -153,25 +153,29 @@
 
 (with-test (:name :atomic-incf-full-call-lp1381867
             :skipped-on '(not (or :x86 :x86-64 :ppc)))
-  (locally
-   ;; Rebind %RAW-INSTANCE-ATOMIC-INCF/WORD as a local function.
-   ;; Declaring it locally notinline fails because it is marked
-   ;; with the ALWAYS-TRANSLATABLE attribute, so it's a bug to call it
-   ;; even though we've asked to call it. (Maybe that's a bug?)
-   ;; And I don't want to call it explictly - I want the macro to do it
-   ;; so that I don't have to inject any of the sign making noise and such.
-   (declare (disable-package-locks sb-kernel:%raw-instance-atomic-incf/word))
-   (let ((b (make-box :word 0))
-         (delta (- (ash 1 (1- sb-vm:n-word-bits))))
-         (f (eval '#'sb-kernel:%raw-instance-atomic-incf/word)))
-     (flet ((sb-kernel:%raw-instance-atomic-incf/word (a b c)
-              (funcall f a b c)))
-       (assert (= (atomic-incf (box-word b) delta) 0))
-       (assert (= (atomic-incf (box-word b) delta)
-                  (ash 1 (1- sb-vm:n-word-bits))))
-       (assert (= (box-word b) 0))
-       (atomic-decf (box-word b))
-       (assert (= (box-word b) sb-ext:most-positive-word))))))
+  ;; contortions to avoid reader errors
+  (let* ((%riai/w (intern "%RAW-INSTANCE-ATOMIC-INCF/WORD" "SB-KERNEL"))
+         (form
+          `(locally
+            ;; Rebind %RAW-INSTANCE-ATOMIC-INCF/WORD as a local
+            ;; function.  Declaring it locally notinline fails because
+            ;; it is marked with the ALWAYS-TRANSLATABLE attribute, so
+            ;; it's a bug to call it even though we've asked to call
+            ;; it. (Maybe that's a bug?)  And I don't want to call it
+            ;; explictly - I want the macro to do it so that I don't
+            ;; have to inject any of the sign making noise and such.
+            (declare (disable-package-locks ,%riai/w))
+            (let ((b (make-box :word 0))
+                  (delta (- (ash 1 (1- sb-vm:n-word-bits))))
+                  (f (fdefinition ',%riai/w)))
+              (flet ((,%riai/w (a b c) (funcall f a b c)))
+                (assert (= (atomic-incf (box-word b) delta) 0))
+                (assert (= (atomic-incf (box-word b) delta)
+                           (ash 1 (1- sb-vm:n-word-bits))))
+                (assert (= (box-word b) 0))
+                (atomic-decf (box-word b))
+                (assert (= (box-word b) sb-ext:most-positive-word)))))))
+    (eval form)))
 
 #+sb-thread
 (with-test (:name (:atomic-incf/decf :threads))
