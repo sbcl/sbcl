@@ -1485,7 +1485,8 @@
            (type string since)
            (type function-name name)
            (type (or function-name list) replacements)
-           (type list lambda-list))
+           (type list lambda-list)
+           #+sb-xc-host (ignore since replacements))
   `(prog1
        ,(ecase state
           ((:early :late)
@@ -1493,6 +1494,7 @@
               ,@body))
           ((:final)
            `',name))
+     #-sb-xc-host
      (proclaim '(deprecated
                  ,state ,since
                  (function ,name ,@(when replacements
@@ -1502,11 +1504,13 @@
                                       &key (value nil valuep) replacement)
   (declare (type deprecation-state state)
            (type string since)
-           (type symbol name))
+           (type symbol name)
+           #+sb-xc-host (ignore since replacement))
   `(prog1
        ,(if (member state '(:early :late))
             `(defvar ,name ,@(when valuep (list value)))
             `',name)
+     #-sb-xc-host
      (proclaim '(deprecated
                  ,state ,since
                  (variable ,name ,@(when replacement
