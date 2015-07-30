@@ -163,7 +163,7 @@
             ;; it's a bug to call it even though we've asked to call
             ;; it. (Maybe that's a bug?)  And I don't want to call it
             ;; explictly - I want the macro to do it so that I don't
-            ;; have to inject any of the sign making noise and such.
+            ;; have to inject any of the sign masking noise and such.
             (declare (disable-package-locks ,%riai/w))
             (let ((b (make-box :word 0))
                   (delta (- (ash 1 (1- sb-vm:n-word-bits))))
