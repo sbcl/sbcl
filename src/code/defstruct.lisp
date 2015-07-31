@@ -1259,13 +1259,11 @@ or they must be declared locally notinline at each call site.~@:>")
                                     &key compiler-layout)
   (declare (type defstruct-description info))
   (multiple-value-bind (class old-layout)
-      (destructuring-bind
-          (&optional
-           name
-           (class 'structure-classoid)
-           (constructor 'make-structure-classoid))
-          (dd-alternate-metaclass info)
-        (declare (ignore name))
+      (multiple-value-bind (class constructor)
+          (acond ((cdr (dd-alternate-metaclass info))
+                  (values (first it) (second it)))
+                 (t
+                  (values 'structure-classoid 'make-structure-classoid)))
         (insured-find-classoid (dd-name info)
                                (if (eq class 'structure-classoid)
                                    (lambda (x)
