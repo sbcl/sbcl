@@ -14,3 +14,5 @@
   `(defmethod ,@args))
 
 (defmacro sb!xc:defmethod (&rest args) `(def!method ,@args))
+
+#+sb-xc(defvar *delayed-def!method-args* nil)

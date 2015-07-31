@@ -151,8 +151,6 @@
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
 
- ("src/code/target-defbangmethod" :not-host)
-
  ("src/code/early-print" :not-host)
  ("src/code/early-pprint" :not-host)
  ("src/code/early-impl" :not-host)
