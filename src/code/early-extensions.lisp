@@ -1445,21 +1445,16 @@
             ~@[~2%~/sb!impl::print-deprecation-replacements/~]")
           namespace name software version replacements))
 
-(defconstant-eqx +function-in-final-deprecation-type+
-    '(function * nil) #'equal)
-
 (defun setup-function-in-final-deprecation
     (software version name replacement-spec)
-  (sb!c:proclaim-ftype
-   name
-   (specifier-type +function-in-final-deprecation-type+)
-   +function-in-final-deprecation-type+
-   :declared)
-  (let ((fun (lambda (&rest deprecated-function-args)
-               (declare (ignore deprecated-function-args))
-               (deprecation-error software version 'function name replacement-spec))))
-    #-sb-xc-host (setf (%fun-name fun) name)
-    (setf (fdefinition name) fun)))
+  #+sb-xc-host (declare (ignore software version name replacement-spec))
+  #-sb-xc-host
+  (setf (fdefinition name)
+        (sb!impl::set-closure-name
+         (lambda (&rest args)
+           (declare (ignore args))
+           (deprecation-error software version 'function name replacement-spec))
+         name)))
 
 (defun setup-variable-in-final-deprecation
     (software version name replacement-spec)
