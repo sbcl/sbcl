@@ -72,7 +72,7 @@
              (note (when state
                      (with-output-to-string (stream)
                        (sb-impl::print-deprecation-message
-                        'function name (first since) (second since)
+                        namespace name (first since) (second since)
                         replacements stream)))))
     (cond
       ((and documentation note)

@@ -14,7 +14,7 @@
 
 ;;;; Helpers
 
-(defun check-deprecated-thing (kind name state make-body
+(defun check-deprecated-thing (namespace name state make-body
                                &key replacements
                                     (call t)
                                     (expected-warning-count '(eql 1))
@@ -27,8 +27,8 @@
                    (setf start (+ match (length fragment)))))))
            (search-string/documentation (string)
              (search-string
-              string `(,(string name)
-                        "deprecated" "as" "of" "some-lib" "1.2.3"
+              string `(,(string-downcase namespace) ,(string name)
+                        "deprecated" "as" "of" "some-lib" "version" "1.2.3"
                         "Use" ,@replacements "instead")))
            (search-string/describe (string)
              (search-string
@@ -62,7 +62,7 @@
       (search-string/describe (with-output-to-string (stream)
                                 (describe name stream))))
     ;; Check DOCUMENTATION.
-    (search-string/documentation (documentation name kind))))
+    (search-string/documentation (documentation name namespace))))
 
 ;;;; DEPRECATED declaration syntax
 
