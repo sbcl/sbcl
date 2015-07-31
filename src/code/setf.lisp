@@ -390,23 +390,18 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
-  (macrolet ((assign-it ()
+ (macrolet ((assign-it ()
                `(progn
                   (when inverse
                     (clear-info :setf :expander name)
                     (setf (info :setf :inverse name) inverse))
                   (when expander
-                    #-sb-xc-host
-                    (setf (%fun-lambda-list
-                           (if (listp expander) (cdr expander) expander))
-                          expander-lambda-list)
                     (clear-info :setf :inverse name)
                     (setf (info :setf :expander name) expander))
                   (when doc
                     (setf (fdocumentation name 'setf) doc))
                   name)))
-  (defun %defsetf (name expander expander-lambda-list inverse &optional doc)
-    #+sb-xc-host (declare (ignore expander-lambda-list))
+  (defun %defsetf (name expander inverse &optional doc)
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
     (let ((setf-fn-name `(setf ,name)))
@@ -433,8 +428,8 @@
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
     (assign-it))
-    (defun !quietly-defsetf (name expander expander-lambda-list inverse &optional doc)
-    #+sb-xc-host (declare (ignore expander-lambda-list))
+  ;; For cold-init, because any warning will cause a crash.
+  (defun !quietly-defsetf (name expander inverse &optional doc)
     (assign-it))))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
@@ -447,7 +442,7 @@
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
-        (%defsetf ',access-fn nil nil ',(car rest) ,@(cdr rest))))
+        (%defsetf ',access-fn nil ',(car rest) ,@(cdr rest))))
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest stores) &body body) rest
        (binding* (((llks req opt rest key aux env)
@@ -469,13 +464,13 @@
                       (cons ,(length stores)
                             (named-lambda (%defsetf ,access-fn)
                                           (,subforms ,env-var ,@stores)
+                              (declare (sb!c::lambda-list ,lambda-list))
                               ,@(if outer-decls (list outer-decls))
                               ,@(unless env `((declare (ignore ,env-var))))
                               (apply (lambda ,lambda-list
                                        ,@inner-decls (block ,access-fn ,@forms))
                                      ,subforms)))
-                      ',lambda-list nil ,@(and doc
-                                               `(,doc)))))))
+                      nil ,@(and doc `(,doc)))))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
@@ -579,16 +574,14 @@
   (unless (symbolp access-fn)
     (error "~S access-function name ~S is not a symbol."
            'sb!xc:define-setf-expander access-fn))
-  (multiple-value-bind (def arglist doc)
+  (multiple-value-bind (def doc)
       ;; Perhaps it would be more elegant to keep the docstring attached
       ;; to the expander function, as for CAS?
       (make-macro-lambda `(setf-expander ,access-fn) lambda-list body
                          'sb!xc:define-setf-expander access-fn
                          :doc-string-allowed :external)
-    (declare (ignore arglist))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%defsetf ',access-fn ,def ',lambda-list nil ,@(and doc
-                                                           `(,doc))))))
+       (%defsetf ',access-fn ,def nil ,@(and doc `(,doc))))))
 
 (sb!xc:define-setf-expander values (&rest places &environment env)
   (declare (type sb!c::lexenv env))

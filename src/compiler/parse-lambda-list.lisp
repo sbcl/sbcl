@@ -1030,10 +1030,11 @@
 ;;; or :IGNORE to allow it, but bind the corresponding symbol to NIL.
 ;;; WRAP-BLOCK, if true, will place a block named NAME around body.
 ;;;
-;;; The second returned value is a new lambda list that should be
-;;; attached to the resulting function, discarding &ENVIRONMENT, &WHOLE,
-;;; and/or anything else that does not document the list shape.
-;;; The third returned value is a docstring, if requested as :EXTERNAL.
+;;; The secondary value is a docstring, if requested as :EXTERNAL.
+;;;
+;;; The lambda contains an internal declaration of its argument list
+;;; that discards &ENVIRONMENT, &WHOLE, and/or anything else that does
+;;; not document the expected list shape.
 ;;;
 ;;; The CLtl2 name for this operation is PARSE-MACRO.
 (defun make-macro-lambda
@@ -1087,6 +1088,8 @@
                   (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
                ,@(when (and docstring (eq doc-string-allowed :internal))
                    (prog1 (list docstring) (setq docstring nil)))
+               ;; Normalize the lambda list by unparsing.
+               (declare (lambda-list ,(unparse-ds-lambda-list parse)))
                ,@(if outer-decls (list outer-decls))
                ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
                ,@(sb!c:macro-policy-decls)
@@ -1100,8 +1103,6 @@
                  ,@(if wrap-block
                        `((block ,(fun-name-block-name name) ,@forms))
                        forms)))
-            ;; Normalize the lambda list by unparsing.
-            (unparse-ds-lambda-list parse)
             docstring)))
 
 ;;; We save space in macro definitions by calling this function.

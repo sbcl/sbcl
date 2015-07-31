@@ -20,3 +20,7 @@
 ;;; INHIBIT-WARNINGS declarations can be safely ignored (although we
 ;;; may then have to wade through some irrelevant warnings).
 (declaim (declaration inhibit-warnings))
+
+;;; SB!C::LAMBDA-LIST declarations can be ignored.
+;;; Cross-compilation does not rely on introspection for anything.
+(declaim (declaration sb!c::lambda-list))

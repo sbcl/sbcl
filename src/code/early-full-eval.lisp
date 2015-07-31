@@ -47,9 +47,10 @@
 #-sb-xc-host
 (progn
   (defun make-interpreted-function
-      (&key name lambda-list env declarations documentation body source-location)
+      (&key name lambda-list env declarations documentation body source-location
+            (debug-lambda-list lambda-list))
     (let ((function (%make-interpreted-function
-                     name name lambda-list lambda-list env
+                     name name lambda-list debug-lambda-list env
                      declarations documentation body source-location)))
       (setf (funcallable-instance-fun function)
             #'(lambda (&rest args)

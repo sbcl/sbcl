@@ -176,36 +176,23 @@ invoked. In that case it will store into PLACE and start over."
     (error 'simple-program-error
            :format-control "cannot define a compiler-macro for a special operator: ~S"
            :format-arguments (list name)))
-  (multiple-value-bind (def lambda-list)
-      ;; DEBUG-NAME is called primarily for its side-effect of asserting
-      ;; that (COMPILER-MACRO-FUNCTION x) is not a legal function name.
-      (make-macro-lambda (sb!c::debug-name 'compiler-macro name)
-                         lambda-list body 'define-compiler-macro name)
+  ;; DEBUG-NAME is called primarily for its side-effect of asserting
+  ;; that (COMPILER-MACRO-FUNCTION x) is not a legal function name.
+  (let ((def (make-macro-lambda (sb!c::debug-name 'compiler-macro name)
+                                lambda-list body 'define-compiler-macro name)))
     `(progn
           (eval-when (:compile-toplevel)
            (sb!c::%compiler-defmacro :compiler-macro-function ',name t))
           (eval-when (:compile-toplevel :load-toplevel :execute)
-           (sb!c::%define-compiler-macro ',name ,def ',lambda-list)))))
+           (sb!c::%define-compiler-macro ',name ,def)))))
 
-;;; FIXME: This will look remarkably similar to those who have already
-;;; seen the code for %DEFMACRO in src/code/defmacro.lisp.  Various
-;;; bits of logic should be shared (notably arglist setting).
-(macrolet
-    ((def (times set-p)
-         `(eval-when (,@times)
-           (defun sb!c::%define-compiler-macro (name definition lambda-list)
-             ,@(unless set-p
-                 '((declare (ignore lambda-list))))
-             (sb!c::warn-if-compiler-macro-dependency-problem name)
-             ;; FIXME: warn about incompatible lambda list with
-             ;; respect to parent function?
-             (setf (sb!xc:compiler-macro-function name) definition)
-             ,(when set-p
-                `(setf (%fun-lambda-list definition) lambda-list))
-             name))))
-  (progn
-    (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
-    #-sb-xc (def (:compile-toplevel) nil)))
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  (defun sb!c::%define-compiler-macro (name definition)
+    (sb!c::warn-if-compiler-macro-dependency-problem name)
+    ;; FIXME: warn about incompatible lambda list with
+    ;; respect to parent function?
+    (setf (sb!xc:compiler-macro-function name) definition)
+    name))
 
 ;;;; CASE, TYPECASE, and friends
 

@@ -44,19 +44,14 @@
              (eval-when (:compile-toplevel)
                (sb!c::%compiler-defmacro :macro-function ',name t))
              (eval-when (:compile-toplevel :load-toplevel :execute)
-               (sb!c::%defmacro ',name ,def ',lambda-list
-                                (sb!c:source-location)))))))
+               (sb!c::%defmacro ',name ,def (sb!c:source-location)))))))
 
-(macrolet
-    ((def (times set-p)
-       `(eval-when (,@times)
-          (defun sb!c::%defmacro (name definition lambda-list source-location)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+          (defun sb!c::%defmacro (name definition source-location)
             (declare (ignorable source-location)) ; xc-host doesn't use
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."
-            ,@(unless set-p
-                '((declare (ignore lambda-list))))
             (let ((kind (info :function :kind name)))
               ;; Check for special form before package locks.
               (when (eq :special-form kind)
@@ -80,13 +75,8 @@
                         :name name
                         :new-function definition
                         :new-location source-location))
-               (setf (sb!xc:macro-function name) definition)
-               ,(when set-p
-                  `(setf (%fun-lambda-list definition) lambda-list))))
-            name))))
-  (progn
-    (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
-    (def (#-sb-xc :compile-toplevel) nil)))
+               (setf (sb!xc:macro-function name) definition)))
+            name))
 
 ;;; Parse the definition and make an expander function. The actual
 ;;; definition is done by %DEFMACRO which we expand into. After the

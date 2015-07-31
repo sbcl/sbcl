@@ -18,6 +18,7 @@
 (defun constant-type-expander (expansion)
   (declare (optimize safety))
   (lambda (whole)
+    (declare (sb!c::lambda-list ())) ; for introspection of DEFTYPE lambda-list
     (if (cdr whole)
         (sb!kernel::arg-count-error 'deftype (car whole) (cdr whole) nil 0 0)
         expansion)))
@@ -29,7 +30,7 @@
   (unless (symbolp name)
     (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
               form))
-  (multiple-value-bind (expander-form lambda-list doc source-location-form)
+  (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body)
         ;; FIXME: We could use CONSTANTP here to deal with slightly more
         ;; complex deftypes using CONSTANT-TYPE-EXPANDER, but that XC:CONSTANTP
@@ -40,7 +41,7 @@
                             (typecase forms
                               ((cons (cons (eql quote))) (cadar forms))
                               ((cons symbol)             (car forms))))
-              (values `(constant-type-expander ,(car forms)) '() doc
+              (values `(constant-type-expander ,(car forms)) doc
                       '(sb!c:source-location)))
             ;; FIXME: it seems non-ANSI-compliant to pretend every lexenv
             ;; is nil. See also lp#309140.
@@ -55,5 +56,5 @@
          ;; but not when running the xc. But it's harmless in the latter.
          (pushnew ',name !*xc-processed-deftypes*))
        (eval-when (:compile-toplevel :load-toplevel :execute)
-         (%compiler-deftype ',name ',lambda-list ,expander-form
-                            ,source-location-form ,@(when doc `(,doc)))))))
+         (%compiler-deftype ',name ,expander-form ,source-location-form
+                            ,@(when doc `(,doc)))))))

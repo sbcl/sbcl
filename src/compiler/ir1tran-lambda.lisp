@@ -946,9 +946,9 @@
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
     (multiple-value-bind (forms decls doc) (parse-body (cddr form))
-      (binding* (((*lexenv* result-type post-binding-lexenv)
+      (binding* (((*lexenv* result-type post-binding-lexenv lambda-list)
                   (process-decls decls (append aux-vars vars) nil
-                                 :binding-form-p t))
+                                 :binding-form-p t :allow-lambda-list t))
                  (debug-catch-p (and maybe-add-debug-catch
                                      *allow-instrumenting*
                                      (policy *lexenv*
@@ -977,7 +977,10 @@
                                                       :debug-name debug-name
                                                       :system-lambda system-lambda)))))
         (setf (functional-inline-expansion res) form)
-        (setf (functional-arg-documentation res) (cadr form))
+        (setf (functional-arg-documentation res)
+              (if (eq lambda-list :unspecified)
+                  (strip-lambda-list (cadr form) :arglist)
+                  lambda-list))
         (setf (functional-documentation res) doc)
         (when (boundp '*lambda-conversions*)
           ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but

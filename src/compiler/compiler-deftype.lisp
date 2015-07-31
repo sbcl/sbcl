@@ -13,8 +13,7 @@
 
 (/show0 "compiler-deftype.lisp 14")
 
-(defun %compiler-deftype (name lambda-list expander source-location &optional doc)
-  #+sb-xc-host (declare (ignore lambda-list))
+(defun %compiler-deftype (name expander source-location &optional doc)
   (with-single-package-locked-error
       (:symbol name "defining ~A as a type specifier"))
   (ecase (info :type :kind name)
@@ -47,7 +46,6 @@
      )
     ((nil :forthcoming-defclass-type)
      (setf (info :type :kind name) :defined)))
-  #-sb-xc-host (setf (%fun-lambda-list expander) lambda-list)
   (setf (info :type :expander name) expander)
   (sb!c:with-source-location (source-location)
     (setf (info :type :source-location name) source-location))

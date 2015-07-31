@@ -29,34 +29,33 @@
 ;;; and we have no implementation-specific workaround to disallow it.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
                               &body body)
-  (let ((fn-name (symbolicate "IR1-CONVERT-" name))
-        (whole-var (make-symbol "FORM")))
-    (multiple-value-bind (lambda-expr arglist doc)
-        (make-macro-lambda nil lambda-list body :special-form name
-                           :doc-string-allowed :external :wrap-block nil)
-      (declare (ignorable arglist doc))
-      `(progn
-           (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
-                           ,fn-name))
-           (defun ,fn-name (,start-var ,next-var ,result-var ,whole-var)
-             (declare (ignorable ,start-var ,next-var ,result-var))
-             (,lambda-expr ,whole-var *lexenv*)
-             (values))
-           (install-guard-function ',name '(:special ,name) ,(or #!+sb-doc doc))
+  (binding* ((fn-name (symbolicate "IR1-CONVERT-" name))
+             (whole-var (make-symbol "FORM"))
+             ((lambda-expr doc)
+              (make-macro-lambda nil lambda-list body :special-form name
+                                 :doc-string-allowed :external
+                                 :wrap-block nil)))
+    (declare (ignorable doc))
+    `(progn
+      (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
+                      ,fn-name))
+      (defun ,fn-name (,start-var ,next-var ,result-var ,whole-var)
+        (declare (ignorable ,start-var ,next-var ,result-var))
            ;; The guard function is a closure, which can't have its lambda-list
            ;; changed independently of other closures based on the same
            ;; simple-fun. So change it in the ir1-translator since the actual
            ;; lambda-list is not terribly useful.
-           #-sb-xc-host
-           (setf (%fun-lambda-list #',fn-name) ; This is for DESCRIBE et. al.
-                 ',arglist)
+        (declare (lambda-list ,lambda-list))
+        (,lambda-expr ,whole-var *lexenv*)
+        (values))
+      (install-guard-function ',name '(:special ,name) ,(or #!+sb-doc doc))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
-           (setf (info :function :ir1-convert ',name) #',fn-name)
+      (setf (info :function :ir1-convert ',name) #',fn-name)
            ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
            ;; the 1990s?
-           (setf (info :function :kind ',name) :special-form)
-           ',name))))
+      (setf (info :function :kind ',name) :special-form)
+      ',name)))
 
 ;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
 ;;; syntax is invalid.)
@@ -426,7 +425,7 @@
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
-    (let ((n-node (or node (sb!xc:gensym)))
+    (let ((n-node (or node (make-symbol "NODE")))
           (n-decls (sb!xc:gensym))
           (n-lambda (sb!xc:gensym)))
       (multiple-value-bind (bindings vars)
@@ -437,6 +436,7 @@
                                ,@(when result
                                    `((,result (node-lvar ,n-node)))))
                  (declare (ignorable ,@(mapcar #'car bindings)))
+                 (declare (lambda-list (node)))
                  ,@decls
                  ,@(if policy
                       `((unless (policy ,n-node ,policy)

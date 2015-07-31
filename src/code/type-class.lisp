@@ -372,14 +372,10 @@
 ;;; an explicit default of '*, or else it assumes a default of NIL.
 (defmacro !def-type-translator (name arglist &body body)
   (declare (type symbol name))
-  (multiple-value-bind (fun #-sb-xc-host arglist)
-      (make-macro-lambda (format nil "~A-TYPE-PARSE" name)
-                         arglist body nil nil :environment nil)
-    `(!cold-init-forms
-      (let ((fun ,fun))
-        #-sb-xc-host
-        (setf (%simple-fun-arglist (the simple-fun fun)) ',arglist)
-        (setf (info :type :translator ',name) fun)))))
+  `(!cold-init-forms
+    (setf (info :type :translator ',name)
+          ,(make-macro-lambda (format nil "~A-TYPE-PARSE" name)
+                              arglist body nil nil :environment nil))))
 
 ;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the
 ;;; same class, invoke the simple method. Otherwise, invoke any

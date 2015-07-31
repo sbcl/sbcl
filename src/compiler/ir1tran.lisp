@@ -1632,9 +1632,11 @@
 ;;; This is also called in main.lisp when PROCESS-FORM handles a use
 ;;; of LOCALLY.
 (defun process-decls (decls vars fvars &key
-                      (lexenv *lexenv*) (binding-form-p nil) (context :compile))
+                      (lexenv *lexenv*) (binding-form-p nil) (context :compile)
+                      (allow-lambda-list nil))
   (declare (list decls vars fvars))
   (let ((result-type *wild-type*)
+        (lambda-list (if allow-lambda-list :unspecified nil))
         (optimize-qualities)
         (*post-binding-variable-lexenv* nil))
     (dolist (decl decls)
@@ -1644,13 +1646,19 @@
                (unless (consp spec)
                  (compiler-error "malformed declaration specifier ~S in ~S"
                                  spec decl))
-               (multiple-value-bind (new-env new-result-type new-qualities)
-                   (process-1-decl spec lexenv vars fvars binding-form-p context)
-                 (setq lexenv new-env
-                       optimize-qualities (nconc new-qualities optimize-qualities))
-                 (unless (eq new-result-type *wild-type*)
-                   (setq result-type
-                         (values-type-intersection result-type new-result-type))))))
+               (if (and (typep spec '(cons (eql lambda-list) (cons t null)))
+                        (eq allow-lambda-list t))
+                   (setq lambda-list (cadr spec) allow-lambda-list nil)
+                   (multiple-value-bind (new-env new-result-type new-qualities)
+                       (process-1-decl spec lexenv vars fvars
+                                       binding-form-p context)
+                     (setq lexenv new-env
+                           optimize-qualities
+                           (nconc new-qualities optimize-qualities))
+                     (unless (eq new-result-type *wild-type*)
+                       (setq result-type
+                             (values-type-intersection result-type
+                                                       new-result-type)))))))
           (if (eq context :compile)
               (let ((*current-path* (or (get-source-path spec)
                                         (get-source-path decl)
@@ -1659,7 +1667,7 @@
             ;; Kludge: EVAL calls this function to deal with LOCALLY.
               (process-it)))))
     (warn-repeated-optimize-qualities (lexenv-policy lexenv) optimize-qualities)
-    (values lexenv result-type *post-binding-variable-lexenv*)))
+    (values lexenv result-type *post-binding-variable-lexenv* lambda-list)))
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
   (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
@@ -1676,6 +1684,7 @@
                  (link-node-to-previous-ctran cast value-ctran)
                  (setf (lvar-dest value-lvar) cast)
                  (use-continuation cast ctran lvar))))))))
+
 (defmacro processing-decls ((decls vars fvars ctran lvar
                                    &optional post-binding-lexenv)
                             &body forms)

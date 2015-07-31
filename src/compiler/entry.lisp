@@ -50,14 +50,12 @@
                                        (or doc xrefs))))
     (when (policy bind (>= debug 1))
       (let ((args (functional-arg-documentation internal-fun)))
-        (aver (not (eq args :unspecified)))
         ;; When the component is dumped, the arglists of the entry
         ;; points will be dumped.  If they contain values that need
         ;; make-load-form processing then we need to do it now (bug
         ;; 310132).
         (setf (entry-info-arguments info)
-              (constant-value
-               (find-constant (strip-lambda-list args :arglist)))))
+              (constant-value (find-constant args))))
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
   (values))
 

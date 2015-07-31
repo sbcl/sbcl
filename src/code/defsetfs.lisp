@@ -76,12 +76,14 @@
     (if (eq sub-accessor 'nthcdr) ; random N
         (lambda (access-form env)
           (declare (ignore env))
+          (declare (sb!c::lambda-list (n list)))
           (destructuring-bind (n list) (cdr access-form) ; for effect
             (declare (ignore n list)))
           (expand '(nthcdr) access-form))
         ;; NTHCDR of fixed N, or CxxxxR composition
         (lambda (access-form env)
           (declare (ignore env))
+          (declare (sb!c::lambda-list (list)))
           (destructuring-bind (list) (cdr access-form) ; for effect
             (declare (ignore list)))
           (expand sub-accessor access-form))))))
@@ -93,9 +95,9 @@
                        (%cxr-setf-expander
                         '(,(symbolicate "C" (subseq string 2)))
                         ',(symbolicate "%RPLAC" (subseq string 1 2)))))
-                  (!quietly-defsetf ',name closure '(list) nil nil)
+                  (!quietly-defsetf ',name closure nil)
                   ,@(when alias
-                      `((!quietly-defsetf ',alias closure '(list) nil nil)))))))
+                      `((!quietly-defsetf ',alias closure nil)))))))
   ;; Rather than expand into a DEFINE-SETF-EXPANDER, install a single closure
   ;; as the expander and capture just enough to distinguish the variations.
   (def caar)
@@ -132,7 +134,7 @@
 (macrolet ((def (name subform)
              `(eval-when (:compile-toplevel :load-toplevel :execute)
                 (!quietly-defsetf ',name (%cxr-setf-expander ',subform '%rplaca)
-                                  '(list) nil nil))))
+                                  nil))))
   (def fifth   (nthcdr 4)) ; or CDDDDR
   (def sixth   (nthcdr 5))
   (def seventh (nthcdr 6))
@@ -148,8 +150,7 @@
 ;; bound to a temporary variable.
 #-sb-xc-host
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (!quietly-defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca) '(n list)
-                    nil nil))
+  (!quietly-defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca) nil))
 
 #-sb-xc-host (defsetf elt %setelt)
 #-sb-xc-host (defsetf row-major-aref %set-row-major-aref)
