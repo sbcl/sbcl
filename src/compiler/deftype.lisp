@@ -20,7 +20,9 @@
   (lambda (whole)
     (declare (sb!c::lambda-list ())) ; for introspection of DEFTYPE lambda-list
     (if (cdr whole)
-        (sb!kernel::arg-count-error 'deftype (car whole) (cdr whole) nil 0 0)
+        (error 'sb!kernel::arg-count-error
+               :kind 'deftype :name (car whole) :args (cdr whole)
+               :lambda-list '() :minimum 0 :maximum 0)
         expansion)))
 
 (defvar !*xc-processed-deftypes* nil)

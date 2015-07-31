@@ -807,6 +807,11 @@
 
 ;;; Runtime support
 
+;; Given FORM as the input to a compiler-macro, return the argument forms
+;; that the called function would receive, skipping over FUNCALL.
+(defun compiler-macro-args (form)
+  (cdr (if (eql (car form) 'funcall) (cdr form) form)))
+
 ;; Extract the context from a destructuring-bind pattern as represented in
 ;; a call to a checking function. A "context" is a non-bindable subpattern
 ;; headed by :MACRO (if it came from any macro-like thing, e.g. DEFTYPE),
@@ -825,10 +830,77 @@
       (t
        (values nil 'destructuring-bind pattern)))))
 
-;; Given FORM as the input to a compiler-macro, return the argument forms
-;; that the called function would receive, skipping over FUNCALL.
-(defun compiler-macro-args (form)
-  (cdr (if (eql (car form) 'funcall) (cdr form) form)))
+;;; Helpers for the variations on CHECK-DS-mumble.
+(defun ds-bind-error (input min max pattern)
+  (multiple-value-bind (name kind lambda-list) (get-ds-bind-context pattern)
+    #-sb-xc-host
+    (declare (optimize sb!c::allow-non-returning-tail-call))
+    (case kind
+     (:special-form
+      ;; IR1 translators should call COMPILER-ERROR instead of
+      ;; ERROR. To ingrain that knowledge into the CHECK-DS-foo
+      ;; functions is a bit of a hack, but to do otherwise
+      ;; changes how DS-BIND has to expand.
+      (compiler-error 'sb!kernel::arg-count-error
+                      :kind "special operator" :name name
+                      :args input :lambda-list lambda-list
+                      :minimum min :maximum max))
+     #!+sb-eval
+     (:eval
+      (error 'sb!eval::arg-count-program-error
+             ;; This is stupid. Maybe we should just say
+             ;;  "error parsing special form"?
+             ;; It would be more sensible than mentioning
+             ;; a random nonstandard macro.
+             :kind 'sb!eval::program-destructuring-bind
+             :args input :lambda-list lambda-list
+             :minimum min :maximum max))
+     (t
+      (error 'sb!kernel::arg-count-error
+             :kind kind :name name
+             :args input :lambda-list lambda-list
+             :minimum min :maximum max)))))
+
+(defun check-ds-bind-keys (input plist valid-keys pattern)
+  ;; Check just the keyword portion of the input in PLIST
+  ;; against VALID-KEYS. If VALID-KEYS = NIL then we don't care what
+  ;; the keys are - &ALLOW-OTHER-KEYS was present in the lambda-list,
+  ;; and we don't care if non-symbols are found in keyword position.
+  ;; Always enforce that the list has even length though.
+  (let* (seen-allowp seen-other bad-key
+         (tail plist)
+         (problem
+          (loop
+           (when (null tail)
+             (if seen-other
+                 (return :unknown-keyword)
+                 (return-from check-ds-bind-keys input)))
+           (unless (listp tail) (return :dotted-list))
+           (let ((next (cdr tail)))
+             (when (null next) (return :odd-length))
+             (unless (listp next) (return :dotted-list))
+             (let ((key (car tail)))
+               (when valid-keys
+                 (if (eq key :allow-other-keys) ; always itself allowed
+                     (unless seen-allowp
+                       (setf seen-allowp t)
+                       (when (car next) ; :allow-other-keys <non-nil>
+                         (setf seen-other nil valid-keys nil)))
+                     (unless (or seen-other
+                                 (find key (truly-the simple-vector valid-keys)
+                                       :test 'eq))
+                       (setq seen-other t bad-key key)))))
+             (setq tail (cdr next))))))
+    (multiple-value-bind (kind name) (get-ds-bind-context pattern)
+      #-sb-xc-host
+      (declare (optimize sb!c::allow-non-returning-tail-call))
+      (error 'sb!kernel::defmacro-lambda-list-broken-key-list-error
+             :kind kind :name name
+             :problem problem
+             :info (if (eq problem :unknown-keyword)
+                       ;; show any one unaccepted keyword
+                       (list bad-key (coerce valid-keys 'list))
+                       plist)))))
 
 (macrolet ((scan-req-opt ((input min max pattern list-name actual-max)
                           &key if-list-exhausted if-max-reached)
@@ -844,42 +916,15 @@
                 (declare (type index count))
                 (loop (when (zerop count) (return ,if-max-reached))
                       (when (null ,list-name)
-                        (if (< (- max count) ,min)
-                            (min/max-err ,pattern ,actual-max)
-                            (return ,if-list-exhausted)))
+                        (return
+                         (if (< (- max count) ,min)
+                             (ds-bind-error ,input ,min ,actual-max ,pattern)
+                             ,if-list-exhausted)))
                       (unless (listp ,list-name) ; dotted list error
-                        (min/max-err ,pattern ,actual-max))
+                        (return
+                         (ds-bind-error ,input ,min ,actual-max ,pattern)))
                       (decf count)
-                      (setq ,list-name (cdr ,list-name)))))
-           (min/max-err (pattern effective-max)
-             ;; IR1 translators should call COMPILER-ERROR instead of
-             ;; ERROR. To ingrain that knowledge into the CHECK-DS-foo
-             ;; functions is a bit of a hack, but to do otherwise
-             ;; changes how DS-BIND has to expand.
-             `(multiple-value-bind (name kind lambda-list)
-                  (get-ds-bind-context ,pattern)
-                (case kind
-                 (:special-form
-                  (compiler-error 'sb!kernel::arg-count-error
-                                  :kind "special operator"
-                                  :name name
-                                  :args input
-                                  :lambda-list lambda-list
-                                  :minimum min
-                                  :maximum ,effective-max))
-                 #!+sb-eval
-                 (:eval
-                  (error 'sb!eval::arg-count-program-error
-                         ;; This is stupid. Maybe we should just say
-                         ;;  "error parsing special form"?
-                         ;; It would be more sensible than mentioning
-                         ;; a random nonstandard macro.
-                         :kind 'sb!eval::program-destructuring-bind
-                         :args input :lambda-list lambda-list
-                         :minimum min :maximum ,effective-max))
-                 (t
-                  (sb!kernel::arg-count-error
-                   kind name input lambda-list min ,effective-max))))))
+                      (setq ,list-name (cdr ,list-name))))))
 
   ;; Assert that INPUT has the requisite number of elements as
   ;; specified by MIN/MAX. PATTERN does not contain &REST or &KEY.
@@ -888,8 +933,9 @@
     (scan-req-opt (input min max pattern list max)
                   ;; If 'count' became zero, then since there was
                   ;; no &REST, the LIST had better be NIL.
-                  :if-max-reached (if list (min/max-err pattern max) input)
-                  ;; The loop checks for dotted tail and at least MIN elements,
+                  :if-max-reached
+                  (if list (ds-bind-error input min max pattern) input)
+                  ;; The loop checks for dotted tail and >= MIN elements,
                   ;; so end of list means a valid match to the pattern.
                   :if-list-exhausted input))
 
@@ -900,53 +946,14 @@
     (scan-req-opt (input min max pattern list nil)
                   :if-list-exhausted input :if-max-reached input))
 
-  ;; Check just the keyword portion of the input in PLIST
-  ;; against VALID-KEYS. If VALID-KEYS = NIL then we don't care what
-  ;; the keys are - &ALLOW-OTHER-KEYS was present in the lambda-list,
-  ;; and we don't care if non-symbols are found in keyword position.
-  ;; We always enforce that the list is not odd-length though.
-  (defun check-plist (input plist valid-keys pattern)
-           (let ((list plist) seen-allowp seen-other bad-key)
-             (flet ((validp (key)
-                      (find key (truly-the simple-vector valid-keys) :test 'eq))
-                    (croak (problem &optional (info plist))
-                      (multiple-value-bind (kind name)
-                          (get-ds-bind-context pattern)
-                       (error 'sb!kernel::defmacro-lambda-list-broken-key-list-error
-                              :kind kind :name name
-                              :problem problem :info info))))
-               (declare (inline validp))
-               (loop
-                (when (null list)
-                  (if seen-other
-                      (croak :unknown-keyword ; show any one unaccepted keyword
-                             (list bad-key
-                                   (coerce (truly-the simple-vector valid-keys)
-                                           'list)))
-                      (return input)))
-                (unless (listp list) (croak :dotted-list))
-                (let ((next (cdr list)))
-                  (when (null next) (croak :odd-length))
-                  (unless (listp next) (croak :dotted-list))
-                  (let ((key (car list)))
-                    (when valid-keys
-                      (if (eq key :allow-other-keys) ; always itself allowed
-                          (unless seen-allowp
-                            (when (car next) ; :allow-other-keys <non-nil>
-                              (setf valid-keys nil seen-other nil))
-                            (setf seen-allowp t))
-                          (when (and (not seen-other) (not (validp key)))
-                            (setq seen-other t bad-key key)))))
-                  (setq list (cdr next)))))))
-
-    ;; The pattern contains &KEY. Anything beyond the final optional arg
-    ;; must be a well-formed property list regardless of existence of &REST.
-    (defun check-ds-list/&key (input min max pattern valid-keys)
-      (declare (type index min max) (optimize speed))
-      (scan-req-opt (input min max pattern list nil)
-                    :if-list-exhausted input
-                    :if-max-reached (check-plist input list valid-keys
-                                                 pattern)))
+  ;; The pattern contains &KEY. Anything beyond the final optional arg
+  ;; must be a well-formed property list regardless of existence of &REST.
+  (defun check-ds-list/&key (input min max pattern valid-keys)
+    (declare (type index min max) (optimize speed))
+    (scan-req-opt (input min max pattern list nil)
+                  :if-list-exhausted input
+                  :if-max-reached (check-ds-bind-keys
+                                   input list valid-keys pattern)))
 
     ;; Compiler-macro lambda lists are macro lambda lists -- meaning that
     ;; &key ((a a) t) should match a literal A, not a form evaluating to A
@@ -969,28 +976,27 @@
     ;; to validate keywords, a compiler-macro is probably always best
     ;; handled by a out-of-line call on account of the extra hair.
     ;;
-    (defun cmacro-check-ds-list/&key (input min max pattern valid-keys)
-      (declare (type index min max) (optimize speed))
-      (flet ((require-constant-keys (plist)
-               ;; Signal a condition if the compiler should give up
-               ;; on expanding this macro. Well-formedness of the plist
-               ;; makes no difference, since CHECK-PLIST is rigorous.
-               ;; If the condition isn't handled, we just press onward.
-               (loop
-                  (when (atom plist) (return))
-                  (let ((key (pop plist)))
-                    (unless (or (keywordp key)
-                                (and (symbolp key)
-                                     (constantp key)
-                                     (eq key (symbol-value key))))
-                      (signal 'compiler-macro-keyword-problem :argument key)))
-                  (when (atom plist) (return))
-                  (pop plist))))
-        (scan-req-opt (input min max pattern list nil)
-                      :if-list-exhausted input
-                      :if-max-reached (progn (require-constant-keys list)
-                                             (check-plist input list valid-keys
-                                                          pattern))))))
+  (defun cmacro-check-ds-list/&key (input min max pattern valid-keys)
+    (declare (type index min max) (optimize speed))
+    (scan-req-opt (input min max pattern list nil)
+                  :if-list-exhausted input
+                  :if-max-reached
+                  ;; Signal a condition if the compiler should give up
+                  ;; on expanding. Well-formedness of the plist
+                  ;; makes no difference, since CHECK-DS-BIND-KEYS is stricter.
+                  ;; If the condition isn't handled, we just press onward.
+                  (let ((plist list))
+                    (loop (when (atom plist) (return))
+                          (let ((key (pop plist)))
+                            (when (atom plist) (return))
+                            (pop plist)
+                            (unless (or (keywordp key)
+                                        (and (symbolp key)
+                                             (constantp key)
+                                             (eq key (symbol-value key))))
+                              (signal 'compiler-macro-keyword-problem
+                                      :argument key))))
+                    (check-ds-bind-keys input list valid-keys pattern)))))
 
 ;; Like GETF but return CDR of the cell whose CAR contained the found key,
 ;; instead of CADR; and return 0 for not found.
@@ -1104,26 +1110,6 @@
                        `((block ,(fun-name-block-name name) ,@forms))
                        forms)))
             docstring)))
-
-;;; We save space in macro definitions by calling this function.
-;;; FIXME: that consideration no longer seems relevant
-;;; given how macros expand now - they don't call this at all.
-;;; And the SB!KERNEL versus SB!C issue is pretty dang confusing
-;;; (the SB!C thing is a vop) so if nothing else, this deserves
-;;; to be renamed.
-(defun sb!kernel::arg-count-error
-    (context name args lambda-list minimum maximum)
-  ;; Tail-call ERROR, contrary to usual behavior.
-  #-sb-xc-host (declare (optimize sb!c::allow-non-returning-tail-call))
-  ;; And why isn't the condition class name an exported symbol?
-  ;; Perhaps to avoid conflict with the one exported from SB-C.
-  (error 'sb!kernel::arg-count-error
-         :kind context
-         :name name
-         :args args
-         :lambda-list lambda-list
-         :minimum minimum
-         :maximum maximum))
 
 ;;; Functions should probably not retain &AUX variables as part
 ;;; of their reflected lambda list, but this is selectable

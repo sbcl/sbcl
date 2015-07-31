@@ -439,10 +439,9 @@
                      (lambda (c)
                        (declare (ignore c))
                        (return-from found
-                         (assoc 'sb-kernel::arg-count-error
+                         (assoc 'sb-c::ds-bind-error
                                 (sb-debug::list-backtrace))))))
-       (sb-kernel::arg-count-error 'destructuring-bind 'nil
-                                   '(1 2) '(a b c) 3 3))))))
+       (sb-c::ds-bind-error '(foo) 2 3 '((:macro baz . deftype))))))))
 
 (with-test (:name :destructuring-optional/key-warn-once-only)
   (let ((count 0))
