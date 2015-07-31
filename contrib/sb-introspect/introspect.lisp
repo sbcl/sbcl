@@ -397,7 +397,10 @@ If an unsupported TYPE is requested, the function will return NIL.
           (loop for (kind loc) on locations by #'cddr
                 when loc
                 collect (let ((loc (translate-source-location loc)))
-                          (setf (definition-source-description loc) (list kind))
+                          (setf (definition-source-description loc)
+                                ;; Copy list to ensure that user code
+                                ;; cannot mutate the original.
+                                (copy-list (sb-int:ensure-list kind)))
                           loc))))
        (t
         nil)))))

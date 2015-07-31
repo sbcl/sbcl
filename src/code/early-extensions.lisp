@@ -1471,13 +1471,12 @@
               (lambda (replacement)
                 `',replacement)
               (normalize-deprecation-replacements replacement-spec))))
-   (sb!c:source-location)))
+   nil))
 
 (defun setup-type-in-final-deprecation
     (software version name replacement-spec)
   (declare (ignore software version replacement-spec))
-  (%compiler-deftype name (constant-type-expander t)
-                     (sb!c:source-location)))
+  (%compiler-deftype name (constant-type-expander t) nil))
 
 (defmacro define-deprecated-function (state version name replacements lambda-list
                                       &body body)
@@ -1495,10 +1494,10 @@
           ((:final)
            `',name))
      #-sb-xc-host
-     (proclaim '(deprecated
-                 ,state ("SBCL" ,version)
-                 (function ,name ,@(when replacements
-                                     `(:replacement ,replacements)))))))
+     (declaim (deprecated
+               ,state ("SBCL" ,version)
+               (function ,name ,@(when replacements
+                                   `(:replacement ,replacements)))))))
 
 (defmacro define-deprecated-variable (state version name
                                       &key (value nil valuep) replacement)
@@ -1511,10 +1510,10 @@
             `(defvar ,name ,@(when valuep (list value)))
             `',name)
      #-sb-xc-host
-     (proclaim '(deprecated
-                 ,state ("SBCL" ,version)
-                 (variable ,name ,@(when replacement
-                                     `(:replacement ,replacement)))))))
+     (declaim (deprecated
+               ,state ("SBCL" ,version)
+               (variable ,name ,@(when replacement
+                                   `(:replacement ,replacement)))))))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:

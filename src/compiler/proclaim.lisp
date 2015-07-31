@@ -264,14 +264,22 @@
           (t
            decl-spec))))
 
+;; These return values are intended for EQ-comparison in
+;; STORE-LOCATION in %PROCLAIM.
+(defun deprecation-location-key (namespace)
+  (case namespace
+    (function '(deprecated function))
+    (variable '(deprecated variable))
+    (type     '(deprecated type))))
+
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
-    (labels ((store-location (name)
+    (labels ((store-location (name &key (key kind))
                (if location
-                   (setf (getf (info :source-location :declaration name) kind)
+                   (setf (getf (info :source-location :declaration name) key)
                          location)
-                   (remf (info :source-location :declaration name) kind)))
+                   (remf (info :source-location :declaration name) key)))
              (map-names (names function &rest extra-args)
                (mapc (lambda (name)
                        (store-location name)
@@ -318,8 +326,13 @@
          (destructuring-bind (state since &rest things) args
            (multiple-value-bind (state software version)
                (check-deprecation-declaration state since form)
-             (map-names things #'process-deprecation-declaration
-                        state software version))))
+             (mapc (lambda (thing)
+                     (destructuring-bind (namespace name &rest rest) thing
+                       (declare (ignore rest))
+                       (store-location
+                        name :key (deprecation-location-key namespace)))
+                     (process-deprecation-declaration thing state software version))
+                   things))))
         (declaration
          (map-args #'process-declaration-declaration form))
         (t
