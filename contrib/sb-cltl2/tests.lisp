@@ -369,7 +369,7 @@
 (deftest function-info.global.deprecation
     (fun-info function-info.global.deprecation)
   (:function nil ((sb-ext:deprecated . (:state        :early
-                                        :since        ("SBCL" "1.2.3")
+                                        :since        (nil "1.2.3")
                                         :replacements (foo))))))
 
 (defmacro my-macro (x) x)

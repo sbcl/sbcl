@@ -1259,7 +1259,7 @@
                             version or a software name and a version.~@:>"
            :format-arguments (list since)))
   (if (typep since 'string)
-      (values "SBCL" since)
+      (values nil since)
       (values-list since)))
 
 (defun normalize-deprecation-replacements (replacements)
@@ -1276,7 +1276,7 @@
                                            replacement-spec))))
              (:copier nil))
   (state        (missing-arg) :type deprecation-state :read-only t)
-  (software     (missing-arg) :type string            :read-only t)
+  (software     (missing-arg) :type (or null string)  :read-only t)
   (version      (missing-arg) :type string            :read-only t)
   (replacements '()           :type list              :read-only t))
 
@@ -1441,7 +1441,7 @@
   (format stream
           (!uncross-format-control
            "The ~(~A~) ~/sb!impl:print-symbol-with-prefix/ has been ~
-            deprecated as of ~A ~A.~
+            deprecated as of ~@[~A ~]version ~A.~
             ~@[~2%~/sb!impl::print-deprecation-replacements/~]")
           namespace name software version replacements))
 
@@ -1479,14 +1479,14 @@
   (%compiler-deftype name (constant-type-expander t)
                      (sb!c:source-location)))
 
-(defmacro define-deprecated-function (state since name replacements lambda-list
+(defmacro define-deprecated-function (state version name replacements lambda-list
                                       &body body)
   (declare (type deprecation-state state)
-           (type string since)
+           (type string version)
            (type function-name name)
            (type (or function-name list) replacements)
            (type list lambda-list)
-           #+sb-xc-host (ignore since replacements))
+           #+sb-xc-host (ignore version replacements))
   `(prog1
        ,(ecase state
           ((:early :late)
@@ -1496,23 +1496,23 @@
            `',name))
      #-sb-xc-host
      (proclaim '(deprecated
-                 ,state ,since
+                 ,state ("SBCL" ,version)
                  (function ,name ,@(when replacements
                                      `(:replacement ,replacements)))))))
 
-(defmacro define-deprecated-variable (state since name
+(defmacro define-deprecated-variable (state version name
                                       &key (value nil valuep) replacement)
   (declare (type deprecation-state state)
-           (type string since)
+           (type string version)
            (type symbol name)
-           #+sb-xc-host (ignore since replacement))
+           #+sb-xc-host (ignore version replacement))
   `(prog1
        ,(if (member state '(:early :late))
             `(defvar ,name ,@(when valuep (list value)))
             `',name)
      #-sb-xc-host
      (proclaim '(deprecated
-                 ,state ,since
+                 ,state ("SBCL" ,version)
                  (variable ,name ,@(when replacement
                                      `(:replacement ,replacement)))))))
 

@@ -367,7 +367,7 @@
       (deprecated-thing-p namespace name)
     (when state
       (destructuring-bind (software version) since
-        (format stream "~@:_In ~A deprecation since ~A version ~A.~
+        (format stream "~@:_In ~A deprecation since ~@[~A ~]version ~A.~
                         ~@[ ~/sb-impl::print-deprecation-replacements/~]"
                 state software version replacements)))))
 

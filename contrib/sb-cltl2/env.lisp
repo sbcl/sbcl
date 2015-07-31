@@ -234,9 +234,9 @@ CARS of the alist include:
 
       :SINCE (SOFTWARE VERSION)
         VERSION is a string designating the version since which the
-        function has been deprecated. SOFTWARE is the name of the
-        software to which VERSION refers, e.g. \"SBCL\" for deprecated
-        functions in SBCL.
+        function has been deprecated. SOFTWARE is NIL or the name of
+        the software to which VERSION refers, e.g. \"SBCL\" for
+        deprecated functions in SBCL.
 
       :REPLACEMENTS REPLACEMENTS
         When this property is present, REPLACEMENTS is a list of
@@ -373,9 +373,9 @@ CARS of the alist include:
 
       :SINCE (SOFTWARE VERSION)
         VERSION is a string designating the version since which the
-        variable has been deprecated. SOFTWARE is the name of the
-        software to which VERSION refers, e.g. \"SBCL\" for deprecated
-        variables in SBCL.
+        variable has been deprecated. SOFTWARE is NIL or the name of
+        the software to which VERSION refers, e.g. \"SBCL\" for
+        deprecated variables in SBCL.
 
       :REPLACEMENTS REPLACEMENTS
         When this property is present, REPLACEMENTS is a list of
