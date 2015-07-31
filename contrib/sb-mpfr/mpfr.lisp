@@ -191,7 +191,7 @@
 (defun try-load-shared-object (pathname)
   (handler-case
       (load-shared-object pathname :dont-save t)
-    (error (e)
+    (error ()
       nil)))
 
 (defun %load-mpfr ()
