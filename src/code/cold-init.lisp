@@ -152,6 +152,10 @@
   (progn (prin1 `(package = ,(package-name *package*)))
          (terpri))
 
+  ;; *RAW-SLOT-DATA-LIST* is essentially a compile-time constant
+  ;; but isn't dumpable as such because it has functions in it.
+  (show-and-call sb!kernel::!raw-slot-data-init)
+
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
   ;; this to be initialized, so we initialize it right away.

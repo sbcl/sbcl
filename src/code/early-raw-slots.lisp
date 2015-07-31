@@ -130,7 +130,7 @@
 ;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
 ;; but not eval'd in the compiler.
 (defglobal *raw-slot-data-list* nil)
-(setq *raw-slot-data-list*
+(defun !raw-slot-data-init ()
   (macrolet ((make-comparer (accessor-name)
                #+sb-xc-host
                `(lambda (x y)
@@ -148,6 +148,7 @@
             #!+(or x86 x86-64 ppc) 1
             ;; at least sparc, mips and alpha can't:
             #!-(or x86 x86-64 ppc) 2))
+     (setq *raw-slot-data-list*
       (list
        (make-raw-slot-data :raw-type 'sb!vm:word
                            :accessor-name '%raw-instance-ref/word
@@ -197,7 +198,9 @@
                            :accessor-name '%raw-instance-ref/complex-long
                            :init-vop 'sb!vm::raw-instance-init/complex-long
                            :n-words #!+x86 6 #!+sparc 8
-                           :comparer (make-comparer %raw-instance-ref/complex-long))))))
+                           :comparer (make-comparer %raw-instance-ref/complex-long)))))))
+
+#+sb-xc-host (!raw-slot-data-init)
 
 (declaim (ftype (sfunction (symbol) raw-slot-data) raw-slot-data-or-lose))
 (defun raw-slot-data-or-lose (type)
