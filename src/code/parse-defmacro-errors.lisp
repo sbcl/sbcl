@@ -50,12 +50,16 @@
   (:report
    (lambda (condition stream)
     (!printing-defmacro-lambda-list-bind-error (condition stream)
-      (let ((min (arg-count-error-minimum condition))
-            (max (arg-count-error-maximum condition))
-            (actual (arg-count-error-args condition)))
+      (let* ((min (arg-count-error-minimum condition))
+             (max (arg-count-error-maximum condition))
+             (actual (arg-count-error-args condition))
+             (n-actual (if (proper-list-p actual) (length actual) nil)))
        (format stream
-               "invalid number of elements in ~2I~_~:S ~
+               "~A elements in ~2I~_~:S ~
                 ~I~_to satisfy lambda list ~2I~_~:S: ~I~_"
+               (cond ((and n-actual (< n-actual min)) "too few")
+                     ((and n-actual max (> n-actual max)) "too many")
+                     (t "invalid number of"))
                actual (arg-count-error-lambda-list condition))
        (format stream
                (cond ((null max) "at least ~W expected")
@@ -67,7 +71,7 @@
              ((cdr (last actual))
               (format stream ", but got an improper list"))
              (t
-              (format stream ", but got ~d" (length actual)))))))))
+              (format stream ", but got ~d" n-actual))))))))
 
 (define-condition defmacro-lambda-list-broken-key-list-error
                   (defmacro-lambda-list-bind-error)
