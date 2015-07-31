@@ -13,9 +13,6 @@
 
 ;;;; exported printer control variables
 
-;;; FIXME: Many of these have nontrivial types, e.g. *PRINT-LEVEL*,
-;;; *PRINT-LENGTH*, and *PRINT-LINES* are (OR NULL UNSIGNED-BYTE).
-
 (!defvar *print-readably* nil
   #!+sb-doc
   "If true, all objects will be printed readably. If readable printing
@@ -54,22 +51,22 @@
 (!defvar *print-gensym* t
   #!+sb-doc
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
-(defvar *print-lines* nil
+(!defvar *print-lines* nil
   #!+sb-doc
   "The maximum number of lines to print per object.")
-(defvar *print-right-margin* nil
+(!defvar *print-right-margin* nil
   #!+sb-doc
   "The position of the right margin in ems (for pretty-printing).")
-(defvar *print-miser-width* nil
+(!defvar *print-miser-width* nil
   #!+sb-doc
   "If the remaining space between the current column and the right margin
    is less than this, then print using ``miser-style'' output. Miser
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
-(defvar *print-pprint-dispatch*)
-#!+sb-doc
-(setf (fdocumentation '*print-pprint-dispatch* 'variable)
-      "The pprint-dispatch-table that controls how to pretty-print objects.")
+(defvar *print-pprint-dispatch*
+  (sb!pretty::make-pprint-dispatch-table) ; for type-correctness
+  #!+sb-doc
+  "The pprint-dispatch-table that controls how to pretty-print objects.")
 (!defvar *suppress-print-errors* nil
   #!+sb-doc
   "Suppress printer errors when the condition is of the type designated by this
@@ -105,8 +102,10 @@ variable: an unreadable object representing the error is printed instead.")
 "
   `(%with-standard-io-syntax (lambda () ,@body)))
 
+(defglobal sb!pretty::*standard-pprint-dispatch-table* nil)
 ;; duplicate defglobal because this file is compiled before "reader"
 (defglobal *standard-readtable* nil)
+
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
   (let ((*package* (find-package "COMMON-LISP-USER"))
@@ -135,8 +134,12 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; routines to print objects
 
-(defun write (object &key
-                     ((:stream stream) *standard-output*)
+(macrolet ((def (fn doc &rest forms)
+             (declare (ignorable doc))
+             `(defun ,fn
+                    (object
+                     &key
+                     ,@(if (eq fn 'write) '(stream))
                      ((:escape *print-escape*) *print-escape*)
                      ((:radix *print-radix*) *print-radix*)
                      ((:base *print-base*) *print-base*)
@@ -157,8 +160,18 @@ variable: an unreadable object representing the error is printed instead.")
                       *print-pprint-dispatch*)
                      ((:suppress-errors *suppress-print-errors*)
                       *suppress-print-errors*))
-  #!+sb-doc
-  "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*."
+               #!+sb-doc ,doc
+               ,@forms)))
+  (def write
+       "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*."
+       (output-object object (out-synonym-of stream))
+       object)
+  (def write-to-string
+       "Return the printed representation of OBJECT as a string."
+       (stringify-object object)))
+
+;;; Same as a call to (WRITE OBJECT :STREAM STREAM), but returning OBJECT.
+(defun %write (object stream)
   (output-object object (out-synonym-of stream))
   object)
 
@@ -198,30 +211,6 @@ variable: an unreadable object representing the error is printed instead.")
     (terpri stream)
     (output-object object stream))
   (values))
-
-(defun write-to-string
-    (object &key
-            ((:escape *print-escape*) *print-escape*)
-            ((:radix *print-radix*) *print-radix*)
-            ((:base *print-base*) *print-base*)
-            ((:circle *print-circle*) *print-circle*)
-            ((:pretty *print-pretty*) *print-pretty*)
-            ((:level *print-level*) *print-level*)
-            ((:length *print-length*) *print-length*)
-            ((:case *print-case*) *print-case*)
-            ((:array *print-array*) *print-array*)
-            ((:gensym *print-gensym*) *print-gensym*)
-            ((:readably *print-readably*) *print-readably*)
-            ((:right-margin *print-right-margin*) *print-right-margin*)
-            ((:miser-width *print-miser-width*) *print-miser-width*)
-            ((:lines *print-lines*) *print-lines*)
-            ((:pprint-dispatch *print-pprint-dispatch*)
-             *print-pprint-dispatch*)
-            ((:suppress-errors *suppress-print-errors*)
-             *suppress-print-errors*))
-  #!+sb-doc
-  "Return the printed representation of OBJECT as a string."
-  (stringify-object object))
 
 (defun prin1-to-string (object)
   #!+sb-doc
@@ -312,6 +301,10 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; Output OBJECT to STREAM observing all printer control variables.
 (defun output-object (object stream)
+  ;; FIXME: this function is declared EXPLICIT-CHECK, so it allows STREAM
+  ;; to be T or NIL (a stream-designator), which is not really right
+  ;; if eventually the call will be to a PRINT-OBJECT method,
+  ;; since the generic function should always receive a stream.
   (labels ((print-it (stream)
              (if *print-pretty*
                  (sb!pretty:output-pretty-object object stream)
@@ -590,6 +583,9 @@ variable: an unreadable object representing the error is printed instead.")
               :element-type '(unsigned-byte 8)))
 
 (defun !printer-cold-init ()
+;; The dispatch table will be changed later, so this doesn't really matter
+;; except if a full call to WRITE wants to read the current binding.
+(setq *print-pprint-dispatch* (sb!pretty::make-pprint-dispatch-table))
 (setq *digit-bases* (make-array 128 ; FIXME
                                 :element-type '(unsigned-byte 8)
                                 :initial-element 36)

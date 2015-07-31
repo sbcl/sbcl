@@ -824,7 +824,6 @@ line break."
 
 ;;;; pprint-dispatch tables
 
-(defvar *standard-pprint-dispatch-table*)
 (defvar *initial-pprint-dispatch-table*)
 
 (defstruct (pprint-dispatch-entry (:copier nil) (:predicate nil))

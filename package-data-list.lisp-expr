@@ -1306,6 +1306,8 @@ possibly temporarily, because it might be used internally."
                "WITH-FAST-READ-BYTE"
                "PREPARE-FOR-FAST-READ-CHAR"
                "OUT-SYNONYM-OF"
+               "STRINGIFY-OBJECT"
+               "%WRITE"
 
                ;; hackery to help set up for cold init
                "!BEGIN-COLLECTING-COLD-INIT-FORMS"
