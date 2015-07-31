@@ -141,6 +141,7 @@
  ("src/code/specializable-array")
 
  ("src/code/early-cl")
+ ("src/code/ansi-stream" :not-host)
  ("src/code/early-fasl")
 
  ;; mostly needed by stuff from comcom, but also used by "x86-vm"
@@ -173,8 +174,6 @@
  ;; accessors and inline functions defined here can be compiled inline
  ;; later. (Avoiding full calls increases efficiency)
  ("src/code/type-class")
-
- ("src/code/ansi-stream" :not-host)
 
  ("src/code/sysmacs" :not-host)
 
