@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!INT")
+(in-package "SB!IMPL")
 
 (/show0 "entering parse-body.lisp")
 
