@@ -195,31 +195,23 @@
 
 (defun %defstruct-package-locks (dd)
   (let ((name (dd-name dd)))
+    #+sb-xc-host (declare (ignore name))
     (with-single-package-locked-error
         (:symbol name "definining ~S as a structure"))
-    (when (dd-predicate-name dd)
+    (awhen (dd-predicate-name dd)
       (with-single-package-locked-error
-          (:symbol (dd-predicate-name dd)
-                   "defining ~s as a predicate for ~s structure"
-                   name)))
-
-    (when (dd-copier-name dd)
+          (:symbol it "defining ~s as a predicate for ~s structure" name)))
+    (awhen (dd-copier-name dd)
       (with-single-package-locked-error
-          (:symbol (dd-copier-name dd)
-                   "defining ~s as a copier for ~s structure"
-                   name)))
+          (:symbol it "defining ~s as a copier for ~s structure" name)))
     (dolist (const (dd-constructors dd))
-      (when (car const)
+      (awhen (car const)
         (with-single-package-locked-error
-            (:symbol (car const)
-                     "defining ~s as a constructor for ~s structure"
-                     name))))
+            (:symbol it "defining ~s as a constructor for ~s structure" name))))
     (dolist (dsd (dd-slots dd))
-      (when (dsd-accessor-name dsd)
+      (awhen (dsd-accessor-name dsd)
         (with-single-package-locked-error
-            (:symbol (dsd-accessor-name dsd)
-                     "defining ~s as an accessor for ~s structure"
-                     name))))))
+            (:symbol it "defining ~s as an accessor for ~s structure" name))))))
 
 ;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT

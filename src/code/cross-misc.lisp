@@ -154,6 +154,7 @@
 
 (defmacro with-single-package-locked-error ((&optional kind thing &rest format)
                                             &body body)
+  ;; FIXME: perhaps this should touch THING to make it used?
   (declare (ignore kind thing format))
   `(progn ,@body))
 
