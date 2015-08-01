@@ -202,6 +202,7 @@
                           (restart-case
                               (handler-bind
                                   ((error (lambda (c)
+                                            (declare (ignore c))
                                             (invoke-restart ',(first clause) ,@args))))
                                 (error "foo"))
                             ,clause))))))
@@ -342,3 +343,15 @@
       (ignore-errors (handler-bind () (error "Foo")))
     (assert (null value))
     (assert (typep condition 'simple-error))))
+
+
+;; Parsing of #'FUNCTION in %HANDLER-BIND was too liberal.
+;; This code should not compile.
+(with-test (:name (handler-bind :no-sloppy-syntax))
+  (assert
+   (nth-value 2 ; errorp
+    (let ((*error-output* (make-broadcast-stream)))
+      (compile nil '(lambda (x)
+                      (sb-impl::%handler-bind
+                         ((condition (function (lambda (c) (print c)) garb)))
+                       (print x))))))))

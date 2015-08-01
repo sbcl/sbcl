@@ -636,8 +636,7 @@ evaluated as a PROGN."
                  (typecase handler
                    ((cons (eql lambda) t)
                     (local-function-handler type handler))
-                   ((cons (eql function)
-                          (cons (cons (eql lambda) t) t))
+                   ((cons (eql function) (cons (cons (eql lambda)) null))
                     (local-function-handler type (second handler)))
                    (t
                     (push (apply #'entry-form binding) cluster-entries))))))
