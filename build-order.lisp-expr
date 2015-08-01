@@ -724,8 +724,7 @@
  ("src/code/external-formats/enc-utf" :not-host)
 
  ;; The code here can't be compiled until CONDITION and
- ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is
- ;; declared special.
+ ;; DEFINE-CONDITION are defined.
  ("src/code/parse-defmacro-errors")
 
  #!+sb-eval
