@@ -197,7 +197,7 @@
   (let ((name (dd-name dd)))
     #+sb-xc-host (declare (ignore name))
     (with-single-package-locked-error
-        (:symbol name "definining ~S as a structure"))
+        (:symbol name "defining ~S as a structure"))
     (awhen (dd-predicate-name dd)
       (with-single-package-locked-error
           (:symbol it "defining ~s as a predicate for ~s structure" name)))
