@@ -6,6 +6,8 @@ changes relative to sbcl-1.2.14:
     SB-CLTL2:{VARIABLE,FUNCTION}-INFORMATION. Documented in the "Deprecation"
     section of the manual.
   * enhancement: ASDF updated to 3.1.5. (lp#1476867)
+  * bug fix: better source location in the presence of quoted forms.
+    (lp#1370561)
 
 changes in sbcl-1.2.14 relative to sbcl-1.2.13:
   * minor incompatible change: The name of a compiled anonymous lambda

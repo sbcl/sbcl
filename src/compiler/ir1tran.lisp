@@ -535,6 +535,10 @@
                                (sub-find-source-paths fm (cons pos path)))
                               ((eq 'quote fm)
                                ;; Don't look into quoted constants.
+                               ;; KLUDGE: this can't actually know about constants.
+                               ;; e.g. (let ((quote (error "foo")))) or
+                               ;; (list quote (error "foo")) are not
+                               ;; constants and yet are ignored.
                                (return))
                               ((not (zerop pos))
                                ;; Otherwise store the containing form. It's not
@@ -544,9 +548,9 @@
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))
         (loop
-          (frob)
-          (frob)
-          (setq trail (cdr trail)))))))
+         (frob)
+         (frob)
+         (setq trail (cdr trail)))))))
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 

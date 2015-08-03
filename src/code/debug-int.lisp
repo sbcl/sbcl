@@ -2551,6 +2551,8 @@ register."
 ;;; The vector elements are in the same format as the compiler's
 ;;; NODE-SOURCE-PATH; that is, the first element is the form number and
 ;;; the last is the TOPLEVEL-FORM number.
+;;;
+;;; This should be synchronized with SB-C::SUB-FIND-SOURCE-PATHS
 (defun form-number-translations (form tlf-number)
   (let ((seen nil)
         (translations (make-array 12 :fill-pointer 0 :adjustable t)))
@@ -2567,8 +2569,11 @@ register."
                                 '(progn
                                   (when (atom subform) (return))
                                   (let ((fm (car subform)))
-                                    (when (consp fm)
-                                      (translate1 fm (cons pos path)))
+                                    (cond ((consp fm)
+                                           (translate1 fm (cons pos path)))
+                                          ((eq 'quote fm)
+                                           ;; Don't look into quoted constants.
+                                           (return)))
                                     (incf pos))
                                   (setq subform (cdr subform))
                                   (when (eq subform trail) (return)))))
