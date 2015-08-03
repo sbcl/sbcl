@@ -144,42 +144,45 @@
 
 ;;; clauses in HANDLER-CASE are allowed to have declarations (and
 ;;; indeed, only declarations)
-(assert
- (null (handler-case (error "foo") (error () (declare (optimize speed))))))
+(with-test (:name (handler-case declare))
+  (assert (null (handler-case (error "foo")
+                  (error ()
+                    (declare (optimize speed)))))))
 
-(handler-case
-    (handler-bind ((warning #'muffle-warning))
-      (signal 'warning))
-  ;; if it's a control error, it had better be printable
-  (control-error (c) (format nil "~A" c))
-  ;; there had better be an error
-  (:no-error (&rest args) (error "No error: ~S" args)))
+(with-test (:name (signal warning muffle-warning control-error))
+  (handler-case
+      (handler-bind ((warning #'muffle-warning))
+        (signal 'warning))
+    ;; if it's a control error, it had better be printable
+    (control-error (c) (format nil "~A" c))
+    ;; there had better be an error
+    (:no-error (&rest args) (error "No error: ~S" args))))
 
-(handler-case
-    (funcall (lambda (x) (check-type x fixnum) x) t)
-  (type-error (c)
-    (assert (and (subtypep (type-error-expected-type c) 'fixnum)
-                 (subtypep 'fixnum (type-error-expected-type c))))
-    (assert (eq (type-error-datum c) t)))
-  (:no-error (&rest rest) (error "no error: ~S" rest)))
+(with-test (:name (check-type type-error))
+  (handler-case
+      (funcall (lambda (x) (check-type x fixnum) x) t)
+    (type-error (c)
+      (assert (and (subtypep (type-error-expected-type c) 'fixnum)
+                   (subtypep 'fixnum (type-error-expected-type c))))
+      (assert (eq (type-error-datum c) t)))
+    (:no-error (&rest rest) (error "no error: ~S" rest))))
 
 ;;; ANSI specifies TYPE-ERROR if datum and arguments of ERROR are not
 ;;; designators for a condition. Reported by Bruno Haible on cmucl-imp
 ;;; 2004-10-12.
-(flet ((test (&rest args)
-         (multiple-value-bind (res err)
-             (ignore-errors (apply #'error args))
-           (assert (not res))
-           (assert (typep err 'type-error))
-           (assert (not (nth-value 1 (ignore-errors
-                                       (type-error-datum err)))))
-           (assert (not (nth-value 1 (ignore-errors
-                                       (type-error-expected-type err))))))))
-  (test '#:no-such-condition)
-  (test nil)
-  (test t)
-  (test 42)
-  (test (make-instance 'standard-object)))
+(with-test (:name (error :invalid-arguments type-error))
+  (flet ((test (&rest args)
+           (multiple-value-bind (res err)
+               (ignore-errors (apply #'error args))
+             (assert (not res))
+             (assert (typep err 'type-error))
+             (assert-no-signal (type-error-datum err))
+             (assert-no-signal (type-error-expected-type err)))))
+    (test '#:no-such-condition)
+    (test nil)
+    (test t)
+    (test 42)
+    (test (make-instance 'standard-object))))
 
 ;;; If CERROR is given a condition, any remaining arguments are only
 ;;; used for the continue format control.
@@ -275,7 +278,8 @@
 
 ;; Printing a READER-ERROR while the underlying stream is still open
 ;; should print the stream position information.
-(with-test (:name (reader-error :stream-error-position-info :open-stream :bug-1264902))
+(with-test (:name (reader-error :stream-error-position-info :open-stream
+                                :bug-1264902))
   (assert
    (search
     "Line: 1, Column: 22, File-Position: 22"
@@ -286,7 +290,8 @@
 
 ;; Printing a READER-ERROR when the underlying stream has been closed
 ;; should still work, but the stream information will not be printed.
-(with-test (:name (reader-error :stream-error-position-info :closed-stream :bug-1264902))
+(with-test (:name (reader-error :stream-error-position-info :closed-stream
+                                :bug-1264902))
   (assert
    (search
     "Package NO-SUCH-PACKAGE does not exist"
@@ -296,21 +301,21 @@
       (reader-error (condition) (princ-to-string condition))))))
 
 (with-test (:name (make-condition :non-condition-class))
-  (handler-case
-      (make-condition 'standard-class)
-    (type-error (condition)
-      (assert (search "not a condition class"
+  (assert (search "not a condition class"
+                  (handler-case
+                      (make-condition 'standard-class)
+                    (type-error (condition)
                       (princ-to-string condition))))))
 
 ;; When called with a symbol not designating a condition class,
 ;; MAKE-CONDITION used to signal an error which printed as "NIL does
 ;; not designate a condition class.".
 (with-test (:name (make-condition :correct-error-for-undefined-condition
-                   :bug-1199223))
-  (handler-case
-      (make-condition 'no-such-condition)
-    (type-error (condition)
-      (assert (search (string 'no-such-condition)
+                                  :bug-1199223))
+  (assert (search (string 'no-such-condition)
+                  (handler-case
+                      (make-condition 'no-such-condition)
+                    (type-error (condition)
                       (princ-to-string condition))))))
 
 ;; Using an undefined condition type in a HANDLER-BIND clause should
@@ -324,26 +329,22 @@
                      :bug-1378939))
     (assert-error
      (handler-bind ((no-such-condition-class #'print))
-       (error "does not matter")))))
+       (error "does not matter"))
+     simple-error)))
 
 ;; Using an undefined condition type in a HANDLER-BIND clause should
 ;; signal a [STYLE-]WARNING at compile time.
 (with-test (:name (handler-bind :undefined-condition-type
                    :compile-time-warning))
-  (handler-bind ((warning #'muffle-warning))
-    (assert-signal
-     (compile nil '(lambda () (handler-bind
-                                  ((no-such-condition-class #'print)))))
-     warning)))
+  (assert-signal
+   (compile nil '(lambda () (handler-bind
+                                ((no-such-condition-class #'print)))))
+   warning))
 
 ;; Empty bindings in HANDLER-BIND pushed an empty cluster onto
 ;; *HANDLER-CLUSTERS* which was not expected by SIGNAL (and wasteful).
 (with-test (:name (handler-bind :empty-bindings :bug-1388707))
-  (multiple-value-bind (value condition)
-      (ignore-errors (handler-bind () (error "Foo")))
-    (assert (null value))
-    (assert (typep condition 'simple-error))))
-
+  (assert-error (handler-bind () (error "Foo")) simple-error))
 
 ;; Parsing of #'FUNCTION in %HANDLER-BIND was too liberal.
 ;; This code should not compile.
