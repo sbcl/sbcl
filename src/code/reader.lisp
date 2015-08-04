@@ -116,7 +116,7 @@
       function
       (cond ((functionp x) x)
             ((null x) ,fallback)
-            (t (values (sb!sys:%primitive sb!c:safe-fdefn-fun x)))))))
+            (t (values (%primitive sb!c:safe-fdefn-fun x)))))))
 
 ;; Return a function-designator given a character-macro-table entry.
 (defmacro !cmt-entry-to-fun-designator (val)
