@@ -348,11 +348,30 @@
 
 ;; Parsing of #'FUNCTION in %HANDLER-BIND was too liberal.
 ;; This code should not compile.
-(with-test (:name (handler-bind :no-sloppy-syntax))
+(with-test (:name (handler-bind :no-sloppy-semantics))
   (assert
    (nth-value 2 ; errorp
     (let ((*error-output* (make-broadcast-stream)))
       (compile nil '(lambda (x)
                       (sb-impl::%handler-bind
                          ((condition (function (lambda (c) (print c)) garb)))
-                       (print x))))))))
+                       (print x)))))))
+  (assert
+   (nth-value 2 ; errorp
+    (let ((*error-output* (make-broadcast-stream)))
+      (compile nil '(lambda (x)
+                      (handler-bind ((warning "woot")) (print x))))))))
+
+(with-test (:name :handler-bind-satisfies-pred-style-warn)
+  (multiple-value-bind (f warnp errorp)
+      (let ((*error-output* (make-broadcast-stream)))
+        (compile nil
+                 '(lambda ()
+                    ;; Just in case we ever change the meaning of #'F in
+                    ;; high safety so that it evals #'F, this test will break,
+                    ;; indicating that HANDLER-BIND will have to be changed.
+                    (declare (optimize (safety 3)))
+                    (declare (notinline +))
+                    (handler-bind (((satisfies snorky) #'abort)) (+ 2 2)))))
+    (assert (and f warnp (not errorp)))
+    (assert (= (funcall f) 4)))) ; there is no runtime error either

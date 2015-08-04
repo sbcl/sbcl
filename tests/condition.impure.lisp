@@ -427,3 +427,64 @@
   (assert (= (length (sb-kernel::condition-classoid-class-slots
                       *a-classy-classoid*))
              2)))
+
+(defun some-silly-handler (x) (declare (ignore x)))
+
+;; Note, you should exercise extreme caution when printing *HANDLER-CLUSTERS*
+;; from the REPL or you will likely confuse yourself.
+;; At any point, the clusters are composed of a chain of dx conses.
+;; One way to print them is like this:
+;;  (funcall (lambda () (print sb-kernel::*handler-clusters*) nil))
+
+(with-test (:name :handler-bind-expansion-variations)
+
+  ;; exercise all 3 possibilities for the TEST of a clause
+  (handler-bind ((error #'print))
+    ;; first cluster, first binding, first part
+    (let ((test (caaar sb-kernel:*handler-clusters*)))
+      (assert (eq test (sb-kernel:find-classoid-cell 'error)))))
+  (locally (declare (muffle-conditions style-warning))
+    (handler-bind (((satisfies some-silly-fun) #'print))
+      (let ((test (caaar sb-kernel:*handler-clusters*)))
+        (assert (eq test (sb-int:find-fdefn 'some-silly-fun))))))
+  (handler-bind (((or warning error) #'print))
+    (let ((test (caaar sb-kernel:*handler-clusters*)))
+      (assert (functionp test))))
+
+  ;; exercise all 3 possibilities for the HANDLER of a clause
+
+  (flet ((frob (x) (print x)))
+    (handler-bind ((warning
+                    (lambda (c) (frob (frob c)))))
+      ;; first cluster, first binding, second part
+      (let ((fn (cdaar sb-kernel:*handler-clusters*)))
+        (assert (functionp fn)))))
+
+  (handler-bind ((warning (eval ''muffle-warning)))
+    (let ((fn (cdaar sb-kernel:*handler-clusters*)))
+      ;; the function is stored as a symbol
+      (assert (eq fn 'muffle-warning))))
+
+  (handler-bind ((warning 'some-silly-handler))
+    (let ((fn (cdaar sb-kernel:*handler-clusters*)))
+      ;; the function is stored as an fdefn
+      (assert (typep fn 'sb-kernel::fdefn))))
+
+  (handler-bind ((warning 'muffle-warning))
+    (let ((fn (cdaar sb-kernel:*handler-clusters*)))
+      ;; the function is stored directly because it's a builtin.
+      (assert (eq fn (symbol-function 'muffle-warning))))))
+
+;; Oddly enough, at least one other Lisp considers this example
+;; *not* to fail, quite explicitly - the handler function in the
+;; handler-cluster is a lambda that returns a function that is
+;; the real handler function.
+(defun this-should-fail ()
+  (declare (muffle-conditions style-warning))
+  (handler-bind ((condition #'some-nonexistent-handler))
+    (random 100)))
+
+(with-test (:name :handler-bind-evals-handlers-immediately)
+  (assert-error (this-should-fail))
+  (defun some-nonexistent-handler (x) x)
+  (assert (integerp (this-should-fail)))) ; but not now it shouldn't

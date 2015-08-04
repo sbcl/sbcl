@@ -75,12 +75,14 @@
    ARGUMENTS. If the condition is not handled, NIL is returned. If
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
-  (let ((condition (coerce-to-condition datum
-                                        arguments
-                                        'simple-condition
-                                        'signal))
-        (handler-clusters *handler-clusters*)
-        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
+  (let* ((condition
+          (coerce-to-condition datum arguments 'simple-condition 'signal))
+         (handler-clusters *handler-clusters*)
+         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal))
+         ;; possible FIXME: despite that fndb says COERCE-TO-CONDITION
+         ;; returns CONDITION, compiler doesn't know that CONDITION
+         ;; is an INSTANCE and emits a type-check.
+         (layout (%instance-layout condition)))
     (when *break-on-signals*
       (maybe-break-on-signal condition))
     (do ((cluster (pop handler-clusters) (pop handler-clusters)))
@@ -93,8 +95,24 @@
       ;; would lead to infinite recursive SIGNAL calls.
       (let ((*handler-clusters* handler-clusters))
         (dolist (handler cluster)
-          (when (funcall (truly-the function (car handler)) condition)
-            (funcall (cdr handler) condition)))))))
+          (macrolet ((cast-to-fun (f possibly-symbolp)
+                       ;; For efficiency the cases are tested in this order:
+                       ;;  - FUNCTIONP is just a lowtag test
+                       ;;  - FDEFN-P is a lowtag + widetag.
+                       ;; Avoiding a SYMBOLP test is fine because
+                       ;; SYMBOL-FUNCTION rejects bogosity anyway.
+                       `(let ((f ,f))
+                          (cond ((functionp f) f)
+                                (,(if possibly-symbolp `(fdefn-p f) 't)
+                                 (truly-the function
+                                  (%primitive sb!c:safe-fdefn-fun f)))
+                                ,@(if possibly-symbolp
+                                      `((t (symbol-function f))))))))
+            (let ((test (car (truly-the cons handler))))
+              (when (if (%instancep test) ; a condition classoid
+                        (classoid-cell-typep layout test condition)
+                        (funcall (cast-to-fun test nil) condition))
+                (funcall (cast-to-fun (cdr handler) t) condition)))))))))
 
 (defun error (datum &rest arguments)
   #!+sb-doc

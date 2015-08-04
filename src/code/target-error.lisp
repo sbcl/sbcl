@@ -19,10 +19,9 @@
 ;; Host lisp does not need a value for this, so start it out as NIL.
 (defglobal **initial-handler-clusters** nil)
 (setq **initial-handler-clusters**
-  `(((,(lambda (condition)
-         (typep condition 'warning))
+  `(((,(find-classoid-cell 'warning :create t)
       .
-      ,(lambda (warning)
+      ,(named-lambda "MAYBE-MUFFLE" (warning)
          (when (muffle-warning-p warning)
            (muffle-warning warning)))))))
 
