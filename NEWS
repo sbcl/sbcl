@@ -7,9 +7,10 @@ changes relative to sbcl-1.2.14:
     section of the manual.
   * enhancement: ASDF updated to 3.1.5. (lp#1476867)
   * enhancement: definitions within PROGN get proper source locations when
-    compiled (needs latest Slime to take advantage of this).
+    compiled (needs latest Slime to take advantage of this). (lp#1473147)
   * bug fix: better source location in the presence of quoted forms.
     (lp#1370561)
+  * bug fix: better source locations inside backqoute. (lp#1361502)
   * bug fix: HANDLER-BIND requires that the handler-function be
     a function designator at the time of binding establishment. (lp#1480679)
 

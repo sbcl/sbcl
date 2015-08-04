@@ -2569,6 +2569,8 @@ register."
                                 '(progn
                                   (when (atom subform) (return))
                                   (let ((fm (car subform)))
+                                    (when (sb!int:comma-p fm)
+                                      (setf fm (sb!int:comma-expr fm)))
                                     (cond ((consp fm)
                                            (translate1 fm (cons pos path)))
                                           ((eq 'quote fm)
