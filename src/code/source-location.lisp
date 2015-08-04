@@ -13,7 +13,7 @@
 
 (def!struct (definition-source-location
              (:constructor %make-definition-source-location
-                           (namestring toplevel-form-number))
+                           (namestring toplevel-form-number form-number))
              (:copier nil)
              (:make-load-form-fun just-dump-it-normally))
   ;; Namestring of the source file that the definition was compiled from.
@@ -21,6 +21,8 @@
   (namestring nil :type (or string null) :read-only t)
   ;; Toplevel form index
   (toplevel-form-number nil :type (or fixnum null) :read-only t)
+  ;; DFO form number within the top-level form
+  (form-number nil :type (or fixnum null) :read-only t)
   ;; plist from WITH-COMPILATION-UNIT
   (plist *source-plist* :read-only t))
 
@@ -32,18 +34,22 @@
                 (make-file-info-namestring
                  *compile-file-pathname*
                  (get-toplevelish-file-info *source-info*)))))
-         (tlf-num (acond ((boundp '*current-path*)
-                          (source-path-tlf-number *current-path*))
-                         ((and source-info (source-info-file-info source-info))
-                          (1- (fill-pointer (file-info-forms it))))))
+         tlf-number
+         form-number
          (last (and source-info
                     (source-info-last-defn-source-loc source-info))))
+    (acond ((boundp '*current-path*)
+            (setf tlf-number (source-path-tlf-number *current-path*)
+                  form-number (source-path-form-number *current-path*)))
+           ((and source-info (source-info-file-info source-info))
+            (setf tlf-number (1- (fill-pointer (file-info-forms it))))))
     (if (and last
-             (eql (definition-source-location-toplevel-form-number last) tlf-num)
+             (eql (definition-source-location-toplevel-form-number last) tlf-number)
+             (eql (definition-source-location-form-number last) form-number)
              (string= (definition-source-location-namestring last) namestring)
              (equal (definition-source-location-plist last) *source-plist*))
         last
-        (let ((new (%make-definition-source-location namestring tlf-num)))
+        (let ((new (%make-definition-source-location namestring tlf-number form-number)))
           (when source-info
             (setf (source-info-last-defn-source-loc source-info) new))
           new))))

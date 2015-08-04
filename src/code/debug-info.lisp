@@ -114,6 +114,7 @@
   ;; NIL, then each code location represented in the BLOCKS specifies
   ;; the TLF number.
   (tlf-number nil :type (or index null))
+  (form-number nil :type (or index null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The

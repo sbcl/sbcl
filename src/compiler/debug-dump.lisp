@@ -154,7 +154,8 @@
 ;;; TLF, and returning it or NIL.
 (defun find-tlf-number (fun)
   (declare (type clambda fun))
-  (let ((res (source-path-tlf-number (node-source-path (lambda-bind fun)))))
+  (let* ((source-path (node-source-path (lambda-bind fun)))
+         (res (source-path-tlf-number source-path)))
     (declare (type (or index null) res))
     (do-physenv-ir2-blocks (2block (lambda-physenv fun))
       (let ((block (ir2-block-block 2block)))
@@ -171,7 +172,7 @@
                          (vop-node (location-info-vop loc))))
                        res)
             (setq res nil)))))
-    res))
+    (values res (source-path-form-number source-path))))
 
 ;;; Dump out the number of locations and the locations for Block.
 (defun dump-block-locations (block locations tlf-num var-locs)
@@ -196,39 +197,39 @@
 ;;; BLOCKS and TLF-NUMBER in FUN's DEBUG-FUN.
 (defun compute-debug-blocks (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
-  (let ((*previous-location* 0)
-        (tlf-num (find-tlf-number fun))
-        (physenv (lambda-physenv fun))
-        (byte-buffer *byte-buffer*)
-        prev-block
-        locations
-        elsewhere-locations)
-    (setf (fill-pointer byte-buffer) 0)
-    (do-physenv-ir2-blocks (2block physenv)
-      (let ((block (ir2-block-block 2block)))
-        (when (eq (block-info block) 2block)
-          (when prev-block
-            (dump-block-locations prev-block (nreverse (shiftf locations nil))
-                                  tlf-num var-locs))
-          (setf prev-block block)))
-      (dolist (loc (ir2-block-locations 2block))
-        (if (label-elsewhere-p (location-info-label loc)
-                               (location-info-kind loc))
-            (push loc elsewhere-locations)
-            (push loc locations))))
+  (multiple-value-bind (tlf-num form-number) (find-tlf-number fun)
+   (let ((*previous-location* 0)
+         (physenv (lambda-physenv fun))
+         (byte-buffer *byte-buffer*)
+         prev-block
+         locations
+         elsewhere-locations)
+     (setf (fill-pointer byte-buffer) 0)
+     (do-physenv-ir2-blocks (2block physenv)
+       (let ((block (ir2-block-block 2block)))
+         (when (eq (block-info block) 2block)
+           (when prev-block
+             (dump-block-locations prev-block (nreverse (shiftf locations nil))
+                                   tlf-num var-locs))
+           (setf prev-block block)))
+       (dolist (loc (ir2-block-locations 2block))
+         (if (label-elsewhere-p (location-info-label loc)
+                                (location-info-kind loc))
+             (push loc elsewhere-locations)
+             (push loc locations))))
 
-    (dump-block-locations prev-block (nreverse locations)
-                          tlf-num var-locs)
+     (dump-block-locations prev-block (nreverse locations)
+                           tlf-num var-locs)
 
-    (when elsewhere-locations
-      (write-var-integer (length elsewhere-locations) byte-buffer)
-      (dolist (loc (nreverse elsewhere-locations))
-        (push loc locations)
-        (dump-location-from-info loc tlf-num var-locs)))
+     (when elsewhere-locations
+       (write-var-integer (length elsewhere-locations) byte-buffer)
+       (dolist (loc (nreverse elsewhere-locations))
+         (push loc locations)
+         (dump-location-from-info loc tlf-num var-locs)))
 
-    (values (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
-                                     byte-buffer)
-            tlf-num)))
+     (values (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
+                                      byte-buffer)
+             tlf-num form-number))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -546,12 +547,14 @@
                  (compute-args fun var-locs))))
 
     (if (and (>= level 2) (not toplevel-p))
-        (multiple-value-bind (blocks tlf-num)
+        (multiple-value-bind (blocks tlf-num form-number)
             (compute-debug-blocks fun var-locs)
-          (setf (compiled-debug-fun-tlf-number dfun) tlf-num)
-          (setf (compiled-debug-fun-blocks dfun) blocks))
-        (setf (compiled-debug-fun-tlf-number dfun) (find-tlf-number fun)))
-
+          (setf (compiled-debug-fun-blocks dfun) blocks
+                (compiled-debug-fun-tlf-number dfun) tlf-num
+                (compiled-debug-fun-form-number dfun) form-number))
+        (multiple-value-bind (tlf-num form-number) (find-tlf-number fun)
+          (setf (compiled-debug-fun-tlf-number dfun) tlf-num
+                (compiled-debug-fun-form-number dfun) form-number)))
     (if (xep-p fun)
         (setf (compiled-debug-fun-returns dfun) :standard)
         (let ((info (tail-set-info (lambda-tail-set fun))))
