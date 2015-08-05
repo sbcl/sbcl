@@ -1455,9 +1455,11 @@ or they must be declared locally notinline at each call site.~@:>")
         (let* ((name (dsd-name slot))
                (dum (copy-symbol name))
                (keyword (keywordicate name))
+               (specfied-type `(and ,int-type ,(dsd-type slot)))
                ;; Canonicalize the type for a prettier macro-expansion
-               (type (type-specifier
-                      (specifier-type `(and ,int-type ,(dsd-type slot))))))
+               ;; but leave it as is if there is a conflict.
+               (type (or (type-specifier (specifier-type specfied-type))
+                         specfied-type)))
           (arglist `((,keyword ,dum) ,(dsd-default slot)))
           (vals dum)
           ;; KLUDGE: we need a separate type declaration for for
