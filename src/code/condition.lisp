@@ -93,22 +93,23 @@
 ;;;     (defmethod print-object ((x c) stream)
 ;;;       (if *print-escape* (call-next-method) (report-name x stream)))
 ;;; The current code doesn't seem to quite match that.
-(def*method print-object ((x condition) stream)
-  (if *print-escape*
-      (if (and (typep x 'simple-condition) (slot-value x 'format-control))
-          (print-unreadable-object (x stream :type t :identity t)
-            (write (simple-condition-format-control x)
-                   :stream stream
-                   :lines 1))
-          (print-unreadable-object (x stream :type t :identity t)))
-      ;; KLUDGE: A comment from CMU CL here said
-      ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
-      ;;   superclasses in define-condition call!
-      (dolist (class (condition-classoid-cpl (classoid-of x))
-                     (error "no REPORT? shouldn't happen!"))
-        (let ((report (condition-classoid-report class)))
-          (when report
-            (return (funcall report x stream)))))))
+(def*method print-object ((object condition) stream)
+  (cond
+    ((not *print-escape*)
+     ;; KLUDGE: A comment from CMU CL here said
+     ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
+     ;;   superclasses in define-condition call!
+     (funcall (or (some #'condition-classoid-report
+                        (condition-classoid-cpl (classoid-of object)))
+                  (error "no REPORT? shouldn't happen!"))
+              object stream))
+    ((and (typep object 'simple-condition)
+          (slot-value object 'format-control))
+     (print-unreadable-object (object stream :type t :identity t)
+       (write (simple-condition-format-control object)
+              :stream stream :lines 1)))
+    (t
+     (print-unreadable-object (object stream :type t :identity t)))))
 
 ;;; It is essential that there be a method that works in warm load
 ;;; because any conditions signaled are not printable otherwise,
