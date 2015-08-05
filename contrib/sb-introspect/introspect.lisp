@@ -177,8 +177,10 @@ constant pool."
             for source = (find-definition-source
                           (sb-c::vop-info-generator-function vop))
             do (setf (definition-source-description source)
-                     (list (sb-c::template-name vop)
-                           (sb-c::template-note vop)))
+                     (if (sb-c::template-note vop)
+                         (list (sb-c::template-name vop)
+                               (sb-c::template-note vop))
+                         (list (sb-c::template-name vop))))
             collect source))))
 
 (defun find-vop-source (name)
