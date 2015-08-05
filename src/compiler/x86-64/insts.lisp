@@ -2545,8 +2545,12 @@
 (defun emit-optimized-test-inst (x y)
   (typecase y
     ((unsigned-byte 7)
+     ;; If we knew that the sign bit would not be tested, this could
+     ;; handle (unsigned-byte 8) constants. But since we don't know,
+     ;; we assume that it's not ok to change the test such that the S flag
+     ;; comes out possibly differently.
      (let ((offset (tn-offset x)))
-       (cond ((and (sc-is x any-reg descriptor-reg)
+       (cond ((and (sc-is x any-reg descriptor-reg signed-reg unsigned-reg)
                    (or (= offset rax-offset) (= offset rbx-offset)
                        (= offset rcx-offset) (= offset rdx-offset)))
               (inst test (reg-in-size x :byte) y))
