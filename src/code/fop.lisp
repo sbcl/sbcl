@@ -278,17 +278,29 @@
 (!define-fop #xF0 (fop-symbol-in-package-save ((:operands pkg-index namelen)))
   (aux-fop-intern namelen (ref-fop-table (fasl-input) pkg-index) (fasl-input)))
 
-(!define-fop 96 (fop-uninterned-symbol-save ((:operands namelen)))
-  (let ((res (make-string namelen)))
-    #!-sb-unicode
-    (read-string-as-bytes (fasl-input-stream) res)
-    #!+sb-unicode
-    (read-string-as-unsigned-byte-32 (fasl-input-stream) res)
-    (push-fop-table (make-symbol res) (fasl-input))))
+;;; Symbol-hash is usually computed lazily and memoized into a symbol.
+;;; Laziness slightly improves the speed of allocation.
+;;; But when loading fasls, the time spent in the loader totally swamps
+;;; any time savings of not precomputing symbol-hash.
+;;; INTERN hashes everything anyway, so let's be consistent
+;;; and precompute the hashes of uninterned symbols too.
+(macrolet ((ensure-hashed (symbol-form)
+             `(let ((symbol ,symbol-form))
+                (ensure-symbol-hash symbol)
+                symbol)))
+  (!define-fop 96 (fop-uninterned-symbol-save ((:operands namelen)))
+    (let ((res (make-string namelen)))
+      #!-sb-unicode
+      (read-string-as-bytes (fasl-input-stream) res)
+      #!+sb-unicode
+      (read-string-as-unsigned-byte-32 (fasl-input-stream) res)
+      (push-fop-table (ensure-hashed (make-symbol res))
+                      (fasl-input))))
 
-(!define-fop 104 (fop-copy-symbol-save ((:operands table-index)))
-  (push-fop-table (copy-symbol (ref-fop-table (fasl-input) table-index))
-                  (fasl-input)))
+  (!define-fop 104 (fop-copy-symbol-save ((:operands table-index)))
+    (push-fop-table (ensure-hashed
+                     (copy-symbol (ref-fop-table (fasl-input) table-index)))
+                    (fasl-input))))
 
 (!define-fop 44 (fop-package (pkg-designator))
   (find-undeleted-package-or-lose pkg-designator))
