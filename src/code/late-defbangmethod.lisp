@@ -13,4 +13,4 @@
 ;;; before real CLOS DEFMETHOD is available, saves up its definition to be
 ;;; executed later when CLOS is available
 (defmacro-mundanely def!method (&rest args)
-  `(push ',args *delayed-def!method-args*))
+  `(push (cons (sb!c:source-location) ',args) *delayed-def!method-args*))

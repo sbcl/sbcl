@@ -17,7 +17,9 @@
                                (format t
                                        "~&/about to do ~S~%"
                                        '(defmethod ,@args))
-                               (defmethod ,@args)
+                               (setf (slot-value (defmethod ,@(cdr args))
+                                                 'sb-pcl::source)
+                                     ,(car args))
                                #+sb-show
                                (format t
                                        "~&/done with DEFMETHOD ~S~%"
