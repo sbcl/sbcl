@@ -299,56 +299,56 @@
 (defun %define-condition (name parent-types layout slots
                           direct-default-initargs all-readers all-writers
                           source-location &optional documentation)
-  (with-single-package-locked-error
-      (:symbol name "defining ~A as a condition")
-    (%compiler-define-condition name parent-types layout all-readers all-writers)
-    (when source-location
-      (setf (layout-source-location layout) source-location))
-    (let ((class (find-classoid name))) ; FIXME: rename to 'classoid'
-      (setf (condition-classoid-slots class) slots
-            (condition-classoid-direct-default-initargs class) direct-default-initargs
-            (fdocumentation name 'type) documentation)
+  (call-with-defining-class
+   'condition name
+   (lambda ()
+     (%%compiler-define-condition name parent-types layout all-readers all-writers)
+     (when source-location
+       (setf (layout-source-location layout) source-location))
+     (let ((classoid (find-classoid name)))
+       (setf (condition-classoid-slots classoid) slots
+             (condition-classoid-direct-default-initargs classoid) direct-default-initargs
+             (fdocumentation name 'type) documentation)
 
-      (dolist (slot slots)
+       (dolist (slot slots)
+         ;; Set up reader and writer functions.
+         (let ((slot-name (condition-slot-name slot)))
+           (dolist (reader (condition-slot-readers slot))
+             (install-condition-slot-reader reader name slot-name))
+           (dolist (writer (condition-slot-writers slot))
+             (install-condition-slot-writer writer name slot-name))))
 
-        ;; Set up reader and writer functions.
-        (let ((slot-name (condition-slot-name slot)))
-          (dolist (reader (condition-slot-readers slot))
-            (install-condition-slot-reader reader name slot-name))
-          (dolist (writer (condition-slot-writers slot))
-            (install-condition-slot-writer writer name slot-name))))
-
-      ;; Compute effective slots and set up the class and hairy slots
-      ;; (subsets of the effective slots.)
-      (setf (condition-classoid-class-slots class) '()
-            (condition-classoid-hairy-slots class) '())
-      (let ((eslots (compute-effective-slots class))
-            (e-def-initargs
-             (reduce #'append
-                     (mapcar #'condition-classoid-direct-default-initargs
-                             (condition-classoid-cpl class)))))
-        (dolist (slot eslots)
-          (ecase (condition-slot-allocation slot)
-            (:class
-             (unless (condition-slot-cell slot)
-               (setf (condition-slot-cell slot)
-                     (list (if (condition-slot-initform-p slot)
-                               (let ((initfun (condition-slot-initfunction slot)))
-                                 (aver (functionp initfun))
-                                 (funcall initfun))
-                               *empty-condition-slot*))))
-             (push slot (condition-classoid-class-slots class)))
-            ((:instance nil)
-             (setf (condition-slot-allocation slot) :instance)
-             ;; FIXME: isn't this "always hairy"?
-             (when (or (functionp (condition-slot-initfunction slot))
-                       (dolist (initarg (condition-slot-initargs slot) nil)
-                         (when (functionp (third (assoc initarg e-def-initargs)))
-                           (return t))))
-               (push slot (condition-classoid-hairy-slots class)))))))
-      (dolist (fun *define-condition-hooks*)
-        (funcall fun class)))
-    name))
+       ;; Compute effective slots and set up the class and hairy slots
+       ;; (subsets of the effective slots.)
+       (setf (condition-classoid-class-slots classoid) '()
+             (condition-classoid-hairy-slots classoid) '())
+       (let ((eslots (compute-effective-slots classoid))
+             (e-def-initargs
+              (reduce #'append
+                      (mapcar #'condition-classoid-direct-default-initargs
+                              (condition-classoid-cpl classoid)))))
+         (dolist (slot eslots)
+           (ecase (condition-slot-allocation slot)
+             (:class
+              (unless (condition-slot-cell slot)
+                (setf (condition-slot-cell slot)
+                      (list (if (condition-slot-initform-p slot)
+                                (let ((initfun (condition-slot-initfunction slot)))
+                                  (aver (functionp initfun))
+                                  (funcall initfun))
+                                *empty-condition-slot*))))
+              (push slot (condition-classoid-class-slots classoid)))
+             ((:instance nil)
+              (setf (condition-slot-allocation slot) :instance)
+              ;; FIXME: isn't this "always hairy"?
+              (when (or (functionp (condition-slot-initfunction slot))
+                        (dolist (initarg (condition-slot-initargs slot) nil)
+                          (when (functionp (third (assoc initarg e-def-initargs)))
+                            (return t))))
+                (push slot (condition-classoid-hairy-slots classoid)))))))
+       (dolist (fun *define-condition-hooks*)
+         (funcall fun classoid)))))
+  name)
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)
                                  &body options)

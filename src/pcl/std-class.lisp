@@ -326,15 +326,16 @@
 
 (defun real-load-defclass (name metaclass-name supers slots other
                            readers writers slot-names source-location &optional safe-p)
-  (with-single-package-locked-error (:symbol name "defining ~S as a class")
-    (%compiler-defclass name readers writers slot-names)
-    (let ((res (apply #'ensure-class name :metaclass metaclass-name
-                      :direct-superclasses supers
-                      :direct-slots slots
-                      :definition-source source-location
-                      'safe-p safe-p
-                      other)))
-      res)))
+  (sb-kernel::call-with-defining-class
+   'class name
+   (lambda ()
+     (sb-kernel::%%compiler-defclass name readers writers slot-names)
+     (apply #'ensure-class name :metaclass metaclass-name
+            :direct-superclasses supers
+            :direct-slots slots
+            :definition-source source-location
+            'safe-p safe-p
+            other))))
 
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
