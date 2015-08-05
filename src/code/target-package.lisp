@@ -931,8 +931,8 @@ implementation it is ~S." *default-package-use-list*)
                names))
     res))
 
-(macrolet ((find/intern (function)
-             ;; Both FIND-SYMBOL* and INTERN* require a SIMPLE-STRING,
+(macrolet ((find/intern (function &rest more-args)
+             ;; Both %FIND-SYMBOL and %INTERN require a SIMPLE-STRING,
              ;; but accept a LENGTH. Given a non-simple string,
              ;; we need copy it only if the cumulative displacement
              ;; into the underlying simple-string is nonzero.
@@ -958,13 +958,14 @@ implementation it is ~S." *default-package-use-list*)
                 (truly-the
                  (values symbol (member :internal :external :inherited nil))
                  (,function name length
-                            (find-undeleted-package-or-lose package))))))
+                            (find-undeleted-package-or-lose package)
+                            ,@more-args)))))
 
   (defun intern (name &optional (package (sane-package)))
   #!+sb-doc
   "Return a symbol in PACKAGE having the specified NAME, creating it
   if necessary."
-    (find/intern intern*))
+    (find/intern %intern t))
 
   (defun find-symbol (name &optional (package (sane-package)))
   #!+sb-doc
@@ -972,13 +973,13 @@ implementation it is ~S." *default-package-use-list*)
   then the second value is :INTERNAL, :EXTERNAL or :INHERITED to indicate
   how the symbol is accessible. If no symbol is found then both values
   are NIL."
-    (find/intern find-symbol*)))
+    (find/intern %find-symbol)))
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
-(defun intern* (name length package &key no-copy)
+(defun %intern (name length package copy-p)
   (declare (simple-string name) (index length))
-  (multiple-value-bind (symbol where) (find-symbol* name length package)
+  (multiple-value-bind (symbol where) (%find-symbol name length package)
     (cond (where
            (values symbol where))
           (t
@@ -987,10 +988,10 @@ implementation it is ~S." *default-package-use-list*)
            ;; COND, but in case another thread is interning in
            ;; parallel we need to check after grabbing the lock.
            (with-package-graph ()
-             (setf (values symbol where) (find-symbol* name length package))
+             (setf (values symbol where) (%find-symbol name length package))
              (if where
                  (values symbol where)
-                 (let ((symbol-name (cond (no-copy
+                 (let ((symbol-name (cond ((not copy-p)
                                            (aver (= (length name) length))
                                            name)
                                           ((typep name '(simple-array nil (*)))
@@ -1018,7 +1019,7 @@ implementation it is ~S." *default-package-use-list*)
 
 ;;; Check internal and external symbols, then scan down the list
 ;;; of hashtables for inherited symbols.
-(defun find-symbol* (string length package)
+(defun %find-symbol (string length package)
   (declare (simple-string string)
            (type index length))
   (let* ((hash (compute-symbol-hash string length))
@@ -1026,10 +1027,10 @@ implementation it is ~S." *default-package-use-list*)
     (declare (type hash hash ehash))
     (with-symbol ((symbol) (package-internal-symbols package)
                   string length hash ehash)
-      (return-from find-symbol* (values symbol :internal)))
+      (return-from %find-symbol (values symbol :internal)))
     (with-symbol ((symbol) (package-external-symbols package)
                   string length hash ehash)
-      (return-from find-symbol* (values symbol :external)))
+      (return-from %find-symbol (values symbol :external)))
     (let* ((tables (package-tables package))
            (n (length tables)))
       (unless (eql n 0)
@@ -1043,7 +1044,7 @@ implementation it is ~S." *default-package-use-list*)
                                              (svref tables i))
                            string length hash ehash)
                (setf (package-mru-table-index package) i)
-               (return-from find-symbol* (values symbol :inherited)))
+               (return-from %find-symbol (values symbol :inherited)))
              (if (< (decf i) 0) (setq i (1- n)))
              (if (= i start) (return)))))))
   (values nil nil))

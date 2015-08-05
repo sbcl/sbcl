@@ -260,10 +260,8 @@
                (list (subseq buffer 0 size)
                      (undefined-package-error package)))
         (push-fop-table (without-package-locks
-                          (intern* buffer
-                                   size
-                                   package
-                                   :no-copy t)) fasl-input))))
+                          (%intern buffer size package nil))
+                        fasl-input))))
 
 (!define-fop 80 (fop-lisp-symbol-save ((:operands namelen)))
   (aux-fop-intern namelen *cl-package* (fasl-input)))

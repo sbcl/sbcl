@@ -85,7 +85,7 @@
   ;; Derived from %USE-LIST, but maintained separately.
   (tables #() :type simple-vector)
   ;; index into TABLES of the table in which an inherited symbol was most
-  ;; recently found. On the next FIND-SYMBOL* operation, the indexed table
+  ;; recently found. On the next %FIND-SYMBOL operation, the indexed table
   ;; is tested first.
   (mru-table-index 0 :type index)
   ;; packages that use this package
