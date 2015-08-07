@@ -420,7 +420,7 @@ If an unsupported TYPE is requested, the function will return NIL.
        (sb-pcl::method-combination-type-name object) :method-combination)))
     (package
      (translate-source-location (sb-impl::package-source-location object)))
-    (class
+    ((or class sb-mop:slot-definition)
      (translate-source-location (sb-pcl::definition-source object)))
     ;; Use the PCL definition location information instead of the function
     ;; debug-info for methods and generic functions. Sometimes the

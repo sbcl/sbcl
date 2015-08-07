@@ -8,6 +8,8 @@ changes relative to sbcl-1.2.14:
   * enhancement: ASDF updated to 3.1.5. (lp#1476867)
   * enhancement: definitions within PROGN get proper source locations when
     compiled (needs latest Slime to take advantage of this). (lp#1473147)
+  * enhancement: source locations for DEFCLASS slots now point directly to the
+    slot definitions, not the whole DEFCLASS form.
   * bug fix: better source location in the presence of quoted forms.
     (lp#1370561)
   * bug fix: better source locations inside backqoute. (lp#1361502)

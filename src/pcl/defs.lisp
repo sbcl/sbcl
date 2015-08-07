@@ -459,7 +459,8 @@
     ;; KLUDGE: we need a reader for bootstrapping purposes, in
     ;; COMPUTE-EFFECTIVE-SLOT-DEFINITION-INITARGS.
     :reader %slot-definition-documentation)
-   (%class :initform nil :initarg :class :accessor slot-definition-class)))
+   (%class :initform nil :initarg :class :accessor slot-definition-class)
+   (source :initform nil :initarg source :accessor definition-source)))
 
 (defclass standard-slot-definition (slot-definition)
   ((allocation

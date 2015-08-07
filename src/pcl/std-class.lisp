@@ -451,8 +451,7 @@
     ((class std-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
-     (direct-default-initargs nil direct-default-initargs-p)
-     definition-source)
+     (direct-default-initargs nil direct-default-initargs-p))
   (cond (direct-superclasses-p
          (setq direct-superclasses
                (or direct-superclasses
@@ -501,7 +500,7 @@
       ;; required by AMOP, "Reinitialization of Class Metaobjects"
       (finalize-inheritance class)
       (update-class class nil))
-  (add-slot-accessors class direct-slots definition-source)
+  (add-slot-accessors class direct-slots)
   (make-preliminary-layout class))
 
 (define-condition invalid-superclass (reference-condition error)
@@ -754,8 +753,7 @@
     ((class structure-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
-     direct-default-initargs
-     definition-source)
+     direct-default-initargs)
   (declare (ignore slot-names direct-default-initargs))
   (if direct-superclasses-p
       (setf (slot-value class 'direct-superclasses)
@@ -814,7 +812,7 @@
         (setf (slot-value class 'wrapper) layout)
         (setf (layout-slot-table layout) (make-slot-table class slots))))
     (setf (slot-value class 'finalized-p) t)
-    (add-slot-accessors class direct-slots definition-source)))
+    (add-slot-accessors class direct-slots)))
 
 (defmethod direct-slot-definition-class ((class structure-class) &rest initargs)
   (declare (ignore initargs))
@@ -823,14 +821,14 @@
 (defmethod finalize-inheritance ((class structure-class))
   nil) ; always finalized
 
-(defun add-slot-accessors (class dslotds &optional source-location)
-  (fix-slot-accessors class dslotds 'add source-location))
+(defun add-slot-accessors (class dslotds)
+  (fix-slot-accessors class dslotds 'add))
 
 (defun remove-slot-accessors (class dslotds)
   (fix-slot-accessors class dslotds 'remove))
 
-(defun fix-slot-accessors (class dslotds add/remove &optional source-location)
-  (flet ((fix (gfspec name r/w doc)
+(defun fix-slot-accessors (class dslotds add/remove)
+  (flet ((fix (gfspec name r/w doc source-location)
            (let ((gf (cond ((eq add/remove 'add)
                             (or (find-generic-function gfspec nil)
                                 (ensure-generic-function
@@ -849,11 +847,12 @@
                         (remove-writer-method class gf))))))))
     (dolist (dslotd dslotds)
       (let ((slot-name (slot-definition-name dslotd))
-            (slot-doc (%slot-definition-documentation dslotd)))
+            (slot-doc (%slot-definition-documentation dslotd))
+            (location (definition-source dslotd)))
         (dolist (r (slot-definition-readers dslotd))
-          (fix r slot-name 'r slot-doc))
+          (fix r slot-name 'r slot-doc location))
         (dolist (w (slot-definition-writers dslotd))
-          (fix w slot-name 'w slot-doc))))))
+          (fix w slot-name 'w slot-doc location))))))
 
 (defun add-direct-subclasses (class supers)
   (dolist (super supers)
