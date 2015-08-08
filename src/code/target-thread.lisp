@@ -326,7 +326,7 @@ terminating the main thread would terminate the entire process. If
 ALLOW-EXIT is true, aborting the main thread is equivalent to calling
 SB-EXT:EXIT code 1 and :ABORT NIL.
 
-Invoking the initial ABORT restart estabilished by MAKE-THREAD is
+Invoking the initial ABORT restart established by MAKE-THREAD is
 equivalent to calling ABORT-THREAD in other than main threads.
 However, whereas ABORT restart may be rebound, ABORT-THREAD always
 unwinds the entire thread. (Behaviour of the initial ABORT restart for

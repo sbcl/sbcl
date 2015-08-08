@@ -63,7 +63,7 @@ unwilling to track changes to SBCL internals.
 Ideally we'd like to be free to refactor our own internals as we
 please, without even going through the hassle of deprecating things.
 Sometimes, however, it turns out that our internal interfaces have
-several external users who aren't using them advicedly, but due to
+several external users who aren't using them advisedly, but due to
 misunderstandings regarding their status or stability.
 
 Consider a deprecated internal interface a reminder for SBCL

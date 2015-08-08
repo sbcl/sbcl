@@ -241,7 +241,7 @@ As a runtime option this is equivalent to @code{--noinform}
 @code{--disable-ldb} @code{--lose-on-corruption}
 @code{--end-runtime-options} @code{--script} @var{filename}. See the
 description of @code{--script} as a toplevel option below. If there
-are no other commandline arguments following @code{--script}, the
+are no other command line arguments following @code{--script}, the
 filename argument can be omitted.
 
 

@@ -578,7 +578,7 @@ When the debugger command loop establishes variable bindings for
 available variables, these variable bindings have lexical scope and
 dynamic extent.@footnote{The variable bindings are actually created
 using the Lisp @code{symbol-macrolet} special form.}  You can close
-over them, but such closures can't be used as upward funargs.
+over them, but such closures can't be used as upward function arguments.
 
 You can also set local variables using @code{setq}, but if the
 variable was closed over in the original source and never set, then
@@ -815,7 +815,7 @@ value for optimization qualities.  It may be useful to specify
 documentation.
 
 @item 1
-Level @code{1} provides argument documentation (printed arglists) and
+Level @code{1} provides argument documentation (printed argument lists) and
 derived argument/result type information.  This makes @code{describe}
 more informative, and allows the compiler to do compile-time argument
 count and type checking for any calls compiled at run-time.  This is
