@@ -15,6 +15,8 @@ changes relative to sbcl-1.2.14:
   * bug fix: better source locations inside backqoute. (lp#1361502)
   * bug fix: HANDLER-BIND requires that the handler-function be
     a function designator at the time of binding establishment. (lp#1480679)
+  * bug fix: inlined functions surrounded by nested macrolets are properly
+    inlined. (lp#309123)
 
 changes in sbcl-1.2.14 relative to sbcl-1.2.13:
   * minor incompatible change: The name of a compiled anonymous lambda

@@ -2664,3 +2664,14 @@
   (ctu:file-compile
    '((locally (declare (optimize sb-c:store-coverage-data))
        (1)))))
+
+(symbol-macrolet ((x 30))
+  (macrolet ((foo (y) (+ x y)))
+    (declaim (inline environment-around-inline))
+    (defun environment-around-inline (z)
+      (* z (foo 4)))))
+
+(with-test (:name :environment-around-inline)
+  (defun environment-around-inline.2 (z)
+    (environment-around-inline z))
+  (assert (= (environment-around-inline.2 10) 340)))

@@ -1073,7 +1073,31 @@
                                 :source-name source-name
                                 :debug-name debug-name))))
 
-;;;; defining global functions
+;;; Convert the forms produced by RECONSTRUCT-LEXENV to LEXENV
+(defun process-inline-lexenv (inline-lexenv)
+  (labels ((recurse (inline-lexenv lexenv)
+             (let ((*lexenv* lexenv))
+               (if (null inline-lexenv)
+                   lexenv
+                   (destructuring-bind (type bindings &optional body) inline-lexenv
+                     (case type
+                       (:declare
+                        (recurse body
+                                 (process-decls `((declare ,@bindings)) nil nil)))
+                       (:macro
+                        (let ((macros (loop for (name . function) in bindings
+                                            collect (list* name 'macro
+                                                           (eval-in-lexenv function lexenv)))))
+                          (recurse body
+                                   (make-lexenv :default lexenv
+                                                :funs macros))))
+                       (:symbol-macro
+                        (funcall-in-symbol-macrolet-lexenv bindings
+                                                           (lambda (&rest args)
+                                                             (declare (ignore args))
+                                                             (recurse body *lexenv*))
+                                                           :compile))))))))
+    (recurse inline-lexenv (make-null-lexenv))))
 
 ;;; Convert FUN as a lambda in the null environment, but use the
 ;;; current compilation policy. Note that FUN may be a
@@ -1086,30 +1110,26 @@
                                   system-lambda)
   (when (and (not debug-name) (eq '.anonymous. source-name))
     (setf debug-name (name-lambdalike fun)))
-  (destructuring-bind (decls macros symbol-macros &rest body)
-      (if (eq (car fun) 'lambda-with-lexenv)
-          (cdr fun)
-          `(() () () . ,(cdr fun)))
-    (let* ((*lexenv* (make-lexenv
-                      :default (process-decls decls nil nil
-                                              :lexenv (make-null-lexenv))
-                      :vars (copy-list symbol-macros)
-                      :funs (mapcar (lambda (x)
-                                      `(,(car x) .
-                                         (macro . ,(coerce (cdr x) 'function))))
-                                    macros)
-                      ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
-                      ;; rather than the definition-site lexenv, since it seems
-                      ;; like a much more common case.
-                      :handled-conditions (lexenv-handled-conditions *lexenv*)
-                      :policy (lexenv-policy *lexenv*)))
-           (clambda (ir1-convert-lambda `(lambda ,@body)
-                                        :source-name source-name
-                                        :debug-name debug-name
-                                        :system-lambda system-lambda)))
-      (setf (functional-inline-expanded clambda) t)
-      clambda)))
-
+  (let* ((lambda-with-lexenv-p (eq (car fun) 'lambda-with-lexenv))
+         (body (if lambda-with-lexenv-p
+                   `(lambda ,@(cddr fun))
+                   fun))
+         (*lexenv* (make-lexenv
+                    :default (if lambda-with-lexenv-p
+                                 (process-inline-lexenv (second fun))
+                                 (make-null-lexenv))
+                    ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
+                    ;; rather than the definition-site lexenv, since it seems
+                    ;; like a much more common case.
+                    :handled-conditions (lexenv-handled-conditions *lexenv*)
+                    :policy (lexenv-policy *lexenv*)))
+         (clambda (ir1-convert-lambda body
+                                      :source-name source-name
+                                      :debug-name debug-name
+                                      :system-lambda system-lambda)))
+    (setf (functional-inline-expanded clambda) t)
+    clambda))
+;;;; defining global functions
 ;;; Given a lambda-list, return a FUN-TYPE object representing the signature:
 ;;; return type is *, and each individual arguments type is T -- but we get
 ;;; the argument counts and keywords.

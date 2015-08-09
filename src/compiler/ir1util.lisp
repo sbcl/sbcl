@@ -922,7 +922,8 @@
      lambda
      cleanup handled-conditions disabled-package-locks
      policy
-     user-data)))
+     user-data
+     default)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander
@@ -957,7 +958,8 @@
      (lexenv-handled-conditions lexenv)
      (lexenv-disabled-package-locks lexenv)
      (lexenv-policy lexenv)
-     (lexenv-user-data lexenv))))
+     (lexenv-user-data lexenv)
+     lexenv)))
 
 ;;;; flow/DFO/component hackery
 
