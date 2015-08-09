@@ -226,8 +226,15 @@
                                           #-sb-xc :host)))
   (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
               name-and-options slot-descriptions))
-         (inherits (if (dd-class-p dd) (inherits-for-structure dd)))
          (name (dd-name dd))
+         (inherits
+          (if (dd-class-p dd)
+              #+sb-xc-host (!inherits-for-structure dd)
+              #-sb-xc-host
+              (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
+                                                        'structure-object))))
+                (concatenate 'simple-vector
+                             (layout-inherits super) (vector super)))))
          (print-method
           (when (dd-print-option dd)
             (let* ((x (sb!xc:gensym "OBJECT"))
@@ -779,13 +786,7 @@ unless :NAMED is also specified.")))
           ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
           (let* ((included-layout (classoid-layout included-classoid))
                  (included-dd (layout-info included-layout)))
-            (when (and (dd-alternate-metaclass included-dd)
-                       ;; As of sbcl-0.pre7.73, anyway, STRUCTURE-OBJECT
-                       ;; is represented with an ALTERNATE-METACLASS. But
-                       ;; it's specifically OK to :INCLUDE (and PCL does)
-                       ;; so in this one case, it's OK to include
-                       ;; something with :ALTERNATE-METACLASS after all.
-                       (not (eql included-name 'structure-object)))
+            (when (dd-alternate-metaclass included-dd)
               (error "can't :INCLUDE class ~S (has alternate metaclass)"
                      included-name)))))
 
@@ -808,10 +809,6 @@ unless :NAMED is also specified.")))
 
       (incf (dd-length dd) (dd-length included-structure))
       (when (dd-class-p dd)
-        (let ((mc (rest (dd-alternate-metaclass included-structure))))
-          (when (and mc (not (dd-alternate-metaclass dd)))
-            (setf (dd-alternate-metaclass dd)
-                  (cons included-name mc))))
         (when (eq (dd-pure dd) :unspecified)
           (setf (dd-pure dd) (dd-pure included-structure)))
         #!-interleaved-raw-slots
@@ -852,7 +849,8 @@ unless :NAMED is also specified.")))
 
 ;;; This function is called at macroexpand time to compute the INHERITS
 ;;; vector for a structure type definition.
-(defun inherits-for-structure (info)
+;;; The cross-compiler is allowed to magically compute LAYOUT-INHERITS.
+(defun !inherits-for-structure (info)
   (declare (type defstruct-description info))
   (let* ((include (dd-include info))
          (superclass-opt (dd-alternate-metaclass info))
@@ -864,15 +862,17 @@ unless :NAMED is also specified.")))
                                     'structure-object))))))
     (case (dd-name info)
       ((ansi-stream)
+       ;; STREAM is an abstract class and you can't :include it,
+       ;; so the inheritance has to be hardcoded.
        (concatenate 'simple-vector
                     (layout-inherits super)
                     (vector super (classoid-layout (find-classoid 'stream)))))
-      ((fd-stream)
+      ((fd-stream) ; Similarly, FILE-STREAM is abstract
        (concatenate 'simple-vector
                     (layout-inherits super)
                     (vector super
                             (classoid-layout (find-classoid 'file-stream)))))
-      ((sb!impl::string-input-stream
+      ((sb!impl::string-input-stream ; etc
         sb!impl::string-output-stream
         sb!impl::fill-pointer-output-stream)
        (concatenate 'simple-vector
@@ -1796,7 +1796,7 @@ or they must be declared locally notinline at each call site.~@:>")
     `(progn
 
       (eval-when (:compile-toplevel :load-toplevel :execute)
-        (%compiler-set-up-layout ',dd ',(inherits-for-structure dd))))))
+        (%compiler-set-up-layout ',dd ',(!inherits-for-structure dd))))))
 
 (sb!xc:proclaim '(special *defstruct-hooks*))
 
@@ -1847,7 +1847,7 @@ or they must be declared locally notinline at each call site.~@:>")
       `(progn
 
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (%compiler-set-up-layout ',dd ',(inherits-for-structure dd)))
+           (%compiler-set-up-layout ',dd ',(!inherits-for-structure dd)))
 
          ;; slot readers and writers
          (declaim (inline ,@(mapcar #'dsd-accessor-name dd-slots)))
@@ -1910,10 +1910,6 @@ or they must be declared locally notinline at each call site.~@:>")
 (defun !set-up-structure-object-class ()
   (let ((dd (make-defstruct-description 'structure-object)))
     (setf
-     ;; Note: This has an ALTERNATE-METACLASS only because of blind
-     ;; clueless imitation of the CMU CL code -- dunno if or why it's
-     ;; needed. -- WHN
-     (dd-alternate-metaclass dd) '(t)
      (dd-slots dd) nil
      (dd-length dd) 1
      (dd-type dd) 'structure)
@@ -1928,7 +1924,7 @@ or they must be declared locally notinline at each call site.~@:>")
   (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
               (first args)
               (rest args)))
-         (inherits (inherits-for-structure dd)))
+         (inherits (!inherits-for-structure dd)))
     (%compiler-defstruct dd inherits)))
 
 (defun find-defstruct-description (name &optional (errorp t))
