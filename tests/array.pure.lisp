@@ -129,16 +129,19 @@
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (aref (make-array 0) 0)))
+  (declare (ignore warn fail))
   #+nil (assert fail) ; doesn't work, (maybe because ASSERTED-TYPE is NIL?)
   (assert-error (funcall fun) type-error))
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (aref (make-array 1) 1)))
+  (declare (ignore warn))
   (assert fail)
   (assert-error (funcall fun) type-error))
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (make-array 5 :element-type 'undefined-type)))
+  (declare (ignore fun fail))
   (assert warn))
 
 (flet ((opaque-identity (x) x))
@@ -307,6 +310,7 @@
      (style-warning ()
        t)
      (:no-error (&rest args)
+       (declare (ignore args))
        nil))))
 
 (with-test (:name :dont-make-array-bad-keywords)

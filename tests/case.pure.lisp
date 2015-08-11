@@ -45,6 +45,7 @@
                           (error "~S shouldn't give a warning, but did: ~A" form c))
                         (setf expected nil))))
           (compile nil form))
+      (declare (ignore warnings-p))
       (assert (functionp fun))
       (assert (null expected)
               ()
