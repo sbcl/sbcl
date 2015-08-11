@@ -40,13 +40,12 @@
 ;;;;  (incf (buffer-tail buffer) n))
 ;;;;
 
-(declaim (inline buffer-sap buffer-length buffer-head buffer-tail
-                 (setf buffer-head) (setf buffer-tail)))
 (defstruct (buffer (:constructor %make-buffer (sap length)))
   (sap (missing-arg) :type system-area-pointer :read-only t)
   (length (missing-arg) :type index :read-only t)
   (head 0 :type index)
   (tail 0 :type index))
+(declaim (freeze-type buffer))
 
 (defvar *available-buffers* ()
   #!+sb-doc
