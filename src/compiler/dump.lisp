@@ -410,7 +410,7 @@
                   (float (dump-float x file))
                   (integer (dump-integer x file)))
                 (equal-save-object x file)))
-             #!+sb-simd-pack
+             #!+(and (not (host-feature sb-xc-host)) sb-simd-pack)
              (simd-pack
               (unless (equal-check-table x file)
                 (dump-fop 'fop-simd-pack file)
