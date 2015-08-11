@@ -27,7 +27,9 @@
     ;; is free to :USE (PACKAGE-USE-LIST :CL-USER) anyway.:-|
     nil))
 
-(defmacro defpackage (package &rest options)
+;; "mundanely" because this macro can't work (never has, never will)
+;; until the target system is fully operational.
+(defmacro-mundanely defpackage (package &rest options)
   #!+sb-doc
   #.(format nil
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
