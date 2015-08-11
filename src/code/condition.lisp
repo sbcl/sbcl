@@ -176,56 +176,53 @@
 
 ;;;; MAKE-CONDITION
 
-(defun allocate-condition (type &rest initargs)
-  (let* ((classoid (if (symbolp type)
-                       (find-classoid type nil)
-                       type))
-         (class (typecase classoid
-                  (condition-classoid classoid)
-                  (class
-                   (return-from allocate-condition
-                     (apply #'allocate-condition (class-name classoid) initargs)))
-                  (classoid
-                   (error 'simple-type-error
-                          :datum classoid
-                          :expected-type 'condition-class
-                          :format-control "~S is not a condition class."
-                          :format-arguments (list type)))
-                  (t
-                   (error 'simple-type-error
-                          :datum type
-                          :expected-type 'condition-class
-                          :format-control
-                          "~S does not designate a condition class."
-                          :format-arguments (list type)))))
-         (condition (%make-condition-object initargs '())))
-    (setf (%instance-layout condition) (classoid-layout class))
-    (values condition class)))
+(defun allocate-condition (designator &rest initargs)
+  ;; I am going to assume that people are not somehow getting to here
+  ;; with a CLASSOID, which is not strictly legal as a designator,
+  ;; but which is accepted because it is actually the desired thing.
+  ;; It doesn't seem worth sweating over that detail, and in any event
+  ;; we could say that it's a supported extension.
+  (let ((classoid (named-let lookup ((designator designator))
+                    (typecase designator
+                     (symbol (find-classoid designator nil))
+                     (class (lookup (class-name designator)))
+                     (t designator)))))
+    (if (condition-classoid-p classoid)
+        (let ((instance (%make-condition-object initargs '())))
+          (setf (%instance-layout instance) (classoid-layout classoid))
+          (values instance classoid))
+        (error 'simple-type-error
+               :datum designator
+               ;; CONDITION-CLASS isn't a type-specifier. Is this legal?
+               :expected-type 'condition-class
+               :format-control "~S does not designate a condition class."
+               :format-arguments (list designator)))))
 
 (defun make-condition (type &rest initargs)
   #!+sb-doc
   "Make an instance of a condition object using the specified initargs."
-  ;; Note: ANSI specifies no exceptional situations in this function.
-  ;; signalling simple-type-error would not be wrong.
-  (multiple-value-bind (condition class)
+  ;; Note: While ANSI specifies no exceptional situations in this function,
+  ;; ALLOCATE-CONDITION will signal a type error if TYPE does not designate
+  ;; a condition class. This seems fair enough.
+  (multiple-value-bind (condition classoid)
       (apply #'allocate-condition type initargs)
 
     ;; Set any class slots with initargs present in this call.
-    (dolist (cslot (condition-classoid-class-slots class))
+    (dolist (cslot (condition-classoid-class-slots classoid))
       (dolist (initarg (condition-slot-initargs cslot))
         (let ((val (getf initargs initarg *empty-condition-slot*)))
           (unless (eq val *empty-condition-slot*)
             (setf (car (condition-slot-cell cslot)) val)))))
 
     ;; Default any slots with non-constant defaults now.
-    (dolist (hslot (condition-classoid-hairy-slots class))
+    (dolist (hslot (condition-classoid-hairy-slots classoid))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
               (unless (eq (getf initargs initarg *empty-condition-slot*)
                           *empty-condition-slot*)
                 (return nil)))
         (setf (getf (condition-assigned-slots condition)
                     (condition-slot-name hslot))
-              (find-slot-default class hslot))))
+              (find-slot-default classoid hslot))))
 
     condition))
 

@@ -301,7 +301,7 @@
       (reader-error (condition) (princ-to-string condition))))))
 
 (with-test (:name (make-condition :non-condition-class))
-  (assert (search "not a condition class"
+  (assert (search "does not designate a condition class"
                   (handler-case
                       (make-condition 'standard-class)
                     (type-error (condition)

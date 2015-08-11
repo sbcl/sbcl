@@ -510,7 +510,7 @@
 
 (defmethod allocate-instance ((class condition-class) &rest initargs)
   (declare (ignore initargs))
-  (allocate-condition (class-name class)))
+  (values (allocate-condition (class-name class))))
 
 (macrolet ((def (name class)
              `(defmethod ,name ((class ,class) &rest initargs)

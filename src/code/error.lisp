@@ -13,21 +13,6 @@
 
 (in-package "SB!KERNEL")
 
-;;; not sure this is the right place, but where else?
-(defun style-warn (datum &rest arguments)
-  (/noshow0 "entering STYLE-WARN")
-  (/noshow datum arguments)
-  (if (stringp datum)
-      (with-sane-io-syntax
-        (warn 'simple-style-warning
-              :format-control datum
-              :format-arguments arguments))
-      ;; Maybe FIXME: check that the DATUM is a STYLE-WARNING or a
-      ;; specifier for a subtype of STYLE-WARNING?  (I had trouble
-      ;; getting through cold-init with that check enabled, though.)
-      ;; -- RMK, 20080701.
-      (apply #'warn datum arguments)))
-
 ;;; a utility for SIGNAL, ERROR, CERROR, WARN, COMPILER-NOTIFY and
 ;;; INVOKE-DEBUGGER: Parse the hairy argument conventions into a
 ;;; single argument that's directly usable by all the other routines.
@@ -42,19 +27,12 @@
                                     when giving ~S to ~S."
                    :format-arguments (list datum fun-name)))
          datum)
-        ((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
-         (apply #'make-condition datum arguments))
         ((or (stringp datum) (functionp datum))
          (make-condition default-type
                          :format-control datum
                          :format-arguments arguments))
         (t
-         (error 'simple-type-error
-                :datum datum
-                :expected-type '(or symbol string function)
-                :format-control "Condition designator ~s is not of type ~s."
-                :format-arguments (list datum
-                                        '(or symbol string function))))))
+         (apply #'make-condition datum arguments))))
 
 (define-condition layout-invalid (type-error)
   ()

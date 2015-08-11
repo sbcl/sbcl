@@ -12,6 +12,16 @@
 (in-package "SB!KERNEL")
 
 (define-condition simple-style-warning (simple-condition style-warning) ())
+(defun style-warn (datum &rest arguments)
+  ;; Cross-compiler needs a special-case for DATUM being a string,
+  ;; because it needs to produce a SIMPLE-STYLE-WARNING, not SIMPLE-WARNING.
+  ;; The SBCL-specific %WARN function - which allows specifying the default
+  ;; condition class when handed a string - exists only on the target lisp.
+  (if (stringp datum)
+      (warn 'simple-style-warning
+            :format-control datum :format-arguments arguments)
+      (apply #'warn datum arguments)))
+
 (define-condition format-too-few-args-warning (simple-warning) ())
 ;;; in the cross-compiler, this is a full warning.  In the target
 ;;; compiler, it will only be a style-warning.

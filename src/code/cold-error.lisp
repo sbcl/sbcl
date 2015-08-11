@@ -109,7 +109,7 @@
                                 ,@(if possibly-symbolp
                                       `((t (symbol-function f))))))))
             (let ((test (car (truly-the cons handler))))
-              (when (if (%instancep test) ; a condition classoid
+              (when (if (%instancep test) ; a condition classoid cell
                         (classoid-cell-typep layout test condition)
                         (funcall (cast-to-fun test nil) condition))
                 (funcall (cast-to-fun (cdr handler) t) condition)))))))))
@@ -171,32 +171,32 @@ of condition handling occurring."
         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'break)))
     (apply #'%break 'break datum arguments)))
 
+(defun %warn (datum arguments super default-type)
+  (infinite-error-protect
+    (let ((condition (coerce-to-condition datum arguments default-type 'warn))
+          (superclassoid-name (classoid-name super)))
+      ;: CONDITION is necessarily an INSTANCE,
+      ;; but pedantry requires it be the right subtype of instance.
+      (unless (classoid-typep (%instance-layout condition)
+                              super condition)
+        (error 'simple-type-error
+               :datum datum :expected-type superclassoid-name
+               :format-control "~S does not designate a ~A class"
+               :format-arguments (list datum superclassoid-name)))
+      (restart-case (signal condition)
+        (muffle-warning ()
+          :report "Skip warning."
+          (return-from %warn nil)))
+      (format *error-output* "~&~@<~S: ~3i~:_~A~:>~%"
+              superclassoid-name condition)))
+  nil)
+
 (defun warn (datum &rest arguments)
   #!+sb-doc
   "Warn about a situation by signalling a condition formed by DATUM and
    ARGUMENTS. While the condition is being signaled, a MUFFLE-WARNING restart
    exists that causes WARN to immediately return NIL."
-  (/show0 "entering WARN")
-  (infinite-error-protect
-       (/show0 "doing COERCE-TO-CONDITION")
-       (let ((condition (coerce-to-condition datum arguments
-                                             'simple-warning 'warn)))
-         (/show0 "back from COERCE-TO-CONDITION, doing ENFORCE-TYPE")
-         (enforce-type condition warning)
-         (/show0 "back from ENFORCE-TYPE, doing RESTART-CASE MUFFLE-WARNING")
-         (restart-case (signal condition)
-           (muffle-warning ()
-             :report "Skip warning."
-             (return-from warn nil)))
-         (/show0 "back from RESTART-CASE MUFFLE-WARNING (i.e. normal return)")
+  (%warn datum arguments (find-classoid 'warning) 'simple-warning))
 
-         (let ((badness (etypecase condition
-                          (style-warning 'style-warning)
-                          (warning 'warning))))
-           (/show0 "got BADNESS, calling FORMAT")
-           (format *error-output*
-                   "~&~@<~S: ~3i~:_~A~:>~%"
-                   badness
-                   condition)
-           (/show0 "back from FORMAT, voila!"))))
-  nil)
+(defun style-warn (datum &rest arguments)
+  (%warn datum arguments (find-classoid 'style-warning) 'simple-style-warning))
