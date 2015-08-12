@@ -274,6 +274,7 @@
     t))
 
 ;;; Returns T if the stream is a binary input stream with a FASL header.
+#-sb-xc-host ;; FIXME: function belongs in 'target-load'
 (defun fasl-header-p (stream &key errorp)
   (unless (and (member (stream-element-type stream) '(character base-char))
                ;; give up if it's not a file stream, or it's an
@@ -407,16 +408,19 @@
   ;;   contents of the source file, but some information is generally printed."
   ;;
   (declare (ignorable print))
-  (let ((stream (%fasl-input-stream fasl-input)))
+  (let ((stream (%fasl-input-stream fasl-input))
+        #!+sb-show (trace *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))
     (catch 'fasl-group-end
-      (setf (svref (%fasl-input-table fasl-input) 0) 0)
+     (setf (svref (%fasl-input-table fasl-input) 0) 0)
+     (macrolet ((tracing (&body forms)
+                  #!+sb-show `(when trace ,@forms)
+                  #!-sb-show (progn forms nil)))
       (loop
-       (let ((byte (the (unsigned-byte 8) (read-byte stream)))
-             (trace (or #!+sb-show *show-fops-p*)))
+       (let ((byte (the (unsigned-byte 8) (read-byte stream))))
          ;; Do some debugging output.
-         (when trace
+         (tracing
            (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
                    (1- (file-position stream))
                    (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
@@ -439,20 +443,21 @@
                              (when (>= byte +2-operand-fops+)
                                (setq arg2 (fast-read-var-u-integer
                                            (ash 1 (ldb (byte 2 2) byte))))))
-                           (when trace
+                           (tracing
                              (format *trace-output* "{~D~@[,~D~]}" arg1 arg2))
                            (if arg2
                                (funcall function fasl-input arg1 arg2)
                                (funcall function fasl-input arg1))))))))
            (when (plusp (sbit (cdr **fop-signatures**) byte))
              (push-fop-stack result fasl-input))
-           (let* ((stack (%fasl-input-stack fasl-input))
-                  (ptr (svref stack 0)))
-             (when trace
-               (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
-                       ptr (svref (%fasl-input-table fasl-input) 0)
-                       (unless (eql ptr 0) (aref stack ptr)))
-               (terpri *trace-output*))
+           (let ((stack (%fasl-input-stack fasl-input)))
+             (declare (ignorable stack)) ; not used in xc-host
+             (tracing
+              (let ((ptr (svref stack 0)))
+                (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
+                        ptr (svref (%fasl-input-table fasl-input) 0)
+                        (unless (eql ptr 0) (aref stack ptr)))
+                (terpri *trace-output*)))
              #-sb-xc-host
              (macrolet ((terminator-opcode ()
                           (or (get 'fop-funcall-for-effect 'opcode)
@@ -468,7 +473,7 @@
                     (and (eq (svref stack 1) 'sb!impl::%defun) (svref stack 2))))
                  (when print
                    (load-fresh-line)
-                   (prin1 result)))))))))))
+                   (prin1 result))))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
