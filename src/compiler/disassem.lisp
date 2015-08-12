@@ -144,6 +144,7 @@
 (defmacro make-dchunk (value)
   `(the dchunk ,value))
 
+#-sb-xc-host ;; FIXME: function belongs in 'target-disassem'
 (defun sap-ref-dchunk (sap byte-offset byte-order)
   (declare (type sb!sys:system-area-pointer sap)
            (type offset byte-offset)
