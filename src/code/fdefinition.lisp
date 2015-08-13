@@ -106,8 +106,7 @@
 (defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn))
   `(let* ((name ,name) (fdefn (,lookup-fn name)))
      (if fdefn
-         (truly-the function
-                    (values (%primitive sb!c:safe-fdefn-fun fdefn)))
+         (sb!c:safe-fdefn-fun fdefn)
          (error 'undefined-function :name name))))
 
 ;; Coerce CALLABLE (a function-designator) to a FUNCTION.

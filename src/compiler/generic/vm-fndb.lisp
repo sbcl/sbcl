@@ -421,6 +421,7 @@
 (defknown fdefn-fun (fdefn) (or function null) (flushable))
 (defknown (setf fdefn-fun) (function fdefn) t ())
 (defknown fdefn-makunbound (fdefn) t ())
+(defknown safe-fdefn-fun (fdefn) function ())
 
 (defknown %simple-fun-self (function) function
   (flushable))

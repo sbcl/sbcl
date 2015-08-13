@@ -104,8 +104,7 @@
                        `(let ((f ,f))
                           (cond ((functionp f) f)
                                 (,(if possibly-symbolp `(fdefn-p f) 't)
-                                 (truly-the function
-                                  (%primitive sb!c:safe-fdefn-fun f)))
+                                  (sb!c:safe-fdefn-fun f))
                                 ,@(if possibly-symbolp
                                       `((t (symbol-function f))))))))
             (let ((test (car (truly-the cons handler))))

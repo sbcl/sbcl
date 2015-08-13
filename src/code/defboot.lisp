@@ -607,11 +607,6 @@ evaluated as a PROGN."
                   (format ,stream ,format-string ,@format-arguments))
         (values nil t)))))
 
-;; It's not nice for HANDLER-BIND to expand such that it uses magic which
-;; is neither a macro nor special-form, so it uses this indirection.
-(declaim (inline %touch-object))
-(defun %touch-object (x) (sb!vm::touch-object x))
-
 (defmacro-mundanely %handler-bind (bindings form &environment env)
   (unless bindings
     (return-from %handler-bind form))
@@ -661,9 +656,12 @@ evaluated as a PROGN."
                       ;; Referencing #'F is enough to ensure a warning if the
                       ;; function isn't defined at compile-time, but the
                       ;; compiler considers it elidable unless something forces
-                      ;; an apparent use of the form at runtime.
+                      ;; an apparent use of the form at runtime,
+                      ;; so instead use SAFE-FDEFN-FUN on the fdefn.
                       (when (eq (car handler) 'function)
-                        (dummy-forms `(%touch-object #',name)))
+                        (dummy-forms `(sb!c:safe-fdefn-fun
+                                       (load-time-value
+                                        (find-or-create-fdefn ',name) t))))
                       ;; Resolve to an fdefn at load-time.
                       `(load-time-value
                         (cons ,test (find-or-create-fdefn ',name))

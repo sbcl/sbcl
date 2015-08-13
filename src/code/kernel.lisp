@@ -72,6 +72,9 @@
 (defun sb!c::control-stack-pointer-sap ()
   (sb!c::control-stack-pointer-sap))
 
+;;; FDEFN -> FUNCTION
+(defun sb!c:safe-fdefn-fun (x) (sb!c:safe-fdefn-fun x))
+
 ;;; Return the header typecode for FUNCTION. Can be set with SETF.
 (defun fun-subtype (function)
   (fun-subtype function))
