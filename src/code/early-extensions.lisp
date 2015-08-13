@@ -1481,18 +1481,18 @@
            (type (or function-name list) replacements)
            (type list lambda-list)
            #+sb-xc-host (ignore version replacements))
-  `(prog1
-       ,(ecase state
-          ((:early :late)
-           `(defun ,name ,lambda-list
-              ,@body))
-          ((:final)
-           `',name))
+  `(progn
      #-sb-xc-host
      (declaim (deprecated
                ,state ("SBCL" ,version)
                (function ,name ,@(when replacements
-                                   `(:replacement ,replacements)))))))
+                                   `(:replacement ,replacements)))))
+     ,(ecase state
+        ((:early :late)
+         `(defun ,name ,lambda-list
+            ,@body))
+        ((:final)
+         `',name))))
 
 (defmacro define-deprecated-variable (state version name
                                       &key (value nil valuep) replacement)
@@ -1500,15 +1500,17 @@
            (type string version)
            (type symbol name)
            #+sb-xc-host (ignore version replacement))
-  `(prog1
-       ,(if (member state '(:early :late))
-            `(defvar ,name ,@(when valuep (list value)))
-            `',name)
+  `(progn
      #-sb-xc-host
      (declaim (deprecated
                ,state ("SBCL" ,version)
                (variable ,name ,@(when replacement
-                                   `(:replacement ,replacement)))))))
+                                   `(:replacement ,replacement)))))
+     ,(ecase state
+        ((:early :late)
+         `(defvar ,name ,@(when valuep (list value))))
+        ((:final)
+         `',name))))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:
