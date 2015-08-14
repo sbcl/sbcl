@@ -277,8 +277,7 @@
 ;;; value is returned which is true when the selection is unique which
 ;;; is often not the case for the MOVE VOP.
 (defun select-tn-representation (tn scs costs)
-  (declare (type tn tn) (type sc-vector costs)
-           (inline add-representation-costs))
+  (declare (type tn tn) (type sc-vector costs))
   (dolist (scn scs)
     (setf (svref costs scn) 0))
 
