@@ -11,6 +11,12 @@
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 (load-or-cload-xcompiler #'host-load-stem)
 
+(let ((*features* (cons :sb-xc *features*)))
+  (load "src/cold/muffler.lisp"))
+(setq sb!c::*handled-conditions*
+      '(((or (satisfies unable-to-optimize-note-p)
+             sb!ext:code-deletion-note) . muffle-warning)))
+
 (defun proclaim-target-optimization ()
   (let ((debug (if (position :sb-show *shebang-features*) 2 1)))
     (sb-xc:proclaim

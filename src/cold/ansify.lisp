@@ -92,12 +92,12 @@
 
 #+sbcl
 (progn
-  (defun optional+key-style-warn-p (condition)
-    (and (typep condition '(and simple-condition style-warning))
-         (search "&OPTIONAL and &KEY found"
-                 (simple-condition-format-control condition))))
-  ;; Let's just say we never care to see this.
-  (declaim (sb-ext:muffle-conditions (satisfies optional+key-style-warn-p))))
+  (load "src/cold/muffler.lisp")
+  ;; Let's just say we never care to see these.
+  (declaim (sb-ext:muffle-conditions
+            (satisfies unable-to-optimize-note-p)
+            (satisfies optional+key-style-warning-p)
+            sb-ext:code-deletion-note)))
 
 ;;;; general non-ANSI-ness
 
