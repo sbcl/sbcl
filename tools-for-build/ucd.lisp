@@ -450,6 +450,7 @@ Length should be adjusted when the standard changes.")
                (line-break-index (gethash code-point *line-break-class-table* 0))
                (age-index (gethash code-point *age-table* 0))
                decomposition)
+          #+nil
           (when (and (not cl-both-case-p)
                      (< gc-index 2))
             (format t "~A~%" name))
@@ -599,6 +600,7 @@ Length should be adjusted when the standard changes.")
                                   :type "txt"
                                   :defaults *unicode-character-database*)
                    :direction :input)
+    (format t "~%//slurp-ucd~%")
     (loop for line = (read-line nil nil)
           while line
           do (slurp-ucd-line line)))
