@@ -14,7 +14,7 @@
 
 ;; This comes early so that fndb can use PPRINT-DISPATCH-TABLE as
 ;; a type-specifier.
-(def!struct (pprint-dispatch-table (:copier nil))
+(sb!xc:defstruct (pprint-dispatch-table (:copier nil))
   ;; A list of all the entries (except for CONS entries below) in highest
   ;; to lowest priority.
   (entries nil :type list)
@@ -22,5 +22,6 @@
   ;; form (CONS (MEMBER <thing>)). If the type specifier is of this form,
   ;; we put it in this hash table instead of the regular entries table.
   (cons-entries (make-hash-table :test 'eql) :read-only t))
+#+sb-xc
 (def!method print-object ((table pprint-dispatch-table) stream)
   (print-unreadable-object (table stream :type t :identity t)))
