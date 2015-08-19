@@ -111,6 +111,9 @@
                           :initial-element 0))
       (%make-package-hashtable table size))))
 
+(declaim (inline pkg-symbol-valid-p))
+(defun pkg-symbol-valid-p (x) (not (fixnump x)))
+
 ;;; Destructively resize TABLE to have room for at least SIZE entries
 ;;; and rehash its existing entries.
 (defun resize-package-hashtable (table size)
@@ -1635,9 +1638,6 @@ PACKAGE."
   (values (logior (ash access-types 3) #b11) 0 #()
           (package-listify pkg-designator-list)))
 
-(declaim (inline pkg-symbol-valid-p))
-(defun pkg-symbol-valid-p (x) (not (fixnump x)))
-
 ;; The STATE parameter is comprised of 4 packed fields
 ;;  [0:1] = substate {0=internal,1=external,2=inherited,3=initial}
 ;;  [2]   = package with inherited symbols has shadowing symbols
@@ -1689,7 +1689,7 @@ PACKAGE."
        (desired-state-p (target-state)
          (logtest start-state (ash 1 (+ target-state 3))))
        (this-package ()
-         (truly-the sb!xc:package (car pkglist)))
+         (truly-the package (car pkglist)))
        (start (next-state new-table)
          (let ((symbols (package-hashtable-cells new-table)))
            (package-iter-step (logior (mask-field (byte 3 3) start-state)

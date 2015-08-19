@@ -1102,8 +1102,7 @@ core and return a descriptor to it."
       (dolist (layout (list t-layout s-o-layout s!o-layout *layout-layout*))
         (patch-instance-layout layout *layout-layout*))
       (setf *package-layout*
-            (chill-layout 'package ; *NOT* SB!XC:PACKAGE, or you lose
-                          t-layout s-o-layout s!o-layout)))))
+            (chill-layout 'package t-layout s-o-layout)))))
 
 ;;;; interning symbols in the cold image
 
@@ -3759,7 +3758,7 @@ initially undefined function references:~2%")
                          layout
                          sb!c::compiled-debug-info
                          sb!c::compiled-debug-fun
-                         sb!xc:package))
+                         package))
           (out-to
            (string-downcase (string class))
            (write-structure-object

@@ -71,7 +71,7 @@
 (defknown (null symbolp atom consp listp numberp integerp rationalp floatp
                 complexp characterp stringp bit-vector-p vectorp
                 simple-vector-p simple-string-p simple-bit-vector-p arrayp
-                sb!xc:packagep functionp compiled-function-p not)
+                packagep functionp compiled-function-p not)
   (t) boolean (movable foldable flushable))
 
 (defknown (eq eql %eql/integer) (t t) boolean
@@ -175,7 +175,7 @@
 (defknown %make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
-(defknown symbol-package (symbol) (or sb!xc:package null) (flushable))
+(defknown symbol-package (symbol) (or package null) (flushable))
 (defknown keywordp (t) boolean (flushable))       ; If someone uninterns it...
 
 ;;;; from the "Packages" chapter:
@@ -188,16 +188,16 @@
                                           ;; ### extensions...
                                           (:internal-symbols index)
                                           (:external-symbols index))
-  sb!xc:package)
-(defknown find-package (package-designator) (or sb!xc:package null)
+  package)
+(defknown find-package (package-designator) (or package null)
   (flushable))
 (defknown find-undeleted-package-or-lose (package-designator)
-  sb!xc:package) ; not flushable
+  package) ; not flushable
 (defknown package-name (package-designator) (or simple-string null)
   (unsafely-flushable))
 (defknown package-nicknames (package-designator) list (unsafely-flushable))
 (defknown rename-package (package-designator package-designator &optional list)
-  sb!xc:package)
+  package)
 (defknown package-use-list (package-designator) list (unsafely-flushable))
 (defknown package-used-by-list (package-designator) list (unsafely-flushable))
 (defknown package-shadowing-symbols (package-designator) list (unsafely-flushable))

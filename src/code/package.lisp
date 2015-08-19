@@ -33,10 +33,10 @@
 ;; FIXME: too vaguely named. Should be PACKAGE-HASH-VECTOR.
 (def!type hash-vector () '(simple-array (unsigned-byte 8) (*)))
 
-(def!struct (package-hashtable
-             (:constructor %make-package-hashtable
-                           (cells size &aux (free size)))
-             (:copier nil))
+(sb!xc:defstruct (package-hashtable
+                  (:constructor %make-package-hashtable
+                                (cells size &aux (free size)))
+                  (:copier nil))
   ;; The general-vector of symbols, with a hash-vector in its last cell.
   (cells (missing-arg) :type simple-vector)
   ;; The total number of entries allowed before resizing.
@@ -52,27 +52,10 @@
 
 ;;;; the PACKAGE structure
 
-;;; Meta: IN-PACKAGE references a string constant, not a package.
-;;; But we need this to be a DEF!STRUCT to emit 'package.h'
-;;; during first genesis.
-;;; KLUDGE: We use DEF!STRUCT to define this not because we need to
-;;; manipulate target package objects on the cross-compilation host,
-;;; but only because its MAKE-LOAD-FORM function needs to be hooked
-;;; into the pre-CLOS DEF!STRUCT MAKE-LOAD-FORM system so that we can
-;;; compile things like IN-PACKAGE in warm init before CLOS is set up.
-;;; The DEF!STRUCT side effect of defining a new PACKAGE type on the
-;;; cross-compilation host is just a nuisance, and in order to avoid
-;;; breaking the cross-compilation host, we need to work around it
-;;; around by putting the new PACKAGE type (and the PACKAGEP predicate
-;;; too..) into SB!XC. -- WHN 20000309
-(def!struct (sb!xc:package
-             (:constructor %make-package
-                 (%name internal-symbols external-symbols))
-             (:make-load-form-fun (lambda (p)
-                                    (values `(find-undeleted-package-or-lose
-                                              ',(package-name p))
-                                            nil)))
-             (:predicate sb!xc:packagep))
+(sb!xc:defstruct (package
+                  (:constructor %make-package
+                                (%name internal-symbols external-symbols))
+                  (:predicate packagep))
   #!+sb-doc
   "the standard structure for the description of a package"
   ;; the name of the package, or NIL for a deleted package
@@ -108,6 +91,11 @@
   ;; Local package nicknames.
   (%local-nicknames nil :type list)
   (%locally-nicknamed-by nil :type list))
+
+#-xb-xc-host
+(defmethod make-load-form ((p package) &optional environment)
+  (declare (ignore environment))
+  `(find-undeleted-package-or-lose ,(package-name p)))
 
 ;;;; iteration macros
 

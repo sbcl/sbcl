@@ -134,7 +134,6 @@
                     "MAKE-LOAD-FORM"
                     "MAKE-LOAD-FORM-SAVING-SLOTS"
                     "MASK-FIELD"
-                    "PACKAGE" "PACKAGEP"
                     "PROCLAIM"
                     "SPECIAL-OPERATOR-P"
                     "STANDARD-CLASS"

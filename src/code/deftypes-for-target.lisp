@@ -141,7 +141,7 @@
 (sb!xc:deftype logical-host-designator ()
   '(or host string))
 
-(sb!xc:deftype package-designator () '(or string-designator sb!xc:package))
+(sb!xc:deftype package-designator () '(or string-designator package))
 ;;; a designator for a list of symbols
 (sb!xc:deftype symbols-designator () '(or list symbol))
 
