@@ -872,8 +872,7 @@ the current thread are replaced with dummy objects which can safely escape."
     ;; Elsewhere in the system, we use the SANE-PACKAGE function for
     ;; this, but here causing an exception just as we're trying to handle
     ;; an exception would be confusing, so instead we use a special hack.
-    (unless (and (packagep *package*)
-                 (package-name *package*))
+    (unless (package-name *package*)
       (setf *package* (find-package :cl-user))
       (format *error-output*
               "The value of ~S was not an undeleted PACKAGE. It has been ~
