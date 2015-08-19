@@ -92,7 +92,7 @@
   (%local-nicknames nil :type list)
   (%locally-nicknamed-by nil :type list))
 
-#-xb-xc-host
+#-sb-xc-host
 (defmethod make-load-form ((p package) &optional environment)
   (declare (ignore environment))
   `(find-undeleted-package-or-lose ,(package-name p)))
