@@ -462,16 +462,14 @@ print_entry_name (lispobj name)
         fputs("::", stdout);
       }
       print_string(native_pointer(symbol->name));
-    } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG) {
-         putchar('"');
-         print_string(object);
-         putchar('"');
+    } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-      } else if (widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG) {
-         putchar('"');
-         print_string(object);
-         putchar('"');
+               || widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
+               ) {
+      putchar('"');
+      print_string(object);
+      putchar('"');
     } else {
       printf("<??? type %d>", (int) widetag_of(*object));
     }
