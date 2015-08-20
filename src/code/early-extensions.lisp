@@ -996,9 +996,7 @@
 ;;; The CL:ASSERT restarts and whatnot expand into a significant
 ;;; amount of code when you multiply them by 400, so replacing them
 ;;; with this should reduce the size of the system by enough to be
-;;; worthwhile. ENFORCE-TYPE is much less common, but might still be
-;;; worthwhile, and since I don't really like CERROR stuff deep in the
-;;; guts of complex systems anyway, I replaced it too.)
+;;; worthwhile.)
 (defmacro aver (expr)
   `(unless ,expr
      (%failed-aver ',expr)))
@@ -1018,20 +1016,6 @@
   (error 'bug
          :format-control format-control
          :format-arguments format-arguments))
-
-(defmacro enforce-type (value type)
-  (once-only ((value value))
-    `(unless (typep ,value ',type)
-       (%failed-enforce-type ,value ',type))))
-
-(defun %failed-enforce-type (value type)
-  ;; maybe should be TYPE-BUG, subclass of BUG?  If it is changed,
-  ;; check uses of it in user-facing code (e.g. WARN)
-  (error 'simple-type-error
-         :datum value
-         :expected-type type
-         :format-control "~@<~S ~_is not a ~_~S~:>"
-         :format-arguments (list value type)))
 
 ;;; Return a function like FUN, but expecting its (two) arguments in
 ;;; the opposite order that FUN does.

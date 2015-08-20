@@ -1829,8 +1829,8 @@ or they must be declared locally notinline at each call site.~@:>")
               :dd-type dd-type))
          (dd-slots (dd-slots dd))
          (dd-length (1+ (length slot-names)))
-         (object-gensym (sb!xc:gensym "OBJECT"))
-         (new-value-gensym (sb!xc:gensym "NEW-VALUE-"))
+         (object-gensym (make-symbol "OBJECT"))
+         (new-value-gensym (make-symbol "NEW-VALUE"))
          (delayed-layout-form `(%delayed-get-compiler-layout ,class-name)))
     (multiple-value-bind (raw-maker-form raw-reffer-operator)
         (ecase dd-type
@@ -1875,14 +1875,9 @@ or they must be declared locally notinline at each call site.~@:>")
          (defun ,boa-constructor ,slot-names
            (let ((,object-gensym ,raw-maker-form))
              ,@(mapcar (lambda (slot-name)
-                         (let ((dsd (find (symbol-name slot-name) dd-slots
-                                          :key (lambda (x)
-                                                 (symbol-name (dsd-name x)))
-                                          :test #'string=)))
-                           ;; KLUDGE: bug 117 bogowarning.  Neither
-                           ;; DECLAREing the type nor TRULY-THE cut
-                           ;; the mustard -- it still gives warnings.
-                           (enforce-type dsd defstruct-slot-description)
+                         (let ((dsd (or (find slot-name dd-slots
+                                              :key #'dsd-name :test #'string=)
+                                        (bug "Bogus alt-metaclass boa ctor"))))
                            `(setf (,(dsd-accessor-name dsd) ,object-gensym)
                                   ,slot-name)))
                        slot-names)
