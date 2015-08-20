@@ -774,7 +774,7 @@ default-value-8
                     (load-symbol-value stepping sb!impl::*stepping*)
                     #!+sb-thread
                     (loadw stepping thread-base-tn thread-stepping-slot)
-                    (inst cmpw stepping null-tn)
+                    (inst cmpwi stepping 0)
                     ;; If it's not null, trap.
                     (inst beq step-done-label)
                     ;; CONTEXT-PC will be pointing here when the
@@ -1265,8 +1265,8 @@ default-value-8
     (load-symbol-value stepping sb!impl::*stepping*)
     #!+sb-thread
     (loadw stepping thread-base-tn thread-stepping-slot)
-    (inst cmpw stepping null-tn)
-    ;; If it's not null, trap.
+    (inst cmpwi stepping 0)
+    ;; If it's not zero, trap.
     (inst beq DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the UNIMP.

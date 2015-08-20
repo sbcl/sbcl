@@ -834,7 +834,7 @@ create_thread_struct(lispobj initial_function) {
     }
     th->synchronous_io_handle_and_flag = 0;
 #endif
-    th->stepping = NIL;
+    th->stepping = 0;
     return th;
 }
 

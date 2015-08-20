@@ -1508,11 +1508,10 @@
     (with-tls-ea (EA :base #!+win32 eax-tn #!-win32 :unused
                      :disp-type :constant
                      :disp (* thread-stepping-slot n-word-bytes))
-      (inst cmp EA nil-value :maybe-fs))
+      (inst cmp EA 0 :maybe-fs))
     #!+win32 (inst pop eax-tn))
   #!-sb-thread
-  (inst cmp (make-ea-for-symbol-value sb!impl::*stepping*)
-        nil-value))
+  (inst cmp (make-ea-for-symbol-value sb!impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)
   (:policy :fast-safe)

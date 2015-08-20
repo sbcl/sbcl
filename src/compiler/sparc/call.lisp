@@ -766,7 +766,7 @@ default-value-8
                   (when step-instrumenting
                     ;; Get the symbol-value of SB!IMPL::*STEPPING*
                     (load-symbol-value stepping sb!impl::*stepping*)
-                    (inst cmp stepping null-tn)
+                    (inst cmp stepping zero-tn)
                     ;; If it's not null, trap.
                     (inst b :eq step-done-label)
                     (inst nop)
@@ -1262,7 +1262,7 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     (load-symbol-value stepping sb!impl::*stepping*)
-    (inst cmp stepping null-tn)
+    (inst cmp stepping zero-tn)
     (inst b :eq DONE)
     (inst nop)
     (note-this-location vop :step-before-vop)

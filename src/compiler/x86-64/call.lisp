@@ -1447,14 +1447,14 @@
   (inst cmp (make-ea :qword
                      :base thread-base-tn
                      :disp (* thread-stepping-slot n-word-bytes))
-        nil-value)
+        0)
   #!-sb-thread
   (inst cmp (make-ea :qword
                      :disp (+ nil-value (static-symbol-offset
                                          'sb!impl::*stepping*)
                               (* symbol-value-slot n-word-bytes)
                               (- other-pointer-lowtag)))
-        nil-value))
+        0))
 
 (define-vop (step-instrument-before-vop)
   (:policy :fast-safe)

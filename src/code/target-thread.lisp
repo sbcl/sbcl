@@ -1923,11 +1923,10 @@ mechanism for inter-thread communication."
 ;;;; Stepping
 
 (defun thread-stepping ()
-  (make-lisp-obj
-   (sap-ref-word (current-thread-sap)
-                 (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))))
+  (sap-ref-lispobj (current-thread-sap)
+                   (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes)))
 
 (defun (setf thread-stepping) (value)
-  (setf (sap-ref-word (current-thread-sap)
-                      (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))
-        (get-lisp-obj-address value)))
+  (setf (sap-ref-lispobj (current-thread-sap)
+                         (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))
+        value))

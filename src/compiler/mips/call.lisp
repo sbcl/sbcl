@@ -1319,8 +1319,8 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     (load-symbol-value stepping sb!impl::*stepping*)
-    ;; If it's not NIL, trap.
-    (inst beq stepping null-tn DONE)
+    ;; If it's not 0, trap.
+    (inst bne stepping DONE)
     (inst nop)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.

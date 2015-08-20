@@ -795,9 +795,8 @@ default-value-8
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (load-symbol-value stepping sb!impl::*stepping*)
-                    ;; If it's not NIL, trap.
-                    ;(inst comb := stepping null-tn step-done-label)
-                    (inst comb := null-tn null-tn step-done-label :nullify t)
+                    ;; If it's not zero, trap.
+                    (inst comb := stepping zero-tn step-done-label :nullify t)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the BREAK.
                     (note-this-location vop :step-before-vop)
@@ -1276,8 +1275,8 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     (load-symbol-value stepping sb!impl::*stepping*)
-    ;; If it's not NIL, trap.
-    (inst comb := stepping null-tn DONE :nullify t)
+    ;; If it's not zero, trap.
+    (inst comb := stepping zero-tn DONE :nullify t)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
     (note-this-location vop :step-before-vop)

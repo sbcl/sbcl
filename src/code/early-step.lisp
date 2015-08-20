@@ -36,12 +36,12 @@
   (defun (setf stepping) (new-value)
     (setf place new-value))
   (defun stepping-enabled-p ()
-    place))
+    (= place 1)))
 
 (defun enable-stepping ()
-  (setf (stepping) t))
+  (setf (stepping) 1))
 (defun disable-stepping ()
-  (setf (stepping) nil))
+  (setf (stepping) 0))
 
 
 (defmacro with-stepping-enabled (&body body)
@@ -51,7 +51,7 @@
             (progn
               (enable-stepping)
               ,@body)
-         (setf (stepping) ,orig)))))
+         (setf (stepping) (if ,orig 1 0))))))
 
 (defmacro with-stepping-disabled (&body body)
   (let ((orig (gensym)))
@@ -60,4 +60,4 @@
             (progn
               (disable-stepping)
               ,@body)
-         (setf (stepping) ,orig)))))
+         (setf (stepping) (if ,orig 1 0))))))
