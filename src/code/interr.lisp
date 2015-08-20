@@ -25,10 +25,10 @@
 
 (eval-when (:compile-toplevel :execute)
 (sb!xc:defmacro deferr (name args &rest body)
-  (multiple-value-bind (llks required optional rest)
-      (parse-lambda-list args)
+  (multiple-value-bind (llks required optional rest) (parse-lambda-list args)
+    (declare (ignore llks))
     (aver (not rest))
-    (let ((max (+ (length required) (length rest))))
+    (let ((max (+ (length required) (length optional))))
       (unless (<= max 3)
         (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" max))))
   `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
