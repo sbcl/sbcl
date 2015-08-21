@@ -48,8 +48,8 @@ Code for options that not every system has should be conditionalised:
       (export ',lisp-name)
       (defun ,lisp-name (socket)
         ,@(when documentation (list (concatenate 'string documentation " " info)))
-        ,(if supportedp
-             `(sb-alien:with-alien ((size sb-alien:int)
+        ,@(if supportedp
+             `((sb-alien:with-alien ((size sb-alien:int)
                                     (buffer ,buffer-type))
                 (setf size (sb-alien:alien-size ,buffer-type :bytes))
                 (socket-error-case
@@ -59,13 +59,14 @@ Code for options that not every system has should be conditionalised:
                                           (sb-alien:addr buffer)
                                           #+win32 size
                                           #-win32 (sb-alien:addr size)))
-                    (,mangle-return buffer size)))
-             `(error 'unsupported-operator
+                    (,mangle-return buffer size))))
+             `((declare (ignore socket))
+               (error 'unsupported-operator
                :format-control "Socket option ~S is not supported in this platform."
-               :format-arguments (list ',lisp-name))))
+               :format-arguments (list ',lisp-name)))))
       (defun (setf ,lisp-name) (new-val socket)
-        ,(if supportedp
-             `(sb-alien:with-alien ((buffer ,buffer-type))
+        ,@(if supportedp
+             `((sb-alien:with-alien ((buffer ,buffer-type))
                   (setf buffer ,(if mangle-arg
                                     `(,mangle-arg new-val)
                                     `new-val))
@@ -77,10 +78,11 @@ Code for options that not every system has should be conditionalised:
                         (,mangle-setf-buffer buffer)
                         ,(if (eql buffer-type 'sb-alien:c-string)
                              `(length new-val)
-                             `(sb-alien:alien-size ,buffer-type :bytes))))))
-             `(error 'unsupported-operator
+                             `(sb-alien:alien-size ,buffer-type :bytes)))))))
+             `((declare (ignore new-val socket))
+               (error 'unsupported-operator
                :format-control "Socket option ~S is not supported on this platform."
-               :format-arguments (list ',lisp-name)))))))
+               :format-arguments (list ',lisp-name))))))))
 
 ;;; sockopts that have integer arguments
 

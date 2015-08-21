@@ -73,6 +73,7 @@
   (handler-case
       (load-shared-object pathname :dont-save t)
     (error (e)
+      (declare (ignore e))
       nil)))
 
 (defun %load-gmp ()

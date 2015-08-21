@@ -189,6 +189,7 @@ directly instantiated.")))
                         (external-format :default)
                         oob eor dontroute dontwait nosignal
                         #+linux confirm #+linux more)
+  (declare (ignorable nosignal))
   (let* ((flags
           (logior (if oob sockint::MSG-OOB 0)
                   (if eor sockint::MSG-EOR 0)
