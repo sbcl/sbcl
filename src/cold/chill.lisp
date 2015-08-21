@@ -61,11 +61,14 @@
     (def 'defvar)))
 
 (export '(sb-int::def!method
+          sb-int::!cold-init-forms
           sb-int::!coerce-to-specialized
           sb-int::!uncross-format-control)
         'sb-int)
 
 (setf (macro-function 'sb-int:def!method) (macro-function 'defmethod))
+
+(defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms))
 
 ;; This macro is never defined for the target Lisp,
 ;; only the cross-compilation host (see "src/code/specializable-array")
