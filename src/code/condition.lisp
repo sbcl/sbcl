@@ -1322,6 +1322,8 @@ handled by any other handler, it will be muffled.")
                 (not new-namestring)
                 (not (string= old-namestring new-namestring))))))))
 
+(setf (info :function :predicate-truth-constraint
+            'uninteresting-ordinary-function-redefinition-p) 'warning)
 (defun uninteresting-ordinary-function-redefinition-p (warning)
   (and
    (typep warning 'redefinition-with-defun)
@@ -1330,6 +1332,8 @@ handled by any other handler, it will be muffled.")
      (not (interesting-function-redefinition-warning-p
            warning (or (fdefinition name) (macro-function name)))))))
 
+(setf (info :function :predicate-truth-constraint
+            'uninteresting-macro-redefinition-p) 'warning)
 (defun uninteresting-macro-redefinition-p (warning)
   (and
    (typep warning 'redefinition-with-defmacro)
@@ -1338,6 +1342,8 @@ handled by any other handler, it will be muffled.")
      (not (interesting-function-redefinition-warning-p
            warning (or (macro-function name) (fdefinition name)))))))
 
+(setf (info :function :predicate-truth-constraint
+            'uninteresting-generic-function-redefinition-p) 'warning)
 (defun uninteresting-generic-function-redefinition-p (warning)
   (and
    (typep warning 'redefinition-with-defgeneric)
@@ -1356,6 +1362,8 @@ handled by any other handler, it will be muffled.")
           new-namestring
           (string= old-namestring new-namestring)))))
 
+(setf (info :function :predicate-truth-constraint
+            'uninteresting-method-redefinition-p) 'warning)
 (defun uninteresting-method-redefinition-p (warning)
   (and
    (typep warning 'redefinition-with-defmethod)

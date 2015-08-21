@@ -1483,7 +1483,7 @@
 
 (!define-type-method (hairy :simple-intersection2 :complex-intersection2)
                      (type1 type2)
-  (cond ((type= type1 type2)
+ (acond ((type= type1 type2)
          type1)
         ((eq type2 *satisfies-keywordp-type*)
          ;; (AND (MEMBER A) (SATISFIES KEYWORDP)) is possibly non-empty
@@ -1494,20 +1494,21 @@
              *empty-type*
              (multiple-value-bind (answer certain)
                  (types-equal-or-intersect type1 (specifier-type 'symbol))
-               (if (and (not answer) certain)
-                   *empty-type*
-                   nil))))
+               (and (not answer) certain *empty-type*))))
         ((eq type2 *fun-name-type*)
          (multiple-value-bind (answer certain)
              (types-equal-or-intersect type1 (specifier-type 'symbol))
-           (if (and (not answer) certain)
-               (multiple-value-bind (answer certain)
-                   (types-equal-or-intersect type1 (specifier-type 'cons))
-                 (if (and (not answer) certain)
-                     *empty-type*
-                     nil))
-               nil)))
-        (t nil)))
+           (and (not answer)
+                certain
+                (multiple-value-bind (answer certain)
+                    (types-equal-or-intersect type1 (specifier-type 'cons))
+                  (and (not answer) certain *empty-type*)))))
+        ((and (typep (hairy-type-specifier type2) '(cons (eql satisfies)))
+              (info :function :predicate-truth-constraint
+                    (cadr (hairy-type-specifier type2))))
+         (multiple-value-bind (answer certain)
+             (types-equal-or-intersect type1 (specifier-type it))
+           (and (not answer) certain *empty-type*)))))
 
 (!define-type-method (hairy :simple-union2)
                      (type1 type2)

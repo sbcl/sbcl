@@ -463,6 +463,14 @@
 ;;; structure containing the info used to special-case compilation.
 (define-info-type (:function :info) :type-spec (or fun-info null))
 
+;;; This is a type specifier <t> such that if an argument X to the function
+;;; does not satisfy (TYPEP x <t>) then the function definitely returns NIL.
+;;; When the named function is a predicate that appears in (SATISFIES p)
+;;; specifiers, it is possible for type operations to see into the predicate
+;;; just enough to determine that something like
+;;;   (AND (SATISFIES UNINTERESTING-METHOD-REDEFINITION-P) RATIONAL)
+;;; is *empty-type*, which in turn avoids type cache pollution.
+(define-info-type (:function :predicate-truth-constraint) :type-spec t)
 
 ;;;; ":VARIABLE" subsection - Data pertaining to globally known variables.
 
