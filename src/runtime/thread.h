@@ -93,25 +93,17 @@ union per_thread_data {
     lispobj dynamic_values[1];  /* actually more like 4000 or so */
 };
 
-/* A helper structure for data local to a thread, which is not pointer-sized.
- *
- * Originally, all layouting of these fields was done manually in C code
- * with pointer arithmetic.  We let the C compiler figure it out now.
- *
- * (Why is this not part of `struct thread'?  Because that structure is
- * declared using genesis, and we would run into issues with fields that
- * are of unknown length.)
- */
+/* The thread struct is generated from lisp during genesis and it
+ * needs to know the sizes of all its members, but some types may have
+ * arbitrary lengths, thus the pointers are stored instead. This
+ * structure is used to help allocation of those types, so that the
+ * pointers can be later shoved into the thread struct. */
 struct nonpointer_thread_data
 {
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_SAFEPOINT)
     os_sem_t state_sem;
     os_sem_t state_not_running_sem;
     os_sem_t state_not_stopped_sem;
-#else
-    /* An unused field follows, to ensure that the struct is non-empty
-     * for non-GCC compilers. */
-    int unused;
 #endif
 };
 

@@ -135,8 +135,16 @@
 	movl	offset(reg), reg ;
 #elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS) || defined(LISP_FEATURE_FREEBSD) || \
         defined(LISP_FEATURE_DRAGONFLY)
-  /* see comment in arch_os_thread_init */
-# define SBCL_THREAD_BASE_EA %fs:THREAD_SELFPTR_OFFSET
+    /* %fs:0 refers to the current thread.  Useful!  Less usefully,
+     * Linux/x86 isn't capable of reporting a faulting si_addr on a
+     * segment as defined above (whereas faults on the segment that %gs
+     * usually points are reported just fine...).
+     * But we have the thread's address stored in the THIS slot,
+     * so that within the thread
+     *   movl %fs:THIS_OFFSET,x
+     * stores the absolute address of %fs:0 into x.
+     */
+# define SBCL_THREAD_BASE_EA %fs:THREAD_THIS_OFFSET
 # define MAYBE_FS(addr) addr
 #else
   /* perhaps there's an OS out there that actually supports %fs without

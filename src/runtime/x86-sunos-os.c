@@ -103,9 +103,6 @@ int arch_os_thread_init(struct thread *thread) {
   thread->tls_cookie = sel;
   pthread_setspecific(specials,thread);
 
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-    thread->selfptr = thread;
-# endif
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

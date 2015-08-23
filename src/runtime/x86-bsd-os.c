@@ -198,9 +198,6 @@ int arch_os_thread_init(struct thread *thread) {
 #endif
 #endif
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-    thread->selfptr = thread;
-#endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     stack_t sigstack;

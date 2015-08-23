@@ -105,19 +105,6 @@ int arch_os_thread_init(struct thread *thread) {
     thread->tls_cookie=n;
     pthread_mutex_unlock(&modify_ldt_lock);
 
-    /* now %fs:0 refers to the current thread.  Useful!  Less usefully,
-     * Linux/x86 isn't capable of reporting a faulting si_addr on a
-     * segment as defined above (whereas faults on the segment that %gs
-     * usually points are reported just fine...).  As a special
-     * workaround, we store each thread structure's absolute address as
-     * as slot in itself, so that within the thread,
-     *   movl %fs:SELFPTR_OFFSET,x
-     * stores the absolute address of %fs:0 into x.
-     */
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-    thread->selfptr = thread;
-#endif
-
     if(n<0) return 0;
 #ifdef LISP_FEATURE_GCC_TLS
     current_thread = thread;
