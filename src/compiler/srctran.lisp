@@ -1126,9 +1126,7 @@
               ;; member types.
               (mapc-member-type-members
                (lambda (member)
-                 (push (if (numberp member)
-                           (make-member-type :members (list member))
-                           *empty-type*)
+                 (push (if (numberp member) (make-eql-type member) *empty-type*)
                        new-args))
                arg)
               (push arg new-args)))
@@ -1221,7 +1219,7 @@
              (t
               ;; (float +0.0 x) => (or (member 0.0) (float (0.0) x))
               ;; (float (-0.0) x) => (or (member 0.0) (float (0.0) x))
-              (list (make-member-type :members (list (float 0.0 lo-val)))
+              (list (make-eql-type (float 0.0 lo-val))
                     (make-numeric-type :class (numeric-type-class type)
                                        :format (numeric-type-format type)
                                        :complexp :real
@@ -1246,7 +1244,10 @@
              (t
               ;; (float x (+0.0)) => (or (member -0.0) (float x (0.0)))
               ;; (float x -0.0) => (or (member -0.0) (float x (0.0)))
-              (list (make-member-type :members (list (float (load-time-value (make-unportable-float :single-float-negative-zero)) hi-val)))
+              (list (make-eql-type
+                     (float (load-time-value
+                             (make-unportable-float :single-float-negative-zero))
+                            hi-val))
                     (make-numeric-type :class (numeric-type-class type)
                                        :format (numeric-type-format type)
                                        :complexp :real
@@ -1317,7 +1318,7 @@
              (push type misc-types))))
     (if (and (xset-empty-p xset) (not fp-zeroes))
         (apply #'type-union numeric-type misc-types)
-        (apply #'type-union (make-member-type :xset xset :fp-zeroes fp-zeroes)
+        (apply #'type-union (make-member-type xset fp-zeroes)
                numeric-type misc-types))))
 
 ;;; Convert a member type with a single member to a numeric type.
@@ -4835,7 +4836,7 @@
                 (cond ((eq element-type '*)
                        (specifier-type 'type-specifier))
                       ((symbolp element-type)
-                       (make-member-type :members (list element-type)))
+                       (make-eql-type element-type))
                       ((consp element-type)
                        (specifier-type (consify element-type)))
                       (t

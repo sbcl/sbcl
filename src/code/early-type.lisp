@@ -639,16 +639,19 @@
           *eql-t-type* (make-it '(t))
           *boolean-type* (make-it '(t nil)))))
 
-(declaim (ftype (sfunction (&key (:xset t) (:fp-zeroes t) (:members t)) ctype)
-                make-member-type))
-(defun make-member-type (&key xset fp-zeroes members)
-  (unless xset
-    (aver (not fp-zeroes))
-    (setf xset (alloc-xset))
-    (dolist (elt members)
+(declaim (ftype (sfunction (xset list) ctype) make-member-type))
+(defun member-type-from-list (members)
+  (let ((xset (alloc-xset))
+        (fp-zeroes))
+    (dolist (elt members (make-member-type xset fp-zeroes))
       (if (fp-zero-p elt)
           (pushnew elt fp-zeroes)
-          (add-to-xset elt xset))))
+          (add-to-xset elt xset)))))
+(defun make-eql-type (elt) (member-type-from-list (list elt)))
+;; Return possibly a union of a MEMBER type and a NUMERIC type,
+;; or just one or the other, or *EMPTY-TYPE* depending on what's in the XSET
+;; and the FP-ZEROES. XSET should not contains characters or real numbers.
+(defun make-member-type (xset fp-zeroes)
   ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is

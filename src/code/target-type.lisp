@@ -151,7 +151,7 @@
             ;; For functions, the input is a type specifier
             ;; of the form (FUNCTION (...) ...)
             (cond ((listp x) (specifier-type x)) ; NIL can't occur
-                  ((symbolp x) (make-member-type :members (list x)))
+                  ((symbolp x) (make-eql-type x))
                   (t (ctype-of-number x))))))
     (typecase x
       (function

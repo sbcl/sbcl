@@ -2869,8 +2869,7 @@ used for a COMPLEX component.~:@>"
         (apply #'type-intersection
                (if (xset-empty-p xset)
                    *universal-type*
-                   (make-negation-type
-                    :type (make-member-type :xset xset)))
+                   (make-negation-type :type (make-member-type xset nil)))
                (mapcar
                 (lambda (x)
                   (let* ((opposite (neg-fp-zero x))
@@ -2879,7 +2878,7 @@ used for a COMPLEX component.~:@>"
                      (make-negation-type
                       :type (modified-numeric-type type :low nil :high nil))
                      (modified-numeric-type type :low nil :high (list opposite))
-                     (make-member-type :members (list opposite))
+                     (make-eql-type opposite)
                      (modified-numeric-type type :low (list opposite) :high nil))))
                 fp-zeroes))
         ;; Easy case
@@ -2924,10 +2923,10 @@ used for a COMPLEX component.~:@>"
         (t (values nil t))))
 
 (!define-type-method (member :simple-intersection2) (type1 type2)
-  (make-member-type :xset (xset-intersection (member-type-xset type1)
-                                             (member-type-xset type2))
-                    :fp-zeroes (intersection (member-type-fp-zeroes type1)
-                                             (member-type-fp-zeroes type2))))
+  (make-member-type (xset-intersection (member-type-xset type1)
+                                       (member-type-xset type2))
+                    (intersection (member-type-fp-zeroes type1)
+                                  (member-type-fp-zeroes type2))))
 
 (!define-type-method (member :complex-intersection2) (type1 type2)
   (block punt
@@ -2945,16 +2944,16 @@ used for a COMPLEX component.~:@>"
        type2)
       (if (and (xset-empty-p xset) (not fp-zeroes))
           *empty-type*
-          (make-member-type :xset xset :fp-zeroes fp-zeroes)))))
+          (make-member-type xset fp-zeroes)))))
 
 ;;; We don't need a :COMPLEX-UNION2, since the only interesting case is
 ;;; a union type, and the member/union interaction is handled by the
 ;;; union type method.
 (!define-type-method (member :simple-union2) (type1 type2)
-  (make-member-type :xset (xset-union (member-type-xset type1)
-                                      (member-type-xset type2))
-                    :fp-zeroes (union (member-type-fp-zeroes type1)
-                                      (member-type-fp-zeroes type2))))
+  (make-member-type (xset-union (member-type-xset type1)
+                                (member-type-xset type2))
+                    (union (member-type-fp-zeroes type1)
+                           (member-type-fp-zeroes type2))))
 
 (!define-type-method (member :simple-=) (type1 type2)
   (let ((xset1 (member-type-xset type1))
@@ -2981,21 +2980,16 @@ used for a COMPLEX component.~:@>"
       (let (ms numbers char-codes)
         (dolist (m (remove-duplicates members))
           (typecase m
-            (float (if (zerop m)
-                       (push m ms)
-                       (push (ctype-of m) numbers)))
-            (real (push (ctype-of m) numbers))
             (character (push (sb!xc:char-code m) char-codes))
+            (real (if (and (floatp m) (zerop m))
+                      (push m ms)
+                      (push (ctype-of m) numbers)))
             (t (push m ms))))
         (apply #'type-union
-               (if ms
-                   (make-member-type :members ms)
-                   *empty-type*)
-              (if char-codes
-                  (make-character-set-type
-                   :pairs (mapcar (lambda (x) (cons x x))
-                                  (sort char-codes #'<)))
-                  *empty-type*)
+               (member-type-from-list ms)
+               (make-character-set-type
+                :pairs (mapcar (lambda (x) (cons x x))
+                               (sort char-codes #'<)))
                (nreverse numbers)))
       *empty-type*))
 
@@ -3667,7 +3661,7 @@ used for a COMPLEX component.~:@>"
                              (add-to-xset elt xset)))))
                    x-type)
                   (unless (and (xset-empty-p xset) (not fp-zeroes))
-                    (res (make-member-type :xset xset :fp-zeroes fp-zeroes))))
+                    (res (make-member-type xset fp-zeroes))))
                 (dolist (y-type y-types (res x-type))
                   (multiple-value-bind (val win) (csubtypep x-type y-type)
                     (unless win (return-from type-difference nil))

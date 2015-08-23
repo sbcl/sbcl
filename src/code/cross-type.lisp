@@ -429,7 +429,7 @@
          ;; most-general function.
          *universal-fun-type*))
     (symbol
-     (make-member-type :members (list x)))
+     (make-eql-type x))
     (number
      (ctype-of-number x))
     (array

@@ -917,7 +917,7 @@
            (change-ref-leaf ref (find-constant t)))
           (t
            (setf not-res
-                 (type-union not-res (make-member-type :xset not-set :fp-zeroes not-fpz)))
+                 (type-union not-res (make-member-type not-set not-fpz)))
            (derive-node-type ref
                              (make-single-value-type
                               (or (type-difference res not-res)
