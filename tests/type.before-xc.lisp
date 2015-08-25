@@ -345,4 +345,9 @@
 (assert (not (type= (specifier-type '(function (t) (values &optional)))
                     (specifier-type '(function (t) (values))))))
 
+;; Why this assertion? Because INDEX type is defined in 'early-extensions'
+;; which is far removed from the logic to return *INDEX-TYPE* which is
+;; hardwired into the kernel. We had best ensure that it remains correct.
+(assert (type= (specifier-type 'index) *index-type*))
+
 (/show "done with tests/type.before-xc.lisp")

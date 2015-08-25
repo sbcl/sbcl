@@ -329,6 +329,12 @@
 ;; is enforced. These encompass all array specializations and more.
 (defglobal *unsigned-byte-type* -1)
 (defglobal *integer-type* -1)
+(defglobal *index-type* -1)
+;; BIGNUM is not an interned type because union types aren't interned,
+;; though some of the important ones probably ought to be.
+(defglobal *positive-bignum-type* -1)
+(defglobal *negative-bignum-type* -1)
+(defglobal *rational-type* -1)
 (defglobal *unsigned-byte-n-types* -1)
 (defglobal *signed-byte-n-types* -1)
 (defglobal *real-ffloat-type* -1)
@@ -354,8 +360,13 @@
           *real-dfloat-type*      (float-type 'double-float :real)
           *complex-ffloat-type*   (float-type 'single-float :complex)
           *complex-dfloat-type*   (float-type 'double-float :complex)
+          *rational-type*         (mark-ctype-interned
+                                   (%make-numeric-type :class 'rational))
           *unsigned-byte-type*    (int-type nil 0 nil)
           *integer-type*          (int-type nil nil nil)
+          *index-type*            (int-type nil 0 (1- sb!xc:array-dimension-limit))
+          *negative-bignum-type*  (int-type nil nil (1- sb!xc:most-negative-fixnum))
+          *positive-bignum-type*  (int-type nil (1+ sb!xc:most-positive-fixnum) nil)
           *unsigned-byte-n-types* (make-array (1+ sb!vm:n-word-bits))
           *signed-byte-n-types*   (make-array sb!vm:n-word-bits))
     (dotimes (j (1+ sb!vm:n-word-bits))
@@ -420,7 +431,9 @@
                      (declare (inline n-bits))
                      (cond ((null high)
                             (cond ((eql low 0) *unsigned-byte-type*)
-                                  ((not low) *integer-type*)))
+                                  ((not low) *integer-type*)
+                                  ((eql low (1+ sb!xc:most-positive-fixnum))
+                                   *positive-bignum-type*)))
                            ((or (= high most-positive-word)
                                 (and (typep high 'word)
                                      ;; is (1+ high) a power-of-2 ?
@@ -429,7 +442,16 @@
                                    (svref *unsigned-byte-n-types* (n-bits)))
                                   ((and (< high most-positive-word)
                                         (eql low (lognot high)))
-                                   (svref *signed-byte-n-types* (n-bits)))))))))
+                                   (svref *signed-byte-n-types* (n-bits)))))
+                           ((and (eql low 0)
+                                 (eql high (1- sb!xc:array-dimension-limit)))
+                            *index-type*)
+                           ((and (not low)
+                                 (eql high (1- sb!xc:most-negative-fixnum)))
+                            *negative-bignum-type*))))
+                  ((and (eq class 'rational) (eq complexp :real)
+                        (null low) (eq high low))
+                   *rational-type*))
             (let ((result
                    (%make-numeric-type :class class
                                        :format format
@@ -539,9 +561,10 @@
 
 ;; For all ctypes which are the element types of specialized arrays,
 ;; 3 ctype objects are stored for the rank-1 arrays of that specialization,
-;; one for each of simple, maybe simple, and not simple.
-;; It would also be reasonable to intern (ARRAY <type> *).
-(defglobal *rank-1-array-ctypes* -1)
+;; one for each of simple, maybe-simple, and non-simple (in that order),
+;; and 2 ctype objects for unknown-rank arrays, one each for simple
+;; and maybe-simple. (Unknown rank, known-non-simple isn't important)
+(defglobal *canonical-array-ctypes* -1)
 (defconstant +canon-array-ctype-hash-divisor+ 37) ; arbitrary-ish
 (defun !intern-important-array-type-instances ()
   ;; Having made the canonical numeric and character ctypes
@@ -551,7 +574,9 @@
           (list*
            *universal-type* *wild-type* *empty-type*
            *character-type*
-           #!+sb-unicode *base-char-type* #!+sb-unicode *extended-char-type*
+           #!+sb-unicode *base-char-type*
+           ;; FIXME: This one is can't be used by MAKE-ARRAY-TYPE?
+           #!+sb-unicode *extended-char-type*
            *real-ffloat-type* *complex-ffloat-type*
            *real-dfloat-type* *complex-dfloat-type*
            (delete
@@ -574,24 +599,27 @@
                       (aref *signed-byte-n-types* (1- sb!vm:n-fixnum-bits)))))
              '#.*specialized-array-element-types*))))
          (n (length element-types))
-         (data-vector (make-array (* 3 n)))
+         (data-vector (make-array (* 5 n)))
          (index 0)
          (hashtable (make-array +canon-array-ctype-hash-divisor+
                                 :initial-element nil)))
     ;; This is a compact binned table. A full-blown hashtable is unneeded.
     #-sb-xc (aver (< (/ n (length hashtable)) 80/100)) ; assert reasonable load
-    (flet ((make-it (complexp type)
-             (mark-ctype-interned (%make-array-type '(*) complexp type type))))
+    (flet ((make-it (dims complexp type)
+             (setf (aref data-vector (prog1 index (incf index)))
+                   (mark-ctype-interned
+                    (%make-array-type dims complexp type type)))))
       (dolist (element-type element-types)
         (let ((bin (mod (type-hash-value element-type)
                         +canon-array-ctype-hash-divisor+)))
           (setf (aref hashtable bin)
                 (nconc (aref hashtable bin) (list (cons element-type index))))
-          (setf (aref data-vector (+ index 0)) (make-it nil    element-type)
-                (aref data-vector (+ index 1)) (make-it :maybe element-type)
-                (aref data-vector (+ index 2)) (make-it t      element-type))
-          (incf index 3))))
-    (setq *rank-1-array-ctypes* (cons data-vector hashtable))))
+          (make-it '(*) nil    element-type)
+          (make-it '(*) :maybe element-type)
+          (make-it '(*) t      element-type)
+          (make-it '*   nil    element-type)
+          (make-it '*   :maybe element-type))))
+    (setq *canonical-array-ctypes* (cons data-vector hashtable))))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
@@ -600,18 +628,20 @@
 (defun make-array-type (dimensions &key (complexp :maybe) element-type
                                         (specialized-element-type *wild-type*))
   (or (and (eq element-type specialized-element-type)
-           (singleton-p dimensions)
-           (eq (first dimensions) '*)
-           (let ((table *rank-1-array-ctypes*))
+           (or (and (eq dimensions '*) (neq complexp t))
+               (typep dimensions '(cons (eql *) null)))
+           (let ((table *canonical-array-ctypes*))
              (dolist (cell (svref (cdr table)
                                   (mod (type-hash-value element-type)
                                        +canon-array-ctype-hash-divisor+)))
                (when (eq (car cell) element-type)
-                 (return (truly-the ctype
-                          (svref (car table)
-                                (+ (cdr cell)
-                                   (ecase complexp
-                                     ((nil) 0) ((:maybe) 1) ((t) 2))))))))))
+                 (return
+                  (truly-the ctype
+                   (svref (car table)
+                          (+ (cdr cell)
+                             (if (listp dimensions) 0 3)
+                             (ecase complexp
+                              ((nil) 0) ((:maybe) 1) ((t) 2))))))))))
       (%make-array-type dimensions
                         complexp element-type specialized-element-type)))
 
