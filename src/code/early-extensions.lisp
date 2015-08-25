@@ -1309,9 +1309,6 @@
 
 ;;; For-effect-only variant of CHECK-DEPRECATED-THING for
 ;;; type-specifiers that descends into compound type-specifiers.
-(declaim (ftype (function ((and type-specifier (not instance)))
-                          (values &optional))
-                %check-deprecated-type))
 (defun %check-deprecated-type (type-specifier)
   (let ((seen '()))
     ;; KLUDGE: we have to use SPECIFIER-TYPE to sanely traverse
@@ -1329,21 +1326,19 @@
     (block nil
       (handler-bind
           ((sb!kernel::parse-deprecated-type
-            (lambda (condition)
-              (let ((type-specifier (sb!kernel::parse-deprecated-type-specifier
-                                     condition)))
-                (aver (symbolp type-specifier))
-                (unless (memq type-specifier seen)
-                  (push type-specifier seen)
-                  (check-deprecated-thing 'type type-specifier)))))
-           (error (lambda (condition)
-                    (declare (ignore condition))
-                    (return))))
-        (specifier-type type-specifier))))
-  (values))
+             (lambda (condition)
+               (let ((type-specifier (sb!kernel::parse-deprecated-type-specifier
+                                      condition)))
+                 (aver (symbolp type-specifier))
+                 (unless (memq type-specifier seen)
+                   (push type-specifier seen)
+                   (check-deprecated-thing 'type type-specifier)))))
+           ((or error sb!kernel:parse-unknown-type)
+             (lambda (condition)
+               (declare (ignore condition))
+               (return))))
+        (specifier-type type-specifier)))))
 
-(declaim (ftype (function (type-specifier) (values &optional))
-                check-deprecated-type))
 (defun check-deprecated-type (type-specifier)
   (typecase type-specifier
     ((and type-specifier (not instance))
@@ -1351,8 +1346,7 @@
     (class
      (let ((name (class-name type-specifier)))
        (when (and name (symbolp name))
-         (%check-deprecated-type name)))))
-  (values))
+         (%check-deprecated-type name))))))
 
 ;; This is the moral equivalent of a warning from /usr/bin/ld that
 ;; "gets() is dangerous." You're informed by both the compiler and linker.
