@@ -352,3 +352,17 @@
              (unschedule-timer timer))))
     (test t)
     (test sb-thread:*current-thread*)))
+
+;; A timer with a repeat interval can be configured to "catch up" in
+;; case of missed calls.
+(with-test (:name (:timer :catch-up))
+  (flet ((test (&rest args)
+           (let ((timer (make-timer (lambda ()))))
+             (apply #'schedule-timer timer .01 args)
+             (unschedule-timer timer))))
+    ;; :CATCH-UP does not make sense without :REPEAT-INTERVAL.
+    (assert-error (test :catch-up nil))
+    (assert-error (test :catch-up t))
+    ;; These combinations are allowed.
+    (test :repeat-interval .01 :catch-up nil)
+    (test :repeat-interval .01 :catch-up t)))

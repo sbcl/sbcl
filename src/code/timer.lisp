@@ -145,6 +145,7 @@ future versions."
   (function           nil :read-only t)
   (expire-time        1   :type (or null real))
   (repeat-interval    nil :type (or null (real 0)))
+  (catch-up           nil :type boolean)
   (thread             nil :type (or sb!thread:thread boolean))
   (interrupt-function nil :type (or null function))
   (cancel-function    nil :type (or null function)))
@@ -256,13 +257,27 @@ from now. For timers with a repeat interval it returns true."
       (set-system-timer)))
   (values))
 
-(defun schedule-timer (timer time &key repeat-interval absolute-p)
+(defun schedule-timer (timer time
+                       &key
+                       repeat-interval
+                       absolute-p
+                       (catch-up nil catch-up-p))
   #!+sb-doc
   "Schedule TIMER to be triggered at TIME. If ABSOLUTE-P then TIME is
 universal time, but non-integral values are also allowed, else TIME is
-measured as the number of seconds from the current time. If
-REPEAT-INTERVAL is given, TIMER is automatically rescheduled upon
-expiry."
+measured as the number of seconds from the current time.
+
+If REPEAT-INTERVAL is given, TIMER is automatically rescheduled upon
+expiry.
+
+If REPEAT-INTERVAL is non-NIL, the Boolean CATCH-UP controls whether
+TIMER will \"catch up\" by repeatedly calling its function without
+delay in case calls are missed because of a clock discontinuity such
+as a suspend and resume cycle of the computer. The default is NIL,
+i.e. do not catch up."
+  (when (and catch-up-p (not repeat-interval))
+    (error "~@<~A does not make sense without ~A.~@:>"
+           :catch-up :repeat-interval))
   ;; CANCEL-FUNCTION may block until all interruptors finish, let's
   ;; try to cancel without the scheduler lock first.
   (when (%timer-cancel-function timer)
@@ -274,7 +289,8 @@ expiry."
                            time))))
       (setf (%timer-expire-time timer) (+ (get-internal-real-time) delta/real)
             (%timer-repeat-interval timer) (when repeat-interval
-                                             (delta->real repeat-interval))))
+                                             (delta->real repeat-interval))
+            (%timer-catch-up timer) catch-up))
     (%schedule-timer timer)))
 
 (defun unschedule-timer (timer)
@@ -307,15 +323,27 @@ triggers."
 
 (defun reschedule-timer (timer)
   ;; unless unscheduled
-  (when (%timer-expire-time timer)
-    (let ((thread (%timer-thread timer)))
+  (symbol-macrolet ((expire-time (%timer-expire-time timer))
+                    (repeat-interval (%timer-repeat-interval timer))
+                    (catch-up (%timer-catch-up timer))
+                    (thread (%timer-thread timer)))
+    (when expire-time
       (if (and (sb!thread::thread-p thread)
                (not (sb!thread:thread-alive-p thread)))
           (unschedule-timer timer)
           (with-scheduler-lock ()
             ;; Schedule at regular intervals. If TIMER has not finished
             ;; in time then it may catch up later.
-            (incf (%timer-expire-time timer) (%timer-repeat-interval timer))
+            (incf expire-time repeat-interval)
+            ;; If the internal real time had a discontinuity
+            ;; (e.g. computer suspended and resumed), maybe adjust the
+            ;; expiration time accordingly unless the timer is
+            ;; configured to "catch up" by performing the missed calls
+            ;; immediately.
+            (unless catch-up
+              (let ((now (get-internal-real-time)))
+                (when (< expire-time now)
+                  (setf expire-time (+ now repeat-interval)))))
             (%schedule-timer timer))))))
 
 ;;; setitimer is unavailable for win32, but we can emulate it when

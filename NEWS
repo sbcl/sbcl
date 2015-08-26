@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.15:
+  * enhancement: by default, timers with a repeat interval do not "catch up"
+    by repeatedly calling their function after a clock discontinuity such as a
+    suspend and resume cycle
   * bug fix: correctly restore multiple values on the stack in the presence of
     alien calls. (lp#1489590)
 
