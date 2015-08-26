@@ -325,7 +325,7 @@
             ;; loop in case more threads get created while trying to exit
             (do ((threads other-threads (other-threads)))
                 ((eq nil threads))
-              (map nil #'sb-thread:destroy-thread threads)
+              (map nil #'sb-thread:terminate-thread threads)
               (sleep 0.2))
             (return-from exit-cmd)))))
   (sb-ext:exit :code status)
