@@ -670,3 +670,10 @@
                      `(lambda (x y)
                         (deposit-field 0 (byte x y) 100)))
             -1 -2)))
+
+(with-test (:name :setf-mask-field)
+  (assert (= (funcall
+              (compile nil
+                       `(lambda (a)
+                          (setf (mask-field (byte 2 0) a) 1) a))
+              15))))

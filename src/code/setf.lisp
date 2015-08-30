@@ -732,7 +732,7 @@ place with bits from the low-order end of the new value."
   "The first argument is a byte specifier. The second is any place form
 acceptable to SETF. Replaces the specified byte of the number in this place
 with bits from the corresponding position in the new value."
-  (setf-expand-ldb bytespec place env 'deposit-byte 'mask-field))
+  (setf-expand-ldb bytespec place env 'deposit-field 'mask-field))
 
 (defun setf-expand-the (the type place env)
   (declare (type sb!c::lexenv env))
