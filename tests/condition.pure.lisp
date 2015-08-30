@@ -375,3 +375,12 @@
                     (handler-bind (((satisfies snorky) #'abort)) (+ 2 2)))))
     (assert (and f warnp (not errorp)))
     (assert (= (funcall f) 4)))) ; there is no runtime error either
+
+(with-test (:name :with-condition-restarts-evaluation-order)
+  (let (result)
+    (with-condition-restarts (progn
+                               (push 1 result)
+                               (make-condition 'error))
+        (progn (push 2 result) nil)
+      (push 3 result))
+    (assert (equal result '(3 2 1)))))

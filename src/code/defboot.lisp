@@ -424,7 +424,8 @@ evaluated as a PROGN."
    RESTARTS-FORM are associated with the condition returned by CONDITION-FORM.
    This allows FIND-RESTART, etc., to recognize restarts that are not related
    to the error currently being debugged. See also RESTART-CASE."
-  (once-only ((restarts restarts-form))
+  (once-only ((condition-form condition-form)
+              (restarts restarts-form))
     (with-unique-names (restart)
       ;; FIXME: check the need for interrupt-safety.
       `(unwind-protect
