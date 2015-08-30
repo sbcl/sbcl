@@ -164,8 +164,8 @@ T, a new thread is created for FUNCTION each time the timer is
 triggered. If THREAD is NIL, FUNCTION is run in an unspecified thread.
 
 When THREAD is not T, INTERRUPT-THREAD is used to run FUNCTION and the
-ordering guarantees of INTERRUPT-THREAD apply. FUNCTION runs with
-interrupts disabled but WITH-INTERRUPTS is allowed.")
+ordering guarantees of INTERRUPT-THREAD apply. In that case, FUNCTION
+runs with interrupts disabled but WITH-INTERRUPTS is allowed.")
 
 (defun timer-name (timer)
   #!+sb-doc
@@ -412,11 +412,8 @@ triggers."
   (let ((function (%timer-interrupt-function timer))
         (thread (%timer-thread timer)))
     (if (eq t thread)
-        (sb!thread:make-thread (without-interrupts
-                                 (allow-with-interrupts
-                                   function))
-                               :name (format nil "Timer ~A"
-                                             (%timer-name timer)))
+        (sb!thread:make-thread function :name (format nil "Timer ~A"
+                                                      (%timer-name timer)))
         (let ((thread (or thread sb!thread:*current-thread*)))
           (handler-case
               (sb!thread:interrupt-thread thread function)
