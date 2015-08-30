@@ -1207,7 +1207,7 @@
   :derive-type #'result-type-first-arg)
 
 (defknown output-object (t stream) null (any explicit-check))
-(defknown %write (t stream) t (any explicit-check))
+(defknown %write (t stream-designator) t (any explicit-check))
 
 (defknown (pprint) (t &optional stream-designator) (values)
   (explicit-check))
