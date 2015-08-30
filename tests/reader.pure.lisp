@@ -417,3 +417,6 @@
 (with-test (:name :sharp-plus-requires-subform)
   (assert-error (read-from-string "(let ((foo 3) #+sbcl) wat)"))
   (assert-error (read-from-string "(let ((foo 3) #-brand-x) wat)")))
+
+(with-test (:name :impossible-number-error)
+  (princ (nth-value 1 (ignore-errors (READ-FROM-STRING "1/0")))))

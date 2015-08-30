@@ -1111,7 +1111,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (let ((error-stream (stream-error-stream condition)))
        (format stream
                "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
-               (file-position-or-nil-for-error error-stream) error-stream
+               (sb!impl::file-position-or-nil-for-error error-stream) error-stream
                (simple-condition-format-control condition)
                (simple-condition-format-arguments condition)
                (reader-impossible-number-error-error condition))))))
