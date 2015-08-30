@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.14:
+changes in sbcl-1.2.15 relative to sbcl-1.2.14:
   * new feature: DEPRECATION declaration for functions, variables and types
     causes {EARLY,LATE,FINAL}-DEPRECATION-WARNING to be signaled when subject
     of the declaration is used. Integrated with DESCRIBE, DOCUMENTATION and
