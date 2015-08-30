@@ -244,9 +244,10 @@ invoked. In that case it will store into PLACE and start over."
                      for existing = (gethash k keys-seen)
                      do (when existing
                           (let ((sb!c::*current-path*
-                                 (when (boundp 'sb!c::*source-paths*)
-                                   (or (sb!c::get-source-path case)
-                                       sb!c::*current-path*))))
+                                  (when (boundp 'sb!c::*source-paths*)
+                                    (or (sb!c::get-source-path case)
+                                        (and (boundp 'sb!c::*current-path*)
+                                             sb!c::*current-path*)))))
                             (warn 'duplicate-case-key-warning
                                   :key k
                                   :case-kind name

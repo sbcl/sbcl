@@ -52,3 +52,6 @@
               "~S should have warned ~S, but didn't."
               form expected)
       (assert (not failure-p))))
+
+(with-test (:name :duplicate-cases-load)
+  (assert (load "case-test.lisp")))
