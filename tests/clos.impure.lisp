@@ -942,12 +942,35 @@
                          slot-name op
                          &optional new-value)
   (declare (ignore new-value))
-  op)
-(assert (eq (slot-value (make-instance 'class-with-all-slots-missing) 'foo)
-            'slot-value))
-(assert (eq (funcall (lambda (x) (slot-value x 'bar))
-                     (make-instance 'class-with-all-slots-missing))
-            'slot-value))
+  (values op 1 2 3))
+
+(with-test (:name :slot-value-missing)
+  (assert (equal (multiple-value-list
+                  (slot-value (make-instance 'class-with-all-slots-missing) 'foo))
+                 '(slot-value)))
+  (assert (equal (multiple-value-list
+                  (funcall (lambda (x) (slot-value x 'bar))
+                           (make-instance 'class-with-all-slots-missing)))
+                 '(slot-value))))
+
+(with-test (:name :slot-boundp-missing)
+  (assert (equal (multiple-value-list
+                  (slot-boundp (make-instance 'class-with-all-slots-missing) 'foo))
+                 '(t)))
+  (assert (equal (multiple-value-list
+                  (funcall (lambda (x) (slot-boundp x 'bar))
+                           (make-instance 'class-with-all-slots-missing)))
+                 '(t))))
+
+(with-test (:name :slot-setf-missing)
+  (assert (equal (multiple-value-list
+                  (setf (slot-value (make-instance 'class-with-all-slots-missing) 'foo) 10))
+                 '(10)))
+  (assert (equal (multiple-value-list
+                  (funcall (lambda (x) (setf (slot-value x 'bar) 20))
+                           (make-instance 'class-with-all-slots-missing)))
+                 '(20))))
+
 (macrolet ((try (which)
              `(assert (eq ((lambda (x)
                              (declare (,which sb-pcl::set-slot-value))

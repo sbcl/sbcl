@@ -88,14 +88,14 @@
                   (slot-accessor-std-p slotd type))))))
 
 (defun slot-missing-info (class slot-name)
-  (flet ((missing (operation)
-           (lambda (object)
-             (slot-missing class object slot-name operation))))
-    (make-slot-info
-     :reader (missing 'slot-value)
-     :boundp (missing 'slot-boundp)
-     :writer (lambda (new-value object)
-               (slot-missing class object slot-name 'setf new-value)))))
+  (make-slot-info
+   :reader (lambda (object)
+             (values (slot-missing class object slot-name 'slot-value)))
+   :boundp (lambda (object)
+             (and (slot-missing class object slot-name 'slot-boundp) t))
+   :writer (lambda (new-value object)
+             (slot-missing class object slot-name 'setf new-value)
+             new-value)))
 
 (defun compute-pv (slot-name-lists wrappers)
   (let ((wrappers (ensure-list wrappers))
