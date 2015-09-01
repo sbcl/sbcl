@@ -130,9 +130,10 @@
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/unportable-float")
  ("src/compiler/policy")
- ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
- ;; ERROR should be known as a condition subtype as soon as possible.
+ ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
+ ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
+ ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/parse-lambda-list")
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart

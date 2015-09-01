@@ -713,3 +713,9 @@
     (with-output-to-string (*standard-output*)
       (funcall (compile nil `(lambda () (write "xx" :stream nil)))))
     "\"xx\"")))
+
+(define-condition foo () (a))
+(defvar *ccc* (make-condition 'foo))
+(define-condition foo (warning) (a))
+(with-test (:name :write-obsolete-condition)
+  (assert (search "UNPRINTABLE" (write-to-string *ccc*))))

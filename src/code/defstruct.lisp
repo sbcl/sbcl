@@ -1891,7 +1891,12 @@ or they must be declared locally notinline at each call site.~@:>")
              `(defun ,predicate (,object-gensym)
                 (typep ,object-gensym ',class-name)))
 
-         (aver (null *defstruct-hooks*))))))
+         ;; Usually we AVER instead of ASSERT, but one alternate-metaclass
+         ;; structure definition is cross-compiled before AVER is a known macro.
+         ;; It could be a def!macro perhaps, but ASSERT works just fine here
+         ;; without adding to image size, since these toplevel forms
+         ;; belong to code that is discarded after cold-init.
+         (assert (null *defstruct-hooks*))))))
 
 ;;;; finalizing bootstrapping
 

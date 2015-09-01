@@ -403,18 +403,22 @@ variable: an unreadable object representing the error is printed instead.")
     (instance
      ;; The first case takes the above idea one step further: If an instance
      ;; isn't a citizen yet, it has no right to a print-object method.
-     (cond ((sb!kernel::undefined-classoid-p (layout-classoid (layout-of object)))
-            ;; not only is this unreadable, it's unprintable too.
-            (print-unreadable-object (object stream :identity t)
-              (format stream "UNPRINTABLE instance of ~W"
-                      (layout-classoid (layout-of object)))))
-           ((not (and (boundp '*print-object-is-disabled-p*)
-                      *print-object-is-disabled-p*))
-            (print-object object stream))
-           ((typep object 'structure-object)
-            (default-structure-print object stream *current-level-in-print*))
-           (t
-            (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream))))
+     ;; Additionally, if the object is an obsolete CONDITION, don't crash.
+     ;; (There is no update-instance protocol for conditions)
+     (let* ((layout (layout-of object))
+            (classoid (layout-classoid layout)))
+       (cond ((or (sb!kernel::undefined-classoid-p classoid)
+                  (and (layout-invalid layout) (condition-classoid-p classoid)))
+              ;; not only is this unreadable, it's unprintable too.
+              (print-unreadable-object (object stream :identity t)
+                (format stream "UNPRINTABLE instance of ~W" classoid)))
+             ((not (and (boundp '*print-object-is-disabled-p*)
+                        *print-object-is-disabled-p*))
+              (print-object object stream))
+             ((typep object 'structure-object)
+              (default-structure-print object stream *current-level-in-print*))
+             (t
+              (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream)))))
     (funcallable-instance
      (cond
        ((not (and (boundp '*print-object-is-disabled-p*)
