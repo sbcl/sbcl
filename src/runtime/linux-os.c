@@ -64,6 +64,7 @@
 /* Prototype for personality(2). Done inline here since the header file
  * for this isn't available on old versions of glibc. */
 int personality (unsigned long);
+#define ADDR_NO_RANDOMIZE 0x0040000
 #else
 #include <sys/personality.h>
 #endif
@@ -261,9 +262,8 @@ os_init(char *argv[], char *envp[])
         || major_version >= 3)
     {
         int pers = personality(0xffffffffUL);
-        /* 0x40000 aka. ADDR_NO_RANDOMIZE */
-        if (!(pers & 0x40000)) {
-            int retval = personality(pers | 0x40000);
+        if (!(pers & ADDR_NO_RANDOMIZE)) {
+            int retval = personality(pers | ADDR_NO_RANDOMIZE);
             /* Allegedly some Linux kernels (the reported case was
              * "hardened Linux 2.6.7") won't set the new personality,
              * but nor will they return -1 for an error. So as a
@@ -298,7 +298,12 @@ os_init(char *argv[], char *envp[])
             fprintf(stderr, "WARNING:\
 \nCouldn't re-execute SBCL with proper personality flags (/proc isn't mounted? setuid?)\
 \nTrying to continue anyway.\n");
-        } else {
+        } else if (getenv("SBCL_IS_RESTARTING")) {
+            /* We restarted due to previously enabled ASLR.  Now,
+             * reenable it for fork()'ed children. */
+            int pers = personality(0xffffffffUL);
+            personality(pers & ~ADDR_NO_RANDOMIZE);
+
             unsetenv("SBCL_IS_RESTARTING");
         }
     }
