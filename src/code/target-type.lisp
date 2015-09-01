@@ -37,7 +37,7 @@
          built-in-classoid
          cons-type
          #!+sb-simd-pack simd-pack-type)
-     (values (%typep obj type) t))
+     (values (%%typep obj type) t))
     (classoid
      (if (if (csubtypep type (specifier-type 'function))
              (funcallable-instance-p obj)

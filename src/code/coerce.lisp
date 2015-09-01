@@ -126,7 +126,6 @@
   #!+sb-doc
   "Coerce the Object to an object of type Output-Type-Spec."
   (flet ((coerce-error ()
-           (/show0 "entering COERCE-ERROR")
            (error 'simple-type-error
                   :format-control "~S can't be converted to type ~S."
                   :format-arguments (list object output-type-spec)
@@ -134,7 +133,7 @@
                   :expected-type output-type-spec)))
     (let ((type (specifier-type output-type-spec)))
       (cond
-        ((%typep object output-type-spec)
+        ((sb!kernel::%%typep object type)
          object)
         ((eq type *empty-type*)
          (coerce-error))
@@ -281,7 +280,7 @@
            result))
     (let ((type (specifier-type output-type-spec)))
       (cond
-        ((%typep object output-type-spec)
+        ((sb!kernel::%%typep object type)
          object)
         ((eq type *empty-type*)
          (coerce-error))

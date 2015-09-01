@@ -22,15 +22,15 @@
   ;; compared to the cost of interpreting types. (And the compiler
   ;; tries hard to optimize away the interpretation of types at
   ;; runtime, and when it succeeds, we never get here anyway.)
-  (%typep object type))
+  (%%typep object (specifier-type type)))
 
 ;;; the actual TYPEP engine. The compiler only generates calls to this
 ;;; function when it can't figure out anything more intelligent to do.
 (defun %typep (object specifier)
-  (%%typep object
-           (if (ctype-p specifier)
-               specifier
-               (specifier-type specifier))))
+  ;; Checking CTYPE-P on the specifier, as used to be done, is not right.
+  ;; If the specifier were a CTYPE we shouldn't have gotten here.
+  (%%typep object (specifier-type specifier)))
+
 (defun %%typep (object type &optional (strict t))
   (declare (type ctype type))
   (etypecase type
