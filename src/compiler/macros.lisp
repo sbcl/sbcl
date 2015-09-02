@@ -11,8 +11,6 @@
 
 (in-package "SB!C")
 
-(declaim (special *compiler-error-context*))
-
 ;;;; source-hacking defining forms
 
 ;;; Parse a DEFMACRO-style lambda-list, setting things up so that a

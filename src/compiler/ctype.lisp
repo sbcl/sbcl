@@ -68,7 +68,6 @@
     (apply *unwinnage-fun* format-string format-args))
   (values))
 
-(declaim (special *compiler-error-context*))
 
 ;;;; stuff for checking a call against a function type
 ;;;;

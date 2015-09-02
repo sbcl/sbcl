@@ -504,6 +504,7 @@
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ("src/compiler/dump")
 
+ ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/xref")
  ("src/code/source-location")
@@ -512,7 +513,6 @@
  ("src/compiler/ir1tran-lambda")
  ("src/compiler/ir1-translators")
  ("src/compiler/ir1util")
- ("src/compiler/ir1report")
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
 
