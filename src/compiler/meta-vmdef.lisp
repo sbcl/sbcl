@@ -867,7 +867,8 @@
               (case (first key)
                 (:scs
                  (aver (typep value 'list))
-                 (setf (operand-parse-scs res) (remove-duplicates value)))
+                 (aver (= (length value) (length (remove-duplicates value))))
+                 (setf (operand-parse-scs res) (copy-list value)))
                 (:load-tn
                  (aver (typep value 'symbol))
                  (setf (operand-parse-load-tn res) value))
