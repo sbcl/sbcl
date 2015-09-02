@@ -284,7 +284,6 @@
  ("src/code/stream"        :not-host)
  ("src/code/print"         :not-host)
  ("src/code/early-format")
- ("src/code/target-format" :not-host)
  ("src/code/defpackage"    :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
@@ -372,6 +371,12 @@
  ("src/code/early-condition")
  ("src/code/condition" :not-host)
  ("src/code/parse-defmacro-errors")
+ ("src/code/format-directive")
+ ;; Target-only stuff should usually be compiled late unless it has
+ ;; compile-time side-effects. This file could probably be later,
+ ;; but should certainly be no earlier than the definitions
+ ;; of FORMAT-ERROR and FORMAT-DIRECTIVE.
+ ("src/code/target-format" :not-host)
 
  ("src/compiler/generic/primtype")
 

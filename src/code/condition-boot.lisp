@@ -48,5 +48,4 @@
   (def sb!di:debug-condition (serious-condition) condition serious-condition)
   (def stream-error (error) condition serious-condition error)
   (def reference-condition (condition) condition)
-  (def sb!format:format-error (error reference-condition)
-       condition reference-condition serious-condition error))
+  )
