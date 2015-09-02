@@ -1,12 +1,20 @@
 OUT=$(mktemp -d)
-mkdir $OUT/sbcl $OUT/ccl32 $OUT/ccl64 $OUT/clisp
+for arch in x86 x86-64; do
+    for host in sbcl ccl32 ccl64 clisp; do
+        mkdir -p $OUT/$arch/$host
+    done
+done
 
-./make.sh --arch=x86 --xc-host='sbcl' "$@" && tar cf - run-sbcl.sh src/runtime/sbcl obj/from-xc output | tar -C $OUT/sbcl -xf -
-
-./make.sh --arch=x86 --xc-host='/home/csr21/src/lisp/ccl/lx86cl -b' "$@" && tar cf - run-sbcl.sh src/runtime/sbcl obj/from-xc output | tar -C $OUT/ccl32 -xf -
-
-./make.sh --arch=x86 --xc-host='/home/csr21/src/lisp/ccl/lx86cl64 -b' "$@" && tar cf - run-sbcl.sh src/runtime/sbcl obj/from-xc output | tar -C $OUT/ccl64 -xf -
-
-./make.sh --arch=x86 --xc-host='clisp -ansi -on-error abort' "$@" && tar cf - run-sbcl.sh src/runtime/sbcl obj/from-xc output | tar -C $OUT/clisp -xf -
+for arch in x86 x86-64; do
+    for host in sbcl ccl32 ccl64 clisp; do
+        case $host in
+            sbcl) xc_host=sbcl;;
+            ccl32) xc_host='/home/csr21/src/lisp/ccl/lx86cl -b';;
+            ccl64) xc_host='/home/csr21/src/lisp/ccl/lx86cl64 -b';;
+            clisp) xc_host='clisp -ansi -on-error abort';;
+        esac
+        ./make.sh --arch=$arch --xc-host="$xc_host" "$@" && tar cf - run-sbcl.sh src/runtime/sbcl obj/from-xc output | tar -C $OUT/$arch/$host -xf -
+    done
+done
 
 echo done: cd $OUT
