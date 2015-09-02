@@ -1,6 +1,6 @@
 /*
- * This is the ARM Linux incarnation of arch-dependent OS-dependent
- * routines. See also "linux-os.c".
+ * This is the ARM BSD incarnation of arch-dependent OS-dependent
+ * routines. See also "bsd-os.c".
  */
 
 /*
@@ -27,6 +27,7 @@
 #include "lispregs.h"
 #include <sys/socket.h>
 #include <sys/utsname.h>
+#include <machine/sysarch.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -68,7 +69,7 @@ os_context_register_addr(os_context_t *context, int offset)
      * Rather than do a big switch/case and all that, just take the
      * address of the first one (R0) and treat it as the start of an
      * array. */
-    return &(&context->uc_mcontext.arm_r0)[offset];
+    return &context->uc_mcontext.__gregs[offset];
 }
 
 os_context_register_t *
@@ -83,12 +84,6 @@ os_context_lr_addr(os_context_t *context)
     return os_context_register_addr(context, reg_LR);
 }
 
-sigset_t *
-os_context_sigmask_addr(os_context_t *context)
-{
-    return &(context->uc_sigmask);
-}
-
 void
 os_restore_fp_control(os_context_t *context)
 {
@@ -98,9 +93,7 @@ os_restore_fp_control(os_context_t *context)
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
-    os_vm_address_t end_address
-        = (os_vm_address_t)(((pointer_sized_uint_t) address) + length);
-    __clear_cache(address, end_address);
+    arm_sync_icache(address, length);
 }
 
 static void
@@ -109,7 +102,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
     u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
 
-    if (trap_instruction != 0xe7f001f0) {
+    if (trap_instruction != 0xe7ffdefe) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
              trap_instruction);
     }

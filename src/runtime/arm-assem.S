@@ -320,8 +320,11 @@ call_into_c:
         ldr     reg_CODE, =undefined_tramp
 
         @@ The magic (undefined) "BREAK_POINT" instruction.
-        .word 0xe7f001f0
-
+#if defined(LISP_FEATURE_LINUX)
+	.word 0xe7f001f0
+#elif defined(LISP_FEATURE_NETBSD)
+	.word 0xe7ffdefe
+#endif
         @@ Error arguments for an undefined function.
         .byte   trap_Error
         .byte   .error_args_end - . - 1
@@ -354,7 +357,11 @@ undefined_alien_function:
         ldr     reg_CODE, = undefined_alien_function
 
         @@ The magic (undefined) "BREAK_POINT" instruction.
-        .word 0xe7f001f0
+#if defined(LISP_FEATURE_LINUX)
+	.word 0xe7f001f0
+#elif defined(LISP_FEATURE_NETBSD)
+	.word 0xe7ffdefe
+#endif
 
         @@ Error arguments for an undefined function.
         .byte   trap_Error
@@ -472,7 +479,11 @@ fpu_restore:
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
-        .word 0xe7f001f0
+#if defined(LISP_FEATURE_LINUX)
+	.word 0xe7f001f0
+#elif defined(LISP_FEATURE_NETBSD)
+	.word 0xe7ffdefe
+#endif
         .byte trap_PendingInterrupt
         .byte 0
         .byte 0

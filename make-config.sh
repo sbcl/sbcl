@@ -381,7 +381,7 @@ case `uname -m` in
     parisc) guessed_sbcl_arch=hppa ;;
     9000/800) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
-    arm*) guessed_sbcl_arch=arm ;;
+    *arm*) guessed_sbcl_arch=arm ;;
     aarch64) guessed_sbcl_arch=arm ;;
     *)
         # If we're not building on a supported target architecture, we

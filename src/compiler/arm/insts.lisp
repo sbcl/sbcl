@@ -965,10 +965,11 @@
 ;;; officially undefined instruction as a single-instruction SIGTRAP
 ;;; generation instruction, or breakpoint.
 (define-instruction debug-trap (segment)
-  (:printer debug-trap ((opcode-32 #xe7f001f0))
+  (:printer debug-trap ((opcode-32 #!+linux #xe7f001f0
+                                   #!+netbsd #xe7ffdefe))
             :default :control #'debug-trap-control)
   (:emitter
-   (emit-word segment #xe7f001f0)))
+   (emit-word segment #!+linux #xe7f001f0 #!+netbsd #xe7ffdefe)))
 
 ;;;; Miscellaneous arithmetic instructions
 

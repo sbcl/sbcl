@@ -110,7 +110,7 @@
 
 (def!constant linkage-table-entry-size 16)
 
-#!+linux
+#!+(or linux netbsd)
 (progn
   #!-gencgc
   (progn

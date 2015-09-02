@@ -7,7 +7,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Minumum observed value, not authoritative.
-  (setf *backend-page-bytes* 4096))
+  (setf *backend-page-bytes* #!+linux 4096 #!+netbsd 8192))
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write

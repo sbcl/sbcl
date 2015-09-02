@@ -114,9 +114,7 @@ extern void globals_init(void);
 # endif
 /**/
 # ifdef LISP_FEATURE_ARM
-#  ifdef __linux__
 #   define EXTERN(name,bytes) .global name
-#  endif
 # endif
 
 # if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_X86_64)
