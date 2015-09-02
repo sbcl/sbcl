@@ -241,6 +241,11 @@
 
 (declaim (freeze-type undefined-package))
 
+;; Not the same as the real definition, but nobody cares.
+;; We'd just better not get this error.
+#+sb-xc-host
+(deftype simple-package-error () 'simple-error)
+
 (defun aux-fop-intern (size package fasl-input)
   (declare (optimize speed))
   (let ((input-stream (%fasl-input-stream fasl-input))
