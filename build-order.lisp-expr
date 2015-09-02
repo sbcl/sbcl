@@ -371,6 +371,7 @@
 
  ("src/code/early-condition")
  ("src/code/condition" :not-host)
+ ("src/code/parse-defmacro-errors")
 
  ("src/compiler/generic/primtype")
 
@@ -723,10 +724,6 @@
  ("src/code/external-formats/enc-ucs" :not-host)
  #!+sb-unicode
  ("src/code/external-formats/enc-utf" :not-host)
-
- ;; The code here can't be compiled until CONDITION and
- ;; DEFINE-CONDITION are defined.
- ("src/code/parse-defmacro-errors")
 
  #!+sb-eval
  ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
