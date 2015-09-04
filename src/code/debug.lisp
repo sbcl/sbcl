@@ -839,20 +839,21 @@ the current thread are replaced with dummy objects which can safely escape."
 (defun resolve-stack-top-hint ()
   (let ((hint *stack-top-hint*)
         (*stack-top-hint* nil))
-    (cond
-      ;; No hint, just keep the debugger guts out.
-      ((not hint)
-       (nth-value 1 (find-caller-name-and-frame)))
-      ;; Interrupted. Look for the interrupted frame -- if we don't find one
-      ;; this falls back to the next case.
-      ((and (eq hint 'invoke-interruption)
-            (nth-value 1 (find-interrupted-name-and-frame))))
-      ;; Name of the first uninteresting frame.
-      ((symbolp hint)
-       (find-caller-of-named-frame hint))
-      ;; We already have a resolved hint.
-      (t
-       hint))))
+    (the (or null sb!di:frame)
+         (cond
+           ;; No hint, just keep the debugger guts out.
+           ((not hint)
+            (nth-value 1 (find-caller-name-and-frame)))
+           ;; Interrupted. Look for the interrupted frame -- if we don't find one
+           ;; this falls back to the next case.
+           ((and (eq hint 'invoke-interruption)
+                 (nth-value 1 (find-interrupted-name-and-frame))))
+           ;; Name of the first uninteresting frame.
+           ((symbolp hint)
+            (find-caller-of-named-frame hint))
+           ;; We already have a resolved hint.
+           (t
+            hint)))))
 
 (defun invoke-debugger (condition)
   #!+sb-doc
