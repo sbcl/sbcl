@@ -1450,7 +1450,7 @@ and the number of 0 bits if INTEGER is negative."
 (collect ((forms))
   (flet ((unsigned-definition (name lambda-list width)
            (let ((pattern (1- (ash 1 width))))
-             `(defun ,name ,lambda-list
+             `(defun ,name ,(copy-list lambda-list)
                (flet ((prepare-argument (x)
                         (declare (integer x))
                         (etypecase x
@@ -1460,7 +1460,7 @@ and the number of 0 bits if INTEGER is negative."
                  (,name ,@(loop for arg in lambda-list
                                 collect `(prepare-argument ,arg)))))))
          (signed-definition (name lambda-list width)
-           `(defun ,name ,lambda-list
+           `(defun ,name ,(copy-list lambda-list)
               (flet ((prepare-argument (x)
                        (declare (integer x))
                        (etypecase x
