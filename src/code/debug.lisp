@@ -842,7 +842,7 @@ the current thread are replaced with dummy objects which can safely escape."
     (cond
       ;; No hint, just keep the debugger guts out.
       ((not hint)
-       (find-caller-name-and-frame))
+       (nth-value 1 (find-caller-name-and-frame)))
       ;; Interrupted. Look for the interrupted frame -- if we don't find one
       ;; this falls back to the next case.
       ((and (eq hint 'invoke-interruption)
