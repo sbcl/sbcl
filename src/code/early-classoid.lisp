@@ -327,3 +327,16 @@
 ;;; This would be a logical place to define FIND-CLASSOID-CELL,
 ;;; but since 'globaldb' occurs later in the build order,
 ;;; you'd have to go out of your way to declare INFO notinline.
+
+;;;; PCL stuff
+
+;;; the CLASSOID that we use to represent type information for
+;;; STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.  The type system
+;;; side does not need to distinguish between STANDARD-CLASS and
+;;; FUNCALLABLE-STANDARD-CLASS.
+(def!struct (standard-classoid (:include classoid)
+                               (:constructor make-standard-classoid)))
+;;; a metaclass for classes which aren't standardlike but will never
+;;; change either.
+(def!struct (static-classoid (:include classoid)
+                             (:constructor make-static-classoid)))

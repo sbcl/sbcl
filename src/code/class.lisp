@@ -808,19 +808,6 @@ between the ~A definition and the ~A definition"
 (!define-type-method (classoid :unparse) (type)
   (classoid-proper-name type))
 
-;;;; PCL stuff
-
-;;; the CLASSOID that we use to represent type information for
-;;; STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.  The type system
-;;; side does not need to distinguish between STANDARD-CLASS and
-;;; FUNCALLABLE-STANDARD-CLASS.
-(def!struct (standard-classoid (:include classoid)
-                               (:constructor make-standard-classoid)))
-;;; a metaclass for classes which aren't standardlike but will never
-;;; change either.
-(def!struct (static-classoid (:include classoid)
-                             (:constructor make-static-classoid)))
-
 ;;;; built-in classes
 
 ;;; The BUILT-IN-CLASSES list is a data structure which configures the
@@ -1372,3 +1359,22 @@ between the ~A definition and the ~A definition"
   #-sb-xc-host (/show0 "done setting *BUILT-IN-CLASS-CODES*"))
 
 (!defun-from-collected-cold-init-forms !classes-cold-init)
+
+;;; Set up fake GENERIC-FUNCTION classoid.
+;;; This is enough to fool the compiler into optimizing TYPEP into
+;;; %INSTANCE-TYPEP. It is possible only because up until GENERIC-FUNCTION
+;;; is defined for real, nothing checks TYPEP on a GF, suggesting that
+;;; some (but not all) of the code in question could be moved to a file
+;;; in warm init.
+#+sb-xc-host
+(let* ((classoid (make-standard-classoid :name 'generic-function))
+       (cell (make-classoid-cell 'generic-function classoid))
+       (layout (make-layout
+                :classoid classoid
+                :inherits (map 'vector #'find-layout (list t 'function))
+                :length 0 ; don't care
+                :depthoid -1
+                :invalid nil)))
+  (setf (classoid-layout classoid) layout
+        (info :type :classoid-cell 'generic-function) cell
+        (info :type :kind 'generic-function) :instance))

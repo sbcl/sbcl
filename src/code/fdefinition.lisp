@@ -140,12 +140,11 @@
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
 (defun encapsulate (name type function)
-  (let ((fdefn (find-fdefn name)))
-    (unless (and fdefn (fdefn-fun fdefn))
-      (error 'undefined-function :name name))
-    (when (typep (fdefn-fun fdefn) 'generic-function)
+  (let* ((fdefn (find-fdefn name))
+         (underlying-fun (sb!c:safe-fdefn-fun fdefn)))
+    (when (typep underlying-fun 'generic-function)
       (return-from encapsulate
-        (encapsulate-generic-function (fdefn-fun fdefn) type function)))
+        (encapsulate-generic-function underlying-fun type function)))
     ;; We must bind and close over INFO. Consider the case where we
     ;; encapsulate (the second) an encapsulated (the first)
     ;; definition, and later someone unencapsulates the encapsulated
@@ -155,7 +154,7 @@
     ;; clobber the appropriate INFO structure to allow
     ;; basic-definition to be bound to the next definition instead of
     ;; an encapsulation that no longer exists.
-    (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
+    (let ((info (make-encapsulation-info type underlying-fun)))
       (setf (fdefn-fun fdefn)
             (named-lambda encapsulation (&rest args)
               (apply function (encapsulation-info-definition info)
