@@ -153,6 +153,7 @@
   (:generator 3
     (inst movd dst x)))
 
+#-sb-xc-host
 (defun %simd-pack-low (x)
   (declare (type simd-pack x))
   (%simd-pack-low x))
@@ -171,6 +172,7 @@
     (inst psrldq tmp 8)
     (inst movd dst tmp)))
 
+#-sb-xc-host
 (defun %simd-pack-high (x)
   (declare (type simd-pack x))
   (%simd-pack-high x))
