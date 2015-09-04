@@ -1153,7 +1153,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
                       (push name names-used))))
              (incf count))))))
 
-(defvar *debug-loop-fun* #'debug-loop-fun
+(defvar *debug-loop-fun* 'debug-loop-fun
   #!+sb-doc
   "A function taking no parameters that starts the low-level debug loop.")
 
