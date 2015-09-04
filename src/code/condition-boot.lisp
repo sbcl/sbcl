@@ -25,10 +25,9 @@
                 ;; excluding T which is assumed.
                 (%compiler-define-condition
                  ',name ',direct-supers
-                 ,(sb!kernel:make-layout
+                 ,(make-layout
                    :classoid (make-undefined-classoid name)
-                   :inherits (map 'vector #'sb!kernel:find-layout
-                                  (cons t inherits))
+                   :inherits (map 'vector #'find-layout (cons t inherits))
                    :depthoid -1
                    :length 3)
                  nil nil))))
