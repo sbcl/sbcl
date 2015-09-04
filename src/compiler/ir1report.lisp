@@ -569,13 +569,10 @@ has written, having proved that it is unreachable."))
             ;; advantage of the (SATISFIES HANDLE-CONDITION-P)
             ;; handler, because if that doesn't handle it the ordinary
             ;; compiler handlers will trigger.
-            (typep
+            (would-muffle-p
              (ecase kind
                (:variable (make-condition 'warning))
-               ((:function :type) (make-condition 'style-warning)))
-             (car
-              (rassoc 'muffle-warning
-                      (lexenv-handled-conditions *lexenv*))))))
+               ((:function :type) (make-condition 'style-warning))))))
     (let* ((found (dolist (warning *undefined-warnings* nil)
                     (when (and (equal (undefined-warning-name warning) name)
                                (eq (undefined-warning-kind warning) kind))

@@ -133,7 +133,7 @@
                   :expected-type output-type-spec)))
     (let ((type (specifier-type output-type-spec)))
       (cond
-        ((sb!kernel::%%typep object type)
+        ((%%typep object type)
          object)
         ((eq type *empty-type*)
          (coerce-error))
@@ -280,7 +280,7 @@
            result))
     (let ((type (specifier-type output-type-spec)))
       (cond
-        ((sb!kernel::%%typep object type)
+        ((%%typep object type)
          object)
         ((eq type *empty-type*)
          (coerce-error))

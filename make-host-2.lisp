@@ -13,9 +13,18 @@
 
 (let ((*features* (cons :sb-xc *features*)))
   (load "src/cold/muffler.lisp"))
+
+;; Avoid forward-reference to an as-yet unknown type.
+;; NB: This is not how you would write this function, if you required
+;; such a thing. It should be (TYPEP X 'CODE-DELETION-NOTE).
+;; Do as I say, not as I do.
+(defun code-deletion-note-p (x)
+  (eq (type-of x) 'sb!ext:code-deletion-note))
 (setq sb!c::*handled-conditions*
-      '(((or (satisfies unable-to-optimize-note-p)
-             sb!ext:code-deletion-note) . muffle-warning)))
+      `((,(sb!kernel:specifier-type
+           '(or (satisfies unable-to-optimize-note-p)
+                (satisfies code-deletion-note-p)))
+         . muffle-warning)))
 
 (defun proclaim-target-optimization ()
   (let ((debug (if (position :sb-show *shebang-features*) 2 1)))

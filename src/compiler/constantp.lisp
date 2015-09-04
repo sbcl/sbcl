@@ -207,8 +207,7 @@ constantness of the FORM in ENVIRONMENT."
                                 (let ((*unparse-fun-type-simplify* t))
                                   (type-specifier parsed)))
                          #-sb-xc-host
-                         (sb!kernel::%%typep (constant-form-value* form)
-                                             parsed nil)))
+                         (%%typep (constant-form-value* form) parsed nil)))
                 (error () nil)))
    :eval (constant-form-value* form))
 

@@ -230,6 +230,10 @@
                             (print-unreadable-object (obj stream :type t)
                               (write (sb-kernel:classoid-name obj) :stream stream))))
      (set-pprint-dispatch
+      'sb-kernel:ctype (lambda (stream obj)
+                         (print-unreadable-object (obj stream :type t)
+                           (prin1 (sb-kernel:type-specifier obj) stream))))
+     (set-pprint-dispatch
       'package (lambda (stream obj)
                  (print-unreadable-object (obj stream :type t)
                    (write (package-name obj) :stream stream))))

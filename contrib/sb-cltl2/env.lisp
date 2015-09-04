@@ -460,8 +460,9 @@ the condition types that have been muffled."
        ;; qualities and for each of the implementation-specific qualities"
        (sb-c::policy-to-decl-spec (sb-c::lexenv-policy env) nil t))
       (sb-ext:muffle-conditions
-       (car (rassoc 'muffle-warning
-                    (sb-c::lexenv-handled-conditions env))))
+       (sb-int:awhen (car (rassoc 'muffle-warning
+                                  (sb-c::lexenv-handled-conditions env)))
+         (sb-kernel:type-specifier it)))
       (declaration
        (copy-list sb-c::*recognized-declarations*))
       (t (if (info :declaration :handler declaration-name)

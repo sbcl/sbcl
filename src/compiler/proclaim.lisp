@@ -35,54 +35,43 @@
                 process-handle-conditions-decl))
 (defun process-handle-conditions-decl (spec list)
   (let ((new (copy-alist list)))
-    (dolist (clause (cdr spec))
+    (dolist (clause (cdr spec) new)
       (destructuring-bind (typespec restart-name) clause
-        (let ((ospec (rassoc restart-name new :test #'eq)))
+        (let ((type (compiler-specifier-type typespec))
+              (ospec (rassoc restart-name new :test #'eq)))
           (if ospec
-              (setf (car ospec)
-                    (type-specifier
-                     (type-union (compiler-specifier-type (car ospec))
-                                 (compiler-specifier-type typespec))))
-              (push (cons (type-specifier (compiler-specifier-type typespec))
-                          restart-name)
-                    new)))))
-    new))
+              (setf (car ospec) (type-union (car ospec) type))
+              (push (cons type restart-name) new)))))))
 
 (declaim (ftype (function (list list) list)
                 process-muffle-conditions-decl))
 (defun process-muffle-conditions-decl (spec list)
   (process-handle-conditions-decl
-   (cons 'handle-conditions
-         (mapcar (lambda (x) (list x 'muffle-warning)) (cdr spec)))
+   `(handle-conditions ((or ,@(cdr spec)) muffle-warning))
    list))
 
 (declaim (ftype (function (list list) list)
                 process-unhandle-conditions-decl))
 (defun process-unhandle-conditions-decl (spec list)
   (let ((new (copy-alist list)))
-    (dolist (clause (cdr spec))
+    (dolist (clause (cdr spec) new)
       (destructuring-bind (typespec restart-name) clause
         (let ((ospec (rassoc restart-name new :test #'eq)))
           (if ospec
-              (let ((type-specifier
-                     (type-specifier
-                      (type-intersection
-                       (compiler-specifier-type (car ospec))
-                       (compiler-specifier-type `(not ,typespec))))))
-                (if type-specifier
-                    (setf (car ospec) type-specifier)
-                    (setq new
-                          (delete restart-name new :test #'eq :key #'cdr))))
+              (let ((type (type-intersection
+                           (car ospec)
+                           (compiler-specifier-type `(not ,typespec)))))
+                (if (type= type *empty-type*)
+                    (setq new (delete restart-name new :test #'eq :key #'cdr))
+                    (setf (car ospec) type)))
               ;; do nothing?
-              nil))))
-    new))
+              nil))))))
 
 (declaim (ftype (function (list list) list)
                 process-unmuffle-conditions-decl))
 (defun process-unmuffle-conditions-decl (spec list)
   (process-unhandle-conditions-decl
-   (cons 'unhandle-conditions
-         (mapcar (lambda (x) (list x 'muffle-warning)) (cdr spec)))
+   `(unhandle-conditions ((or ,@(cdr spec)) muffle-warning))
    list))
 
 (declaim (ftype (function (list list) list)

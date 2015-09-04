@@ -1658,44 +1658,51 @@ necessary, since type inference may take arbitrarily long to converge.")
     (setq *block-compile* nil)
     (setq *entry-points* nil)))
 
-(defun handle-condition-p (condition)
-  (let ((lexenv
-         (etypecase *compiler-error-context*
-           (node
-            (node-lexenv *compiler-error-context*))
-           (compiler-error-context
-            (let ((lexenv (compiler-error-context-lexenv
-                           *compiler-error-context*)))
-              (aver lexenv)
-              lexenv))
-           (null *lexenv*))))
-    (let ((muffles (lexenv-handled-conditions lexenv)))
-      (if (null muffles) ; common case
-          nil
-          (dolist (muffle muffles nil)
-            (destructuring-bind (typespec . restart-name) muffle
-              (when (and (typep condition typespec)
-                         (find-restart restart-name condition))
-                (return t))))))))
+(flet ((get-handled-conditions ()
+         (let ((ctxt *compiler-error-context*))
+           (lexenv-handled-conditions
+            (etypecase ctxt
+             (node (node-lexenv ctxt))
+             (compiler-error-context
+              (let ((lexenv (compiler-error-context-lexenv ctxt)))
+                (aver lexenv)
+                lexenv))
+             ;; Is this right? I would think that if lexenv is null
+             ;; we should look at *HANDLED-CONDITIONS*.
+             (null *lexenv*)))))
+       (handle-p (condition ctype)
+         #+sb-xc-host (typep condition (type-specifier ctype))
+         #-sb-xc-host (%%typep condition ctype)))
+  (declare (inline handle-p))
 
-(defun handle-condition-handler (condition)
-  (let ((lexenv
-         (etypecase *compiler-error-context*
-           (node
-            (node-lexenv *compiler-error-context*))
-           (compiler-error-context
-            (let ((lexenv (compiler-error-context-lexenv
-                           *compiler-error-context*)))
-              (aver lexenv)
-              lexenv))
-           (null *lexenv*))))
-    (let ((muffles (lexenv-handled-conditions lexenv)))
-      (aver muffles)
+  (defun handle-condition-p (condition)
+    (dolist (muffle (get-handled-conditions) nil)
+      (destructuring-bind (ctype . restart-name) muffle
+        (when (and (handle-p condition ctype)
+                   (find-restart restart-name condition))
+          (return t)))))
+
+  (defun handle-condition-handler (condition)
+    (let ((muffles (get-handled-conditions)))
+      (aver muffles) ; FIXME: looks redundant with "fell through"
       (dolist (muffle muffles (bug "fell through"))
-        (destructuring-bind (typespec . restart-name) muffle
-          (when (typep condition typespec)
+        (destructuring-bind (ctype . restart-name) muffle
+          (when (handle-p condition ctype)
             (awhen (find-restart restart-name condition)
-              (invoke-restart it))))))))
+              (invoke-restart it)))))))
+
+  ;; WOULD-MUFFLE-P is called (incorrectly) only by NOTE-UNDEFINED-REFERENCE.
+  ;; It is not wrong per se, but as used, it is wrong, making it nearly
+  ;; impossible to muffle a subset of undefind warnings whose NAME and KIND
+  ;; slots match specific things tested by a user-defined predicate.
+  ;; Attempting to do that might muffle everything, depending on how your
+  ;; predicate responds to a vanilla WARNING. Consider e.g.
+  ;;   (AND WARNING (NOT (SATISFIES HAIRYFN)))
+  ;; where HAIRYFN depends on the :FORMAT-CONTROL and :FORMAT-ARGUMENTS.
+  (defun would-muffle-p (condition)
+    (let ((ctype (rassoc 'muffle-warning
+                         (lexenv-handled-conditions *lexenv*))))
+      (and ctype (handle-p condition (car ctype))))))
 
 ;;; Read all forms from INFO and compile them, with output to OBJECT.
 ;;; Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
