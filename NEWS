@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.15:
+  * bug fix: correctly restore multiple values on the stack in the presence of
+    alien calls. (lp#1489590)
+
 changes in sbcl-1.2.15 relative to sbcl-1.2.14:
   * new feature: DEPRECATION declaration for functions, variables and types
     causes {EARLY,LATE,FINAL}-DEPRECATION-WARNING to be signaled when subject

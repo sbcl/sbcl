@@ -746,14 +746,19 @@
         ;; deal with all of the stack arguments before the wired
         ;; register arguments become live.
         (args #!-arm args #!+arm (reverse args))
-        #!+x86
+        #!+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
         (make-call-out-tns type)
       #!+x86
-      (progn
-        (vop set-fpu-word-for-c call block)
-        (vop current-stack-pointer call block stack-pointer))
+      (vop set-fpu-word-for-c call block)
+      ;; Save the stack pointer, it will get aligned and subtracting
+      ;; the size will not restore the original value, and some
+      ;; things, like SB-C::CALL-VARIABLE, use the stack pointer to
+      ;; calculate the number of saved values.
+      ;; See alien.impure.lisp/:stack-misalignment
+      #!+c-stack-is-control-stack
+      (vop current-stack-pointer call block stack-pointer)
       (vop alloc-number-stack-space call block stack-frame-size nsp)
       ;; KLUDGE: This is where the second half of the ARM
       ;; register-pressure change lives (see above).
@@ -818,12 +823,12 @@
               ((lvar-tn call block function)
                (reference-tn-list arg-tns nil))
               ((reference-tn-list result-tns t)))
-        #!-x86
+        #!-c-stack-is-control-stack
         (vop dealloc-number-stack-space call block stack-frame-size)
+        #!+c-stack-is-control-stack
+        (vop reset-stack-pointer call block stack-pointer)
         #!+x86
-        (progn
-          (vop reset-stack-pointer call block stack-pointer)
-          (vop set-fpu-word-for-lisp call block))
+        (vop set-fpu-word-for-lisp call block)
         (cond
           #!+arm-softfp
           ((and lvar
