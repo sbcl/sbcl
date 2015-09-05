@@ -85,9 +85,10 @@
                 &aux (contents (make-array 100
                                            :adjustable t
                                            :fill-pointer 0
-                                           :element-type element-type)))))
-  contents
-  keyfun)
+                                           :element-type element-type))))
+             (:copier nil))
+  (contents nil :type vector   :read-only t)
+  (keyfun   nil :type function :read-only t))
 
 (def!method print-object ((object priority-queue) stream)
   (print-unreadable-object (object stream :type t :identity t)
@@ -133,18 +134,20 @@
 
 (defstruct (timer
              (:conc-name %timer-)
-             (:constructor make-timer
-                 (function &key name (thread sb!thread:*current-thread*))))
+             (:constructor
+              make-timer
+              (function &key name (thread sb!thread:*current-thread*)))
+             (:copier nil))
   #!+sb-doc
   "Timer type. Do not rely on timers being structs as it may change in
 future versions."
-  name
-  function
-  expire-time
-  repeat-interval
-  (thread nil :type (or sb!thread:thread (member t nil)))
-  interrupt-function
-  cancel-function)
+  (name               nil :read-only t)
+  (function           nil :read-only t)
+  (expire-time        1   :type (or null real))
+  (repeat-interval    nil :type (or null (real 0)))
+  (thread             nil :type (or sb!thread:thread boolean))
+  (interrupt-function nil :type (or null function))
+  (cancel-function    nil :type (or null function)))
 
 (def!method print-object ((timer timer) stream)
   (let ((name (%timer-name timer)))
@@ -155,7 +158,8 @@ future versions."
           ;; body is empty => there is only one space between type and
           ;; identity
           ))))
-  #!+sb-doc
+
+#!+sb-doc
 (setf (fdocumentation 'make-timer 'function)
       "Create a timer that runs FUNCTION when triggered.
 
@@ -178,10 +182,10 @@ runs with interrupts disabled but WITH-INTERRUPTS is allowed.")
 from now. For timers with a repeat interval it returns true."
   (symbol-macrolet ((expire-time (%timer-expire-time timer))
                     (repeat-interval (%timer-repeat-interval timer)))
-      (or (and repeat-interval (plusp repeat-interval))
-          (and expire-time
-               (<= (+ (get-internal-real-time) delta)
-                   expire-time)))))
+    (or (and repeat-interval (plusp repeat-interval))
+        (and expire-time
+             (<= (+ (get-internal-real-time) delta)
+                 expire-time)))))
 
 ;;; The scheduler
 
@@ -221,7 +225,7 @@ from now. For timers with a repeat interval it returns true."
                              (funcall (%timer-function timer))
                           (reschedule-timer timer)))
                       (%timer-function timer))))
-    (list
+    (values
      (lambda ()
        ;; Use WITHOUT-INTERRUPTS for the acquiring lock to avoid
        ;; unblocking deferrables unless it's inevitable.
@@ -247,7 +251,7 @@ from now. For timers with a repeat interval it returns true."
       (setq changed-p t))
     (setf (values (%timer-interrupt-function timer)
                   (%timer-cancel-function timer))
-          (values-list (make-cancellable-interruptor timer)))
+          (make-cancellable-interruptor timer))
     (when changed-p
       (set-system-timer)))
   (values))
@@ -264,14 +268,13 @@ expiry."
   (when (%timer-cancel-function timer)
     (funcall (%timer-cancel-function timer)))
   (with-scheduler-lock ()
-    (setf (%timer-expire-time timer) (+ (get-internal-real-time)
-                                        (delta->real
-                                         (if absolute-p
-                                             (- time (get-universal-time))
-                                             time)))
-          (%timer-repeat-interval timer) (if repeat-interval
-                                             (delta->real repeat-interval)
-                                             nil))
+    (let ((delta/real (delta->real
+                       (if absolute-p
+                           (- time (get-universal-time))
+                           time))))
+      (setf (%timer-expire-time timer) (+ (get-internal-real-time) delta/real)
+            (%timer-repeat-interval timer) (when repeat-interval
+                                             (delta->real repeat-interval))))
     (%schedule-timer timer)))
 
 (defun unschedule-timer (timer)
