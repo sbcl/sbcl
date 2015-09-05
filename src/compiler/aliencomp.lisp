@@ -817,12 +817,11 @@
                   (vop sb!vm::move-single-to-int-arg call block
                        float-tn i1-tn))))))
       (aver (null args))
-      (let ((arg-tns (remove-if-not #'tn-p (flatten-list arg-tns)))
-            (result-tns (remove-if-not #'tn-p (ensure-list result-tns))))
+      (let ((result-tns (ensure-list result-tns)))
         (vop* call-out call block
               ((lvar-tn call block function)
-               (reference-tn-list arg-tns nil))
-              ((reference-tn-list result-tns t)))
+               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
+              ((reference-tn-list (remove-if-not #'tn-p result-tns) t)))
         #!-c-stack-is-control-stack
         (vop dealloc-number-stack-space call block stack-frame-size)
         #!+c-stack-is-control-stack
