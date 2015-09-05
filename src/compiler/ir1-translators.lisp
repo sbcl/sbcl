@@ -287,19 +287,24 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
 ;;; Call DEFINITIONIZE-FUN on each element of DEFINITIONS to find its
 ;;; in-lexenv representation, stuff the results into *LEXENV*, and
 ;;; call FUN (with no arguments).
-;;; lp#1395952 suggests that this needs to be more careful.
 (defun %funcall-in-foomacrolet-lexenv (definitionize-fun
                                        definitionize-keyword
                                        definitions
                                        fun)
-  (declare (type function definitionize-fun fun))
-  (declare (type (member :vars :funs) definitionize-keyword))
-  (declare (type list definitions))
-  (unless (= (length definitions)
-             (length (remove-duplicates definitions :key #'first)))
-    (compiler-style-warn "duplicate definitions in ~S" definitions))
+  (declare (type function definitionize-fun fun)
+           (type (member :vars :funs) definitionize-keyword))
+  (unless (listp definitions)
+    (compiler-error "Malformed ~s definitions: ~s"
+                    (case definitionize-keyword
+                      (:vars 'symbol-macrolet)
+                      (:funs 'macrolet))
+                    definitions))
   (let* ((processed-definitions (mapcar definitionize-fun definitions))
          (*lexenv* (make-lexenv definitionize-keyword processed-definitions)))
+    ;; Do this after processing, since the definitions can be malformed.
+    (unless (= (length definitions)
+               (length (remove-duplicates definitions :key #'first)))
+      (compiler-style-warn "Duplicate definitions in ~S" definitions))
     ;; I wonder how much of an compiler performance penalty this
     ;; non-constant keyword is.
     (funcall fun definitionize-keyword processed-definitions)))
@@ -821,6 +826,8 @@ not enclose the definitions; any use of NAME in the FORMS will refer to the
 lexically apparent function definition in the enclosing environment."
   (multiple-value-bind (forms decls)
       (parse-body body :doc-string-allowed nil)
+    (unless (listp definitions)
+      (compiler-error "Malformed FLET definitions: ~s" definitions))
     (multiple-value-bind (names defs)
         (extract-flet-vars definitions 'flet)
       (let ((fvars (mapcar (lambda (n d)
@@ -842,6 +849,8 @@ Evaluate the BODY-FORMS with local function definitions. The bindings enclose
 the new definitions, so the defined functions can call themselves or each
 other."
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+    (unless (listp definitions)
+      (compiler-error "Malformed LABELS definitions: ~s" definitions))
     (multiple-value-bind (names defs)
         (extract-flet-vars definitions 'labels)
       (let* (;; dummy LABELS functions, to be used as placeholders
