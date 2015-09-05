@@ -102,8 +102,8 @@ introspective tools such as @code{apropos} more useful.
 
 SBCL uses a @dfn{deprecation pipeline} with multiple stages: as time
 goes by, deprecated things move from earlier stages of deprecation to
-later stages before finally being removed. This intention is making
-users aware of necessary changes early but allowing a migration to new
+later stages before finally being removed. The intention is making users
+aware of necessary changes early but allowing a migration to new
 interfaces at a reasonable pace.
 
 Deprecation proceeds in three stages, each lasting approximately a
