@@ -138,6 +138,51 @@ The commands are:
 (defun redisplay (stream &optional (skip 0))
   (display-current stream *inspect-length* skip))
 
+;;; INSPECTED-PARTS
+;;;
+;;; Accepts the arguments OBJECT LENGTH SKIP and returns,
+;;;   (LIST COMPONENTS SEQ-TYPE COUNT SEQ-HINT)
+;;; where..
+;;;
+;;;   COMPONENTS are the component parts of OBJECT (whose
+;;;   representation is determined by SEQ-TYPE). Except for the
+;;;   SEQ-TYPE :named and :array, components is just the OBJECT itself
+;;;
+;;;   SEQ-TYPE determines what representation is used for components
+;;;   of COMPONENTS.
+;;;      If SEQ-TYPE is :named, then each element is (CONS NAME VALUE)
+;;;      If SEQ-TYPE is :dotted-list, then each element is just value,
+;;;        but the last element must be retrieved by
+;;;        (cdr (last components))
+;;;      If SEQ-TYPE is :cylic-list, then each element is just value,
+;;;      If SEQ-TYPE is :list, then each element is a value of an array
+;;;      If SEQ-TYPE is :vector, then each element is a value of an vector
+;;;      If SEQ-TYPE is :array, then each element is a value of an array
+;;;        with rank >= 2. The
+;;;      If SEQ-TYPE is :bignum, then object is just a bignum and not a
+;;;        a sequence
+;;;
+;;;   COUNT is the total number of components in the OBJECT
+;;;
+;;; SEQ-HINT is a seq-type dependent hint. Used by SEQ-TYPE :array
+;;; to hold the reverse-dimensions of the orignal array.
+
+(declaim (inline parts-components))
+(defun parts-components (parts)
+  (first parts))
+
+(declaim (inline parts-count))
+(defun parts-count (parts)
+  (second parts))
+
+(declaim (inline parts-seq-type))
+(defun parts-seq-type (parts)
+  (third parts))
+
+(declaim (inline parts-seq-hint))
+(defun parts-seq-hint (parts)
+  (fourth parts))
+
 ;;;
 ;;; istep command processing
 ;;;
@@ -719,51 +764,6 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
   "..unbound..")
 
 
-;;; INSPECTED-PARTS
-;;;
-;;; Accepts the arguments OBJECT LENGTH SKIP and returns,
-;;;   (LIST COMPONENTS SEQ-TYPE COUNT SEQ-HINT)
-;;; where..
-;;;
-;;;   COMPONENTS are the component parts of OBJECT (whose
-;;;   representation is determined by SEQ-TYPE). Except for the
-;;;   SEQ-TYPE :named and :array, components is just the OBJECT itself
-;;;
-;;;   SEQ-TYPE determines what representation is used for components
-;;;   of COMPONENTS.
-;;;      If SEQ-TYPE is :named, then each element is (CONS NAME VALUE)
-;;;      If SEQ-TYPE is :dotted-list, then each element is just value,
-;;;        but the last element must be retrieved by
-;;;        (cdr (last components))
-;;;      If SEQ-TYPE is :cylic-list, then each element is just value,
-;;;      If SEQ-TYPE is :list, then each element is a value of an array
-;;;      If SEQ-TYPE is :vector, then each element is a value of an vector
-;;;      If SEQ-TYPE is :array, then each element is a value of an array
-;;;        with rank >= 2. The
-;;;      If SEQ-TYPE is :bignum, then object is just a bignum and not a
-;;;        a sequence
-;;;
-;;;   COUNT is the total number of components in the OBJECT
-;;;
-;;; SEQ-HINT is a seq-type dependent hint. Used by SEQ-TYPE :array
-;;; to hold the reverse-dimensions of the orignal array.
-
-(declaim (inline parts-components)) ; FIXME: out-of-order
-(defun parts-components (parts)
-  (first parts))
-
-(declaim (inline parts-count)) ; FIXME: out-of-order
-(defun parts-count (parts)
-  (second parts))
-
-(declaim (inline parts-seq-type)) ; FIXME: out-of-order
-(defun parts-seq-type (parts)
-  (third parts))
-
-(declaim (inline parts-seq-hint)) ; FIXME: out-of-order
-(defun parts-seq-hint (parts)
-  (fourth parts))
-
 ;;; FIXME: Most of this should be refactored to share the code
 ;;; with the vanilla inspector. Also, we should check what the
 ;;; Slime inspector does, and provide a an interface for it to
