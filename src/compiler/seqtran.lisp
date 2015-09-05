@@ -1042,23 +1042,20 @@
                    (%vector-raw-bits src (1- i))))
            (values))))))
 
-#.(loop for i = 1 then (* i 2)
-        collect `(deftransform ,(intern (format nil "UB~D-BASH-COPY" i)
-                                        "SB!KERNEL")
-                                                        ((src src-offset
-                                                          dst dst-offset
-                                                          length)
-                                                        ((simple-unboxed-array (*))
-                                                         (constant-arg index)
-                                                         (simple-unboxed-array (*))
-                                                         (constant-arg index)
-                                                         index)
-                                                        *)
-                  (frob-bash-transform src src-offset
-                                       dst dst-offset length
-                                       ,(truncate sb!vm:n-word-bits i))) into forms
-        until (= i sb!vm:n-word-bits)
-        finally (return `(progn ,@forms)))
+#.
+(let ((arglist '((src src-offset dst dst-offset length)
+                 ((simple-unboxed-array (*)) (constant-arg index)
+                  (simple-unboxed-array (*)) (constant-arg index)
+                  index)
+                 *)))
+  (loop for i = 1 then (* i 2)
+     for name = (intern (format nil "UB~D-BASH-COPY" i) "SB!KERNEL")
+     collect `(deftransform ,name ,arglist
+                (frob-bash-transform src src-offset
+                                     dst dst-offset length
+                                     ,(truncate sb!vm:n-word-bits i))) into forms
+     until (= i sb!vm:n-word-bits)
+     finally (return `(progn ,@forms))))
 
 ;;; We expand copy loops inline in SUBSEQ and COPY-SEQ if we're copying
 ;;; arrays with elements of size >= the word size.  We do this because
