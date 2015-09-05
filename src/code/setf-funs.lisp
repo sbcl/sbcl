@@ -43,7 +43,8 @@
                    (eq (info :function :kind sym) :function)
                    (or (info :setf :inverse sym)
                        (info :setf :expander sym))
-                   (not (member sym ignore)))
+                   ;; Use STRING= because (NEQ 'LDB 'SB!XC:LDB) etc.
+                   (not (member sym ignore :test #'string=)))
           (res sym))))
     `(progn
       ,@(mapcan

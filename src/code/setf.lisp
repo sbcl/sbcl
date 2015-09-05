@@ -420,6 +420,9 @@
            (when present-p
              (warn "defining setf macro for ~S when ~S was previously ~
              treated as a function" name setf-fn-name)))
+          ;; This is a useless and unavoidable warning during self-build.
+          ;; cf. similar disabling of warning in WARN-IF-SETF-MACRO.
+          #-sb-xc-host
           (:defined
            ;; Somebody defined (SETF F) but then also said F has a macro.
            ;; A soft warning seems appropriate because in this case it's
