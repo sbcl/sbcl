@@ -716,6 +716,20 @@
 
 (defclass dependent-update-mixin (plist-mixin) ())
 
+;; FIXME: as far as I can tell, most of these predicates should be wrappers
+;; on %INSTANCE-TYPEP instead of using the GF dispatch mechanism to return T
+;; for a particular layout. Why would it be done this way? While it allows
+;; for returning T on types that don't have any superclass in common,
+;; I can't imagine that as being useful extension, especially as none of
+;; the functions are exposed to users (as external symbols) and thus should
+;; not have methods added to them.
+;; The only other thing I can think of is that it might have been necessary
+;; for portability. It seems like since portability is not a concern,
+;; they should be ordinary functions, and if we're clever, it should be
+;; possible to define them in such a way that they return NIL during the
+;; part of the build that happens before PCL is bootstrapped.
+;; Certainly this would help CLASSP do the right thing, at which point
+;; there's no reason not to make them all dtrt.
 (defparameter *!early-class-predicates*
   '((specializer specializerp)
     (standard-specializer standard-specializer-p)
@@ -730,7 +744,7 @@
     (condition-class condition-class-p)
     (structure-class structure-class-p)
     (forward-referenced-class forward-referenced-class-p)
-    (method method-p)
+    (method method-p) ; shouldn't this be spelled METHODP? (like CLASSP)
     (standard-method standard-method-p)
     (accessor-method accessor-method-p)
     (standard-accessor-method standard-accessor-method-p)

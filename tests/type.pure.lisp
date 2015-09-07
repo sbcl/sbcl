@@ -573,3 +573,36 @@
                    '(not (or (and simple-array (not vector))
                              (and array (not simple-array))))))
                  (specifier-type 'simple-string))))
+
+(test-util:with-test (:name :classoids-as-type-specifiers)
+  (dolist (classoid (list (find-classoid 'integer)
+                          (find-class 'integer)))
+    ;; Classoids and classes should work as type specifiers
+    ;; in the atom form, not as lists.
+    ;; Their legality or lack thereof is equivalent in all cases.
+    (flet ((expect-win (type)
+             (multiple-value-bind (f warn err)
+                 (compile nil `(lambda (x) (declare (,type x)) x))
+               (assert (and f (not warn) (not err))))
+             (multiple-value-bind (f warn err)
+                 (compile nil `(lambda (x) (declare (type ,type x)) x))
+               (assert (and f (not warn) (not err))))))
+      (expect-win classoid))
+    ;; Negative tests come in two flavors:
+    ;; In the case of (DECLARE (TYPE ...)), parsing the following thing
+    ;; as a type should fail. But when 'TYPE is implied, "canonization"
+    ;; should do nothing, because the following form is not a type,
+    ;; so we get an error about an unrecognized declaration instead.
+    (flet ((expect-lose (type)
+             (multiple-value-bind (f warn err)
+                 (let ((*error-output* (make-broadcast-stream)))
+                   (compile nil `(lambda (x) (declare (,type x)) x)))
+               (declare (ignore f warn))
+               (assert err))
+             (multiple-value-bind (f warn err)
+                 (let ((*error-output* (make-broadcast-stream)))
+                   (compile nil `(lambda (x) (declare (type ,type x)) x)))
+               (declare (ignore f warn))
+               (assert err))))
+      (expect-lose `(,classoid))
+      (expect-lose `(,classoid 1 100)))))

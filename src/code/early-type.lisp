@@ -896,14 +896,41 @@
 (defmacro !values-specifier-type-body (arg)
   `(let* ((u (uncross ,arg))
           (cachep t)
+          ;; FIXME: some of the logic below is more complicated than warranted.
+          ;; It stemmed from strange internal representations of various
+          ;; special-cased type specifiers which mandated the "if this, but not
+          ;; that, then do something" chain of reasoning.
+          ;; Notably, each of SHORT-FLOAT and LONG-FLOAT had the :BUILTIN
+          ;; property, *and* they had both an :EXPANDER and :TRANSLATOR.
+          ;; Additionally, a bunch of of non-atomic types such as (MOD n) for
+          ;; certain values of N were considered :PRIMITIVE to avoid
+          ;; re-consing the CTYPE if cache miss occurred. This is no longer
+          ;; how it works - the type constructor for (MOD n) is guaranteed
+          ;; to return the same object every time it is called with an
+          ;; EQUAL list for those same predetermined "important" values of N.
           (result (or (info :type :builtin u)
                       (let ((spec (typexpand u)))
                         (when (and (symbolp u) (deprecated-thing-p 'type u))
                           (setf cachep nil)
                           (signal 'parse-deprecated-type :specifier u))
                         (cond
+                          ;; The (NOT (EQ SPEC U)) test is not acting as a
+                          ;; semantic guard on the info call - it's avoiding
+                          ;; an extra call to INFO when the answer would be NIL,
+                          ;; as was already obtained above pre-expansion.
                           ((and (not (eq spec u))
                                 (info :type :builtin spec)))
+                          ;; This case is necessary because TYPEXPAND
+                          ;; will not expand (FOO params...) if FOO is :BUILTIN
+                          ;; and has an expander. This is a *very* confusing
+                          ;; place to have to know that, in my opinion.
+                          ;; What we want is the same kind of duality imparted
+                          ;; by %MACROEXPAND vs MACROEXPAND, except it's
+                          ;; reversed here - the internal version "keeps trying"
+                          ;; if it can, when the external one stops expanding.
+                          ;; It sucks that we have to say, well, since the
+                          ;; expansion function didn't do what it should have
+                          ;; for the internal usage, work around that.
                           ((and (consp spec) (symbolp (car spec))
                                 (info :type :builtin (car spec))
                                 (let ((expander (info :type :expander (car spec))))
@@ -914,6 +941,18 @@
                            (if (typep spec 'built-in-classoid)
                                (or (built-in-classoid-translation spec) spec)
                                spec))
+                          ;; FIXME: there's another case that wants to be here,
+                          ;; namely
+                          ;;  ((CLASSP spec) (FIND-CLASSOID (CLASS-NAME spec)).
+                          ;; We could get through bootstrap by defining a
+                          ;; preliminary version of CLASSP that returns NIL.
+                          ;; The we can get rid of the so-called :TRANSLATION
+                          ;; for classes. But why on earth is CLASSP (among
+                          ;; others) a GF instead of just being the obvious
+                          ;; call to %INSTANCE-TYPEP on the classoid CLASS?
+                          ;; It's ghastly to have a GF for that, because if
+                          ;; you break CLOS in the slightest way, you couldnt't
+                          ;; translate a type-specifier any more. Yeesh.
                           (t
                            (when (and (atom spec)
                                       (member spec '(and or not member eql satisfies values)))
@@ -922,10 +961,45 @@
                                   (info :type :translator (if (consp spec) (car spec) spec))))
                              (cond ((functionp fun-or-ctype)
                                     (funcall fun-or-ctype (ensure-list spec)))
-                                   (fun-or-ctype)
+                                   ;; This case handles #<CLASS> objects used as
+                                   ;; specifiers. This is bad for (at least) the
+                                   ;; reason that it's more garbage in globaldb causing
+                                   ;; retention of things that could otherwise go away if
+                                   ;; symbols and whatnot are uninterned. A #<CLASS> points
+                                   ;; to tons of crap and should not be an info key.
+                                   ;; At any rate, explicitly reject the class as specifier
+                                   ;; when used with parentheses around it.
+                                   ((and fun-or-ctype (atom spec)) fun-or-ctype)
+                                   ;; This case is trying to say
+                                   ;; "could the SPEC be a legal type specifier?"
+                                   ;; The requirement that it not be :BUILTIN
+                                   ;; and a list says that you can't use
+                                   ;; things like (FDEFN), (EXTENDED-SEQUENCE), (T)
+                                   ;; as specifiers, just to name a few.
+                                   ;; But as far as I can tell, the
+                                   ;;   (AND (SYMBOLP (NOT ...)) case in unreachable.
+                                   ;; Wouldn't a spec that is a symbol and builtin
+                                   ;; *always* have gotten handled somewhere above?
                                    ((or (and (consp spec) (symbolp (car spec))
                                              (not (info :type :builtin (car spec))))
                                         (and (symbolp spec) (not (info :type :builtin spec))))
+                                    ;; This guard seems spurious. Until PCL is loaded,
+                                    ;; there are no :FORTHCOMING-DEFCLASS-TYPEs.
+                                    ;; PCL is the only thing that sets that value,
+                                    ;; long after *TYPE-SYSTEM-INITIALIZED* is T.
+                                    ;;
+                                    ;; And, moreover, this is, as I understand things,
+                                    ;; entirely contrary to what it means to make the type
+                                    ;; "known" to the compiler. If we compile in one file:
+                                    ;;  (DEFCLASS FRUITBAT () ())
+                                    ;;  (DEFUN FRUITBATP (X) (TYPEP X 'FRUITBAT))
+                                    ;; we see that it emits a call to %TYPEP with the
+                                    ;; symbol FRUITBAT as its argument, whereas it should
+                                    ;; involve CLASSOID-CELL-TYPEP and LAYOUT-OF, which
+                                    ;; (correctly) signals an error if the class were not
+                                    ;; defined by the time of the call. Delayed re-parsing
+                                    ;; of FRUITBAT into any random specifier at call time
+                                    ;; is distinctly wrong.
                                     (when (and *type-system-initialized*
                                                (not (eq (info :type :kind spec)
                                                         :forthcoming-defclass-type)))

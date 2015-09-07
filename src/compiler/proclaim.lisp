@@ -232,26 +232,20 @@
 ;;; (TYPE FOO X Y) when FOO is a type specifier. This function
 ;;; implements that by converting (FOO X Y) to (TYPE FOO X Y).
 (defun canonized-decl-spec (decl-spec)
-  (let* ((id (first decl-spec))
-         (id-is-type (if (symbolp id)
-                         (info :type :kind id)
-                         ;; A cons might not be a valid type specifier,
-                         ;; but it can't be a declaration either.
-                         (or (consp id)
-                             (typep id 'class))))
-         (id-is-declared-decl (info :declaration :recognized id)))
-    ;; FIXME: Checking ID-IS-DECLARED is probably useless these days,
-    ;; since we refuse to use the same symbol as both a type name and
-    ;; recognized declaration name.
-    (cond ((and id-is-type id-is-declared-decl)
-           (compiler-error
-            "ambiguous declaration ~S:~%  ~
-             ~S was declared as a DECLARATION, but is also a type name."
-            decl-spec id))
-          (id-is-type
-           (list* 'type decl-spec))
-          (t
-           decl-spec))))
+  (let ((id (first decl-spec)))
+    (if (cond  ((symbolp id) (info :type :kind id))
+               ((listp id)
+                (let ((id (car id)))
+                  (and (symbolp id)
+                       (or (info :type :translator id)
+                           (info :type :kind id)))))
+               (t
+                ;; FIXME: should be (TYPEP id '(OR CLASS CLASSOID))
+                ;; but that references CLASS too soon.
+                ;; See related hack in DEF!TYPE TYPE-SPECIFIER.
+                (typep id 'instance)))
+        (cons 'type decl-spec)
+        decl-spec)))
 
 ;; These return values are intended for EQ-comparison in
 ;; STORE-LOCATION in %PROCLAIM.
