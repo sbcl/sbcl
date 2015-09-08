@@ -378,7 +378,15 @@
   ;; ways. In decreasing order of estimated user astonishment, I note:
   ;; full calls to SPECIFIER-TYPE at runtime; copying input vectors
   ;; to lists before doing MERGE-LISTS -- WHN 2003-01-05
-  (let ((type (specifier-type result-type)))
+  (let ((type (specifier-type result-type))
+        (pred-fun (%coerce-callable-to-fun predicate))
+        ;; Avoid coercing NIL to a function since 2 out of 3 branches of the
+        ;; COND below optimize for NIL as the key function. Additionally
+        ;; recognize the reverse - when you said #'IDENTITY which can be
+        ;; turned into NIL. Also, in the generic case, don't defer a
+        ;; type error to the method (even though it also coerces to fun).
+        (key-fun (when (and key (neq key #'identity))
+                   (%coerce-callable-to-fun key))))
     (cond
       ((csubtypep type (specifier-type 'list))
        ;; the VECTOR clause, below, goes through MAKE-SEQUENCE, so
@@ -387,10 +395,8 @@
        ;; case, so do relevant length checking here:
        (let ((s1 (coerce sequence1 'list))
              (s2 (coerce sequence2 'list))
-             (pred-fun (%coerce-callable-to-fun predicate))
-             (key-fun (if key
-                          (%coerce-callable-to-fun key)
-                          #'identity)))
+             ;; MERGE-LISTS* does not contain special code for KEY = NIL.
+             (key-fun (or key-fun #'identity)))
          (when (type= type (specifier-type 'list))
            (return-from merge (merge-lists s1 s2 pred-fun key-fun)))
          (when (eq type *empty-type*)
@@ -420,20 +426,26 @@
               (length-1 (length vector-1))
               (length-2 (length vector-2))
               (result (make-sequence result-type (+ length-1 length-2))))
-         (declare (vector vector-1 vector-2)
-                  (fixnum length-1 length-2))
+         (declare (vector vector-1 vector-2) ; FIXME: this looks redundant,
+                  (fixnum length-1 length-2)) ; as does this.
          (if (and (simple-vector-p result)
                   (simple-vector-p vector-1)
                   (simple-vector-p vector-2))
              (merge-vectors vector-1 length-1 vector-2 length-2
-                            result predicate key svref)
+                            result pred-fun key-fun svref)
+             ;; Some things that could improve the fancy vector case:
+             ;; - recognize when the only fancy aspect of both inputs
+             ;;   is that they have fill pointers.
+             ;; - use the specialized reffer for inputs + output
              (merge-vectors vector-1 length-1 vector-2 length-2
-                            result predicate key aref))))
+                            result pred-fun key-fun aref))))
       ((and (csubtypep type (specifier-type 'sequence))
             (awhen (find-class result-type nil)
-              (let ((predicate-function (%coerce-callable-to-fun predicate)))
-                (sb!sequence:merge
-                 (sb!mop:class-prototype
-                  (sb!pcl:ensure-class-finalized it))
-                 sequence1 sequence2 predicate-function :key key)))))
+              (sb!sequence:merge
+               (sb!mop:class-prototype (sb!pcl:ensure-class-finalized it))
+               ;; GF dispatch deals with the erroneous situation wherein
+               ;; either of SEQUENCE1 or SEQUENCE2 is not a sequence.
+               ;; Note that the one builtin method optimizes for NIL as
+               ;; the key fun, and we correctly preserve a NIL here.
+               sequence1 sequence2 pred-fun :key key-fun))))
       (t (bad-sequence-type-error result-type)))))

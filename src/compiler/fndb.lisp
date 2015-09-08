@@ -719,7 +719,7 @@
 (defknown merge (type-specifier sequence sequence callable
                                 &key (:key callable))
   sequence
-  (call important-result)
+  (call important-result explicit-check)
   :derive-type (creation-result-type-specifier-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2 3))
 

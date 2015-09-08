@@ -114,6 +114,11 @@
 ;; Extended-function-designators are not accepted,
 ;; This function is defknowned with 'explicit-check', and we avoid calling
 ;; SYMBOL-FUNCTION because that would do another check.
+;; It would be great if this could change its error message
+;; depending on the input to either:
+;;   "foo is not a function designator" if not a CALLABLE
+;;   "foo does not designate a currently defined function"
+;;    if a symbol does not satisfy FBOUNDP.
 (defun %coerce-callable-to-fun (callable)
   (etypecase callable
     (function callable)
