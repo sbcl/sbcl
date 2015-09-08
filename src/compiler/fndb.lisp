@@ -18,12 +18,14 @@
 (defknown coerce (t type-specifier) t
     ;; Note:
     ;; This is not FLUSHABLE because it's defined to signal errors.
-    (movable)
+    (movable explicit-check)
   ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 2 ? Nope... (COERCE 1 'COMPLEX)
   ;; returns REAL/INTEGER, not COMPLEX.
   )
-(defknown list-to-vector* (list type-specifier) vector)
-(defknown vector-to-vector* (vector type-specifier) vector)
+;; These each check their input sequence for type-correctness,
+;; but not the output type specifier, because MAKE-SEQUENCE will do that.
+(defknown list-to-vector* (list type-specifier) vector (explicit-check))
+(defknown vector-to-vector* (vector type-specifier) vector (explicit-check))
 
 (defknown type-of (t) t (foldable flushable))
 
