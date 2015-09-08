@@ -32,7 +32,7 @@
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
 (defknown (sb!xc:upgraded-complex-part-type sb!xc:upgraded-array-element-type)
     (type-specifier &optional lexenv-designator) type-specifier
-    (unsafely-flushable))
+    (unsafely-flushable explicit-check))
 
 ;;;; from the "Predicates" chapter:
 
@@ -60,7 +60,7 @@
    ;;
    ;; (UPGRADED-ARRAY-ELEMENT-TYPE and UPGRADED-COMPLEX-PART-TYPE have
    ;; behavior like SUBTYPEP in this respect, not like TYPEP.)
-   (foldable))
+   (foldable explicit-check))
 (defknown subtypep (type-specifier type-specifier &optional lexenv-designator)
   (values boolean boolean)
   ;; This is not FOLDABLE because its value is affected by type
@@ -68,7 +68,7 @@
   ;;
   ;; FIXME: Is it OK to fold this when the types have already been
   ;; defined? Does the code inherited from CMU CL already do this?
-  (unsafely-flushable))
+  (unsafely-flushable explicit-check))
 
 (defknown (null symbolp atom consp listp numberp integerp rationalp floatp
                 complexp characterp stringp bit-vector-p vectorp
@@ -503,7 +503,7 @@
                                         &key
                                         (:initial-element t))
   consed-sequence
-  (movable)
+  (movable explicit-check)
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown concatenate (type-specifier &rest sequence) consed-sequence
@@ -1417,7 +1417,7 @@
 (defknown warn (t &rest t) null)
 (defknown invoke-debugger (condition) nil)
 (defknown break (&optional format-control &rest t) null)
-(defknown make-condition (type-specifier &rest t) condition)
+(defknown make-condition (type-specifier &rest t) condition (explicit-check))
 (defknown compute-restarts (&optional (or condition null)) list)
 (defknown find-restart (restart-designator &optional (or condition null))
   (or restart null))

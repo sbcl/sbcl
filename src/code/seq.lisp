@@ -347,7 +347,7 @@
   #!+sb-doc
   "Return a sequence of the given TYPE and LENGTH, with elements initialized
   to INITIAL-ELEMENT."
-  (declare (fixnum length))
+  (declare (index length))
   (let* ((expanded-type (typexpand type))
          (adjusted-type
           (typecase expanded-type
@@ -410,11 +410,15 @@
                 (awhen (find-class adjusted-type nil)
                   (let ((prototype (sb!mop:class-prototype
                                     (sb!pcl:ensure-class-finalized it))))
+                   ;; This function is DEFKNOWNed with EXPLICIT-CHECK,
+                   ;; so we must manually assert that user-written methods
+                   ;; return a subtype of SEQUENCE.
+                   (the sequence
                     (if iep
                         (sb!sequence:make-sequence-like
                          prototype length :initial-element initial-element)
                         (sb!sequence:make-sequence-like
-                         prototype length))))))
+                         prototype length)))))))
           (t (bad-sequence-type-error (type-specifier type))))))
 
 ;;;; SUBSEQ

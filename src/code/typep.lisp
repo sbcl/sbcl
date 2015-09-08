@@ -16,7 +16,7 @@
 (defun typep (object type &optional environment)
   #!+sb-doc
   "Is OBJECT of type TYPE?"
-  (declare (ignore environment))
+  (declare (type lexenv-designator environment) (ignore environment))
   ;; Actually interpreting types at runtime is done by %TYPEP. The
   ;; cost of the extra function call here should be negligible
   ;; compared to the cost of interpreting types. (And the compiler
