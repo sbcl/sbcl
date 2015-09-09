@@ -175,7 +175,7 @@ compiled with this declaration in effect.")
 ;;; However ARG-COUNT-ERROR is not supposed to be visible.
 ;;; Techniques that evolved to address its invisibility were brittle:
 ;;; undocumented DEBUG versus SPEED policy-based decisions in TAIL-ANNOTATE,
-;;; or inefficient (performing FIND-CALLER-NAME-AND-FRAME before calling ERROR).
+;;; or inefficient (performing FIND-CALLER-FRAME before calling ERROR).
 ;;; Frobbing *STACK-TOP-HINT* seems no better than a declaration saying
 ;;; "do what I mean," as the latter at least produces a consistent backtrace
 ;;; between Lisp and ldb or gdb.

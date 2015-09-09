@@ -537,14 +537,14 @@
                                      applicable-methods))
 
 (defun invalid-method-error (method format-control &rest format-arguments)
-  (let ((sb-debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
+  (let ((sb-debug:*stack-top-hint* (find-caller-frame)))
     (error "~@<invalid method error for ~2I~_~S ~I~_method: ~2I~_~?~:>"
            method
            format-control
            format-arguments)))
 
 (defun method-combination-error (format-control &rest format-arguments)
-  (let ((sb-debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
+  (let ((sb-debug:*stack-top-hint* (find-caller-frame)))
     (error "~@<method combination error in CLOS dispatch: ~2I~_~?~:>"
            format-control
            format-arguments)))

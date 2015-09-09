@@ -233,7 +233,7 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
                        do (setf frame (or (sb!di:frame-down frame) frame)))
                  frame))
              (interrupted-frame ()
-               (or (nth-value 1 (find-interrupted-name-and-frame))
+               (or (find-interrupted-frame)
                    (current-frame))))
      (cond ((eq :current-frame frame-designator)
             (current-frame))
@@ -842,11 +842,11 @@ the current thread are replaced with dummy objects which can safely escape."
     (cond
       ;; No hint, just keep the debugger guts out.
       ((not hint)
-       (find-caller-name-and-frame))
+       (find-caller-frame))
       ;; Interrupted. Look for the interrupted frame -- if we don't find one
       ;; this falls back to the next case.
       ((and (eq hint 'invoke-interruption)
-            (nth-value 1 (find-interrupted-name-and-frame))))
+            (find-interrupted-frame)))
       ;; Name of the first uninteresting frame.
       ((symbolp hint)
        (find-caller-of-named-frame hint))
@@ -857,14 +857,11 @@ the current thread are replaced with dummy objects which can safely escape."
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
-
   (let ((*stack-top-hint* (resolve-stack-top-hint)))
-
     ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
     ;; called when the debugger is disabled
     (run-hook '*invoke-debugger-hook* condition)
     (run-hook '*debugger-hook* condition)
-
     ;; We definitely want *PACKAGE* to be of valid type.
     ;;
     ;; Elsewhere in the system, we use the SANE-PACKAGE function for
@@ -876,13 +873,11 @@ the current thread are replaced with dummy objects which can safely escape."
               "The value of ~S was not an undeleted PACKAGE. It has been ~
                reset to ~S."
               '*package* *package*))
-
     ;; Before we start our own output, finish any pending output.
     ;; Otherwise, if the user tried to track the progress of his program
     ;; using PRINT statements, he'd tend to lose the last line of output
     ;; or so, which'd be confusing.
     (flush-standard-output-streams)
-
     (funcall-with-debug-io-syntax #'%invoke-debugger condition)))
 
 (defun %print-debugger-invocation-reason (condition stream)

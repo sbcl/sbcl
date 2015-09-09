@@ -100,7 +100,7 @@
   (let* ((record (deref (sap-alien exception-record-sap (* (struct exception-record)))))
          (code (slot record 'exception-code))
          (condition-name (cdr (assoc code *exception-code-map*)))
-         (sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+         (sb!debug:*stack-top-hint* (sb!kernel:find-interrupted-frame)))
     (cond (condition-name
            (error condition-name))
           ((= code +dbg-printexception-c+)
@@ -192,7 +192,7 @@
       (let ((*unblock-deferrables-on-enabling-interrupts-p* t))
         (with-interrupt-bindings
           (let ((sb!debug:*stack-top-hint*
-                 (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+                  (sb!kernel:find-interrupted-frame)))
             (allow-with-interrupts
               (nlx-protect
                (funcall function)
