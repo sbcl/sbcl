@@ -839,20 +839,21 @@ the current thread are replaced with dummy objects which can safely escape."
 (defun resolve-stack-top-hint ()
   (let ((hint *stack-top-hint*)
         (*stack-top-hint* nil))
-    (cond
-      ;; No hint, just keep the debugger guts out.
-      ((not hint)
-       (find-caller-name-and-frame))
-      ;; Interrupted. Look for the interrupted frame -- if we don't find one
-      ;; this falls back to the next case.
-      ((and (eq hint 'invoke-interruption)
-            (nth-value 1 (find-interrupted-name-and-frame))))
-      ;; Name of the first uninteresting frame.
-      ((symbolp hint)
-       (find-caller-of-named-frame hint))
-      ;; We already have a resolved hint.
-      (t
-       hint))))
+    (the (or null sb!di:frame)
+         (cond
+           ;; No hint, just keep the debugger guts out.
+           ((not hint)
+            (nth-value 1 (find-caller-name-and-frame)))
+           ;; Interrupted. Look for the interrupted frame -- if we don't find one
+           ;; this falls back to the next case.
+           ((and (eq hint 'invoke-interruption)
+                 (nth-value 1 (find-interrupted-name-and-frame))))
+           ;; Name of the first uninteresting frame.
+           ((symbolp hint)
+            (find-caller-of-named-frame hint))
+           ;; We already have a resolved hint.
+           (t
+            hint)))))
 
 (defun invoke-debugger (condition)
   #!+sb-doc
@@ -1119,7 +1120,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
                       (push name names-used))))
              (incf count))))))
 
-(defvar *debug-loop-fun* #'debug-loop-fun
+(defvar *debug-loop-fun* 'debug-loop-fun
   #!+sb-doc
   "A function taking no parameters that starts the low-level debug loop.")
 
