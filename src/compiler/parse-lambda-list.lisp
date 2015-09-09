@@ -111,6 +111,13 @@
                       (and (typep name 'simple-base-string)
                            (plusp (length name))
                            (char= (char name 0) #\&)))))
+             (check-suspicious (kind form)
+               (and (probably-ll-keyword-p form)
+                    (member form sb!xc:lambda-list-keywords)
+                    (report-suspicious kind form)))
+             (report-suspicious (kind what)
+               (style-warn "suspicious ~A ~S in lambda list: ~S."
+                           kind what list))
              (need-arg (state)
                (croak "expecting variable after ~A in: ~S" state list))
              (need-symbol (x why)
@@ -143,7 +150,9 @@
                  ;; Expecting a callee to understand how to signal conditions
                  ;; tailored to a particular caller is not how things are
                  ;; supposed to work.
-                 (funcall (if (destructuring-p) 'error 'compiler-error)
+                 (funcall (if (or (destructuring-p) (eq context 'defmethod))
+                              'error
+                              'compiler-error)
                           condition-class
                           :format-control string :format-arguments l))))
       (prog ((input list)
@@ -202,6 +211,7 @@
                           (:values-type "a VALUES type specifier")
                           (:macro "a macro lambda list")
                           (destructuring-bind "a destructuring lambda list")
+                          (defmethod "a specialized lambda list")
                           (t context))))
                    (croak "~A is not allowed in ~A: ~S" arg where list)))
 
@@ -234,9 +244,7 @@
                              arg list)))
                (go LOOP)))
            ;; Fell through, so warn if desired, and fall through some more.
-           (unless silent
-             (style-warn
-              "suspicious variable ~S in lambda list: ~S." arg list)))
+           (unless silent (report-suspicious "variable" arg)))
 
          ;; Handle a lambda variable
          (when (logbitp state (bits &allow-other-keys ; Not a collecting state.
@@ -275,7 +283,12 @@
                        #'need-symbol #'need-bindable)
                    (car whole) "&WHOLE argument"))
         (dolist (arg required)
-          (need-bindable arg "Required argument"))
+          (if (eq context 'defmethod)
+              (unless (or (and (symbolp arg) (not (null arg)))
+                          (and (listp arg) (singleton-p (cdr arg))))
+                (croak "arg is not a non-NIL symbol or a list of two elements: ~A"
+                       arg))
+              (need-bindable arg "Required argument")))
         ;; FIXME: why not check symbol-ness of supplied-p variables now?
         (flet ((scan-opt/key (list what-kind description)
                  (dolist (arg list)
@@ -286,7 +299,8 @@
                      (destructuring-bind (var &optional default sup-p) arg
                        (if (and (consp var) (eq what-kind '&key))
                            (destructuring-bind (keyword-name var) var
-                             (declare (ignore keyword-name))
+                             (unless (symbolp keyword-name)
+                               (croak "keyword-name in ~S is not a symbol" arg))
                              (need-bindable var description))
                            (need-bindable var description))
                        ;; Inform the user about a possibly malformed
@@ -297,15 +311,8 @@
                        ;; and an illegal name for a DEFVAR or such,
                        ;; being in the CL package.
                        (unless silent
-                         (when (and (probably-ll-keyword-p default)
-                                    (member default sb!xc:lambda-list-keywords))
-                           (style-warn "suspicious default ~S in lambda list: ~S."
-                                       default list))
-                         (when (and (probably-ll-keyword-p sup-p)
-                                    (member sup-p sb!xc:lambda-list-keywords))
-                           (style-warn
-                            "suspicious supplied-p variable ~S in lambda list: ~S."
-                            sup-p list))))))))
+                         (check-suspicious "default" default)
+                         (check-suspicious "supplied-p variable" sup-p)))))))
           (scan-opt/key optional '&optional "&OPTIONAL parameter name")
           (when rest
             (need-bindable (car rest) "&REST argument"))
