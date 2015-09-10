@@ -117,7 +117,8 @@
                     (report-suspicious kind form)))
              (report-suspicious (kind what)
                (style-warn "suspicious ~A ~S in lambda list: ~S."
-                           kind what list))
+                           kind what list)
+               nil) ; Avoid "return convention is not fixed" optimizer note
              (need-arg (state)
                (croak "expecting variable after ~A in: ~S" state list))
              (need-symbol (x why)

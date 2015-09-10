@@ -295,7 +295,9 @@ between the ~A definition and the ~A definition"
                           layout)
                 find-and-init-or-check-layout))
 (defun find-and-init-or-check-layout (name length inherits depthoid metadata)
-  (with-world-lock ()
+  (truly-the ; avoid an "assertion too complex to check" optimizer note
+   (values layout &optional)
+   (with-world-lock ()
     (let ((layout (find-layout name)))
       (%init-or-check-layout layout
                              (or (find-classoid name nil)
@@ -303,7 +305,7 @@ between the ~A definition and the ~A definition"
                              length
                              inherits
                              depthoid
-                             metadata))))
+                             metadata)))))
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
@@ -646,8 +648,10 @@ between the ~A definition and the ~A definition"
 
 ;;;; CLASS type operations
 
-;; referenced right away by !DEFINE-TYPE-CLASS.
-(eval-when (:compile-toplevel :load-toplevel :execute)
+;; CLASSOID-ENUMERABLE-P is referenced during compile by !DEFINE-TYPE-CLASS.
+;; But don't redefine it when building the target since we've already
+;; got a perfectly good definition loaded for the host.
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;; Actually this definition makes very little sense because
   ;;     (TYPE-ENUMERABLE (FIND-CLASSOID 'CHARACTER)) => T
   ;; but (TYPE-ENUMERABLE (SPECIFIER-TYPE 'CHARACTER)) => NIL.
