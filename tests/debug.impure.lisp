@@ -852,7 +852,8 @@
    (block nil
      (handler-bind ((error (lambda (e)
                              (declare (ignore e))
-                             (return (< (length (car (sb-debug:backtrace-as-list 1))) 10)))))
+                             (return (< (length (car (sb-debug:list-backtrace :count 1)))
+                                        10)))))
        (funcall (compile nil `(lambda (i) (declare ((mod 65536) i)) i)) nil)))))
 
 ;;; bug-1261646

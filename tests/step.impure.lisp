@@ -218,7 +218,7 @@
                            (typecase condition
                              (step-form-condition
                               (let ((*debug-io* (make-broadcast-stream)))
-                                (backtrace)))))))
+                                (print-backtrace)))))))
     (step (fib 3))))
 
 (defun test-step-next/2 ()

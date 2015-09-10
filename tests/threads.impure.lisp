@@ -648,8 +648,8 @@
             (lambda ()
               (handler-bind ((error #'(lambda (cond)
                                         (princ cond)
-                                        (sb-debug:backtrace
-                                         most-positive-fixnum))))
+                                        (sb-debug:print-backtrace
+                                         :count most-positive-fixnum))))
                 (loop (check-interrupt-count
                        (counter-n *interrupt-counter*))))))))
     (let ((func (lambda ()
@@ -936,7 +936,7 @@
 (defun oops (e)
   (setf *errors* e)
   (format t "~&oops: ~A in ~S~%" e *current-thread*)
-  (sb-debug:backtrace)
+  (sb-debug:print-backtrace)
   (catch 'done))
 
 (with-test (:name (:unsynchronized-hash-table)
@@ -1252,7 +1252,7 @@
                                  (lambda ()
                                    (dotimes (i 1000)
                                      (with-output-to-string (*debug-io*)
-                                       (sb-debug::backtrace 10))))))))
+                                       (sb-debug:print-backtrace :count 10))))))))
     (wait-for-threads threads)))
 
 (format t "backtrace test done~%")

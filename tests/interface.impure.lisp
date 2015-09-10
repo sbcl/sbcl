@@ -375,7 +375,7 @@
                  (when (plusp n)
                    (foo (1- n) x))
                  (when (zerop n)
-                   (sb-debug:backtrace 100 s))))
+                   (sb-debug:print-backtrace :count 100 :stream s))))
         (foo 100 (make-instance 'cannot-print-this))))))
 (with-test (:name :backtrace-and-circles)
   (handler-bind ((error #'continue))
@@ -384,7 +384,7 @@
                  (when (plusp n)
                    (foo (1- n) x))
                  (when (zerop n)
-                   (sb-debug:backtrace 100 s))))
+                   (sb-debug:print-backtrace :count 100 :stream s))))
         (foo 100 (let ((list (list t)))
                    (nconc list list)))))))
 

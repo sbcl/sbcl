@@ -66,7 +66,7 @@
                                  (block nil
                                      (handler-bind ((serious-condition (lambda (c)
                                                                          (princ c)
-                                                                         (sb-debug:backtrace)
+                                                                         (sb-debug:print-backtrace)
                                                                          (return c))))
                                        (let ((*random-state* rs))
                                          (signal-semaphore r)
