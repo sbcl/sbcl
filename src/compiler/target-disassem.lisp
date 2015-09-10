@@ -918,6 +918,7 @@
 #!-sb-fluid (declaim (inline sap-maker))
 (defun sap-maker (function input offset)
   (declare (optimize (speed 3))
+           (muffle-conditions compiler-note)
            (type (function (t) sb!sys:system-area-pointer) function)
            (type offset offset))
   (let ((old-sap (sb!sys:sap+ (funcall function input) offset)))
@@ -945,6 +946,7 @@
 
 (defun memory-sap-maker (address)
   (declare (optimize (speed 3))
+           (muffle-conditions compiler-note)
            (type address address))
   (let ((sap (sb!sys:int-sap address)))
     (lambda () sap)))
@@ -1748,6 +1750,7 @@
            (type (unsigned-byte 16) offset)
            (type (member 1 2 4 8) length)
            (type (member :little-endian :big-endian) byte-order)
+           (muffle-conditions compiler-note) ; integer coercion, oh well
            (optimize (speed 3) (safety 0)))
   (ecase length
     (1 (sb!sys:sap-ref-8 sap offset))

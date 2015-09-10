@@ -282,6 +282,7 @@
 
 (defun add-bignums (a b)
   (declare (type bignum-type a b))
+  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let ((len-a (%bignum-length a))
         (len-b (%bignum-length b)))
     (multiple-value-bind (a len-a b len-b)
@@ -441,6 +442,7 @@
 
 (defun multiply-fixnums (a b)
   (declare (fixnum a b))
+  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let* ((a-minusp (minusp a))
          (b-minusp (minusp b)))
     (multiple-value-bind (high low)
@@ -589,6 +591,7 @@
 ;;; paper, but uses some clever bit-twiddling nicked from Nickle to do it.
 (declaim (inline bmod))
 (defun bmod (u v)
+  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let ((ud (%bignum-ref u 0))
         (vd (%bignum-ref v 0))
         (umask 0)
@@ -939,6 +942,7 @@
 
 ;;; This assumes bignum is positive; that is, the result of negating it will
 ;;; stay in the provided allocated bignum.
+(declaim (maybe-inline negate-bignum-buffer-in-place))
 (defun negate-bignum-buffer-in-place (bignum bignum-len)
   (bignum-negate-loop bignum bignum-len bignum)
   bignum)
@@ -1307,6 +1311,7 @@
 (defun bignum-logcount (bignum)
   (declare (type bignum-type bignum)
            (optimize speed))
+  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let ((length (%bignum-length bignum))
         (result 0))
     (declare (type bignum-length length)
@@ -1551,6 +1556,7 @@
 ;;; reduction in readability that was introduced. --JES, 2004-08-07
 (defun bignum-truncate (x y)
   (declare (type bignum-type x y))
+  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let (truncate-x truncate-y)
     (labels
         ;;; Divide X by Y when Y is a single bignum digit. BIGNUM-TRUNCATE
@@ -1900,6 +1906,7 @@
 (defun %normalize-bignum (result len)
   (declare (type bignum-type result)
            (type bignum-length len)
+           (muffle-conditions compiler-note)
            (inline %normalize-bignum-buffer))
   (let ((newlen (%normalize-bignum-buffer result len)))
     (declare (type bignum-length newlen))

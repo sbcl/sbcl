@@ -274,7 +274,7 @@
                        (parse-unknown-type ()
                          (return (result sb!vm:simple-vector-widetag))))))
                (typecase ctype
-                 (union-type
+                 (union-type ; FIXME: forward ref
                   (let ((types (union-type-types ctype)))
                     (cond ((not (every #'numeric-type-p types))
                            (result sb!vm:simple-vector-widetag))
@@ -291,7 +291,7 @@
                            (result sb!vm:simple-array-long-float-widetag))
                           (t
                            (result sb!vm:simple-vector-widetag)))))
-                 (character-set-type
+                 (character-set-type ; FIXME: forward ref
                   #!-sb-unicode (result sb!vm:simple-base-string-widetag)
                   #!+sb-unicode
                   (if (loop for (start . end)
@@ -667,8 +667,11 @@ of specialized arrays is supported."
 (macrolet ((define-reffer (saetp check-form)
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))
-               `(named-lambda optimized-data-vector-ref (vector index)
+               `(named-lambda (optimized-data-vector-ref ,type) (vector index)
                   (declare (optimize speed (safety 0))
+                           ;; Obviously these all coerce raw words to lispobjs
+                           ;; so don't keep spewing notes about it.
+                           (muffle-conditions compiler-note)
                            (ignorable index))
                   ,(if type
                        `(data-vector-ref (the ,atype vector)
@@ -680,8 +683,11 @@ of specialized arrays is supported."
            (define-setter (saetp check-form)
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))
-               `(named-lambda optimized-data-vector-set (vector index new-value)
+               `(named-lambda (optimized-data-vector-set ,type) (vector index new-value)
                   (declare (optimize speed (safety 0)))
+                  ;; Impossibly setting an elt of an (ARRAY NIL)
+                  ;; returns no value. And nobody cares.
+                  (declare (muffle-conditions compiler-note))
                   (data-vector-set (the ,atype vector)
                                    (locally
                                        (declare (optimize (safety 1)))
