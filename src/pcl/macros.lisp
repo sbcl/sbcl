@@ -95,12 +95,6 @@
                         errorp))
 
 
-;;; This DEFVAR was originally in defs.lisp, now moved here.
-;;;
-;;; Possible values are NIL, EARLY, BRAID, or COMPLETE.
-(declaim (type (member nil early braid complete) **boot-state**))
-(defglobal **boot-state** nil)
-
 (/show "pcl/macros.lisp 187")
 
 (define-compiler-macro find-class (&whole form

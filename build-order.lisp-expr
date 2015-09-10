@@ -364,9 +364,14 @@
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/target/vm")
 
+ ;; META-FIXME: I think I figured out why this was, and fixed that,
+ ;; and never removed the following comment, nor can I remember why.
  ;; FIXME: Classic CMU CL had (OPTIMIZE (SAFETY 2) (DEBUG 2) declared
  ;; around the compilation of "code/class". Why?
  ("src/code/class")
+ ("src/pcl/pre-warm")
+ ("src/pcl/early-low" :not-host)
+ ("src/pcl/low" :not-host)
 
  ("src/code/early-condition")
  ("src/code/condition" :not-host)

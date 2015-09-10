@@ -8,50 +8,6 @@
 
 (in-package "SB-PCL")
 
-;;;; class predicates
-
-(defgeneric class-eq-specializer-p (object))
-
-(defgeneric classp (object))
-
-(defgeneric condition-class-p (object))
-
-(defgeneric eql-specializer-p (object))
-
-(defgeneric exact-class-specializer-p (object))
-
-(defgeneric forward-referenced-class-p (object))
-
-(defgeneric funcallable-standard-class-p (object))
-
-(defgeneric generic-function-p (object))
-
-(defgeneric method-combination-p (object))
-
-(defgeneric method-p (object))
-
-(defgeneric short-method-combination-p (object))
-
-(defgeneric slot-class-p (object))
-
-(defgeneric specializerp (object))
-
-(defgeneric standard-accessor-method-p (object))
-
-(defgeneric standard-boundp-method-p (object))
-
-(defgeneric standard-class-p (object))
-
-(defgeneric standard-generic-function-p (object))
-
-(defgeneric standard-method-p (object))
-
-(defgeneric standard-reader-method-p (object))
-
-(defgeneric standard-writer-method-p (object))
-
-(defgeneric structure-class-p (object))
-
 ;;;; readers
 
 (defgeneric accessor-method-slot-definition (standard-accessor-method))

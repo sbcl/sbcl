@@ -507,16 +507,6 @@
     (dolist (writer writers) (do-writer-definition writer))
     (dolist (boundp boundps) (do-boundp-definition boundp))))
 
-;;; FIXME: find a better name.
-(defun !bootstrap-class-predicates (early-p)
-  (let ((*early-p* early-p)
-        (source-loc (sb-c:source-location)))
-    (dolist (ecp *!early-class-predicates*)
-      (let ((class-name (car ecp))
-            (predicate-name (cadr ecp)))
-        (!make-class-predicate (find-class class-name) predicate-name
-                               source-loc)))))
-
 (defun !bootstrap-built-in-classes ()
 
   ;; First make sure that all the supers listed in
@@ -682,9 +672,7 @@
 
 (!bootstrap-meta-braid)
 (!bootstrap-accessor-definitions t)
-(!bootstrap-class-predicates t)
 (!bootstrap-accessor-definitions nil)
-(!bootstrap-class-predicates nil)
 (!bootstrap-built-in-classes)
 
 (loop for (name . x)

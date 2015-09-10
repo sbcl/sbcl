@@ -2502,7 +2502,6 @@ generic function lambda list ~S~:>"
                          '(accessor-method-slot-name
                            generic-function-methods
                            method-specializers
-                           specializerp
                            specializer-type
                            specializer-class
                            slot-definition-location
@@ -2512,11 +2511,7 @@ generic function lambda list ~S~:>"
                            class-precedence-list
                            slot-boundp-using-class
                            (setf slot-value-using-class)
-                           slot-value-using-class
-                           structure-class-p
-                           standard-class-p
-                           funcallable-standard-class-p
-                           specializerp)))
+                           slot-value-using-class)))
       (/show spec)
       (setq *!early-generic-functions*
             (cons spec

@@ -105,10 +105,10 @@
                 ;; order dependencies from the old PCL defsys.lisp
                 ;; dependency database.
                 #+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
-                "SRC;PCL;EARLY-LOW"
+                #+nil "SRC;PCL;EARLY-LOW"
                 "SRC;PCL;MACROS"
                 "SRC;PCL;COMPILER-SUPPORT"
-                "SRC;PCL;LOW"
+                #+nil "SRC;PCL;LOW"
                 #+nil "SRC;PCL;SLOT-NAME" ; moved to build-order.lisp-expr
                 "SRC;PCL;DEFCLASS"
                 "SRC;PCL;DEFS"

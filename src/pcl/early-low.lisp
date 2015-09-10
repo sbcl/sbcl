@@ -24,13 +24,19 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
+
+(declaim (type (member nil early braid complete) **boot-state**))
+(defglobal **boot-state** nil)
 
 (/show "starting early-low.lisp")
 
 ;;; The PCL package is internal and is used by code in potential
 ;;; bottlenecks. And since it's internal, no one should be
 ;;; doing things like deleting and recreating it in a running target Lisp.
+;;; By the time we get to compiling the rest of PCL,
+;;; the package will have been renamed,
+;;; so subsequently compiled code should refer to "SB-PCL", not "SB!PCL".
 (define-symbol-macro *pcl-package* (load-time-value (find-package "SB-PCL") t))
 
 (declaim (inline defstruct-classoid-p))
@@ -59,10 +65,14 @@
    (intern (apply #'format nil format-string format-arguments) package)))
 
 (defun make-class-symbol (class-name)
-  (format-symbol *pcl-package* "*THE-CLASS-~A*" (symbol-name class-name)))
+  ;; Reference a package that is now SB!PCL but later SB-PCL
+  (format-symbol (load-time-value (find-package "SB!PCL") t)
+                 "*THE-CLASS-~A*" (symbol-name class-name)))
 
 (defun make-wrapper-symbol (class-name)
-  (format-symbol *pcl-package* "*THE-WRAPPER-~A*" (symbol-name class-name)))
+  ;; Reference a package that is now SB!PCL but later SB-PCL
+  (format-symbol (load-time-value (find-package "SB!PCL") t)
+                 "*THE-WRAPPER-~A*" (symbol-name class-name)))
 
 (defun condition-type-p (type)
   (and (symbolp type)
