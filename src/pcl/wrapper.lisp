@@ -225,9 +225,7 @@
                         (t
                          (bug "unrecognized instance type")))))
                (:obsolete
-                (%obsolete-instance-trap owrapper (cadr state) instance))))
-            (t
-             (bug "Invalid LAYOUT-INVALID: ~S" state))))))
+                (%obsolete-instance-trap owrapper (cadr state) instance))))))))
 
 (declaim (inline check-obsolete-instance))
 (defun check-obsolete-instance (instance)
