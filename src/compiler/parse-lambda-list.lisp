@@ -1053,8 +1053,8 @@
 ;;; The CLtl2 name for this operation is PARSE-MACRO.
 (defun make-macro-lambda
     (lambda-name lambda-list body kind name
-     &key ((:environment envp) t) (doc-string-allowed :internal)
-           (wrap-block name))
+     &key (accessor 'cdr) (doc-string-allowed :internal)
+          ((:environment envp) t) (wrap-block name))
   (declare (type (member t nil :ignore) envp))
   (declare (type (member nil :external :internal) doc-string-allowed))
   (binding* (((forms decls docstring)
@@ -1084,9 +1084,7 @@
                       (when whole `((,(car whole) ,ll-whole)))))
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
-             (parse (parse-ds-lambda-list new-ll))
-             (arg-accessor
-              (if (eq kind 'define-compiler-macro) 'compiler-macro-args 'cdr)))
+             (parse (parse-ds-lambda-list new-ll)))
     ;; Signal a style warning for duplicate names, but disregard &AUX variables
     ;; because most folks agree that (LET* ((X (F)) (X (G X))) ..) makes sense
     ;; - some would even say that it is idiomatic - and &AUX bindings are just
@@ -1112,7 +1110,7 @@
                                            `(:special-form . ,name)
                                            `(:macro ,name . ,kind)))
                       '(destructuring-bind))
-                   ,new-ll (,arg-accessor ,ll-whole)
+                   ,new-ll (,accessor ,ll-whole)
                  ,@decls
                  ,@(if wrap-block
                        `((block ,(fun-name-block-name name) ,@forms))

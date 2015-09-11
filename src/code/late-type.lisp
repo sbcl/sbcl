@@ -390,7 +390,7 @@
                              :allowp (ll-kwds-allowp llks)
                              :returns result))))))
 
-(!def-type-translator values (&rest values)
+(!def-type-translator values :list (&rest values)
   (if (eq values '*)
       *wild-type*
       (multiple-value-bind (llks required optional rest)
@@ -1522,22 +1522,17 @@
       (values t t)
       (values nil nil)))
 
-(!def-type-translator satisfies (&whole whole fun)
-  (declare (ignore fun))
-  ;; Check legality of arguments.
-  (destructuring-bind (satisfies predicate-name) whole
-    (declare (ignore satisfies))
-    (unless (symbolp predicate-name)
-      (error 'simple-type-error
-             :datum predicate-name
-             :expected-type 'symbol
-             :format-control "The SATISFIES predicate name is not a symbol: ~S"
-             :format-arguments (list predicate-name)))
-    ;; Create object.
-    (case predicate-name
-      (keywordp *satisfies-keywordp-type*)
-      (legal-fun-name-p *fun-name-type*)
-      (t (%make-hairy-type whole)))))
+(!def-type-translator satisfies :list (&whole whole predicate-name)
+  (unless (symbolp predicate-name)
+    (error 'simple-type-error
+           :datum predicate-name
+           :expected-type 'symbol
+           :format-control "The SATISFIES predicate name is not a symbol: ~S"
+           :format-arguments (list predicate-name)))
+  (case predicate-name
+   (keywordp *satisfies-keywordp-type*)
+   (legal-fun-name-p *fun-name-type*)
+   (t (%make-hairy-type whole))))
 
 ;;;; negation types
 
@@ -1712,7 +1707,7 @@
 (!define-type-method (negation :simple-=) (type1 type2)
   (type= (negation-type-type type1) (negation-type-type type2)))
 
-(!def-type-translator not (typespec)
+(!def-type-translator not :list (typespec)
   (type-negation (specifier-type typespec)))
 
 ;;;; numeric types
@@ -2975,7 +2970,7 @@ used for a COMPLEX component.~:@>"
             (values nil t)))
       (values nil t)))
 
-(!def-type-translator member (&rest members)
+(!def-type-translator member :list (&rest members)
   (if members
       (let (ms numbers char-codes)
         (dolist (m (remove-duplicates members))
@@ -3139,7 +3134,7 @@ used for a COMPLEX component.~:@>"
                (setf accumulator
                      (type-intersection accumulator union))))))))
 
-(!def-type-translator and (&rest type-specifiers)
+(!def-type-translator and :list (&rest type-specifiers)
   (apply #'type-intersection
          (mapcar #'specifier-type type-specifiers)))
 
@@ -3311,7 +3306,7 @@ used for a COMPLEX component.~:@>"
                    (type-union accumulator
                                (type-intersection type1 t2))))))))
 
-(!def-type-translator or (&rest type-specifiers)
+(!def-type-translator or :list (&rest type-specifiers)
   (let ((type (apply #'type-union
                      (mapcar #'specifier-type type-specifiers))))
     (if (union-type-p type)

@@ -954,13 +954,12 @@
                           ;; you break CLOS in the slightest way, you couldnt't
                           ;; translate a type-specifier any more. Yeesh.
                           (t
-                           (when (and (atom spec)
-                                      (member spec '(and or not member eql satisfies values)))
-                             (error "The symbol ~S is not valid as a type specifier." spec))
                            (let ((fun-or-ctype
                                   (info :type :translator (if (consp spec) (car spec) spec))))
                              (cond ((functionp fun-or-ctype)
-                                    (funcall fun-or-ctype (ensure-list spec)))
+                                    (or (funcall fun-or-ctype spec)
+                                        (error "The symbol ~S is not valid as a type specifier."
+                                               spec)))
                                    ;; This case handles #<CLASS> objects used as
                                    ;; specifiers. This is bad for (at least) the
                                    ;; reason that it's more garbage in globaldb causing

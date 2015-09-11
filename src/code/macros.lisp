@@ -179,7 +179,8 @@ invoked. In that case it will store into PLACE and start over."
   ;; DEBUG-NAME is called primarily for its side-effect of asserting
   ;; that (COMPILER-MACRO-FUNCTION x) is not a legal function name.
   (let ((def (make-macro-lambda (sb!c::debug-name 'compiler-macro name)
-                                lambda-list body 'define-compiler-macro name)))
+                                lambda-list body 'define-compiler-macro name
+                                :accessor 'sb!c::compiler-macro-args)))
     `(progn
           (eval-when (:compile-toplevel)
            (sb!c::%compiler-defmacro :compiler-macro-function ',name t))

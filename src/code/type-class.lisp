@@ -370,12 +370,25 @@
 ;;; Semantics are slightly different though: DEFTYPE causes the default
 ;;; for missing &OPTIONAL arguments to be '* but a translator requires
 ;;; an explicit default of '*, or else it assumes a default of NIL.
-(defmacro !def-type-translator (name arglist &body body)
+(defmacro !def-type-translator (name &rest stuff)
   (declare (type symbol name))
-  `(!cold-init-forms
-    (setf (info :type :translator ',name)
-          ,(make-macro-lambda (format nil "~A-TYPE-PARSE" name)
-                              arglist body nil nil :environment nil))))
+  (let* ((allow-atom (if (eq (car stuff) :list) (progn (pop stuff) nil) t))
+         ;; If atoms are allowed, then the internal destructuring-bind receives
+         ;; NIL when the spec is an atom; it should not take CDR of its input.
+         ;; (Note that a &WHOLE argument gets NIL, not the atom in that case)
+         ;; If atoms are disallowed, it's basically like a regular macro.
+         (lexpr (make-macro-lambda nil (pop stuff) stuff nil nil
+                                   :accessor (if allow-atom 'identity 'cdr)
+                                   :environment nil))
+         (ll-decl (third lexpr)))
+    (aver (and (eq (car ll-decl) 'declare) (caadr ll-decl) 'sb!c::lambda-list))
+    `(!cold-init-forms
+      (setf (info :type :translator ',name)
+            (named-lambda ,(format nil "~A-TYPE-PARSE" name) (spec)
+              ,ll-decl
+              ,(if allow-atom
+                   `(,lexpr (and (listp spec) (cdr spec)))
+                   `(if (listp spec) (,lexpr spec))))))))
 
 ;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the
 ;;; same class, invoke the simple method. Otherwise, invoke any
