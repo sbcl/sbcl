@@ -657,20 +657,6 @@
         (when (and name (symbolp name) (eq name (classoid-name classoid)))
           (setf (find-classoid name) classoid))))))
 
-;; FIXME: This can mostly go away, except for EQL specializers.
-(defun %set-class-type-translation (class classoid)
-  (when (not (typep classoid 'classoid))
-    (setq classoid (find-classoid classoid nil)))
-  (etypecase classoid
-    (null)
-    (classoid
-     ;; There used to be an AVER preventing the placeholder :INITIALIZING from
-     ;; sneaking into globaldb. It can't any more due to type-safe (SETF INFO).
-     (setf (info :type :translator class)
-           (or (and (typep classoid 'built-in-classoid)
-                    (built-in-classoid-translation classoid))
-               classoid)))))
-
 (!bootstrap-meta-braid)
 (!bootstrap-accessor-definitions t)
 (!bootstrap-accessor-definitions nil)
@@ -700,7 +686,7 @@
             (t
              (setf (find-classoid name) lclass)))
 
-      (%set-class-type-translation class name))))
+      )))
 
 (setq **boot-state** 'braid)
 

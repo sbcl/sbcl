@@ -119,7 +119,7 @@
 (defun class-classoid (class)
   (layout-classoid (class-wrapper class)))
 
-(declaim (ftype function %set-class-type-translation update-ctors))
+(declaim (ftype function update-ctors))
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))
   (cond ((legal-class-name-p name)
@@ -132,8 +132,7 @@
                     (setf (classoid-cell-pcl-class cell) new-value)
                     (when (eq **boot-state** 'complete)
                       (let ((classoid (class-classoid new-value)))
-                        (setf (find-classoid name) classoid)
-                        (%set-class-type-translation new-value classoid))))
+                        (setf (find-classoid name) classoid))))
                    (cell
                     (%clear-classoid name cell)))
              (when (or (eq **boot-state** 'complete)

@@ -340,6 +340,7 @@
   (declare (ignore slot-names))
   (setf (slot-value specl '%type)
         `(eql ,(specializer-object specl)))
+  ;; Maybe the specializer object should point to the CTYPE directly?
   (setf (info :type :translator specl)
         (make-eql-type (specializer-object specl))))
 
@@ -416,9 +417,6 @@
                    (let ((class (funcall thunk class name metaclass initargs)))
                      (without-package-locks
                        (setf (find-class name) class)))))))
-    ;; After boot (SETF FIND-CLASS) does this.
-    (unless (eq **boot-state** 'complete)
-      (%set-class-type-translation class name))
     class))
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
@@ -556,8 +554,7 @@
                       (order-layout-inherits
                        (map 'simple-vector #'class-wrapper
                             (reverse (rest cpl))))))
-              (register-layout layout :invalidate t)
-              (%set-class-type-translation class (layout-classoid layout)))))
+              (register-layout layout :invalidate t))))
         (mapc #'make-preliminary-layout (class-direct-subclasses class))))))
 
 
