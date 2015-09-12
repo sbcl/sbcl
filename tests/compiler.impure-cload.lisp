@@ -11,6 +11,7 @@
 (defstruct foo
   (uhw2 nil :type (or package null)))
 (macrolet ((defprojection (variant &key lexpr eexpr)
+             (declare (ignore variant eexpr))
              (let ()
                `(defmethod uu ((foo foo))
                   (let ((uhw2 (foo.uhw2 bar)))
@@ -48,8 +49,9 @@
 (declaim (ftype (function ((or w bad) (or w bad)) (values)) %ufm))
 (defun %ufm (base bound) (froj base bound *1*) (values))
 (declaim (ftype (function ((vector t)) (or w bad)) %pu))
-(defun %pu (pds) *2*)
+(defun %pu (pds) (declare (ignore pds)) *2*)
 (defun uu (yam)
+  (declare (ignore yam))
   (let ((v (yam-v az)))
     (%ufm v
           (flet ((project (x) (frob x 0)))
@@ -69,6 +71,7 @@
 (defstruct foo bar bletch)
 (defun %zeep ()
   (labels ((kidify1 (kid)
+             (declare (ignore kid))
              )
            (kid-frob (kid)
              (if *thing*
@@ -102,9 +105,11 @@
   (declare (optimize (safety 3) (speed 2) (space 1)))
   (labels ((c.frob ())
            (ad.frob (ad)
+             (declare (ignorable ad))
              (if *foo*
                  (mapc #'ad.frob *bar*)
                  (dolist (b *bar*)
+                   (declare (ignore b))
                    (c.frob)))))
     (declare (inline c.frob ad.frob))
     (ad.frob ad0)))
@@ -389,6 +394,7 @@
 ;;; during inline expansion. Bug report by Peter Denno, simplified
 ;;; test case by David Wragg.
 (defun bug262-return-from (x &aux (y nil))
+  (declare (ignore y))
   (labels ((foo-a (z) (return-from bug262-return-from z))
            (foo-b (z) (foo-a z)))
     (declare (inline foo-a))
