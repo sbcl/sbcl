@@ -918,10 +918,14 @@ many elements are copied."
          (concat-to-simple* output-type-spec sequences))
         ((and (csubtypep type (specifier-type 'sequence))
               (awhen (find-class output-type-spec nil)
+               ;; This function is DEFKNOWNed with EXPLICIT-CHECK,
+               ;; so we must manually assert that user-written methods
+               ;; return a subtype of SEQUENCE.
+               (the sequence
                 (apply #'sb!sequence:concatenate
                        (sb!mop:class-prototype
                         (sb!pcl:ensure-class-finalized it))
-                       sequences))))
+                       sequences)))))
         (t
          (bad-sequence-type-error output-type-spec))))))
 

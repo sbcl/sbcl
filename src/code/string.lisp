@@ -416,9 +416,17 @@
   #!+sb-doc
   "Given a character count and an optional fill character, makes and returns a
 new string COUNT long filled with the fill character."
-  (declare (fixnum count))
+  (declare (index count))
+  ;; FIXME: while this is a correct implementation relying on an IR1 transform,
+  ;; it would be better if in the following example (assuming NOTINLINE):
+  ;;  (MAKE-STRING 1000 :ELEMENT-TYPE 'BIT :INITIAL-element #\a)
+  ;; we could report that "BIT is not a subtype of CHARACTER"
+  ;; instead of "#\a is not of type BIT". Additionally, in this case:
+  ;;  (MAKE-STRING 200000000 :ELEMENT-TYPE 'WORD :INITIAL-ELEMENT #\a)
+  ;; the error reported is heap exhaustion rather than type mismatch.
   (if fill-char
-      (make-string count :element-type element-type :initial-element fill-char)
+      (make-string count :element-type element-type
+                         :initial-element (the character fill-char))
       (make-string count :element-type element-type)))
 
 (flet ((%upcase (string start end)

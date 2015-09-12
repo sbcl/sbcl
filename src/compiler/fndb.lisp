@@ -507,7 +507,7 @@
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown concatenate (type-specifier &rest sequence) consed-sequence
-  ()
+  (explicit-check)
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown %concatenate-to-string (&rest sequence) simple-string
@@ -1031,7 +1031,7 @@
 
 (defknown make-string (index &key (:element-type type-specifier)
                        (:initial-element character))
-  simple-string (flushable))
+  simple-string (flushable explicit-check))
 
 (defknown (string-trim string-left-trim string-right-trim)
   (sequence string-designator) string (flushable))
@@ -1156,7 +1156,7 @@
   (type-specifier (or null callable)
    &optional real sb!pretty:pprint-dispatch-table)
   null
-  ())
+  (explicit-check))
 
 ;;; may return any type due to eof-value...
 ;;; and because READ generally returns anything.
