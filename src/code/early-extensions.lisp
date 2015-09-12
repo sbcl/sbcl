@@ -1344,6 +1344,11 @@
     ((and type-specifier (not instance))
      (%check-deprecated-type type-specifier))
     (class
+     ;; FIXME: this case does not acknowledge that improperly named classes
+     ;; can exist. Suppose a few classes each have CLASS-NAME = FRED
+     ;; but (FIND-CLASS 'FRED) does not return any of them; and simultaneously
+     ;; FRED is a completely unrelated type specifier defined via DEFTYPE.
+     ;; This should see that class-name does not properly name the class.
      (let ((name (class-name type-specifier)))
        (when (and name (symbolp name))
          (%check-deprecated-type name))))))
