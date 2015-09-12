@@ -657,6 +657,7 @@
         (when (and name (symbolp name) (eq name (classoid-name classoid)))
           (setf (find-classoid name) classoid))))))
 
+;; FIXME: This can mostly go away, except for EQL specializers.
 (defun %set-class-type-translation (class classoid)
   (when (not (typep classoid 'classoid))
     (setq classoid (find-classoid classoid nil)))

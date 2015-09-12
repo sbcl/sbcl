@@ -65,7 +65,10 @@ provide bindings for printer control variables.")
 ;;; If this is bound before the debugger is invoked, it is used as the stack
 ;;; top by the debugger. It can either be the first interesting frame, or the
 ;;; name of the last uninteresting frame.
-(defvar *stack-top-hint* nil)
+;;; This is a !DEFVAR so that cold-init can use SIGNAL.
+;;; It actually works as long as the condition is not a subtype of WARNING
+;;; or ERROR. (Any other direct descendant of CONDITION should be fine)
+(!defvar *stack-top-hint* nil)
 
 (defvar *real-stack-top* nil)
 (defvar *stack-top* nil)

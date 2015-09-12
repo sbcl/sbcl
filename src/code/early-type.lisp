@@ -882,140 +882,87 @@
 
 ;;;; type utilities
 
-;;; Return the type structure corresponding to a type specifier. We
-;;; pick off structure types as a special case.
+;;; Return the type structure corresponding to a type specifier.
 ;;;
 ;;; Note: VALUES-SPECIFIER-TYPE-CACHE-CLEAR must be called whenever a
 ;;; type is defined (or redefined).
-;;; This cache is sized extremely generously, which has payoff
-;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
-;;; since EQ types are an immediate win.
+;;;
+;;; As I understand things, :FORTHCOMING-DEFCLASS-TYPE behaves contrarily
+;;; to the CLHS intent, which is to make the type known to the compiler.
+;;; If we compile in one file:
+;;;  (DEFCLASS FRUITBAT () ())
+;;;  (DEFUN FRUITBATP (X) (TYPEP X 'FRUITBAT))
+;;; we see that it emits a call to %TYPEP with the symbol FRUITBAT as its
+;;; argument, whereas it should involve CLASSOID-CELL-TYPEP and LAYOUT-OF,
+;;; which (correctly) signals an error if the class were not defined by the
+;;; time of the call. Delayed re-parsing of FRUITBAT into any random specifier
+;;; at call time is wrong.
+;;;
+;;; FIXME: symbols which are :PRIMITIVE are inconsistently accepted as singleton
+;;; lists. e.g. (BIT) and (ATOM) are considered legal, but (FIXNUM) and
+;;; (CHARACTER) are not. It has to do with whether the primitive is actually
+;;; a DEFTYPE. The CLHS glossary implies that the singleton is *always* legal.
+;;;  "For every atomic type specifier, x, there is an _equivalent_ [my emphasis]
+;;;   compound type specifier with no arguments supplied, (x)."
+;;; By that same reasonining, is (x) accepted if x names a class?
 ;;;
 ;;; KLUDGE: why isn't this a MACROLET?  "lexical environment too
 ;;; hairy"
 (defmacro !values-specifier-type-body (arg)
-  `(let* ((u (uncross ,arg))
-          (cachep t)
-          ;; FIXME: some of the logic below is more complicated than warranted.
-          ;; It stemmed from strange internal representations of various
-          ;; special-cased type specifiers which mandated the "if this, but not
-          ;; that, then do something" chain of reasoning.
-          ;; Notably, each of SHORT-FLOAT and LONG-FLOAT had the :BUILTIN
-          ;; property, *and* they had both an :EXPANDER and :TRANSLATOR.
-          ;; Additionally, a bunch of of non-atomic types such as (MOD n) for
-          ;; certain values of N were considered :PRIMITIVE to avoid
-          ;; re-consing the CTYPE if cache miss occurred. This is no longer
-          ;; how it works - the type constructor for (MOD n) is guaranteed
-          ;; to return the same object every time it is called with an
-          ;; EQUAL list for those same predetermined "important" values of N.
-          (result (or (info :type :builtin u)
-                      (let ((spec (typexpand u)))
-                        (when (and (symbolp u) (deprecated-thing-p 'type u))
-                          (setf cachep nil)
-                          (signal 'parse-deprecated-type :specifier u))
-                        (cond
-                          ;; The (NOT (EQ SPEC U)) test is not acting as a
-                          ;; semantic guard on the info call - it's avoiding
-                          ;; an extra call to INFO when the answer would be NIL,
-                          ;; as was already obtained above pre-expansion.
-                          ((and (not (eq spec u))
-                                (info :type :builtin spec)))
-                          ;; This case is necessary because TYPEXPAND
-                          ;; will not expand (FOO params...) if FOO is :BUILTIN
-                          ;; and has an expander. This is a *very* confusing
-                          ;; place to have to know that, in my opinion.
-                          ;; What we want is the same kind of duality imparted
-                          ;; by %MACROEXPAND vs MACROEXPAND, except it's
-                          ;; reversed here - the internal version "keeps trying"
-                          ;; if it can, when the external one stops expanding.
-                          ;; It sucks that we have to say, well, since the
-                          ;; expansion function didn't do what it should have
-                          ;; for the internal usage, work around that.
-                          ((and (consp spec) (symbolp (car spec))
-                                (info :type :builtin (car spec))
-                                (let ((expander (info :type :expander (car spec))))
-                                  (and expander (values-specifier-type (funcall expander spec))))))
-                          ((eq (info :type :kind spec) :instance)
-                           (find-classoid spec))
-                          ((typep spec 'classoid)
-                           (if (typep spec 'built-in-classoid)
-                               (or (built-in-classoid-translation spec) spec)
-                               spec))
-                          ;; FIXME: there's another case that wants to be here,
-                          ;; namely
-                          ;;  ((CLASSP spec) (FIND-CLASSOID (CLASS-NAME spec)).
-                          ;; We could get through bootstrap by defining a
-                          ;; preliminary version of CLASSP that returns NIL.
-                          ;; The we can get rid of the so-called :TRANSLATION
-                          ;; for classes. But why on earth is CLASSP (among
-                          ;; others) a GF instead of just being the obvious
-                          ;; call to %INSTANCE-TYPEP on the classoid CLASS?
-                          ;; It's ghastly to have a GF for that, because if
-                          ;; you break CLOS in the slightest way, you couldnt't
-                          ;; translate a type-specifier any more. Yeesh.
-                          (t
-                           (let ((fun-or-ctype
-                                  (info :type :translator (if (consp spec) (car spec) spec))))
-                             (cond ((functionp fun-or-ctype)
-                                    (or (funcall fun-or-ctype spec)
-                                        (error "The symbol ~S is not valid as a type specifier."
-                                               spec)))
-                                   ;; This case handles #<CLASS> objects used as
-                                   ;; specifiers. This is bad for (at least) the
-                                   ;; reason that it's more garbage in globaldb causing
-                                   ;; retention of things that could otherwise go away if
-                                   ;; symbols and whatnot are uninterned. A #<CLASS> points
-                                   ;; to tons of crap and should not be an info key.
-                                   ;; At any rate, explicitly reject the class as specifier
-                                   ;; when used with parentheses around it.
-                                   ((and fun-or-ctype (atom spec)) fun-or-ctype)
-                                   ;; This case is trying to say
-                                   ;; "could the SPEC be a legal type specifier?"
-                                   ;; The requirement that it not be :BUILTIN
-                                   ;; and a list says that you can't use
-                                   ;; things like (FDEFN), (EXTENDED-SEQUENCE), (T)
-                                   ;; as specifiers, just to name a few.
-                                   ;; But as far as I can tell, the
-                                   ;;   (AND (SYMBOLP (NOT ...)) case in unreachable.
-                                   ;; Wouldn't a spec that is a symbol and builtin
-                                   ;; *always* have gotten handled somewhere above?
-                                   ((or (and (consp spec) (symbolp (car spec))
-                                             (not (info :type :builtin (car spec))))
-                                        (and (symbolp spec) (not (info :type :builtin spec))))
-                                    ;; This guard seems spurious. Until PCL is loaded,
-                                    ;; there are no :FORTHCOMING-DEFCLASS-TYPEs.
-                                    ;; PCL is the only thing that sets that value,
-                                    ;; long after *TYPE-SYSTEM-INITIALIZED* is T.
-                                    ;;
-                                    ;; And, moreover, this is, as I understand things,
-                                    ;; entirely contrary to what it means to make the type
-                                    ;; "known" to the compiler. If we compile in one file:
-                                    ;;  (DEFCLASS FRUITBAT () ())
-                                    ;;  (DEFUN FRUITBATP (X) (TYPEP X 'FRUITBAT))
-                                    ;; we see that it emits a call to %TYPEP with the
-                                    ;; symbol FRUITBAT as its argument, whereas it should
-                                    ;; involve CLASSOID-CELL-TYPEP and LAYOUT-OF, which
-                                    ;; (correctly) signals an error if the class were not
-                                    ;; defined by the time of the call. Delayed re-parsing
-                                    ;; of FRUITBAT into any random specifier at call time
-                                    ;; is distinctly wrong.
-                                    (when (and *type-system-initialized*
-                                               (not (eq (info :type :kind spec)
-                                                        :forthcoming-defclass-type)))
-                                      (signal 'parse-unknown-type :specifier spec))
-                                    (setf cachep nil)
-                                    (make-unknown-type :specifier spec))
-                                   (t
-                                    (error "bad thing to be a type specifier: ~S"
-                                           spec))))))))))
-     (if cachep
-         result
-         ;; (The RETURN-FROM here inhibits caching; this does not only
-         ;; make sense from a compiler diagnostics point of view but
-         ;; is also indispensable for proper workingness of
-         ;; VALID-TYPE-SPECIFIER-P.)
-         (return-from values-specifier-type
-           result))))
+  `(let ((cachep t))
+     (labels
+         ((translate (x)
+            (or (and (built-in-classoid-p x)
+                     (built-in-classoid-translation x))
+                x))
+          ;; Q: Shouldn't this signal a TYPE-ERROR ?
+          (fail (spec) (error "bad thing to be a type specifier: ~S" spec))
+          (recurse (spec)
+            (when (typep spec 'instance)
+              (return-from recurse
+               (cond ((classoid-p spec) (translate spec))
+                     ((sb!pcl::classp spec)
+                      (translate (sb!pcl::class-classoid spec)))
+                     ;; We don't try to know how to map a generalized
+                     ;; PCL specializer to its ctype other than by lookup.
+                     (t (or (info :type :translator spec) (fail spec))))))
+            (prog* ((head (if (listp spec) (car spec) spec))
+                    (builtin (if (symbolp head)
+                                 (info :type :builtin head)
+                                 (return (fail spec)))))
+              (when (deprecated-thing-p 'type head)
+                (setf cachep nil)
+                (signal 'parse-deprecated-type :specifier spec))
+              (when (atom spec)
+                ;; If spec is non-atomic, the :BUILTIN value is inapplicable.
+                ;; There used to be compound builtins, but not any more.
+                (when builtin (return builtin))
+                (case (info :type :kind spec)
+                  (:instance (return (find-classoid spec)))
+                  (:forthcoming-defclass-type (go unknown))))
+              (awhen (info :type :translator head)
+                (return (or (funcall it spec) (fail spec))))
+              (awhen (info :type :expander head)
+                (return (recurse (funcall it (ensure-list spec)))))
+              ;; If the spec is (X ...) and X has neither a translator
+              ;; nor expander, and is a builtin, such as FIXNUM, fail now.
+              ;; But - see FIXME at top - it would be consistent with
+              ;; DEFTYPE to reject spec only if not a singleton.
+              (when builtin (return (fail spec)))
+              ;; SPEC has a legal form, so return an unknown type.
+              (signal 'parse-unknown-type :specifier spec)
+             UNKNOWN
+              (setf cachep nil)
+              (return (make-unknown-type :specifier spec)))))
+       (let ((result (recurse (uncross ,arg))))
+         (if cachep
+             result
+             ;; (The RETURN-FROM here inhibits caching; this makes sense
+             ;; not only from a compiler diagnostics point of view,
+             ;; but also for proper workingness of VALID-TYPE-SPECIFIER-P.
+             ;; FIXME: cache bypass for (OR DEPRECATED GOOD)
+             ;; or (OR UNKNOWN KNOWN) doesn't actually work.
+             (return-from values-specifier-type result))))))
 #+sb-xc-host
 (let ((table (make-hash-table :test 'equal)))
   (defun values-specifier-type (specifier)
@@ -1026,6 +973,9 @@
                 (!values-specifier-type-body specifier)))))
   (defun values-specifier-type-cache-clear ()
     (clrhash table)))
+;;; This cache is sized extremely generously, which has payoff
+;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
+;;; since EQ types are an immediate win.
 #-sb-xc-host
 (defun-cached (values-specifier-type
                :hash-function #'sxhash :hash-bits 10)

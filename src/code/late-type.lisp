@@ -1022,10 +1022,23 @@
 
 ;;; Take a list of type specifiers, computing the translation of each
 ;;; specifier and defining it as a builtin type.
+;;; Seee the comments in 'type-init' for why this is a slightly
+;;; screwy way to go about it.
 (declaim (ftype (function (list) (values)) !precompute-types))
 (defun !precompute-types (specs)
   (dolist (spec specs)
-    (let ((res (specifier-type spec)))
+    (let ((res (handler-bind
+                   ((parse-unknown-type
+                     (lambda (c)
+                       (declare (ignore c))
+                       ;; We can handle conditions at this point,
+                       ;; but win32 can not perform i/o here because
+                       ;; !MAKE-COLD-STDERR-STREAM has no implementation.
+                       #!-win32
+                       (progn (write-string "//caught: parse-unknown ")
+                              (write spec)
+                              (terpri)))))
+             (specifier-type spec))))
       (unless (unknown-type-p res)
         (setf (info :type :builtin spec) res)
         (setf (info :type :kind spec) :primitive))))
