@@ -1023,7 +1023,7 @@
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
   (declare (type type-specifier type-specifier))
-  (declare (ignore env))
+  (declare (type lexenv-designator) (ignore env))
   (let* ((spec type-specifier)
          (atom (if (listp spec) (car spec) spec))
          (expander (and (symbolp atom) (info :type :expander atom))))
@@ -1043,12 +1043,13 @@ expansion happened."
   "Takes and expands a type specifier repeatedly like MACROEXPAND.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
-  (declare (type type-specifier type-specifier))
-  (multiple-value-bind (expansion flag)
+  ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to
+  ;; defer to TYPEXPAND-1 for the typecheck. Similarly for ENV.
+  (multiple-value-bind (expansion expanded)
       (typexpand-1 type-specifier env)
-    (if flag
+    (if expanded
         (values (typexpand expansion env) t)
-        (values expansion flag))))
+        (values expansion expanded))))
 
 ;;; Note that the type NAME has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.

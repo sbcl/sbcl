@@ -225,8 +225,9 @@
 (defun typexpand-all (type-specifier &optional env)
   #!+sb-doc
   "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
-  (declare (type type-specifier type-specifier))
-  (declare (ignore env))
+  ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to
+  ;; defer to VALUES-SPECIFIER-TYPE for the check.
+  (declare (type lexenv-designator) (ignore env))
   ;; I first thought this would not be a good implementation because
   ;; it signals an error on e.g. (CONS 1 2) until I realized that
   ;; walking and calling TYPEXPAND would also result in errors, and

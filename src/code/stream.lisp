@@ -1313,6 +1313,8 @@
   ;; end of the stream.
   (index-cache 0 :type index)
   ;; Requested element type
+  ;; FIXME: there seems to be no way to skip the type-check in the ctor,
+  ;; which is redundant with the check in MAKE-STRING-OUTPUT-STREAM.
   (element-type 'character :type type-specifier
                            :read-only t))
 

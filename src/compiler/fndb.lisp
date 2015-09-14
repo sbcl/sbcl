@@ -27,11 +27,18 @@
 (defknown list-to-vector* (list type-specifier) vector (explicit-check))
 (defknown vector-to-vector* (vector type-specifier) vector (explicit-check))
 
-(defknown type-of (t) t (foldable flushable))
+;; FIXME: Is this really FOLDABLE? A counterexample seems to be:
+;;  (LET ((S :S)) (VALUES (TYPE-OF S) (UNINTERN S 'KEYWORD) (TYPE-OF S) S))
+;; Anyway, the TYPE-SPECIFIER type is more inclusive than the actual
+;; possible return values. Most of the time it will be (OR LIST SYMBOL).
+;; CLASS can be returned only when you've got an object whose class-name
+;; does not properly name its class.
+(defknown type-of (t) (or list symbol class)
+  (foldable flushable explicit-check))
 
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
 (defknown (sb!xc:upgraded-complex-part-type sb!xc:upgraded-array-element-type)
-    (type-specifier &optional lexenv-designator) type-specifier
+    (type-specifier &optional lexenv-designator) (or list symbol)
     (unsafely-flushable explicit-check))
 
 ;;;; from the "Predicates" chapter:
@@ -946,8 +953,7 @@
 (defknown aref (array &rest index) t (foldable))
 (defknown row-major-aref (array index) t (foldable))
 
-(defknown array-element-type (array)
-  type-specifier
+(defknown array-element-type (array) (or list symbol)
   (foldable flushable recursive))
 (defknown array-rank (array) array-rank (foldable flushable))
 ;; FIXME: there's a fencepost bug, but for all practical purposes our
@@ -1081,7 +1087,7 @@
   (flushable explicit-check))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
-(defknown stream-element-type (stream) type-specifier
+(defknown stream-element-type (stream) type-specifier ; can it return a CLASS?
   (movable foldable flushable))
 (defknown stream-external-format (stream) t (flushable))
 (defknown (output-stream-p input-stream-p) (stream) boolean
