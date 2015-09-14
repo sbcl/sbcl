@@ -358,7 +358,7 @@
      (set-pprint-dispatch '(or weasel (and woodle (satisfies thing)))
                           (lambda (stream obj)
                             (format stream "hi ~A!" (type-of obj))))
-     warning 3)
+     warning 2)
     (write-to-string (macroexpand '(setf (values a b) (floor x y)))
                      :pretty t)
     ;; yay, we're not dead
