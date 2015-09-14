@@ -999,12 +999,7 @@ line break."
                      :priority priority :fun function))))
     (when (and function disabled-p)
       ;; a DISABLED-P test function has to close over the ENTRY
-      (setf (pprint-dispatch-entry-test-fn entry) (defer-type-checker entry))
-      (unless (unknown-type-p ctype) ; already warned in this case
-        ;; But (OR KNOWN UNKNOWN) did not signal - actually it is indeterminate
-        ;; - depending on whather it was cached. I think we should not cache
-        ;; any specifier that contains any unknown anywhere within it.
-        (warn "~S contains an unrecognized type specifier" type)))
+      (setf (pprint-dispatch-entry-test-fn entry) (defer-type-checker entry)))
     (if consp
         (let ((hashtable (pprint-dispatch-table-cons-entries table)))
           (dolist (key (member-type-members (cons-type-car-type ctype)))

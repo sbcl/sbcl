@@ -335,8 +335,8 @@
 (!define-type-method (constant :simple-=) (type1 type2)
   (type= (constant-type-type type1) (constant-type-type type2)))
 
-(!def-type-translator constant-arg (type)
-  (make-constant-type :type (single-value-specifier-type type)))
+(!def-type-translator constant-arg ((:context context) type)
+  (make-constant-type :type (single-value-specifier-type-r context type)))
 
 ;;; Return the lambda-list-like type specification corresponding
 ;;; to an ARGS-TYPE.
@@ -367,14 +367,15 @@
 
     (result)))
 
-(!def-type-translator function (&optional (args '*) (result '*))
-  (let ((result (coerce-to-values (values-specifier-type result))))
+(!def-type-translator function ((:context context)
+                                &optional (args '*) (result '*))
+  (let ((result (coerce-to-values (values-specifier-type-r context result))))
     (if (eq args '*)
         (if (eq result *wild-type*)
             (specifier-type 'function)
             (make-fun-type :wild-args t :returns result))
         (multiple-value-bind (llks required optional rest keywords)
-            (parse-args-types args :function-type)
+            (parse-args-types context args :function-type)
           (if (and (null required)
                    (null optional)
                    (eq rest *universal-type*)
@@ -390,11 +391,11 @@
                              :allowp (ll-kwds-allowp llks)
                              :returns result))))))
 
-(!def-type-translator values :list (&rest values)
+(!def-type-translator values :list ((:context context) &rest values)
   (if (eq values '*)
       *wild-type*
       (multiple-value-bind (llks required optional rest)
-          (parse-args-types values :values-type)
+          (parse-args-types context values :values-type)
         (if (plusp llks)
             (make-values-type :required required :optional optional :rest rest)
             (make-short-values-type required)))))
@@ -1720,8 +1721,8 @@
 (!define-type-method (negation :simple-=) (type1 type2)
   (type= (negation-type-type type1) (negation-type-type type2)))
 
-(!def-type-translator not :list (typespec)
-  (type-negation (specifier-type typespec)))
+(!def-type-translator not :list ((:context context) typespec)
+  (type-negation (specifier-type-r context typespec)))
 
 ;;;; numeric types
 
@@ -2062,7 +2063,7 @@
   (setf (info :type :builtin 'number)
         (make-numeric-type :complexp nil)))
 
-(!def-type-translator complex (&optional (typespec '*))
+(!def-type-translator complex ((:context context) &optional (typespec '*))
   (if (eq typespec '*)
       (specifier-type '(complex real))
       (labels ((not-numeric ()
@@ -2125,7 +2126,7 @@
                           (bug "~@<(known bug #145): The type ~S is too hairy to be ~
 used for a COMPLEX component.~:@>"
                                typespec)))))))
-        (let ((ctype (specifier-type typespec)))
+        (let ((ctype (specifier-type-r context typespec)))
           (do-complex ctype)))))
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
@@ -3147,9 +3148,10 @@ used for a COMPLEX component.~:@>"
                (setf accumulator
                      (type-intersection accumulator union))))))))
 
-(!def-type-translator and :list (&rest type-specifiers)
+(!def-type-translator and :list ((:context context) &rest type-specifiers)
   (apply #'type-intersection
-         (mapcar #'specifier-type type-specifiers)))
+         (mapcar (lambda (x) (specifier-type-r context x))
+                 type-specifiers)))
 
 ;;;; union types
 
@@ -3319,9 +3321,10 @@ used for a COMPLEX component.~:@>"
                    (type-union accumulator
                                (type-intersection type1 t2))))))))
 
-(!def-type-translator or :list (&rest type-specifiers)
+(!def-type-translator or :list ((:context context) &rest type-specifiers)
   (let ((type (apply #'type-union
-                     (mapcar #'specifier-type type-specifiers))))
+                     (mapcar (lambda (x) (specifier-type-r context x))
+                             type-specifiers))))
     (if (union-type-p type)
         (sb!kernel::simplify-array-unions type)
         type)))
@@ -3330,9 +3333,10 @@ used for a COMPLEX component.~:@>"
 
 (!define-type-class cons :enumerable nil :might-contain-other-types nil)
 
-(!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
-  (let ((car-type (single-value-specifier-type car-type-spec))
-        (cdr-type (single-value-specifier-type cdr-type-spec)))
+(!def-type-translator cons ((:context context)
+                            &optional (car-type-spec '*) (cdr-type-spec '*))
+  (let ((car-type (single-value-specifier-type-r context car-type-spec))
+        (cdr-type (single-value-specifier-type-r context cdr-type-spec)))
     (make-cons-type car-type cdr-type)))
 
 (!define-type-method (cons :negate) (type)
@@ -3688,22 +3692,24 @@ used for a COMPLEX component.~:@>"
                    y-mem)))))
           (apply #'type-union (res))))))
 
-(!def-type-translator array (&optional (element-type '*)
+(!def-type-translator array ((:context context)
+                             &optional (element-type '*)
                                        (dimensions '*))
   (let ((eltype (if (eq element-type '*)
                     *wild-type*
-                    (specifier-type element-type))))
+                    (specifier-type-r context element-type))))
     (make-array-type (canonical-array-dimensions dimensions)
                      :complexp :maybe
                      :element-type eltype
                      :specialized-element-type (%upgraded-array-element-type
                                                 eltype))))
 
-(!def-type-translator simple-array (&optional (element-type '*)
+(!def-type-translator simple-array ((:context context)
+                                    &optional (element-type '*)
                                               (dimensions '*))
   (let ((eltype (if (eq element-type '*)
                     *wild-type*
-                    (specifier-type element-type))))
+                    (specifier-type-r context element-type))))
    (make-array-type (canonical-array-dimensions dimensions)
                     :complexp nil
                     :element-type eltype
@@ -3716,6 +3722,8 @@ used for a COMPLEX component.~:@>"
   (!define-type-class simd-pack :enumerable nil
                       :might-contain-other-types nil)
 
+  ;; Though this involves a recursive call to parser, parsing context need not
+  ;; be passed down, because an unknown-type condition is an immediate failure.
   (!def-type-translator simd-pack (&optional (element-type-spec '*))
      (if (eql element-type-spec '*)
          (%make-simd-pack-type *simd-pack-element-types*)

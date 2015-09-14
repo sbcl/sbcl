@@ -124,19 +124,25 @@
                                        (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
-(defun parse-args-types (lambda-listy-thing context)
+;; CONTEXT is the cookie passed down from the outermost surrounding call
+;; of VALUES-SPECIFIER-TYPE. INNER-CONTEXT-KIND is an indicator of whether
+;; we are currently parsing a FUNCTION or a VALUES compound type specifier.
+(defun parse-args-types (context lambda-listy-thing inner-context-kind)
   (multiple-value-bind (llks required optional rest keys)
       (parse-lambda-list
        lambda-listy-thing
-       :context context
-       :accept (ecase context
+       :context inner-context-kind
+       :accept (ecase inner-context-kind
                  (:values-type (lambda-list-keyword-mask '(&optional &rest)))
                  (:function-type (lambda-list-keyword-mask
                                   '(&optional &rest &key &allow-other-keys))))
        :silent t)
-    (let ((required (mapcar #'single-value-specifier-type required))
-          (optional (mapcar #'single-value-specifier-type optional))
-          (rest (when rest (single-value-specifier-type (car rest))))
+   (flet ((parse-list (list)
+            (mapcar (lambda (x) (single-value-specifier-type-r context x))
+                    list)))
+    (let ((required (parse-list required))
+          (optional (parse-list optional))
+          (rest (when rest (single-value-specifier-type-r context (car rest))))
           (keywords
            (collect ((key-info))
              (dolist (key keys)
@@ -148,13 +154,15 @@
                           kwd lambda-listy-thing))
                  (key-info
                   (make-key-info
+                   ;; MAKE-KEY-INFO will complain if KWD is not a symbol.
+                   ;; That's good enough - we don't need an extra check here.
                    :name kwd
-                   :type (single-value-specifier-type (second key))))))
+                   :type (single-value-specifier-type-r context (second key))))))
              (key-info))))
       (multiple-value-bind (required optional rest)
           (canonicalize-args-type-args required optional rest
                                        (ll-kwds-keyp llks))
-        (values llks required optional rest keywords)))))
+        (values llks required optional rest keywords))))))
 
 (defstruct (values-type
             (:include args-type
@@ -906,32 +914,54 @@
 ;;;   compound type specifier with no arguments supplied, (x)."
 ;;; By that same reasonining, is (x) accepted if x names a class?
 ;;;
-;;; KLUDGE: why isn't this a MACROLET?  "lexical environment too
-;;; hairy"
-(defmacro !values-specifier-type-body (arg)
-  `(let ((cachep t))
-     (labels
-         ((translate (x)
-            (or (and (built-in-classoid-p x)
-                     (built-in-classoid-translation x))
-                x))
-          ;; Q: Shouldn't this signal a TYPE-ERROR ?
-          (fail (spec) (error "bad thing to be a type specifier: ~S" spec))
-          (recurse (spec)
-            (when (typep spec 'instance)
-              (return-from recurse
-               (cond ((classoid-p spec) (translate spec))
-                     ((sb!pcl::classp spec)
-                      (translate (sb!pcl::class-classoid spec)))
-                     ;; We don't try to know how to map a generalized
-                     ;; PCL specializer to its ctype other than by lookup.
-                     (t (or (info :type :translator spec) (fail spec))))))
+
+;;; The xc host uses an ordinary hash table for memoization.
+#+sb-xc-host
+(let ((table (make-hash-table :test 'equal)))
+  (defun values-specifier-type-memo-wrapper (thunk specifier)
+    (multiple-value-bind (type yesp) (gethash specifier table)
+      (if yesp
+          type
+          (setf (gethash specifier table) (funcall thunk)))))
+  (defun values-specifier-type-cache-clear ()
+    (clrhash table)))
+;;; This cache is sized extremely generously, which has payoff
+;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
+;;; since EQ types are an immediate win.
+#-sb-xc-host
+(sb!impl::!define-hash-cache values-specifier-type
+  ((orig equal-but-no-car-recursion)) ()
+  :hash-function #'sxhash :hash-bits 10)
+
+;;; The recursive ("-R" suffixed) entry point for this function
+;;; should be used for each nested parser invocation.
+(defun values-specifier-type-r (context type-specifier)
+  (declare (type cons context))
+  (flet ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
+           (error "bad thing to be a type specifier: ~S" spec)))
+    (when (typep type-specifier 'instance)
+      (flet ((translate (classoid)
+               (or (and (built-in-classoid-p classoid)
+                        (built-in-classoid-translation classoid))
+                   classoid)))
+        (return-from values-specifier-type-r
+         (cond ((classoid-p type-specifier) (translate type-specifier))
+               ((sb!pcl::classp type-specifier)
+                (translate (sb!pcl::class-classoid type-specifier)))
+               ;; We don't try to know how to map a generalized
+               ;; PCL specializer to its ctype other than by lookup.
+               (t (or (info :type :translator type-specifier)
+                      (fail type-specifier)))))))
+    (values-specifier-type-memo-wrapper
+     (lambda ()
+       (labels
+         ((recurse (spec)
             (prog* ((head (if (listp spec) (car spec) spec))
                     (builtin (if (symbolp head)
                                  (info :type :builtin head)
                                  (return (fail spec)))))
               (when (deprecated-thing-p 'type head)
-                (setf cachep nil)
+                (setf (cdr context) nil)
                 (signal 'parse-deprecated-type :specifier spec))
               (when (atom spec)
                 ;; If spec is non-atomic, the :BUILTIN value is inapplicable.
@@ -941,7 +971,7 @@
                   (:instance (return (find-classoid spec)))
                   (:forthcoming-defclass-type (go unknown))))
               (awhen (info :type :translator head)
-                (return (or (funcall it spec) (fail spec))))
+                (return (or (funcall it context spec) (fail spec))))
               (awhen (info :type :expander head)
                 (return (recurse (funcall it (ensure-list spec)))))
               ;; If the spec is (X ...) and X has neither a translator
@@ -952,47 +982,36 @@
               ;; SPEC has a legal form, so return an unknown type.
               (signal 'parse-unknown-type :specifier spec)
              UNKNOWN
-              (setf cachep nil)
+              (setf (cdr context) nil)
               (return (make-unknown-type :specifier spec)))))
-       (let ((result (recurse (uncross ,arg))))
-         (if cachep
-             result
-             ;; (The RETURN-FROM here inhibits caching; this makes sense
-             ;; not only from a compiler diagnostics point of view,
-             ;; but also for proper workingness of VALID-TYPE-SPECIFIER-P.
-             ;; FIXME: cache bypass for (OR DEPRECATED GOOD)
-             ;; or (OR UNKNOWN KNOWN) doesn't actually work.
-             (return-from values-specifier-type result))))))
-#+sb-xc-host
-(let ((table (make-hash-table :test 'equal)))
-  (defun values-specifier-type (specifier)
-    (multiple-value-bind (type yesp) (gethash specifier table)
-      (if yesp
-          type
-          (setf (gethash specifier table)
-                (!values-specifier-type-body specifier)))))
-  (defun values-specifier-type-cache-clear ()
-    (clrhash table)))
-;;; This cache is sized extremely generously, which has payoff
-;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
-;;; since EQ types are an immediate win.
-#-sb-xc-host
-(defun-cached (values-specifier-type
-               :hash-function #'sxhash :hash-bits 10)
-    ((orig equal-but-no-car-recursion))
-  (!values-specifier-type-body orig))
+        (let ((result (recurse (uncross type-specifier))))
+          (if (cdr context) ; cacheable
+              result
+              ;; (The RETURN-FROM here inhibits caching; this makes sense
+              ;; not only from a compiler diagnostics point of view,
+              ;; but also for proper workingness of VALID-TYPE-SPECIFIER-P.
+              (return-from values-specifier-type-r result)))))
+     type-specifier)))
+(defun values-specifier-type (type-specifier)
+  (dx-let ((context (cons type-specifier t)))
+    (values-specifier-type-r context type-specifier)))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
-(defun specifier-type (type-specifier)
-  (let ((ctype (values-specifier-type type-specifier)))
+(defun specifier-type-r (context type-specifier)
+  (let ((ctype (values-specifier-type-r context type-specifier)))
     (when (or (values-type-p ctype)
               ;; bootstrap magic :-(
               (and (named-type-p ctype)
                    (eq (named-type-name ctype) '*)))
       (error "VALUES type illegal in this context:~%  ~S" type-specifier))
     ctype))
+(defun specifier-type (type-specifier)
+  (dx-let ((context (cons type-specifier t)))
+    (specifier-type-r context type-specifier)))
 
+(defun single-value-specifier-type-r (context x)
+  (if (eq x '*) *universal-type* (specifier-type-r context x)))
 (defun single-value-specifier-type (x)
   (if (eq x '*)
       *universal-type*

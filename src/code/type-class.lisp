@@ -373,19 +373,24 @@
 (defmacro !def-type-translator (name &rest stuff)
   (declare (type symbol name))
   (let* ((allow-atom (if (eq (car stuff) :list) (progn (pop stuff) nil) t))
+         (lambda-list (pop stuff))
+         (context-var-p (typep (car lambda-list) '(cons (eql :context))))
+         (context
+          (if context-var-p (cadr (pop lambda-list)) (make-symbol "CONTEXT")))
          ;; If atoms are allowed, then the internal destructuring-bind receives
          ;; NIL when the spec is an atom; it should not take CDR of its input.
          ;; (Note that a &WHOLE argument gets NIL, not the atom in that case)
          ;; If atoms are disallowed, it's basically like a regular macro.
-         (lexpr (make-macro-lambda nil (pop stuff) stuff nil nil
+         (lexpr (make-macro-lambda nil lambda-list stuff nil nil
                                    :accessor (if allow-atom 'identity 'cdr)
                                    :environment nil))
          (ll-decl (third lexpr)))
     (aver (and (eq (car ll-decl) 'declare) (caadr ll-decl) 'sb!c::lambda-list))
     `(!cold-init-forms
       (setf (info :type :translator ',name)
-            (named-lambda ,(format nil "~A-TYPE-PARSE" name) (spec)
+            (named-lambda ,(format nil "~A-TYPE-PARSE" name) (,context spec)
               ,ll-decl
+              ,@(unless context-var-p `((declare (ignore ,context))))
               ,(if allow-atom
                    `(,lexpr (and (listp spec) (cdr spec)))
                    `(if (listp spec) (,lexpr spec))))))))
