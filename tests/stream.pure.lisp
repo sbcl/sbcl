@@ -274,6 +274,9 @@
   (frob 'base-char)
   (frob 'nil))
 
+(with-test (:name :make-string-output-stream-et-bogosity)
+  (assert-error (make-string-output-stream :element-type 'real)))
+
 (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :element-type '(signed-byte 48))
   (assert (eq :eof (read-byte s nil :eof))))
 

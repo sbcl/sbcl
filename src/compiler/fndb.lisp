@@ -1077,9 +1077,8 @@
   stream
   (flushable))
 (defknown make-string-output-stream
-    (&key (:element-type type-specifier))
-    string-output-stream
-  (flushable))
+    (&key (:element-type type-specifier)) string-output-stream
+  (flushable explicit-check))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
 (defknown stream-element-type (stream) type-specifier

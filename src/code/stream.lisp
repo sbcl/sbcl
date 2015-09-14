@@ -1294,8 +1294,7 @@
                       (out #'string-ouch)
                       (sout #'string-sout)
                       (misc #'string-out-misc))
-            (:constructor make-string-output-stream
-                          (&key (element-type 'character)))
+            (:constructor %make-string-output-stream (element-type))
             (:copier nil)
             (:predicate nil))
   ;; The string we throw stuff in.
@@ -1318,11 +1317,13 @@
                            :read-only t))
 
 (declaim (freeze-type string-output-stream))
-
-#!+sb-doc
-(setf (fdocumentation 'make-string-output-stream 'function)
+(defun make-string-output-stream (&key (element-type 'character))
+  #!+sb-doc
   "Return an output stream which will accumulate all output given it for the
-benefit of the function GET-OUTPUT-STREAM-STRING.")
+benefit of the function GET-OUTPUT-STREAM-STRING."
+  (if (csubtypep (specifier-type element-type) (specifier-type 'character))
+      (%make-string-output-stream element-type)
+      (error "~S is not a subtype of CHARACTER" element-type)))
 
 ;;; Pushes the current segment onto the prev-list, and either pops
 ;;; or allocates a new one.
