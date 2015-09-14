@@ -26,7 +26,8 @@
                     (symbol-value (symbolicate primitive-type-name "-WIDETAG")))))
             (:copier nil))
   ;; the element specifier, e.g. BASE-CHAR or (UNSIGNED-BYTE 4)
-  (specifier (missing-arg) :type type-specifier :read-only t)
+  ;; TYPE-SPECIFIER is too general - this doesn't allow CLASS/CLASSOID.
+  (specifier (missing-arg) :type (or symbol list) :read-only t)
   ;; the element type, e.g. #<BUILT-IN-CLASS BASE-CHAR (sealed)> or
   ;; #<SB-KERNEL:NUMERIC-TYPE (UNSIGNED-BYTE 4)>
   (ctype nil :type (or ctype null))

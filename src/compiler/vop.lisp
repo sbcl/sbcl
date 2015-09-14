@@ -41,18 +41,19 @@
 ;;; representations of that value.
 (defstruct (primitive-type (:copier nil))
   ;; the name of this PRIMITIVE-TYPE
-  (name nil :type symbol)
+  (name nil :type symbol :read-only t)
   ;; a list of the SC numbers for all the SCs that a TN of this type
   ;; can be allocated in
-  (scs nil :type list)
+  (scs nil :type list :read-only t)
   ;; the Lisp type equivalent to this type. If this type could never be
-  ;; returned by PRIMITIVE-TYPE, then this is the NIL (or empty) type
-  (specifier (missing-arg) :type type-specifier)
+  ;; returned by PRIMITIVE-TYPE, then this is the NIL (or empty) type.
+  ;; TYPE-SPECIFIER is too general - this doesn't allow CLASS/CLASSOID.
+  (specifier (missing-arg) :type (or symbol list) :read-only t)
   ;; the template used to check that an object is of this type. This is a
   ;; template of one argument and one result, both of primitive-type T. If
   ;; the argument is of the correct type, then it is delivered into the
   ;; result. If the type is incorrect, then an error is signalled.
-  (check nil :type (or template null)))
+  (check nil :type (or template null) :read-only nil))
 
 (defprinter (primitive-type)
   name)
