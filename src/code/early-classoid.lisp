@@ -340,3 +340,6 @@
 ;;; change either.
 (def!struct (static-classoid (:include classoid)
                              (:constructor make-static-classoid)))
+
+(declaim (freeze-type built-in-classoid condition-classoid
+                      standard-classoid static-classoid))
