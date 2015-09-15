@@ -937,21 +937,24 @@
 ;;; should be used for each nested parser invocation.
 (defun values-specifier-type-r (context type-specifier)
   (declare (type cons context))
-  (flet ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
-           (error "bad thing to be a type specifier: ~S" spec)))
+  (labels ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
+             (error "bad thing to be a type specifier: ~S" spec))
+           (instance-to-ctype (x)
+             (flet ((translate (classoid)
+                      ;; Hmm, perhaps this should signal PARSE-UNKNOWN-TYPE
+                      ;; if CLASSOID is an instance of UNDEFINED-CLASSOID ?
+                      ;; Can that happen?
+                      (or (and (built-in-classoid-p classoid)
+                               (built-in-classoid-translation classoid))
+                          classoid)))
+               (cond ((classoid-p x) (translate x))
+                     ((sb!pcl::classp x) (translate (sb!pcl::class-classoid x)))
+                     (t
+                      ;; PCL specializers that are not classes are mapped
+                      ;; to their ctype via globaldb.
+                      (the ctype (or (info :type :translator x) (fail x))))))))
     (when (typep type-specifier 'instance)
-      (flet ((translate (classoid)
-               (or (and (built-in-classoid-p classoid)
-                        (built-in-classoid-translation classoid))
-                   classoid)))
-        (return-from values-specifier-type-r
-         (cond ((classoid-p type-specifier) (translate type-specifier))
-               ((sb!pcl::classp type-specifier)
-                (translate (sb!pcl::class-classoid type-specifier)))
-               ;; We don't try to know how to map a generalized
-               ;; PCL specializer to its ctype other than by lookup.
-               (t (or (info :type :translator type-specifier)
-                      (fail type-specifier)))))))
+      (return-from values-specifier-type-r (instance-to-ctype type-specifier)))
     (values-specifier-type-memo-wrapper
      (lambda ()
        (labels
@@ -972,8 +975,14 @@
                   (:forthcoming-defclass-type (go unknown))))
               (awhen (info :type :translator head)
                 (return (or (funcall it context spec) (fail spec))))
+              ;; Expansion brings up an interesting question - should the cache
+              ;; contain entries for intermediary types? Say A -> B -> REAL.
+              ;; As it stands, we cache the ctype corresponding to A but not B.
               (awhen (info :type :expander head)
-                (return (recurse (funcall it (ensure-list spec)))))
+                (let ((expansion (funcall it (ensure-list spec))))
+                  (return (if (typep expansion 'instance)
+                              (instance-to-ctype expansion)
+                              (recurse expansion)))))
               ;; If the spec is (X ...) and X has neither a translator
               ;; nor expander, and is a builtin, such as FIXNUM, fail now.
               ;; But - see FIXME at top - it would be consistent with

@@ -994,4 +994,10 @@
       (try `(simple-array ,spec (*)))
       (try `(and (not simple-array) (array ,spec (*)))))))
 
+;; The expansion of FRUITBAT is a class itself, not its name.
+(deftype fruitbat () (find-class 'hash-table))
+(with-test (:name :typexpand-into-classoid)
+  (assert (eq (sb-kernel:specifier-type 'fruitbat)
+              (sb-kernel:find-classoid 'hash-table))))
+
 ;;; success
