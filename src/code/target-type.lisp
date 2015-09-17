@@ -227,7 +227,7 @@
   "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
   ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to
   ;; defer to VALUES-SPECIFIER-TYPE for the check.
-  (declare (type lexenv-designator) (ignore env))
+  (declare (type lexenv-designator env) (ignore env))
   ;; I first thought this would not be a good implementation because
   ;; it signals an error on e.g. (CONS 1 2) until I realized that
   ;; walking and calling TYPEXPAND would also result in errors, and

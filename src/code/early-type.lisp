@@ -1032,7 +1032,7 @@
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
   (declare (type type-specifier type-specifier))
-  (declare (type lexenv-designator) (ignore env))
+  (declare (type lexenv-designator env) (ignore env))
   (let* ((spec type-specifier)
          (atom (if (listp spec) (car spec) spec))
          (expander (and (symbolp atom) (info :type :expander atom))))

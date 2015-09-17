@@ -11,6 +11,10 @@
 
 (in-package "CL-USER")
 
+(test-util:with-test (:name :typexpand-check-lexenv)
+  (flet ((try (f) (assert-error (funcall f 'hash-table 3))))
+    (mapc #'try '(typexpand-1 typexpand typexpand-all))))
+
 (locally
   (declare (notinline mapcar))
   (mapcar (lambda (args)
