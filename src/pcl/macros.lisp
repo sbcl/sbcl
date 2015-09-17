@@ -155,6 +155,5 @@
 (defun get-setf-fun-name (name)
   `(setf ,name))
 
-(defsetf slot-value set-slot-value)
 
 (/show "finished with pcl/macros.lisp")

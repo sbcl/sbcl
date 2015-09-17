@@ -75,7 +75,7 @@
   ;; KLUDGE: Note that neither of these slots is ever accessed by its
   ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
   ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
-  :slot-names (clos-slots name hash-code)
+  :slot-names (clos-slots hash-code)
   :boa-constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name standard-classoid
@@ -116,7 +116,7 @@
 (defmacro fsc-instance-slots (fin)
   `(%funcallable-instance-info ,fin 1))
 (defmacro fsc-instance-hash (fin)
-  `(%funcallable-instance-info ,fin 3))
+  `(%funcallable-instance-info ,fin 2))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))
@@ -181,6 +181,8 @@ comparison.")
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
 (declaim (ftype function class-of))
+;; This is an absolutely terrible name for a function which both assigns
+;; the name slot of a function, and _sometimes_ binds a name to a function.
 (defun set-fun-name (fun new-name)
   #!+sb-doc
   "Set the name of a compiled function object. Return the function."
@@ -188,18 +190,9 @@ comparison.")
     (setq fun (fdefinition fun)))
   (typecase fun
     (%method-function (setf (%method-function-name fun) new-name))
-    #!+sb-eval
-    (sb!eval:interpreted-function
-     (setf (sb!eval:interpreted-function-name fun) new-name))
-    (closure
-     (setq fun (sb!impl::set-closure-name fun new-name)))
-    (funcallable-instance ;; KLUDGE: probably a generic function...
-     (cond ((if (eq **boot-state** 'complete)
-                (typep fun 'generic-function)
-                (eq (class-of fun) *the-class-standard-generic-function*))
-            (setf (%funcallable-instance-info fun 2) new-name))
-           (t
-            (bug "unanticipated function type")))))
+    ;; a closure potentially becomes a different closure
+    (closure (setq fun (sb!impl::set-closure-name fun new-name)))
+    (t (setf (%fun-name fun) new-name)))
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
   ;; comes from CMUCL).  -- CSR, 2004-12-31

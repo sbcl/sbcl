@@ -134,7 +134,11 @@
     #!+sb-eval
     (sb!eval:interpreted-function
      (setf (sb!eval:interpreted-function-debug-name function) new-value))
-    ;; FIXME: Eliding general funcallable-instances for now.
+    (generic-function
+     ;; STANDARD-GENERIC-FUNCTION definitely has a NAME,
+     ;; but other subtypes of GENERIC-FUNCTION could as well.
+     (when (slot-exists-p function 'sb!pcl::name)
+       (setf (slot-value function 'sb!pcl::name) new-value)))
     ;; This does not set the name of an un-named closure because doing so
     ;; is not a side-effecting operation that it ought to be.
     ;; In contrast, SB-PCL::SET-FUN-NAME specifically says that only if the

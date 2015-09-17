@@ -642,6 +642,8 @@
     ;; always reference default's temp var to "use" it
     `(%puthash ,key ,hashtable ,(if constp newval `(progn ,default ,newval)))))
 
+(sb!xc:defsetf slot-value sb!pcl::set-slot-value)
+
 ;;; CMU CL had a comment here that:
 ;;;   Evil hack invented by the gnomes of Vassar Street (though not as evil as
 ;;;   it used to be.)  The function arg must be constant, and is converted to

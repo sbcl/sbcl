@@ -174,8 +174,7 @@
 (defmethod shared-initialize :before
            ((generic-function standard-generic-function)
             slot-names
-            &key (name nil namep)
-                 (lambda-list () lambda-list-p)
+            &key (lambda-list () lambda-list-p)
                  argument-precedence-order
                  declarations
                  documentation
@@ -184,9 +183,6 @@
   (declare (ignore slot-names
                    declarations argument-precedence-order documentation
                    lambda-list lambda-list-p))
-
-  (when namep
-    (set-fun-name generic-function name))
 
   (flet ((initarg-error (initarg value string)
            (error "when initializing the generic function ~S:~%~

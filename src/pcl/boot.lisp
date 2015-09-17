@@ -2059,7 +2059,6 @@ generic function lambda list ~S~:>"
                          'source source-location)
     (!bootstrap-set-slot 'standard-generic-function fin
                          '%documentation documentation)
-    (set-fun-name fin spec)
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)
       (when lambda-list-p

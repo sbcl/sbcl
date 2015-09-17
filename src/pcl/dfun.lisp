@@ -1700,11 +1700,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                              (or dfun (make-initial-dfun generic-function))
                              (compute-discriminating-function generic-function))))
                (set-funcallable-instance-function generic-function dfun)
-               (let ((gf-name (if early-p
-                                  (!early-gf-name generic-function)
-                                  (generic-function-name generic-function))))
-                 (set-fun-name generic-function gf-name)
-                 dfun))))
+               dfun)))
       ;; This needs to be atomic per generic function, consider:
       ;;   1. T1 sets dfun-state to S1 and computes discr. fun using S1
       ;;   2. T2 sets dfun-state to S2 and computes discr. fun using S2
