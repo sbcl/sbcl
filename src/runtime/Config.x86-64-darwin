@@ -10,12 +10,23 @@
 # files for more information.
 
 CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
-ifdef LISP_FEATURE_DARWIN9_OR_BETTER
-CFLAGS += -mmacosx-version-min=10.5
-LINKFLAGS += -mmacosx-version-min=10.5
+
+ifdef SBCL_MACOSX_VERSION_MIN
+  CFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
+  LINKFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
 else
-CFLAGS += -mmacosx-version-min=10.4
-LINKFLAGS += -mmacosx-version-min=10.4
+# This file is included both for compiling of host tools (in tools-for-build)
+# as well as the target objects.  In the former case we haven't yet written
+# the "Makefile.features" file wherein the DARWIN9 flag is set.
+# That's fine because the host should be able to compile files for itself
+# without requiring any extra magic in the compiler invocation.
+  ifdef LISP_FEATURE_DARWIN9_OR_BETTER
+    CFLAGS += -mmacosx-version-min=10.6
+    LINKFLAGS += -mmacosx-version-min=10.6
+  else
+    CFLAGS += -mmacosx-version-min=10.4
+    LINKFLAGS += -mmacosx-version-min=10.4
+  endif
 endif
 ifdef LISP_FEATURE_INODE64
 CFLAGS += -D_DARWIN_USE_64_BIT_INODE

@@ -240,8 +240,10 @@ code:
                         "-D_FILE_OFFSET_BITS=64")
                       #+(and (or x86 ppc) (or linux freebsd)) '("-m32")
                       #+(and x86-64 darwin inode64)
-                      '("-arch" "x86_64"
-                        "-mmacosx-version-min=10.5"
+                      `("-arch" "x86_64"
+                        ,(format nil "-mmacosx-version-min=~A"
+                                 (or (sb-ext:posix-getenv "SBCL_MACOSX_VERSION_MIN")
+                                     "10.5"))
                         "-D_DARWIN_USE_64_BIT_INODE")
                       #+(and x86-64 darwin (not inode64))
                       '("-arch" "x86_64"
