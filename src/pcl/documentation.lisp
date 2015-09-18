@@ -45,7 +45,7 @@
          (fun-name (fdefinition name)))))
 
 (defun ignore-nil-doc (type)
-  (style-warn "Ignoring documentation of type ~a for ~a."
+  (style-warn "Ignoring doc-type ~a for ~a."
               type nil))
 
 (defun set-function-name-documentation (name documentation)
@@ -318,7 +318,7 @@
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
 (defmethod documentation (object doc-type)
-  (warn "unsupported DOCUMENTATION: type ~S for object of type ~S"
+  (warn "unsupported DOCUMENTATION: doc-type ~S for object of type ~S"
         doc-type
         (type-of object))
   nil)
@@ -328,7 +328,7 @@
   ;; CMU CL made this an error, but since ANSI says that even for supported
   ;; doc types an implementation is permitted to discard docs at any time
   ;; for any reason, this feels to me more like a warning. -- WHN 19991214
-  (warn "discarding unsupported DOCUMENTATION of type ~S for object ~S"
+  (warn "discarding unsupported DOCUMENTATION: doc-type ~S for object of type ~S"
         doc-type
         (type-of object))
   new-value)
