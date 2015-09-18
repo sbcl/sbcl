@@ -754,12 +754,13 @@
     complex-single-float complex-single-reg t
     (inst xorps xmm xmm)
     (move r x)
+    (move copy-y y)  ; y == r only if y == x == r
+    (setf y copy-y)
+
     (inst unpcklps r r)
     (move imag r)
     (inst unpckhpd imag xmm)
     (inst unpcklpd r    xmm)
-    (move copy-y y)  ; y == r only if y == x == r
-    (setf y copy-y)
 
     (inst mulps r y)
 
