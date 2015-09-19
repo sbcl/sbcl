@@ -462,13 +462,14 @@ alloc_tramp:
         // Create a new frame and save descriptor regs on the stack
 	// for the GC to see.
         stp     reg_CFP,reg_NULL,[reg_CSP, #16]!
-        stp     reg_CODE,reg_LEXENV,[reg_CSP, #16]!
+        stp     reg_CODE,reg_NULL,[reg_CSP, #16]!
+
         stp     reg_R0,reg_R1, [reg_CSP, #16]!
         stp     reg_R2,reg_R3, [reg_CSP, #16]!
         stp     reg_R4,reg_R5, [reg_CSP, #16]!
         stp     reg_R6,reg_R7, [reg_CSP, #16]!
         stp     reg_R8,reg_R9, [reg_CSP, #16]!
-        stp     x10,reg_NULL, [reg_CSP, #16]!
+        stp     x10,reg_LEXENV, [reg_CSP, #16]!
 
         ldr     x0,[sp,#24]
  
@@ -488,13 +489,14 @@ alloc_tramp:
 
         str     x0, [sp,#24]
 
-        ldp     x10, reg_NULL, [reg_CSP], #16
+        ldp     x10, reg_LEXENV, [reg_CSP], #16
         ldp     reg_R8,reg_R9, [reg_CSP], #16
         ldp     reg_R6,reg_R7, [reg_CSP], #16
         ldp     reg_R4,reg_R5, [reg_CSP], #16
         ldp     reg_R2,reg_R3, [reg_CSP], #16
         ldp     reg_R0,reg_R1, [reg_CSP], #16
-        ldp     reg_CODE,reg_LEXENV,[reg_CSP], #16
+
+        sub     reg_CSP, reg_CSP, #32 // deallocate the frame
 
         ldr     reg_TMP, =foreign_function_call_active
 	str     xzr, [reg_TMP]
