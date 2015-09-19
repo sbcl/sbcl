@@ -29,7 +29,7 @@
 (declaim (type (member nil early braid complete) **boot-state**))
 (defglobal **boot-state** nil)
 
-(/show "starting early-low.lisp")
+(/show0 "starting early-low.lisp")
 
 ;;; The PCL package is internal and is used by code in potential
 ;;; bottlenecks. And since it's internal, no one should be
@@ -130,4 +130,4 @@
                   *the-wrapper-of-complex* *the-wrapper-of-character*
                   *the-wrapper-of-bit-vector* *the-wrapper-of-array*))
 
-(/show "finished with early-low.lisp")
+(/show0 "finished with early-low.lisp")
