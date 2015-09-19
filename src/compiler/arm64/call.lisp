@@ -883,8 +883,6 @@
                       :to :eval)
                  ,(if named 'name-pass 'lexenv))
 
-     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-                 function)
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
@@ -915,8 +913,7 @@
                   '((lra-label (gen-label))))
               (filler
                (remove nil
-                       (list :load-nargs
-                             ,@(if (eq return :tail)
+                       (list ,@(if (eq return :tail)
                                    '((unless (location= return-pc
                                                         (make-random-tn :kind :normal
                                                                         :sc (sc-or-lose 'control-stack)
@@ -927,7 +924,8 @@
                                    '(:comp-lra
                                      (when cur-nfp
                                        :frob-nfp)
-                                     :load-fp))))))
+                                     :load-fp))
+                             :load-nargs))))
          (flet ((do-next-filler ()
                   (let* ((next (pop filler))
                          (what (if (consp next) (car next) next)))
@@ -1002,7 +1000,7 @@
                       (load-constant vop name name-pass)
                       (do-next-filler)))
                    (insert-step-instrumenting name-pass)
-                   (loadw function name-pass fdefn-raw-addr-slot
+                   (loadw lip name-pass fdefn-raw-addr-slot
                           other-pointer-lowtag)
                    (do-next-filler))
                  `((sc-case arg-fun
@@ -1013,17 +1011,17 @@
                      (constant
                       (load-constant vop arg-fun lexenv)
                       (do-next-filler)))
-                   (loadw function lexenv closure-fun-slot
+                   (loadw lip lexenv closure-fun-slot
                           fun-pointer-lowtag)
                    (do-next-filler)
-                   (insert-step-instrumenting function)))
+                   (insert-step-instrumenting lip)))
            (loop
              (if filler
                  (do-next-filler)
                  (return)))
 
            (note-this-location vop :call-site)
-           (lisp-jump function))
+           (inst br lip))
 
          ,@(ecase return
              (:fixed

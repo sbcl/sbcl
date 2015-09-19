@@ -335,26 +335,25 @@ call_into_c:
 
 	.size	call_into_c, .-call_into_c
 
-
-/* Trampolines, like on SPARC, use Lisp calling conventions. */
 	.align	3
 	.global	undefined_tramp
 	.type	undefined_tramp, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	undefined_tramp, .+1
-	.word	undefined_tramp
+	.dword	SIMPLE_FUN_HEADER_WIDETAG
+        .dword	undefined_tramp - SIMPLE_FUN_CODE_OFFSET
 .known_nil:
-	.dword	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+undefined_tramp:
 
         // As in ppc-assem.S, point reg_CODE to the header with a
-        // function lowtag...  Which the address already has.
-        ldr     reg_CODE, =undefined_tramp
+        // function lowtag
+        add     reg_CODE,reg_LR,-SIMPLE_FUN_CODE_OFFSET
 
         // The magic (undefined) "BREAK_POINT" instruction.
-        .word 0xe7f001f0
+        brk 0
 
         // Error arguments for an undefined function.
         .byte   trap_Error

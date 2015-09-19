@@ -112,11 +112,11 @@
 
 (defmacro lisp-jump (function)
   "Jump to the lisp function FUNCTION."
-  `(progn
-     (inst add tmp-tn ,function
+  `(let ((function ,function))
+     (inst add function function
            (- (ash simple-fun-code-offset word-shift)
               fun-pointer-lowtag))
-     (inst br tmp-tn)))
+     (inst br function)))
 
 (defmacro lisp-return (return-pc return-style)
   "Return to RETURN-PC."

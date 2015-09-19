@@ -18,7 +18,6 @@
   (:vop-var vop)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg)) move-temp)
-  (:temporary (:scs (descriptor-reg)) function)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc interior-reg) lip)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save))
@@ -76,7 +75,7 @@
                  (cur-nfp (current-nfp-tn vop)))
              ,@(moves (temp-names) (arg-names))
              (inst mov tmp-tn (static-fun-offset symbol))
-             (inst ldr function (@ null-tn tmp-tn))
+
              (inst mov nargs (fixnumize ,num-args))
              (when cur-nfp
                (store-stack-tn nfp-save cur-nfp))
@@ -91,7 +90,9 @@
              (inst str lip (@ csp-tn -8))
              (inst sub cfp-tn csp-tn 16)
              (note-this-location vop :call-site)
-             (lisp-jump function)
+             (inst ldr lip (@ null-tn tmp-tn))
+             (inst br lip)
+
              (emit-return-pc lra-label)
              ,(collect ((bindings) (links))
                 (do ((temp (temp-names) (cdr temp))

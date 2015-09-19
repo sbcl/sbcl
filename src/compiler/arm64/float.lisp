@@ -195,13 +195,14 @@
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:note "complex single float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y pa-flag complex-single-float-widetag
-                               complex-single-float-size)
-       (inst sub pa-flag y (- other-pointer-lowtag
-                              (* complex-single-float-real-slot
-                                 n-word-bytes)))
-       ;; (inst store-complex-single x (@ pa-flag))
-       )))
+     ;; (with-fixed-allocation (y pa-flag complex-single-float-widetag
+     ;;                           complex-single-float-size)
+     ;;   (inst sub pa-flag y (- other-pointer-lowtag
+     ;;                          (* complex-single-float-real-slot
+     ;;                             n-word-bytes)))
+     ;;   (inst store-complex-single x (@ pa-flag))
+     ;;   )
+     ))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -211,13 +212,14 @@
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:note "complex double float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y pa-flag complex-double-float-widetag
-                               complex-double-float-size)
-       (inst add pa-flag y (- (* complex-double-float-real-slot
-                                 n-word-bytes)
-                              other-pointer-lowtag))
-       ;; (inst store-complex-double x (@ pa-flag))
-       )))
+     ;; (with-fixed-allocation (y pa-flag complex-double-float-widetag
+     ;;                           complex-double-float-size)
+     ;;   (inst add pa-flag y (- (* complex-double-float-real-slot
+     ;;                             n-word-bytes)
+     ;;                          other-pointer-lowtag))
+     ;;    (inst store-complex-double x (@ pa-flag))
+     ;;   )
+     ))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
@@ -230,8 +232,9 @@
   (:results (y :scs (complex-single-reg)))
   (:note "pointer to complex float coercion")
   (:generator 2
-    (loadw x y complex-single-float-real-slot
-        other-pointer-lowtag)))
+    ;; (loadw x y complex-single-float-real-slot
+    ;;     other-pointer-lowtag)
+    ))
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
 
@@ -240,8 +243,9 @@
   (:results (y :scs (complex-double-reg)))
   (:note "pointer to complex float coercion")
   (:generator 2
-    (loadw x y complex-double-float-real-slot
-        other-pointer-lowtag)))
+    ;; (loadw x y complex-double-float-real-slot
+    ;;     other-pointer-lowtag)
+    ))
 (define-move-vop move-to-complex-double :move
   (descriptor-reg) (complex-double-reg))
 
