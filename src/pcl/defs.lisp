@@ -587,9 +587,27 @@
 
 (defclass eql-specializer (standard-specializer exact-class-specializer specializer-with-object)
   ((object :initarg :object :reader specializer-object
-           :reader eql-specializer-object)))
+           :reader eql-specializer-object)
+   ;; Because EQL specializers are interned, any two putative instances
+   ;; of EQL-specializer referring to the same object are in fact EQ to
+   ;; each other. Therefore a list of direct methods in the specializer can
+   ;; reliably track all methods that are specialized on the identical object.
+   (direct-methods :initform (cons nil nil))))
 
-(defvar *eql-specializer-table* (make-hash-table :test 'eql))
+;; Why is this weak-value, not weak-key: suppose the value is unreachable (dead)
+;; but the key is reachable - this should allow dropping the entry, because
+;; you're indifferent to getting a fresh EQL specializer if you re-intern the
+;; same key. There's no way to know that you got a new VALUE, since the
+;; pre-condition of this case was that the old value was unreachable.
+;; KEY weakness is actually equivalent to KEY-OR-VALUE weakness, which would
+;; be less likely to drop the entry. The equivalence stems from the fact that
+;; holding the value (the specializer) also holds the key.
+;; Whereas, with :VALUE weakness, you can drop the specializer as soon as
+;; nothing needs it, even if OBJECT persists. You might think that calling
+;; gethash on a live key should get the identical specializer, but since
+;; nothing referenced the old specializer, consing a new one is fine.
+(defglobal *eql-specializer-table*
+  (make-hash-table :test 'eql :weakness :value))
 
 (defun intern-eql-specializer (object)
   ;; Need to lock, so that two threads don't get non-EQ specializers

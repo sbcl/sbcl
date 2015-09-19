@@ -71,8 +71,10 @@
 (defmethod print-object ((method standard-method) stream)
   (if (slot-boundp method '%generic-function)
       (print-unreadable-object (method stream :type t :identity t)
-        (let ((generic-function (method-generic-function method)))
-          (format stream "~/sb-impl::print-symbol-with-prefix/ ~{~S ~}~:S"
+        (let ((generic-function (method-generic-function method))
+              (*print-length* 50))
+          (format stream "~:[~*~;~/sb-impl::print-symbol-with-prefix/ ~]~{~S ~}~:S"
+                  generic-function
                   (and generic-function
                        (generic-function-name generic-function))
                   (method-qualifiers method)
@@ -168,3 +170,9 @@
 (defmethod print-object ((obj class-precedence-description) stream)
   (print-unreadable-object (obj stream :type t)
     (format stream "~D" (cpd-count obj))))
+
+(defmethod print-object ((self eql-specializer) stream)
+  (let ((have-obj (slot-boundp self 'object)))
+    (print-unreadable-object (self stream :type t :identity (not have-obj))
+      (when have-obj
+        (write (slot-value self 'object) :stream stream)))))

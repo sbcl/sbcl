@@ -948,11 +948,17 @@
                                (built-in-classoid-translation classoid))
                           classoid)))
                (cond ((classoid-p x) (translate x))
+                     ;; Avoid TYPEP on SB!MOP:EQL-SPECIALIZER and CLASS because
+                     ;; the fake metaobjects do not allow type analysis, and
+                     ;; would cause a compiler error as it tries to decide
+                     ;; whether any clause of this COND subsumes another.
+                     ;; Moreover, we don't require the host to support MOP.
                      ((sb!pcl::classp x) (translate (sb!pcl::class-classoid x)))
-                     (t
-                      ;; PCL specializers that are not classes are mapped
-                      ;; to their ctype via globaldb.
-                      (the ctype (or (info :type :translator x) (fail x))))))))
+                     #-sb-xc-host
+                     ((sb!pcl::eql-specializer-p type-specifier)
+                      (make-eql-type
+                       (sb!mop:eql-specializer-object type-specifier)))
+                     (t (fail x))))))
     (when (typep type-specifier 'instance)
       (return-from values-specifier-type-r (instance-to-ctype type-specifier)))
     (values-specifier-type-memo-wrapper

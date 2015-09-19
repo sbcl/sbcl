@@ -7,6 +7,8 @@ changes relative to sbcl-1.2.15:
     alien calls. (lp#1489590)
   * bug fix: MAKE-STRING-OUTPUT-STREAM enforces that :ELEMENT-TYPE
     is a subtype of CHARACTER.
+  * bug fix: an EQL method specializer no longer causes garbage retention
+    if there are no extant methods using the specializer. (lp#492851)
 
 changes in sbcl-1.2.15 relative to sbcl-1.2.14:
   * new feature: DEPRECATION declaration for functions, variables and types

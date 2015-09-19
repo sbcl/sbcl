@@ -196,8 +196,20 @@ comparison.")
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
   ;; comes from CMUCL).  -- CSR, 2004-12-31
+  ;;
+  ;; Now, given this logic is somewhat suspect to begin with, and is the final
+  ;; remaining contributor to the immortalization of EQL-specialized methods,
+  ;; I'm going to say that we don't create an fdefn for anything
+  ;; whose specializers are not symbols.
+  ;; Otherwise, adding+removing N methods named
+  ;;  (SLOW-METHOD BLAH ((EQL <HAIRY-LIST-OBJECT>)))
+  ;; makes them all permanent because FDEFNs are compared by name EQUALity,
+  ;; so each gets its own FDEFN. This is bad, and pretty much useless anyway.
   (when (and (consp new-name)
-             (member (car new-name) '(slow-method fast-method slot-accessor)))
+             (or (eq (car new-name) 'slot-accessor)
+                 (and (member (car new-name) '(slow-method fast-method))
+                      ;; name is: ({SLOW|FAST}-METHOD root <qual>* spec+)
+                      (every #'symbolp (car (last new-name))))))
     (setf (fdefinition new-name) fun))
   fun)
 
@@ -363,3 +375,8 @@ comparison.")
 
 (defun structure-slotd-init-form (slotd)
   (dsd-default slotd))
+
+(declaim (ftype function class-wrapper))
+(declaim (inline class-classoid))
+(defun class-classoid (class)
+  (layout-classoid (class-wrapper class)))

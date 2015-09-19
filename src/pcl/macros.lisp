@@ -114,11 +114,6 @@
                        (find-class-from-cell ',symbol ,cell nil))))))
       form))
 
-(declaim (ftype function class-wrapper))
-(declaim (inline class-classoid))
-(defun class-classoid (class)
-  (layout-classoid (class-wrapper class)))
-
 (declaim (ftype function update-ctors))
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))

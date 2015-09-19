@@ -298,6 +298,11 @@
    ;; at this point.  Since there's no ANSI-blessed way of getting an
    ;; EQL specializer, that seems unnecessarily painful, so we are
    ;; nice to our users.  -- CSR, 2007-06-01
+   ;; Note that INTERN-EQL-SPECIALIZER is exported from SB-MOP, but MOP isn't
+   ;; part of the ANSI standard. Parsing introduces a tiny semantic problem in
+   ;; the edge case of an EQL specializer whose object is literally (EQL :X).
+   ;; That one must be supplied as a pre-parsed #<EQL-SPECIALIZER> because if
+   ;; not, we'd parse it into a specializer whose object is :X.
    (parse-specializers generic-function specializers) errorp t))
 
 ;;; Compute various information about a generic-function's arglist by looking
@@ -576,6 +581,7 @@
 
 (defun real-remove-method (generic-function method)
   (when (eq generic-function (method-generic-function method))
+    (flush-effective-method-cache generic-function)
     (let ((lock (gf-lock generic-function)))
       ;; System lock because interrupts need to be disabled as well:
       ;; it would be bad to unwind and leave the gf in an inconsistent
@@ -725,8 +731,15 @@
                                (specl2 class-eq-specializer))
   (eq (specializer-class specl1) (specializer-class specl2)))
 
+;; FIXME: This method is wacky, and indicative of a coding style in which
+;; metaphorically the left hand does not know what the right is doing.
+;; If you want this to be the abstract comparator, and you "don't know"
+;; that EQL-specializers are interned, then the comparator should be EQL.
+;; But if you *do* know that they're interned, then why does this method
+;; exist at all? The method on SPECIALIZER works fine.
 (defmethod same-specializer-p ((specl1 eql-specializer)
                                (specl2 eql-specializer))
+  ;; A bit of deception to confuse the enemy?
   (eq (specializer-object specl1) (specializer-object specl2)))
 
 (defmethod specializer-class ((specializer eql-specializer))

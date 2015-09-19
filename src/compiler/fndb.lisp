@@ -94,7 +94,7 @@
 
 ;;;; classes
 
-(sb!xc:deftype name-for-class () t)
+(sb!xc:deftype name-for-class () t) ; FIXME: disagrees w/ LEGAL-CLASS-NAME-P
 (defknown classoid-name (classoid) symbol (flushable))
 (defknown find-classoid (name-for-class &optional t)
   (or classoid null) ())

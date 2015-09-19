@@ -556,6 +556,9 @@
 (with-test (:name :make-method-lambda-wrapping+return-from)
   (assert (eq :default (wrapped (cons t t)))))
 
+;; This test tests something a little shady - that a method
+;; are accessible by way of FDEFNs. They aren't all.
+;; See the comment in src/pcl/low.lisp at SET-FUN-NAME.
 (with-test (:name :slow-method-is-fboundp)
   (assert (fboundp '(sb-pcl::slow-method wrapped (cons))))
   (assert (eq :default (funcall #'(sb-pcl::slow-method wrapped (cons)) (list (cons t t)) nil))))

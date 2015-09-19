@@ -243,6 +243,8 @@
 
 (defgeneric specializer-method-table (specializer))
 
+(defgeneric specializer-method-holder (specializer &optional create))
+
 (defgeneric update-constructors (class))
 
 (defgeneric wrapper-fetcher (class))

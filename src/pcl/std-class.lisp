@@ -181,8 +181,7 @@
 
 ;;; Maintaining the direct-methods and direct-generic-functions backpointers.
 ;;;
-;;; There are four generic functions involved, each has one method for the
-;;; class case and another method for the damned EQL specializers. All of
+;;; There are four generic functions involved, each has one method. All of
 ;;; these are specified methods and appear in their specified place in the
 ;;; class graph.
 ;;;
@@ -192,7 +191,7 @@
 ;;;   SPECIALIZER-DIRECT-GENERIC-FUNCTIONS
 ;;;
 ;;; In each case, we maintain one value which is a cons. The car is the list
-;;; methods. The cdr is a list of the generic functions. The cdr is always
+;;; of methods. The cdr is a list of the generic functions. The cdr is always
 ;;; computed lazily.
 
 ;;; This needs to be used recursively, in case a non-trivial user
@@ -212,8 +211,8 @@
   (sb-thread::with-recursive-system-lock (*specializer-lock*)
     (call-next-method)))
 
-(defmethod add-direct-method ((specializer class) (method method))
-  (let ((cell (slot-value specializer 'direct-methods)))
+(defmethod add-direct-method ((specializer specializer) (method method))
+  (let ((cell (specializer-method-holder specializer)))
     ;; We need to first smash the CDR, because a parallel read may
     ;; be in progress, and because if an interrupt catches us we
     ;; need to have a consistent state.
@@ -221,8 +220,8 @@
           (car cell) (adjoin method (car cell) :test #'eq)))
   method)
 
-(defmethod remove-direct-method ((specializer class) (method method))
-  (let ((cell (slot-value specializer 'direct-methods)))
+(defmethod remove-direct-method ((specializer specializer) (method method))
+  (let ((cell (specializer-method-holder specializer)))
     ;; We need to first smash the CDR, because a parallel read may
     ;; be in progress, and because if an interrupt catches us we
     ;; need to have a consistent state.
@@ -230,90 +229,73 @@
           (car cell) (remove method (car cell))))
   method)
 
-(defmethod specializer-direct-methods ((specializer class))
-  (with-slots (direct-methods) specializer
-    (car direct-methods)))
+(defmethod specializer-direct-methods ((specializer specializer))
+  (car (specializer-method-holder specializer nil)))
 
-(defmethod specializer-direct-generic-functions ((specializer class))
-  (let ((cell (slot-value specializer 'direct-methods)))
+(defmethod specializer-direct-generic-functions ((specializer specializer))
+  (let ((cell (specializer-method-holder specializer nil)))
     ;; If an ADD/REMOVE-METHOD is in progress, no matter: either
     ;; we behave as if we got just first or just after -- it's just
     ;; for update that we need to lock.
     (or (cdr cell)
-        (sb-thread:with-mutex (*specializer-lock*)
+        (when (car cell)
           (setf (cdr cell)
-                (let (collect)
-                  (dolist (m (car cell))
-                    ;; the old PCL code used COLLECTING-ONCE which used
-                    ;; #'EQ to check for newness
-                    (pushnew (method-generic-function m) collect :test #'eq))
-                  (nreverse collect)))))))
+                (sb-thread:with-mutex (*specializer-lock*)
+                  (let (collect)
+                    (dolist (m (car cell) (nreverse collect))
+                ;; the old PCL code used COLLECTING-ONCE which used
+                ;; #'EQ to check for newness
+                      (pushnew (method-generic-function m) collect
+                               :test #'eq)))))))))
 
-;;; This hash table is used to store the direct methods and direct generic
-;;; functions of EQL specializers. Each value in the table is the cons.
-;;;
-;;; These tables are shared between threads, so they need to be synchronized.
-(defvar *eql-specializer-methods* (make-hash-table :test 'eql :synchronized t))
-(defvar *class-eq-specializer-methods* (make-hash-table :test 'eq :synchronized t))
+(defmethod specializer-method-holder ((self specializer) &optional create)
+  ;; CREATE can be ignored, because instances of SPECIALIZER
+  ;; other than CLASS-EQ-SPECIALIZER have their DIRECT-METHODS slot
+  ;; preinitialized with (NIL . NIL).
+  (declare (ignore create))
+  (slot-value self 'direct-methods))
 
-(defmethod specializer-method-table ((specializer eql-specializer))
-  *eql-specializer-methods*)
+;; Same as for CLASS but the only ancestor it shares is SPECIALIZER.
+;; If this were defined on SPECIALIZER-WITH-OBJECT then it would
+;; apply as well to CLASS-EQ specializers which we don't want.
+(defmethod specializer-method-holder ((self eql-specializer) &optional create)
+  (declare (ignore create))
+  (slot-value self 'direct-methods))
+
+;;; This hash table is used to store the direct methods and direct generic
+;;; functions of CLASS-EQ specializers.
+;;; This is needed because CLASS-EQ specializers are not interned: two different
+;;; specializers could refer to the identical CLASS. But semantically you don't
+;;; want to collect the direct methods separately, you want them all together.
+;;; So a logical place to do that would be in the CLASS. We could add another
+;;; slot to CLASS holding the CLASS-EQ-DIRECT-METHODS.  I guess the idea though
+;;; is to be able to define other kinds of specializers that hold an object
+;;; where you don't have the ability to add a slot to that object.
+;;; So that's fine, you look up the object in this table, and the approach
+;;; generalizes by defining other tables similarly, but has the same problem
+;;; of garbage retention as did EQL specializers.
+;;; I suspect CLASS-EQ specializers aren't used enough to worry about.
+;;;
+;;; This table is shared between threads, so needs to be synchronized.
+;;; (though insertions are only performed when holding the specializer-lock,
+;;; so the preceding claim is probably overly paranoid.)
+(defvar *class-eq-specializer-methods* (make-hash-table :test 'eq :synchronized t))
 
 (defmethod specializer-method-table ((specializer class-eq-specializer))
   *class-eq-specializer-methods*)
 
-(defmethod add-direct-method ((specializer specializer-with-object)
-                              (method method))
-  (let* ((object (specializer-object specializer))
-         (table (specializer-method-table specializer))
-         (entry (gethash object table)))
-    (unless entry
-      (setf entry
-            (setf (gethash object table) (cons nil nil))))
-    ;; We need to first smash the CDR, because a parallel read may
-    ;; be in progress, and because if an interrupt catches us we
-    ;; need to have a consistent state.
-    (setf (cdr entry) ()
-          (car entry) (adjoin method (car entry) :test #'eq))
-    method))
-
-(defmethod remove-direct-method ((specializer specializer-with-object)
-                                 (method method))
-  (let* ((object (specializer-object specializer))
-         (entry (gethash object (specializer-method-table specializer))))
-    (when entry
-      ;; We need to first smash the CDR, because a parallel read may
-      ;; be in progress, and because if an interrupt catches us we
-      ;; need to have a consistent state.
-      (setf (cdr entry) ()
-            (car entry) (remove method (car entry))))
-    method))
-
-(defmethod specializer-direct-methods ((specializer specializer-with-object))
-  (car (gethash (specializer-object specializer)
-                (specializer-method-table specializer))))
-
-(defmethod specializer-direct-generic-functions ((specializer
-                                                  specializer-with-object))
-  (let* ((object (specializer-object specializer))
-         (entry (gethash object (specializer-method-table specializer))))
-    (when entry
-      (or (cdr entry)
-          (sb-thread:with-mutex (*specializer-lock*)
-            (setf (cdr entry)
-                  (let (collect)
-                    (dolist (m (car entry))
-                      (pushnew (method-generic-function m) collect :test #'eq))
-                    (nreverse collect))))))))
+(defmethod specializer-method-holder ((self specializer-with-object)
+                                      &optional (create t))
+  (let ((table (specializer-method-table self))
+        (object (specializer-object self)))
+    (if create
+        (sb-impl::puthash-if-absent object table (lambda () (cons nil nil)))
+        (gethash object table))))
 
 (defun map-specializers (function)
   (map-all-classes (lambda (class)
                      (funcall function (class-eq-specializer class))
                      (funcall function class)))
-  (maphash (lambda (object methods)
-             (declare (ignore methods))
-             (intern-eql-specializer object))
-           *eql-specializer-methods*)
   (maphash (lambda (object specl)
              (declare (ignore object))
              (funcall function specl))
@@ -339,10 +321,7 @@
 (defmethod shared-initialize :after ((specl eql-specializer) slot-names &key)
   (declare (ignore slot-names))
   (setf (slot-value specl '%type)
-        `(eql ,(specializer-object specl)))
-  ;; Maybe the specializer object should point to the CTYPE directly?
-  (setf (info :type :translator specl)
-        (make-eql-type (specializer-object specl))))
+        `(eql ,(specializer-object specl))))
 
 (defun real-load-defclass (name metaclass-name supers slots other
                            readers writers slot-names source-location &optional safe-p)

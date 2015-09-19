@@ -16,6 +16,61 @@
 
 (in-package "CLOS-ADD/REMOVE-METHOD")
 
+(defvar *tons-o-method-count* 0)
+;; Test for lp#492851
+;; On an x86-64 without the fix for garbage retention,
+;; this would use up all memory after ~2400 iterations.
+;; Now it can run forever, as far as I know.
+(defun make-tons-o-methods (&optional (n 50000))
+  (dotimes (i n)
+    (let ((object (cons "lottajunk" (make-array 20001))))
+      ;; FIXME: the first method we defined gets its OBJECT immortalized,
+      ;; because that's the one whose name goes in globaldb
+      ;; as the chosen one who arbitrarily created the GF.
+      (defmethod blah ((x (eql object))) "what?"
+        (when (zerop (mod (incf *tons-o-method-count*) 500))
+          (write-char #\.)
+          (force-output))
+        (if (zerop (mod *tons-o-method-count* 100000))
+            (terpri)))
+      (blah object))
+    (remove-method #'blah (first (sb-mop:generic-function-methods #'blah)))))
+
+(format t "~&;; Be patient. This test is slow.~%")
+(test-util:with-test (:name :exhaust-heap-with-eql-specializers)
+  (let ((n-junk 0)
+        (starting-eql-spec-count
+         (hash-table-count sb-pcl::*eql-specializer-table*)))
+    (make-tons-o-methods 50000)
+    (sb-int:dx-flet ((visit (object type size)
+                       (declare (ignore type size))
+                       (when (and (typep object '(cons string (simple-vector 20001)))
+                                  (string= (car object) "lottajunk"))
+                         (incf n-junk))))
+      (sb-vm::map-allocated-objects #'visit :dynamic)
+      ;; This is probably not more than a few hundred.
+      ;; But how are there ** more ** EQL-specializers than junk objects?
+      (format t "~&;; Post-test EQL-spec count: ~S, junk obj count: ~D~%"
+              (hash-table-count sb-pcl::*eql-specializer-table*) n-junk)
+      (sb-ext:gc :full t)
+      (setq n-junk 0)
+      (sb-vm::map-allocated-objects #'visit :dynamic)
+      (format t "~&;; Post-GC EQL-spec count: ~S, junk obj count: ~D~%"
+              (hash-table-count sb-pcl::*eql-specializer-table*) n-junk)
+      ;; There should be no stray EQL-specializers left.
+      ;; The reasoning is a bit elusive, since the first method's specializer's
+      ;; OBJECT gets permanentized. But due to the weakness on :VALUE
+      ;; in the specializer table, the table entry is dead even though it's
+      ;; still possible to get an EQL-specializer for the (almost) zombie object.
+      ;; But if you do that, you'll get a new specializer, and you can't see
+      ;; that it wasn't the previously interned one, unless you do something
+      ;; like extend EQL-specializer to have more slots. In that case you could
+      ;; sense that your data went missing. But then you probably shouldn't
+      ;; be relying on the existing interned specializer table.
+      ;; Generic programming is not a panacea.
+      (assert (= (hash-table-count sb-pcl::*eql-specializer-table*)
+                 starting-eql-spec-count)))))
+
 ;;; We make a generic function, add a bunch of method for it, and
 ;;; prepare another bunch of method objects for later addition.
 ;;;
