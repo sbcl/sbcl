@@ -704,13 +704,13 @@ core and return a descriptor to it."
   (let ((des (allocate-header+object *dynamic*
                                       (1- sb!vm:complex-single-float-size)
                                       sb!vm:complex-single-float-widetag)))
-    #!-x86-64
+    #!-64-bit
     (progn
       (write-wordindexed des sb!vm:complex-single-float-real-slot
                          (make-random-descriptor (single-float-bits (realpart num))))
       (write-wordindexed des sb!vm:complex-single-float-imag-slot
                          (make-random-descriptor (single-float-bits (imagpart num)))))
-    #!+x86-64
+    #!+64-bit
     (write-wordindexed des sb!vm:complex-single-float-data-slot
                        (make-random-descriptor
                         (logior (ldb (byte 32 0) (single-float-bits (realpart num)))
