@@ -1029,14 +1029,14 @@ between the ~A definition and the ~A definition"
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 32)))
-     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     #!+64-bit
      (simple-array-unsigned-byte-63
       :translation (simple-array (unsigned-byte 63) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-63-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 63)))
-     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     #!+64-bit
      (simple-array-unsigned-byte-64
       :translation (simple-array (unsigned-byte 64) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-64-widetag)
@@ -1072,7 +1072,7 @@ between the ~A definition and the ~A definition"
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(signed-byte 32)))
-     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     #!+64-bit
      (simple-array-signed-byte-64
       :translation (simple-array (signed-byte 64) (*))
       :codes (#.sb!vm:simple-array-signed-byte-64-widetag)

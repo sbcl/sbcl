@@ -114,7 +114,7 @@
   (setf (svref *meta-room-info* unbound-marker-widetag) cons-info)
 
   ;; Single-floats are immediate data on 64-bit systems.
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   (setf (svref *meta-room-info* single-float-widetag) cons-info))
 
 ) ; EVAL-WHEN

@@ -177,19 +177,19 @@
 
 ;; lispobj-sized word, whatever that may be
 ;; hopefully nobody ever wants a 128-bit SBCL...
-#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+#!+64-bit
 (progn
-(defun bvref-word (bytes index)
-  (bvref-64 bytes index))
-(defun (setf bvref-word) (new-val bytes index)
-  (setf (bvref-64 bytes index) new-val)))
+  (defun bvref-word (bytes index)
+    (bvref-64 bytes index))
+  (defun (setf bvref-word) (new-val bytes index)
+    (setf (bvref-64 bytes index) new-val)))
 
-#!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+#!-64-bit
 (progn
-(defun bvref-word (bytes index)
-  (bvref-32 bytes index))
-(defun (setf bvref-word) (new-val bytes index)
-  (setf (bvref-32 bytes index) new-val)))
+  (defun bvref-word (bytes index)
+    (bvref-32 bytes index))
+  (defun (setf bvref-word) (new-val bytes index)
+    (setf (bvref-32 bytes index) new-val)))
 
 
 ;;;; representation of spaces in the core
@@ -682,10 +682,10 @@ core and return a descriptor to it."
   (etypecase x
     (single-float
      ;; 64-bit platforms have immediate single-floats.
-     #!+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+     #!+64-bit
      (make-random-descriptor (logior (ash (single-float-bits x) 32)
                                      sb!vm::single-float-widetag))
-     #!-#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+     #!-64-bit
      (let ((des (allocate-header+object *dynamic*
                                          (1- sb!vm:single-float-size)
                                          sb!vm:single-float-widetag)))
@@ -2728,7 +2728,7 @@ core and return a descriptor to it."
             (cond ((cold-null x) (return-from recurse nil))
                   ((is-fixnum-lowtag (descriptor-lowtag x))
                    (return-from recurse (descriptor-fixnum x)))
-                  #!+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+                  #!+64-bit
                   ((is-other-immediate-lowtag (descriptor-lowtag x))
                    (let ((bits (descriptor-bits x)))
                      (when (= (logand bits sb!vm:widetag-mask)
@@ -2745,14 +2745,14 @@ core and return a descriptor to it."
                          (base-string-from-core
                           (read-wordindexed x sb!vm:symbol-name-slot)))
                         (warm-symbol x)))
-                   #!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
+                   #!-64-bit
                    (#.sb!vm:single-float-widetag
                     `(:ffloat-bits
                       ,(read-bits-wordindexed x sb!vm:single-float-value-slot)))
                    (#.sb!vm:double-float-widetag
                     `(:dfloat-bits
                       ,(read-bits-wordindexed x sb!vm:double-float-value-slot)
-                      #!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
+                      #!-64-bit
                       ,(read-bits-wordindexed
                         x (1+ sb!vm:double-float-value-slot))))
                    (#.sb!vm:bignum-widetag

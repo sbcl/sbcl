@@ -1491,13 +1491,13 @@ and the number of 0 bits if INTEGER is negative."
 ;;; arithmetic, as that is only (currently) defined for constant
 ;;; shifts.  See also the comment in (LOGAND OPTIMIZER) for more
 ;;; discussion of this hack.  -- CSR, 2003-10-09
-#!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 32) '(and) '(or))
+#!-64-bit
 (defun sb!vm::ash-left-mod32 (integer amount)
   (etypecase integer
     ((unsigned-byte 32) (ldb (byte 32 0) (ash integer amount)))
     (fixnum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))
     (bignum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))))
-#!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 64) '(and) '(or))
+#!+64-bit
 (defun sb!vm::ash-left-mod64 (integer amount)
   (etypecase integer
     ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))

@@ -191,7 +191,7 @@
 
 ;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
 
-#!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
+#!-64-bit
 (progn
 #!+#.(cl:if (cl:eq :little-endian sb!c:*backend-byte-order*) '(and) '(or))
 (progn

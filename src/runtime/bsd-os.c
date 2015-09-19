@@ -638,7 +638,7 @@ openbsd_init()
      * Show a warning if it looks like the memory available after
      * allocating the spaces won't be at least this much.
      */
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_64_BIT
     const int wantfree = 64 * 1024 * 1024;
 #else
     const int wantfree = 32 * 1024 * 1024;

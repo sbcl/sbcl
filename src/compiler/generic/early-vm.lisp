@@ -20,24 +20,22 @@
 (def!constant lowtag-limit (ash 1 n-lowtag-bits))
 ;;; the number of tag bits used for a fixnum
 (def!constant n-fixnum-tag-bits
-  (locally (declare (notinline =)) ; avoid unreachable code warning
-    (if (= 64 n-word-bits)
-        ;; On 64-bit targets, this may be as low as 1 (for 63-bit
-        ;; fixnums) and as high as 3 (for 61-bit fixnums).  The
-        ;; constraint on the low end is that we need at least one bit
-        ;; to determine if a value is a fixnum or not, and the
-        ;; constraint on the high end is that it must not exceed
-        ;; WORD-SHIFT (defined below) due to the use of unboxed
-        ;; word-aligned byte pointers as boxed values in various
-        ;; places.  FIXME: This should possibly be exposed for
-        ;; configuration via customize-target-features.
-        1
-        ;; On 32-bit targets, this may be as low as 2 (for 30-bit
-        ;; fixnums) and as high as 2 (for 30-bit fixnums).  The
-        ;; constraint on the low end is simple overcrowding of the
-        ;; lowtag space, and the constraint on the high end is that it
-        ;; must not exceed WORD-SHIFT.
-        (1- n-lowtag-bits))))
+  ;; On 64-bit targets, this may be as low as 1 (for 63-bit
+  ;; fixnums) and as high as 3 (for 61-bit fixnums).  The
+  ;; constraint on the low end is that we need at least one bit
+  ;; to determine if a value is a fixnum or not, and the
+  ;; constraint on the high end is that it must not exceed
+  ;; WORD-SHIFT (defined below) due to the use of unboxed
+  ;; word-aligned byte pointers as boxed values in various
+  ;; places.  FIXME: This should possibly be exposed for
+  ;; configuration via customize-target-features.
+  #!+64-bit 1
+  ;; On 32-bit targets, this may be as low as 2 (for 30-bit
+  ;; fixnums) and as high as 2 (for 30-bit fixnums).  The
+  ;; constraint on the low end is simple overcrowding of the
+  ;; lowtag space, and the constraint on the high end is that it
+  ;; must not exceed WORD-SHIFT.
+  #!-64-bit (1- n-lowtag-bits))
 ;;; the fixnum tag mask
 (def!constant fixnum-tag-mask (1- (ash 1 n-fixnum-tag-bits)))
 ;;; the bit width of fixnums

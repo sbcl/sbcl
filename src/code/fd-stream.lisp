@@ -730,7 +730,7 @@
   (setf (signed-sap-ref-32 (buffer-sap obuf) tail)
         byte))
 
-#+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+#!+64-bit
 (progn
   (def-output-routines ("OUTPUT-UNSIGNED-LONG-LONG-~A-BUFFERED"
                         8
@@ -1238,7 +1238,7 @@
                    ((signed-byte 32) 4 sap head)
   (signed-sap-ref-32 sap head))
 
-#+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+#!+64-bit
 (progn
   (def-input-routine input-unsigned-64bit-byte
       ((unsigned-byte 64) 8 sap head)

@@ -694,13 +694,13 @@ static void print_otherptr(lispobj obj)
 #ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
             case COMPLEX_SINGLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_64_BIT
                 printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[0]);
 #else
                 printf("%g", ((struct complex_single_float *)native_pointer(obj))->real);
 #endif
                 NEWLINE_OR_RETURN;
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_64_BIT
                 printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[1]);
 #else
                 printf("%g", ((struct complex_single_float *)native_pointer(obj))->imag);
@@ -815,7 +815,7 @@ static void print_otherptr(lispobj obj)
 
 static void print_obj(char *prefix, lispobj obj)
 {
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_64_BIT
     static void (*verbose_fns[])(lispobj obj)
         = {print_fixnum, print_otherimm, print_fixnum, print_struct,
            print_fixnum, print_otherimm, print_fixnum, print_list,

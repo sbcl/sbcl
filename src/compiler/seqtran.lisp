@@ -631,9 +631,9 @@
                   (kind (cond ((sb!vm:saetp-fixnum-p saetp) :tagged)
                               ((member element-type '(character base-char)) :char)
                               ((eq element-type 'single-float) :single-float)
-                              #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                              #!+64-bit
                               ((eq element-type 'double-float) :double-float)
-                              #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                              #!+64-bit
                               ((equal element-type '(complex single-float))
                                :complex-single-float)
                               (t
@@ -658,11 +658,11 @@
                                          tmp)
                                         (:single-float
                                          (single-float-bits tmp))
-                                        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                        #!+64-bit
                                         (:double-float
                                          (logior (ash (double-float-high-bits tmp) 32)
                                                  (double-float-low-bits tmp)))
-                                        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                        #!+64-bit
                                         (:complex-single-float
                                          (logior (ash (single-float-bits (imagpart tmp)) 32)
                                                  (ldb (byte 32 0)
@@ -685,11 +685,11 @@
                                                     `item)
                                                    (:single-float
                                                     `(single-float-bits item))
-                                                   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                                   #!+64-bit
                                                    (:double-float
                                                     `(logior (ash (double-float-high-bits item) 32)
                                                              (double-float-low-bits item)))
-                                                   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                                   #!+64-bit
                                                    (:complex-single-float
                                                     `(logior (ash (single-float-bits (imagpart item)) 32)
                                                              (ldb (byte 32 0)

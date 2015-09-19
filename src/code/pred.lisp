@@ -145,11 +145,11 @@
   (def-type-predicate-wrapper %other-pointer-p)
   (def-type-predicate-wrapper system-area-pointer-p)
   (def-type-predicate-wrapper weak-pointer-p)
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   (progn
     (def-type-predicate-wrapper unsigned-byte-32-p)
     (def-type-predicate-wrapper signed-byte-32-p))
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   (progn
     (def-type-predicate-wrapper unsigned-byte-64-p)
     (def-type-predicate-wrapper signed-byte-64-p))

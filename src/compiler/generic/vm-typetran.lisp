@@ -57,10 +57,10 @@
 (define-type-predicate simple-array-unsigned-byte-32-p
                        (simple-array (unsigned-byte 32) (*)))
 
-#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+#!+64-bit
 (define-type-predicate simple-array-unsigned-byte-63-p
                        (simple-array (unsigned-byte 63) (*)))
-#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+#!+64-bit
 (define-type-predicate simple-array-unsigned-byte-64-p
                        (simple-array (unsigned-byte 64) (*)))
 (define-type-predicate simple-array-signed-byte-8-p
@@ -75,7 +75,7 @@
 (define-type-predicate simple-array-signed-byte-32-p
     (simple-array (signed-byte 32) (*)))
 
-#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+#!+64-bit
 (define-type-predicate simple-array-signed-byte-64-p
                        (simple-array (signed-byte 64) (*)))
 (define-type-predicate simple-array-single-float-p
@@ -96,13 +96,13 @@
 #!+sb-unicode (define-type-predicate simple-character-string-p
                   (simple-array character (*)))
 (define-type-predicate system-area-pointer-p system-area-pointer)
-#!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+#!-64-bit
 (define-type-predicate unsigned-byte-32-p (unsigned-byte 32))
-#!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+#!-64-bit
 (define-type-predicate signed-byte-32-p (signed-byte 32))
-#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+#!+64-bit
 (define-type-predicate unsigned-byte-64-p (unsigned-byte 64))
-#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+#!+64-bit
 (define-type-predicate signed-byte-64-p (signed-byte 64))
 #!+sb-simd-pack
 (define-type-predicate simd-pack-p simd-pack)

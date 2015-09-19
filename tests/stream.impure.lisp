@@ -422,7 +422,7 @@
 
 ;;; writing looong lines. takes way too long and way too much space
 ;;; to test on 64 bit platforms
-#-#.(cl:if (cl:= sb-vm:n-word-bits 64) '(and) '(or))
+#-64-bit
 (let ((test "long-lines-write-test.tmp"))
     (unwind-protect
          (with-open-file (f test

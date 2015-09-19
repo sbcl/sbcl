@@ -11,9 +11,8 @@
 (in-package "SB!VM")
 
 (defparameter *immediate-types*
-  (list* unbound-marker-widetag character-widetag
-         (when (= n-word-bits 64)
-           (list single-float-widetag))))
+  (list unbound-marker-widetag character-widetag
+        #!+64-bit single-float-widetag))
 
 (defparameter *fun-header-widetags*
   (list funcallable-instance-header-widetag

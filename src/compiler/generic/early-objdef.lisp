@@ -56,7 +56,7 @@
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
   ;; defined in the first DEFENUM. -- AL 20000216
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   (defenum ()
     even-fixnum-lowtag
     other-immediate-0-lowtag
@@ -74,7 +74,7 @@
     other-immediate-3-lowtag
     pad5-lowtag
     other-pointer-lowtag)
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   (defenum ()
     even-fixnum-lowtag
     instance-pointer-lowtag
@@ -209,14 +209,14 @@
   unused05-widetag                          ;  6E   75  6E   75
   unused06-widetag                          ;  72   79  72   79
   unused07-widetag                          ;  76   7D  76   7D
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   unused08-widetag                          ;  7A       7A
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   unused09-widetag                          ;  7E       7E
 
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   unused10-widetag                          ;  82       82
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   unused11-widetag                          ;  86       86
 
   simple-array-widetag                      ;  8A   81  8A   81
@@ -227,24 +227,24 @@
   simple-array-unsigned-byte-15-widetag     ;  9E   95  9E   95
   simple-array-unsigned-byte-16-widetag     ;  A2   99  A2   99
 
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   simple-array-unsigned-fixnum-widetag      ;  A6   A5  A6   A5
   simple-array-unsigned-byte-31-widetag     ;  AA   9D  AA   9D
   simple-array-unsigned-byte-32-widetag     ;  AE   A1  AE   A1
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   simple-array-unsigned-fixnum-widetag      ;  A6   A5  A6   A5
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   simple-array-unsigned-byte-63-widetag     ;       A9       A9
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   simple-array-unsigned-byte-64-widetag     ;       AD       AD
   simple-array-signed-byte-8-widetag        ;  B2   B1  B2   B1
   simple-array-signed-byte-16-widetag       ;  B6   B5  B6   B5
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   simple-array-fixnum-widetag               ;  BA   BD  BA   BD
   simple-array-signed-byte-32-widetag       ;  BE   B9  BE   B9
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   simple-array-fixnum-widetag               ;  BA   BD  BA   BD
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+64-bit
   simple-array-signed-byte-64-widetag       ;       C1       C1
   simple-array-single-float-widetag         ;  C2   C5  C2   C5
   simple-array-double-float-widetag         ;  C6   C9  C6   C9
@@ -267,13 +267,11 @@
   complex-vector-widetag                    ;  F6   F9  EE   F1
   complex-array-widetag                     ;  FA   FD  F2   F5
 
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  #!-64-bit
   unused12-widetag                          ;  FE       F6
-  #!+(and #.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-          (not sb-unicode))
+  #!+(and (not 64-bit) (not sb-unicode))
   unused13-widetag                          ;           FA
-  #!+(and #.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-          (not sb-unicode))
+  #!+(and (not 64-bit) (not sb-unicode))
   unused14-widetag                          ;           FE
 )
 

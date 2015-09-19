@@ -657,7 +657,7 @@ if [ "$sbcl_arch" = "x86" ]; then
         sh tools-for-build/openbsd-sigcontext.sh > src/runtime/openbsd-sigcontext.h
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
-    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
+    printf ' :64-bit :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
     printf ' :interleaved-raw-slots :precise-arg-count-error :fp-and-pc-standard-save' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf

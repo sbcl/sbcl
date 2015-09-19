@@ -66,15 +66,15 @@
                :ref-trans %denominator
                :init :arg))
 
-#!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
+#!-64-bit
 (!define-primitive-object (single-float :lowtag other-pointer-lowtag
                                        :widetag single-float-widetag)
   (value :c-type "float"))
 
 (!define-primitive-object (double-float :lowtag other-pointer-lowtag
                                        :widetag double-float-widetag)
-  #!-x86-64 (filler)
-  (value :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
+  #!-64-bit (filler)
+  (value :c-type "double" :length #.(/ 64 n-word-bits)))
 
 #!+long-float
 (!define-primitive-object (long-float :lowtag other-pointer-lowtag
@@ -359,19 +359,19 @@
 (!define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-single-float-widetag)
-  #!+x86-64
+  #!+64-bit
   (data :c-type "struct { float data[2]; } ")
-  #!-x86-64
+  #!-64-bit
   (real :c-type "float")
-  #!-x86-64
+  #!-64-bit
   (imag :c-type "float"))
 
 (!define-primitive-object (complex-double-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-double-float-widetag)
   (filler)
-  (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
-  (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
+  (real :c-type "double" :length #.(/ 64 n-word-bits))
+  (imag :c-type "double" :length #.(/ 64 n-word-bits)))
 
 #!+sb-simd-pack
 (!define-primitive-object (simd-pack
