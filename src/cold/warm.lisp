@@ -249,6 +249,19 @@
       'restart (lambda (stream obj)
                  (print-unreadable-object (obj stream :type t :identity t)
                    (write (restart-name obj) :stream stream))))
+     ;; These next two are coded in a totally brittle way, but no more wrong
+     ;; than typing the decoding expressions into the debugger to decipher
+     ;; a backtrace. Anyway, if it ceases to print right, just fix it again!
+     (set-pprint-dispatch
+      'generic-function
+      (lambda (stream obj)
+        (format stream "<~S ~S>" (type-of obj)
+                (svref (sb-kernel:%funcallable-instance-info obj 1) 5))))
+     (set-pprint-dispatch
+      'class
+      (lambda (stream obj)
+        (format stream "<~S ~S>" (type-of obj)
+                (svref (sb-kernel:%instance-ref obj 1) 3))))
      (with-compilation-unit ()
        (let ((*compile-print* nil))
          (do-srcs pcl-srcs)))
