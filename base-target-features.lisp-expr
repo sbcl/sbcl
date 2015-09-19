@@ -411,13 +411,18 @@
  ;;      any MIPS CPU (in little-endian mode with :little-endian)
  ;;   :arm
  ;;      an ARM CPU (details yet to be determined)
- ;;
+ ;;   :arm64
+ ;;     an ARMv8 AArch64 CPU
  ;; (CMU CL also had a :pentium feature, which affected the definition
  ;; of some floating point vops. It was present but not enabled or
  ;; documented in the CMU CL code that SBCL is derived from, and has
  ;; now been moved to the backend-subfeatures mechanism.)
  ;;
  ;; properties derived from the machine architecture
+ ;;
+ ;;   :64-bit
+ ;;     means (= sb-vm:n-word-bits 64) currently true for x86-64 and arm64
+ ;;
  ;;   :control-stack-grows-downward-not-upward
  ;;     On the X86, the Lisp control stack grows downward. On the
  ;;     other supported CPU architectures as of sbcl-0.7.1.40, the
