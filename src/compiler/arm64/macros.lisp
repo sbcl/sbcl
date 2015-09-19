@@ -56,12 +56,12 @@
          (load-immediate-word tmp-tn x)
          tmp-tn)))
 
-(defun load-store-offset (offset)
+(defun load-store-offset (offset &optional (temp tmp-tn))
   (cond ((ldr-str-offset-encodable offset)
          offset)
         (t
-         (load-immediate-word tmp-tn offset)
-         tmp-tn)))
+         (load-immediate-word temp offset)
+         temp)))
 
 (macrolet
     ((def (op inst shift)
@@ -144,13 +144,7 @@
 
 ;;; Move a stack TN to a register and vice-versa.
 (defun load-stack-offset (reg stack stack-tn)
-  (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
-    (cond ((or (tn-p offset)
-               (typep offset '(unsigned-byte 12)))
-           (inst ldr reg (@ stack offset)))
-          (t
-           (load-immediate-word reg offset)
-           (inst ldr reg (@ stack reg))))))
+  (inst ldr reg (@ stack (load-store-offset (* (tn-offset stack-tn) n-word-bytes)))))
 
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
@@ -161,19 +155,7 @@
 
 (defun store-stack-offset (reg stack stack-tn)
   (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
-    (cond ((or (typep offset '(unsigned-byte 12))
-               (tn-p offset))
-           (inst str reg (@ stack offset)))
-          (t
-           (let ((low (ldb (byte 12 0) offset))
-                 (high (mask-field (byte 20 12) offset)))
-             ;; KLUDGE:
-             ;; Have to do this because it is used in move vops
-             ;; which do not have temporary registers.
-             ;; The debugger will be not happy.
-             (composite-immediate-instruction add stack stack high)
-             (inst str reg (@ stack low))
-             (composite-immediate-instruction sub stack stack high))))))
+    (inst str reg (@ stack (load-store-offset offset)))))
 
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)

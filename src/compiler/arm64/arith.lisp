@@ -760,7 +760,7 @@
   (:generator 3
     (cond ((zerop width)
            (inst mov r 0))
-          ((= width 32)
+          ((= width 64)
            (move r x))
           (t
            (let ((delta (- n-word-bits width)))
@@ -852,8 +852,8 @@
   (:result-types unsigned-num unsigned-num)
   (:generator 2
     (move lo carry-in)
-    (inst mov hi 0)
-    (inst umlal lo hi x y)))
+    (inst umulh hi x y)
+    (inst madd lo x y lo)))
 
 (define-vop (bignum-mult-and-add-4-arg)
   (:translate sb!bignum:%multiply-and-add)
@@ -869,19 +869,21 @@
   (:generator 9
     (inst adds lo prev carry-in)
     (inst cset hi :cs)
-    (inst umlal lo hi x y)))
+    (inst umulh hi x y)
+    (inst madd lo x y lo)))
 
 (define-vop (bignum-mult)
   (:translate sb!bignum:%multiply)
   (:policy :fast-safe)
-  (:args (x :scs (unsigned-reg))
-         (y :scs (unsigned-reg)))
+  (:args (x :scs (unsigned-reg) :to :result)
+         (y :scs (unsigned-reg) :to :result))
   (:arg-types unsigned-num unsigned-num)
-  (:results (hi :scs (unsigned-reg))
-            (lo :scs (unsigned-reg)))
+  (:results (hi :scs (unsigned-reg) :from :eval)
+            (lo :scs (unsigned-reg) :from :eval))
   (:result-types unsigned-num unsigned-num)
   (:generator 1
-    (inst umull lo hi x y)))
+    (inst umulh hi x y)
+    (inst mul lo x y)))
 
 #!+multiply-high-vops
 (define-vop (mulhi)
@@ -890,11 +892,10 @@
   (:args (x :scs (unsigned-reg) :target hi)
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:temporary (:sc unsigned-reg) lo)
   (:results (hi :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 20
-    (inst umull lo hi x y)))
+    (inst umulh hi x y)))
 
 #!+multiply-high-vops
 (define-vop (mulhi/fx)
@@ -903,12 +904,12 @@
   (:args (x :scs (any-reg) :target hi)
          (y :scs (unsigned-reg)))
   (:arg-types positive-fixnum unsigned-num)
-  (:temporary (:sc any-reg) lo)
+  (:temporary (:sc unsigned-reg) temp)
   (:results (hi :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 15
-    (inst umull lo hi x y)
-    (inst and hi hi (bic-mask fixnum-tag-mask))))
+    (inst umulh temp x y)
+    (inst and hi temp (bic-mask fixnum-tag-mask))))
 
 (define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
   (:translate sb!bignum:%lognot))
@@ -926,14 +927,14 @@
   (:generator 300
     (move rem div-high)
     (move quo div-low)
-    (dotimes (i 33)
+    (dotimes (i 65)
       (assemble ()
         (inst cmp rem divisor)
         (inst b :cc CC)
         (inst sub rem rem divisor)
         CC
         (inst adcs quo quo quo)
-        (unless (= i 32)
+        (unless (= i 64)
           (inst adc rem rem rem))))))
 
 (define-vop (signify-digit)
