@@ -14,28 +14,24 @@
 ;;;; Move functions:
 
 (define-move-fun (load-single 1) (vop x y)
-  ((single-stack) (single-reg))
-  (inst flds y (@ (current-nfp-tn vop) (* (tn-offset x) n-word-bytes))))
+                 ((single-stack) (single-reg))
+  (loadw y (current-nfp-tn vop) (tn-offset x)))
 
 (define-move-fun (store-single 1) (vop x y)
-  ((single-reg) (single-stack))
-  (inst fsts x (@ (current-nfp-tn vop) (* (tn-offset y) n-word-bytes))))
+                 ((single-reg) (single-stack))
+  (storew y (current-nfp-tn vop) (tn-offset x)))
 
 (define-move-fun (load-double 2) (vop x y)
-  ((double-stack) (double-reg))
-  (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
-    (inst fldd y (@ nfp offset))))
+                 ((double-stack) (double-reg))
+  (loadw y (current-nfp-tn vop) (tn-offset x)))
 
 (define-move-fun (store-double 2) (vop x y)
-  ((double-reg) (double-stack))
-  (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
-    (inst fstd x (@ nfp offset))))
+                 ((double-reg) (double-stack))
+  (storew y (current-nfp-tn vop) (tn-offset x)))
 
 ;;;; Move VOPs:
 
-(macrolet ((frob (vop sc move-macro)
+(macrolet ((frob (vop sc)
              `(progn
                 (define-vop (,vop)
                   (:args (x :scs (,sc)
@@ -45,17 +41,20 @@
                                :load-if (not (location= x y))))
                   (:note "float move")
                   (:generator 0
-                    (,move-macro y x)))
+                    (inst fmov y x)))
                 (define-move-vop ,vop :move (,sc) (,sc)))))
-  (frob single-move single-reg move-single)
-  (frob double-move double-reg move-double))
+  (frob single-move single-reg)
+  (frob double-move double-reg))
 
 (define-vop (move-from-single)
   (:args (x :scs (single-reg) :to :save))
+  (:temporary (:sc non-descriptor-reg) tmp)
   (:results (y :scs (descriptor-reg)))
   (:note "float to pointer coercion")
   (:generator 4
-    (error "implement")))
+    (inst fmov tmp x)
+    (inst lsl tmp tmp 32)
+    (inst add y tmp single-float-widetag)))
 
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
@@ -65,26 +64,33 @@
   (:results (y))
   (:note "float to pointer coercion")
   (:temporary (:sc non-descriptor-reg) tmp)
-  (:temporary (:sc interior-reg) lip)
   (:results (y :scs (descriptor-reg)))
   (:generator 13
    (with-fixed-allocation (y tmp
                            double-float-widetag
                            double-float-value-slot)
-     (inst sub lip y other-pointer-lowtag)
-     (inst fstd x (@ lip (* double-float-value-slot n-word-bytes))))))
+     (storew x y double-float-value-slot other-pointer-lowtag))))
 
 (define-move-vop move-from-double :move (double-reg) (descriptor-reg))
 
 (define-vop (move-to-double)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (double-reg)))
-  (:temporary (:sc interior-reg) lip)
   (:note "pointer to float coercion")
   (:generator 2
-              (inst sub lip x other-pointer-lowtag)
-              (inst fldd y (@ lip (* double-float-value-slot n-word-bytes)))))
+    (loadw y x double-float-value-slot other-pointer-lowtag)))
 (define-move-vop move-to-double :move (descriptor-reg) (double-reg))
+
+(define-vop (move-to-single-reg)
+   (:args (x :scs (descriptor-reg) :target tmp))
+  (:temporary (:sc unsigned-reg :from :argument :to :result) tmp)
+   (:results (y :scs (single-reg)))
+   (:note "pointer to float coercion")
+  (:generator 2
+   (inst lsr tmp x 32)
+   (inst fmov y tmp)))
+
+(define-move-vop move-to-single-reg :move (descriptor-reg) (single-reg))
 
 (macrolet ((frob (name sc stack-sc double-p)
              `(progn
@@ -97,10 +103,9 @@
                   (:generator ,(if double-p 2 1)
                     (sc-case y
                       (,sc
-                       (,(if double-p 'move-double 'move-single) y x))
+                       (inst fmov y x))
                       (,stack-sc
-                       (let ((offset (* (tn-offset y) n-word-bytes)))
-                         (inst ,(if double-p 'fstd 'fsts) x (@ nfp offset)))))))
+                       (storew x nfp (tn-offset y))))))
                 (define-move-vop ,name :move-arg
                   (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack nil)
@@ -128,28 +133,32 @@
   (let ((nfp (current-nfp-tn vop))
         (offset (* (tn-offset x) n-word-bytes)))
     (inst add lr-tn nfp offset)
-    (inst load-complex-single y (@ lr-tn))))
+    ;; (inst load-complex-single y (@ lr-tn))
+    ))
 
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
   (let ((nfp (current-nfp-tn vop))
         (offset (* (tn-offset y) n-word-bytes)))
     (inst add lr-tn nfp offset)
-    (inst store-complex-single x (@ lr-tn))))
+    ;; (inst store-complex-single x (@ lr-tn))
+    ))
 
 (define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((nfp (current-nfp-tn vop))
         (offset (* (tn-offset x) n-word-bytes)))
     (inst add lr-tn nfp offset)
-    (inst load-complex-double y (@ lr-tn))))
+    ;; (inst load-complex-double y (@ lr-tn))
+    ))
 
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
   (let ((nfp (current-nfp-tn vop))
         (offset (* (tn-offset y) n-word-bytes)))
     (inst add lr-tn nfp offset)
-    (inst store-complex-double x (@ lr-tn))))
+    ;; (inst store-complex-double x (@ lr-tn))
+    ))
 
 ;;;
 ;;; Complex float register to register moves.
@@ -191,7 +200,8 @@
        (inst sub pa-flag y (- other-pointer-lowtag
                               (* complex-single-float-real-slot
                                  n-word-bytes)))
-       (inst store-complex-single x (@ pa-flag)))))
+       ;; (inst store-complex-single x (@ pa-flag))
+       )))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -206,7 +216,8 @@
        (inst add pa-flag y (- (* complex-double-float-real-slot
                                  n-word-bytes)
                               other-pointer-lowtag))
-       (inst store-complex-double x (@ pa-flag)))))
+       ;; (inst store-complex-double x (@ pa-flag))
+       )))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
@@ -217,26 +228,20 @@
 (define-vop (move-to-complex-single)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (complex-single-reg)))
-  (:temporary (:sc interior-reg) lip)
   (:note "pointer to complex float coercion")
   (:generator 2
-    (inst sub lip x (- other-pointer-lowtag
-                       (* complex-single-float-real-slot
-                          n-word-bytes)))
-    (inst load-complex-single y (@ lip))))
+    (loadw x y complex-single-float-real-slot
+        other-pointer-lowtag)))
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
 
 (define-vop (move-to-complex-double)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (complex-double-reg)))
-  (:temporary (:sc interior-reg) lip)
   (:note "pointer to complex float coercion")
   (:generator 2
-    (inst add lip x (- (* complex-double-float-real-slot
-                          n-word-bytes)
-                       other-pointer-lowtag))
-    (inst load-complex-double y (@ lip))))
+    (loadw x y complex-double-float-real-slot
+        other-pointer-lowtag)))
 (define-move-vop move-to-complex-double :move
   (descriptor-reg) (complex-double-reg))
 
@@ -251,13 +256,14 @@
   (:temporary (:sc interior-reg) lip)
   (:note "complex single-float arg move")
   (:generator 1
-    (sc-case y
-      (complex-single-reg
-       (move-complex-single y x))
-      (complex-single-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
-         (inst add lip nfp offset)
-         (inst store-complex-single x (@ lip)))))))
+    ;; (sc-case y
+    ;;   (complex-single-reg
+    ;;    (move-complex-single y x))
+    ;;   (complex-single-stack
+    ;;    (let ((offset (* (tn-offset y) n-word-bytes)))
+    ;;      (inst add lip nfp offset)
+    ;;      (inst store-complex-single x (@ lip)))))
+    ))
 (define-move-vop move-complex-single-float-arg :move-arg
   (complex-single-reg descriptor-reg) (complex-single-reg))
 
@@ -268,13 +274,14 @@
   (:temporary (:sc interior-reg) lip)
   (:note "complex double-float arg move")
   (:generator 2
-    (sc-case y
-      (complex-double-reg
-       (move-complex-double y x))
-      (complex-double-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
-         (inst add lip nfp offset)
-         (inst store-complex-double x (@ lip)))))))
+    ;; (sc-case y
+    ;;   (complex-double-reg
+    ;;    (move-complex-double y x))
+    ;;   (complex-double-stack
+    ;;    (let ((offset (* (tn-offset y) n-word-bytes)))
+    ;;      (inst add lip nfp offset)
+    ;;      (inst store-complex-double x (@ lip)))))
+    ))
 (define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
 
@@ -308,20 +315,20 @@
   (frob single-float-op single-reg single-float)
   (frob double-float-op double-reg double-float))
 
-(macrolet ((frob (op sinst sname scost dinst dname dcost)
+(macrolet ((frob (op inst sname scost dname dcost)
              `(progn
                 (define-vop (,sname single-float-op)
                   (:translate ,op)
                   (:generator ,scost
-                    (inst ,sinst r x y)))
+                    (inst ,inst r x y)))
                 (define-vop (,dname double-float-op)
                   (:translate ,op)
                   (:generator ,dcost
-                    (inst ,dinst r x y))))))
-  (frob + fadds +/single-float 2 faddd +/double-float 2)
-  (frob - fsubs -/single-float 2 fsubd -/double-float 2)
-  (frob * fmuls */single-float 4 fmuld */double-float 5)
-  (frob / fdivs //single-float 12 fdivd //double-float 19))
+                    (inst ,inst r x y))))))
+  (frob + fadd +/single-float 2  +/double-float 2)
+  (frob - fsub -/single-float 2 -/double-float 2)
+  (frob * fmul */single-float 4  */double-float 5)
+  (frob / fdiv //single-float 12 //double-float 19))
 
 (macrolet ((frob (name inst translate sc type)
              `(define-vop (,name)
@@ -337,10 +344,10 @@
                 (:generator 1
                   (note-this-location vop :internal-error)
                   (inst ,inst y x)))))
-  (frob abs/single-float fabss abs single-reg single-float)
-  (frob abs/double-float fabsd abs double-reg double-float)
-  (frob %negate/single-float fnegs %negate single-reg single-float)
-  (frob %negate/double-float fnegd %negate double-reg double-float))
+  (frob abs/single-float fabs abs single-reg single-float)
+  (frob abs/double-float fabs abs double-reg double-float)
+  (frob %negate/single-float fneg %negate single-reg single-float)
+  (frob %negate/double-float fneg %negate double-reg double-float))
 
 (define-vop (fsqrtd)
   (:args (x :scs (double-reg)))
@@ -352,7 +359,7 @@
   (:note "inline float arithmetic")
   (:save-p :compute-only)
   (:generator 1
-     (inst fsqrtd y x)))
+     (inst fsqrt y x)))
 
 (define-vop (fsqrts)
   (:args (x :scs (single-reg)))
@@ -364,7 +371,7 @@
   (:note "inline float arithmetic")
   (:save-p :compute-only)
   (:generator 1
-    (inst fsqrts y x)))
+    (inst fsqrt y x)))
 
 ;;;; Comparison:
 
@@ -380,13 +387,12 @@
     (ecase format
       (:single
        (if is-=
-           (inst fcmps x y)
-           (inst fcmpes x y)))
+           (inst fcmp x y)
+           (inst fcmpe x y)))
       (:double
        (if is-=
-           (inst fcmpd x y)
-           (inst fcmped x y))))
-    (inst fmstat)))
+           (inst fcmp x y)
+           (inst fcmpe x y))))))
 
 (macrolet ((frob (name sc ptype)
              `(define-vop (,name float-compare)
@@ -414,23 +420,16 @@
   (:args (x))
   (:info y)
   (:ignore y)
-  (:variant-vars format is-=)
+  (:variant-vars is-=)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 2
     (note-this-location vop :internal-error)
-    (ecase format
-      (:single
-       (if is-=
-           (inst fcmpzs x)
-           (inst fcmpezs x)))
-      (:double
-       (if is-=
-           (inst fcmpzd x)
-           (inst fcmpezd x))))
-    (inst fmstat)))
+    (if is-=
+        (inst fcmp x 0)
+        (inst fcmpe x 0))))
 
 (macrolet ((frob (name sc ptype constant-type)
              `(define-vop (,name float-compare-zero)
@@ -446,11 +445,11 @@
                 (define-vop (,sname single-float-compare-zero)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :single ,is-=))
+                  (:variant ,is-=))
                 (define-vop (,dname double-float-compare-zero)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :double ,is-=)))))
+                  (:variant ,is-=)))))
   (frob < :mi </single-float-zero </double-float-zero nil)
   (frob > :gt >/single-float-zero >/double-float-zero nil)
   (frob = :eq eql/single-float-zero eql/double-float-zero t))
@@ -460,7 +459,6 @@
 (macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
             `(define-vop (,name)
                (:args (x :scs (,from-sc)))
-               (:temporary (:scs (single-reg)) rtemp)
                (:results (y :scs (,to-sc)))
                (:arg-types ,from-type)
                (:result-types ,to-type)
@@ -470,8 +468,7 @@
                (:vop-var vop)
                (:save-p :compute-only)
                (:generator 5
-                 (inst fmsr rtemp x)
-                 (inst ,inst y rtemp)))))
+                 (inst scvtf y x)))))
   (frob %single-float/signed %single-float fsitos
         signed-reg signed-num single-reg single-float)
   (frob %double-float/signed %double-float fsitod
@@ -481,7 +478,7 @@
   (frob %double-float/unsigned %double-float fuitod
         unsigned-reg unsigned-num double-reg double-float))
 
-(macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
+(macrolet ((frob (name translate from-sc from-type to-sc to-type)
              `(define-vop (,name)
                 (:args (x :scs (,from-sc)))
                 (:results (y :scs (,to-sc)))
@@ -494,16 +491,15 @@
                 (:save-p :compute-only)
                 (:generator 2
                   (note-this-location vop :internal-error)
-                  (inst ,inst y x)))))
-  (frob %single-float/double-float %single-float fcvtsd
+                  (inst fcvt y x)))))
+  (frob %single-float/double-float %single-float
     double-reg double-float single-reg single-float)
-  (frob %double-float/single-float %double-float fcvtds
+  (frob %double-float/single-float %double-float
     single-reg single-float double-reg double-float))
 
 (macrolet ((frob (trans from-sc from-type inst)
              `(define-vop (,(symbolicate trans "/" from-type))
-                (:args (x :scs (,from-sc) :target temp))
-                (:temporary (:from (:argument 0) :sc single-reg) temp)
+                (:args (x :scs (,from-sc)))
                 (:results (y :scs (signed-reg)))
                 (:arg-types ,from-type)
                 (:result-types signed-num)
@@ -514,12 +510,11 @@
                 (:save-p :compute-only)
                 (:generator 5
                   (note-this-location vop :internal-error)
-                  (inst ,inst temp x)
-                  (inst fmrs y temp)))))
-  (frob %unary-truncate/single-float single-reg single-float ftosizs)
-  (frob %unary-truncate/double-float double-reg double-float ftosizd)
-  (frob %unary-round single-reg single-float ftosis)
-  (frob %unary-round double-reg double-float ftosid))
+                  (inst ,inst y x)))))
+  (frob %unary-truncate/single-float single-reg single-float fcvtzs)
+  (frob %unary-truncate/double-float double-reg double-float fcvtzs)
+  (frob %unary-round single-reg single-float fcvtns)
+  (frob %unary-round double-reg double-float fcvtns))
 
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res
@@ -537,15 +532,13 @@
       (signed-reg
        (sc-case res
          (single-reg
-          (inst fmsr res bits))
+          (inst fmov res bits))
          (single-stack
           (storew bits (current-nfp-tn vop) (tn-offset res)))))
       (signed-stack
        (sc-case res
          (single-reg
-          (inst flds res
-                (@ (current-nfp-tn vop)
-                   (* (tn-offset bits) n-word-bytes))))
+          (loadw res (current-nfp-tn vop) (tn-offset res)))
          (single-stack
           (unless (location= bits res)
             (loadw temp (current-nfp-tn vop) (tn-offset bits))
@@ -559,20 +552,16 @@
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
+  (:temporary (:sc unsigned-reg) temp)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 2
+    (inst orr temp lo-bits (lsl hi-bits 32))
     (sc-case res
       (double-reg
-       (inst fmdrr res lo-bits hi-bits))
+       (inst fmov res temp))
       (double-stack
-       (cond
-         ((eq *backend-byte-order* :big-endian)
-          (storew hi-bits (current-nfp-tn vop) (tn-offset res))
-          (storew lo-bits (current-nfp-tn vop) (1+ (tn-offset res))))
-         (t
-          (storew lo-bits (current-nfp-tn vop) (tn-offset res))
-          (storew hi-bits (current-nfp-tn vop) (1+ (tn-offset res)))))))))
+       (storew temp (current-nfp-tn vop) (tn-offset res))))))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
@@ -590,16 +579,15 @@
       (signed-reg
        (sc-case float
          (single-reg
-          (inst fmrs bits float))
+          (inst fmov bits float))
          (single-stack
           (loadw bits (current-nfp-tn vop) (tn-offset float)))
          (descriptor-reg
-          (error "implement"))))
+          (style-warn "implement"))))
       (signed-stack
        (sc-case float
          (single-reg
-          (inst fsts float (@ (current-nfp-tn vop)
-                              (* (tn-offset bits) n-word-bytes))))
+          (storew float (current-nfp-tn vop) (tn-offset bits)))
          ((single-stack descriptor-reg)
           ;; Fun and games: This also affects PPC, silently.
           ;; Hopefully it's a non-issue, but I'd rather have the
@@ -607,8 +595,7 @@
           (bug "Unable to extract single-float bits from ~S to ~S" float bits)))))))
 
 (define-vop (double-float-high-bits)
-  (:args (float :scs (double-reg descriptor-reg)
-                :load-if (not (sc-is float double-stack))))
+  (:args (float :scs (double-reg descriptor-reg)))
   (:results (hi-bits :scs (signed-reg)))
   (:arg-types double-float)
   (:result-types signed-num)
@@ -618,7 +605,8 @@
   (:generator 5
     (sc-case float
       (double-reg
-        (inst fmrdh hi-bits float))
+       (inst fmov hi-bits float)
+       (inst asr hi-bits hi-bits 32))
       (double-stack
         (loadw hi-bits (current-nfp-tn vop)
                (+ (tn-offset float)
@@ -642,7 +630,8 @@
   (:generator 5
     (sc-case float
       (double-reg
-        (inst fmrdl lo-bits float))
+       (inst fmov lo-bits float)
+       (inst and lo-bits lo-bits (ldb (byte 32 0) -1)))
       (double-stack
         (loadw lo-bits (current-nfp-tn vop)
                (+ (tn-offset float)
@@ -667,7 +656,7 @@
   (:translate floating-point-modes)
   (:policy :fast-safe)
   (:generator 3
-    (inst fmrx res :fpscr)))
+    (inst mrs res :fpsr)))
 
 (define-vop (set-floating-point-modes)
   (:args (new :scs (unsigned-reg) :target res))
@@ -677,7 +666,7 @@
   (:translate (setf floating-point-modes))
   (:policy :fast-safe)
   (:generator 3
-    (inst fmxr :fpscr new)
+    (inst msr :fpsr new)
     (move res new)))
 
 ;;;; Complex float VOPs
@@ -695,18 +684,20 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
-    (sc-case r
-      (complex-single-reg
-       (let ((r-real (complex-single-reg-real-tn r)))
-         (move-single r-real real))
-       (let ((r-imag (complex-single-reg-imag-tn r)))
-         (move-single r-imag imag)))
-      (complex-single-stack
-       (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
-         (unless (location= real r)
-           (inst fsts real (@ nfp offset)))
-         (inst fsts imag (@ nfp (+ offset n-word-bytes))))))))
+    ;; (sc-case r
+    ;;   (complex-single-reg
+    ;;    (let ((r-real (complex-single-reg-real-tn r)))
+    ;;      (inst fmov r-real real))
+    ;;    (let ((r-imag (complex-single-reg-imag-tn r)))
+    ;;      (inst fmov r-imag imag)))
+    ;;   (complex-single-stack
+    ;;    (let ((nfp (current-nfp-tn vop))
+    ;;          (offset (* (tn-offset r) n-word-bytes)))
+    ;;      (unless (location= real r)
+    ;;        (in)
+    ;;        (inst fsts real (@ nfp offset)))
+    ;;      (inst fsts imag (@ nfp (+ offset n-word-bytes))))))
+    ))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -721,18 +712,19 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
-    (sc-case r
-      (complex-double-reg
-       (let ((r-real (complex-double-reg-real-tn r)))
-         (move-double r-real real))
-       (let ((r-imag (complex-double-reg-imag-tn r)))
-         (move-double r-imag imag)))
-      (complex-double-stack
-       (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
-         (unless (location= real r)
-           (inst fstd real (@ nfp offset)))
-         (inst fstd imag (@ nfp (+ offset (* 2 n-word-bytes)))))))))
+    ;; (sc-case r
+    ;;   (complex-double-reg
+    ;;    (let ((r-real (complex-double-reg-real-tn r)))
+    ;;      (inst fmov r-real real))
+    ;;    (let ((r-imag (complex-double-reg-imag-tn r)))
+    ;;      (inst fmov r-imag imag)))
+    ;;   (complex-double-stack
+    ;;    (let ((nfp (current-nfp-tn vop))
+    ;;          (offset (* (tn-offset r) n-word-bytes)))
+    ;;      (unless (location= real r)
+    ;;        (storew real nfp offset))
+    ;;      (storew imag nfp (+ offset 2)))))
+    ))
 
 
 (define-vop (complex-single-float-value)
@@ -745,17 +737,17 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (sc-case x
-      (complex-single-reg
-       (let ((value-tn (ecase slot
-                         (:real (complex-single-reg-real-tn x))
-                         (:imag (complex-single-reg-imag-tn x)))))
-         (move-single r value-tn)))
-      (complex-single-stack
-       (inst flds r (@ (current-nfp-tn vop)
-                       (* (+ (ecase slot (:real 0) (:imag 1))
-                             (tn-offset x))
-                          n-word-bytes)))))))
+    ;; (sc-case x
+    ;;   (complex-single-reg
+    ;;    (let ((value-tn (ecase slot
+    ;;                      (:real (complex-single-reg-real-tn x))
+    ;;                      (:imag (complex-single-reg-imag-tn x)))))
+    ;;      (inst fmov r value-tn)))
+    ;;   (complex-single-stack
+    ;;    (loadw r (current-nfp-tn vop)
+    ;;        (+ (ecase slot (:real 0) (:imag 1))
+    ;;           (tn-offset x)))))
+    ))
 
 (define-vop (realpart/complex-single-float complex-single-float-value)
   (:translate realpart)
@@ -782,12 +774,10 @@
        (let ((value-tn (ecase slot
                          (:real (complex-double-reg-real-tn x))
                          (:imag (complex-double-reg-imag-tn x)))))
-         (move-double r value-tn)))
+         (inst fmov r value-tn)))
       (complex-double-stack
-       (inst fldd r (@ (current-nfp-tn vop)
-                       (* (+ (ecase slot (:real 0) (:imag 2))
-                             (tn-offset x))
-                          n-word-bytes)))))))
+       (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 2))
+                                        (tn-offset x)))))))
 
 (define-vop (realpart/complex-double-float complex-double-float-value)
   (:translate realpart)

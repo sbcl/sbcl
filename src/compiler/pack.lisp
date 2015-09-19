@@ -1508,7 +1508,7 @@
     #!+(or x86 x86-64 arm arm64)
     (when (and (not (eq (tn-kind tn) :specified-save))
                (not (and (string= (sb-name sb)
-                                  #!-arm "STACK"
+                                  #!-(or arm arm64) "STACK"
                                   #!+(or arm arm64) "CONTROL-STACK")
                          (or (= offset 0)
                              (= offset 1))))

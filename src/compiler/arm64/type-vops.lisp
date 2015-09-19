@@ -17,6 +17,23 @@
     (inst tst value fixnum-tag-mask)
     (inst b (if not-p :ne :eq) target)))
 
+(defun %test-fixnum-immediate-and-headers (value target not-p immediate
+                                           headers &key temp)
+  (let ((drop-through (gen-label)))
+    (inst tst value fixnum-tag-mask)
+    (inst b :eq (if not-p drop-through target))
+    (%test-immediate-and-headers value target not-p immediate headers
+                                 :drop-through drop-through :temp temp)))
+
+(defun %test-immediate-and-headers (value target not-p immediate headers
+                                    &key (drop-through (gen-label)) temp)
+
+  (inst mov temp immediate)
+  (inst cmp temp (extend value :uxtb))
+  (inst b :eq (if not-p drop-through target))
+  (%test-headers value target not-p nil headers :drop-through drop-through
+                                                :temp temp))
+
 (defun %test-fixnum-and-headers (value target not-p headers &key temp)
   (let ((drop-through (gen-label)))
     (assemble ()
@@ -57,7 +74,8 @@
                  ((and (not last) (null (cddr remaining))
                        (atom (cadr remaining))
                        (= (logcount (logxor header (cadr remaining))) 1))
-                  (inst and temp temp (ldb (byte 8 0) (logeqv header (cadr remaining))))
+                  (inst and temp temp (logical-mask
+                                       (ldb (byte 8 0) (logeqv header (cadr remaining)))))
                   (inst cmp temp (ldb (byte 8 0) (logand header (cadr remaining))))
                   (inst b (if not-p :ne :eq) target)
                   (return))
@@ -73,7 +91,8 @@
                    ((and last (not (= start bignum-widetag))
                          (= (+ start 4) end)
                          (= (logcount (logxor start end)) 1))
-                    (inst and temp temp (ldb (byte 8 0) (logeqv start end)))
+                    (inst and temp temp (logical-mask
+                                         (ldb (byte 8 0) (logeqv start end))))
                     (inst cmp temp (ldb (byte 8 0) (logand start end)))
                     (inst b (if not-p :ne :eq) target))
                    ((and (not last) (null (cddr remaining))
@@ -151,9 +170,9 @@
 
 ;;;; Other integer ranges.
 
-;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
+;;; A (signed-byte 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
-(defun signed-byte-32-test (value temp not-p target not-target)
+(defun signed-byte-64-test (value temp not-p target not-target)
   (multiple-value-bind
         (yep nope)
       (if not-p
@@ -164,31 +183,31 @@
       (inst b :eq yep)
       (test-type value nope t (other-pointer-lowtag) :temp temp)
       (loadw temp value 0 other-pointer-lowtag)
-      ;; (+ (ash 1 n-widetag-bits) bignum-widetag) does not fit into a single immediate
-      (inst eor temp temp (ash 1 n-widetag-bits))
-      (inst eors temp temp bignum-widetag)
+      (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst eor temp temp tmp-tn)
+      (inst tst temp temp)
       (inst b (if not-p :ne :eq) target)))
   (values))
 
-(define-vop (signed-byte-32-p type-predicate)
-  (:translate signed-byte-32-p)
+(define-vop (signed-byte-64-p type-predicate)
+  (:translate signed-byte-64-p)
   (:generator 45
    (let ((not-target (gen-label)))
-     (signed-byte-32-test value temp not-p target not-target)
+     (signed-byte-64-test value temp not-p target not-target)
      (emit-label not-target))))
 
-(define-vop (check-signed-byte-32 check-type)
+(define-vop (check-signed-byte-64 check-type)
   (:generator 45
-    (let ((nope (generate-error-code vop 'object-not-signed-byte-32-error value))
+    (let ((nope (generate-error-code vop 'object-not-signed-byte-64-error value))
           (yep (gen-label)))
-      (signed-byte-32-test value temp t nope yep)
+      (signed-byte-64-test value temp t nope yep)
       (emit-label yep)
       (move result value))))
 
-;;; An (UNSIGNED-BYTE 32) can be represented with either a positive
+;;; An (UNSIGNED-BYTE 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
-(defun unsigned-byte-32-test (value temp not-p target not-target)
+(defun unsigned-byte-64-test (value temp not-p target not-target)
   (let ((single-word (gen-label))
         (fixnum (gen-label)))
     (multiple-value-bind (yep nope)
@@ -205,26 +224,26 @@
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
-        ;; (+ (ash 1 n-widetag-bits) bignum-widetag) does not fit into a single immediate
-        (inst eor temp temp (ash 1 n-widetag-bits))
-        (inst eors temp temp bignum-widetag)
+        (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst eor temp temp tmp-tn)
+        (inst tst temp temp)
         (inst b :eq single-word)
-        ;; If it's other than two, we can't be an (unsigned-byte 32)
-        (inst eors temp temp (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
-                                     (+ (ash 2 n-widetag-bits) bignum-widetag)))
+        ;; If it's other than two, we can't be an (unsigned-byte 64)
+        (inst eor temp temp (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
+                                    (+ (ash 2 n-widetag-bits) bignum-widetag)))
+        (inst tst temp temp)
         (inst b :ne nope)
         ;; Get the second digit.
         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        ;; All zeros, its an (unsigned-byte 32).
-        (inst cmp temp 0)
-        (inst b :eq yep)
+        ;; All zeros, its an (unsigned-byte 64).
+        (inst cbz temp yep)
         (inst b nope)
 
         (emit-label single-word)
         ;; Get the single digit.
         (loadw temp value bignum-digits-offset other-pointer-lowtag)
 
-        ;; positive implies (unsigned-byte 32).
+        ;; positive implies (unsigned-byte 64).
         (emit-label fixnum)
         (inst cmp temp 0)
         (if not-p
@@ -232,18 +251,18 @@
             (inst b :ge target))))
     (values)))
 
-(define-vop (unsigned-byte-32-p type-predicate)
-  (:translate unsigned-byte-32-p)
+(define-vop (unsigned-byte-64-p type-predicate)
+  (:translate unsigned-byte-64-p)
   (:generator 45
    (let ((not-target (gen-label)))
-     (unsigned-byte-32-test value temp not-p target not-target)
+     (unsigned-byte-64-test value temp not-p target not-target)
      (emit-label not-target))))
 
-(define-vop (check-unsigned-byte-32 check-type)
+(define-vop (check-unsigned-byte-64 check-type)
   (:generator 45
-    (let ((lose (generate-error-code vop 'object-not-unsigned-byte-32-error value))
+    (let ((lose (generate-error-code vop 'object-not-unsigned-byte-64-error value))
           (okay (gen-label)))
-      (unsigned-byte-32-test value temp t lose okay)
+      (unsigned-byte-64-test value temp t lose okay)
       (emit-label okay)
       (move result value))))
 

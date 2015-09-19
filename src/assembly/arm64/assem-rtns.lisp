@@ -21,7 +21,8 @@
      ;; These are needed so we can get at the register args.
      (:temp r0 descriptor-reg r0-offset)
      (:temp r1 descriptor-reg r1-offset)
-     (:temp r2 descriptor-reg r2-offset))
+     (:temp r2 descriptor-reg r2-offset)
+     (:temp r3 descriptor-reg r3-offset))
 
   ;; Note, because of the way the return-multiple vop is written, we
   ;; can assume that we are never called with nvals == 1 (not that it
@@ -36,7 +37,7 @@
   ;; We don't need to copy stack values at this point, so default any
   ;; unsupplied values that should be in arg-passing registers.  First
   ;; piece of black magic: A computed jump.
-  (inst add (error "pc-tn") (error "pc-tn") nvals)
+  ;(inst add (error "pc-tn") (error "pc-tn") nvals)
   ;; Eat a word of padding for the computed jump.
   (inst word 0)
 
@@ -45,12 +46,13 @@
   (inst mov r0 null-tn)
   (inst mov r1 null-tn)
   (inst mov r2 null-tn)
+  (inst mov r3 null-tn)
 
   ;; We've defaulted any unsupplied parameters, but now we need to
   ;; load the supplied parameters.  Second piece of black magic: A
   ;; hairier computed jump.
-  (inst rsb count nvals (fixnumize 2))
-  (inst add (error "pc-tn") (error "pc-tn") count)
+  ;(inst rsb count nvals (fixnumize 2))
+  ;(inst add (error "pc-tn") (error "pc-tn") count)
 
   ;; The computed jump above will land on one of the next four
   ;; instructions, based on the number of values to return, in reverse
@@ -89,8 +91,7 @@
   ;; Deallocate the unused stack space.
   (move ocfp-tn cfp-tn)
   (move cfp-tn old-fp)
-  (inst add dst ocfp-tn nvals)
-  (store-csp dst)
+  (inst add csp-tn ocfp-tn nvals)
 
   ;; Return.
   (lisp-return lra :multiple-values))
@@ -113,7 +114,6 @@
      (:temp dest any-reg nl2-offset) ;; Not live concurrent with ARGS.
      (:temp count any-reg nl3-offset)
      (:temp temp descriptor-reg r8-offset)
-     (:temp stack-top non-descriptor-reg ocfp-offset)
 
      ;; These are needed so we can get at the register args.
      (:temp r0 descriptor-reg r0-offset)
@@ -129,8 +129,7 @@
   ;; exist), and the total arg count (NARGS).
 
   ;; Calculate NARGS (as a fixnum)
-  (load-csp nargs)
-  (inst sub nargs nargs args)
+  (inst sub nargs csp-tn args)
 
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations, and we need ARGS to be dead for the blt)
@@ -149,13 +148,12 @@
   ;; Find where our shifted arguments ned to go.
   (inst add dest cfp-tn nargs)
 
-  ;; And come from.
-  (load-csp stack-top)
 
   LOOP
   ;; Copy one arg.
-  (inst ldr temp (@ stack-top (- count)))
-  (inst str temp (@ dest (- count)))
+  (inst neg tmp-tn count)
+  (inst ldr temp (@ csp-tn tmp-tn))
+  (inst str temp (@ dest tmp-tn))
   (inst subs count count n-word-bytes)
   (inst b :ne LOOP)
 
@@ -187,42 +185,40 @@
     (inst cmp catch 0)
     (inst b :eq error))
 
-  (loadw tag catch catch-block-tag-slot)
-  (inst cmp tag target)
-  (loadw catch catch catch-block-previous-catch-slot 0 :ne)
-  (inst b :ne LOOP)
-
-  ;; As a dreadful cleverness, make use of the fact that assembly
-  ;; routines are emitted in order, with no padding, and that the body
-  ;; of UNWIND follows to arrange for the stack to be unwound to our
-  ;; chosen destination.
-  (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
-  )
+  (assemble ()
+    (loadw tag catch catch-block-tag-slot)
+    (inst cmp tag target)
+    (inst b :eq DONE)
+    (loadw catch catch catch-block-previous-catch-slot 0)
+    (inst b LOOP)
+    DONE
+    ;; As a dreadful cleverness, make use of the fact that assembly
+    ;; routines are emitted in order, with no padding, and that the body
+    ;; of UNWIND follows to arrange for the stack to be unwound to our
+    ;; chosen destination.
+    (move target catch))) ;; TARGET coincides with UNWIND's BLOCK argument
 
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:translate %continue-unwind)
                           (:policy :fast-safe))
-                         ((:arg block (any-reg descriptor-reg) r0-offset)
-                          (:arg start (any-reg descriptor-reg) r8-offset)
-                          (:arg count (any-reg descriptor-reg) nargs-offset)
-                          (:temp ocfp non-descriptor-reg ocfp-offset)
-                          (:temp lra descriptor-reg lexenv-offset)
-                          (:temp cur-uwp any-reg nl2-offset))
+    ((:arg block (any-reg descriptor-reg) r0-offset)
+     (:arg start (any-reg descriptor-reg) r8-offset)
+     (:arg count (any-reg descriptor-reg) nargs-offset)
+     (:temp ocfp non-descriptor-reg ocfp-offset)
+     (:temp lra descriptor-reg lexenv-offset)
+     (:temp cur-uwp any-reg nl2-offset))
   (declare (ignore start count))
-
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst cmp block 0)
-    (inst b :eq error))
-
+    (inst cbz block error))
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw ocfp block unwind-block-current-uwp-slot)
   (inst cmp cur-uwp ocfp)
-
-  (loadw ocfp cur-uwp unwind-block-current-uwp-slot 0 :ne)
-  (store-symbol-value ocfp *current-unwind-protect-block* :ne)
-
-  (move cur-uwp block :eq)
+  (inst b :eq EQ)
+  (loadw ocfp cur-uwp unwind-block-current-uwp-slot 0)
+  (store-symbol-value ocfp *current-unwind-protect-block*)
+  EQ
+  (inst csel cur-uwp block cur-uwp :eq)
 
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)

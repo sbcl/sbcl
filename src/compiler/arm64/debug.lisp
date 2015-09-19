@@ -17,7 +17,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
-    (load-csp res)))
+    (move res csp-tn)))
 
 (define-vop (debug-cur-fp)
   (:translate sb!di::current-fp)
@@ -58,13 +58,14 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:variant-vars lowtag)
   (:generator 5
+    (move code null-tn)
     (loadw temp thing 0 lowtag)
-    (inst mov temp (lsr temp (- n-widetag-bits word-shift)))
-    (inst cmp temp 0)
+    (inst lsr temp temp (- n-widetag-bits word-shift))
+    (inst cbz temp DONE)
     (unless (= lowtag other-pointer-lowtag)
-      (inst sub :ne temp temp (- other-pointer-lowtag lowtag)))
-    (inst sub :ne code thing temp)
-    (inst mov :eq code null-tn)))
+      (inst sub temp temp (- other-pointer-lowtag lowtag)))
+    (inst sub code thing temp)
+    DONE))
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate sb!di::lra-code-header)
@@ -101,5 +102,5 @@
   (:result-types positive-fixnum)
   (:generator 5
     (loadw res fun 0 fun-pointer-lowtag)
-    (inst mov res (lsr res n-widetag-bits))))
+    (inst lsr res res n-widetag-bits)))
 

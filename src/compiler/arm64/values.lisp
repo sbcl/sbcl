@@ -14,7 +14,7 @@
 (define-vop (reset-stack-pointer)
   (:args (ptr :scs (any-reg)))
   (:generator 1
-    (store-csp ptr)))
+    (move csp-tn ptr)))
 
 (define-vop (%%nip-values)
   (:args (last-nipped-ptr :scs (any-reg) :target dest)
@@ -24,23 +24,21 @@
   (:temporary (:sc any-reg) src)
   (:temporary (:sc any-reg) dest)
   (:temporary (:sc non-descriptor-reg) temp)
-  (:temporary (:sc any-reg) stack-pointer)
   (:ignore r-moved-ptrs)
   (:generator 1
     (move src last-preserved-ptr)
     (move dest last-nipped-ptr)
-    (load-csp stack-pointer)
-    (inst cmp stack-pointer src)
+    (inst cmp csp-tn src)
     (inst b :le DONE)
     LOOP
     (loadw temp src)
     (inst add dest dest n-word-bytes)
     (inst add src src n-word-bytes)
     (storew temp dest -1)
-    (inst cmp stack-pointer src)
+    (inst cmp csp-tn src)
     (inst b :gt LOOP)
     DONE
-    (store-csp dest)
+    (move csp-tn dest)
     (inst sub src src dest)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
           while moved
@@ -67,9 +65,8 @@
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
-    (load-csp start)
-    (inst add temp start (* nvals n-word-bytes))
-    (store-csp temp)
+    (move start csp-tn)
+    (inst add csp-tn csp-tn (* nvals n-word-bytes))
     (do ((val vals (tn-ref-across val))
          (i 0 (1+ i)))
         ((null val))
@@ -99,7 +96,7 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (load-csp start)
+    (move start csp-tn)
     (move csp-temp start)
 
     LOOP
@@ -108,7 +105,7 @@
     (inst b :eq DONE)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
     (inst add csp-temp csp-temp n-word-bytes)
-    (store-csp csp-temp)
+    (move csp-tn csp-temp)
     (storew temp csp-temp -1)
     (test-type list LOOP nil (list-pointer-lowtag) :temp ndescr)
     (error-call vop 'bogus-arg-to-values-list-error list)
@@ -138,11 +135,11 @@
       (any-reg
        (inst add src context skip)))
     (inst adds count num 0)
-    (load-csp start)
+    (move start csp-tn)
     (inst b :eq DONE)
     (inst mov dst start)
     (inst add i start count)
-    (store-csp i)
+    (move csp-tn i)
     (inst mov i count)
     LOOP
     (inst cmp i 4)

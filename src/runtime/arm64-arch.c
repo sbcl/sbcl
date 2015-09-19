@@ -41,7 +41,7 @@ void arch_skip_instruction(os_context_t *context)
 
     /* Note that we're doing integer arithmetic here, not pointer. So
      * the value that the return value of os_context_pc_addr() points
-     * to will be incremented by 4, not 16.
+     * to will be incremented by 4, not 32.
      */
     *os_context_pc_addr(context) += 4;
 }
@@ -129,7 +129,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
     u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
 
-    if (trap_instruction != 0xe7f001f0) {
+    if (trap_instruction != 0xd4200000) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
              trap_instruction);
     }

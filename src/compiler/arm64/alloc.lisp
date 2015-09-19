@@ -80,11 +80,11 @@
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:generator 100
     (inst add boxed boxed-arg (fixnumize (1+ code-constants-offset)))
-    (inst bic boxed boxed lowtag-mask)
-    (inst mov unboxed (lsr unboxed-arg word-shift))
+    (inst and boxed boxed (bic-mask lowtag-mask))
+    (inst lsr unboxed unboxed-arg word-shift)
     (inst add unboxed unboxed lowtag-mask)
-    (inst bic unboxed unboxed lowtag-mask)
-    (inst mov ndescr (lsl boxed (- n-widetag-bits word-shift)))
+    (inst and unboxed unboxed (bic-mask lowtag-mask))
+    (inst lsl ndescr boxed (- n-widetag-bits word-shift))
     (inst orr ndescr ndescr code-header-widetag)
     (inst add size boxed unboxed)
     (pseudo-atomic (pa-flag)
@@ -99,19 +99,18 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :argument))
-  (:temporary (:sc interior-reg) lip)
   (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
     (let ((undefined-tramp-fixup (gen-label)))
       (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size)
-        (inst load-from-label temp lip undefined-tramp-fixup)
+        (inst load-from-label temp undefined-tramp-fixup)
         (storew name result fdefn-name-slot other-pointer-lowtag)
         (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
         (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))
       (assemble (*elsewhere*)
         (emit-label undefined-tramp-fixup)
-        (inst word (make-fixup "undefined_tramp" :foreign))))))
+        (inst dword (make-fixup "undefined_tramp" :foreign))))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -156,13 +155,12 @@
 (define-vop (make-funcallable-instance-tramp)
   (:args)
   (:results (result :scs (any-reg)))
-  (:temporary (:sc interior-reg) lip)
   (:generator 1
     (let ((fixup (gen-label)))
-      (inst load-from-label result lip fixup)
+      (inst load-from-label result fixup)
       (assemble (*elsewhere*)
         (emit-label fixup)
-        (inst word (make-fixup "funcallable_instance_tramp" :foreign))))))
+        (inst dword (make-fixup "funcallable_instance_tramp" :foreign))))))
 
 (define-vop (fixed-alloc)
   (:args)
@@ -188,12 +186,12 @@
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
     (inst add bytes extra (* (1- words) n-word-bytes))
-    (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
+    (inst lsl header bytes (- n-widetag-bits n-fixnum-tag-bits))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity
     (inst add bytes bytes (* 2 n-word-bytes))
-    (inst bic bytes bytes lowtag-mask)
+    (inst and bytes bytes (bic-mask lowtag-mask))
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag :flag-tn pa-flag)

@@ -13,12 +13,12 @@
 
 ;;; Instruction-like macros.
 
-(defmacro move (dst src &optional (predicate :al))
+(defmacro move (dst src)
   "Move SRC into DST unless they are location=."
   (once-only ((n-dst dst)
               (n-src src))
     `(unless (location= ,n-dst ,n-src)
-       (inst mov ,predicate ,n-dst ,n-src))))
+       (inst mov ,n-dst ,n-src))))
 
 (macrolet
     ((def (type inst)
@@ -26,13 +26,13 @@
              (imag-tn-fn (symbolicate 'complex- type '-reg-imag-tn)))
          `(progn
             (defmacro ,(symbolicate 'move- type)
-                (dst src &optional (predicate :al))
+                (dst src)
               (once-only ((n-dst dst)
                           (n-src src))
                 `(unless (location= ,n-dst ,n-src)
-                   (inst ,',inst ,predicate ,n-dst ,n-src))))
+                   (inst ,',inst ,n-dst ,n-src))))
             (defmacro ,(symbolicate 'move-complex- type)
-                (dst src &optional (predicate :al))
+                (dst src)
               (once-only ((n-dst dst)
                           (n-src src))
                 `(unless (location= ,n-dst ,n-src)
@@ -42,19 +42,33 @@
                    ;; need to worry about overlap.
                    (let ((src-real (,',real-tn-fn ,n-src))
                          (dst-real (,',real-tn-fn ,n-dst)))
-                     (inst ,',inst ,predicate dst-real src-real))
+                     (inst ,',inst dst-real src-real))
                    (let ((src-imag (,',imag-tn-fn ,n-src))
                          (dst-imag (,',imag-tn-fn ,n-dst)))
-                     (inst ,', inst ,predicate dst-imag src-imag)))))))))
-  (def single fcpys)
-  (def double fcpyd))
+                     (inst ,', inst dst-imag src-imag)))))))))
+  (def single fmov)
+  (def double fmov))
+
+(defun logical-mask (x)
+  (cond ((encode-logical-immediate x)
+         x)
+        (t
+         (load-immediate-word tmp-tn x)
+         tmp-tn)))
+
+(defun load-store-offset (offset)
+  (cond ((ldr-str-offset-encodable offset)
+         offset)
+        (t
+         (load-immediate-word tmp-tn offset)
+         tmp-tn)))
 
 (macrolet
     ((def (op inst shift)
        `(defmacro ,op (object base
-                       &optional (offset 0) (lowtag 0) (predicate :al))
-          `(inst ,',inst ,predicate ,object
-                 (@ ,base (- (ash ,offset ,,shift) ,lowtag))))))
+                       &optional (offset 0) (lowtag 0))
+          `(inst ,',inst ,object
+                 (@ ,base (load-store-offset (- (ash ,offset ,,shift) ,lowtag)))))))
   (def loadw ldr word-shift)
   (def storew str word-shift))
 
@@ -63,21 +77,23 @@
     `(progn
        (composite-immediate-instruction add ,reg null-tn (static-symbol-offset ,symbol)))))
 
-(defmacro load-symbol-value (reg symbol &optional (predicate :al))
-  `(inst ldr ,predicate ,reg
-         (@ null-tn
-            (+ (static-symbol-offset ',symbol)
-               (ash symbol-value-slot word-shift)
-               (- other-pointer-lowtag)))))
+(defmacro load-symbol-value (reg symbol)
+  `(progn
+     (inst mov tmp-tn
+           (+ (static-symbol-offset ',symbol)
+              (ash symbol-value-slot word-shift)
+              (- other-pointer-lowtag)))
+     (inst ldr ,reg (@ null-tn tmp-tn))))
 
-(defmacro store-symbol-value (reg symbol &optional (predicate :al))
-  `(inst str ,predicate ,reg
-         (@ null-tn
-            (+ (static-symbol-offset ',symbol)
-               (ash symbol-value-slot word-shift)
-               (- other-pointer-lowtag)))))
+(defmacro store-symbol-value (reg symbol)
+  `(progn
+     (inst mov tmp-tn (+ (static-symbol-offset ',symbol)
+                         (ash symbol-value-slot word-shift)
+                         (- other-pointer-lowtag)))
+     (inst str ,reg
+           (@ null-tn tmp-tn))))
 
-(defmacro load-type (target source &optional (offset 0) (predicate :al))
+(defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
   byte-ordering issues."
   (once-only ((n-target target)
@@ -86,16 +102,10 @@
     (let ((target-offset (ecase *backend-byte-order*
                            (:little-endian n-offset)
                            (:big-endian `(+ ,n-offset (1- n-word-bytes))))))
-      `(inst ldrb ,predicate ,n-target (@ ,n-source ,target-offset)))))
+      `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
 ;;; Macros to handle the fact that our stack pointer isn't actually in
 ;;; a register (or won't be, by the time we're done).
-
-(defmacro load-csp (target &optional (predicate :al))
-  `(load-symbol-value ,target *control-stack-pointer* ,predicate))
-
-(defmacro store-csp (source &optional (predicate :al))
-  `(store-symbol-value ,source *control-stack-pointer* ,predicate))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
@@ -106,7 +116,7 @@
      (inst add tmp-tn ,function
            (- (ash simple-fun-code-offset word-shift)
               fun-pointer-lowtag))
-     (inst b tmp-tn)))
+     (inst br tmp-tn)))
 
 (defmacro lisp-return (return-pc return-style)
   "Return to RETURN-PC."
@@ -114,12 +124,13 @@
      ;; Indicate a single-valued return by clearing all of the status
      ;; flags, or a multiple-valued return by setting all of the status
      ;; flags.
-     ,(ecase return-style
-             (:single-value '(inst msr (cpsr :f) 0))
-             (:multiple-values '(inst msr (cpsr :f) #xf0000000))
-             (:known))
-     (inst sub tmp-tn ,return-pc (- other-pointer-lowtag 4))
-     (inst b tmp-tn)))
+     ,@(ecase return-style
+         (:single-value '((inst msr :nzcv zr-tn)))
+         (:multiple-values '((inst orr tmp-tn zr-tn #xf0000000)
+                             (inst msr :nzcv tmp-tn)))
+         (:known))
+     (inst sub tmp-tn ,return-pc (- other-pointer-lowtag 8))
+     (inst br tmp-tn)))
 
 (defmacro emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
@@ -132,27 +143,27 @@
 ;;;; Stack TN's
 
 ;;; Move a stack TN to a register and vice-versa.
-(defun load-stack-offset (reg stack stack-tn &optional (predicate :al))
+(defun load-stack-offset (reg stack stack-tn)
   (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
     (cond ((or (tn-p offset)
                (typep offset '(unsigned-byte 12)))
-           (inst ldr predicate reg (@ stack offset)))
+           (inst ldr reg (@ stack offset)))
           (t
            (load-immediate-word reg offset)
-           (inst ldr predicate reg (@ stack reg))))))
+           (inst ldr reg (@ stack reg))))))
 
-(defmacro load-stack-tn (reg stack &optional (predicate :al))
+(defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
          (stack ,stack))
      (sc-case stack
        ((control-stack)
-        (load-stack-offset reg cfp-tn stack ,predicate)))))
+        (load-stack-offset reg cfp-tn stack)))))
 
-(defun store-stack-offset (reg stack stack-tn &optional (predicate :al))
+(defun store-stack-offset (reg stack stack-tn)
   (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
     (cond ((or (typep offset '(unsigned-byte 12))
                (tn-p offset))
-           (inst str predicate reg (@ stack offset)))
+           (inst str reg (@ stack offset)))
           (t
            (let ((low (ldb (byte 12 0) offset))
                  (high (mask-field (byte 20 12) offset)))
@@ -161,15 +172,15 @@
              ;; which do not have temporary registers.
              ;; The debugger will be not happy.
              (composite-immediate-instruction add stack stack high)
-             (inst str predicate reg (@ stack low))
+             (inst str reg (@ stack low))
              (composite-immediate-instruction sub stack stack high))))))
 
-(defmacro store-stack-tn (stack reg &optional (predicate :al))
+(defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
          (reg ,reg))
      (sc-case stack
        ((control-stack)
-        (store-stack-offset reg cfp-tn stack ,predicate)))))
+        (store-stack-offset reg cfp-tn stack)))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
@@ -205,19 +216,18 @@
   (let ((fixup (gen-label)))
     (when (integerp size)
       (load-immediate-word alloc-tn size))
-    (emit-word sb!assem::**current-segment** (logior #xe92d0000
-                                                     (ash 1 (if (integerp size)
-                                                                (tn-offset alloc-tn)
-                                                                (tn-offset size)))
-                                                     (ash 1 (tn-offset lr-tn))))
-    (inst load-from-label alloc-tn alloc-tn fixup)
-    (inst bl alloc-tn)
-    (emit-word sb!assem::**current-segment** (logior #xe8bd0000
-                                                     (ash 1 (tn-offset alloc-tn))
-                                                     (ash 1 (tn-offset lr-tn))))
+    (inst stp
+          (if (integerp size)
+              alloc-tn
+              size)
+          lr-tn
+          (@ nsp-tn -16 :pre-index))
+    (inst load-from-label alloc-tn fixup)
+    (inst blr alloc-tn)
+    (inst ldp alloc-tn lr-tn (@ nsp-tn 16 :post-index))
     (inst b back-label)
     (emit-label fixup)
-    (inst word (make-fixup "alloc_tramp" :foreign))))
+    (inst dword (make-fixup "alloc_tramp" :foreign))))
 
 (defmacro allocation (result-tn size lowtag &key flag-tn
                                                  stack-allocate-p)
@@ -228,17 +238,22 @@
               (flag-tn flag-tn)
               (stack-allocate-p stack-allocate-p))
     `(cond (,stack-allocate-p
-            (load-csp ,result-tn)
-            (inst tst ,result-tn lowtag-mask)
-            (inst add :ne ,result-tn ,result-tn n-word-bytes)
-            (if (integerp ,size)
-                (composite-immediate-instruction add ,flag-tn ,result-tn ,size)
-                (inst add ,flag-tn ,result-tn ,size))
-            (store-csp ,flag-tn)
-            ;; :ne is from TST above, this needs to be done after the
-            ;; stack pointer has been stored.
-            (storew null-tn ,result-tn -1 0 :ne)
-            (inst orr ,result-tn ,result-tn ,lowtag))
+            (assemble ()
+              (move ,result-tn csp-tn)
+              (inst tst ,result-tn lowtag-mask)
+              (inst b :eq ALIGNED)
+              (inst add ,result-tn ,result-tn n-word-bytes)
+              ALIGNED
+              (if (integerp ,size)
+                  (composite-immediate-instruction add ,flag-tn ,result-tn ,size)
+                  (inst add ,flag-tn ,result-tn ,size))
+              (move csp-tn ,flag-tn)
+              ;; :ne is from TST above, this needs to be done after the
+              ;; stack pointer has been stored.
+              (inst b :eq ALIGNED2)
+              (storew null-tn ,result-tn -1 0)
+              ALIGNED2
+              (inst orr ,result-tn ,result-tn ,lowtag)))
            #!-gencgc
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
@@ -252,7 +267,7 @@
             (let ((fixup (gen-label))
                   (alloc (gen-label))
                   (back-from-alloc (gen-label)))
-              (inst load-from-label ,flag-tn ,flag-tn FIXUP)
+              (inst load-from-label ,flag-tn FIXUP)
               (loadw ,result-tn ,flag-tn)
               (loadw ,flag-tn ,flag-tn 1)
               (if (integerp ,size)
@@ -260,7 +275,7 @@
                   (inst add ,result-tn ,result-tn ,size))
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
-              (inst load-from-label ,flag-tn ,flag-tn FIXUP)
+              (inst load-from-label ,flag-tn FIXUP)
               (storew ,result-tn ,flag-tn)
 
               (if (integerp ,size)
@@ -269,13 +284,13 @@
 
               (emit-label BACK-FROM-ALLOC)
               (when ,lowtag
-                (inst orr ,result-tn ,result-tn ,lowtag))
+                (inst add ,result-tn ,result-tn ,lowtag))
 
               (assemble (*elsewhere*)
                 (emit-label ALLOC)
                 (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)
                 (emit-label FIXUP)
-                (inst word (make-fixup "boxed_region" :foreign))))))))
+                (inst dword (make-fixup "boxed_region" :foreign))))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
@@ -294,7 +309,7 @@
                    :stack-allocate-p ,stack-allocate-p)
        (when ,type-code
          (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
-         (inst orr ,flag-tn ,flag-tn ,type-code)
+         (inst add ,flag-tn ,flag-tn ,type-code)
          (storew ,flag-tn ,result-tn 0 ,lowtag))
        ,@body)))
 
@@ -317,7 +332,7 @@
       (inst byte (length vector))
       (dotimes (i (length vector))
         (inst byte (aref vector i)))
-      (emit-alignment word-shift))))
+      (emit-alignment 2))))
 
 (defun error-call (vop error-code &rest values)
   #!+sb-doc
@@ -354,10 +369,12 @@
        (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
        ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
        ;; do_pending_interrupt
-       (inst cmp ,flag-tn 0)
-       ,(if link
-            `(inst bl :ne ,flag-tn)
-            `(inst b :ne ,flag-tn)))))
+       (let ((not-interrputed (gen-label)))
+         (inst cbz ,flag-tn not-interrputed)
+         ,(if link
+              `(inst blr ,flag-tn)
+              `(inst br ,flag-tn))
+         (emit-label not-interrputed)))))
 
 ;;;; memory accessor vop generators
 

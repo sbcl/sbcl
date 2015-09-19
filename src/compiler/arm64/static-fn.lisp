@@ -70,13 +70,13 @@
                     static-fun-template)
          (:args ,@(args))
          ,@(temps)
-         (:temporary (:sc any-reg) csp-temp)
          (:results ,@(results))
          (:generator ,(+ 50 num-args num-results)
            (let ((lra-label (gen-label))
                  (cur-nfp (current-nfp-tn vop)))
              ,@(moves (temp-names) (arg-names))
-             (inst ldr function (@ null-tn (static-fun-offset symbol)))
+             (inst mov tmp-tn (static-fun-offset symbol))
+             (inst ldr function (@ null-tn tmp-tn))
              (inst mov nargs (fixnumize ,num-args))
              (when cur-nfp
                (store-stack-tn nfp-save cur-nfp))
@@ -85,12 +85,11 @@
              ;; the new CFP, then pushing another value on CSP, but it
              ;; works for this situation.
              (inst compute-lra lip lip lra-label)
-             (load-csp csp-temp)
-             (inst add csp-temp csp-temp 8)
-             (store-csp csp-temp)
-             (inst str cfp-tn (@ csp-temp -8))
-             (inst str lip (@ csp-temp -4))
-             (inst sub cfp-tn csp-temp 8)
+             
+             (inst add csp-tn csp-tn 16)
+             (inst str cfp-tn (@ csp-tn -16))
+             (inst str lip (@ csp-tn -8))
+             (inst sub cfp-tn csp-tn 16)
              (note-this-location vop :call-site)
              (lisp-jump function)
              (emit-return-pc lra-label)

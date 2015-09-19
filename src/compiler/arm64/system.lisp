@@ -31,25 +31,23 @@
   (:generator 6
     ;; First, pick off the immediate types, starting with FIXNUM.
     (inst ands result object fixnum-tag-mask)
+    (inst b :eq fixnum)
     ;; If it wasn't a fixnum, start with the full widetag.
-    (inst and :ne result object widetag-mask)
-
+    (inst and result object widetag-mask)
+    fixnum
     ;; Now, we have our result for an immediate type, but we might
     ;; have a pointer object instead, in which case we need to do more
-    ;; work.  Check for a pointer type.
+    ;; work.  Check for a pointer type, set two low-bits.
 
-    ;; KLUDGE: We're a 32-bit port, so all pointer lowtags have the
-    ;; low bit set, but there's no obvious named constant for this.
-    ;; On 64-bit ports, all pointer lowtags have the low two bits set,
-    ;; so this wouldn't work as easily.
-    (inst tst object 1)
-
+    (inst mvn tmp-tn result)
+    (inst tst object #b11)
+    (inst b :ne done)
     ;; If we have a pointer type, we need to compute a different
     ;; answer.  For lists and instances, we just need the lowtag.  For
     ;; functions and "other", we need to load the widetag from the
     ;; object header.  In both cases, having just the widetag
     ;; available is handy.
-    (inst and :ne result object lowtag-mask)
+    (inst and result object lowtag-mask)
 
     ;; We now have the correct answer for list-pointer-lowtag and
     ;; instance-pointer-lowtag, but need to pick off the case for the
@@ -57,16 +55,18 @@
     ;; OTHER-POINTER-LOWTAG are both in the upper half of the lowtag
     ;; space, while LIST-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG
     ;; are in the lower half, so we distinguish with a bit test.
-    (inst tst :ne object 4)
-
+    (inst tst object 8)
+    (inst b :ne done)
     ;; We can't use both register and immediate offsets in the same
     ;; load/store instruction, so we need to bias our register offset
     ;; on big-endian systems.
     (when (eq *backend-byte-order* :big-endian)
-      (inst sub :ne result (1- n-word-bytes)))
+      (inst sub result result (1- n-word-bytes)))
 
     ;; And, finally, pick out the widetag from the header.
-    (inst ldrb :ne result (@ object (- result)))))
+    (inst neg result result)
+    (inst ldrb result (@ object result))
+    done))
 
 
 (define-vop (fun-subtype)
@@ -101,7 +101,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
-    (inst mov res (lsr res n-widetag-bits))))
+    (inst lsr res res n-widetag-bits)))
 
 (define-vop (get-closure-length)
   (:translate get-closure-length)
@@ -111,7 +111,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst mov res (lsr res n-widetag-bits))))
+    (inst lsr res res n-widetag-bits)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -131,7 +131,7 @@
        ;; than an eight bit range aligned on an even bit position.
        ;; See SYS:SRC;COMPILER;ARM;MOVE.LISP for a partial fix...  And
        ;; maybe it should be promoted to an instruction-macro?
-       (inst orr t1 t1 (ash (tn-value data) n-widetag-bits))))
+       (inst orr t1 t1 (logical-mask (ash (tn-value data) n-widetag-bits)))))
     (storew t1 x 0 other-pointer-lowtag)
     (move res x)))
 
@@ -142,8 +142,8 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst bic res ptr lowtag-mask)
-    (inst mov res (lsr res 1))))
+    (inst and res ptr (bic-mask lowtag-mask))
+    (inst lsr res res 1)))
 
 ;;;; Allocation
 
@@ -169,7 +169,7 @@
   (:translate control-stack-pointer-sap)
   (:policy :fast-safe)
   (:generator 1
-    (load-csp int)))
+    (move int csp-tn)))
 
 ;;;; Code object frobbing.
 
@@ -184,7 +184,7 @@
     (loadw ndescr code 0 other-pointer-lowtag)
     ;; CODE-HEADER-WIDETAG is #x38, which has the top two bits clear,
     ;; so we don't to clear the low bits here.  If we do, use BIC.
-    (inst mov ndescr (lsr ndescr (- n-widetag-bits word-shift)))
+    (inst lsr ndescr ndescr (- n-widetag-bits word-shift))
     (inst sub ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
@@ -214,7 +214,9 @@
     ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
     (inst and temp res lowtag-mask)
     (inst cmp temp list-pointer-lowtag)
-    (loadw res res cons-cdr-slot list-pointer-lowtag :eq)))
+    (inst b :ne NE)
+    (loadw res res cons-cdr-slot list-pointer-lowtag)
+    NE))
 
 #!+symbol-info-vops
 (define-vop (symbol-plist)
@@ -228,7 +230,7 @@
     ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
     (loadw res res cons-car-slot list-pointer-lowtag)
     (inst tst res fixnum-tag-mask)
-    (inst mov :eq res null-tn)))
+    (inst csel :eq res null-tn res)))
 
 ;;;; other miscellaneous VOPs
 
@@ -239,18 +241,14 @@
   (:generator 1
     (inst debug-trap)
     (inst byte pending-interrupt-trap)
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 (define-vop (halt)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:generator 1
-    ;; See macros.lisp, EMIT-ERROR-BREAK, for an explanation.
-    (inst mov error-temp #x000f0000)
-    (inst add error-temp error-temp 1)
-    (inst swi 0)
+    (inst debug-trap)
     (inst byte halt-trap)
-    ;; Re-align to the next instruction boundary.
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop (spin-loop-hint)

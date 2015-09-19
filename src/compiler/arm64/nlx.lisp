@@ -59,7 +59,7 @@
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
-    (load-csp res)))
+    (move res csp-tn)))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
@@ -159,9 +159,13 @@
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
-           (inst cmp count 0)
-           (move (tn-ref-tn values) null-tn :eq)
-           (loadw (tn-ref-tn values) start 0 0 :ne))
+           (assemble ()
+             (inst cbnz count non-zero)
+             (move (tn-ref-tn values) null-tn)
+             (inst b DONE)
+             NON-ZERO
+             (loadw (tn-ref-tn values) start 0 0)
+             done))
           (t
            (do ((i 0 (1+ i))
                 (tn-ref values (tn-ref-across tn-ref)))
@@ -170,14 +174,19 @@
                (inst subs count count (fixnumize 1))
                (sc-case tn
                  ((descriptor-reg any-reg)
-                  (loadw tn start i 0 :ge)
-                  (move tn null-tn :lt))
+                  (assemble ()
+                    (inst b :lt LESS-THAN)
+                    (loadw move-temp start i 0)
+                    LESS-THAN
+                    (inst csel tn null-tn move-temp :lt)))
                  (control-stack
-                  (loadw move-temp start i 0 :ge)
-                  (store-stack-tn tn move-temp :ge)
-                  (store-stack-tn tn null-tn :lt)))))))
+                  (assemble ()
+                    (inst b :lt LESS-THAN)
+                    (loadw move-temp start i 0)
+                    LESS-THAN
+                    (inst csel tn null-tn move-temp :lt))))))))
     (load-stack-tn move-temp sp)
-    (store-csp move-temp)))
+    (move csp-tn move-temp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top :target result) (src) (count))
@@ -215,7 +224,7 @@
     ;; Reset the CSP.
     DONE
     (inst add temp result num)
-    (store-csp temp)))
+    (move csp-tn temp)))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
@@ -251,9 +260,8 @@
       (move saved-function function)
 
       ;; Allocate space for magic UWP block.
-      (load-csp block)
-      (inst add temp block (* unwind-block-size n-word-bytes))
-      (store-csp temp)
+      (move block csp-tn)
+      (inst add csp-tn block (* unwind-block-size n-word-bytes))
 
       ;; Set up magic catch / UWP block.
 
@@ -271,8 +279,9 @@
       ;; Run any required UWPs.
       (assemble (*elsewhere* vop)
         (emit-label uwp-label)
-        (inst word (make-fixup 'unwind :assembly-routine)))
-      (inst load-from-label (error "pc-tn") lr-tn uwp-label)
+        (inst dword (make-fixup 'unwind :assembly-routine)))
+      (inst load-from-label tmp-tn uwp-label)
+      (inst br tmp-tn)
 
       (emit-label ENTRY-LABEL)
       ;; KLUDGE: either COMPUTE-LRA computes or UNWIND jumps one

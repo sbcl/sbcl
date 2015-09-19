@@ -19,7 +19,7 @@
   (:results (y :scs (character-reg)))
   (:note "character untagging")
   (:generator 1
-    (inst mov y (lsr x n-widetag-bits))))
+     (inst lsr y x n-widetag-bits)))
 (define-move-vop move-to-character :move
   (any-reg descriptor-reg) (character-reg))
 
@@ -29,8 +29,8 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (inst mov y (lsl x n-widetag-bits))
-    (inst orr y y character-widetag)))
+    (inst lsl y x n-widetag-bits)
+    (inst add y y character-widetag)))
 (define-move-vop move-from-character :move
   (character-reg) (any-reg descriptor-reg))
 
@@ -80,7 +80,7 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst mov res (lsl ch n-fixnum-tag-bits))))
+    (inst lsl res ch n-fixnum-tag-bits)))
 
 (define-vop (code-char)
   (:translate code-char)
@@ -90,7 +90,7 @@
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (inst mov res (lsr code n-fixnum-tag-bits))))
+    (inst lsr res code n-fixnum-tag-bits)))
 
 (define-vop (character-compare)
   (:args (x :scs (character-reg))

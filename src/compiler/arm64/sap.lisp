@@ -169,12 +169,10 @@
                      (:generator 5
                       ,@(when use-lip
                           '((inst add lip sap offset)))
-                      (inst ,(ecase size
-                                    (:byte (if signed 'ldrsb 'ldrb))
-                                    (:short (if signed 'ldrsh 'ldrh))
-                                    (:long 'ldr)
-                                    (:single 'flds)
-                                    (:double 'fldd))
+                      (inst ,(case size
+                               (:byte (if signed 'ldrsb 'ldrb))
+                               (:short (if signed 'ldrsh 'ldrh))
+                               (t 'ldr))
                             result ,(if use-lip
                                         '(@ lip)
                                         '(@ sap offset)))))
@@ -188,12 +186,10 @@
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
                      (:generator 4
-                      (inst ,(ecase size
+                      (inst ,(case size
                                     (:byte (if signed 'ldrsb 'ldrb))
                                     (:short (if signed 'ldrsh 'ldrh))
-                                    (:long 'ldr)
-                                    (:single 'flds)
-                                    (:double 'fldd))
+                                    (t 'ldr))
                             result (@ sap offset))))
                    (define-vop (,set-name)
                        (:translate ,set-name)
@@ -209,23 +205,19 @@
                      (:generator 5
                       ,@(when use-lip
                           '((inst add lip sap offset)))
-                      (inst ,(ecase size
-                                    (:byte 'strb)
-                                    (:short 'strh)
-                                    (:long 'str)
-                                    (:single 'fsts)
-                                    (:double 'fstd))
+                      (inst ,(case size
+                               (:byte 'strb)
+                               (:short 'strh)
+                               (t 'str))
                             value ,(if use-lip
                                        '(@ lip)
                                        '(@ sap offset)))
                       (unless (location= result value)
                         ,@(case size
-                                (:single
-                                 '((inst fcpys result value)))
-                                (:double
-                                 '((inst fcpyd result value)))
-                                (t
-                                 '((inst mov result value)))))))
+                            ((:single :double)
+                             '((inst fmov result value)))
+                            (t
+                             '((inst mov result value)))))))
                    #+(or)
                    (define-vop (,set-name-c)
                        (:translate ,set-name)
@@ -237,12 +229,10 @@
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
                      (:generator 4
-                      (inst ,(ecase size
-                                    (:byte 'strb)
-                                    (:short 'strh)
-                                    (:long 'str)
-                                    (:single 'fsts)
-                                    (:double 'fstd))
+                      (inst ,(case size
+                               (:byte 'strb)
+                               (:short 'strh)
+                               (t 'str))
                             value (@ sap offset))
                       (unless (location= result value)
                         ,@(case size
@@ -263,6 +253,10 @@
   (def-system-ref-and-set sap-ref-32 %set-sap-ref-32
     unsigned-reg unsigned-num :long :signed nil)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
+    signed-reg signed-num :long :signed t)
+  (def-system-ref-and-set sap-ref-64 %set-sap-ref-64
+    unsigned-reg unsigned-num :long :signed nil)
+  (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64
     signed-reg signed-num :long :signed t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
     sap-reg system-area-pointer :long)

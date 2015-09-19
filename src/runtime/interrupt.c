@@ -644,9 +644,9 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 #if !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
     access_control_frame_pointer(th) =
         (lispobj *)(uword_t)
-            (*os_context_register_addr(context, reg_CSP));
+        (*os_context_register_addr(context, reg_CSP));
     if ((lispobj *)(uword_t)
-            (*os_context_register_addr(context, reg_CFP))
+        (*os_context_register_addr(context, reg_CFP))
         == access_control_frame_pointer(th)) {
         /* There is a small window during call where the callee's
          * frame isn't built yet. */
@@ -668,9 +668,13 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
             oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
         }
     } else
-#else /* LISP_FEATURE_ARM */
+#elif defined (LISP_FEATURE_ARM)
+        access_control_frame_pointer(th) =
+            SymbolValue(CONTROL_STACK_POINTER, th);
+#elif defined (LISP_FEATURE_ARM64)
     access_control_frame_pointer(th) =
-        SymbolValue(CONTROL_STACK_POINTER, th);
+        (lispobj *)(uword_t)
+        (*os_context_register_addr(context, reg_CSP));
 #endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */

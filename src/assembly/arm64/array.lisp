@@ -39,9 +39,9 @@
   (pseudo-atomic (pa-flag :link nil)
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst bic ndescr ndescr lowtag-mask)
+    (inst and ndescr ndescr (bic-mask lowtag-mask))
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
-    (inst mov ndescr (lsr type word-shift))
+    (inst lsr ndescr type word-shift)
     (storew ndescr vector 0 other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings
     ;; passed to C do not cause a WP violation in foreign code.
@@ -71,11 +71,11 @@
   (pseudo-atomic (pa-flag :link nil)
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst bic ndescr ndescr lowtag-mask)
+    (inst and ndescr ndescr (bic-mask lowtag-mask))
     (allocation vector ndescr other-pointer-lowtag
                 :flag-tn pa-flag
                 :stack-allocate-p t)
-    (inst mov pa-flag (lsr type word-shift))
+    (inst lsr pa-flag type word-shift)
     (storew pa-flag vector 0 other-pointer-lowtag)
     ;; Zero fill
     (let ((loop (gen-label)))

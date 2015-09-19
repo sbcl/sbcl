@@ -93,13 +93,7 @@
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
-#!+arm-vfp
 (define-storage-base float-registers :finite :size 32)
-;; NOTE: If you fix the following, please to so with its own feature
-;; conditional, and also adjust the definitions of the
-;; {,COMPLEX-}{SINGLE,DOUBLE}-REG SCs below.
-#!-arm-vfp
-(error "Don't know how many float registers for non-VFP systems")
 
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
@@ -217,22 +211,19 @@
 
   ;; Non-Descriptor double-floats.
   (double-reg float-registers
-              :locations #.(loop for i below 32 by 2 collect i)
-              :element-size 2
+              :locations #.(loop for i below 32 collect i)
               :constant-scs ()
               :save-p t
               :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
-                      :locations #.(loop for i from 0 below 32 by 2 collect i)
-                      :element-size 2
+                      :locations #.(loop for i below 32 collect i)
                       :constant-scs ()
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-                      :locations #.(loop for i from 0 below 32 by 4 collect i)
-                      :element-size 4
+                      :locations #.(loop for i below 32 collect i)
                       :constant-scs ()
                       :save-p t
                       :alternate-scs (complex-double-stack))
@@ -257,6 +248,7 @@
   (defregtn nargs any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg)
+  (defregtn zr any-reg)
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
   (defregtn lr interior-reg))

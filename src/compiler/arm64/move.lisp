@@ -14,35 +14,22 @@
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
 
-(defun repeating-pattern-p (val)
-  (declare (type (unsigned-byte 32) val))
-  (and (= (ldb (byte 16 0) val)
-          (ldb (byte 16 16) val))
-       (not (encodable-immediate (ldb (byte 16 16) val)))))
-
-;;; This should be put into composite-immediate-instruction, but that
-;;; macro is too scary.
-(defun load-repeating-pattern (dest val)
-  (declare (type (signed-byte 32) val))
-  (inst mov dest (ldb (byte 8 0) val))
-  (inst orr dest dest (mask-field (byte 8 8) val))
-  (inst orr dest dest (lsl dest 16)))
-
 (defun load-immediate-word (y val)
-  (cond ((let ((unsigned (ldb (byte 32 0) val)))
-           (when (encodable-immediate unsigned)
-             (inst mov y unsigned)
-             t)))
-        ((let ((inverted (ldb (byte 32 0) (lognot val))))
-           (when (encodable-immediate inverted)
-             (inst mvn y inverted)
-             t)))
-        ((< val 0)
-         (composite-immediate-instruction bic y y val :first-op mvn :first-no-source t :invert-y t))
-        ((repeating-pattern-p val)
-         (load-repeating-pattern y val))
+  (cond ((typep val '(unsigned-byte 16))
+         (inst movz y val))
+        ((typep val '(and (signed-byte 16) (integer * -1)))
+         (inst movn y (lognot val)))
+        ((encode-logical-immediate val)
+         (inst orr y zr-tn val))
         (t
-         (composite-immediate-instruction orr y y val :first-op mov :first-no-source t))))
+         (loop with first = t
+               for i below 64 by 16
+               for part = (ldb (byte 16 i) val)
+               when (plusp part)
+               do
+               (if (shiftf first nil)
+                   (inst movz y part i)
+                   (inst movk y part i))))))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate)
@@ -81,14 +68,13 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
-  (let ((offset (- (ash (tn-offset x) 2) other-pointer-lowtag)))
-    (typecase offset
-      ((unsigned-byte 12)
+  (let ((offset (- (* (tn-offset x) n-word-bytes) other-pointer-lowtag)))
+    (cond 
+      ((ldr-str-offset-encodable offset)
        (inst ldr y (@ code-tn offset)))
       (t
-       ;; Y is a descriptor-reg, make sure offset is a fixnum.
-       (load-immediate-word y (ash offset n-fixnum-tag-bits))
-       (inst ldr y (@ code-tn (lsr y n-fixnum-tag-bits)))))))
+       (load-immediate-word tmp-tn offset)
+       (inst ldr y (@ code-tn tmp-tn))))))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
@@ -184,7 +170,7 @@
   (:arg-types tagged-num)
   (:note "fixnum untagging")
   (:generator 1
-    (inst mov y (asr x n-fixnum-tag-bits))))
+    (inst asr y x n-fixnum-tag-bits)))
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
@@ -199,7 +185,7 @@
            (load-immediate-word y (tn-value x)))
           (t
            (load-constant vop x y)
-           (inst mov y (asr y n-fixnum-tag-bits))))))
+           (inst asr y y n-fixnum-tag-bits)))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 
@@ -210,12 +196,16 @@
   (:note "integer to untagged word coercion")
   (:generator 4
     (inst tst x fixnum-tag-mask)
+    (inst b :ne BIGNUM )
     (sc-case y
       (signed-reg
-       (inst mov :eq y (asr x n-fixnum-tag-bits)))
+       (inst asr y x n-fixnum-tag-bits))
       (unsigned-reg
-       (inst mov :eq y (lsr x n-fixnum-tag-bits))))
-    (loadw y x bignum-digits-offset other-pointer-lowtag :ne)))
+       (inst lsr y x n-fixnum-tag-bits)))
+    (inst b DONE)
+    BIGNUM
+    (loadw y x bignum-digits-offset other-pointer-lowtag)
+    DONE))
 
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
@@ -228,7 +218,7 @@
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (inst mov y (lsl x n-fixnum-tag-bits))))
+     (inst lsl y x n-fixnum-tag-bits)))
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
@@ -244,9 +234,10 @@
   (:generator 20
     (move x arg)
     (inst adds pa-flag x x)
-    (inst adds :vc y pa-flag pa-flag)
+    (inst b :vs alloc)
+    (inst adds y pa-flag pa-flag)
     (inst b :vc DONE)
-
+    alloc
     (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
@@ -267,7 +258,7 @@
     (inst tst x (ash (1- (ash 1 (- n-word-bits
                                    n-positive-fixnum-bits)))
                      n-positive-fixnum-bits))
-    (inst mov y (lsl x n-fixnum-tag-bits))
+    (inst lsl y x n-fixnum-tag-bits)
     (inst b :eq DONE)
 
     (with-fixed-allocation
@@ -277,9 +268,11 @@
       ;; case, configured for a 2-word bignum.  If the sign bit in the
       ;; value we're boxing is CLEAR, we need to shrink the bignum by
       ;; one word, hence the following:
-      (inst orrs x x 0)
-      (inst sub :pl pa-flag pa-flag #x100)
-      (storew pa-flag y 0 other-pointer-lowtag :pl)
+      (inst tst x x)
+      (inst b :mi STORE)
+      (inst sub pa-flag pa-flag #x100)
+      (storew pa-flag y 0 other-pointer-lowtag)
+      STORE
       (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
 (define-move-vop move-from-unsigned :move

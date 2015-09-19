@@ -45,7 +45,7 @@
       new))
 
 (defun context-pc (context)
-  (int-sap (context-register context pc-offset)))
+  (int-sap (context-register context (1+ lr-offset))))
 
 ;;;; INTERNAL-ERROR-ARGS.
 

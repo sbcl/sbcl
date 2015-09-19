@@ -52,9 +52,9 @@
   (+ (byte-size single-float-significand-byte) 1))
 
 (def!constant double-float-digits
-  (+ (byte-size double-float-significand-byte) n-word-bits 1))
+  (+ (byte-size double-float-significand-byte) 32 1))
 
-#!+arm-vfp
+
 (progn
   (def!constant float-invalid-trap-bit (ash 1 0))
   (def!constant float-divide-by-zero-trap-bit (ash 1 1))
@@ -75,11 +75,6 @@
   (defconstant-eqx float-exceptions-byte (byte 8 0) #'equalp)
 
   (def!constant float-fast-bit (ash 1 24))) ;; Flush-to-zero mode
-;; NOTE: As with the FLOAT-REGISTERS SB in vm.lisp, if you define this
-;; for non-VFP systems, please use a specific positive feature
-;; conditional.
-#!-arm-vfp
-(error "Don't know how to set the FPU control word layout on non-VFP systems")
 
 ;;;; Where to put the different spaces.
 
