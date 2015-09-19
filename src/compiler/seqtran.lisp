@@ -158,7 +158,7 @@
                                       result-type)))
                    (if (array-type-p result-ctype)
                        (let ((dims (array-type-dimensions result-ctype)))
-                         (unless (and (listp dims) (= (length dims) 1))
+                         (unless (singleton-p dims)
                            (give-up-ir1-transform "invalid sequence type"))
                          (let ((dim (first dims)))
                            (if (eq dim '*)
