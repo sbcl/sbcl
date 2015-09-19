@@ -1803,7 +1803,11 @@ scav_hash_table_entries (struct hash_table *hash_table)
              * rehashing. */
             if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {
                 lispobj new_key = kv_vector[2*i];
-
+                // FIXME: many EQ-based sxhash values are insensitive
+                // to object movement. The most important one is SYMBOL,
+                // but others also carry around a hash value: LAYOUT, CLASSOID,
+                // and STANDARD-[FUNCALLABLE-]INSTANCE.
+                // If old_key is any of those, don't set needs_rehash_p.
                 if (old_key != new_key && new_key != empty_symbol) {
                     hash_table->needs_rehash_p = T;
                 }
