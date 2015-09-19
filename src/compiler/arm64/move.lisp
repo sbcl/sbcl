@@ -234,10 +234,7 @@
   (:generator 20
     (move x arg)
     (inst adds pa-flag x x)
-    (inst b :vs alloc)
-    (inst adds y pa-flag pa-flag)
     (inst b :vc DONE)
-    alloc
     (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
