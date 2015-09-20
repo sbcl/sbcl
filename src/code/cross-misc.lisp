@@ -77,6 +77,13 @@
 (deftype funcallable-instance ()
   (error "not clear how to represent FUNCALLABLE-INSTANCE type"))
 
+;; The definition of TYPE-SPECIFIER for the target appears in the file
+;; 'deftypes-for-target' - it allows CLASSes and CLASOIDs as specifiers.
+;; Instances are never used as specifiers when building SBCL,
+;; handily avoiding a problem in figuring out an order in which to
+;; define the types CLASS, CLASSOID, and TYPE-SPECIFIER.
+(deftype type-specifier () '(or list symbol))
+
 ;;; In the target SBCL, the INSTANCE type refers to a base
 ;;; implementation for compound types with lowtag
 ;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
