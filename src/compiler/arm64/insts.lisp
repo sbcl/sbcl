@@ -1283,6 +1283,35 @@
 
 (define-instruction-macro cset (rd cond)
   `(inst csinc ,rd zr-tn zr-tn (invert-condition ,cond)))
+;;;
+
+(def-emitter cond-compare
+  (size 1 31)
+  (op 1 30)
+  (#b111010010 9 21)
+  (rm-imm 5 16)
+  (cond 4 12)
+  (imm-p 1 11)
+  (#b0 1 10)
+  (rn 5 5)
+  (0 1 4)
+  (nzcv 4 0))
+
+(defmacro def-cond-compare (name op)
+  `(define-instruction ,name (segment rn rm-imm cond &optional (nzcv 0))
+     (:emitter
+      (emit-cond-compare segment +64-bit-size+ ,op
+                         (if (integerp rm-imm)
+                             rm-imm
+                             (tn-offset rm-imm))
+                         (conditional-opcode cond)
+                         (if (integerp rm-imm)
+                             1
+                             0)
+                         (tn-offset rn) nzcv))))
+
+(def-cond-compare ccmn #b0)
+(def-cond-compare ccmp #b1)
 
 ;;;
 
@@ -1952,7 +1981,6 @@
 
 ;;;
 
-
 (defmacro def-fp-conversion (name op &optional from-int)
   `(define-instruction ,name (segment rd rn)
      (:emitter
@@ -2024,38 +2052,6 @@
                                     #b01111
                                     #b111)
                                 (tn-offset rn) (tn-offset rd)))))))
-
-
-
-;;;; Exception-generating instructions
-
-;;; There are two exception-generating instructions.  One, BKPT, is
-;;; ostensibly used as a breakpoint instruction, and to communicate
-;;; with debugging hardware.  The other, SWI, is intended for use as a
-;;; system call interface.  We need both because, at least on some
-;;; platforms, the only breakpoint trap that works properly is a
-;;; syscall.
-
-(define-bitfield-emitter emit-swi-instruction 32
-  (byte 4 28) (byte 4 24) (byte 24 0))
-
-(define-instruction swi (segment &rest args)
-  (:printer swi ((opcode-4 #b1111)))
-  (:emitter
-   (with-condition-defaulted (args (condition code))
-     (emit-swi-instruction segment
-                           (conditional-opcode condition)
-                           #b1111 code))))
-
-
-;;;; Multiply instructions
-
-(macrolet
-    ((define-multiply-instruction (name field-mapping opcode1 opcode2)
-       `(define-instruction ,name (segment &rest args))))
-
-  (define-multiply-instruction umull  :ddsm #b00001000 #b1001)
-  (define-multiply-instruction umlal  :ddsm #b00001010 #b1001))
 
 ;;;; Boxed-object computation instructions (for LRA and CODE)
 
