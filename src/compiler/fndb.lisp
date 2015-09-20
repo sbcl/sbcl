@@ -522,15 +522,18 @@
 (defknown %concatenate-to-base-string (&rest sequence) simple-base-string
   (explicit-check flushable))
 
-(defknown (map %map) (type-specifier callable sequence &rest sequence)
-  consed-sequence
-  (call)
+(defknown map (type-specifier callable sequence &rest sequence)
+  consed-sequence (call explicit-check)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
-(defknown %map-for-effect-arity-1 (callable sequence) null (call))
-(defknown %map-to-list-arity-1 (callable sequence) list (flushable call))
+(defknown %map (type-specifier callable &rest sequence)
+  consed-sequence (call explicit-check))
+(defknown %map-for-effect-arity-1 (callable sequence) null
+  (call explicit-check))
+(defknown %map-to-list-arity-1 (callable sequence) list
+  (flushable call explicit-check))
 (defknown %map-to-simple-vector-arity-1 (callable sequence) simple-vector
-  (flushable call))
+  (flushable call explicit-check))
 
 (defknown map-into (sequence callable &rest sequence)
   sequence

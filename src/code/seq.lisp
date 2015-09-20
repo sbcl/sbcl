@@ -1016,6 +1016,8 @@ many elements are copied."
                   (setf (car in-apply-args) (aref v i)
                         (car in-iters) (1+ i)))))
            (t
+            ;; While on one hand this could benefit from a zero-safety ds-bind,
+            ;; on the other, why not coerce these tuples to vectors or structs?
             (destructuring-bind (state limit from-end step endp elt &rest ignore)
                 i
               (declare (type function step endp elt)
@@ -1060,10 +1062,17 @@ many elements are copied."
 ;;; %MAP is just MAP without the final just-to-be-sure check that
 ;;; length of the output sequence matches any length specified
 ;;; in RESULT-TYPE.
-(defun %map (result-type function first-sequence &rest more-sequences)
+(defun %map (result-type function &rest sequences)
+  (declare (dynamic-extent sequences))
+  ;; Everything that we end up calling uses %COERCE-TO-CALLABLE
+  ;; on FUNCTION so we don't need to declare it of type CALLABLE here.
+  ;; Additionally all the arity-1 mappers use SEQ-DISPATCH which asserts
+  ;; that the input is a SEQUENCE. Despite SEQ-DISPATCH being "less safe"
+  ;; than SEQ-DISPATCH-CHECKING, both are in fact equally safe, because
+  ;; the ARRAY case (which assumes that all arrays are vectors) utilizes
+  ;; %WITH-ARRAY-DATA/FP which asserts that its input is a vector.
   (labels ((slower-map (type)
-             (let ((really-fun (%coerce-callable-to-fun function))
-                   (sequences (cons first-sequence more-sequences)))
+             (let ((really-fun (%coerce-callable-to-fun function)))
                (cond
                  ((eq type *empty-type*)
                   (%map-for-effect really-fun sequences))
@@ -1073,46 +1082,48 @@ many elements are copied."
                   (%map-to-vector result-type really-fun sequences))
                  ((and (csubtypep type (specifier-type 'sequence))
                        (awhen (find-class result-type nil)
-                         (apply #'sb!sequence:map
-                                (sb!mop:class-prototype
-                                 (sb!pcl:ensure-class-finalized it))
-                                really-fun sequences))))
+                         ;; This function is DEFKNOWNed with EXPLICIT-CHECK,
+                         ;; so we must manually assert that user-written methods
+                         ;; return a subtype of SEQUENCE.
+                         (the sequence
+                              (apply #'sb!sequence:map
+                                     (sb!mop:class-prototype
+                                      (sb!pcl:ensure-class-finalized it))
+                                     really-fun sequences)))))
                  (t
-                  (bad-sequence-type-error result-type)))))
-           (slow-map ()
-             (let ((type (specifier-type result-type)))
-               (cond
-                 (more-sequences
-                  (slower-map type))
-                 ((eq type *empty-type*)
-                  (%map-for-effect-arity-1 function first-sequence))
-                 ((csubtypep type (specifier-type 'list))
-                  (%map-to-list-arity-1 function first-sequence))
-                 ((or (csubtypep type (specifier-type 'simple-vector))
-                      (csubtypep type (specifier-type '(vector t))))
-                  (%map-to-simple-vector-arity-1 function first-sequence))
-                 (t
-                  (slower-map type))))))
+                  (bad-sequence-type-error result-type))))))
     ;; Handle some easy cases faster
-    (cond (more-sequences
-           (slow-map))
-          ((null result-type)
-           (%map-for-effect-arity-1 function first-sequence))
-          ((or (eq result-type 'list)
-               (eq result-type 'cons))
-           (%map-to-list-arity-1 function first-sequence))
-          ((or (eq result-type 'vector)
-               (eq result-type 'simple-vector))
-           (%map-to-simple-vector-arity-1 function first-sequence))
-          (t
-           (slow-map)))))
+    (if (/= (length sequences) 1)
+        (slower-map (specifier-type result-type))
+        (let ((first-sequence (fast-&rest-nth 0 sequences)))
+          (case result-type
+           ((nil)
+            (%map-for-effect-arity-1 function first-sequence))
+           ((list cons)
+            (%map-to-list-arity-1 function first-sequence))
+           ((vector simple-vector)
+            (%map-to-simple-vector-arity-1 function first-sequence))
+           (t
+            (let ((type (specifier-type result-type)))
+              (cond ((eq type *empty-type*)
+                     (%map-for-effect-arity-1 function first-sequence))
+                    ((csubtypep type (specifier-type 'list))
+                     (%map-to-list-arity-1 function first-sequence))
+                    ((csubtypep type (specifier-type '(vector t)))
+                     (%map-to-simple-vector-arity-1 function first-sequence))
+                    (t
+                     (slower-map type))))))))))
 
 (defun map (result-type function first-sequence &rest more-sequences)
-  (apply #'%map
-         result-type
-         function
-         first-sequence
-         more-sequences))
+  (let ((result
+         (apply #'%map result-type function first-sequence more-sequences)))
+    (if (or (eq result-type 'nil) (typep result result-type))
+        result
+        (error 'simple-type-error
+               :format-control "MAP result ~S is not a sequence of type ~S"
+               :datum result
+               :expected-type result-type
+               :format-arguments (list result result-type)))))
 
 ;;;; MAP-INTO
 
@@ -1123,7 +1134,7 @@ many elements are copied."
      ;; Note (MAP-INTO SEQ (LAMBDA () ...)) is a different animal,
      ;; hence the awkward flip between MAP and LOOP.
      (if ,sequences
-         (apply #'map nil #'f ,sequences)
+         (apply #'%map nil #'f ,sequences)
          (loop (f)))))
 
 (define-array-dispatch vector-map-into (data start end fun sequences)

@@ -416,3 +416,13 @@
    (compile nil
             '(lambda (n)
                (make-sequence '(vector (integer 1 15) 5) n)))))
+
+;; Precisely type-check result of full call to MAP.
+(with-test (:name :notinlined-map-maximally-safe)
+  (assert-error
+   (locally (declare (notinline map)) (map '(cons symbol) '+ '(1 2) '(3 4)))
+   type-error)
+  (assert-error
+   (locally (declare (notinline map))
+            (map '(cons t (cons t null)) '+ '(1 2 3) '(10 10 10)))
+   type-error))

@@ -34,7 +34,7 @@
                                             value
                                             found-result))))))
                          (declare (inline ,wrapper))
-                         (map nil #',wrapper ,@sequences)
+                         (%map nil #',wrapper ,@sequences)
                          ,unfound-result))))
                (values (if bind-fun `(let ,bind-fun ,form) form) nil)))))
   (macrolet ((defquantifier (name found-test found-result
@@ -75,7 +75,7 @@
                                         'value
                                         found-result))))))
                       (declare (inline map-me))
-                      (apply #'map nil #'map-me first-seq more-seqs)
+                      (apply #'%map nil #'map-me first-seq more-seqs)
                       ,unfound-result)))))
 
   (defquantifier some when :value :unfound-result nil
