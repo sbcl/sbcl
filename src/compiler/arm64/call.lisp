@@ -1014,7 +1014,10 @@
                    (loadw lip lexenv closure-fun-slot
                           fun-pointer-lowtag)
                    (do-next-filler)
-                   (insert-step-instrumenting lip)))
+                   (insert-step-instrumenting lip)
+                   (inst add lip lip
+                         (- (ash simple-fun-code-offset word-shift)
+                            fun-pointer-lowtag))))
            (loop
              (if filler
                  (do-next-filler)
@@ -1095,33 +1098,6 @@
     ;; Clear the control stack, and restore the frame pointer.
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
-    ;; (let ((d1 (make-random-tn :kind :normal
-    ;;                           :sc (sc-or-lose 'double-reg)
-    ;;                           :offset 0))
-    ;;       (d2 (make-random-tn :kind :normal
-    ;;                           :sc (sc-or-lose 'double-reg)
-    ;;                           :offset 10))
-    ;;       (s1 (make-random-tn :kind :normal
-    ;;                           :sc (sc-or-lose 'single-reg)
-    ;;                           :offset 1))
-    ;;       (s2 (make-random-tn :kind :normal
-    ;;                           :sc (sc-or-lose 'single-reg)
-    ;;                           :offset 2)))
-    ;;   (inst fcmp d1 d2)
-    ;;   (inst fcmp d1 0)
-    ;;   (inst fcmp s1 s2)
-    ;;   (inst fcmpe s1 0)
-    ;;   (inst fmul d1 d2 d1)
-    ;;   (inst fmadd d1 d1 d2 d1)
-    ;;   (inst fnmsub s1 s1 s2 s1)
-    ;;   (inst fmov d1 d2)
-    ;;   (inst fneg s1 s2)
-    ;;   (inst ucvtf d1 tmp-tn )
-    ;;   (inst scvtf s1 tmp-tn )
-    ;;   (inst fmov s1 tmp-tn)
-    ;;   (inst fmov tmp-tn d2)
-    ;;   (inst ldr d2 (@ csp-tn))
-    ;;   (inst str s1 (@ csp-tn 10)))
 
     ;; Out of here.
     (lisp-return return-pc :single-value)))
