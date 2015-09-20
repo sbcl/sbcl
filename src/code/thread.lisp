@@ -14,29 +14,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (sb!xc:proclaim '(sb!ext:always-bound *current-thread*)))
 
-(def!type thread-name ()
-  'simple-string)
-
-(def!struct (thread (:constructor %make-thread))
-  #!+sb-doc
-  "Thread type. Do not rely on threads being structs as it may change
-in future versions."
-  (name          nil :type (or thread-name null))
-  (%alive-p      nil :type boolean)
-  (%ephemeral-p  nil :type boolean)
-  (os-thread     0 :type sb!vm:word)
-  (interruptions nil :type list)
-  ;; On succesful execution of the thread's lambda a list of values.
-  (result 0)
-  (interruptions-lock
-   (make-mutex :name "thread interruptions lock")
-   :type mutex)
-  (result-lock
-   (make-mutex :name "thread result lock")
-   :type mutex)
-  waiting-for)
-
-(def!struct (foreign-thread
+(defstruct (foreign-thread
              (:include thread)
              (:conc-name "THREAD-"))
   #!+sb-doc
@@ -44,23 +22,12 @@ in future versions."
 temporarily.")
 
 #!+(and sb-safepoint-strictly (not win32))
-(def!struct (signal-handling-thread
+(defstruct (signal-handling-thread
              (:include foreign-thread)
              (:conc-name "THREAD-"))
   #!+sb-doc
   "Asynchronous signal handling thread."
   (signal-number nil :type integer))
-
-(declaim (inline make-mutex)) ;; for possible DX-allocating
-(def!struct (mutex
-             (:constructor make-mutex (&key name)))
-  #!+sb-doc
-  "Mutex type."
-  (name   nil :type (or null thread-name))
-  (%owner nil :type (or null thread))
-  #!+(and sb-thread sb-futex)
-  (state    0 :type fixnum))
-(declaim (notinline make-mutex))
 
 (defun mutex-value (mutex)
   #!+sb-doc
