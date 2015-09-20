@@ -377,7 +377,7 @@
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
-       (inst add lip object index)
+       (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
        (loadw value lip ,offset ,lowtag))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
@@ -394,7 +394,7 @@
      (:results (result :scs ,scs))
      (:result-types ,el-type)
      (:generator 2
-       (inst add lip object index)
+       (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
        (storew value lip ,offset ,lowtag)
        (move result value))))
 
