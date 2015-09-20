@@ -65,7 +65,7 @@
   ;; Deallocate the unused stack space.
   (move ocfp-tn cfp-tn)
   (move cfp-tn old-fp)
-  (inst add csp-tn ocfp-tn nvals)
+  (inst add csp-tn ocfp-tn (lsl nvals (- word-shift n-fixnum-tag-bits)))
 
   ;; Return.
   (lisp-return lra lip :multiple-values))
@@ -122,8 +122,8 @@
   ;; If there aren't any stack args then we're done.
   (inst b :le DONE)
 
-  ;; Find where our shifted arguments ned to go.
-  (inst add dest cfp-tn nargs)
+  ;; Find where our shifted arguments need to go.
+  (inst add dest cfp-tn (lsl nargs (- word-shift n-fixnum-tag-bits)))
 
 
   LOOP

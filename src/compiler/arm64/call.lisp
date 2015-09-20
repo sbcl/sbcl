@@ -427,21 +427,20 @@
         ;; Compute the end of the MORE arg area (and our overall frame
         ;; allocation) into the stack pointer.
         (cond ((zerop fixed)
-               (inst cmp nargs-tn 0)
-               (inst add dest result nargs-tn)
+               (inst add dest result (lsl nargs-tn (- word-shift n-fixnum-tag-bits)))
                (move csp-tn dest)
-               (inst b :eq DONE))
+               (inst cbz nargs-tn done))
               (t
                (inst subs count nargs-tn (fixnumize fixed))
                (inst csel csp-tn result csp-tn :le)
                (inst b :le DONE)
-               (inst add dest result count)
+               (inst add dest result (lsl count (- word-shift n-fixnum-tag-bits)))
                (move csp-tn dest)))
 
         (when (< fixed register-arg-count)
           ;; We must stop when we run out of stack args, not when we
           ;; run out of more args.
-          (inst add result result (fixnumize (- register-arg-count fixed))))
+          (inst add result result (* (- register-arg-count fixed) n-word-bytes)))
 
         ;; We are copying at most (- NARGS FIXED) values, from last to
         ;; first, in order to shift them out of the allocated part of
@@ -527,9 +526,9 @@
       ;; Allocate a cons (2 words) for each item.
       (let* ((dx-p (node-stack-allocate-p node))
              (size (cond (dx-p
-                          (lsl count 1))
+                          (lsl count (1+ (- word-shift n-fixnum-tag-bits))))
                          (t
-                          (inst lsl temp count 1)
+                          (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
                           temp))))
         (allocation dst size list-pointer-lowtag
                     :flag-tn pa-flag
@@ -581,8 +580,7 @@
   (:note "more-arg-context")
   (:generator 5
     (inst sub count supplied (fixnumize fixed))
-    (move context csp-tn)
-    (inst sub context context count)))
+    (inst sub context csp-tn (lsl count (- word-shift n-fixnum-tag-bits)))))
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
@@ -916,7 +914,8 @@
               (filler
                (remove nil
                        (list ,@(if (eq return :tail)
-                                   '((unless (location= return-pc
+                                   '(:load-nargs
+                                     (unless (location= return-pc
                                                         (make-random-tn :kind :normal
                                                                         :sc (sc-or-lose 'control-stack)
                                                                         :offset lra-save-offset))
@@ -924,10 +923,10 @@
                                      (when cur-nfp
                                        :frob-nfp))
                                    '(:comp-lra
+                                     :load-nargs
                                      (when cur-nfp
                                        :frob-nfp)
-                                     :load-fp))
-                             :load-nargs))))
+                                     :load-fp))))))
          (flet ((do-next-filler ()
                   (let* ((next (pop filler))
                          (what (if (consp next) (car next) next)))
