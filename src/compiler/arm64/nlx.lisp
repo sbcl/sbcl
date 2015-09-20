@@ -292,4 +292,4 @@
       (move lexenv saved-function)
 
       (loadw saved-function lexenv closure-fun-slot fun-pointer-lowtag)
-      (lisp-jump saved-function))))
+      (lisp-jump lip saved-function))))

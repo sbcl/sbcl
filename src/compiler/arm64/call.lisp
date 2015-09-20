@@ -785,6 +785,7 @@
          (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
   (:temporary (:sc descriptor-reg :from (:argument 1)) return-pc-temp)
+  (:temporary (:scs (interior-reg)) lip)
   (:move-args :known-return)
   (:info val-locs)
   (:ignore val-locs vals)
@@ -798,7 +799,7 @@
         (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
         (move nsp-tn cur-nfp)))
     (move cfp-tn old-fp-temp)
-    (lisp-return return-pc-temp :known)))
+    (lisp-return return-pc-temp lip :known)))
 
 ;;;; Full call:
 ;;;
@@ -882,7 +883,8 @@
                       :from (:argument ,(if (eq return :tail) 0 1))
                       :to :eval)
                  ,(if named 'name-pass 'lexenv))
-
+     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+                 function)
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
@@ -1011,11 +1013,11 @@
                      (constant
                       (load-constant vop arg-fun lexenv)
                       (do-next-filler)))
-                   (loadw lip lexenv closure-fun-slot
+                   (loadw function lexenv closure-fun-slot
                           fun-pointer-lowtag)
                    (do-next-filler)
                    (insert-step-instrumenting lip)
-                   (inst add lip lip
+                   (inst add lip function
                          (- (ash simple-fun-code-offset word-shift)
                             fun-pointer-lowtag))))
            (loop
@@ -1061,7 +1063,7 @@
    (old-fp-arg :scs (any-reg) :load-if nil)
    (lra-arg :scs (descriptor-reg) :load-if nil))
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
-  (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
+  (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 75
@@ -1087,6 +1089,7 @@
   (:args (old-fp :scs (any-reg) :to :eval)
          (return-pc :scs (descriptor-reg))
          (value))
+  (:temporary (:scs (interior-reg)) lip)
   (:ignore value)
   (:vop-var vop)
   (:generator 6
@@ -1100,7 +1103,7 @@
     (move cfp-tn old-fp)
 
     ;; Out of here.
-    (lisp-return return-pc :single-value)))
+    (lisp-return return-pc lip :single-value)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
 ;;; required to be set up in the standard passing locations.  Nvals is the
@@ -1117,19 +1120,19 @@
 (define-vop (return)
   (:args
    (old-fp :scs (any-reg))
-   (return-pc :scs (descriptor-reg) :to (:eval 1) :target lra)
+   (return-pc :scs (descriptor-reg))
    (values :more t))
   (:ignore values)
   (:info nvals)
   (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)) r0)
   (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
   (:temporary (:sc descriptor-reg :offset r2-offset :from (:eval 0)) r2)
-  (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:eval 1)) lra)
+  (:temporary (:sc descriptor-reg :offset r3-offset :from (:eval 0)) r3)
+  (:temporary (:sc interior-reg) lip)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:vop-var vop)
   (:generator 6
-    (move lra return-pc)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -1142,7 +1145,7 @@
            (move csp-tn cfp-tn)
            (move cfp-tn old-fp)
            ;; Out of here.
-           (lisp-return lra :single-value))
+           (lisp-return return-pc lip :single-value))
           (t
            ;; Establish the values pointer.
            (move val-ptr cfp-tn)
@@ -1156,10 +1159,10 @@
            (load-immediate-word nargs (fixnumize nvals))
            ;; pre-default any argument register that need it.
            (when (< nvals register-arg-count)
-             (dolist (reg (subseq (list r0 r1 r2) nvals))
+             (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return lra :multiple-values)))))
+           (lisp-return return-pc lip :multiple-values)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.)  We check for the common case of a single return
@@ -1173,10 +1176,11 @@
    (vals-arg :scs (any-reg) :target vals)
    (nvals-arg :scs (any-reg) :target nvals))
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) old-fp)
-  (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:argument 1)) lra)
-  (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) vals)
+  (:temporary (:sc descriptor-reg :offset r6-offset :from (:argument 1)) lra)
+  (:temporary (:sc any-reg :offset nl1-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset r0-offset) r0)
+  (:temporary (:sc interior-reg) lip)
   (:vop-var vop)
   (:generator 13
     (move lra lra-arg)
@@ -1196,7 +1200,7 @@
     (inst ldr r0 (@ vals-arg))
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp-arg)
-    (lisp-return lra-arg :single-value)
+    (lisp-return lra lip :single-value)
 
     ;; Nope, not the single case.
     NOT-SINGLE

@@ -7,85 +7,59 @@
     (return-multiple
      (:return-style :none))
 
-     ;; These four are really arguments.
+    ;; These four are really arguments.
     ((:temp nvals any-reg nargs-offset)
-     (:temp vals any-reg ocfp-offset)
+     (:temp vals any-reg nl1-offset)
      (:temp old-fp any-reg nl2-offset)
-     (:temp lra descriptor-reg lexenv-offset)
+     (:temp lra descriptor-reg r6-offset)
 
      ;; These are just needed to facilitate the transfer
-     (:temp count any-reg nfp-offset)
-     (:temp src any-reg code-offset)
-     (:temp dst descriptor-reg r8-offset)
+     (:temp count any-reg nl3-offset)
+     (:temp src any-reg nl4-offset)
+     (:temp dst descriptor-reg r4-offset)
+     (:temp temp descriptor-reg r5-offset)
 
      ;; These are needed so we can get at the register args.
      (:temp r0 descriptor-reg r0-offset)
      (:temp r1 descriptor-reg r1-offset)
      (:temp r2 descriptor-reg r2-offset)
-     (:temp r3 descriptor-reg r3-offset))
+     (:temp r3 descriptor-reg r3-offset)
+     (:temp lip interior-reg lr-offset))
 
   ;; Note, because of the way the return-multiple vop is written, we
   ;; can assume that we are never called with nvals == 1 (not that it
   ;; helps overmuch).
-
-  ;; If there are more return values than there are arg-passing
-  ;; registers, then we need to arrange for the excess values to be
-  ;; moved.
+  (inst cmp nvals 0)
+  (inst b :le default-r0-and-on)
+  (inst cmp nvals (fixnumize 2))
+  (loadw r1 vals 1)
+  (inst b :le default-r2-and-on)
   (inst cmp nvals (fixnumize 3))
-  (inst b :gt MOVE-STACK-VALUES)
-
-  ;; We don't need to copy stack values at this point, so default any
-  ;; unsupplied values that should be in arg-passing registers.  First
-  ;; piece of black magic: A computed jump.
-  ;(inst add (error "pc-tn") (error "pc-tn") nvals)
-  ;; Eat a word of padding for the computed jump.
-  (inst word 0)
-
-  ;; The computed jump above will land on one of the next four
-  ;; instructions, based on the number of values to return.
-  (inst mov r0 null-tn)
-  (inst mov r1 null-tn)
-  (inst mov r2 null-tn)
-  (inst mov r3 null-tn)
-
-  ;; We've defaulted any unsupplied parameters, but now we need to
-  ;; load the supplied parameters.  Second piece of black magic: A
-  ;; hairier computed jump.
-  ;(inst rsb count nvals (fixnumize 2))
-  ;(inst add (error "pc-tn") (error "pc-tn") count)
-
-  ;; The computed jump above will land on one of the next four
-  ;; instructions, based on the number of values to return, in reverse
-  ;; order.
-  (inst ldr r2 (@ vals (* 2 n-word-bytes)))
-
-  ;; If we need to copy stack values, we land here so as to load the
-  ;; first two register values (the third will be loaded after the
-  ;; values are copied, due to register pressure).
-  MOVE-STACK-VALUES
-  (inst ldr r1 (@ vals n-word-bytes))
-  (inst ldr r0 (@ vals))
-
-  ;; The last instruction to set the flags was the CMP to check to see
-  ;; if we needed to move the values on the stack.  If we do not need
-  ;; to move the values on the stack then we're almost done.
+  (loadw r2 vals 2)
+  (inst b :le default-r3-and-on)
+  (inst cmp nvals (fixnumize 4))
+  (loadw r3 vals 3)
   (inst b :le DONE)
 
-  ;; Copy the remaining args (including the future R2 register value)
-  ;; over the outbound stack frame.
-  (inst add src vals (* 2 n-word-bytes))
-  (inst add dst cfp-tn (* 2 n-word-bytes))
-  (inst sub count nvals (fixnumize 2))
+  ;; Copy the remaining args over the outbound stack frame.
+  (inst add src vals (* 4 n-word-bytes))
+  (inst add dst cfp-tn (* 4 n-word-bytes))
+  (inst sub count nvals (fixnumize 4))
 
   LOOP
   (inst subs count count (fixnumize 1))
-  (inst ldr r2 (@ src n-word-bytes :post-index))
-  (inst str r2 (@ dst n-word-bytes :post-index))
+  (inst ldr temp (@ src n-word-bytes :post-index))
+  (inst str temp (@ dst n-word-bytes :post-index))
   (inst b :ge LOOP)
 
-  ;; Load the last remaining register result.
-  (inst ldr r2 (@ cfp-tn (* 2 n-word-bytes)))
-
+  DEFAULT-R0-AND-ON
+  (move r0 null-tn)
+  (move r1 null-tn)
+  DEFAULT-R2-AND-ON
+  (move r2 null-tn)
+  DEFAULT-R3-AND-ON
+  (move r3 null-tn)
+  
   DONE
 
   ;; Deallocate the unused stack space.
@@ -94,7 +68,7 @@
   (inst add csp-tn ocfp-tn nvals)
 
   ;; Return.
-  (lisp-return lra :multiple-values))
+  (lisp-return lra lip :multiple-values))
 
 ;;;; tail-call-variable.
 
@@ -166,8 +140,8 @@
   ;; function object (in case of closure functions or funcallable
   ;; instances), and R8 (known as TEMP) and, technically, CODE happen
   ;; to be the only ones available.
-  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump lip))
+  (loadw lexenv lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lexenv lip))
 
 ;;;; Non-local exit noise.
 
@@ -210,7 +184,8 @@
      (:arg count (any-reg descriptor-reg) nargs-offset)
      (:temp ocfp non-descriptor-reg ocfp-offset)
      (:temp lra descriptor-reg lexenv-offset)
-     (:temp cur-uwp any-reg nl2-offset))
+     (:temp cur-uwp any-reg nl2-offset)
+     (:temp lip interior-reg lr-offset))
   (declare (ignore start count))
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst cbz block error))
@@ -226,4 +201,4 @@
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra :known))
+  (lisp-return lra lip :known))

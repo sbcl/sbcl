@@ -110,27 +110,31 @@
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
 
-(defmacro lisp-jump (function)
-  "Jump to the lisp function FUNCTION."
-  `(let ((function ,function))
-     (inst add function function
+(defmacro lisp-jump (function lip)
+  "Jump to the lisp lip LIP."
+  `(let ((function ,function)
+         (lip ,lip))
+     (assert (sc-is lip interior-reg))
+     (inst add lip function
            (- (ash simple-fun-code-offset word-shift)
               fun-pointer-lowtag))
-     (inst br function)))
+     (inst br lip)))
 
-(defmacro lisp-return (return-pc return-style)
+(defmacro lisp-return (function lip return-style)
   "Return to RETURN-PC."
-  `(progn
+  `(let* ((function ,function)
+          (lip ,lip))
      ;; Indicate a single-valued return by clearing all of the status
      ;; flags, or a multiple-valued return by setting all of the status
      ;; flags.
+     (assert (sc-is lip interior-reg))
      ,@(ecase return-style
          (:single-value '((inst msr :nzcv zr-tn)))
          (:multiple-values '((inst orr tmp-tn zr-tn #xf0000000)
                              (inst msr :nzcv tmp-tn)))
          (:known))
-     (inst sub tmp-tn ,return-pc (- other-pointer-lowtag 8))
-     (inst br tmp-tn)))
+     (inst sub lip function (- other-pointer-lowtag 8))
+     (inst br lip)))
 
 (defmacro emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
