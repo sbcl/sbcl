@@ -37,9 +37,9 @@
   ;; This still uses the normal :return-style, BX LR, since the call
   ;; to do_pending_interrupt interrupt is conditional.
   (pseudo-atomic (pa-flag :link nil)
-    ;; boxed words == unboxed bytes
-    (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst and ndescr ndescr (bic-mask lowtag-mask))
+    (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
+    (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
+    (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
     (inst lsr ndescr type n-fixnum-tag-bits)
     (storew ndescr vector 0 other-pointer-lowtag)
@@ -69,9 +69,9 @@
      (:temp vector descriptor-reg r8-offset))
   ;; See why :LINK NIL is needed in ALLOCATE-VECTOR-ON-HEAP above.
   (pseudo-atomic (pa-flag :link nil)
-    ;; boxed words == unboxed bytes
-    (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst and ndescr ndescr (bic-mask lowtag-mask))
+    (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
+    (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
+    (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (allocation vector ndescr other-pointer-lowtag
                 :flag-tn pa-flag
                 :stack-allocate-p t)
