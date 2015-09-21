@@ -57,21 +57,6 @@
            (when ,topmost
              (setf *ignored-package-locks* :invalid)))))))
 
-(defun program-assert-symbol-home-package-unlocked (context symbol control)
-  #!-sb-package-locks
-  (declare (ignore context symbol control))
-  #!+sb-package-locks
-  (handler-bind ((package-lock-violation
-                  (lambda (condition)
-                    (ecase context
-                      (:compile
-                       (warn "Compile-time package lock violation:~%  ~A"
-                             condition)
-                       (sb!c:compiler-error condition))
-                      (:eval
-                       (eval-error condition))))))
-    (with-single-package-locked-error (:symbol symbol control))))
-
 (defmacro without-package-locks (&body body)
   #!+sb-doc
   "Ignores all runtime package lock violations during the execution of

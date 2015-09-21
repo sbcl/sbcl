@@ -292,8 +292,6 @@
  ("src/code/serve-event" :not-host)
  ("src/code/fd-stream"   :not-host)
 
- ("src/code/module" :not-host)
-
  ("src/code/query"  :not-host)
 
  ("src/code/sort"  :not-host)
@@ -673,6 +671,7 @@
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
  ("src/code/target-sap"        :not-host) ; uses SAP-INT type
  ("src/code/target-package"    :not-host) ; needs "code/package"
+ ("src/code/module"            :not-host)
  ("src/code/target-random"     :not-host) ; needs "code/random"
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
