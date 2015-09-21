@@ -1119,7 +1119,7 @@
 (define-vop (return)
   (:args
    (old-fp :scs (any-reg))
-   (return-pc :scs (descriptor-reg))
+   (return-pc :scs (descriptor-reg) :to (:eval 1))
    (values :more t))
   (:ignore values)
   (:info nvals)
@@ -1150,8 +1150,7 @@
            ;; restore the frame pointer and clear as much of the control
            ;; stack as possible.
            (move cfp-tn old-fp)
-           (composite-immediate-instruction
-            add nargs val-ptr (* nvals n-word-bytes))
+           (inst add nargs val-ptr (add-sub-immediate (* nvals n-word-bytes)))
            (move csp-tn nargs)
            ;; Establish the values count.
            (load-immediate-word nargs (fixnumize nvals))
