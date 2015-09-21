@@ -336,7 +336,7 @@
     (cond ((< -64 amount 64)
            (if (plusp amount)
                (inst lsl result number amount)
-               (inst lsl result number (- amount))))
+               (inst lsr result number (- amount))))
           (t
            (inst mov result 0)))))
 
@@ -551,9 +551,9 @@
     (inst and res num #xff)))
 
 ;;; Modular functions
-(define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
-(define-vop (lognot-mod32/unsigned=>unsigned)
-  (:translate lognot-mod32)
+(define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
+(define-vop (lognot-mod64/unsigned=>unsigned)
+  (:translate lognot-mod64)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (res :scs (unsigned-reg)))
@@ -562,31 +562,31 @@
   (:generator 1
     (inst mvn res x)))
 
-;; (macrolet
-;;     ((define-modular-backend (fun &optional constantp)
-;;        (let ((mfun-name (symbolicate fun '-mod32))
-;;              (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
-;;              (modcvop (symbolicate 'fast- fun 'mod32-c/unsigned=>unsigned))
-;;              (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
-;;              (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
-;;          `(progn
-;;             (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 32)
-;;             (define-vop (,modvop ,vop)
-;;               (:translate ,mfun-name))
-;;             ,@(when constantp
-;;                 `((define-vop (,modcvop ,cvop)
-;;                     (:translate ,mfun-name))))))))
-;;   (define-modular-backend + t)
-;;   (define-modular-backend - t)
-;;   (define-modular-backend *)
-;;   ;; (define-modular-backend logeqv)
-;;   ;; (define-modular-backend lognand)
-;;   ;; (define-modular-backend lognor)
-;;   (define-modular-backend logandc1)
-;;   (define-modular-backend logandc2)
-;;   ;; (define-modular-backend logorc1)
-;;   ;; (define-modular-backend logorc2)
-;;   )
+(macrolet
+    ((define-modular-backend (fun &optional constantp)
+       (let ((mfun-name (symbolicate fun '-mod64))
+             (modvop (symbolicate 'fast- fun '-mod64/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun 'mod64-c/unsigned=>unsigned))
+             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
+             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
+         `(progn
+            (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 64)
+            (define-vop (,modvop ,vop)
+              (:translate ,mfun-name))
+            ,@(when constantp
+                `((define-vop (,modcvop ,cvop)
+                    (:translate ,mfun-name))))))))
+  (define-modular-backend +)
+  (define-modular-backend -)
+  (define-modular-backend *)
+  ;; (define-modular-backend logeqv)
+  ;; (define-modular-backend lognand)
+  ;; (define-modular-backend lognor)
+  (define-modular-backend logandc1)
+  (define-modular-backend logandc2)
+  ;; (define-modular-backend logorc1)
+  ;; (define-modular-backend logorc2)
+  )
 
 ;;;; Binary conditional VOPs:
 
@@ -911,7 +911,7 @@
     (inst umulh temp x y)
     (inst and hi temp (bic-mask fixnum-tag-mask))))
 
-(define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
+(define-vop (bignum-lognot lognot-mod64/unsigned=>unsigned)
   (:translate sb!bignum:%lognot))
 
 (define-vop (bignum-floor)
