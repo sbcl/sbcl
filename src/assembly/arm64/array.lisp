@@ -41,7 +41,7 @@
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask))
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
-    (inst lsr ndescr type word-shift)
+    (inst lsr ndescr type n-fixnum-tag-bits)
     (storew ndescr vector 0 other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings
     ;; passed to C do not cause a WP violation in foreign code.
@@ -75,7 +75,7 @@
     (allocation vector ndescr other-pointer-lowtag
                 :flag-tn pa-flag
                 :stack-allocate-p t)
-    (inst lsr pa-flag type word-shift)
+    (inst lsr pa-flag type n-fixnum-tag-bits)
     (storew pa-flag vector 0 other-pointer-lowtag)
     ;; Zero fill
     (let ((loop (gen-label)))
