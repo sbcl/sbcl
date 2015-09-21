@@ -222,9 +222,8 @@
          (:generator 25
            ;; Compute the offset for the word we're interested in.
            (inst lsr temp index ,bit-shift)
-           (inst lsl temp temp n-fixnum-tag-bits)
            ;; Load the word in question.
-           (inst add lip object temp)
+           (inst add lip object (lsl temp word-shift))
            (inst ldr old (@ lip
                             (- (* vector-data-offset n-word-bytes)
                                other-pointer-lowtag)))
@@ -274,10 +273,10 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types single-float)
   (:generator 5
-    (inst add offset index (- (* vector-data-offset n-word-bytes)
-                              other-pointer-lowtag))
+    (inst mov offset (- (* vector-data-offset n-word-bytes)
+                        other-pointer-lowtag))
+    (inst add offset offset (lsl index (1- (- word-shift n-fixnum-tag-bits))))
     (inst ldr value (@ object offset))))
-
 
 (define-vop (data-vector-set/simple-array-single-float)
   (:note "inline array store")
@@ -291,8 +290,9 @@
   (:result-types single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (inst add offset index (- (* vector-data-offset n-word-bytes)
-                              other-pointer-lowtag))
+    (inst mov offset (- (* vector-data-offset n-word-bytes)
+                        other-pointer-lowtag))
+    (inst add offset offset (lsl index (1- (- word-shift n-fixnum-tag-bits))))
     (inst str value (@ object offset))
     (unless (location= result value)
       (inst fmov result value))))
@@ -310,7 +310,7 @@
   (:generator 7
     (inst mov offset (- (* vector-data-offset n-word-bytes)
                         other-pointer-lowtag))
-    (inst add offset offset (lsl index 1))
+    (inst add offset offset (lsl index (- word-shift n-fixnum-tag-bits)))
     (inst ldr value (@ object offset))))
 
 (define-vop (data-vector-set/simple-array-double-float)
@@ -327,7 +327,7 @@
   (:generator 20
     (inst mov offset (- (* vector-data-offset n-word-bytes)
                         other-pointer-lowtag))
-    (inst add offset offset (lsl index 1))
+    (inst add offset offset (lsl index (- word-shift n-fixnum-tag-bits)))
     (inst str value (@ object offset))
     (unless (location= result value)
       (inst fmov result value))))

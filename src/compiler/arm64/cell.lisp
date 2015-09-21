@@ -299,8 +299,8 @@
        (labels ((emit-generator (instruction move-result)
                   `((loadw offset object 0 instance-pointer-lowtag)
                     (inst lsr offset offset n-widetag-bits)
-                    (inst lsl offset offset n-fixnum-tag-bits)
-                    (inst sub offset offset index)
+                    (inst lsl offset offset word-shift)
+                    (inst sub offset offset (lsl index (- word-shift n-fixnum-tag-bits)))
                     (inst sub offset offset (+ (* (- ,width
                                                      instance-slots-offset)
                                                   n-word-bytes)
