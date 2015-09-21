@@ -1610,6 +1610,7 @@
 (defknown %unary-ftruncate/double (double-float) double-float
   (movable foldable flushable))
 
+#-sb-xc-host
 (defun %unary-ftruncate/single (x)
   (declare (type single-float x))
   (declare (optimize speed (safety 0)))
@@ -1627,6 +1628,7 @@
          (setf bits (logandc2 bits (- (ash 1 frac-bits) 1)))
          (make-single-float bits))))))
 
+#-sb-xc-host
 (defun %unary-ftruncate/double (x)
   (declare (type double-float x))
   (declare (optimize speed (safety 0)))
