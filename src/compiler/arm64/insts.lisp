@@ -933,6 +933,11 @@
   (rn 5 5)
   (rd 5 0))
 
+(defun add-sub-immediate-p (x)
+  (or (typep x '(unsigned-byte 12))
+      (and (typep x '(unsigned-byte 24))
+           (not (ldb-test (byte 12 0) x)))))
+
 (defmacro def-add-sub (name op)
   `(define-instruction ,name (segment rd rn rm)
      (:emitter
@@ -1234,6 +1239,9 @@
                        (eq 'null (sc-name (tn-sc ,reg))))
                   null-tn
                   ,reg)))
+
+(define-instruction-macro mov-sp (rd rm)
+  `(inst add ,rd ,rm 0))
 
 (define-instruction-macro mov (rd rm)
   `(let ((rd ,rd)

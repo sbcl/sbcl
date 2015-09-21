@@ -193,8 +193,8 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
-        (composite-immediate-instruction sub nsp-tn nsp-tn delta)
-        (move result nsp-tn)))))
+        (inst sub nsp-tn nsp-tn (add-sub-immediate delta))
+        (inst mov-sp result nsp-tn)))))
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
@@ -322,7 +322,7 @@
                                  +number-stack-alignment-mask+))
       (assemble (segment)
         (emit-word segment #xe92d4ff8) ;; stmfd sp!, {r3-r11, lr}
-        (move nsp-save-tn nsp-tn)
+        (inst mov-sp nsp-save-tn nsp-tn)
 
         ;; Make room on the stack for arguments.
         (when (plusp frame-size)
@@ -390,11 +390,11 @@
         ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
         (inst mov r1-tn (fixnumize index))
         ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-        (inst mov r2-tn nsp-tn)
+        (inst mov-sp r2-tn nsp-tn)
         ;; add room on stack for return value
         (inst sub nsp-tn nsp-tn 8)
         ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-        (inst mov r3-tn nsp-tn)
+        (inst mov-sp r3-tn nsp-tn)
 
         ;; Call
         (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
@@ -417,7 +417,7 @@
           ((alien-void-type-p result-type))
           (t
            (error "Unrecognized alien type: ~A" result-type)))
-        (move nsp-tn nsp-save-tn)
+        (inst mov-sp nsp-tn nsp-save-tn)
         (emit-word segment #xe8bd4ff8) ;; ldmfd sp!, {r3-r11, lr}
         (inst br lr-tn))
       (finalize-segment segment)

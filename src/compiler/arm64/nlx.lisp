@@ -42,7 +42,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (move nfp cur-nfp)))
-    (move nsp nsp-tn)))
+    (inst mov-sp nsp nsp-tn)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
@@ -54,7 +54,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (move cur-nfp nfp)))
-    (move nsp-tn nsp)))
+    (inst mov-sp nsp-tn nsp)))
 
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))

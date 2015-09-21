@@ -29,7 +29,13 @@
                do
                (if (shiftf first nil)
                    (inst movz y part i)
-                   (inst movk y part i))))))
+                   (inst movk y part i)))))
+  y)
+
+(defun add-sub-immediate (x &optional (temp tmp-tn))
+  (if (add-sub-immediate-p x)
+      x
+      (load-immediate-word temp x)))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate)
@@ -233,7 +239,7 @@
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
-    (inst adds pa-flag x x)
+    (inst adds y x x)
     (inst b :vc DONE)
     (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
