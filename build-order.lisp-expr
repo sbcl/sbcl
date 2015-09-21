@@ -265,7 +265,6 @@
  #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
  #!+win32 ("src/code/target-exception" :not-host)
 
- ("src/code/symbol"     :not-host)
  ("src/code/bignum"     :not-host)
  ("src/code/numbers"    :not-host)
  ("src/code/float-trap" :not-host)
@@ -282,6 +281,7 @@
  ("src/code/room"   :not-host)
 
  ("src/code/stream"        :not-host)
+ ("src/code/symbol"        :not-host) ; uses STRING-OUTPUT-STREAM
  ("src/code/print"         :not-host)
  ("src/code/early-format")
  ("src/code/defpackage"    :not-host)
