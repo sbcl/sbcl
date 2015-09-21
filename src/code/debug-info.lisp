@@ -312,3 +312,71 @@
              (timestamp (file-write-date namestring)))
         (setf (debug-source-created debug-source) timestamp
               (debug-source-compiled debug-source) now)))))
+
+;;;; file reading
+;;;;
+;;;; When reading from a file, we have to keep track of some source
+;;;; information. We also exploit our ability to back up for printing
+;;;; the error context and for recovering from errors.
+;;;;
+;;;; The interface we provide to this stuff is the stream-oid
+;;;; SOURCE-INFO structure. The bookkeeping is done as a side effect
+;;;; of getting the next source form.
+
+;;; A FILE-INFO structure holds all the source information for a
+;;; given file.
+(defstruct (file-info
+             (:copier nil)
+             #-no-ansi-print-object
+             (:print-object (lambda (s stream)
+                              (print-unreadable-object (s stream :type t)
+                                (princ (file-info-name s) stream)))))
+  ;; If a file, the truename of the corresponding source file. If from
+  ;; a Lisp form, :LISP. If from a stream, :STREAM.
+  (name (missing-arg) :type (or pathname (eql :lisp)))
+  ;; the external format that we'll call OPEN with, if NAME is a file.
+  (external-format nil)
+  ;; the defaulted, but not necessarily absolute file name (i.e. prior
+  ;; to TRUENAME call.) Null if not a file. This is used to set
+  ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the
+  ;; debug-info.
+  (untruename nil :type (or pathname null))
+  ;; the file's write date (if relevant)
+  (write-date nil :type (or unsigned-byte null))
+  ;; the source path root number of the first form in this file (i.e.
+  ;; the total number of forms converted previously in this
+  ;; compilation)
+  (source-root 0 :type unsigned-byte)
+  ;; parallel vectors containing the forms read out of the file and
+  ;; the file positions that reading of each form started at (i.e. the
+  ;; end of the previous form)
+  (forms (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
+  (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
+  ;; A vector of character ranges than span each subform in the TLF,
+  ;; reset to empty for each one, updated by form-tracking-stream-observer.
+  (subforms nil :type (or null (vector t)) :read-only t))
+
+;;; The SOURCE-INFO structure provides a handle on all the source
+;;; information for an entire compilation.
+(defstruct (source-info
+             #-no-ansi-print-object
+             (:print-object (lambda (s stream)
+                              (print-unreadable-object
+                                  (s stream :type t :identity t))))
+             (:copier nil))
+  ;; the UT that compilation started at
+  (start-time (get-universal-time) :type unsigned-byte)
+  ;; the IRT that compilation started at
+  (start-real-time (get-internal-real-time) :type unsigned-byte)
+  ;; the FILE-INFO structure for this compilation
+  (file-info nil :type (or file-info null))
+  ;; the stream that we are using to read the FILE-INFO, or NIL if
+  ;; no stream has been opened yet
+  (stream nil :type (or stream null))
+  ;; for coalescing DEFINITION-SOURCE-LOCATION of effectively toplevel forms
+  ;; inside one truly toplevel form.
+  (last-defn-source-loc)
+  ;; if the current compilation is recursive (e.g., due to EVAL-WHEN
+  ;; processing at compile-time), the invoking compilation's
+  ;; source-info.
+  (parent nil :type (or source-info null)))
