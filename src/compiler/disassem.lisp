@@ -148,6 +148,7 @@
 (defun sap-ref-dchunk (sap byte-offset byte-order)
   (declare (type sb!sys:system-area-pointer sap)
            (type offset byte-offset)
+           (muffle-conditions compiler-note) ; returns possible bignum
            (optimize (speed 3) (safety 0)))
   (the dchunk
        (ecase dchunk-bits
@@ -1533,6 +1534,28 @@
            (optimize (speed 3) (safety 0)))
   (sign-extend (read-suffix length dstate) length))
 
+(defstruct (storage-info (:copier nil))
+  (groups nil :type list)               ; alist of (name . location-group)
+  (debug-vars #() :type vector))
+
+(defstruct (segment (:conc-name seg-)
+                    (:constructor %make-segment)
+                    (:copier nil))
+  (sap-maker (missing-arg)
+             :type (function () sb!sys:system-area-pointer))
+  ;; Length in bytes of the range of memory covered by this segment.
+  (length 0 :type disassem-length)
+  ;; Length of the memory range excluding any trailing untagged data.
+  ;; Defaults to 'length' but could be shorter.
+  ;; FIXME: can opcodes-length really be shorter? Nothing ever alters it.
+  (opcodes-length 0 :type disassem-length)
+  (virtual-location 0 :type address)
+  (storage-info nil :type (or null storage-info))
+  ;; KLUDGE: CODE-COMPONENT is not a type the host understands
+  #-sb-xc-host (code nil :type (or null sb!kernel:code-component))
+  (unboxed-data-range nil :type (or null (cons fixnum fixnum)))
+  (hooks nil :type list))
+
 ;;; All state during disassembly. We store some seemingly redundant
 ;;; information so that we can allow garbage collect during disassembly and
 ;;; not get tripped up by a code block being moved...
@@ -1546,11 +1569,7 @@
   ;; a sap pointing to our segment
   (segment-sap nil :type (or null sb!sys:system-area-pointer))
   ;; the current segment
-  ;; But this makes no sense: SEGMENT is defined in 'target-disassem'
-  ;; which means the host can't use an instance of DISASSEM-STATE.
-  ;; Why is this structure defined at all?
-  ;; Perhaps the entire disassembler should be target-only.
-  (segment nil :type (or null #-sb-xc-host segment))
+  (segment nil :type (or null segment))
   ;; what to align to in most cases
   (alignment sb!vm:n-word-bytes :type alignment)
   (byte-order :little-endian

@@ -254,21 +254,6 @@
   (fun (missing-arg) :type function)
   (before-address nil :type (member t nil)))
 
-(defstruct (segment (:conc-name seg-)
-                    (:constructor %make-segment)
-                    (:copier nil))
-  (sap-maker (missing-arg)
-             :type (function () sb!sys:system-area-pointer))
-  ;; Length in bytes of the range of memory covered by this segment.
-  (length 0 :type disassem-length)
-  ;; Length of the memory range excluding any trailing untagged data.
-  ;; Defaults to 'length' but could be shorter.
-  (opcodes-length 0 :type disassem-length)
-  (virtual-location 0 :type address)
-  (storage-info nil :type (or null storage-info))
-  (code nil :type (or null sb!kernel:code-component))
-  (unboxed-data-range nil :type (or null (cons fixnum fixnum)))
-  (hooks nil :type list))
 (def!method print-object ((seg segment) stream)
   (print-unreadable-object (seg stream :type t)
     (let ((addr (sb!sys:sap-int (funcall (seg-sap-maker seg)))))
@@ -1068,10 +1053,6 @@
 
 (defstruct (location-group (:copier nil))
   (locations #() :type (vector (or list fixnum))))
-
-(defstruct (storage-info (:copier nil))
-  (groups nil :type list)               ; alist of (name . location-group)
-  (debug-vars #() :type vector))
 
 ;;; Return the vector of DEBUG-VARs currently associated with DSTATE.
 (defun dstate-debug-vars (dstate)
