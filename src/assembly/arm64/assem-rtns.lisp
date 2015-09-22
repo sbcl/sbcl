@@ -100,11 +100,11 @@
   ;; OCFP, both already set up in the stack frame.  We have a set of
   ;; arguments, represented as the address of the first argument
   ;; (ARGS) and the address just beyond the last argument (CSP-TN),
-  ;; and need to set up the arg-passing-registers (R0, R1, and R2),
-  ;; any stack arguments (the fourth and subsequent arguments, if such
-  ;; exist), and the total arg count (NARGS).
+  ;; and need to set up the arg-passing-registers, any stack arguments
+  ;; (the fourth and subsequent arguments, if such exist), and the
+  ;; total arg count (NARGS).
 
-  ;; Calculate NARGS (as a fixnum)
+  ;; Calculate NARGS
   (inst sub nargs csp-tn args)
 
   ;; Load the argument regs (must do this now, 'cause the blt might
@@ -118,20 +118,19 @@
   ;; from CSP-TN.
 
   ;; Figure out how many arguments we really need to shift.
-  (inst subs count nargs (fixnumize register-arg-count))
+  (inst subs count nargs (* register-arg-count n-word-bytes))
   ;; If there aren't any stack args then we're done.
   (inst b :le DONE)
 
   ;; Find where our shifted arguments need to go.
-  (inst add dest cfp-tn (lsl nargs (- word-shift n-fixnum-tag-bits)))
+  (inst add dest cfp-tn nargs)
 
-
+  (inst neg count count)
   LOOP
   ;; Copy one arg.
-  (inst neg tmp-tn count)
-  (inst ldr temp (@ csp-tn tmp-tn))
-  (inst str temp (@ dest tmp-tn))
-  (inst subs count count n-word-bytes)
+  (inst ldr temp (@ csp-tn count))
+  (inst str temp (@ dest count))
+  (inst adds count count n-word-bytes)
   (inst b :ne LOOP)
 
   DONE
@@ -140,6 +139,7 @@
   ;; function object (in case of closure functions or funcallable
   ;; instances), and R8 (known as TEMP) and, technically, CODE happen
   ;; to be the only ones available.
+  (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))
   (loadw lexenv lexenv closure-fun-slot fun-pointer-lowtag)
   (lisp-jump lexenv lip))
 
@@ -159,14 +159,13 @@
   LOOP
 
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
-    (inst cmp catch 0)
-    (inst b :eq error))
+    (inst cbz catch error))
 
   (assemble ()
     (loadw tag catch catch-block-tag-slot)
     (inst cmp tag target)
     (inst b :eq DONE)
-    (loadw catch catch catch-block-previous-catch-slot 0)
+    (loadw catch catch catch-block-previous-catch-slot)
     (inst b LOOP)
     DONE
     ;; As a dreadful cleverness, make use of the fact that assembly
@@ -193,7 +192,7 @@
   (loadw ocfp block unwind-block-current-uwp-slot)
   (inst cmp cur-uwp ocfp)
   (inst b :eq EQ)
-  (loadw ocfp cur-uwp unwind-block-current-uwp-slot 0)
+  (loadw ocfp cur-uwp unwind-block-current-uwp-slot)
   (store-symbol-value ocfp *current-unwind-protect-block*)
   EQ
   (inst csel cur-uwp block cur-uwp :eq)
