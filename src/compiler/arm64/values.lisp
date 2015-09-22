@@ -134,14 +134,14 @@
        (inst add src context (* (tn-value skip) n-word-bytes)))
       (any-reg
        (inst add src context (lsl skip (- word-shift n-fixnum-tag-bits)))))
-    (inst adds count zr-tn (lsl num (- word-shift n-fixnum-tag-bits)))
+    (inst adds count num 0)
     (move start csp-tn)
     (inst b :eq DONE)
     (inst mov dst start)
-    (inst add csp-tn start count)
-    (inst mov i count)
+    (inst lsl i count (- word-shift n-fixnum-tag-bits))
+    (inst add csp-tn start i)
     LOOP
-    (inst subs i i n-word-bits)
+    (inst subs i i n-word-bytes)
     (inst ldr temp (@ src i))
     (inst str temp (@ dst i))
     (inst b :ne LOOP)
