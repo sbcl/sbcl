@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(defconstant +number-stack-alignment-mask+ 7)
+(defconstant +number-stack-alignment-mask+ (1- (* n-word-bytes 2)))
 
 (defconstant +max-register-args+ 4)
 
