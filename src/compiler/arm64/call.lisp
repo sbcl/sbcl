@@ -272,7 +272,7 @@
         ;; OCFP so that we don't screw ourselves with the
         ;; defaulting and stack clearing logic.
         (inst csel ocfp-tn csp-tn ocfp-tn :ne)
-        (inst mov tmp-tn n-word-bytes)
+        (inst mov tmp-tn (fixnumize 1))
         (inst csel nargs-tn tmp-tn nargs-tn :ne)
 
         ;; Compute the number of stack values (may be negative if
@@ -289,7 +289,7 @@
           (assemble () 
             ;; ... Load it if there is a stack value available, or
             ;; default it if there isn't.
-            (inst subs values-on-stack values-on-stack 4)
+            (inst subs values-on-stack values-on-stack (fixnumize 1))
             (inst b :lt NONE)
             (loadw move-temp ocfp-tn i 0)
             NONE
@@ -319,25 +319,22 @@
 ;;; results Start and Count (also, it's nice to be able to target them).
 (defun receive-unknown-values (args nargs start count lra-label temp lip)
   (declare (type tn args nargs start count temp))
-  (let ((done (gen-label))
-        (single (gen-label)))
+  (assemble ()
     (inst compute-code code-tn lip lra-label temp)
-    (inst b :eq single)
-    (move nargs csp-tn)
-    (inst add temp nargs n-word-bytes)
-    (move csp-tn temp)
-    (inst str (first *register-arg-tns*) (@ nargs))
-    (inst mov start nargs)
+    (inst b :eq MULTIPLE)
+    (move start csp-tn)
+    (inst add csp-tn nargs n-word-bytes)
+    (inst str (first *register-arg-tns*) (@ start))
     (inst mov count (fixnumize 1))
     (inst b DONE)
-    (emit-label SINGLE)
+    MULTIPLE
     (do ((arg *register-arg-tns* (rest arg))
          (i 0 (1+ i)))
         ((null arg))
       (storew (first arg) args i 0))
     (move start args)
     (move count nargs)
-    (emit-label DONE)))
+    DONE))
 
 
 ;;; VOP that can be inherited by unknown values receivers.  The main
