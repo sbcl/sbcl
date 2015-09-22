@@ -230,16 +230,13 @@
               (inst b :eq ALIGNED)
               (inst add ,result-tn ,result-tn n-word-bytes)
               ALIGNED
-              (if (integerp ,size)
-                  (composite-immediate-instruction add ,flag-tn ,result-tn ,size)
-                  (inst add ,flag-tn ,result-tn ,size))
-              (move csp-tn ,flag-tn)
+              (inst add csp-tn ,result-tn (add-sub-immediate ,size))
               ;; :ne is from TST above, this needs to be done after the
               ;; stack pointer has been stored.
               (inst b :eq ALIGNED2)
-              (storew null-tn ,result-tn -1 0)
+              (storew zr-tn ,result-tn -1 0)
               ALIGNED2
-              (inst orr ,result-tn ,result-tn ,lowtag)))
+              (inst add ,result-tn ,result-tn ,lowtag)))
            #!-gencgc
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
@@ -254,19 +251,14 @@
                   (alloc (gen-label))
                   (back-from-alloc (gen-label)))
               (inst load-from-label ,flag-tn FIXUP)
-              (loadw ,result-tn ,flag-tn)
-              (loadw ,flag-tn ,flag-tn 1)
-              (if (integerp ,size)
-                  (composite-immediate-instruction add ,result-tn ,result-tn ,size)
-                  (inst add ,result-tn ,result-tn ,size))
+              (inst ldp ,result-tn ,flag-tn (@ ,flag-tn))
+              (inst add ,result-tn ,flag-tn (add-sub-immediate ,size))
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
               (inst load-from-label ,flag-tn FIXUP)
               (storew ,result-tn ,flag-tn)
 
-              (if (integerp ,size)
-                  (composite-immediate-instruction sub ,result-tn ,result-tn ,size)
-                  (inst sub ,result-tn ,result-tn ,size))
+              (inst sub ,result-tn ,result-tn (add-sub-immediate ,size))
 
               (emit-label BACK-FROM-ALLOC)
               (when ,lowtag

@@ -120,8 +120,7 @@
   (:args (tn))
   (:temporary (:scs (descriptor-reg)) new-uwp)
   (:generator 7
-    (composite-immediate-instruction
-     add new-uwp cfp-tn (* (tn-offset tn) n-word-bytes))
+    (inst add new-uwp cfp-tn (add-sub-immediate (* (tn-offset tn) n-word-bytes)))
     (store-symbol-value new-uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
@@ -160,12 +159,10 @@
     (cond ((zerop nvals))
           ((= nvals 1)
            (assemble ()
-             (inst cbnz count non-zero)
              (move (tn-ref-tn values) null-tn)
-             (inst b DONE)
-             NON-ZERO
-             (loadw (tn-ref-tn values) start 0 0)
-             done))
+             (inst cbz count zero)
+             (loadw (tn-ref-tn values) start)
+             ZERO))
           (t
            (do ((i 0 (1+ i))
                 (tn-ref values (tn-ref-across tn-ref)))
@@ -176,25 +173,27 @@
                  ((descriptor-reg any-reg)
                   (assemble ()
                     (inst b :lt LESS-THAN)
-                    (loadw move-temp start i 0)
+                    (loadw move-temp start i)
                     LESS-THAN
                     (inst csel tn null-tn move-temp :lt)))
                  (control-stack
                   (assemble ()
                     (inst b :lt LESS-THAN)
-                    (loadw move-temp start i 0)
+                    (loadw move-temp start i)
                     LESS-THAN
                     (inst csel tn null-tn move-temp :lt))))))))
-    (load-stack-tn move-temp sp)
-    (move csp-tn move-temp)))
+    (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
-  (:args (top :target result) (src) (count))
+  (:args (top :target result)
+         (src)
+         (count :target count-words))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
   (:temporary (:scs (any-reg)) dst)
   (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (descriptor-reg)) count-words)
   (:results (result :scs (any-reg) :from (:argument 0))
             (num :scs (any-reg) :from (:argument 0)))
   (:save-p :force-to-stack)
@@ -205,26 +204,26 @@
 
     ;; Setup results, and test for the zero value case.
     (load-stack-tn result top)
-    (inst cmp count 0)
     (inst mov num 0)
+    ;; Shift and check for zero in one go
+    (inst adds count-words zr-tn (lsl count (- word-shift n-fixnum-tag-bits)))
     (inst b :eq DONE)
 
     ;; Compute dst as one slot down from result, because we inc the index
     ;; before we use it.
-    (inst sub dst result 4)
+    (inst sub dst result n-word-bytes)
 
     ;; Copy stuff down the stack.
     LOOP
     (inst ldr temp (@ src num))
-    (inst add num num (fixnumize 1))
-    (inst cmp num count)
+    (inst add num num n-word-bytes)
+    (inst cmp num count-words)
     (inst str temp (@ dst num))
     (inst b :ne LOOP)
 
     ;; Reset the CSP.
     DONE
-    (inst add temp result num)
-    (move csp-tn temp)))
+    (inst add csp-tn result num)))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;

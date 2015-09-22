@@ -33,9 +33,12 @@
   y)
 
 (defun add-sub-immediate (x &optional (temp tmp-tn))
-  (if (add-sub-immediate-p x)
-      x
-      (load-immediate-word temp x)))
+  (cond ((not (integerp x))
+         x)
+        ((add-sub-immediate-p x)
+         x)
+        (t
+         (load-immediate-word temp x))))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate)
