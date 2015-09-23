@@ -2614,6 +2614,7 @@ generic function lambda list ~S~:>"
        :context 'defmethod
        :accept (lambda-list-keyword-mask
                 '(&optional &rest &key &allow-other-keys &aux))
+       :silent t ; never signal &OPTIONAL + &KEY style-warning
        :condition-class 'specialized-lambda-list-error)
     (let ((required (mapcar (lambda (x) (if (listp x) (car x) x)) specialized)))
       (values (append required

@@ -84,7 +84,14 @@
                (accept (lambda-list-keyword-mask
                         '(&optional &rest &more &key &allow-other-keys &aux)))
                (condition-class 'simple-program-error)
-               silent
+               ;; For internal method functions, just shut up about everything
+               ;; that we could style-warn about. Interpreters tend to scan the
+               ;; lambda list at various inopportune times depending on strategy
+               ;; (macro caching, etc) and it's really annoying to see the
+               ;; &OPTIONAL/&KEY message randomly repeated, especially if it's
+               ;; someone else's code. Fwiw, 'full-eval' muffles warnings during
+               ;; all calls to this parser anyway.
+               (silent (typep list '(cons (eql sb!pcl::.pv.))))
           &aux (seen 0) required optional rest more keys aux env whole tail
                (rest-bits 0))
   (declare (optimize speed))

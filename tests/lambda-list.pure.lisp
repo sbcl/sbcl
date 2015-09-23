@@ -449,3 +449,9 @@
       (macroexpand-1
        '(defmacro defx (name ll &optional (types '*) &key node) 1)))
     (assert (= count 1))))
+
+(with-test (:name :silent-pcl-internals)
+  (assert-no-signal
+   (sb-int:parse-lambda-list
+    '(sb-pcl::.pv. sb-pcl::.next-method-call. self &optional o &key k
+       &allow-other-keys))))

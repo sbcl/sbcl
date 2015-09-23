@@ -36,14 +36,17 @@
 
 (multiple-value-bind (function warningsp failurep)
     (compile nil '(lambda () (ftype-correctness)))
+  (declare (ignore function failurep))
   (assert warningsp))
 
 (multiple-value-bind (function warningsp failurep)
     (compile nil '(lambda () (ftype-correctness "FOO")))
+  (declare (ignore function failurep))
   (assert (not warningsp)))
 
 (multiple-value-bind (function warningsp failurep)
     (compile nil '(lambda () (ftype-correctness "FOO" "BAR")))
+  (declare (ignore function failurep))
   (assert warningsp))
 
 ;;; This used to break due to too eager auxiliary type twiddling in
