@@ -91,27 +91,25 @@
   (:temporary (:scs (descriptor-reg) :type list :from (:argument 0)) list)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:sc any-reg) csp-temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
     (move start csp-tn)
-    (move csp-temp start)
 
     LOOP
     (inst cmp list null-tn)
     (loadw temp list cons-car-slot list-pointer-lowtag)
     (inst b :eq DONE)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (inst add csp-temp csp-temp n-word-bytes)
-    (move csp-tn csp-temp)
-    (storew temp csp-temp -1)
+    (inst add csp-tn csp-tn n-word-bytes)
+    (storew temp csp-tn -1)
     (test-type list LOOP nil (list-pointer-lowtag) :temp ndescr)
     (error-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst sub count csp-temp start)))
+    (inst sub count csp-tn start)
+    (inst asr count count (- word-shift n-fixnum-tag-bits))))
 
 
 ;;; Copy the more arg block to the top of the stack so we can use them

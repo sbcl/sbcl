@@ -916,8 +916,8 @@
                                        :load-return-pc)
                                      (when cur-nfp
                                        :frob-nfp))
-                                   '(:comp-lra
-                                     :load-nargs
+                                   '(:load-nargs
+                                     :comp-lra
                                      (when cur-nfp
                                        :frob-nfp)
                                      :load-fp))))))
@@ -930,12 +930,13 @@
                              `((move nargs-pass csp-tn)
                                ;; The variable args are on the stack
                                ;; and become the frame, but there may
-                               ;; be <3 args and 2 stack slots are
+                               ;; be <4 args and 2 stack slots are
                                ;; assumed allocate on the call. So
                                ;; need to ensure there are at least 2
                                ;; slots. This just adds 2 more.
                                (inst add csp-tn nargs-pass (* 2 n-word-bytes))
                                (inst sub nargs-pass nargs-pass new-fp)
+                               (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
                                ,@(let ((index -1))
                                    (mapcar #'(lambda (name)
                                                `(loadw ,name new-fp ,(incf index)))
@@ -995,10 +996,8 @@
                      (constant
                       (load-constant vop name name-pass)
                       (do-next-filler)))
-                   (insert-step-instrumenting name-pass)
-                   (loadw lip name-pass fdefn-raw-addr-slot
-                          other-pointer-lowtag)
-                   (do-next-filler))
+                   (do-next-filler)
+                   (insert-step-instrumenting name-pass))
                  `((sc-case arg-fun
                      (descriptor-reg (move lexenv arg-fun))
                      (control-stack
@@ -1010,15 +1009,18 @@
                    (loadw function lexenv closure-fun-slot
                           fun-pointer-lowtag)
                    (do-next-filler)
-                   (insert-step-instrumenting lip)
-                   (inst add lip function
-                         (- (ash simple-fun-code-offset word-shift)
-                            fun-pointer-lowtag))))
+                   (insert-step-instrumenting lip)))
            (loop
              (if filler
                  (do-next-filler)
                  (return)))
-
+           ,(if named
+                `(loadw lip name-pass fdefn-raw-addr-slot
+                     other-pointer-lowtag)
+                `(inst add lip function
+                       (- (ash simple-fun-code-offset word-shift)
+                          fun-pointer-lowtag)))
+           
            (note-this-location vop :call-site)
            (inst br lip))
 
