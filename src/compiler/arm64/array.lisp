@@ -104,7 +104,7 @@
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
 ;;; elements are represented in integer registers and are built out of
-;;; 8, 16, or 32 bit elements.
+;;; 8, 16, 32, or 64 bit elements.
 (macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
@@ -143,10 +143,10 @@
   (def-partial-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum
     :short nil unsigned-reg signed-reg)
 
-  (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num
-    unsigned-reg)
-  (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
-    unsigned-reg)
+  (def-partial-data-vector-frobs simple-array-unsigned-byte-31 positive-fixnum
+    :word nil unsigned-reg signed-reg)
+  (def-partial-data-vector-frobs simple-array-unsigned-byte-32 positive-fixnum
+    :word nil unsigned-reg signed-reg)
 
   (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
     unsigned-reg)
@@ -160,13 +160,14 @@
   (def-partial-data-vector-frobs simple-array-signed-byte-16 tagged-num
     :short t signed-reg)
 
+  (def-partial-data-vector-frobs simple-array-signed-byte-32 tagged-num
+    :word t signed-reg)
+
   (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum
     any-reg)
   (def-full-data-vector-frobs simple-array-fixnum tagged-num
     any-reg)
 
-  (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
-    signed-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-64 signed-num
     signed-reg))
 

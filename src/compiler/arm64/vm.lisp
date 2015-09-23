@@ -153,6 +153,9 @@
                   :save-p t
                   :alternate-scs (control-stack))
 
+  (32-bit-reg registers
+              :locations #.(loop for i below 32 collect i))
+
   ;; The non-descriptor stacks.
   (signed-stack non-descriptor-stack)    ; (signed-byte 64)
   (unsigned-stack non-descriptor-stack)  ; (unsigned-byte 64)
@@ -340,3 +343,8 @@
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))
   nil)
+
+(defun 32-bit-reg (tn)
+  (make-random-tn :kind :normal
+                  :sc (sc-or-lose '32-bit-reg)
+                  :offset (tn-offset tn)))

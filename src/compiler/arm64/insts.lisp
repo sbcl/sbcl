@@ -1192,6 +1192,10 @@
    (emit-bitfield segment +64-bit-size+ 1 +64-bit-size+
                   immr imms (tn-offset rn) (tn-offset rd))))
 
+(define-instruction ubfm (segment rd rn immr imms)
+  (:emitter
+   (emit-bitfield segment +64-bit-size+ #b10 +64-bit-size+
+                  immr imms (tn-offset rn) (tn-offset rd))))
 
 (define-instruction-macro asr (rd rn shift)
   `(let ((rd ,rd)
@@ -1219,10 +1223,8 @@
                (- 63 shift))
          (inst lslv rd rn shift))))
 
-(define-instruction ubfm (segment rd rn immr imms)
-  (:emitter
-   (emit-bitfield segment +64-bit-size+ #b10 +64-bit-size+
-                  immr imms (tn-offset rn) (tn-offset rd))))
+(define-instruction-macro sxtw (rd rn)
+  `(inst sbfm ,rd ,rn 0 31))
 
 ;;;
 
@@ -1494,7 +1496,11 @@
          (v  (if fp
                  1
                  0))
-         (size (cond ((not fp)
+         (size (cond ((not size)
+                      (if (sc-is dst 32-bit-reg)
+                          #b10
+                          #b11))
+                     ((not fp)
                       size)
                      ((eq (sc-name (tn-sc dst)) 'complex-double-reg)
                       (setf opc (logior #b10 opc))
@@ -1563,7 +1569,7 @@
 (def-load-store strh 1 #b00)
 (def-load-store ldrh 1 #b01)
 (def-load-store ldrsh 1 #b10) 
-(def-load-store str 3 #b00)
+(def-load-store str nil #b00)
 
 (define-instruction ldr (segment dst address)
   (:emitter
@@ -1577,7 +1583,7 @@
                                                 0)
                                             (ash (- (label-position address) posn) -2)
                                             (tn-offset dst))))
-       (emit-load-store 3 1 segment dst address))))
+       (emit-load-store nil 1 segment dst address))))
 
 (def-emitter ldr-str-pair
   (opc 2 30)

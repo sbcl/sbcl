@@ -185,8 +185,9 @@
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
-    (inst add bytes extra (* (1- words) n-word-bytes))
-    (inst lsl header bytes (- n-widetag-bits n-fixnum-tag-bits))
+    (load-immediate-word bytes (* (1- words) n-word-bytes))
+    (inst add bytes bytes (lsl extra (- word-shift n-fixnum-tag-bits)))
+    (inst lsl header bytes n-word-bytes)
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity

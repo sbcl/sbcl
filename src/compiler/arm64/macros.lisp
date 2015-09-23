@@ -403,13 +403,20 @@
      (:result-types ,el-type)
      (:temporary (:scs (interior-reg)) lip)
      (:generator 5
-       ,(if (eq size :byte)
-            '(inst add lip object index)
-            '(inst add lip object (lsl index 1)))
-       (inst ,(ecase size
-                     (:byte (if signed 'ldrsb 'ldrb))
-                     (:short (if signed 'ldrsh 'ldrh)))
-             value (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))
+       ,@(ecase size (eq size :byte)
+               (:byte
+                `((inst add lip object index)
+                  (inst ,(if signed 'ldrsb 'ldrb)
+                        value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
+               (:short
+                `((inst add lip object (lsl index 1))
+                  (inst ,(if signed 'ldrsh 'ldrh)
+                        value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
+               (:word
+                `((inst add lip object (lsl index 2))
+                  (inst ldr (32-bit-reg value) (@ lip (- (* ,offset n-word-bytes) ,lowtag)))
+                  ,@(and signed
+                         `((inst sxtw value value)))))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)
@@ -425,11 +432,16 @@
      (:results (result :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
-       ,(if (eq size :byte)
-            '(inst add lip object index)
-            '(inst add lip object (lsl index 1)))
-       (inst ,(ecase size (:byte 'strb) (:short 'strh))
-             value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))
+       ,@(ecase size (eq size :byte)
+                (:byte
+                 `((inst add lip object index)
+                   (inst strb value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
+                (:short
+                 `((inst add lip object (lsl index 1))
+                   (inst strh value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
+                (:word
+                 `((inst add lip object (lsl index 2))
+                   (inst str (32-bit-reg value) (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))
        (move result value))))
 
 (def!macro with-pinned-objects ((&rest objects) &body body)
