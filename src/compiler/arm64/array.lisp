@@ -26,15 +26,16 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 5
     ;; Compute the allocation size.
-    (inst add ndescr rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
-                             lowtag-mask))
+    (inst lsl ndescr rank (- word-shift n-fixnum-tag-bits))
+    (inst add ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
+                               lowtag-mask))
     (inst and ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header
       ;; value.
-      (inst add ndescr rank (fixnumize (1- array-dimensions-offset)))
-      (inst lsl ndescr ndescr (- n-widetag-bits n-fixnum-tag-bits))
+      (inst lsl ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
+      (inst add ndescr ndescr (ash (1- array-dimensions-offset) n-widetag-bits))
       (inst orr ndescr ndescr (lsr type n-fixnum-tag-bits))
       ;; And store the header value.
       (storew ndescr header 0 other-pointer-lowtag))
