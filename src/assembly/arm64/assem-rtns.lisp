@@ -32,6 +32,7 @@
   (inst cmp nvals 0)
   (inst b :le default-r0-and-on)
   (inst cmp nvals (fixnumize 2))
+  (loadw r0 vals)
   (loadw r1 vals 1)
   (inst b :le default-r2-and-on)
   (inst cmp nvals (fixnumize 3))
