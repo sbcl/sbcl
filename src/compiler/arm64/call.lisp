@@ -511,8 +511,8 @@
     (move context context-arg)
     (move count count-arg)
     ;; Check to see if there are any arguments.
-    (inst cbz count DONE)
     (move result null-tn)
+    (inst cbz count DONE)
 
     ;; We need to do this atomically.
     (pseudo-atomic (pa-flag)
