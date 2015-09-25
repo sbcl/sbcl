@@ -608,7 +608,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
        (format *debug-io*
                "~&=== Starting a ~A without a timeout while interrupts are disabled. ===~%"
                type)
-       (sb!debug:backtrace)))
+       (sb!debug:print-backtrace)))
     nil))
 
 ;;;; poll.h
