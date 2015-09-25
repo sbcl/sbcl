@@ -15,13 +15,13 @@
 
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
-  (unless (zerop (rem offset n-word-bytes))
+  (unless (zerop (rem offset 4))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
-   (let ((sap (%primitive sb!kernel::code-instructions code)))
-     (ecase kind
-       (:absolute
-        (setf (sap-ref-32 sap offset) fixup))))))
+    (let ((sap (%primitive sb!kernel::code-instructions code)))
+      (ecase kind
+        (:absolute
+         (setf (sap-ref-word sap offset) fixup))))))
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.
