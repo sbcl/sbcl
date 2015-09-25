@@ -13,7 +13,7 @@
 
 (defconstant +number-stack-alignment-mask+ (1- (* n-word-bytes 2)))
 
-(defconstant +max-register-args+ 4)
+(defconstant +max-register-args+ 8)
 
 (defun my-make-wired-tn (prim-type-name sc-name offset)
   (make-wired-tn (primitive-type-or-lose prim-type-name)
@@ -30,11 +30,12 @@
 
 (defun result-reg-offset (slot)
   (ecase slot
-    (0 nargs-offset)
-    (1 nl3-offset)))
+    (0 nl0-offset)
+    (1 nl1-offset)))
 
 (defun register-args-offset (index)
-  (elt '(#.ocfp-offset #.nargs-offset #.nl2-offset #.nl3-offset)
+  (elt '#.(list nl0-offset nl1-offset nl2-offset nl3-offset nl4-offset nl5-offset nl6-offset
+                      nl7-offset)
        index))
 
 (defun int-arg (state prim-type reg-sc stack-sc)
@@ -94,7 +95,7 @@
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type state))
-  (my-make-wired-tn 'system-area-pointer 'sap-reg nargs-offset))
+  (my-make-wired-tn 'system-area-pointer 'sap-reg (result-reg-offset 0)))
 
 
 (define-alien-type-method (single-float :result-tn) (type state)
@@ -164,9 +165,9 @@
   (:ignore args results)
   (:save-p t)
   (:temporary (:sc any-reg :offset r8-offset
-                   :from (:argument 0) :to (:result 0)) cfunc)
+               :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:sc any-reg) temp)
+  (:temporary (:sc any-reg :offset r9-offset) temp)
   (:vop-var vop)
   (:generator 0
     (let ((call-into-c-fixup (gen-label))

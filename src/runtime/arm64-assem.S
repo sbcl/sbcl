@@ -195,10 +195,7 @@ call_into_c:
 	// At this point, we have:
 	// X8 -- C function to call.
         // LR -- Return address within the code component.
-        // OCFP -- First C register argument.
-        // NARGS -- Second C register argument.
-        // NL2 -- Third C register argument.
-        // NL3 -- Fourth C register argument.
+        // R0-R7 arguments
         // All other C arguments are already stashed on the C stack.
 
 	// We need to convert our return address to a GC-safe format,
@@ -209,9 +206,6 @@ call_into_c:
         // our stack frame, restore the return address, and return to
         // our caller.
 
-        // We have ONE unboxed scratch register: NFP.  Use it as a
-	// temporary while we convert the (unboxed) return address to
-        // a (fixnum) offset within the component.
         sub     reg_NFP, reg_LR, reg_CODE
         add     reg_NFP, reg_NFP, #OTHER_POINTER_LOWTAG
 
@@ -235,10 +229,6 @@ call_into_c:
 	ldr	reg_NFP, =current_control_frame_pointer
 	str	reg_TMP, [reg_NFP]
 
-        // We're done with X0, and we need to use OCFP when leaving
-        // pseudo-atomic, so move the first of the C register
-	// arguments to its final resting place now.
-        mov     x0, reg_OCFP
 
 	// Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_NFP, =foreign_function_call_active
@@ -253,12 +243,6 @@ call_into_c:
 
 	LEAVE_PA
 
-        // Now that we're in C mode, move the remaining register args
-	// into place.
-        mov     x1, reg_NARGS
-        mov     x2, reg_NL2
-        mov     x3, reg_NL3
-
         // And call the C function.
         //
         // X8 is important for undefined_alien_function.
@@ -267,14 +251,6 @@ call_into_c:
         // We're back.  Our main tasks are to move the C return value
         // to where Lisp expects it, and to re-establish the Lisp
         // environment.
-
-        // Stash the return value into NARGS for Lisp.
-        mov     reg_NARGS, x0
-        // For returning long-long, and doubles with softfp.
-        mov     reg_NL3, x1
-
-        // Re-establish NIL.
-        ldr     reg_NULL, .known_nil
 
         // Blank the boxed registers.
         mov     reg_R0, #0
@@ -319,13 +295,13 @@ call_into_c:
 
         // Restore our caller state from our stack frame.
         ldr     reg_CODE, [reg_NFP, #16]
-        ldr     reg_NL2, [reg_NFP, #8]
+        ldr     reg_NL8, [reg_NFP, #8]
         ldr     reg_CFP, [reg_NFP]
         mov     reg_CSP, reg_NFP
 
         // Return
-        sub     reg_NL2, reg_NL2, #OTHER_POINTER_LOWTAG
-        add     reg_TMP, reg_NL2, reg_CODE
+        sub     reg_NL8, reg_NL8, #OTHER_POINTER_LOWTAG
+        add     reg_TMP, reg_NL8, reg_CODE
         br      reg_TMP
 
 	.size	call_into_c, .-call_into_c

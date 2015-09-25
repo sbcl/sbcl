@@ -1197,7 +1197,6 @@
     (move cfp-tn old-fp-arg)
     (lisp-return lra lip :single-value)
 
-    ;; Nope, not the single case.
     NOT-SINGLE
     (move old-fp old-fp-arg)
     (move vals vals-arg)

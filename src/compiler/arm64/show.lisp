@@ -14,14 +14,13 @@
 
 
 (define-vop (print)
-  (:args (object :scs (descriptor-reg any-reg) :target ocfp))
+  (:args (object :scs (descriptor-reg any-reg) :target nl0))
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
-  (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 0)) ocfp)
+  (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) nl0)
   (:temporary (:sc any-reg :offset r8-offset) cfunc)
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:sc non-descriptor-reg :offset nargs-offset) nargs)
-  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+ (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:vop-var vop)
   (:generator 100
     (let ((call-into-c-fixup (gen-label))
@@ -34,10 +33,10 @@
         (inst dword (make-fixup "debug_print" :foreign)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (move ocfp object)
+      (move nl0 object)
       (inst load-from-label temp call-into-c-fixup)
       (inst load-from-label cfunc debug-print-fixup)
       (inst blr temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
-      (move result nargs))))
+      (move result nl0))))
