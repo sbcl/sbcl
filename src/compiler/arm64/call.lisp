@@ -323,7 +323,7 @@
     (inst compute-code code-tn lip lra-label temp)
     (inst b :eq MULTIPLE)
     (move start csp-tn)
-    (inst add csp-tn nargs n-word-bytes)
+    (inst add csp-tn csp-tn n-word-bytes)
     (inst str (first *register-arg-tns*) (@ start))
     (inst mov count (fixnumize 1))
     (inst b DONE)
