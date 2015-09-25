@@ -138,13 +138,13 @@
         (emit-label closure-tramp-fixup)
         (inst dword (make-fixup "closure_tramp" :foreign)))
       (assemble ()
+        (inst add lip function (- (* simple-fun-code-offset n-word-bytes)
+                                  fun-pointer-lowtag))
         (load-type type function (- fun-pointer-lowtag))
         (inst cmp type simple-fun-header-widetag)
         (inst b :eq SIMPLE-FUN)
         (inst load-from-label lip closure-tramp-fixup)
         SIMPLE-FUN
-        (inst csel lip function lip :eq)
-      
         (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
         (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
         (move result function)))))
