@@ -147,101 +147,51 @@
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 (macrolet ((def-system-ref-and-set
-               ;; NOTE: The -C VOPs have been disabled, as the allowed
-               ;; displacements for memory references vary by
-               ;; instruction, are confusing to figure out, and might
-               ;; be sign-magnitude encoded.  FIXME: Figure these
-               ;; things out, and re-enable the VOPs.
-               (ref-name set-name sc type size &key signed use-lip)
-               (let ((ref-name-c (symbolicate ref-name "-C"))
-                     (set-name-c (symbolicate set-name "-C")))
-                 `(progn
-                   (define-vop (,ref-name)
-                       (:translate ,ref-name)
-                     (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg)))
-                     (:arg-types system-area-pointer signed-num)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
-                     ,@(when use-lip
-                             '((:temporary (:sc interior-reg) lip)))
-                     (:generator 5
-                      ,@(when use-lip
-                          '((inst add lip sap offset)))
-                      (inst ,(case size
-                               (:byte (if signed 'ldrsb 'ldrb))
-                               (:short (if signed 'ldrsh 'ldrh))
-                               (t 'ldr))
-                            result ,(if use-lip
-                                        '(@ lip)
-                                        '(@ sap offset)))))
-                   #+(or)
-                   (define-vop (,ref-name-c)
-                       (:translate ,ref-name)
-                     (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg)))
-                     (:arg-types system-area-pointer (:constant (signed-byte 16)))
-                     (:info offset)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
-                     (:generator 4
-                      (inst ,(case size
-                                    (:byte (if signed 'ldrsb 'ldrb))
-                                    (:short (if signed 'ldrsh 'ldrh))
-                                    (t 'ldr))
-                            result (@ sap offset))))
-                   (define-vop (,set-name)
-                       (:translate ,set-name)
-                     (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer signed-num ,type)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
-                     ,@(when use-lip
-                             '((:temporary (:sc interior-reg) lip)))
-                     (:generator 5
-                      ,@(when use-lip
-                          '((inst add lip sap offset)))
-                      (inst ,(case size
-                               (:byte 'strb)
-                               (:short 'strh)
-                               (t 'str))
-                            value ,(if use-lip
-                                       '(@ lip)
-                                       '(@ sap offset)))
-                      (unless (location= result value)
-                        ,@(case size
-                            ((:single :double)
-                             '((inst fmov result value)))
-                            (t
-                             '((inst mov result value)))))))
-                   #+(or)
-                   (define-vop (,set-name-c)
-                       (:translate ,set-name)
-                     (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer (:constant (signed-byte 16)) ,type)
-                     (:info offset)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
-                     (:generator 4
-                      (inst ,(case size
-                               (:byte 'strb)
-                               (:short 'strh)
-                               (t 'str))
-                            value (@ sap offset))
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst fcpys result value)))
-                                (:double
-                                 '((inst fcpyd result value)))
-                                (t
-                                 '((inst mov result value)))))))))))
+               (ref-name set-name sc type size &key signed)
+             `(progn
+                (define-vop (,ref-name)
+                  (:translate ,ref-name)
+                  (:policy :fast-safe)
+                  (:args (sap :scs (sap-reg))
+                         (offset :scs (signed-reg)))
+                  (:arg-types system-area-pointer signed-num)
+                  (:results (result :scs (,sc)))
+                  (:result-types ,type)
+                  (:generator 5
+                              (inst ,(case size
+                                       (:byte (if signed 'ldrsb 'ldrb))
+                                       (:short (if signed 'ldrsh 'ldrh))
+                                       (t 'ldr))
+                                    ,(if (eq size :word)
+                                         '(32-bit-reg result)
+                                         'result)
+                                    (@ sap offset))
+                              ,@(and (eq size :word) signed
+                                     '((inst sxtw result result)))))
+                (define-vop (,set-name)
+                  (:translate ,set-name)
+                  (:policy :fast-safe)
+                  (:args (sap :scs (sap-reg))
+                         (offset :scs (signed-reg))
+                         (value :scs (,sc) :target result))
+                  (:arg-types system-area-pointer signed-num ,type)
+                  (:results (result :scs (,sc)))
+                  (:result-types ,type)
+                  (:generator 5
+                              (inst ,(case size
+                                       (:byte 'strb)
+                                       (:short 'strh)
+                                       (t 'str))
+                                    ,(if (eq size :word)
+                                         '(32-bit-reg value)
+                                         'value)
+                                    (@ sap offset))
+                              (unless (location= result value)
+                                ,@(case size
+                                    ((:single :double)
+                                     '((inst fmov result value)))
+                                    (t
+                                     '((inst mov result value))))))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte :signed nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8
@@ -251,9 +201,9 @@
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16
     signed-reg tagged-num :short :signed t)
   (def-system-ref-and-set sap-ref-32 %set-sap-ref-32
-    unsigned-reg unsigned-num :long :signed nil)
+    unsigned-reg unsigned-num :word :signed nil)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
-    signed-reg signed-num :long :signed t)
+    signed-reg signed-num :word :signed t)
   (def-system-ref-and-set sap-ref-64 %set-sap-ref-64
     unsigned-reg unsigned-num :long :signed nil)
   (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64
@@ -263,9 +213,9 @@
   (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj
     descriptor-reg * :long)
   (def-system-ref-and-set sap-ref-single %set-sap-ref-single
-    single-reg single-float :single :use-lip t)
+    single-reg single-float :single)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
-    double-reg double-float :double :use-lip t))
+    double-reg double-float :double))
 
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
