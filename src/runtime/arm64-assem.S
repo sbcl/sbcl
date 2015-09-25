@@ -18,7 +18,7 @@
 #define STORE_STATIC_SYMBOL_VALUE(value,sym) \
         mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
         str value,[reg_NULL, reg_TMP]
-        
+
 #define ENTER_PA \
         STORE_STATIC_SYMBOL_VALUE(reg_CFP,PSEUDO_ATOMIC_ATOMIC)
 
@@ -27,7 +27,7 @@
         LOAD_STATIC_SYMBOL_VALUE(reg_OCFP,PSEUDO_ATOMIC_INTERRUPTED)      ;\
         cbz     reg_OCFP, 1f; \
 	blr     reg_OCFP; \
-1: 
+1:
 	.align
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
@@ -57,7 +57,7 @@ call_into_lisp:
 	ldr	reg_NULL, .known_nil
 
 	// Set up NARGS.
-	orr	reg_NARGS, xzr, x2, LSL #1
+	orr	reg_NARGS, xzr, x2, LSL #N_FIXNUM_TAG_BITS
 
 	// Move args pointer out of the way of the args to be loaded.
 	mov	reg_R8, x1
@@ -75,7 +75,7 @@ call_into_lisp:
         mov     reg_R7, #0
         mov     reg_R9, #0
 #ifndef LISP_FEATURE_SB_THREAD
-        mov     reg_10, #0
+        mov     reg_R10, #0
 #endif
         mov     reg_CODE, #0
 
@@ -89,7 +89,7 @@ call_into_lisp:
 	ldr	reg_CFP, [reg_CFP]
 
         ENTER_PA
-	
+
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer into the symbol.
@@ -127,7 +127,7 @@ call_into_lisp:
         bmi one_arg
 three_args:
 	ldr	reg_R2, [reg_R8, #16]
-two_args:        
+two_args:
 	ldr	reg_R1, [reg_R8, #8]
 one_arg:
 	ldr	reg_R0, [reg_R8]
@@ -171,7 +171,7 @@ no_args:
         LEAVE_PA
 
 	// Restore saved registers.
-        
+
         ldp     d14, d15, [sp],#16
         ldp     d12, d13, [sp],#16
         ldp     d10, d11, [sp],#16
@@ -193,9 +193,7 @@ no_args:
 	.type	call_into_c, %function
 call_into_c:
 	// At this point, we have:
-	// X8 -- C function to call.  This routine doesn't support
-        //       thumb interworking, but linkage-table does, so we
-        //       don't have to.
+	// X8 -- C function to call.
         // LR -- Return address within the code component.
         // OCFP -- First C register argument.
         // NARGS -- Second C register argument.
@@ -261,10 +259,7 @@ call_into_c:
         mov     x2, reg_NL2
         mov     x3, reg_NL3
 
-        // And call the C function.  We don't support interworking
-	// here because we have to be able to pass the function
-	// pointer in a boxed register, but the linkage-table is quite
-        // capable of doing a tail-call to a Thumb routine.
+        // And call the C function.
         //
         // X8 is important for undefined_alien_function.
         blr      reg_R8
@@ -293,7 +288,7 @@ call_into_c:
         mov     reg_R8, #0
         mov     reg_R9, #0
 #ifndef LISP_FEATURE_SB_THREAD
-        mov     reg_10, #0
+        mov     reg_R10, #0
 #endif
         mov     reg_LEXENV, #0
         mov     reg_CODE, #0
@@ -398,22 +393,22 @@ undefined_alien_function:
         .byte   0x11
         .byte   0x02
 
+
 	.align	3
 	.global	closure_tramp
 	.type	closure_tramp, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	closure_tramp, .+1
-	.word	closure_tramp
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-
+	.dword	SIMPLE_FUN_HEADER_WIDETAG
+        .dword	closure_tramp - SIMPLE_FUN_CODE_OFFSET
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+closure_tramp:
 	ldr	reg_LEXENV, [reg_LEXENV, #FDEFN_FUN_OFFSET]
 	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-        br      reg_TMP
+	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+        br      reg_LR
 
 	.align	3
 	.global	funcallable_instance_tramp
@@ -466,10 +461,16 @@ alloc_tramp:
         stp     reg_R4,reg_R5, [reg_CSP, #16]!
         stp     reg_R6,reg_R7, [reg_CSP, #16]!
         stp     reg_R8,reg_R9, [reg_CSP, #16]!
-        stp     x10,reg_LEXENV, [reg_CSP, #16]!
+        stp     x20,reg_LEXENV, [reg_CSP, #16]!
 
-        ldr     x0,[sp,#24]
- 
+        stp     reg_NL0,reg_NL1, [sp,#-16]!
+        stp     reg_NL2,reg_NL3, [sp,#-16]!
+        stp     reg_NL4,reg_NL5, [sp,#-16]!
+        stp     reg_NL6,reg_NL7, [sp,#-16]!
+        stp     reg_NL8,reg_NL9, [sp,#-16]!
+
+        ldr     x0,[sp,#104]
+
         stp     d0, d1, [sp,#-16]!
         stp     d2, d3, [sp,#-16]!
         stp     d4, d5, [sp,#-16]!
@@ -484,9 +485,15 @@ alloc_tramp:
         ldp     d2, d3, [sp],#16
         ldp     d0, d1, [sp],#16
 
-        str     x0, [sp,#24]
+        str     x0, [sp,#104]
 
-        ldp     x10, reg_LEXENV, [reg_CSP], #-16
+        ldp     reg_NL8,reg_NL9, [sp],#16
+        ldp     reg_NL6,reg_NL7, [sp],#16
+        ldp     reg_NL4,reg_NL5, [sp],#16
+        ldp     reg_NL2,reg_NL3, [sp],#16
+        ldp     reg_NL0,reg_NL1, [sp],#16
+
+        ldp     x20, reg_LEXENV, [reg_CSP], #-16
         ldp     reg_R8,reg_R9, [reg_CSP], #-16
         ldp     reg_R6,reg_R7, [reg_CSP], #-16
         ldp     reg_R4,reg_R5, [reg_CSP], #-16
@@ -527,4 +534,3 @@ do_pending_interrupt:
         .byte 0
 	ret	reg_LR
         #endif
-
