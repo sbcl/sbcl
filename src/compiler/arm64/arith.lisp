@@ -479,7 +479,7 @@
     (inst asr temp number amount)
     (inst and result temp (bic-mask fixnum-tag-mask))))
 
-;;; Only the lower 5 bits of the shift amount are significant.
+;;; Only the lower 6 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
   (:args (num :scs (unsigned-reg))
@@ -493,14 +493,14 @@
   (:translate shift-towards-start)
   (:note "SHIFT-TOWARDS-START")
   (:generator 1
-    (inst and temp amount #b11111)
+    (inst and temp amount #b111111)
     (inst lsr r num temp)))
 
 (define-vop (shift-towards-end shift-towards-someplace)
   (:translate shift-towards-end)
   (:note "SHIFT-TOWARDS-END")
   (:generator 1
-    (inst and temp amount #b11111)
+    (inst and temp amount #b111111)
     (inst lsl r num temp)))
 
 (define-vop (signed-byte-64-len)
