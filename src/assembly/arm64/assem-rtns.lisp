@@ -52,6 +52,7 @@
   (inst ldr temp (@ src n-word-bytes :post-index))
   (inst str temp (@ dst n-word-bytes :post-index))
   (inst b :ge LOOP)
+  (inst b DONE)
 
   DEFAULT-R0-AND-ON
   (move r0 null-tn)
