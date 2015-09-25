@@ -190,15 +190,13 @@
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:temporary (:scs (any-reg)) bsp-temp)
-  (:temporary (:scs (any-reg)) zero-temp)
   (:generator 0
-    (inst mov zero-temp 0)
     (load-symbol-value bsp-temp *binding-stack-pointer*)
     (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
     (loadw value bsp-temp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-temp bsp-temp (- binding-symbol-slot binding-size))
-    (storew zero-temp bsp-temp (- binding-value-slot binding-size))
+    (storew zr-tn bsp-temp (- binding-symbol-slot binding-size))
+    (storew zr-tn bsp-temp (- binding-value-slot binding-size))
     (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
 
@@ -206,23 +204,22 @@
   (:args (arg :scs (descriptor-reg any-reg) :target where))
   (:temporary (:scs (any-reg) :from (:argument 0)) where)
   (:temporary (:scs (descriptor-reg)) symbol value)
-  (:temporary (:scs (any-reg)) bsp-temp zero-temp)
+  (:temporary (:scs (any-reg)) bsp-temp)
   (:generator 0
     (load-symbol-value bsp-temp *binding-stack-pointer*)
-    (inst mov zero-temp 0)
     (move where arg)
     (inst cmp where bsp-temp)
     (inst b :eq DONE)
 
     LOOP
     (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
-    (inst cbnz symbol NOT-ZERO)
+    (inst cbz symbol ZERO)
 
-    (loadw value bsp-temp (- binding-value-slot binding-size) 0)
+    (loadw value bsp-temp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-temp bsp-temp (- binding-symbol-slot binding-size) 0)
-    NOT-ZERO
-    (storew zero-temp bsp-temp (- binding-value-slot binding-size))
+    (storew zr-tn bsp-temp (- binding-symbol-slot binding-size))
+    ZERO
+    (storew zr-tn bsp-temp (- binding-value-slot binding-size))
     (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
     (inst cmp where bsp-temp)
     (inst b :ne LOOP)
