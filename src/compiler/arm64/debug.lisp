@@ -60,8 +60,9 @@
   (:generator 5
     (move code null-tn)
     (loadw temp thing 0 lowtag)
-    (inst lsr temp temp (- n-widetag-bits word-shift))
+    (inst lsr temp temp n-widetag-bits)
     (inst cbz temp DONE)
+    (inst lsl temp temp word-shift)
     (unless (= lowtag other-pointer-lowtag)
       (inst sub temp temp (- other-pointer-lowtag lowtag)))
     (inst sub code thing temp)
@@ -92,7 +93,6 @@
   (:result-types unsigned-num)
   (:generator 1
     (move result thing)))
-
 
 (define-vop (fun-word-offset)
   (:policy :fast-safe)
