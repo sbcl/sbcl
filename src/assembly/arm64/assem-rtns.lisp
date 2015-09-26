@@ -139,11 +139,10 @@
   ;; The call frame is all set up, so all that remains is to jump to
   ;; the new function.  We need a boxed register to hold the actual
   ;; function object (in case of closure functions or funcallable
-  ;; instances), and R8 (known as TEMP) and, technically, CODE happen
-  ;; to be the only ones available.
+  ;; instances)
   (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))
-  (loadw lexenv lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump lexenv lip))
+  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump temp lip))
 
 ;;;; Non-local exit noise.
 
@@ -170,11 +169,8 @@
     (loadw catch catch catch-block-previous-catch-slot)
     (inst b LOOP)
     DONE
-    ;; As a dreadful cleverness, make use of the fact that assembly
-    ;; routines are emitted in order, with no padding, and that the body
-    ;; of UNWIND follows to arrange for the stack to be unwound to our
-    ;; chosen destination.
-    (move target catch))) ;; TARGET coincides with UNWIND's BLOCK argument
+    (move target catch)  ;; TARGET coincides with UNWIND's BLOCK argument
+    (inst b (make-fixup 'unwind :assembly-routine))))
 
 (define-assembly-routine (unwind
                           (:return-style :none)
