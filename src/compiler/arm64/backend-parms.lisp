@@ -1,6 +1,7 @@
 (in-package "SB!VM")
 
-(def!constant +backend-fasl-file-implementation+ :arm)
+(def!constant +backend-fasl-file-implementation+ :arm64)
+
 (setf *backend-byte-order*
       #!+little-endian :little-endian
       #!-little-endian :big-endian)

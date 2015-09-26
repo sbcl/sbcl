@@ -172,16 +172,17 @@
                (sc-case tn
                  ((descriptor-reg any-reg)
                   (assemble ()
-                    (inst b :lt LESS-THAN)
-                    (loadw move-temp start i)
-                    LESS-THAN
-                    (inst csel tn null-tn move-temp :lt)))
+                            (move tn null-tn)
+                            (inst b :lt LESS-THAN)
+                            (loadw tn start i)
+                            LESS-THAN))
                  (control-stack
                   (assemble ()
+                    (move move-temp null-tn)
                     (inst b :lt LESS-THAN)
                     (loadw move-temp start i)
                     LESS-THAN
-                    (inst csel tn null-tn move-temp :lt))))))))
+                    (store-stack-tn tn move-temp))))))))
     (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
@@ -220,6 +221,7 @@
     (inst cmp num count-words)
     (inst str temp (@ dst num))
     (inst b :ne LOOP)
+    (inst lsr num num (- word-shift n-fixnum-tag-bits))
 
     ;; Reset the CSP.
     DONE

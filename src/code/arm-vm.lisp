@@ -40,9 +40,9 @@
   (deref (context-register-addr context index)))
 
 (defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
+  (declare (type (alien (* os-context-t)) context))
+  (setf (deref (context-register-addr context index))
+        new))
 
 (defun context-pc (context)
   (int-sap (context-register context pc-offset)))

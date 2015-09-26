@@ -2003,6 +2003,20 @@ core and return a descriptor to it."
        (ecase kind
          (:absolute
           (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
+      (:arm64
+       (ecase kind
+         (:absolute
+          (setf (bvref-64 gspace-bytes gspace-byte-offset) value))
+         (:cond-branch
+          (setf (ldb (byte 19 5)
+                     (bvref-32 gspace-bytes gspace-byte-offset))
+                (ash (- value (+ gspace-byte-address gspace-byte-offset))
+                     -2)))
+         (:uncond-branch
+          (setf (ldb (byte 26 0)
+                     (bvref-32 gspace-bytes gspace-byte-offset))
+                (ash (- value (+ gspace-byte-address gspace-byte-offset))
+                     -2)))))
       (:hppa
        (ecase kind
          (:load

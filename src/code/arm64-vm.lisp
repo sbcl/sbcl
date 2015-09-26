@@ -17,11 +17,17 @@
   (declare (type index offset))
   (unless (zerop (rem offset 4))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb!sys:without-gcing
-    (let ((sap (%primitive sb!kernel::code-instructions code)))
+  (without-gcing
+    (let ((sap (%primitive code-instructions code)))
       (ecase kind
         (:absolute
-         (setf (sap-ref-word sap offset) fixup))))))
+         (setf (sap-ref-word sap offset) fixup))
+        (:cond-branch
+         (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
+               (ash (- fixup (+ (sap-int sap) offset)) -2)))
+        (:uncond-branch
+         (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
+               (ash (- fixup (+ (sap-int sap) offset)) -2)))))))
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.

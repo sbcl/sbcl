@@ -546,37 +546,12 @@
 
 ;;;; primitive emitters
 
-;(define-bitfield-emitter emit-word 16
-;  (byte 16 0))
-
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
 
 (define-bitfield-emitter emit-dword 64
   (byte 64 0))
-
-;;;; fixup emitters
-#|
-(defun emit-absolute-fixup (segment fixup)
-  (note-fixup segment :absolute fixup)
-  (let ((offset (fixup-offset fixup)))
-    (if (label-p offset)
-        (emit-back-patch segment
-                         4 ; FIXME: n-word-bytes
-                         (lambda (segment posn)
-                           (declare (ignore posn))
-                           (emit-dword segment
-                                       (- (+ (component-header-length)
-                                             (or (label-position offset)
-                                                 0))
-                                          other-pointer-lowtag))))
-        (emit-dword segment (or offset 0)))))
 
-(defun emit-relative-fixup (segment fixup)
-  (note-fixup segment :relative fixup)
-  (emit-dword segment (or (fixup-offset fixup) 0)))
-|#
-
 ;;;; miscellaneous hackery
 
 (defun register-p (thing)
@@ -1652,28 +1627,40 @@
 
 (define-instruction b (segment cond-or-label &optional label)
   (:emitter
-   (emit-back-patch segment 4
-                    (cond (label
-                           (assert (label-p label))
-                           (lambda (segment posn)
-                             (emit-cond-branch segment
-                                               (ash (- (label-position label) posn) -2)
-                                               (conditional-opcode cond-or-label))))
-                          (t
-                           (assert (label-p cond-or-label))
-                           (lambda (segment posn)
-                             (emit-uncond-branch segment
-                                                 0
-                                                 (ash (- (label-position cond-or-label) posn) -2))))))))
+   (cond ((and (fixup-p cond-or-label)
+               (not label))
+          (note-fixup segment :uncond-branch cond-or-label)
+          (emit-uncond-branch segment 0 0))
+         ((and (fixup-p label))
+          (note-fixup segment :cond-branch cond-or-label)
+          (emit-cond-branch segment 0 (conditional-opcode cond-or-label)))
+         (t
+          (emit-back-patch segment 4
+                           (cond (label
+                                  (assert (label-p label))
+                                  (lambda (segment posn)
+                                    (emit-cond-branch segment
+                                                      (ash (- (label-position label) posn) -2)
+                                                      (conditional-opcode cond-or-label))))
+                                 (t
+                                  (assert (label-p cond-or-label))
+                                  (lambda (segment posn)
+                                    (emit-uncond-branch segment
+                                                        0
+                                                        (ash (- (label-position cond-or-label) posn) -2))))))))))
 
 (define-instruction bl (segment label)
   (:emitter
-   (assert (label-p label))
-   (emit-back-patch segment 4
-                    (lambda (segment posn)
-                      (emit-uncond-branch segment
-                                          1
-                                          (ash (- (label-position label) posn) -2))))))
+   (ecase label
+     (fixup
+      (note-fixup segment :uncond-branch label)
+      (emit-uncond-branch segment 1 0))
+     (label
+      (emit-back-patch segment 4
+                       (lambda (segment posn)
+                         (emit-uncond-branch segment
+                                             1
+                                             (ash (- (label-position label) posn) -2))))))))
 
 (def-emitter uncond-branch-reg
   (#b1101011 7 25)
