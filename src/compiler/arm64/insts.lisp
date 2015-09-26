@@ -1827,6 +1827,21 @@
 (define-instruction mrs (segment rt sys-reg)
   (:emitter
    (emit-system segment 1 (sys-reg-encoding sys-reg) (tn-offset rt))))
+
+;;; 
+
+(def-emitter hint
+  (#b110101010000001100100000 24 8)
+  (imm 3 5)
+  (#b11111 5 0))
+
+(define-instruction hint (segment imm)
+  (:emitter
+   (emit-hint segment imm)))
+
+(define-instruction-macro nop ()
+  `(inst hint 0))
+
 ;;; Floating point
 
 (defun fp-reg-type (reg)
