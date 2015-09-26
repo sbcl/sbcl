@@ -33,6 +33,10 @@
   (context (* os-context-t))
   (index int))
 
+(define-alien-routine ("os_context_pc_addr" context-register-pc-addr)
+  (* unsigned-int)
+  (context (* os-context-t)))
+
 ;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
 ;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
@@ -40,12 +44,13 @@
   (deref (context-register-addr context index)))
 
 (defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
+  (declare (type (alien (* os-context-t)) context))
+  (setf (deref (context-register-addr context index))
+        new))
 
 (defun context-pc (context)
-  (int-sap (context-register context (1+ lr-offset))))
+  (declare (type (alien (* os-context-t)) context))
+  (int-sap (deref (context-register-pc-addr context))))
 
 ;;;; INTERNAL-ERROR-ARGS.
 
