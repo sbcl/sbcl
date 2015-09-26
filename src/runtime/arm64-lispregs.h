@@ -58,11 +58,17 @@
 #define reg_LR          REG(30)
 #define reg_NSP         REG(31)
 
+#ifdef LISP_FEATURE_SB_THREAD
+#define REG10_NAME "THREAD"
+#else
+#define REG10_NAME "R10"
+#endif
+
 #define REGNAMES \
-        "R0",           "R1",           "R2",           "LEXENV", \
-        "NL2",          "CODE",         "NL3",          "OCFP", \
-        "R8",           "NFP",          "NULL",         "CFP", \
-        "NARGS",        "NSP",          "LR",           "PC", "TMP"
+    "NL0", "NL1", "NL2", "NL3", "NL4", "NL5", "NL6", "NL7", "NL8", "NL9", \
+    "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", REG10_NAME, \
+    "LEXENV", "NARGS", "NFP", "OCFP", "CFP", "CSP", "TMP", "NULL", \
+    "CODE", "LR", "NSP"
 
 #define BOXED_REGISTERS { \
     reg_R0, reg_R1, reg_R2, reg_R3, reg_R4, reg_R5, reg_R6, \
