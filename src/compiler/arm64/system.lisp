@@ -31,17 +31,16 @@
   (:generator 6
     ;; First, pick off the immediate types, starting with FIXNUM.
     (inst ands result object fixnum-tag-mask)
-    (inst b :eq fixnum)
+    (inst b :eq done)
     ;; If it wasn't a fixnum, start with the full widetag.
     (inst and result object widetag-mask)
-    fixnum
+
     ;; Now, we have our result for an immediate type, but we might
     ;; have a pointer object instead, in which case we need to do more
-    ;; work.  Check for a pointer type, set two low-bits.
+    ;; work.  Check for a pointer type, set two low-bits. 
 
-    (inst mvn tmp-tn result)
-    (inst tst object #b11)
-    (inst b :ne done)
+    (inst tst object #b10)
+    (inst b :eq done)
     ;; If we have a pointer type, we need to compute a different
     ;; answer.  For lists and instances, we just need the lowtag.  For
     ;; functions and "other", we need to load the widetag from the
@@ -56,7 +55,7 @@
     ;; space, while LIST-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG
     ;; are in the lower half, so we distinguish with a bit test.
     (inst tst object 8)
-    (inst b :ne done)
+    (inst b :eq done)
     ;; We can't use both register and immediate offsets in the same
     ;; load/store instruction, so we need to bias our register offset
     ;; on big-endian systems.
