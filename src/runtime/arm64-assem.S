@@ -330,18 +330,18 @@ undefined_tramp:
         .byte   trap_Error
         .byte   .error_args_end - . - 1
         .byte   UNDEFINED_FUN_ERROR
-        // Need to indicate reg_LEXENV here, which is X3.  Encoding
-        // rules are to produce an "sc-offset" with the SC number in
-        // the low six bits and the offset (3 in our case) in the
-        // high $n$ bits.  sc_DescriptorReg happens to be 5, but we
-        // should use the constant for it.  So long as the overall
-        // value of the sc-offset is less than 254, we can use a
-        // single byte.  Overflowing that will take having the SC
-        // number being 30 or 31, and as of this writing the highest
-        // SC number is sc_CatchBlock at 16.  It would also take an
-        // offset of 7, not the 3 that we use for LEXENV.
-        .byte   sc_DescriptorReg + (0x40 * 3)
+        // Encode LEXENV
+        // produced with
+        // (let ((result (make-array 10 :fill-pointer 0)))
+        //  (sb-c:write-var-integer
+        //   (sb-c:make-sc-offset sb-vm:descriptor-reg-sc-number sb-vm::lexenv-offset)
+        //   result)
+        //  result)
+        .byte   254
+        .byte   69
+        .byte   5
 .error_args_end:
+
 
         .align	3
 	.global	undefined_alien_function
