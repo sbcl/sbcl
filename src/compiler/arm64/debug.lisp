@@ -52,7 +52,7 @@
   (:result-types *)
   (:generator 5
     (inst lsl temp offset (- word-shift n-fixnum-tag-bits))
-    (inst str value (@ sap offset))
+    (inst str value (@ sap temp))
     (move result value)))
 
 (define-vop (code-from-mumble)

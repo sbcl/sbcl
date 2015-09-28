@@ -29,7 +29,7 @@
           (loop (gen-label))
           (not-list (gen-label)))
       (move ptr object)
-      (inst eor count count count)
+      (inst mov count 0)
 
       (emit-label loop)
 

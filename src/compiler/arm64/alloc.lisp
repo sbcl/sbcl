@@ -179,14 +179,14 @@
   (:info name words type lowtag)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (any-reg)) bytes)
+  (:temporary (:scs (any-reg) :from :argument) bytes)
   (:temporary (:scs (non-descriptor-reg)) header)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
-    (load-immediate-word bytes (* (1- words) n-word-bytes))
-    (inst add bytes bytes (lsl extra (- word-shift n-fixnum-tag-bits)))
+    (inst lsl bytes extra (- word-shift n-fixnum-tag-bits))
+    (inst add bytes bytes (add-sub-immediate (* (1- words) n-word-bytes)))
     (inst lsl header bytes (- n-widetag-bits word-shift))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to

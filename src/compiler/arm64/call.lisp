@@ -527,8 +527,7 @@
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p))
       (move result dst)
-      ;; FIXME: This entire loop is based on the PPC version, which is
-      ;; a poor fit for the ARM instruction set.
+
       (inst b ENTER)
 
       ;; Compute the next cons and store it in the current one.

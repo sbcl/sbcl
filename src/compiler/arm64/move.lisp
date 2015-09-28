@@ -72,7 +72,7 @@
   (let ((immediate-label (gen-label)))
     (assemble (*elsewhere*)
       (emit-label immediate-label)
-      (inst word (sap-int (tn-value x))))
+      (inst dword (sap-int (tn-value x))))
     (inst ldr y (@ immediate-label))))
 
 (define-move-fun (load-constant 5) (vop x y)

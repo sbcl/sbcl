@@ -25,8 +25,8 @@
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 1)))
-  (:results (result :scs (unsigned-reg) :from (:eval 0)))
+  (:args (object :scs (descriptor-reg)))
+  (:results (result :scs (unsigned-reg) :from :load))
   (:result-types positive-fixnum)
   (:generator 6
     ;; First, pick off the immediate types, starting with FIXNUM.

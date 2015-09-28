@@ -148,7 +148,7 @@
               ; would be inserted before the LRA.
          (start)
          (count))
-  (:results (values :more t))
+  (:results (values :more t :from :load))
   (:temporary (:scs (descriptor-reg)) move-temp)
   (:info label nvals)
   (:save-p :force-to-stack)
@@ -164,11 +164,11 @@
              (loadw (tn-ref-tn values) start)
              ZERO))
           (t
+           (inst cmp count (fixnumize 1))
            (do ((i 0 (1+ i))
                 (tn-ref values (tn-ref-across tn-ref)))
                ((null tn-ref))
              (let ((tn (tn-ref-tn tn-ref)))
-               (inst subs count count (fixnumize 1))
                (sc-case tn
                  ((descriptor-reg any-reg)
                   (assemble ()
