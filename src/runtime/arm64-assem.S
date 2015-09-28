@@ -357,8 +357,7 @@ undefined_tramp:
 undefined_alien_function:
         ldr     reg_CODE, = undefined_alien_function
 
-        // The magic (undefined) "BREAK_POINT" instruction.
-        .word 0xe7f001f0
+        brk     0
 
         // Error arguments for an undefined function.
         .byte   trap_Error
@@ -503,10 +502,10 @@ fpu_restore:
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
-        .word 0xe7f001f0
+        brk 0
         .byte trap_PendingInterrupt
         .byte 0
         .byte 0
         .byte 0
-	ret	reg_LR
+	ret
         #endif
