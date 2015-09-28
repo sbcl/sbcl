@@ -113,64 +113,37 @@
 
 ;;;; Complex float move functions
 
-(defun complex-single-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
-                  :offset (tn-offset x)))
-(defun complex-single-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
-                  :offset (1+ (tn-offset x))))
-
-(defun complex-double-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-                  :offset (tn-offset x)))
-(defun complex-double-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-                  :offset (+ 2 (tn-offset x))))
 
 
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
-  (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
-    (inst add lr-tn nfp offset)
-    ;; (inst load-complex-single y (@ lr-tn))
-    ))
+  (loadw y (current-nfp-tn vop) (tn-offset x)))
 
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
-  (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
-    (inst add lr-tn nfp offset)
-    ;; (inst store-complex-single x (@ lr-tn))
-    ))
+  (storew x (current-nfp-tn vop) (tn-offset y)))
 
 (define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
-  (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
-    (inst add lr-tn nfp offset)
-    ;; (inst load-complex-double y (@ lr-tn))
-    ))
+  (loadw y (current-nfp-tn vop) (tn-offset x)))
 
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
-  (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
-    (inst add lr-tn nfp offset)
-    ;; (inst store-complex-double x (@ lr-tn))
-    ))
+  (storew x (current-nfp-tn vop) (tn-offset y)))
+
 
 ;;;
 ;;; Complex float register to register moves.
 ;;;
 
 (define-vop (complex-single-move)
-  (:args (x :scs (complex-single-reg) :target y
-            :load-if (not (location= x y))))
-  (:results (y :scs (complex-single-reg) :load-if (not (location= x y))))
-  (:note "complex single float move")
-  (:generator 0
-     (move-complex-single y x)))
+    (:args (x :scs (complex-single-reg) :target y
+              :load-if (not (location= x y))))
+    (:results (y :scs (complex-single-reg) :load-if (not (location= x y))))
+    (:note "complex single float move")
+    (:generator 0
+      ;; (inst fmov y x)
+      ))
 (define-move-vop complex-single-move :move
   (complex-single-reg) (complex-single-reg))
 
@@ -180,7 +153,8 @@
   (:results (y :scs (complex-double-reg) :load-if (not (location= x y))))
   (:note "complex double float move")
   (:generator 0
-     (move-complex-double y x)))
+     ;; (inst fmov y x)
+     ))
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
@@ -773,15 +747,16 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (sc-case x
-      (complex-double-reg
-       (let ((value-tn (ecase slot
-                         (:real (complex-double-reg-real-tn x))
-                         (:imag (complex-double-reg-imag-tn x)))))
-         (inst fmov r value-tn)))
-      (complex-double-stack
-       (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 2))
-                                        (tn-offset x)))))))
+    ;; (sc-case x
+    ;;   (complex-double-reg
+    ;;    (let ((value-tn (ecase slot
+    ;;                      (:real (complex-double-reg-real-tn x))
+    ;;                      (:imag (complex-double-reg-imag-tn x)))))
+    ;;      (inst fmov r value-tn)))
+    ;;   (complex-double-stack
+    ;;    (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 2))
+    ;;                                     (tn-offset x)))))
+    ))
 
 (define-vop (realpart/complex-double-float complex-double-float-value)
   (:translate realpart)

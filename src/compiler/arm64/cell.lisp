@@ -118,10 +118,9 @@
   (:save-p :compute-only)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp)
   (:generator 10
-    (move obj-temp object)
-    (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
+    (loadw value object fdefn-fun-slot other-pointer-lowtag)
     (inst cmp value null-tn)
-    (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
+    (let ((err-lab (generate-error-code vop 'undefined-fun-error object)))
       (inst b :eq err-lab))))
 
 (define-vop (set-fdefn-fun)
@@ -331,10 +330,10 @@
                 (:generator 5 ,@(emit-generator set-inst t))))))))
   (define-raw-slot-vops word ldr str unsigned-num unsigned-reg)
   (define-raw-slot-vops single ldr str single-float single-reg
-     :move-macro move-single)
+     :move-macro move-float)
   (define-raw-slot-vops double ldr str double-float double-reg
-     :width 2 :move-macro move-double)
+     :width 2 :move-macro move-float)
   (define-raw-slot-vops complex-single ldr str complex-single-float complex-single-reg
-     :width 2 :move-macro move-complex-single)
+     :width 2 :move-macro move-float)
   (define-raw-slot-vops complex-double ldr str complex-double-float complex-double-reg
-     :width 4 :move-macro move-complex-double))
+     :width 4 :move-macro move-float))

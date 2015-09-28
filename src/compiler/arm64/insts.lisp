@@ -2037,7 +2037,9 @@
 
 (define-instruction fmov (segment rd rn)
   (:emitter
-   (cond ((and (fp-register-p rd)
+   (cond ((or (sc-is rd complex-double-reg complex-single-reg)
+              (sc-is rn complex-double-reg complex-single-reg)))
+         ((and (fp-register-p rd)
                (fp-register-p rn))
           (assert (and (eq (tn-sc rd) (tn-sc rn))) (rd rn)
                   "Arguments should have the same fp storage class: ~s ~s."

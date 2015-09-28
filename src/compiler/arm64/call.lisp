@@ -1149,8 +1149,7 @@
            ;; restore the frame pointer and clear as much of the control
            ;; stack as possible.
            (move cfp-tn old-fp)
-           (inst add nargs val-ptr (add-sub-immediate (* nvals n-word-bytes)))
-           (move csp-tn nargs)
+           (inst add csp-tn val-ptr (add-sub-immediate (* nvals n-word-bytes)))
            ;; Establish the values count.
            (load-immediate-word nargs (fixnumize nvals))
            ;; pre-default any argument register that need it.
