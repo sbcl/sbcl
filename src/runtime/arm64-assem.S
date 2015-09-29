@@ -388,19 +388,18 @@ closure_tramp:
 	.align	3
 	.global	funcallable_instance_tramp
 	.type	funcallable_instance_tramp, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	funcallable_instance_tramp, .+1
-	.word	funcallable_instance_tramp
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-
-	ldr	reg_LEXENV, [reg_LEXENV, #FUNCALLABLE_INSTANCE_FUNCTION_OFFSET]
+	.dword	SIMPLE_FUN_HEADER_WIDETAG
+	.equ	funcallable_instance_tramp, .+ FUN_POINTER_LOWTAG-N_WORD_BYTES
+	.dword	funcallable_instance_tramp
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        ldr	reg_LEXENV, [reg_LEXENV, #FUNCALLABLE_INSTANCE_FUNCTION_OFFSET]
 	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-        br      reg_TMP
+	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+        br      reg_LR
 
         // FIXME-ARM: The following is random garbage, to make
         // code/debug-int compile. To get the debugger working, this
