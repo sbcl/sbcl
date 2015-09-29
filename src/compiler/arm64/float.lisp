@@ -557,15 +557,17 @@
       (signed-reg
        (sc-case float
          (single-reg
-          (inst fmov bits float))
+          (inst fmov bits float)
+          (inst sxtw bits bits))
          (single-stack
-          (loadw bits (current-nfp-tn vop) (tn-offset float)))
+          (loadw (32-bit-reg bits) (current-nfp-tn vop) (tn-offset float))
+          (inst sxtw bits bits))
          (descriptor-reg
-          (style-warn "implement"))))
+          (inst asr bits float 32))))
       (signed-stack
        (sc-case float
          (single-reg
-          (storew float (current-nfp-tn vop) (tn-offset bits)))
+          (storew (32-bit-reg float) (current-nfp-tn vop) (tn-offset bits)))
          ((single-stack descriptor-reg)
           ;; Fun and games: This also affects PPC, silently.
           ;; Hopefully it's a non-issue, but I'd rather have the
@@ -586,15 +588,22 @@
        (inst fmov hi-bits float)
        (inst asr hi-bits hi-bits 32))
       (double-stack
-        (loadw hi-bits (current-nfp-tn vop)
-               (+ (tn-offset float)
-                  (if (eq *backend-byte-order* :big-endian)
-                      0 1))))
+        (inst ldr (32-bit-reg hi-bits)
+              (@ (current-nfp-tn vop)
+                 (load-store-offset
+                  (+ (* (tn-offset float) n-word-bytes)
+                     (if (eq *backend-byte-order* :big-endian)
+                         0
+                         4))))))
       (descriptor-reg
-        (loadw hi-bits float (+ double-float-value-slot
-                                (if (eq *backend-byte-order* :big-endian)
-                                    0 1))
-               other-pointer-lowtag)))))
+       (inst ldr (32-bit-reg hi-bits)
+             (@ float
+                (- (+ (* double-float-value-slot n-word-bytes)
+                      (if (eq *backend-byte-order* :big-endian)
+                          0
+                          4))
+                   other-pointer-lowtag)))
+       (inst sxtw hi-bits hi-bits)))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -611,15 +620,21 @@
        (inst fmov lo-bits float)
        (inst and lo-bits lo-bits (ldb (byte 32 0) -1)))
       (double-stack
-        (loadw lo-bits (current-nfp-tn vop)
-               (+ (tn-offset float)
-                  (if (eq *backend-byte-order* :big-endian)
-                      1 0))))
+       (inst ldr (32-bit-reg lo-bits)
+             (@ (current-nfp-tn vop)
+                (load-store-offset
+                 (+ (* (tn-offset float) n-word-bytes)
+                    (if (eq *backend-byte-order* :big-endian)
+                        4
+                        0))))))
       (descriptor-reg
-        (loadw lo-bits float (+ double-float-value-slot
-                                (if (eq *backend-byte-order* :big-endian)
-                                    1 0))
-               other-pointer-lowtag)))))
+       (inst ldr (32-bit-reg lo-bits)
+             (@ float
+                (- (+ (* double-float-value-slot n-word-bytes)
+                      (if (eq *backend-byte-order* :big-endian)
+                          1
+                          0))
+                   other-pointer-lowtag)))))))
 
 ;;;; Float mode hackery:
 

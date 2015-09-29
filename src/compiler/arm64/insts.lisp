@@ -1805,7 +1805,8 @@
   (ecase reg
     (:nzcv #b1101101000010000)
     (:fpcr #b1101101000100000)
-    (:fpsr #b1101101000100001)))
+    (:fpsr #b1101101000100001)
+    (:ccnt #b1101110011101000)))
 
 (define-instruction msr (segment sys-reg rt)
   (:emitter

@@ -82,9 +82,6 @@
           (t
            (incf (arg-state-fp-registers state) 2)
            (my-make-wired-tn 'double-float 'double-reg register)))))
-(defknown sign-extend ((signed-byte 64) t) fixnum
-    (foldable flushable movable))
-
 ;;;
 
 (defknown sign-extend ((signed-byte 64) t) fixnum
