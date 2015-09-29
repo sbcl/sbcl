@@ -82,6 +82,46 @@
           (t
            (incf (arg-state-fp-registers state) 2)
            (my-make-wired-tn 'double-float 'double-reg register)))))
+(defknown sign-extend ((signed-byte 64) t) fixnum
+    (foldable flushable movable))
+
+;;;
+
+(defknown sign-extend ((signed-byte 64) t) fixnum
+    (foldable flushable movable))
+
+(define-vop (sign-extend)
+  (:translate sign-extend)
+  (:policy :fast-safe)
+  (:args (val :scs (signed-reg)))
+  (:arg-types signed-num (:constant fixnum))
+  (:info size)
+  (:results (res :scs (signed-reg)))
+  (:result-types fixnum)
+  (:generator 1
+    (check-type size (member 8 16 32))
+    (inst sbfm res val 0 (1- size))))
+
+#-sb-xc-host
+(defun sign-extend (x size)
+  (declare (type (signed-byte 64) x))
+  (ecase size
+    (8 (sign-extend x size))
+    (16 (sign-extend x size))
+    (32 (sign-extend x size))))
+
+#+sb-xc-host
+(defun sign-extend (x size)
+  (if (logbitp (1- size) x)
+      (dpb x (byte size 0) -1)
+      x))
+
+(define-alien-type-method (integer :naturalize-gen) (type alien)
+  (if (<= (alien-type-bits type) 32)
+      (if (alien-integer-type-signed type)
+          `(sign-extend ,alien ,(alien-type-bits type))
+          `(logand ,alien ,(1- (ash 1 (alien-type-bits type)))))
+      alien))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
