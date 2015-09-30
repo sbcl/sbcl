@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.15:
+changes in sbcl-1.2.16 relative to sbcl-1.2.15:
   * enhancement: by default, timers with a repeat interval do not "catch up"
     by repeatedly calling their function after a clock discontinuity such as a
     suspend and resume cycle
