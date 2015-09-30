@@ -374,7 +374,8 @@
   #-sb-xc-host (lambda (name) (if (fboundp name) :function nil)))
 
 ;;; Indicates whether the function is deprecated.
-(define-info-type (:function :deprecated) :type-spec deprecation-info)
+(define-info-type (:function :deprecated)
+  :type-spec (or null deprecation-info))
 
 (declaim (ftype (sfunction (t) ctype)
                 specifier-type ctype-of sb!kernel::ctype-of-array))
@@ -485,7 +486,8 @@
 (define-info-type (:variable :always-bound)
   :type-spec (member nil :eventually :always-bound))
 
-(define-info-type (:variable :deprecated) :type-spec deprecation-info)
+(define-info-type (:variable :deprecated)
+  :type-spec (or null deprecation-info))
 
 ;;; the declared type for this variable
 (define-info-type (:variable :type)
@@ -645,8 +647,9 @@
 
 (define-info-type (:type :source-location) :type-spec t)
 
-;;; Indicates whether the function is deprecated.
-(define-info-type (:type :deprecated) :type-spec deprecation-info)
+;;; Indicates whether the type is deprecated.
+(define-info-type (:type :deprecated)
+  :type-spec (or null deprecation-info))
 
 ;;;; ":TYPED-STRUCTURE" subsection.
 ;;;; Data pertaining to structures that used DEFSTRUCT's :TYPE option.
