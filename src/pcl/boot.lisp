@@ -73,8 +73,8 @@ bootstrapping.
                     add-method remove-method))
 
 (defvar *!early-functions*
-  '((make-a-method early-make-a-method real-make-a-method)
-    (add-named-method early-add-named-method real-add-named-method)))
+  '((make-a-method !early-make-a-method real-make-a-method)
+    (add-named-method !early-add-named-method real-add-named-method)))
 
 ;;; For each of the early functions, arrange to have it point to its
 ;;; early definition. Do this in a way that makes sure that if we
@@ -2287,7 +2287,7 @@ generic function lambda list ~S~:>"
     (declare (list metatypes))
     (length metatypes)))
 
-(defun early-make-a-method (class qualifiers arglist specializers initargs doc
+(defun !early-make-a-method (class qualifiers arglist specializers initargs doc
                             &key slot-name object-class method-class-function
                             definition-source)
   (let ((parsed ())
@@ -2297,10 +2297,8 @@ generic function lambda list ~S~:>"
     ;; got class objects, then we can compute unparsed, but if we got
     ;; class names we don't try to compute parsed.
     ;;
-    ;; Note that the use of not symbolp in this call to every should be
-    ;; read as 'classp' we can't use classp itself because it doesn't
-    ;; exist yet.
-    (if (every (lambda (s) (not (symbolp s))) specializers)
+    (aver (notany #'sb-pcl::eql-specializer-p specializers))
+    (if (every #'classp specializers)
         (setq parsed specializers
               unparsed (mapcar (lambda (s)
                                  (if (eq s t) t (class-name s)))
@@ -2412,7 +2410,7 @@ generic function lambda list ~S~:>"
 (defun (setf early-method-initargs) (new-value early-method)
   (setf (fifth (fifth early-method)) new-value))
 
-(defun early-add-named-method (generic-function-name qualifiers
+(defun !early-add-named-method (generic-function-name qualifiers
                                specializers arglist &rest initargs
                                &key documentation definition-source
                                &allow-other-keys)
