@@ -344,6 +344,14 @@
 (defbt 5 (&optional (opt (oops)))
   (list opt))
 
+(defbt 6 (&optional (opt nil opt-p))
+  (declare (ignore opt))
+  (list (error "error ~A" opt-p))) ; use OPT-P
+
+(defbt 7 (&key (key nil key-p))
+  (declare (ignore key))
+  (list (error "error ~A" key-p))) ; use KEY-P
+
 (defun bug-354 (x)
   (error "XEPs in backtraces: ~S" x))
 
@@ -410,6 +418,40 @@
   (assert-backtrace #'bt.5.1 '((bt.5.1)))
   (assert-backtrace #'bt.5.2 '((bt.5.2)))
   (assert-backtrace #'bt.5.3 `((bt.5.3 . ,*unavailable-lambda-list*))))
+
+(with-test (:name (:backtrace :unused-optinoal-with-supplied-p :bug-1498644))
+  (assert-backtrace (lambda () (bt.6.1 :opt))
+                    `(((bt.6.1 ,*unused-argument*) ()))
+                    :details t)
+  (assert-backtrace (lambda () (bt.6.2 :opt))
+                    `(((bt.6.2 ,*unused-argument*) ()))
+                    :details t)
+  (assert-backtrace (lambda () (bt.6.3 :opt))
+                    `(((bt.6.3 . ,*unavailable-lambda-list*) ()))
+                    :details t)
+  (assert-backtrace (lambda () (bt.6.1 :opt))
+                    `((bt.6.1 ,*unused-argument*)))
+  (assert-backtrace (lambda () (bt.6.2 :opt))
+                    `((bt.6.2 ,*unused-argument*)))
+  (assert-backtrace (lambda () (bt.6.3 :opt))
+                    `((bt.6.3 . ,*unavailable-lambda-list*))))
+
+(with-test (:name (:backtrace :unused-key-with-supplied-p))
+  (assert-backtrace (lambda () (bt.7.1 :key :value))
+                    `(((bt.7.1 :key ,*unused-argument*) ()))
+                    :details t)
+  (assert-backtrace (lambda () (bt.7.2 :key :value))
+                    `(((bt.7.2 :key ,*unused-argument*) ()))
+                    :details t)
+  (assert-backtrace (lambda () (bt.7.3 :key :value))
+                    `(((bt.7.3 . ,*unavailable-lambda-list*) ()))
+                    :details t)
+  (assert-backtrace (lambda () (bt.7.1 :key :value))
+                    `((bt.7.1 :key ,*unused-argument*)))
+  (assert-backtrace (lambda () (bt.7.2 :key :value))
+                    `((bt.7.2 :key ,*unused-argument*)))
+  (assert-backtrace (lambda () (bt.7.3 :key :value))
+                    `((bt.7.3 . ,*unavailable-lambda-list*))))
 
 (defvar *compile-nil-error*
   (compile nil '(lambda (x)

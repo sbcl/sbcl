@@ -523,36 +523,36 @@ thread, NIL otherwise."
           (map-frame-args
            (lambda (element)
              (lambda-list-element-dispatch element
-                                           :required ((push (frame-call-arg element location frame) reversed-result))
-                                           :optional ((push (frame-call-arg (second element) location frame)
-                                                            reversed-result))
-                                           :keyword ((push (second element) reversed-result)
-                                                     (push (frame-call-arg (third element) location frame)
-                                                           reversed-result))
-                                           :deleted ((push (frame-call-arg element location frame) reversed-result))
-                                           :rest ((lambda-var-dispatch (second element) location
-                                                                       nil
-                                                                       (let ((rest (sb!di:debug-var-value (second element) frame)))
-                                                                         (if (listp rest)
-                                                                             (setf reversed-result (append (reverse rest) reversed-result))
-                                                                             (push (make-unprintable-object "unavailable &REST argument")
-                                                                                   reversed-result))
-                                                                         (return-from enumerating))
-                                                                       (push (make-unprintable-object
-                                                                              "unavailable &REST argument")
-                                                                             reversed-result)))
-                                           :more ((lambda-var-dispatch (second element) location
-                                                                       nil
-                                                                       (let ((context (sb!di:debug-var-value (second element) frame))
-                                                                             (count (sb!di:debug-var-value (third element) frame)))
-                                                                         (setf reversed-result
-                                                                               (append (reverse
-                                                                                        (multiple-value-list
-                                                                                         (sb!c::%more-arg-values context 0 count)))
-                                                                                       reversed-result))
-                                                                         (return-from enumerating))
-                                                                       (push (make-unprintable-object "unavailable &MORE argument")
-                                                                             reversed-result)))))
+              :required ((push (frame-call-arg element location frame) reversed-result))
+              :optional ((push (frame-call-arg (second element) location frame)
+                               reversed-result))
+              :keyword ((push (second element) reversed-result)
+                        (push (frame-call-arg (third element) location frame)
+                              reversed-result))
+              :deleted ((push (frame-call-arg element location frame) reversed-result))
+              :rest ((lambda-var-dispatch (second element) location
+                      nil
+                      (let ((rest (sb!di:debug-var-value (second element) frame)))
+                        (if (listp rest)
+                            (setf reversed-result (append (reverse rest) reversed-result))
+                            (push (make-unprintable-object "unavailable &REST argument")
+                                  reversed-result))
+                        (return-from enumerating))
+                      (push (make-unprintable-object
+                             "unavailable &REST argument")
+                            reversed-result)))
+              :more ((lambda-var-dispatch (second element) location
+                      nil
+                      (let ((context (sb!di:debug-var-value (second element) frame))
+                            (count (sb!di:debug-var-value (third element) frame)))
+                        (setf reversed-result
+                              (append (reverse
+                                       (multiple-value-list
+                                        (sb!c::%more-arg-values context 0 count)))
+                                      reversed-result))
+                        (return-from enumerating))
+                      (push (make-unprintable-object "unavailable &MORE argument")
+                            reversed-result)))))
            frame))
         (nreverse reversed-result))
     (sb!di:lambda-list-unavailable ()

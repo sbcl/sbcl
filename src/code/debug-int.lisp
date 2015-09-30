@@ -1472,70 +1472,77 @@ register."
   (let ((args (sb!c::compiled-debug-fun-arguments
                (compiled-debug-fun-compiler-debug-fun debug-fun))))
     (cond
-     ((not args)
-      (values nil nil))
-     ((eq args :minimal)
-      (values (coerce (debug-fun-debug-vars debug-fun) 'list)
-              t))
-     (t
-      (let ((vars (debug-fun-debug-vars debug-fun))
-            (i 0)
-            (len (length args))
-            (res nil)
-            (optionalp nil))
-        (declare (type (or null simple-vector) vars))
-        (loop
-          (when (>= i len) (return))
-          (let ((ele (aref args i)))
-            (cond
-             ((symbolp ele)
-              (case ele
-                (sb!c::deleted
-                 ;; Deleted required arg at beginning of args array.
-                 (push :deleted res))
-                (sb!c::optional-args
-                 (setf optionalp t))
-                (sb!c::supplied-p
-                 ;; SUPPLIED-P var immediately following keyword or
-                 ;; optional. Stick the extra var in the result
-                 ;; element representing the keyword or optional,
-                 ;; which is the previous one.
-                 ;;
-                 ;; FIXME: NCONC used for side-effect: the effect is defined,
-                 ;; but this is bad style no matter what.
-                 (nconc (car res)
-                        (list (compiled-debug-fun-lambda-list-var
-                               args (incf i) vars))))
-                (sb!c::rest-arg
-                 (push (list :rest
-                             (compiled-debug-fun-lambda-list-var
-                              args (incf i) vars))
-                       res))
-                (sb!c::more-arg
-                 ;; The next two args are the &MORE arg context and count.
-                 (push (list :more
-                             (compiled-debug-fun-lambda-list-var
-                              args (incf i) vars)
-                             (compiled-debug-fun-lambda-list-var
-                              args (incf i) vars))
-                       res))
-                (t
-                 ;; &KEY arg
-                 (push (list :keyword
-                             ele
-                             (compiled-debug-fun-lambda-list-var
-                              args (incf i) vars))
-                       res))))
-             (optionalp
-              ;; We saw an optional marker, so the following
-              ;; non-symbols are indexes indicating optional
-              ;; variables.
-              (push (list :optional (svref vars ele)) res))
-             (t
-              ;; Required arg at beginning of args array.
-              (push (svref vars ele) res))))
-          (incf i))
-        (values (nreverse res) t))))))
+      ((not args)
+       (values nil nil))
+      ((eq args :minimal)
+       (values (coerce (debug-fun-debug-vars debug-fun) 'list)
+               t))
+      (t
+       (values (parse-compiled-debug-fun-lambda-list/args-available
+                (debug-fun-debug-vars debug-fun) args)
+               t)))))
+
+(defun parse-compiled-debug-fun-lambda-list/args-available (vars args)
+  (declare (type (or null simple-vector) vars))
+  (let ((i 0)
+        (len (length args))
+        (optionalp nil)
+        (keyword nil)
+        (result '()))
+    (flet ((push-var (tag-and-info &optional var-count)
+             (push (if var-count
+                       (append tag-and-info
+                               (loop :repeat var-count :collect
+                                  (compiled-debug-fun-lambda-list-var
+                                   args (incf i) vars)))
+                       tag-and-info)
+                   result))
+           (var-or-deleted (index-or-deleted)
+             (if (eq index-or-deleted 'sb!c::deleted)
+                 :deleted
+                 (svref vars index-or-deleted))))
+      (loop
+         :while (< i len)
+         :for ele = (aref args i) :do
+         (cond
+           ((eq ele 'sb!c::optional-args)
+            (setf optionalp t))
+           ((eq ele 'sb!c::rest-arg)
+            (push-var '(:rest) 1))
+           ;; The next two args are the &MORE arg context and
+           ;; count.
+           ((eq ele 'sb!c::more-arg)
+            (push-var '(:more) 2))
+           ;; SUPPLIED-P var immediately following keyword or
+           ;; optional. Stick the extra var in the result element
+           ;; representing the keyword or optional, which is the
+           ;; previous one.
+           ((eq ele 'sb!c::supplied-p)
+            (push-var (pop result) 1))
+           ;; The keyword of a keyword parameter. Store it so the next
+           ;; element can be used to form a (:keyword KEYWORD VALUE)
+           ;; entry.
+           ((typep ele '(and symbol (not (eql sb!c::deleted))))
+            (setf keyword ele))
+           ;; The previous element was the keyword of a keyword
+           ;; parameter and is stored in KEYWORD. The current element
+           ;; is the index of the value (or a deleted
+           ;; marker). Construct and push the complete entry.
+           (keyword
+            (push-var (list :keyword keyword (var-or-deleted ele))))
+           ;; We saw an optional marker, so the following non-symbols
+           ;; are indexes (or deleted markers) indicating optional
+           ;; variables.
+           (optionalp
+            (push-var (list :optional (var-or-deleted ele))))
+           ;; Deleted required, optional or keyword argument.
+           ((eq ele 'sb!c::deleted)
+            (push-var :deleted))
+           ;; Required arg at beginning of args array.
+           (t
+            (push-var (svref vars ele))))
+         (incf i)
+         :finally (return (nreverse result))))))
 
 ;;; This is used in COMPILED-DEBUG-FUN-LAMBDA-LIST.
 (defun compiled-debug-fun-lambda-list-var (args i vars)
