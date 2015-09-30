@@ -736,7 +736,7 @@ fake_foreign_function_call(os_context_t *context)
         *os_context_register_addr(context, reg_BSP));
 #endif
 
-#if defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64
+#if defined(LISP_FEATURE_ARM)
     /* Stash our control stack pointer */
     bind_variable(INTERRUPTED_CONTROL_STACK_POINTER,
                   SymbolValue(CONTROL_STACK_POINTER, thread),
@@ -782,7 +782,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
 
-#if defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64
+#if defined(LISP_FEATURE_ARM)
     /* Restore our saved control stack pointer */
     SetSymbolValue(CONTROL_STACK_POINTER,
                    SymbolValue(INTERRUPTED_CONTROL_STACK_POINTER,
