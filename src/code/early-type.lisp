@@ -918,7 +918,7 @@
 ;;; The xc host uses an ordinary hash table for memoization.
 #+sb-xc-host
 (let ((table (make-hash-table :test 'equal)))
-  (defun values-specifier-type-memo-wrapper (thunk specifier)
+  (defun !values-specifier-type-memo-wrapper (thunk specifier)
     (multiple-value-bind (type yesp) (gethash specifier table)
       (if yesp
           type
@@ -961,7 +961,7 @@
                      (t (fail x))))))
     (when (typep type-specifier 'instance)
       (return-from values-specifier-type-r (instance-to-ctype type-specifier)))
-    (values-specifier-type-memo-wrapper
+    (!values-specifier-type-memo-wrapper
      (lambda ()
        (labels
          ((recurse (spec)

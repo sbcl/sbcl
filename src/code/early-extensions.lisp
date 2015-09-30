@@ -671,7 +671,7 @@
     (unless (<= 2 (length arg) 3)
       (error "bad argument spec: ~S" arg)))
   (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
-  (let* ((fun-name (symbolicate name "-MEMO-WRAPPER"))
+  (let* ((fun-name (symbolicate "!" name "-MEMO-WRAPPER"))
          (var-name (symbolicate "**" name "-CACHE-VECTOR**"))
          (statistics-name
           (when *profile-hash-cache*
@@ -837,7 +837,7 @@
                        ;; We don't need (DX-FLET ((,thunk () ,@body)) ...)
                        ;; This lambda is a single-use local call within
                        ;; the inline memoizing wrapper.
-                       `(,',(symbolicate name "-MEMO-WRAPPER")
+                       `(,',(symbolicate "!" name "-MEMO-WRAPPER")
                          (lambda () ,@body) ,@',arg-names)))
              ,@(if memoizer-supplied-p
                    forms
