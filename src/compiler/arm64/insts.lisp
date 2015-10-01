@@ -89,405 +89,104 @@
                 ;;                (sb!disassem::dstate-byte-order dstate))))
                 ;;    (sb!disassem:maybe-note-assembler-routine value nil dstate)))
                 )))))))
+(defun current-instruction (dstate)
+  (sb!disassem::sap-ref-int
+   (sb!disassem:dstate-segment-sap dstate)
+   (sb!disassem:dstate-cur-offs dstate)
+   n-word-bytes
+   (sb!disassem::dstate-byte-order dstate)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; DEFINE-ARG-TYPE requires that any :PRINTER be defined at
-  ;; compile-time...  Why?
+(defun 32-bit-register-p (dstate)
+  (not (logbitp 31 (current-instruction dstate))))
 
-  (defun print-condition (value stream dstate)
-    (declare (type stream stream)
-             (fixnum value)
-             (ignore dstate))
-    (unless (= value 14) ;; Don't print :al
-      (princ (aref *condition-name-vec* value) stream)))
+(progn
+  (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (defun print-reg (value stream dstate)
-    (declare (type stream stream)
-             (fixnum value)
-             (ignore dstate))
-    (princ (aref *register-names* value) stream))
+    (defun print-shift (value stream dstate)
+      (declare (ignore dstate))
+      (destructuring-bind (kind amount) value
+        (when (plusp amount)
+          (princ ", ")
+          (princ (ecase kind
+                   (#b00 "LSL")
+                   (#b01 "LSR")
+                   (#b10 "ASR")
+                   (#b11 "ROR"))
+                 stream)
+          (format stream " #~d" amount))))
 
-  (defun print-float-reg (value stream dstate)
-    (declare (type stream stream)
-             (list value)
-             (ignore dstate))
-    (destructuring-bind (double high low) value
-      (format stream "~[S~;D~]~a"
-              double
-              (if (= double 1)
-                  high
-                  (logior (ash high 1) low)))))
+    (defun print-2-bit-shift (value stream dstate)
+      (declare (ignore dstate))
+      (when (= value 1)
+        (princ ", LSL #12" stream)))
 
-  (defun print-float-sys-reg (value stream dstate)
-    (declare (type stream stream)
-             (fixnum value)
-             (ignore dstate))
-    (princ (ecase value
-             (#b0000 "FPSID")
-             (#b0001 "FPSCR")
-             (#b1000 "FPEXC")) stream))
+    (defun print-extend (value stream dstate)
+      (destructuring-bind (kind amount) value
+        (let* ((inst (current-instruction dstate))
+               (rd (ldb (byte 5 0) inst))
+               (rn (ldb (byte 5 5) inst)))
+          (princ " " stream)
+          (princ (if (and (= kind #b011)
+                          (or (= rd nsp-offset)
+                              (= rn nsp-offset)))
+                     "LSL"
+                     (ecase kind
+                       (#b00 "UXTB")
+                       (#b001 "UXTH")
+                       (#b010 "UXTW")
+                       (#b011 "UXTX")
+                       (#b100 "SXTB")
+                       (#b101 "SXTH")
+                       (#b110 "SXTW")
+                       (#b111 "SXTX")))
+                 stream))
+        (when (plusp amount)
+          (format stream  " #~d" amount))))
 
-  (defun print-shift-type (value stream dstate)
-    (declare (type stream stream)
-             (fixnum value)
-             (ignore dstate))
-    (princ (aref #(lsl lsr asr ror) value) stream))
+    (defun print-immediate (value stream dstate)
+      (declare (ignore dstate))
+      (format stream "#~D" value))
 
-  (defun print-immediate-shift (value stream dstate)
-    (declare (type stream stream)
-             (type (cons fixnum (cons fixnum null)) value)
-             (ignore dstate))
-    (destructuring-bind (amount shift) value
-      (cond
-        ((and (zerop amount)
-              (zerop shift))) ;; No shift
-        ((and (zerop amount)
-              (= shift 3))
-         (princ ", RRX" stream))
-        (t
-         (princ ", " stream)
-         (princ (aref #(lsl lsr asr ror) shift) stream)
-         (princ " #" stream)
-         (princ amount stream)))))
+    (defun print-logical-immediate (value stream dstate)
+      (declare (ignore dstate))
+      (format stream " #~D" (apply #'decode-logical-immediate value)))
 
-  (defun print-shifter-immediate (value stream dstate)
-    (declare (type stream stream)
-             (fixnum value))
-    (maybe-add-notes dstate)
-    (let* ((rotate (ldb (byte 4 8) value))
-           (immediate (mask-field (byte 8 0) value))
-           (left (mask-field (byte 32 0)
-                             (ash immediate (- 32 rotate rotate))))
-           (right (ash immediate (- 0 rotate rotate))))
-      (princ (logior left right) stream)))
+    (defun print-reg (value stream dstate)
+      (when (32-bit-register-p dstate)
+        (princ "W" stream))
+      (princ (aref *register-names* value) stream))
 
-  (defun use-label-relative-label (value dstate)
-    (declare (type (signed-byte 24) value)
-             (type sb!disassem:disassem-state dstate))
-    (+ 8 (ash value 2) (sb!disassem:dstate-cur-addr dstate)))
+    (defun print-reg-sp (value stream dstate)
+      (when (32-bit-register-p dstate)
+        (princ "W" stream))
+      (if (= value nsp-offset)
+          (princ "NSP" stream)
+          (princ (aref *register-names* value) stream))))
 
-  (defun print-load/store-immediate (value stream dstate)
-    (declare (type stream stream)
-             (type (cons bit (cons bit (cons bit (cons fixnum null)))) value))
-    (maybe-add-notes dstate)
-    (destructuring-bind (p u w offset) value
-      (if (zerop offset)
-          (princ "]" stream)
-          (progn
-            (princ (if (zerop p) "], #" ", #") stream)
-            (when (zerop u)
-              (princ "-" stream))
-            (princ offset stream)
-            (unless (zerop p)
-              (princ (if (zerop w) "]" "]!") stream))))))
+  (sb!disassem:define-arg-type shift
+    :printer #'print-shift)
 
-  (defun print-load/store-register (value stream dstate)
-    (destructuring-bind (p u w shift-imm shift rm) value
-      (when (zerop p)
-        (princ "]" stream))
-      (princ (if (zerop u) ", -" ", ") stream)
-      (print-reg rm stream dstate)
-      (print-immediate-shift (list shift-imm shift) stream dstate)
-      (unless (zerop p)
-        (princ (if (zerop w) "]" "]!") stream))))
+  (sb!disassem:define-arg-type 2-bit-shift
+    :printer #'print-2-bit-shift)
 
-  (defun print-msr-field-mask (value stream dstate)
-    (declare (type stream stream)
-             (type (cons bit (cons (unsigned-byte 4) null)) value)
-             (ignore dstate))
-    (destructuring-bind (spsr-p field-mask) value
-      (if (zerop spsr-p)
-          (princ "CPSR_" stream)
-          (princ "SPSR_" stream))
-      (when (logbitp 0 field-mask) (princ "c" stream))
-      (when (logbitp 1 field-mask) (princ "x" stream))
-      (when (logbitp 2 field-mask) (princ "s" stream))
-      (when (logbitp 3 field-mask) (princ "f" stream))))
-) ; EVAL-WHEN
+  (sb!disassem:define-arg-type extend
+    :printer #'print-extend)
 
-(sb!disassem:define-arg-type condition-code
-    :printer #'print-condition)
+  (sb!disassem:define-arg-type immediate
+    :printer #'print-immediate)
 
-(sb!disassem:define-arg-type reg
+  (sb!disassem:define-arg-type logical-immediate
+    :printer #'print-logical-immediate)
+
+  (sb!disassem:define-arg-type reg
     :printer #'print-reg)
 
-(sb!disassem:define-arg-type float-reg
-  :printer #'print-float-reg)
+  (sb!disassem:define-arg-type reg-sp
+    :printer #'print-reg-sp)
 
-(sb!disassem:define-arg-type float-sys-reg
-  :printer #'print-float-sys-reg)
 
-(sb!disassem:define-arg-type shift-type
-    :printer #'print-shift-type)
-
-(sb!disassem:define-arg-type immediate-shift
-    :printer #'print-immediate-shift)
-
-(sb!disassem:define-arg-type shifter-immediate
-    :printer #'print-shifter-immediate)
-
-(sb!disassem:define-arg-type relative-label
-  :sign-extend t
-  :use-label #'use-label-relative-label)
-
-(sb!disassem:define-arg-type load/store-immediate
-    :printer #'print-load/store-immediate)
-
-(sb!disassem:define-arg-type load/store-register
-    :printer #'print-load/store-register)
-
-;; We use a prefilter in order to read trap codes in order to avoid
-;; encoding the code within the instruction body (requiring the use of
-;; a different trap instruction and a SIGILL handler) and in order to
-;; avoid attempting to include the code in the decoded instruction
-;; proper (requiring moving to a 40-bit instruction for disassembling
-;; trap codes, and being affected by endianness issues).
-(sb!disassem:define-arg-type debug-trap-code
-    :prefilter (lambda (value dstate)
-                 (declare (ignore value))
-                 (sb!disassem:read-suffix 8 dstate)))
-
-(sb!disassem:define-arg-type msr-field-mask
-    :printer #'print-msr-field-mask)
-
-;;;; disassembler instruction format definitions
-
-(sb!disassem:define-instruction-format
-    (dp-shift-immediate 32
-     :default-printer '(:name cond :tab rd ", " rn ", " rm shift))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (rn :field (byte 4 16) :type 'reg)
-  (rd :field (byte 4 12) :type 'reg)
-  (shift :fields (list (byte 5 7) (byte 2 5)) :type 'immediate-shift)
-  (register-shift-p :field (byte 1 4) :value 0)
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (dp-shift-register 32
-      :default-printer '(:name cond :tab rd ", " rn ", " rm ", " shift-type " " rs))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (rn :field (byte 4 16) :type 'reg)
-  (rd :field (byte 4 12) :type 'reg)
-  (rs :field (byte 4 8) :type 'reg)
-  (multiply-p :field (byte 1 7) :value 0)
-  (shift-type :field (byte 2 5) :type 'shift-type)
-  (register-shift-p :field (byte 1 4) :value 1)
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (dp-immediate 32
-      :default-printer '(:name cond :tab rd ", " rn ", #" immediate))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (rn :field (byte 4 16) :type 'reg)
-  (rd :field (byte 4 12) :type 'reg)
-  (immediate :field (byte 12 0) :type 'shifter-immediate))
-
-(sb!disassem:define-instruction-format
-    (branch 32 :default-printer '(:name cond :tab target))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-4 :field (byte 4 24))
-  (target :field (byte 24 0) :type 'relative-label))
-
-(sb!disassem:define-instruction-format
-    (load/store-immediate 32
-     ;; FIXME: cond should come between LDR/STR and B.
-     :default-printer '(:name cond :tab rd ", [" rn load/store-offset))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-3 :field (byte 3 25))
-  (load/store-offset :fields (list (byte 1 24)
-                                   (byte 1 23)
-                                   (byte 1 21)
-                                   (byte 12 0))
-                     :type 'load/store-immediate)
-  (opcode-b :field (byte 1 22))
-  (opcode-l :field (byte 1 20))
-  (rn :field (byte 4 16) :type 'reg)
-  (rd :field (byte 4 12) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (load/store-register 32
-     ;; FIXME: cond should come between LDR/STR and B.
-     :default-printer '(:name cond :tab rd ", [" rn load/store-offset))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-3 :field (byte 3 25))
-  (load/store-offset :fields (list (byte 1 24)
-                                   (byte 1 23)
-                                   (byte 1 21)
-                                   (byte 5 7)  ;; shift_imm
-                                   (byte 2 5)  ;; shift
-                                   (byte 4 0)) ;; Rm
-                     :type 'load/store-register)
-  (opcode-b :field (byte 1 22))
-  (opcode-l :field (byte 1 20))
-  (opcode-0 :field (byte 1 4))
-  (rn :field (byte 4 16) :type 'reg)
-  (rd :field (byte 4 12) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (swi 32 :default-printer '(:name cond :tab "#" swi-number))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-4 :field (byte 4 24))
-  (swi-number :field (byte 24 0)))
-
-(sb!disassem:define-instruction-format
-    (debug-trap 32 :default-printer '(:name :tab code))
-  (opcode-32 :field (byte 32 0))
-  (code :type 'debug-trap-code :reader debug-trap-code))
-
-(sb!disassem:define-instruction-format
-    (msr-immediate 32
-     :default-printer '(:name cond :tab field-mask ", #" immediate))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-5 :field (byte 5 23) :value #b00110)
-  (field-mask :fields (list (byte 1 22) (byte 4 16)) :type 'msr-field-mask)
-  (opcode-2 :field (byte 2 20) :value #b10)
-  (sbo :field (byte 4 12) :value #b1111)
-  (immediate :field (byte 12 0) :type 'shifter-immediate))
-
-(sb!disassem:define-instruction-format
-    (msr-register 32
-     :default-printer '(:name cond :tab field-mask ", " rm))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-5 :field (byte 5 23) :value #b00010)
-  (field-mask :fields (list (byte 1 22) (byte 4 16)) :type 'msr-field-mask)
-  (opcode-2 :field (byte 2 20) :value #b10)
-  (sbo :field (byte 4 12) :value #b1111)
-  (sbz :field (byte 8 4) :value #b00000000)
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (multiply-dzsm 32
-     :default-printer '(:name cond :tab rd ", " rs ", " rm))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (rd :field (byte 4 16) :type 'reg)
-  (sbz :field (byte 4 12) :value 0)
-  (rs :field (byte 4 8) :type 'reg)
-  (opcode-4 :field (byte 4 4))
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (multiply-dnsm 32
-     :default-printer '(:name cond :tab rd ", " rs ", " rm ", " num))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (rd :field (byte 4 16) :type 'reg)
-  (num :field (byte 4 12) :type 'reg)
-  (rs :field (byte 4 8) :type 'reg)
-  (opcode-4 :field (byte 4 4))
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (multiply-ddsm 32
-     :default-printer '(:name cond :tab rdlo ", " rdhi ", " rs ", " rm))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (rdhi :field (byte 4 16) :type 'reg)
-  (rdlo :field (byte 4 12) :type 'reg)
-  (rs :field (byte 4 8) :type 'reg)
-  (opcode-4 :field (byte 4 4))
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (branch-exchange 32
-     :default-printer '(:name cond :tab rm))
-  (cond :field (byte 4 28) :type 'condition-code)
-  (opcode-8 :field (byte 8 20))
-  (sbo :field (byte 12 8) :value #xFFF)
-  (opcode-4 :field (byte 4 4))
-  (rm :field (byte 4 0) :type 'reg))
-
-(sb!disassem:define-instruction-format
-    (fp-binary 32
-     :default-printer '(:name cond :tab fd ", " fn ", " fm))
-    (cond :field (byte 4 28) :type 'condition-code)
-    (opc-1 :field (byte 4 24) :value #b1110)
-    (p :field (byte 1 23))
-    (q :field (byte 1 21))
-    (r :field (byte 1 20))
-    (s :field (byte 1 6))
-    (fn :fields (list (byte 1 8) (byte 4 16) (byte 1 7)) :type 'float-reg)
-    (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
-    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
-    (opc-2 :field (byte 3 9) :value #b101)
-    (size :field (byte 1 8))
-    (opc-3 :field (byte 1 4) :value 0))
-
-(sb!disassem:define-instruction-format
-    (fp-unary 32
-     :default-printer '(:name cond :tab fd  ", " fm))
-    (cond :field (byte 4 28) :type 'condition-code)
-    (opc-1 :field (byte 5 23) :value #b11101)
-    (opc-2 :field (byte 2 20) :value #b11)
-    (opc :field (byte 4 16))
-    (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
-    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
-    (opc-3 :field (byte 3 9) :value #b101)
-    (size :field (byte 1 8))
-    (n :field (byte 1 7))
-    (s :field (byte 1 6) :value 1)
-    (opc-4 :field (byte 1 4) :value 0))
-
-(sb!disassem:define-instruction-format
-    (fp-unary-one-op 32
-     :default-printer '(:name cond :tab fd))
-    (cond :field (byte 4 28) :type 'condition-code)
-    (opc-1 :field (byte 5 23) :value #b11101)
-    (opc-2 :field (byte 2 20) :value #b11)
-    (opc :field (byte 4 16))
-    (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
-
-    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
-    (opc-3 :field (byte 3 9) :value #b101)
-    (size :field (byte 1 8))
-    (n :field (byte 1 7))
-    (s :field (byte 1 6) :value 1)
-    (sbz :field (byte 6 0) :value 0))
-
-(sb!disassem:define-instruction-format
-    (fp-srt 32)
-    (cond :field (byte 4 28) :type 'condition-code)
-    (opc-1 :field (byte 4 24) :value #b1110)
-    (opc :field (byte 3 21))
-    (l :field (byte 1 20))
-    (fn :fields (list (byte 1 8) (byte 1 7) (byte 4 16)) :type 'float-reg)
-    (rd :field (byte 4 12)  :type 'reg)
-    (opc-3 :field (byte 3 9) :value #b101)
-    (size :field (byte 1 8))
-    (opc-4 :field (byte 7 0) :value #b0010000))
-
-(sb!disassem:define-instruction-format
-    (fp-srt-sys 32)
-    (cond :field (byte 4 28) :type 'condition-code)
-    (opc-1 :field (byte 4 24) :value #b1110)
-    (opc :field (byte 3 21))
-    (l :field (byte 1 20))
-    (fn :field (byte 4 16) :type 'float-sys-reg)
-    (rd :field (byte 4 12)  :type 'reg)
-    (opc-3 :field (byte 3 9) :value #b101)
-    (opc-4 :field (byte 8 0) :value #b00010000))
-
-(sb!disassem:define-instruction-format
-    (fp-trt 32)
-    (cond :field (byte 4 28) :type 'condition-code)
-    (opc-1 :field (byte 7 21) :value #b1100010)
-    (l :field (byte 1 20))
-    (rn :field (byte 4 16)  :type 'reg)
-    (rd :field (byte 4 12)  :type 'reg)
-    (opc-2 :field (byte 3 9) :value #b101)
-    (size :field (byte 1 8))
-    (opc-3 :field (byte 2 6) :value 0)
-    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
-    (opc-4 :field (byte 1 4) :value 1))
-
-(sb!disassem:define-instruction-format
-    (conditional 32
-     :default-printer '(:name cond))
-    (cond :field (byte 4 28) :type 'condition-code)
-    (op :field (byte 28 0)))
+  (sb!disassem:define-arg-type condition-code
+    :printer #'print-condition))
 
 ;;;; special magic to support decoding internal-error and related traps
 
@@ -887,6 +586,37 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (add-sub 32)
+    (op :field (byte 2 29))
+    (rn :field (byte 5 5) :type 'reg-sp)
+    (rd :field (byte 5 0) :type 'reg-sp))
+
+(sb!disassem:define-instruction-format
+    (add-sub-imm 32
+     :default-printer '(:name :tab rd ", " rn ", " imm shift)
+     :include add-sub)
+    (op2 :field (byte 5 24) :value #b10001)
+    (shift :field (byte 2 22) :type '2-bit-shift)
+    (imm :field (byte 12 10) :type 'immediate))
+
+(sb!disassem:define-instruction-format
+    (adds-subs-imm 32
+     :include add-sub-imm
+     :default-printer '(:name :tab rd ", " rn ", " imm shift))
+    (rd :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (add-sub-shift-reg 32
+     :default-printer '(:name :tab rd ", " rn ", " rm shift)
+     :include add-sub)
+    (op2 :field (byte 5 24) :value #b01011)
+    (op3 :field (byte 1 21) :value #b0)
+    (shift :fields (list (byte 2 22) (byte 6 10)) :type 'shift)
+    (rm :field (byte 5 16) :type 'reg)
+    (rn :type 'reg)
+    (rd :type 'reg))
+
 (def-emitter add-sub-shift-reg
   (size 1 31)
   (op 2 29)
@@ -897,6 +627,15 @@
   (imm 6 10)
   (rn 5 5)
   (rd 5 0))
+
+(sb!disassem:define-instruction-format
+    (add-sub-ext-reg 32
+     :default-printer '(:name :tab rd ", " rn ", " extend)
+     :include add-sub)
+    (op2 :field (byte 8 21) :value #b01011001)
+    (extend :fields (list (byte 3 13) (byte 3 10)) :type 'extend)
+    (rm :field (byte 5 16) :type 'reg)
+    (rd :type 'reg))
 
 (def-emitter add-sub-ext-reg
   (size 1 31)
@@ -913,8 +652,9 @@
       (and (typep x '(unsigned-byte 24))
            (not (ldb-test (byte 12 0) x)))))
 
-(defmacro def-add-sub (name op)
+(defmacro def-add-sub (name op &rest printer)
   `(define-instruction ,name (segment rd rn rm)
+     ,@printer
      (:emitter
       (let ((rd (tn-offset rd)))
         (cond ((or (register-p rm)
@@ -950,10 +690,41 @@
                          shift 1))
                  (emit-add-sub-imm segment +64-bit-size+ ,op shift imm (tn-offset rn) rd))))))))
 
-(def-add-sub add #b00)
-(def-add-sub adds #b01)
-(def-add-sub sub #b10)
-(def-add-sub subs #b11)
+(def-add-sub add #b00
+  (:printer add-sub-imm ((op #b00)))
+  (:printer add-sub-ext-reg ((op #b00)))
+  (:printer add-sub-shift-reg ((op #b00))))
+
+(def-add-sub adds #b01
+  (:printer add-sub-imm ((op #b01) (rd nil :type 'reg)))
+  (:printer add-sub-ext-reg ((op #b01) (rd nil :type 'reg)))
+  (:printer add-sub-shift-reg ((op #b01) (op #b01)))
+  (:printer add-sub-imm ((op #b01) (rd #b11111))
+            '('cmn :tab rn ", " imm shift))
+  (:printer add-sub-ext-reg ((op #b01) (rd #b11111))
+            '('cmn :tab rn ", " rm extend))
+  (:printer add-sub-shift-reg ((op #b01) (rd #b11111))
+            '('cmn :tab rn ", " rm shift)))
+
+(def-add-sub sub #b10
+  (:printer add-sub-imm ((op #b10)))
+  (:printer add-sub-ext-reg ((op #b10)))
+  (:printer add-sub-shift-reg ((op #b10)))
+  (:printer add-sub-shift-reg ((op #b10) (rn #b11111))
+            '('neg :tab rd ", " rm shift)))
+
+(def-add-sub subs #b11
+  (:printer add-sub-imm ((op #b11)))
+  (:printer add-sub-ext-reg ((op #b11)))
+  (:printer add-sub-shift-reg ((op #b11)))
+  (:printer add-sub-imm ((op #b11) (rd #b11111))
+            '('cmp :tab rn ", " imm shift))
+  (:printer add-sub-ext-reg ((op #b11) (rd #b11111))
+            '('cmp :tab rn ", " extend))
+  (:printer add-sub-shift-reg ((op #b11) (rd #b11111))
+            '('cmp :tab rn ", " shift))
+  (:printer add-sub-shift-reg ((op #b11) (rn #b11111))
+            '('negs :tab rd ", " rm shift)))
 
 (define-instruction-macro cmp (rn rm)
   `(inst subs zr-tn ,rn ,rm))
@@ -993,6 +764,12 @@
 
 ;;;
 
+(sb!disassem:define-instruction-format
+    (logical 32)
+    (op :field (byte 2 29))
+    (rn :field (byte 5 5) :type 'reg)
+    (rd :field (byte 5 0) :type 'reg))
+
 (def-emitter logical-reg
   (size 1 31)
   (opc 2 29)
@@ -1004,6 +781,15 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (logical-reg 32
+     :include logical
+     :default-printer '(:name :tab rd ", " rn ", " rm shift))
+    (op2 :field (byte 5 24) :value #b01010)
+    (shift :fields (list (byte 2 22) (byte 6 10)) :type 'shift)
+    (n :field (byte 1 21) :value 0)
+    (rm :field (byte 5 16) :type 'reg))
+
 (def-emitter logical-imm
   (size 1 31)
   (opc 2 29)
@@ -1014,12 +800,21 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (logical-imm 32
+     :include logical
+     :default-printer '(:name :tab rd  ", " rn ", " imm))
+    (op2 :field (byte 6 23) :value #b100100)
+    (imm :fields (list (byte 1 22) (byte 6 16) (byte 6 10))
+         :type 'logical-immediate)
+    (rd :type 'reg-sp))
+
 (defun sequence-of-ones-p (integer)
   (declare (type (unsigned-byte 64) integer))
   (and (plusp integer)
        (let ((ones (logior (1- integer) integer))) ;; turns zeros on the right into ones
          (not (logtest (1+ ones) ;; Turns #b111 into #b1000
-                       ones))))) ;; And when ANDed will produce 0  
+                       ones))))) ;; And when ANDed will produce 0
 
 (defun count-trailing-zeros (integer)
   (declare (type (unsigned-byte 64) integer))
@@ -1109,8 +904,9 @@
                       amount
                       (tn-offset rn) (tn-offset rd))))
 
-(defmacro def-logical-imm-and-reg (name opc)
+(defmacro def-logical-imm-and-reg (name opc &rest printers)
   `(define-instruction ,name (segment rd rn rm)
+     ,@printers
      (:emitter
       (if (or (register-p rm)
               (shifter-operand-p rm))
@@ -1121,26 +917,49 @@
               (error 'cannot-encode-immediate-operand :value rm))
             (emit-logical-imm segment +64-bit-size+ ,opc n immr imms (tn-offset rn) (tn-offset rd)))))))
 
-(def-logical-imm-and-reg and #b00)
-(def-logical-imm-and-reg orr #b01)
-(def-logical-imm-and-reg eor #b10)
-(def-logical-imm-and-reg ands #b11)
+(def-logical-imm-and-reg and #b00
+  (:printer logical-imm ((op #b00) (n 0)))
+  (:printer logical-reg ((op #b00) (n 0))))
+(def-logical-imm-and-reg orr #b01
+  (:printer logical-imm ((op #b01)))
+  (:printer logical-reg ((op #b01)))
+  (:printer logical-imm ((op #b01) (rn 31))
+            '('mov :tab rd  ", " imm))
+  (:printer logical-reg ((op #b01) (rn 31))
+                        '('mov :tab rd ", " rm shift)))
+(def-logical-imm-and-reg eor #b10
+  (:printer logical-imm ((op #b10)))
+  (:printer logical-reg ((op #b10))))
+(def-logical-imm-and-reg ands #b11
+  (:printer logical-imm ((op #b11)))
+  (:printer logical-reg ((op #b11)))
+  (:printer logical-imm ((op #b11) (rd 31))
+            '('tst :tab rn  ", " imm))
+  (:printer logical-reg ((op #b11) (rd 31))
+            '('tst :tab rn ", " rm shift)))
 
-(defmacro def-logical-reg (name opc)
+(define-instruction-macro tst (rn rm)
+  `(inst ands zr-tn ,rn ,rm))
+
+(defmacro def-logical-reg (name opc &rest printers)
   `(define-instruction ,name (segment rd rn rm)
+     ,@printers
      (:emitter
       (emit-logical-reg-inst segment ,opc 1 rd rn rm))))
 
 (defun bic-mask (x)
   (ldb (byte 64 0) (lognot x)))
 
-(def-logical-reg bic #b00)
-(def-logical-reg orn #b01)
-(def-logical-reg eon #b10)
-(def-logical-reg bics #b11)
-
-(define-instruction-macro tst (rn rm)
-  `(inst ands zr-tn ,rn ,rm))
+(def-logical-reg bic #b00
+  (:printer logical-reg ((op #b00) (n 1))))
+(def-logical-reg orn #b01
+  (:printer logical-reg ((op #b01) (n 1)))
+  (:printer logical-reg ((op #b01) (n 1) (rn 31))
+            '('mvn :tab rd ", " rm shift)))
+(def-logical-reg eon #b10
+  (:printer logical-reg ((op #b10) (n 1))))
+(def-logical-reg bics #b11
+  (:printer logical-reg ((op #b11) (n 1))))
 
 (define-instruction-macro mvn (rd rm)
   `(inst orn ,rd zr-tn ,rm))
@@ -1310,7 +1129,7 @@
 (defmacro def-data-processing-1 (name opc)
   `(define-instruction ,name (segment rd rn)
      (:emitter
-      (emit-data-processing-1 segment +64-bit-size+ 
+      (emit-data-processing-1 segment +64-bit-size+
                               ,opc (tn-offset rn) (tn-offset rd)))))
 
 (def-data-processing-1 rbit #b000)
@@ -1543,7 +1362,7 @@
 (def-load-store ldrsb 0 #b10)
 (def-load-store strh 1 #b00)
 (def-load-store ldrh 1 #b01)
-(def-load-store ldrsh 1 #b10) 
+(def-load-store ldrsh 1 #b10)
 (def-load-store str nil #b00)
 
 (define-instruction ldr (segment dst address)
@@ -1816,7 +1635,7 @@
   (:emitter
    (emit-system segment 1 (sys-reg-encoding sys-reg) (tn-offset rt))))
 
-;;; 
+;;;
 
 (def-emitter hint
   (#b110101010000001100100000 24 8)
@@ -2083,7 +1902,7 @@
     segment 16
     (lambda (segment position)
       (assemble (segment vop)
-        ;; Calculate the address of the code component. 
+        ;; Calculate the address of the code component.
         (let ((offset (- (+ (label-position object-label) other-pointer-lowtag)
                          position)))
           (emit-pc-relative segment 0
@@ -2186,5 +2005,3 @@
       segment 8 2
       #'two-instruction-maybe-shrink
       #'two-instruction-emitter))))
-
-
