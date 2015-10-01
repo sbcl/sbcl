@@ -130,6 +130,7 @@
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/unportable-float")
  ("src/compiler/policy")
+ ("src/compiler/early-lexenv")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
@@ -302,7 +303,6 @@
  ;;; convenient to stick them here)
 
  ("src/compiler/early-c")
- ("src/compiler/lexenv")
  ("src/compiler/policies")
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
@@ -324,6 +324,8 @@
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node")
+ ;; RECONSTRUCT-LEXENV needs types GLOBAL-VAR and DEFINED-FUN
+ ("src/compiler/lexenv")
 
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
  ;; and LABEL, needed by IR2-NLX-INFO
