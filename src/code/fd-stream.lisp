@@ -843,41 +843,6 @@
   "Hashtable of all available external formats. The table maps from
   external-format names to EXTERNAL-FORMAT structures.")
 
-(defun get-external-format (external-format)
-  (flet ((keyword-external-format (keyword)
-           (declare (type keyword keyword))
-           (gethash keyword *external-formats*))
-         (replacement-handlerify (entry replacement)
-           (when entry
-             (wrap-external-format-functions
-              entry
-              (lambda (fun)
-                (and fun
-                     (lambda (&rest rest)
-                       (declare (dynamic-extent rest))
-                       (handler-bind
-                           ((stream-decoding-error
-                             (lambda (c)
-                               (declare (ignore c))
-                               (invoke-restart 'input-replacement replacement)))
-                            (stream-encoding-error
-                             (lambda (c)
-                               (declare (ignore c))
-                               (invoke-restart 'output-replacement replacement)))
-                            (octets-encoding-error
-                             (lambda (c) (use-value replacement c)))
-                            (octet-decoding-error
-                             (lambda (c) (use-value replacement c))))
-                         (apply fun rest)))))))))
-    (typecase external-format
-      (keyword (keyword-external-format external-format))
-      ((cons keyword)
-       (let ((entry (keyword-external-format (car external-format)))
-             (replacement (getf (cdr external-format) :replacement)))
-         (if replacement
-             (replacement-handlerify entry replacement)
-             entry))))))
-
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)
       (error "Undefined external-format: ~S" external-format)))
