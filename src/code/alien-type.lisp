@@ -17,13 +17,6 @@
 
 (!begin-collecting-cold-init-forms)
 
-(defstruct (alien-type-type
-            (:include ctype
-                      (class-info (type-class-or-lose 'alien)))
-            (:constructor %make-alien-type-type (alien-type))
-            (:copier nil))
-  (alien-type nil :type alien-type :read-only t))
-
 (!define-type-class alien :enumerable nil :might-contain-other-types nil)
 
 (!define-type-method (alien :negate) (type)

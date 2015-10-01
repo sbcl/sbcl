@@ -238,16 +238,6 @@
                (info :alien-type :enum name)))
         (error "attempt to shadow definition of ~A ~S" kind name)))))
 
-(def!struct (alien-type
-             (:make-load-form-fun sb!kernel:just-dump-it-normally)
-             (:constructor make-alien-type
-                           (&key class bits alignment
-                            &aux (alignment
-                                  (or alignment (guess-alignment bits))))))
-  (class 'root :type symbol)
-  (bits nil :type (or null unsigned-byte))
-  (alignment nil :type (or null unsigned-byte)))
-
 (defun unparse-alien-type (type)
   #!+sb-doc
   "Convert the alien-type structure TYPE back into a list specification of

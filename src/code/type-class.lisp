@@ -492,3 +492,101 @@
         finally (return res)))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
+
+;;; A few type representations need to be defined slightly earlier than
+;;; 'early-type' is compiled, so they're defined here.
+
+;;; An ARRAY-TYPE is used to represent any array type, including
+;;; things such as SIMPLE-BASE-STRING.
+(defstruct (array-type (:include ctype
+                                 (class-info (type-class-or-lose 'array)))
+                       (:constructor %make-array-type
+                        (dimensions complexp element-type
+                                    specialized-element-type))
+                       (:copier nil))
+  ;; the dimensions of the array, or * if unspecified. If a dimension
+  ;; is unspecified, it is *.
+  (dimensions '* :type (or list (member *)) :read-only t)
+  ;; Is this not a simple array type? (:MAYBE means that we don't know.)
+  (complexp :maybe :type (member t nil :maybe) :read-only t)
+  ;; the element type as originally specified
+  (element-type (missing-arg) :type ctype :read-only t)
+  ;; the element type as it is specialized in this implementation
+  (specialized-element-type *wild-type* :type ctype :read-only t))
+
+(defstruct (character-set-type
+            (:include ctype
+                      (class-info (type-class-or-lose 'character-set)))
+            (:constructor %make-character-set-type (pairs))
+            (:copier nil))
+  (pairs (missing-arg) :type list :read-only t))
+
+;;; A COMPOUND-TYPE is a type defined out of a set of types, the
+;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
+(defstruct (compound-type (:include ctype)
+                          (:constructor nil)
+                          (:copier nil))
+  ;; Formerly defined in every CTYPE, but now just in the ones
+  ;; for which enumerability is variable.
+  (enumerable nil :read-only t)
+  (types nil :type list :read-only t))
+
+;;; A UNION-TYPE represents a use of the OR type specifier which we
+;;; couldn't canonicalize to something simpler. Canonical form:
+;;;   1. All possible pairwise simplifications (using the UNION2 type
+;;;      methods) have been performed. Thus e.g. there is never more
+;;;      than one MEMBER-TYPE component. FIXME: As of sbcl-0.6.11.13,
+;;;      this hadn't been fully implemented yet.
+;;;   2. There are never any UNION-TYPE components.
+;;;
+;;; TODO: As STRING is an especially important union type,
+;;; it could be interned by canonicalizing its subparts into
+;;; ARRAY of {CHARACTER,BASE-CHAR,NIL} in that exact order always.
+;;; It will therefore admit quick TYPE=, but not quick failure, since
+;;;   (type= (specifier-type '(or (simple-array (member #\a) (*))
+;;;                               (simple-array character (*))
+;;;                               (simple-array nil (*))))
+;;;          (specifier-type 'simple-string)) => T and T
+;;; even though (MEMBER #\A) is not TYPE= to BASE-CHAR.
+;;;
+(defstruct (union-type (:include compound-type
+                                 (class-info (type-class-or-lose 'union)))
+                       (:constructor make-union-type (enumerable types))
+                       (:copier nil)))
+
+;;; An INTERSECTION-TYPE represents a use of the AND type specifier
+;;; which we couldn't canonicalize to something simpler. Canonical form:
+;;;   1. All possible pairwise simplifications (using the INTERSECTION2
+;;;      type methods) have been performed. Thus e.g. there is never more
+;;;      than one MEMBER-TYPE component.
+;;;   2. There are never any INTERSECTION-TYPE components: we've
+;;;      flattened everything into a single INTERSECTION-TYPE object.
+;;;   3. There are never any UNION-TYPE components. Either we should
+;;;      use the distributive rule to rearrange things so that
+;;;      unions contain intersections and not vice versa, or we
+;;;      should just punt to using a HAIRY-TYPE.
+(defstruct (intersection-type (:include compound-type
+                                        (class-info (type-class-or-lose
+                                                     'intersection)))
+                              (:constructor %make-intersection-type
+                                            (enumerable types))
+                              (:copier nil)))
+
+(in-package "SB!ALIEN")
+(def!struct (alien-type
+             (:make-load-form-fun sb!kernel:just-dump-it-normally)
+             (:constructor make-alien-type
+                           (&key class bits alignment
+                            &aux (alignment
+                                  (or alignment (guess-alignment bits))))))
+  (class 'root :type symbol :read-only t)
+  (bits nil :type (or null unsigned-byte))
+  (alignment nil :type (or null unsigned-byte)))
+
+(in-package "SB!KERNEL")
+(defstruct (alien-type-type
+            (:include ctype
+                      (class-info (type-class-or-lose 'alien)))
+            (:constructor %make-alien-type-type (alien-type))
+            (:copier nil))
+  (alien-type nil :type alien-type :read-only t))
