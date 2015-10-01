@@ -27,8 +27,6 @@
 
 (in-package "SB!KERNEL")
 
-#!-sb-fluid
-(declaim (inline alloc-xset xset-data (setf xset-data) xset-list-size (setf xset-list-size)))
 (defstruct (xset (:constructor alloc-xset) (:copier nil) (:predicate nil))
   (list-size 0 :type index)
   (data nil :type (or list hash-table)))
