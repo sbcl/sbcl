@@ -391,9 +391,8 @@
                         value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
                (:word
                 `((inst add lip object (lsl index 2))
-                  (inst ldr (32-bit-reg value) (@ lip (- (* ,offset n-word-bytes) ,lowtag)))
-                  ,@(and signed
-                         `((inst sxtw value value)))))))))
+                  (inst ,(if signed 'ldrsw 'ldr) (32-bit-reg value)
+                        (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)

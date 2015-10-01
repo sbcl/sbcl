@@ -161,13 +161,11 @@
                               (inst ,(case size
                                        (:byte (if signed 'ldrsb 'ldrb))
                                        (:short (if signed 'ldrsh 'ldrh))
-                                       (t 'ldr))
+                                       (t (if signed 'ldrsw 'ldr)))
                                     ,(if (eq size :word)
                                          '(32-bit-reg result)
                                          'result)
-                                    (@ sap offset))
-                              ,@(and (eq size :word) signed
-                                     '((inst sxtw result result)))))
+                                    (@ sap offset))))
                 (define-vop (,set-name)
                   (:translate ,set-name)
                   (:policy :fast-safe)

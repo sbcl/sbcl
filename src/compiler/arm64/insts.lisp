@@ -1600,6 +1600,7 @@
 (def-load-store strh 1 #b00)
 (def-load-store ldrh 1 #b01)
 (def-load-store ldrsh 1 #b10)
+(def-load-store ldrsw #b10 #b10)
 (def-load-store str nil #b00)
 
 (define-instruction ldr (segment dst address)
@@ -2332,3 +2333,4 @@
       segment 8 2
       #'two-instruction-maybe-shrink
       #'two-instruction-emitter))))
+

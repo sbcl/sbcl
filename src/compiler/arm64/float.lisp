@@ -560,8 +560,9 @@
           (inst fmov bits float)
           (inst sxtw bits bits))
          (single-stack
-          (loadw (32-bit-reg bits) (current-nfp-tn vop) (tn-offset float))
-          (inst sxtw bits bits))
+          (inst ldrsw (32-bit-reg bits)
+                (@ (current-nfp-tn vop)
+                   (load-store-offset (ash (tn-offset float) 3)))))
          (descriptor-reg
           (inst asr bits float 32))))
       (signed-stack
@@ -596,14 +597,13 @@
                          0
                          4))))))
       (descriptor-reg
-       (inst ldr (32-bit-reg hi-bits)
+       (inst ldrsw (32-bit-reg hi-bits)
              (@ float
                 (- (+ (* double-float-value-slot n-word-bytes)
                       (if (eq *backend-byte-order* :big-endian)
                           0
                           4))
-                   other-pointer-lowtag)))
-       (inst sxtw hi-bits hi-bits)))))
+                   other-pointer-lowtag)))))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
