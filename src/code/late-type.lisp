@@ -3177,7 +3177,6 @@ used for a COMPLEX component.~:@>"
     ((type= type (specifier-type 'simple-string)) 'simple-string)
     ((type= type (specifier-type 'string)) 'string)
     ((type= type (specifier-type 'complex)) 'complex)
-    ((type= type (specifier-type 'standard-char)) 'standard-char)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each
