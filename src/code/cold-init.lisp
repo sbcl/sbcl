@@ -305,7 +305,8 @@
   ;; the ANSI-specified initial value of *PACKAGE*
   (setf *package* (find-package "COMMON-LISP-USER"))
 
-  (!enable-infinite-error-protector)
+  ;; Enable normal (post-cold-init) behavior of INFINITE-ERROR-PROTECT.
+  (setf sb!kernel::*maximum-error-depth* 10)
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
   #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)

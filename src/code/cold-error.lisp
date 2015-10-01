@@ -113,6 +113,44 @@
                         (funcall (cast-to-fun test nil) condition))
                 (funcall (cast-to-fun (cdr handler) t) condition)))))))))
 
+;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
+
+;;; counts of nested errors (with internal errors double-counted)
+(defvar *maximum-error-depth*) ; this gets set to 10 in !COLD-INIT
+(!defvar *current-error-depth* 0)
+
+;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
+;;; of hyperspace.
+(defmacro infinite-error-protect (&rest forms)
+  `(let ((*current-error-depth* (infinite-error-protector)))
+     (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
+     ;; arbitrary truncation
+     #!+sb-show (sb!debug:print-backtrace :count 8)
+     ,@forms))
+
+;;; a helper function for INFINITE-ERROR-PROTECT
+(defun infinite-error-protector ()
+  (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
+  (/hexstr *current-error-depth*)
+  ;; *MAXIMUM-ERROR-DEPTH* is not bound during cold-init, and testing BOUNDP
+  ;; is superfluous since REALP will return false either way.
+  (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
+        (max (locally (declare (optimize (safety 0))) *maximum-error-depth*)))
+    (cond ((or (not (fixnump cur)) (not (fixnump max)))
+           (%primitive print "Argh! corrupted error depth, halting")
+           (%primitive sb!c:halt))
+          ((> cur max)
+           (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
+           (/hexstr max)
+           (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
+           (error-error "Help! "
+                        cur
+                        " nested errors. "
+                        "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded."))
+          (t
+           (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
+           (1+ *current-error-depth*)))))
+
 (defun error (datum &rest arguments)
   #!+sb-doc
   "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.

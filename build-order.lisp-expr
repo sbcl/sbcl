@@ -190,13 +190,6 @@
  ;; automatically by grovel_headers.c, i.e. it's not in CVS.
  ("output/stuff-groveled-from-headers" :not-host)
 
- ;; a comment from classic CMU CL:
- ;;   "These guys can supposedly come in any order, but not really.
- ;;    Some are put at the end so that macros don't run interpreted
- ;;    and stuff."
- ;; Dunno exactly what this meant or whether it still holds. -- WHN 19990803
- ;; FIXME: more informative and up-to-date comment?
- ("src/code/toplevel"    :not-host)
  ("src/code/cold-error"  :not-host)
  ("src/pcl/slot-name") ; for calls from 'info-vector'
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
@@ -372,6 +365,7 @@
 
  ("src/code/early-condition")
  ("src/code/condition" :not-host)
+ ("src/code/toplevel"  :not-host)
  ("src/code/parse-defmacro-errors")
  ("src/code/format-directive")
  ;; Target-only stuff should usually be compiled late unless it has

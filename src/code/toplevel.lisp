@@ -32,10 +32,6 @@
                   *interrupt-pending*
                   #!+sb-thruption *thruption-pending*))
 
-;;; counts of nested errors (with internal errors double-counted)
-(defvar *maximum-error-depth*) ; this gets set to 10 when cold-init is finished
-(!defvar *current-error-depth* 0)
-
 ;;;; default initfiles
 
 (defun sysinit-pathname ()
@@ -118,45 +114,6 @@ means to wait indefinitely.")
                  (sb!thread::%exit-other-threads)
                  (setf ok t))
             (os-exit code :abort (not ok)))))))
-
-;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
-
-;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
-;;; of hyperspace.
-(defmacro infinite-error-protect (&rest forms)
-  `(progn
-     (infinite-error-protector)
-     (/show0 "back from INFINITE-ERROR-PROTECTOR")
-     (let ((*current-error-depth* (1+ *current-error-depth*)))
-       (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
-       ;; arbitrary truncation
-       #!+sb-show (sb!debug:print-backtrace :count 8)
-       ,@forms)))
-
-;;; a helper function for INFINITE-ERROR-PROTECT
-(defun infinite-error-protector ()
-  (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
-  (/hexstr *current-error-depth*)
-  ;; *MAXIMUM-ERROR-DEPTH* is not bound during cold-init, and testing BOUNDP
-  ;; is superfluous since REALP will return false either way.
-  (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
-        (max (locally (declare (optimize (safety 0))) *maximum-error-depth*)))
-    (cond ((or (not (realp cur)) (not (realp max))) ; why not just FIXNUMP?
-           (%primitive print "Argh! corrupted error depth, halting")
-           (%primitive sb!c:halt))
-          ((> cur max)
-           (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
-           (/hexstr max)
-           (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-           (error-error "Help! "
-                        cur
-                        " nested errors. "
-                        "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded."))
-          (t
-           (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
-           nil))))
-
-(defun !enable-infinite-error-protector () (setf *maximum-error-depth* 10))
 
 ;;;; miscellaneous external functions
 
