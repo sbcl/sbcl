@@ -143,7 +143,7 @@
            (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
            (/hexstr max)
            (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-           (error-error "Help! "
+           (sb!impl::error-error "Help! "
                         cur
                         " nested errors. "
                         "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded."))
