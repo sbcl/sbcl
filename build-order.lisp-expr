@@ -296,7 +296,6 @@
 
  ("src/code/sort"  :not-host)
  ("src/code/time"  :not-host)
- ("src/code/timer" :not-host)
  ("src/code/final" :not-host)
 
  ("src/code/setf-funs" :not-host)
@@ -693,6 +692,7 @@
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
  ("src/code/target-thread"     :not-host)
+ ("src/code/timer" :not-host)
 
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/interr" :not-host)
