@@ -289,7 +289,7 @@
 ;;;; raw instance slot accessors
 
 (macrolet
-    ((define-raw-slot-vops (name ref-inst set-inst value-primtype value-sc
+    ((define-raw-slot-vops (name value-primtype value-sc
                                  &key (width 1) (move-macro 'move))
        (labels ((emit-generator (instruction move-result)
                   `((loadw offset object 0 instance-pointer-lowtag)
@@ -315,7 +315,7 @@
                 (:results (value :scs (,value-sc)))
                 (:result-types ,value-primtype)
                 (:temporary (:scs (non-descriptor-reg)) offset)
-                (:generator 5 ,@(emit-generator ref-inst nil)))
+                (:generator 5 ,@(emit-generator 'ldr nil)))
               (define-vop (,set-vop)
                 (:translate ,(symbolicate "%" set-vop))
                 (:policy :fast-safe)
@@ -326,13 +326,13 @@
                 (:results (result :scs (,value-sc)))
                 (:result-types ,value-primtype)
                 (:temporary (:scs (non-descriptor-reg)) offset)
-                (:generator 5 ,@(emit-generator set-inst t))))))))
-  (define-raw-slot-vops word ldr str unsigned-num unsigned-reg)
-  (define-raw-slot-vops single ldr str single-float single-reg
+                (:generator 5 ,@(emit-generator 'str t))))))))
+  (define-raw-slot-vops word unsigned-num unsigned-reg)
+  (define-raw-slot-vops single single-float single-reg
      :move-macro move-float)
-  (define-raw-slot-vops double ldr str double-float double-reg
+  (define-raw-slot-vops double double-float double-reg
      :move-macro move-float)
-  (define-raw-slot-vops complex-single ldr str complex-single-float complex-single-reg
+  (define-raw-slot-vops complex-single complex-single-float complex-single-reg
     :move-macro move-float)
-  (define-raw-slot-vops complex-double ldr str complex-double-float complex-double-reg
+  (define-raw-slot-vops complex-double complex-double-float complex-double-reg
      :width 2 :move-macro move-complex-double))

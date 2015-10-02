@@ -41,7 +41,7 @@
                                :load-if (not (location= x y))))
                   (:note "float move")
                   (:generator 0
-                    (inst fmov y x)))
+                    (move-float y x)))
                 (define-move-vop ,vop :move (,sc) (,sc)))))
   (frob single-move single-reg)
   (frob double-move double-reg))
@@ -82,10 +82,10 @@
 (define-move-vop move-to-double :move (descriptor-reg) (double-reg))
 
 (define-vop (move-to-single-reg)
-   (:args (x :scs (descriptor-reg) :target tmp))
+  (:args (x :scs (descriptor-reg) :target tmp))
   (:temporary (:sc unsigned-reg :from :argument :to :result) tmp)
-   (:results (y :scs (single-reg)))
-   (:note "pointer to float coercion")
+  (:results (y :scs (single-reg)))
+  (:note "pointer to float coercion")
   (:generator 2
    (inst lsr tmp x 32)
    (inst fmov y tmp)))
@@ -103,7 +103,7 @@
                   (:generator ,(if double-p 2 1)
                     (sc-case y
                       (,sc
-                       (inst fmov y x))
+                       (move-float y x))
                       (,stack-sc
                        (storew x nfp (tn-offset y))))))
                 (define-move-vop ,name :move-arg
@@ -225,7 +225,7 @@
   (:generator 1
     (sc-case y
       (complex-single-reg
-       (inst fmov y x))
+       (move-float y x))
       (complex-single-stack
        (storew x nfp (tn-offset y))))))
 (define-move-vop move-complex-single-float-arg :move-arg
@@ -492,7 +492,7 @@
       (signed-reg
        (sc-case res
          (single-reg
-          (inst fmov res bits))
+          (move-float res bits))
          (single-stack
           (storew bits (current-nfp-tn vop) (tn-offset res)))))
       (signed-stack
