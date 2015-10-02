@@ -221,11 +221,11 @@
     (inst cmp num count-words)
     (inst str temp (@ dst num))
     (inst b :ne LOOP)
-    (inst lsr num num (- word-shift n-fixnum-tag-bits))
 
     ;; Reset the CSP.
     DONE
-    (inst add csp-tn result num)))
+    (inst add csp-tn result num)
+    (inst lsr num num (- word-shift n-fixnum-tag-bits))))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
