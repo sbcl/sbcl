@@ -429,8 +429,8 @@
                 (:generator ,cost
                   (move temp amount)
                   (inst cmp temp sb!vm:n-word-bits)
-                  (inst b :le do)
-                  (inst mov temp sb!vm:n-word-bits)
+                  (inst b :lt do)
+                  (inst mov temp (1- sb!vm:n-word-bits))
                   do
                   (inst lsl result number temp)))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
