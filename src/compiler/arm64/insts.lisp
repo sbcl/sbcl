@@ -1523,18 +1523,18 @@
          (v  (if fp
                  1
                  0))
-         (size (cond ((not size)
-                      (if (sc-is dst 32-bit-reg)
-                          #b10
-                          #b11))
-                     ((not fp)
-                      size)
-                     ((eq (sc-name (tn-sc dst)) 'complex-double-reg)
-                      (setf opc (logior #b10 opc))
-                      #b00)
-                     (t
-                      (logior #b10
-                              (fp-reg-type dst)))))
+         (size (cond (fp
+                      (sc-case dst
+                        (complex-double-reg
+                         (setf opc (logior #b10 opc))
+                         #b00)
+                        (t
+                         (logior #b10
+                                 (fp-reg-type dst)))))
+                     (size)
+                     ((sc-is dst 32-bit-reg)
+                      #b10)
+                     (t #b11)))
          (dst (tn-offset dst)))
     (cond ((and (typep offset '(unsigned-byte 15))
                 (not (ldb-test (byte 3 0) offset))
@@ -2333,4 +2333,101 @@
       segment 8 2
       #'two-instruction-maybe-shrink
       #'two-instruction-emitter))))
+
+;;; SIMD
+(def-emitter simd-three-diff
+  (#b0 1 31)
+  (q 1 30)
+  (u 1 29)
+  (#b01110 5 24)
+  (size 2 22)
+  (#b1 1 21)
+  (rm 5 16)
+  (opc 4 12)
+  (0 2 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(def-emitter simd-three-same
+  (#b0 1 31)
+  (q 1 30)
+  (u 1 29)
+  (#b01110 5 24)
+  (size 2 22)
+  (#b1 1 21)
+  (rm 5 16)
+  (opc 5 11)
+  (#b1 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(defun decode-vector-size (size)
+  (ecase size
+    (:8b 0)
+    (:16b 1)))
+
+(define-instruction s-orr (segment rd rn rm &optional (size :16b))
+  (:emitter
+   (emit-simd-three-same segment
+                         (decode-vector-size size)
+                         #b0
+                         #b10
+                         (tn-offset rm)
+                         #b00011
+                         (tn-offset rn)
+                         (tn-offset rd))))
+
+(define-instruction-macro s-mov (rd rn &optional (size :16b))
+  `(let ((rd ,rd)
+         (rn ,rn)
+         (size ,size))
+     (inst s-orr rd rn rn size)))
+
+;;;
+
+(def-emitter simd-extract
+  (#b0 1 31)
+  (q 1 30)
+  (#b101110000 9 21)
+  (rm 5 16)
+  (#b0 1 15)
+  (imm4 4 11)
+  (#b0 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction s-ext (segment rd rn rm index &optional (size :16b))
+  (:emitter
+   (emit-simd-extract segment
+                      (decode-vector-size size)
+                      (tn-offset rm)
+                      index
+                      (tn-offset rn)
+                      (tn-offset rd))))
+
+;;;
+
+(def-emitter simd-adv-copy
+  (#b0 1 31)
+  (q 1 30)
+  (op 1 29)
+  (#b01110000 8 21)
+  (imm5 5 16)
+  (#b0 1 15)
+  (imm4 4 11)
+  (#b1 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction s-ins (segment rd index1 rn index2 size)
+  (:emitter
+   (let ((size (position size '(:B :H :S :D))))
+     (emit-simd-adv-copy segment
+                         1
+                         1
+                         (logior (ash index1 (1+ size))
+                                 (ash 1 size))
+                         (ash index2 size)
+                         (tn-offset rn)
+                         (tn-offset rd)))))
 

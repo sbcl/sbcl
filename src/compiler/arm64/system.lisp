@@ -241,7 +241,6 @@
     (emit-alignment 2)))
 
 (define-vop (halt)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:generator 1
     (inst debug-trap)
     (inst byte halt-trap)

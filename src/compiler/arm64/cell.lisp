@@ -112,11 +112,10 @@
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :target obj-temp))
+  (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:save-p :compute-only)
-  (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp)
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
     (inst cmp value null-tn)
@@ -336,4 +335,4 @@
   (define-raw-slot-vops complex-single ldr str complex-single-float complex-single-reg
      :width 2 :move-macro move-float)
   (define-raw-slot-vops complex-double ldr str complex-double-float complex-double-reg
-     :width 4 :move-macro move-float))
+     :width 4 :move-macro move-complex-double))

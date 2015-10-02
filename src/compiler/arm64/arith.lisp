@@ -126,7 +126,9 @@
 
 (defmacro define-binop (translate untagged-penalty op
                         &key cop arg-swap neg-op invert-y invert-r try-single-op)
+  (declare (ignore  neg-op invert-y invert-r try-single-op))
   (let ((cop (or cop op)))
+    (declare (ignore cop))
     `(progn
        (define-vop (,(symbolicate 'fast- translate '/fixnum=>fixnum)
                      fast-fixnum-binop)

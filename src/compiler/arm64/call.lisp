@@ -874,8 +874,10 @@
                       :from (:argument ,(if (eq return :tail) 0 1))
                       :to :eval)
                  ,(if named 'name-pass 'lexenv))
-     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-                 function)
+     
+     ,@(and (not named)
+            '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+               function)))
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
