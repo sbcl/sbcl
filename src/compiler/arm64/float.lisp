@@ -19,7 +19,7 @@
 
 (define-move-fun (store-single 1) (vop x y)
                  ((single-reg) (single-stack))
-  (storew y (current-nfp-tn vop) (tn-offset x)))
+  (storew x (current-nfp-tn vop) (tn-offset y)))
 
 (define-move-fun (load-double 2) (vop x y)
                  ((double-stack) (double-reg))
@@ -27,7 +27,7 @@
 
 (define-move-fun (store-double 2) (vop x y)
                  ((double-reg) (double-stack))
-  (storew y (current-nfp-tn vop) (tn-offset x)))
+  (storew x (current-nfp-tn vop) (tn-offset y)))
 
 ;;;; Move VOPs:
 
