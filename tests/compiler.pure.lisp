@@ -5596,3 +5596,23 @@
     (test '(flet x))
     (test '(labels (foo () 'bar)))
     (test '(labels x))))
+
+(with-test (:name :compile-load-time-value-interpreted-mode)
+  ;; This test exercises the same pattern as HANDLER-BIND (to a degree).
+  ;; In particular a HANDLER-BIND that was compiled when the *EVALUATOR-MODE*
+  ;; was :INTERPRET would not compile its class predicates, because
+  ;; LOAD-TIME-VALUE just called EVAL, and you would get back a list
+  ;; with an interpreted function it it.
+  ;; In the code below, this function when called would generate a new symbol
+  ;; each time. But if the compiler processes the guts as it should,
+  ;; you get back a compiled lambda which returns a constant symbol.
+  (let ((f (let ((sb-ext:*evaluator-mode* :interpret))
+             (compile nil
+                      '(lambda ()
+                        (load-time-value
+                         (list (lambda ()
+                                 (macrolet ((foo ()
+                                              (sb-int:keywordicate (gensym))))
+                                   (foo))))))))))
+    (eq (funcall (car (funcall f)))
+        (funcall (car (funcall f))))))

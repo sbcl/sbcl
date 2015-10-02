@@ -71,11 +71,19 @@ guaranteed to never be modified, so it can be put in read-only storage."
                       `(value-cell-ref (%load-time-value ',handle)))))
             (the-in-policy type value-form **zero-typecheck-policy**
                            start next result)))
-        (let* ((value
-                 (handler-case (eval form)
-                   (error (condition)
-                     (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
-                                     condition)))))
+        (let ((value
+               (flet ((eval-it (operator thing)
+                        (handler-case (funcall operator thing)
+                          (error (condition)
+                            (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
+                                            condition)))))
+                 (if (eq sb!ext:*evaluator-mode* :compile)
+                     ;; This call to EVAL actually means compile+eval.
+                     (eval-it 'eval form)
+                     (let ((f (compile nil `(lambda () ,form))))
+                       (if f
+                           (eval-it 'funcall f)
+                           (compiler-error "Failed to compile LOAD-TIME-VALUE form")))))))
           (if read-only-p
               (ir1-convert start next result `',value)
               (the-in-policy (ctype-of value) `(value-cell-ref ,(make-value-cell value))
