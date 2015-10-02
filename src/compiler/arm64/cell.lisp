@@ -331,8 +331,8 @@
   (define-raw-slot-vops single ldr str single-float single-reg
      :move-macro move-float)
   (define-raw-slot-vops double ldr str double-float double-reg
-     :width 2 :move-macro move-float)
+     :move-macro move-float)
   (define-raw-slot-vops complex-single ldr str complex-single-float complex-single-reg
-     :width 2 :move-macro move-float)
+    :move-macro move-float)
   (define-raw-slot-vops complex-double ldr str complex-double-float complex-double-reg
-     :width 4 :move-macro move-complex-double))
+     :width 2 :move-macro move-complex-double))
