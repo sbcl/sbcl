@@ -167,7 +167,8 @@
 
   (defun print-scaled-immediate (value stream dstate)
     (declare (ignore dstate))
-    (format stream "#~D" (* value 8)))
+    (destructuring-bind (size opc value) value
+      (format stream "#~D" (ash value (logior (ash opc 2) size)))))
 
   (defun print-logical-immediate (value stream dstate)
     (declare (ignore dstate))
@@ -201,13 +202,13 @@
                   (t
                    (format stream "~a~d"
                            (cond ((and (= size #b10)
-                                       (= opc #b01))
+                                       (= opc #b0))
                                   "S")
                                  ((and (= size #b11)
-                                       (= opc #b01))
+                                       (= opc #b0))
                                   "D")
                                  ((and (= size #b00)
-                                       (= opc #b11))
+                                       (= opc #b1))
                                   "Q"))
                            reg))))
           (destructuring-bind (size reg) value
@@ -1418,7 +1419,7 @@
     (op3 :field (byte 2 24) :value #b00)
     (op :field (byte 2 22))
     (rn :field (byte 5 5) :type 'reg-sp)
-    (rt :fields (list (byte 2 30) (byte 2 22) (byte 5 0)) :type 'reg-float-reg))
+    (rt :fields (list (byte 2 30) (byte 1 23) (byte 5 0)) :type 'reg-float-reg))
 
 (def-emitter ldr-str-unsigned-imm
   (size 2 30)
@@ -1435,7 +1436,7 @@
      :default-printer '(:name :tab rt  ", [" rn "], " imm)
      :include ldr-str)
     (op3 :value #b01)
-    (imm :field (byte 12 10) :type 'scaled-immediate))
+    (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10)) :type 'scaled-immediate))
 
 (def-emitter ldr-str-unscaled-imm
   (size 2 30)
@@ -1542,7 +1543,7 @@
                 (eq mode :offset))
            (emit-ldr-str-unsigned-imm segment size
                                       v opc
-                                      (/ offset 8)
+                                      (ash offset (- (logior (ash (ldb (byte 1 1) opc) 2) size)))
                                       (tn-offset base)
                                       dst))
           ((and index-encoding
