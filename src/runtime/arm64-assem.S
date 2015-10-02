@@ -445,19 +445,42 @@ alloc_tramp:
 
         ldr     x0,[sp,#104]
 
-        stp     d0, d1, [sp,#-16]!
-        stp     d2, d3, [sp,#-16]!
-        stp     d4, d5, [sp,#-16]!
-        stp     d6, d7, [sp,#-16]!
-
+        stp     q0, q1, [sp,#-32]!
+        stp     q2, q3, [sp,#-32]!
+        stp     q4, q5, [sp,#-32]!
+        stp     q6, q7, [sp,#-32]!
+        stp     q8, q9, [sp,#-32]!
+        stp     q10, q11, [sp,#-32]!
+        stp     q12, q13, [sp,#-32]!
+        stp     q14, q15, [sp,#-32]!
+        stp     q16, q17, [sp,#-32]!
+        stp     q18, q19, [sp,#-32]!
+        stp     q20, q21, [sp,#-32]!
+        stp     q22, q23, [sp,#-32]!
+        stp     q24, q25, [sp,#-32]!
+        stp     q26, q27, [sp,#-32]!
+        stp     q28, q29, [sp,#-32]!
+        stp     q30, q31, [sp,#-32]!
 
         ldr     reg_TMP,=alloc
         blr     reg_TMP
 
-        ldp     d6, d7, [sp],#16
-        ldp     d4, d5, [sp],#16
-        ldp     d2, d3, [sp],#16
-        ldp     d0, d1, [sp],#16
+        ldp     q30, q31, [sp],#32
+        ldp     q28, q29, [sp],#32
+        ldp     q26, q27, [sp],#32
+        ldp     q24, q25, [sp],#32
+        ldp     q22, q23, [sp],#32
+        ldp     q20, q21, [sp],#32
+        ldp     q18, q19, [sp],#32
+        ldp     q16, q17, [sp],#32
+        ldp     q14, q15, [sp],#32
+        ldp     q12, q13, [sp],#32
+        ldp     q10, q11, [sp],#32
+        ldp     q8, q9, [sp],#32
+        ldp     q6, q7, [sp],#32
+        ldp     q4, q5, [sp],#32
+        ldp     q2, q3, [sp],#32
+        ldp     q0, q1, [sp],#32
 
         str     x0, [sp,#104]
 
