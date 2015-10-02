@@ -382,7 +382,7 @@
     (inst neg temp temp)
     (inst cmp temp sb!vm:n-word-bits)
     (inst b :lt DO)
-    (inst mov temp sb!vm:n-word-bits)
+    (inst mov temp (1- sb!vm:n-word-bits))
     DO
     (ecase variant
       (:signed (inst asr result number temp))
@@ -391,7 +391,7 @@
     LEFT
     (inst cmp temp sb!vm:n-word-bits)
     (inst b :lt DO2)
-    (inst mov temp sb!vm:n-word-bits)
+    (inst mov temp (1- sb!vm:n-word-bits))
     DO2
     (inst lsl result number temp)
     END))
