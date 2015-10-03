@@ -581,8 +581,14 @@ between the ~A definition and the ~A definition"
           ;;   (setf (find-class 'foo) (find-class 'integer))
           ;; and
           ;;   (setf (find-class 'integer) (find-class 'integer))
-          (setf (info :type :kind name)
-                (if (built-in-classoid-p new-value) :primitive :instance))
+          (cond ((built-in-classoid-p new-value)
+                 ;; But I can't figure out how to get assertions to pass
+                 ;; without violation what would otherwise be invariants
+                 ;; of the internal representation of types. This sucks.
+                 (setf (info :type :kind name)
+                       (or (info :type :kind name) :defined)))
+                (t
+                 (setf (info :type :kind name) :instance)))
           (setf (classoid-cell-classoid cell) new-value)
           (unless (eq (info :type :compiler-layout name)
                       (classoid-layout new-value))
