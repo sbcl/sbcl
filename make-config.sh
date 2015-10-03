@@ -734,12 +734,8 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
-    printf ' :64-bit :gencgc' >> $ltf
-    # printf ' :gencgc :linkage-table :alien-callbacks' >> $ltf
-    # # As opposed to soft-float or FPA, we support VFP only (and
-    # # possibly VFPv2 and higher only), but we'll leave the obvious
-    # # hooks in for someone to add the support later.
-    printf ' :arm-vfp :arm-vfpv2' >> $ltf
+    printf ' :64-bit :gencgc :linkage-table' >> $ltf
+    # printf ' :alien-callbacks' >> $ltf
     printf ' :precise-arg-count-error' >> $ltf
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf

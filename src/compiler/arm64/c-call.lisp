@@ -189,7 +189,7 @@
   (:result-types system-area-pointer)
   (:generator 2
     (let ((fixup-label (gen-label)))
-      (inst load-from-label res)
+      (inst load-from-label res fixup-label)
       (inst ldr res (@ res))
       (assemble (*elsewhere*)
         (emit-label fixup-label)

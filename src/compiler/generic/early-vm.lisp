@@ -83,7 +83,9 @@
 (def!constant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
           (start dynamic-space-start))
-      (dolist (other-start (list read-only-space-start static-space-start linkage-table-space-start))
+      (dolist (other-start (list read-only-space-start static-space-start
+                                 #!+linkage-table
+                                 linkage-table-space-start))
         (declare (notinline <)) ; avoid dead code note
         (when (< start other-start)
           (setf stop (min stop other-start))))

@@ -151,7 +151,7 @@ void arch_install_interrupt_handlers()
 
 /* Linkage tables
  *
- * Linkage entry size is 16, because we need 4 instructions.
+ * Linkage entry size is 16, because we need 2 instructions and an 8 byte address.
  */
 
 #define LINKAGE_TEMP_REG        reg_NFP
@@ -159,13 +159,8 @@ void arch_install_interrupt_handlers()
 void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
 {
   /*
-    ldr reg, [pc, #4]
-    bx  reg
-    nop
-    address
-
-    BX is needed for thumb interworking, without it it could take just two words with
-    ldr pc, [pc, #-4]
+    ldr reg,=address
+    br  reg
     address
   */
   int* inst_ptr;
@@ -173,20 +168,16 @@ void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
 
   inst_ptr = (int*) reloc_addr;
 
-  // ldr reg, [pc, #4]
-  inst = 0xe59f0000 | LINKAGE_TEMP_REG << 12 | 4;
+  // ldr reg, =address
+  inst = 0x58000000 | 2 << 5 | LINKAGE_TEMP_REG;
   *inst_ptr++ = inst;
 
-  // bx reg
-  inst = 0xe12fff10 | LINKAGE_TEMP_REG;
-  *inst_ptr++ = inst;
-
-  // nop aka mov r0, r0
-  inst = 0xe1a00000;
+  // br reg
+  inst = 0xD61F0000 | LINKAGE_TEMP_REG << 5;
   *inst_ptr++ = inst;
 
   // address
-  *inst_ptr++ = target_addr;
+  *(unsigned long *)inst_ptr++ = target_addr;
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
 }

@@ -263,6 +263,9 @@
     :sign-extend t
     :printer #'print-immediate)
 
+  (sb!disassem:define-arg-type unsigned-immediate
+    :printer #'print-immediate)
+
   (sb!disassem:define-arg-type logical-immediate
     :printer #'print-logical-immediate)
 
@@ -1165,7 +1168,7 @@
     (op :field (byte 2 29))
     (op2 :field (byte 6 23) :value #b100101)
     (shift :field (byte 2 21) :type 'wide-shift)
-    (imm :field (byte 16 5) :type 'immediate)
+    (imm :field (byte 16 5) :type 'unsigned-immediate)
     (rd :field (byte 5 0) :type 'reg))
 
 (defmacro process-null-sc (reg)
@@ -1399,13 +1402,15 @@
   `(inst madd ,rd ,rn ,rm zr-tn))
 
 (define-instruction smulh (segment rd rn rm)
-  (:printer data-processing-3 ((op31 #b010) (o0 0) (ra 31)))
+  (:printer data-processing-3 ((op31 #b010) (o0 0) (ra 31))
+            '(:name :tab rd  ", " rn ", " rm))
   (:emitter
    (emit-data-processing-3 segment +64-bit-size+ #b010 (tn-offset rm)
                            0 31 (tn-offset rn) (tn-offset rd))))
 
 (define-instruction umulh (segment rd rn rm)
-  (:printer data-processing-3 ((op31 #b110) (o0 0) (ra 31)))
+  (:printer data-processing-3 ((op31 #b110) (o0 0) (ra 31))
+            '(:name :tab rd  ", " rn ", " rm))
   (:emitter
    (emit-data-processing-3 segment +64-bit-size+ #b110 (tn-offset rm)
                            0 31 (tn-offset rn) (tn-offset rd))))
@@ -2431,4 +2436,3 @@
                          (ash index2 size)
                          (tn-offset rn)
                          (tn-offset rd)))))
-
