@@ -304,7 +304,16 @@
           (t
            (ecase (first spec)
              (satisfies
-              `(if (funcall (global-function ,(second spec)) ,object) t nil))
+              (let* ((name (second spec))
+                     (expansion (fun-name-inline-expansion name)))
+                ;; Lambda without lexenv can easily be handled here.
+                ;; This fixes the issue that LEGAL-FUN-NAME-P which is
+                ;; just a renaming of VALID-FUNCTION-NAME-P would not
+                ;; be inlined when testing the FUNCTION-NAME type.
+                `(if ,(if (typep expansion '(cons (eql lambda)))
+                          `(,expansion ,object)
+                          `(funcall (global-function ,name) ,object))
+                     t nil)))
              ((not and)
               (once-only ((n-obj object))
                 `(,(first spec) ,@(mapcar (lambda (x)

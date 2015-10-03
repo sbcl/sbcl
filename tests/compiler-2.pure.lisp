@@ -62,3 +62,13 @@
                     (byte (truly-the sb-kernel:byte-specifier bspec)))
                (sb-kernel:%dpb new (byte-size byte) (byte-position byte)
                                (old)))))))
+
+(with-test (:name :inline-satisfies-predicate)
+  ;; If we remove the indirections in these functions,
+  ;; this test should visibly break so that we can write a new test
+  ;; that asserts that inlining F works in (THE (SATISFIES F) obj).
+  (assert (equal (sb-ext:typexpand 'sb-impl::function-name)
+                 '(satisfies sb-int:legal-fun-name-p)))
+  (let ((f (compile nil '(lambda (x) (the sb-impl::function-name x)))))
+    (assert (equal (list (symbol-function 'sb-int:valid-function-name-p))
+                   (ctu:find-named-callees f)))))
