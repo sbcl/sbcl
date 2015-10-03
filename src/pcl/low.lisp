@@ -375,8 +375,3 @@ comparison.")
 
 (defun structure-slotd-init-form (slotd)
   (dsd-default slotd))
-
-(declaim (ftype function class-wrapper))
-(declaim (inline class-classoid))
-(defun class-classoid (class)
-  (layout-classoid (class-wrapper class)))

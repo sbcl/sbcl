@@ -320,6 +320,7 @@
  ;; needed by "compiler/vop"
  ("src/compiler/sset")
  ("src/code/xset") ; for representation of MEMBER type
+ ("src/pcl/early-low" :not-host)
  ("src/code/early-type")
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
@@ -362,7 +363,6 @@
  ;; around the compilation of "code/class". Why?
  ("src/code/class")
  ("src/pcl/pre-warm")
- ("src/pcl/early-low" :not-host)
  ("src/pcl/low" :not-host)
 
  ("src/code/early-condition")

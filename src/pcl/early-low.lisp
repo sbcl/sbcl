@@ -39,6 +39,10 @@
 ;;; so subsequently compiled code should refer to "SB-PCL", not "SB!PCL".
 (define-symbol-macro *pcl-package* (load-time-value (find-package "SB-PCL") t))
 
+(declaim (inline class-classoid))
+(defun class-classoid (class)
+  (layout-classoid (class-wrapper class)))
+
 (declaim (inline defstruct-classoid-p))
 (defun defstruct-classoid-p (classoid)
   ;; It is non-obvious to me why STRUCTURE-CLASSOID-P doesn't
