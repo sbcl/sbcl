@@ -181,6 +181,35 @@
        (member (%other-pointer-widetag x) choices)
        t))
 
+;;; Return the layout for an object. This is the basic operation for
+;;; finding out the "type" of an object, and is used for generic
+;;; function dispatch. The standard doesn't seem to say as much as it
+;;; should about what this returns for built-in objects. For example,
+;;; it seems that we must return NULL rather than LIST when X is NIL
+;;; so that GF's can specialize on NULL.
+(declaim (inline layout-of))
+#-sb-xc-host
+(defun layout-of (x)
+  (declare (optimize (speed 3) (safety 0)))
+  (cond ((%instancep x) (%instance-layout x))
+        ((funcallable-instance-p x) (%funcallable-instance-layout x))
+        ;; Compiler can dump literal layouts, which handily sidesteps
+        ;; the question of when cold-init runs L-T-V forms.
+        ((null x) #.(find-layout 'null))
+        (t
+         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
+         ;; improved - we've already ruled out some of the lowtags.
+         (svref (load-time-value sb!kernel::**built-in-class-codes** t)
+                (widetag-of x)))))
+
+(declaim (inline classoid-of))
+#-sb-xc-host
+(defun classoid-of (object)
+  #!+sb-doc
+  "Return the class of the supplied object, which may be any Lisp object, not
+   just a CLOS STANDARD-OBJECT."
+  (layout-classoid (layout-of object)))
+
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different
 ;;; goals than TYPE-OF. In particular, speed is more important than
@@ -201,17 +230,26 @@
      (if (>= object 0)
          '(integer #.(1+ sb!xc:most-positive-fixnum))
          'bignum))
-    (standard-char 'standard-char)
-    (base-char 'base-char)
-    (extended-char 'extended-char)
-    ((member t) 'boolean)
-    (keyword 'keyword)
+    (character
+     (typecase object
+       (standard-char 'standard-char)
+       (base-char 'base-char)
+       (extended-char 'extended-char)))
+    ;; We "have to" (or have chosen to) pick off KEYWORD and BOOLEAN,
+    ;; so we may as well have a branch that returns early for any SYMBOL
+    ;; rather than falling into the CLASSOID-based test. But then since we
+    ;; do that, we also have to pick off NIL so that it doesn't say SYMBOL.
+    (symbol
+     (cond ((eq object t) 'boolean)
+           ((eq object nil) sb!kernel::*null-type*)
+           ((eq (symbol-package object) *keyword-package*) 'keyword)
+           (t 'symbol)))
     ((or array complex #!+sb-simd-pack simd-pack)
      (let ((sb!kernel::*unparse-allow-negation* nil))
        (declare (special sb!kernel::*unparse-allow-negation*)) ; forward ref
        (type-specifier (ctype-of object))))
     (t
-     (let* ((classoid (layout-classoid (layout-of object)))
+     (let* ((classoid (classoid-of object))
             (name (classoid-name classoid)))
        (if (%instancep object)
            (case name

@@ -92,32 +92,6 @@
                 (sb!c::constant-function-call-p form nil nil)
               (values (not (null result)) ok)))))))))
 
-;;; Return the layout for an object. This is the basic operation for
-;;; finding out the "type" of an object, and is used for generic
-;;; function dispatch. The standard doesn't seem to say as much as it
-;;; should about what this returns for built-in objects. For example,
-;;; it seems that we must return NULL rather than LIST when X is NIL
-;;; so that GF's can specialize on NULL.
-#!-sb-fluid (declaim (inline layout-of))
-(defun layout-of (x)
-  (declare (optimize (speed 3) (safety 0)))
-  (cond ((%instancep x) (%instance-layout x))
-        ((funcallable-instance-p x) (%funcallable-instance-layout x))
-        ;; Compiler can dump literal layouts, which handily sidesteps
-        ;; the question of when cold-init runs L-T-V forms.
-        ((null x) #.(find-layout 'null))
-        (t
-         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
-         ;; improved - we've already ruled out some of the lowtags.
-         (svref (load-time-value **built-in-class-codes** t) (widetag-of x)))))
-
-#!-sb-fluid (declaim (inline classoid-of))
-(defun classoid-of (object)
-  #!+sb-doc
-  "Return the class of the supplied object, which may be any Lisp object, not
-   just a CLOS STANDARD-OBJECT."
-  (layout-classoid (layout-of object)))
-
 ;;;; miscellaneous interfaces
 
 ;;; Clear memoization of all type system operations that can be
