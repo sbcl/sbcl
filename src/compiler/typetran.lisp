@@ -310,7 +310,8 @@
                 ;; This fixes the issue that LEGAL-FUN-NAME-P which is
                 ;; just a renaming of VALID-FUNCTION-NAME-P would not
                 ;; be inlined when testing the FUNCTION-NAME type.
-                `(if ,(if (typep expansion '(cons (eql lambda)))
+                `(if ,(if (and (typep expansion '(cons (eql lambda)))
+                               (not (fun-lexically-notinline-p name)))
                           `(,expansion ,object)
                           `(funcall (global-function ,name) ,object))
                      t nil)))
