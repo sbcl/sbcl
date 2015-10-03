@@ -14,7 +14,10 @@
 
 ;; This comes early so that fndb can use PPRINT-DISPATCH-TABLE as
 ;; a type-specifier.
-(sb!xc:defstruct (pprint-dispatch-table (:copier nil))
+(sb!xc:defstruct (pprint-dispatch-table
+                  (:constructor make-pprint-dispatch-table (&optional entries))
+                  (:copier nil) ; needs a deep copy
+                  (:predicate nil))
   ;; A list of all the entries (except for CONS entries below) in highest
   ;; to lowest priority.
   (entries nil :type list)

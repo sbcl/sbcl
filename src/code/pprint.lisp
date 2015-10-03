@@ -22,7 +22,7 @@
   '(and fixnum unsigned-byte))
 ;;; The INDEX type is picked up from the kernel package.
 (deftype posn ()
-  'fixnum)
+  'fixnum) ; huh? was this supposed to be INDEX?
 
 (defconstant initial-buffer-size 128)
 
@@ -824,11 +824,13 @@ line break."
 
 ;;;; pprint-dispatch tables
 
-(defvar *initial-pprint-dispatch-table*)
+(defglobal *initial-pprint-dispatch-table* nil)
 
-(defstruct (pprint-dispatch-entry (:copier nil) (:predicate nil))
+(defstruct (pprint-dispatch-entry
+            (:constructor make-pprint-dispatch-entry (type priority fun test-fn))
+            (:copier nil) (:predicate nil))
   ;; the type specifier for this entry
-  (type (missing-arg) :type t :read-only t)
+  (type nil :type t :read-only t)
   ;; a function to test to see whether an object is of this type,
   ;; either (LAMBDA (OBJ) (TYPEP OBJECT TYPE)) or a builtin predicate.
   ;; We don't bother computing this for entries in the CONS
@@ -837,10 +839,9 @@ line break."
   ;; the priority for this guy
   (priority 0 :type real :read-only t)
   ;; T iff one of the original entries.
-  (initial-p (eq *initial-pprint-dispatch-table* nil)
-             :type (member t nil) :read-only t)
+  (initial-p (null *initial-pprint-dispatch-table*) :type boolean :read-only t)
   ;; and the associated function
-  (fun (missing-arg) :type callable :read-only t))
+  (fun nil :type callable :read-only t))
 (def!method print-object ((entry pprint-dispatch-entry) stream)
   (print-unreadable-object (entry stream :type t)
     (format stream "type=~S, priority=~S~@[ [initial]~]"
@@ -897,7 +898,7 @@ line break."
   (declare (type (or pprint-dispatch-table null) table))
   (let* ((orig (or table *initial-pprint-dispatch-table*))
          (new (make-pprint-dispatch-table
-               :entries (copy-list (pprint-dispatch-table-entries orig)))))
+               (copy-list (pprint-dispatch-table-entries orig)))))
     (replace/eql-hash-table (pprint-dispatch-table-cons-entries new)
                             (pprint-dispatch-table-cons-entries orig))
     new))
@@ -993,10 +994,9 @@ line break."
          (disabled-p (not (testable-type-p ctype)))
          (entry (if function
                     (make-pprint-dispatch-entry
-                     :type type
-                     :test-fn (unless (or consp disabled-p)
-                                (compute-test-fn ctype type function))
-                     :priority priority :fun function))))
+                     type priority function
+                     (unless (or consp disabled-p)
+                       (compute-test-fn ctype type function))))))
     (when (and function disabled-p)
       ;; a DISABLED-P test function has to close over the ENTRY
       (setf (pprint-dispatch-entry-test-fn entry) (defer-type-checker entry)))
@@ -1598,67 +1598,50 @@ line break."
   ;; it's used in WITH-STANDARD-IO-SYNTAX, and condition reportery
   ;; possibly performed in the following extent may use W-S-IO-SYNTAX.
   (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table))
-  (setf *initial-pprint-dispatch-table*  nil)
+  (setf *initial-pprint-dispatch-table* nil)
   (let ((*print-pprint-dispatch* (make-pprint-dispatch-table)))
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
-    (set-pprint-dispatch '(and array (not (or string bit-vector))) #'pprint-array)
+    (set-pprint-dispatch '(and array (not (or string bit-vector))) 'pprint-array)
     ;; MACRO-FUNCTION must have effectively higher priority than FBOUNDP.
     ;; The implementation happens to check identical priorities in the order added,
     ;; but that's unspecified behavior.  Both must be _strictly_ lower than the
     ;; default cons entries though.
     (set-pprint-dispatch '(cons (and symbol (satisfies macro-function)))
-                         #'pprint-macro-call -1)
+                         'pprint-macro-call -1)
     (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))
-                         #'pprint-fun-call -1)
+                         'pprint-fun-call -1)
     (set-pprint-dispatch '(cons symbol)
-                         #'pprint-data-list -2)
-    (set-pprint-dispatch 'cons #'pprint-fill -2)
-    (set-pprint-dispatch 'sb!impl::comma #'pprint-unquoting-comma -3)
+                         'pprint-data-list -2)
+    (set-pprint-dispatch 'cons 'pprint-fill -2)
+    (set-pprint-dispatch 'sb!impl::comma 'pprint-unquoting-comma -3)
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")
 
     (dolist (magic-form '((lambda pprint-lambda)
-                          (declare pprint-declare)
+                          ((declare declaim) pprint-declare)
 
                           ;; special forms
-                          (block pprint-block)
-                          (catch pprint-block)
-                          (eval-when pprint-block)
-                          (flet pprint-flet)
-                          (function pprint-quote)
+                          ((block catch return-from throw eval-when
+                            multiple-value-call multiple-value-prog1
+                            unwind-protect) pprint-block)
+                          ((flet labels macrolet dx-flet) pprint-flet)
+                          ((function quasiquote quote) pprint-quote)
                           (if pprint-if)
-                          (labels pprint-flet)
-                          ((let let*) pprint-let)
-                          (locally pprint-progn)
-                          (macrolet pprint-flet)
-                          (multiple-value-call pprint-block)
-                          (multiple-value-prog1 pprint-block)
-                          (progn pprint-progn)
+                          ((let let* symbol-macrolet dx-let) pprint-let)
+                          ((locally progn) pprint-progn)
                           (progv pprint-progv)
-                          ((quasiquote quote) pprint-quote)
-                          (return-from pprint-block)
                           ((setq psetq setf psetf) pprint-setq)
-                          (symbol-macrolet pprint-let)
                           (tagbody pprint-tagbody)
-                          (throw pprint-block)
-                          (unwind-protect pprint-block)
 
                           ;; macros
                           ((case ccase ecase) pprint-case)
                           ((ctypecase etypecase typecase) pprint-typecase)
-                          (declaim pprint-declare)
-                          (defconstant pprint-block)
-                          (define-modify-macro pprint-defun)
-                          (define-setf-expander pprint-defun)
-                          (defmacro pprint-defun)
+                          ((defconstant defparameter defstruct defvar)
+                           pprint-block)
+                          ((define-modify-macro define-setf-expander
+                           defmacro defsetf deftype defun) pprint-defun)
                           (defmethod pprint-defmethod)
                           (defpackage pprint-defpackage)
-                          (defparameter pprint-block)
-                          (defsetf pprint-defun)
-                          (defstruct pprint-block)
-                          (deftype pprint-defun)
-                          (defun pprint-defun)
-                          (defvar pprint-block)
                           (destructuring-bind pprint-destructuring-bind)
                           ((do do*) pprint-do)
                           ((do-all-symbols do-external-symbols do-symbols
@@ -1666,39 +1649,25 @@ line break."
                           #+nil (handler-bind ...)
                           #+nil (handler-case ...)
                           (loop pprint-loop)
-                          (multiple-value-bind pprint-prog2)
-                          (multiple-value-setq pprint-block)
-                          (pprint-logical-block pprint-block)
-                          (print-unreadable-object pprint-block)
+                          ((multiple-value-bind prog2) pprint-prog2)
+                          ((multiple-value-setq prog1 pprint-logical-block
+                            print-unreadable-object prog1) pprint-block)
                           ((prog prog*) pprint-prog)
-                          (prog1 pprint-block)
-                          (prog2 pprint-prog2)
                           #+nil (restart-bind ...)
                           #+nil (restart-case ...)
-                          (step pprint-progn)
-                          (time pprint-progn)
+                          ((step time) pprint-progn)
                           ((unless when) pprint-block)
-                          (with-compilation-unit pprint-block)
                           #+nil (with-condition-restarts ...)
-                          (with-hash-table-iterator pprint-block)
-                          (with-input-from-string pprint-block)
-                          (with-open-file pprint-block)
-                          (with-open-stream pprint-block)
-                          (with-output-to-string pprint-block)
-                          (with-package-iterator pprint-block)
-                          (with-simple-restart pprint-block)
-                          (with-standard-io-syntax pprint-progn)
-
-                          ;; sbcl specific
-                          (sb!int:dx-flet pprint-flet)
-                          ))
+                          ((with-compilation-unit with-simple-restart
+                            with-hash-table-iterator with-package-iterator
+                            with-input-from-string with-output-to-string
+                            with-open-file with-open-stream) pprint-block)
+                          (with-standard-io-syntax pprint-progn)))
 
       ;; Grouping some symbols together in the above list looks pretty.
       ;; The sharing of dispatch entries is inconsequential.
-      (set-pprint-dispatch (let ((thing (first magic-form)))
-                             `(cons (member
-                                     ,@(if (consp thing) thing (list thing)))))
-                           (symbol-function (second magic-form))))
+      (set-pprint-dispatch `(cons (member ,@(ensure-list (first magic-form))))
+                           (second magic-form)))
     (setf *initial-pprint-dispatch-table* *print-pprint-dispatch*))
 
   (setf *standard-pprint-dispatch-table*
