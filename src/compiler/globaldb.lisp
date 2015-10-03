@@ -568,13 +568,9 @@
 
 (define-info-type (:type :documentation) :type-spec (or string null))
 
-;;; Either a CTYPE which is the translation of this type name,
-;;; or a function that parses type specifiers into CTYPE structures.
-;;; The :BUILTIN property is mutually exclusive with a CTYPE stored here.
-;;; :BUILTIN could probably be eliminated, as it is redundant since we
-;;; can discern a :BUILTIN by its :KIND being :PRIMITIVE.
+;;; A function that parses type specifiers into CTYPE structures.
 (define-info-type (:type :translator)
-  :type-spec (or function ctype null)
+  :type-spec (or function null)
   ;; This error is never seen by a user. After meta-compile there is no
   ;; means to define additional types with custom translators.
   :validate-function (lambda (name new-value)
@@ -582,11 +578,7 @@
                        ;; on forward-referenced info-types.
                        #+sb-xc-host (declare (notinline info))
                        (when (and new-value (info :type :expander name))
-                         (bug "Type has an expander"))
-                       (when (and (not (functionp new-value))
-                                  new-value
-                                  (info :type :builtin name))
-                         (bug ":BUILTIN and :TRANSLATOR are incompatible"))))
+                         (bug "Type has an expander"))))
 
 ;;; The expander function for a defined type.
 ;;; It returns a type expression, not a CTYPE.

@@ -718,8 +718,6 @@
         (describe-deprecation 'type name stream)
         (describe-documentation name 'type stream (eq t fun))
         (unless (eq t fun)
-          ;; even though :translator can store a CTYPE, this is safe
-          ;; because a symbol can't have a non-FUNCTIONP translator.
           (describe-lambda-list (%fun-lambda-list fun) stream)
           (multiple-value-bind (expansion ok)
               (handler-case (typexpand-1 name)

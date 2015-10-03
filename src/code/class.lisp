@@ -571,18 +571,18 @@ between the ~A definition and the ~A definition"
 
           (remhash name table)
           (%note-type-defined name)
+          ;; FIXME: I'm unconvinced of the need to handle either of these.
+          ;; Package locks preclude the latter, and in the former case,
+          ;; once you've made some random thing into a :PRIMITIVE kind of type,
+          ;; you've painted yourself into a corner - those types
+          ;; elicit vociferous complaints if you try to redefine them.
+          ;;
           ;; we need to handle things like
           ;;   (setf (find-class 'foo) (find-class 'integer))
           ;; and
           ;;   (setf (find-class 'integer) (find-class 'integer))
-          (cond ((built-in-classoid-p new-value)
-                 (setf (info :type :kind name)
-                       (or (info :type :kind name) :defined))
-                 (let ((translation (built-in-classoid-translation new-value)))
-                   (when translation
-                     (setf (info :type :translator name) translation))))
-                (t
-                 (setf (info :type :kind name) :instance)))
+          (setf (info :type :kind name)
+                (if (built-in-classoid-p new-value) :primitive :instance))
           (setf (classoid-cell-classoid cell) new-value)
           (unless (eq (info :type :compiler-layout name)
                       (classoid-layout new-value))

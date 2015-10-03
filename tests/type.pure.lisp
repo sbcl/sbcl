@@ -630,3 +630,12 @@
                (assert err))))
       (expect-lose `(,classoid))
       (expect-lose `(,classoid 1 100)))))
+
+(test-util:with-test (:name :classoid-type-kind)
+  (do-all-symbols (s)
+    (let ((c (sb-kernel:find-classoid s nil)))
+      ;; No classoid can have a :TYPE :KIND that is :DEFINED.
+      (when c
+        (if (typep c 'sb-kernel:built-in-classoid)
+            (assert (eq (sb-int:info :type :kind s) :primitive))
+            (assert (eq (sb-int:info :type :kind s) :instance)))))))
