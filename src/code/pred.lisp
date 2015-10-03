@@ -241,7 +241,7 @@
     ;; do that, we also have to pick off NIL so that it doesn't say SYMBOL.
     (symbol
      (cond ((eq object t) 'boolean)
-           ((eq object nil) sb!kernel::*null-type*)
+           ((eq object nil) (specifier-type 'null))
            ((eq (symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
     ((or array complex #!+sb-simd-pack simd-pack)
