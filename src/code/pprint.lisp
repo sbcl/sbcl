@@ -1432,27 +1432,17 @@ line break."
   (declare (ignore noise))
   (pprint-fill stream list))
 
-;;; Returns an Emacs-style indent spec: an integer N, meaning indent
-;;; the first N arguments specially then indent any further arguments
-;;; like a body.
+;;; Return the number of positional arguments that macro NAME accepts
+;;; by looking for &BODY. A dotted list is indented as it it had &BODY.
+;;; ANSI says that a dotted tail is like &REST, but the pretty-printer
+;;; can do whatever it likes anyway. I happen to think this makes sense.
 (defun macro-indentation (name)
-  (labels ((clean-arglist (arglist)
-             ;; FIXME: for purposes of introspection, we should never "leak"
-             ;; that a macro uses an &AUX variable, that it takes &WHOLE,
-             ;; or that it cares about its lexenv (though that's debatable).
-             ;; Certainly the first two aspects are not part of the macro's
-             ;; interface, and as such, should not be stored at all.
-             "Remove &whole, &enviroment, and &aux elements from ARGLIST."
-             (cond ((null arglist) '())
-                   ((member (car arglist) '(&whole &environment))
-                    (clean-arglist (cddr arglist)))
-                   ((eq (car arglist) '&aux)
-                    '())
-                   (t (cons (car arglist) (clean-arglist (cdr arglist)))))))
-    (let ((arglist (%fun-lambda-list (macro-function name))))
-      (if (proper-list-p arglist)       ; guard against dotted arglists
-          (position '&body (remove '&optional (clean-arglist arglist)))
-          nil))))
+  (do ((n 0)
+       (list (%fun-lambda-list (macro-function name)) (cdr list)))
+      ((or (atom list) (eq (car list) '&body))
+       (if (null list) nil n))
+    (unless (eq (car list) '&optional)
+      (incf n))))
 
 ;;; Pretty-Print macros by looking where &BODY appears in a macro's
 ;;; lambda-list.

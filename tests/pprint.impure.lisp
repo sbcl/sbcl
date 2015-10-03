@@ -420,4 +420,18 @@
   ;; or crash, depending on what lay at 4 words past the function address.
   (assert (= (sb-pretty::macro-indentation 'macdaddy) 2)))
 
+(defmacro try1 (a b &body fool) `(baz ,a ,b ,fool))
+(defmacro try2 (a b &optional &body fool) `(baz ,a ,b ,fool))
+(defmacro try3 (a b &optional c &body fool) `(baz ,a ,b ,c ,fool))
+(defmacro try4 (a b . fool) `(baz ,a ,b ,fool))
+(defmacro try5 (a b &optional . fool) `(baz ,a ,b ,fool))
+(defmacro try6 (a b &optional c . fool) `(baz ,a ,b ,c ,fool))
+(with-test (:name :macro-indentation)
+  (assert (= (sb-pretty::macro-indentation 'try1) 2))
+  (assert (= (sb-pretty::macro-indentation 'try2) 2))
+  (assert (= (sb-pretty::macro-indentation 'try3) 3))
+  (assert (= (sb-pretty::macro-indentation 'try4) 2))
+  (assert (= (sb-pretty::macro-indentation 'try5) 2))
+  (assert (= (sb-pretty::macro-indentation 'try6) 3)))
+
 ;;; success
