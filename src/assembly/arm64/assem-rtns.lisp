@@ -61,7 +61,7 @@
   (move r2 null-tn)
   DEFAULT-R3-AND-ON
   (move r3 null-tn)
-  
+
   DONE
 
   ;; Deallocate the unused stack space.

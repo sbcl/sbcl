@@ -84,7 +84,7 @@
              ;; the new CFP, then pushing another value on CSP, but it
              ;; works for this situation.
              (inst compute-lra lip lip lra-label)
-             
+
              (inst add csp-tn csp-tn 16)
              (inst str cfp-tn (@ csp-tn -16))
              (inst str lip (@ csp-tn -8))

@@ -285,7 +285,7 @@
                       ((= i register-arg-count) val))
                   (tn-ref-across val)))
             ((null val))
-          (assemble () 
+          (assemble ()
             ;; ... Load it if there is a stack value available, or
             ;; default it if there isn't.
             (inst subs values-on-stack values-on-stack (fixnumize 1))
@@ -875,7 +875,7 @@
                       :from (:argument ,(if (eq return :tail) 0 1))
                       :to :eval)
                  ,(if named 'name-pass 'lexenv))
-     
+
      ,@(and (not named)
             '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
                function)))
@@ -1022,7 +1022,7 @@
                 `(inst add lip function
                        (- (ash simple-fun-code-offset word-shift)
                           fun-pointer-lowtag)))
-           
+
            (note-this-location vop :call-site)
            (inst br lip))
 

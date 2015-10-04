@@ -37,7 +37,7 @@
 
     ;; Now, we have our result for an immediate type, but we might
     ;; have a pointer object instead, in which case we need to do more
-    ;; work.  Check for a pointer type, set two low-bits. 
+    ;; work.  Check for a pointer type, set two low-bits.
 
     (inst tst object #b10)
     (inst b :eq done)
@@ -227,7 +227,7 @@
     ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
     (loadw res res cons-car-slot list-pointer-lowtag)
     (inst tst res fixnum-tag-mask)
-    (inst csel :eq res null-tn res)))
+    (inst csel res null-tn res :eq)))
 
 ;;;; other miscellaneous VOPs
 
