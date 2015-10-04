@@ -252,8 +252,7 @@
   (:temporary (:sc descriptor-reg :offset nargs-offset) nargs)
   (:vop-var vop)
   (:generator 22
-    (let ((uwp-label (gen-label))
-          (entry-label (gen-label)))
+    (let ((entry-label (gen-label)))
       ;; Store the function into a non-stack location, since we'll be
       ;; unwinding the stack and destroying register contents before we
       ;; use it.  It turns out that R8 is preserved as part of the
@@ -278,10 +277,7 @@
       (storew temp block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
-      (assemble (*elsewhere* vop)
-        (emit-label uwp-label)
-        (inst dword (make-fixup 'unwind :assembly-routine)))
-      (inst load-from-label tmp-tn uwp-label)
+      (load-fixup tmp-tn (make-fixup 'unwind :assembly-routine) lip)
       (inst br tmp-tn)
 
       (emit-label ENTRY-LABEL)

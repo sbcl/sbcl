@@ -12,21 +12,17 @@
 (in-package "SB!VM")
 
 (defun generate-call-sequence (name style vop options)
-  (declare (ignore options))
+  (declare (ignore options vop))
   (ecase style
     ((:none :raw)
-     (let ((fixup-address (make-symbol "FIXUP-ADDRESS")))
-       (values
-        `((let ((,fixup-address (gen-label)))
-            ,@(if (eq style :none)
-                  `((inst load-from-label tmp-tn ,fixup-address)
-                    (inst br tmp-tn))
-                  `((inst load-from-label lr-tn ,fixup-address)
-                    (inst blr lr-tn)))
-            (assemble (*elsewhere* ,vop)
-              (emit-label ,fixup-address)
-              (inst dword (make-fixup ',name :assembly-routine)))))
-        nil)))
+     (values
+      `((progn
+          ,@(if (eq style :none)
+                `((load-fixup tmp-tn (make-fixup ',name :assembly-routine))
+                  (inst br tmp-tn))
+                `((load-fixup lr-tn (make-fixup ',name :assembly-routine))
+                  (inst blr lr-tn)))))
+      nil))
     #+(or)
     (:full-call
      (let ((temp (make-symbol "TEMP"))

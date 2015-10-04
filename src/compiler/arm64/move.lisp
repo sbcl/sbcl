@@ -239,12 +239,13 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
     (inst adds y x x)
     (inst b :vc DONE)
-    (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
+    (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset) :lip lip)
       (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
 (define-move-vop move-from-signed :move
@@ -258,6 +259,7 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)
@@ -268,7 +270,7 @@
     (inst b :eq DONE)
 
     (with-fixed-allocation
-        (y pa-flag bignum-widetag (+ 2 bignum-digits-offset))
+        (y pa-flag bignum-widetag (+ 2 bignum-digits-offset) :lip lip)
       ;; WITH-FIXED-ALLOCATION, when using a supplied type-code,
       ;; leaves PA-FLAG containing the computed header value.  In our
       ;; case, configured for a 2-word bignum.  If the sign bit in the

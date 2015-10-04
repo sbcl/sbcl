@@ -56,15 +56,18 @@
 
 ;;;; disassembler field definitions
 
+(defun current-instruction (dstate)
+  (sb!disassem::sap-ref-int
+   (sb!disassem:dstate-segment-sap dstate)
+   (sb!disassem:dstate-cur-offs dstate)
+   n-word-bytes
+   (sb!disassem::dstate-byte-order dstate)))
+
 (defun maybe-add-notes (dstate)
-  (let* ((inst (sb!disassem::sap-ref-int
-                (sb!disassem:dstate-segment-sap dstate)
-                (sb!disassem:dstate-cur-offs dstate)
-                n-word-bytes
-                (sb!disassem::dstate-byte-order dstate)))
+  (let* ((inst (current-instruction dstate))
          (op (ldb (byte 8 20) inst))
          (offset (ldb (byte 12 0) inst))
-         (rn (ldb (byte 4 16) inst)))
+         (rn (ldb (byte 5 5) inst)))
     (cond ((and (= rn null-offset))
            (let ((offset (+ nil-value offset)))
              (case op
@@ -89,12 +92,7 @@
                 ;;                (sb!disassem::dstate-byte-order dstate))))
                 ;;    (sb!disassem:maybe-note-assembler-routine value nil dstate)))
                 )))))))
-(defun current-instruction (dstate)
-  (sb!disassem::sap-ref-int
-   (sb!disassem:dstate-segment-sap dstate)
-   (sb!disassem:dstate-cur-offs dstate)
-   n-word-bytes
-   (sb!disassem::dstate-byte-order dstate)))
+
 
 (defun 32-bit-register-p (dstate)
   (not (logbitp 31 (current-instruction dstate))))
@@ -134,7 +132,7 @@
                             (= rn nsp-offset)))
                    "LSL"
                    (ecase kind
-                     (#b00 "UXTB")
+                     (#b000 "UXTB")
                      (#b001 "UXTH")
                      (#b010 "UXTW")
                      (#b011 "UXTX")
@@ -701,7 +699,7 @@
      :include add-sub)
     (op2 :field (byte 5 24) :value #b10001)
     (shift :field (byte 2 22) :type '2-bit-shift)
-    (imm :field (byte 12 10) :type 'immediate))
+    (imm :field (byte 12 10) :type 'unsigned-immediate))
 
 (sb!disassem:define-instruction-format
     (adds-subs-imm 32
@@ -2239,6 +2237,7 @@
         ;; Calculate the address of the code component.
         (let ((offset (- (+ (label-position object-label) other-pointer-lowtag)
                          position)))
+          ;; ADR
           (emit-pc-relative segment 0
                             (ldb (byte 2 0) offset)
                             (ldb (byte 19 2) offset)
@@ -2251,66 +2250,47 @@
         ;; subtract from LIP
         (inst sub code lip (lsl temp word-shift)))))))
 
-;;; Compute the address of a nearby LRA object by dead reckoning from
-;;; the location of the current instruction.
 (define-instruction compute-lra (segment dest lip lra-label)
   (:vop-var vop)
   (:emitter
-   ;; We can compute the LRA in a single instruction if the overall
-   ;; offset puts it to within an 8-bit displacement.  Otherwise, we
-   ;; need to load it by parts into LIP until we're down to an 8-bit
-   ;; displacement, and load the final 8 bits into DEST.  We may
-   ;; safely presume that an overall displacement may be up to 24 bits
-   ;; wide (the PPC backend has special provision for branches over 15
-   ;; bits, which implies that segments can become large, but a 16
-   ;; megabyte segment (24 bits of displacement) is ridiculous), so we
-   ;; need to cover a range of up to three octets of displacement.
    (labels ((compute-delta (position &optional magic-value)
               (- (+ (label-position lra-label
                                     (when magic-value position)
                                     magic-value)
                     other-pointer-lowtag)
                  position))
-
-            (three-instruction-emitter (segment position)
-              (declare (ignore segment position))
-              (error "write compute-lra three-instruction-emitter"))
-
-            (two-instruction-emitter (segment position)
-              (declare (ignore segment position))
-              (error "write compute-lra three-instruction-emitter"))
-
+            (multi-instruction-emitter (segment position)
+              (when (minusp position)
+                (error "Implement negative offsets in compute-lra"))
+              (let* ((delta (compute-delta position))
+                     (low (ldb (byte 19 0) delta))
+                     (high (ldb (byte 45 19) delta)))
+                ;; ADR
+                (emit-pc-relative segment 0
+                                  (ldb (byte 2 0) low)
+                                  (ldb (byte 19 2) low)
+                                  (tn-offset lip))
+                (assemble (segment vop)
+                  (inst movz tmp-tn high 16)
+                  (inst add dest lip (lsl tmp-tn 3)))))
             (one-instruction-emitter (segment position)
               (let ((delta (compute-delta position)))
+                ;; ADR
                 (emit-pc-relative segment 0
                                   (ldb (byte 2 0) delta)
                                   (ldb (byte 19 2) delta)
                                   (tn-offset dest))))
-
-            (two-instruction-maybe-shrink (segment posn magic-value)
-              (let ((delta (compute-delta posn magic-value)))
-                (when (typep delta '(signed-byte 19))
-                  (emit-back-patch segment 4
-                                   #'one-instruction-emitter)
-                  t)))
-
-            (three-instruction-maybe-shrink (segment posn magic-value)
-              (let ((delta (compute-delta posn magic-value)))
-                (when (<= (integer-length delta) 16)
-                  (emit-chooser segment 8 2
-                                #'two-instruction-maybe-shrink
-                                #'two-instruction-emitter)
-                  t))))
+            (multi-instruction-maybe-shrink (segment posn magic-value)
+              (when (typep (compute-delta posn magic-value) '(signed-byte 19))
+                (emit-back-patch segment 4
+                                 #'one-instruction-emitter)
+                t)))
      (emit-chooser
-      ;; We need to emit up to three instructions, which is 12 octets.
-      ;; This preserves a mere two bits of alignment.
       segment 12 2
-      #'three-instruction-maybe-shrink
-      #'three-instruction-emitter))))
+      #'multi-instruction-maybe-shrink
+      #'multi-instruction-emitter))))
 
-;;; Load a register from a "nearby" LABEL by dead reckoning from the
-;;; location of the current instruction.
-(define-instruction load-from-label (segment dest label)
+(define-instruction load-from-label (segment dest label &optional lip)
   (:vop-var vop)
   (:emitter
    (labels ((compute-delta (position &optional magic-value)
@@ -2318,27 +2298,37 @@
                                  (when magic-value position)
                                  magic-value)
                  position))
-            (two-instruction-emitter (segment position)
-              (declare (ignore segment position))
-              (error "implement two instruction load-from-label"))
+            (multi-instruction-emitter (segment position)
+              (when (minusp position)
+                (error "Implement negative offsets in load-from-label"))
+              (let* ((delta (compute-delta position))
+                     (low (ldb (byte 19 0) delta))
+                     (high (ldb (byte 45 19) delta)))
+                ;; ADR
+                (emit-pc-relative segment 0
+                                  (ldb (byte 2 0) low)
+                                  (ldb (byte 19 2) low)
+                                  (tn-offset lip))
+                (assemble (segment vop)
+                  (inst movz tmp-tn high 16)
+                  (inst ldr dest (@ lip (extend tmp-tn :lsl 3))))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
                                 #b01 0
                                 (ash (compute-delta position) -2)
                                 (tn-offset dest)))
-            (two-instruction-maybe-shrink (segment posn magic-value)
+            (multi-instruction-maybe-shrink (segment posn magic-value)
               (let ((delta (compute-delta posn magic-value)))
                 (when (typep delta '(signed-byte 19))
                   (emit-back-patch segment 4
                                    #'one-instruction-emitter)
                   t))))
-     (emit-chooser
-      ;; We need to emit up to two instructions, which is 8 octets,
-      ;; but might wish to emit only one.  This preserves a mere two
-      ;; bits of alignment.
-      segment 8 2
-      #'two-instruction-maybe-shrink
-      #'two-instruction-emitter))))
+     (if lip
+         (emit-chooser
+          segment 12 2
+          #'multi-instruction-maybe-shrink
+          #'multi-instruction-emitter)
+         (emit-back-patch segment 4 #'one-instruction-emitter)))))
 
 ;;; SIMD
 (def-emitter simd-three-diff

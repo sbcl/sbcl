@@ -172,9 +172,8 @@
 (define-vop (xep-setup-sp)
   (:vop-var vop)
   (:generator 1
-    (composite-immediate-instruction
-       add csp-tn cfp-tn
-       (* n-word-bytes (sb-allocated-size 'control-stack)))
+    (inst add csp-tn cfp-tn
+          (add-sub-immediate (* n-word-bytes (sb-allocated-size 'control-stack))))
     (let ((nfp-tn (current-nfp-tn vop)))
       (when nfp-tn
         (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
@@ -503,6 +502,7 @@
   (:temporary (:scs (descriptor-reg) :from :eval) temp)
   (:temporary (:scs (any-reg) :from :eval) dst)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
@@ -525,7 +525,8 @@
                           temp))))
         (allocation dst size list-pointer-lowtag
                     :flag-tn pa-flag
-                    :stack-allocate-p dx-p))
+                    :stack-allocate-p dx-p
+                    :lip lip))
       (move result dst)
 
       (inst b ENTER)
@@ -1061,6 +1062,7 @@
    (lra-arg :scs (descriptor-reg) :load-if nil))
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:argument 1)) lexenv)
+  (:temporary (:scs (interior-reg)) lip)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 75
@@ -1073,12 +1075,9 @@
         (inst add cur-nfp cur-nfp (add-sub-immediate
                                    (bytes-needed-for-non-descriptor-stack-frame)))
         (inst mov-sp nsp-tn cur-nfp)))
-    (let ((fixup-lab (gen-label)))
-      (assemble (*elsewhere*)
-        (emit-label fixup-lab)
-        (inst dword (make-fixup 'tail-call-variable :assembly-routine)))
-      (inst load-from-label tmp-tn fixup-lab)
-      (inst br tmp-tn))))
+    (load-fixup tmp-tn (make-fixup 'tail-call-variable :assembly-routine)
+                lip)
+    (inst br tmp-tn)))
 
 ;;;; Unknown values return:
 
@@ -1201,10 +1200,8 @@
     (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
-    (inst load-from-label tmp-tn fixup)
-    (inst br tmp-tn)
-    FIXUP
-    (inst dword (make-fixup 'return-multiple :assembly-routine))))
+    (load-fixup tmp-tn (make-fixup 'return-multiple :assembly-routine) lip)
+    (inst br tmp-tn)))
 
 ;;; Single-stepping
 

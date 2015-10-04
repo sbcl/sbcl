@@ -199,13 +199,17 @@
     (inst dword (make-fixup "alloc_tramp" :foreign))))
 
 (defmacro allocation (result-tn size lowtag &key flag-tn
-                                                 stack-allocate-p)
+                                                 stack-allocate-p
+                                                 (lip (if stack-allocate-p
+                                                          nil
+                                                          (missing-arg))))
   ;; Normal allocation to the heap.
   (once-only ((result-tn result-tn)
               (size size)
               (lowtag lowtag)
               (flag-tn flag-tn)
-              (stack-allocate-p stack-allocate-p))
+              (stack-allocate-p stack-allocate-p)
+              (lip lip))
     `(cond (,stack-allocate-p
             (assemble ()
               (move ,result-tn csp-tn)
@@ -238,7 +242,7 @@
               (inst add ,result-tn ,result-tn (add-sub-immediate ,size))
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
-              (inst load-from-label ,flag-tn FIXUP)
+              (inst load-from-label ,flag-tn FIXUP ,lip)
               (storew ,result-tn ,flag-tn)
 
               (inst sub ,result-tn ,result-tn (add-sub-immediate ,size))
@@ -255,7 +259,8 @@
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
-                                                 stack-allocate-p)
+                                                 stack-allocate-p
+                                                 (lip (missing-arg)))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -263,11 +268,14 @@
   by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
   initializes the object."
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
-              (type-code type-code) (size size) (lowtag lowtag))
+              (type-code type-code) (size size) (lowtag lowtag)
+              (stack-allocate-p stack-allocate-p)
+              (lip lip))
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
                    :flag-tn ,flag-tn
-                   :stack-allocate-p ,stack-allocate-p)
+                   :stack-allocate-p ,stack-allocate-p
+                   :lip ,lip)
        (when ,type-code
          (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
          (inst add ,flag-tn ,flag-tn ,type-code)
@@ -440,3 +448,10 @@ garbage collection.  This is currently implemented by disabling GC"
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
      (declare (truly-dynamic-extent *pinned-objects*))
      ,@body))
+
+(defun load-fixup (dst fixup &optional lip)
+  (let ((label (gen-label)))
+    (assemble (*elsewhere*)
+      (emit-label label)
+      (inst dword fixup))
+    (inst load-from-label dst label lip)))

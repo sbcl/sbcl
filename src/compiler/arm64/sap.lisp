@@ -30,10 +30,11 @@
 (define-vop (move-from-sap)
   (:args (sap :scs (sap-reg) :to :save))
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (res :scs (descriptor-reg)))
   (:note "SAP to pointer coercion")
   (:generator 20
-    (with-fixed-allocation (res pa-flag sap-widetag sap-size)
+    (with-fixed-allocation (res pa-flag sap-widetag sap-size :lip lip)
       (storew sap res sap-pointer-slot other-pointer-lowtag))))
 
 (define-move-vop move-from-sap :move

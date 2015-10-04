@@ -18,6 +18,7 @@
   (:temporary (:scs (descriptor-reg) :type list :to (:result 0) :target result)
               res)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:info num)
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
@@ -43,7 +44,8 @@
                (pseudo-atomic (pa-flag)
                  (allocation res alloc list-pointer-lowtag
                              :flag-tn pa-flag
-                             :stack-allocate-p (node-stack-allocate-p node))
+                             :stack-allocate-p (node-stack-allocate-p node)
+                             :lip lip)
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (storew (maybe-load (tn-ref-tn things)) ptr
@@ -78,6 +80,7 @@
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
   (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:generator 100
     (inst add boxed boxed-arg (fixnumize (1+ code-constants-offset)))
     (inst and boxed boxed (bic-mask lowtag-mask))
@@ -88,7 +91,7 @@
     (inst orr ndescr ndescr code-header-widetag)
     (inst add size boxed unboxed)
     (pseudo-atomic (pa-flag)
-      (allocation result size other-pointer-lowtag :flag-tn pa-flag)
+      (allocation result size other-pointer-lowtag :flag-tn pa-flag :lip lip)
       (storew ndescr result 0 other-pointer-lowtag)
       (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
       (storew null-tn result code-entry-points-slot other-pointer-lowtag)
@@ -98,24 +101,23 @@
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg) :from :argument))
   (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
-    (let ((undefined-tramp-fixup (gen-label)))
-      (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size)
-        (inst load-from-label temp undefined-tramp-fixup)
-        (storew name result fdefn-name-slot other-pointer-lowtag)
-        (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
-        (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))
-      (assemble (*elsewhere*)
-        (emit-label undefined-tramp-fixup)
-        (inst dword (make-fixup "undefined_tramp" :foreign))))))
+    (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size :lip lip)
+      (load-fixup temp (make-fixup "undefined_tramp" :foreign)
+                       lip)
+      (storew name result fdefn-name-slot other-pointer-lowtag)
+      (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
+      (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (let* ((size (+ length closure-info-offset))
@@ -124,7 +126,8 @@
         (allocation result alloc-size
                     fun-pointer-lowtag
                     :flag-tn pa-flag
-                    :stack-allocate-p stack-allocate-p)
+                    :stack-allocate-p stack-allocate-p
+                    :lip lip)
         (load-immediate-word pa-flag
                              (logior
                               (ash (1- size) n-widetag-bits)
@@ -137,11 +140,13 @@
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation (result pa-flag value-cell-header-widetag
-                            value-cell-size :stack-allocate-p stack-allocate-p)
+                            value-cell-size :stack-allocate-p stack-allocate-p
+                            :lip lip)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.
@@ -154,13 +159,11 @@
 
 (define-vop (make-funcallable-instance-tramp)
   (:args)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (let ((fixup (gen-label)))
-      (inst load-from-label result fixup)
-      (assemble (*elsewhere*)
-        (emit-label fixup)
-        (inst dword (make-fixup "funcallable_instance_tramp" :foreign))))))
+    (load-fixup result (make-fixup "funcallable_instance_tramp" :foreign)
+                lip)))
 
 (define-vop (fixed-alloc)
   (:args)
@@ -168,10 +171,12 @@
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:generator 4
     (with-fixed-allocation (result pa-flag type words
                             :lowtag lowtag
-                            :stack-allocate-p stack-allocate-p))))
+                            :stack-allocate-p stack-allocate-p
+                            :lip lip))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -182,6 +187,7 @@
   (:temporary (:scs (any-reg) :from :argument) bytes)
   (:temporary (:scs (non-descriptor-reg)) header)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
@@ -195,5 +201,5 @@
     (inst and bytes bytes (bic-mask lowtag-mask))
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :flag-tn pa-flag)
+      (allocation result bytes lowtag :flag-tn pa-flag :lip lip)
       (storew header result 0 lowtag))))
