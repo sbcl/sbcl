@@ -673,8 +673,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
             SymbolValue(CONTROL_STACK_POINTER, th);
 #elif defined (LISP_FEATURE_ARM64)
     access_control_frame_pointer(th) =
-        (lispobj *)(uword_t)
-        (*os_context_register_addr(context, reg_CSP));
+        (lispobj *)(uword_t) (*os_context_register_addr(context, reg_CSP));
 #endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */
@@ -685,7 +684,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
     }
 
-    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 8;
+    access_control_stack_pointer(th) = access_control_frame_pointer(th) + N_WORD_BYTES * 2;
 
     access_control_frame_pointer(th)[0] = oldcont;
     access_control_frame_pointer(th)[1] = NIL;
@@ -1386,7 +1385,8 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
         || (signal == SIGEMT)
 #endif
         )
-        corruption_warning_and_maybe_lose("Signal %d received", signal);
+        corruption_warning_and_maybe_lose("Signal %d received (PC: %p)", signal,
+                                          *os_context_pc_addr(context));
 #endif
     interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;

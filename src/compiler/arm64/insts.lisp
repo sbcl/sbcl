@@ -157,7 +157,7 @@
                  (#b111 "SXTX"))
                stream))
       (when (plusp amount)
-        (format stream  " #~d" amount))))
+        (princ " #3" stream))))
 
   (defun print-immediate (value stream dstate)
     (declare (ignore dstate))
