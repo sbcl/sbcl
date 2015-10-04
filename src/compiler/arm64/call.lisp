@@ -414,8 +414,8 @@
       (assemble ()
         ;; Compute the end of the fixed stack frame (start of the MORE
         ;; arg area) into RESULT.
-        (composite-immediate-instruction
-         add result cfp-tn (* n-word-bytes (sb-allocated-size 'control-stack)))
+        (inst add result cfp-tn (add-sub-immediate
+                                 (* n-word-bytes (sb-allocated-size 'control-stack))))
         ;; Compute the end of the MORE arg area (and our overall frame
         ;; allocation) into the stack pointer.
         (cond ((zerop fixed)
@@ -483,8 +483,7 @@
         ;; number stack frame.
         (let ((nfp-tn (current-nfp-tn vop)))
           (when nfp-tn
-            (composite-immediate-instruction
-             sub nfp-tn nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
+            (inst sub nfp-tn nsp-tn (add-sub-immediate (bytes-needed-for-non-descriptor-stack-frame)))
             (inst mov-sp nsp-tn nfp-tn)))))))
 
 ;;; More args are stored consecutively on the stack, starting
@@ -579,31 +578,29 @@
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
-  (:temporary (:sc unsigned-reg :offset nl2-offset) temp)
   (:info min max)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
            (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (flet ((maybe-load-immediate (x)
-               (let ((x (fixnumize x)))
-                (cond ((encodable-immediate x)
-                       x)
-                      (t
-                       (load-immediate-word temp x)
-                       temp)))))
-       (cond ((not min)
-              (inst cmp nargs (maybe-load-immediate max))
-              (inst b :ne err-lab))
+      (flet ((load-immediate (x)
+               (add-sub-immediate (fixnumize x))))
+        (cond ((eql max 0)
+               (inst cbnz nargs err-lab))
+              ((not min)
+               (inst cmp nargs (load-immediate max))
+               (inst b :ne err-lab))
              (max
               (when (plusp min)
-                (inst cmp nargs (maybe-load-immediate min))
+                (inst cmp nargs (load-immediate min))
                 (inst b :lo err-lab))
-              (inst cmp nargs (maybe-load-immediate max))
+              (inst cmp nargs (load-immediate max))
               (inst b :hi err-lab))
+             ((eql min 1)
+              (inst cbz nargs err-lab))
              ((plusp min)
-              (inst cmp nargs (maybe-load-immediate min))
+              (inst cmp nargs (load-immediate min))
               (inst b :lo err-lab)))))))
 
 ;;; Signal various errors.
