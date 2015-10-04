@@ -362,14 +362,6 @@
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
 
-(defmacro with-condition-defaulted ((argvar arglist) &body body)
-  (let ((internal-emitter (gensym)))
-    `(flet ((,internal-emitter ,arglist
-              ,@body))
-       (if (assoc (car ,argvar) *conditions*)
-           (apply #',internal-emitter ,argvar)
-           (apply #',internal-emitter :al ,argvar)))))
-
 (define-instruction byte (segment byte)
   (:emitter
    (emit-byte segment byte)))
@@ -471,35 +463,6 @@
 (define-condition cannot-encode-immediate-operand (error)
   ((value :initarg :value)))
 
-(defun encodable-immediate (operand)
-  ;; 32-bit immediate data is encoded as an 8-bit immediate data value
-  ;; and a 4-bit immediate shift count.  The actual value is the
-  ;; immediate data rotated right by a number of bits equal to twice
-  ;; the shift count.  Note that this means that there are a limited
-  ;; number of valid immediate integers and that some integers have
-  ;; multiple possible encodings.  In the case of multiple encodings,
-  ;; the correct one to use is the one with the lowest shift count.
-  ;;
-  ;; XXX: Is it possible to determine the correct encoding in constant
-  ;; time, rather than time proportional to the final shift count?  Is
-  ;; it possible to determine if a given integer is valid without
-  ;; attempting to encode it?  Are such solutions cheaper (either time
-  ;; or spacewise) than simply attempting to encode it?
-  (labels ((try-immediate-encoding (value shift)
-             (unless (<= 0 shift 15)
-               (return-from encodable-immediate))
-             (if (typep value '(unsigned-byte 8))
-                 (dpb shift (byte 4 8) value)
-                 (try-immediate-encoding (dpb value (byte 30 2)
-                                              (ldb (byte 2 30) value))
-                                         (1+ shift)))))
-    (try-immediate-encoding operand 0)))
-
-(defun encode-shifter-immediate (operand)
-  (or
-   (encodable-immediate operand)
-   (error 'cannot-encode-immediate-operand :value operand)))
-
 (defun encode-shifted-register (operand)
   (etypecase operand
     (tn
@@ -508,57 +471,6 @@
      (values (shifter-operand-function-code operand)
              (shifter-operand-operand operand)
              (tn-offset (shifter-operand-register operand))))))
-
-(defmacro composite-immediate-instruction (op r x y &key fixnumize neg-op invert-y invert-r single-op-op first-op first-no-source)
-  ;; Successively applies 8-bit wide chunks of Y to X using OP storing the result in R.
-  ;;
-  ;; If FIXNUMIZE is true, Y is fixnumized before being used.
-  ;; If NEG-OP is given and Y is negative, NEG-OP is used instead of OP.
-  ;; If INVERT-Y is given LOGNOT is applied to Y before it being used (but after possibly
-  ;; being fixnumized.
-  ;; If INVERT-R is given R is bit wise inverted at the end.
-  ;; If SINGLE-OP-OP is given and (possibly fixnumized) Y fits into a single ARM immediate
-  ;; it is used for a single operation instead of OP.
-  ;; If FIRST-OP is given, it is used in the first iteration instead of OP.
-  ;; If FIRST-NO-SOURCE is given, there will be ne source register (X) in the first iteration.
-  (let ((bytespec (gensym "bytespec"))
-        (value (gensym "value"))
-        (transformed (gensym "transformed")))
-    (labels ((instruction (source-reg op neg-op &optional no-source)
-               `(,@(if neg-op
-                        `((if (< ,y 0)
-                              (inst ,neg-op ,r ,@(when (not no-source)`(,source-reg))
-                                    (mask-field ,bytespec ,value))
-                              (inst ,op ,r ,@(when (not no-source) `(,source-reg))
-                                    (mask-field ,bytespec ,value))))
-                        `((inst ,op ,r ,@(when (not no-source) `(,source-reg))
-                                (mask-field ,bytespec ,value))))
-                  (setf (ldb ,bytespec ,value) 0)))
-             (composite ()
-               `((let ((,bytespec (byte 8 (logandc1 1 (lowest-set-bit-index ,value)))))
-                    ,@(instruction x (or first-op op) neg-op first-no-source))
-                  (do ((,bytespec (byte 8 (logandc1 1 (lowest-set-bit-index ,value)))
-                                  (byte 8 (logandc1 1 (lowest-set-bit-index ,value)))))
-                      ((zerop ,value))
-                    ,@(instruction r op neg-op)
-                    ,@(when invert-r
-                            `((inst mvn ,r ,r)))))))
-      `(let* ((,transformed ,(if fixnumize
-                                 `(fixnumize ,y)
-                                 `,y))
-              (,value (ldb (byte 32 0)
-                           ,@(if neg-op
-                                 `((if (< ,transformed 0) (- ,transformed) ,transformed))
-                                 (if invert-y
-                                     `((lognot ,transformed))
-                                     `(,transformed))))))
-         ,@(if single-op-op
-              `((handler-case
-                    (progn
-                      (inst ,single-op-op ,r ,x ,transformed))
-                  (cannot-encode-immediate-operand ()
-                    ,@(composite))))
-              (composite))))))
 
 
 ;;;; Addressing mode 2 support

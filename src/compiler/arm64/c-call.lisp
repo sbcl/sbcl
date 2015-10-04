@@ -230,7 +230,7 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
-        (composite-immediate-instruction add nsp-tn nsp-tn delta)))))
+        (inst add nsp-tn nsp-tn (add-sub-immediate delta))))))
 
 ;;; long-long support
 ;; (deftransform %alien-funcall ((function type &rest args) * * :node node)

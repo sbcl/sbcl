@@ -57,8 +57,7 @@
 
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
-    `(progn
-       (composite-immediate-instruction add ,reg null-tn (static-symbol-offset ,symbol)))))
+    `(inst add ,reg null-tn (add-sub-immediate  (static-symbol-offset ,symbol)))))
 
 (defmacro load-symbol-value (reg symbol)
   `(progn
@@ -228,9 +227,7 @@
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
-            (if (integerp ,size)
-                (composite-immediate-instruction add ,flag-tn ,flag-tn ,size)
-                (inst add ,flag-tn ,flag-tn ,size))
+            (inst add ,flag-tn ,flag-tn (add-sub-immediate ,size))
             (store-symbol-value ,flag-tn *allocation-pointer*))
            #!+gencgc
            (t
