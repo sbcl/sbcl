@@ -268,7 +268,7 @@
     (once-only ((n-object object))
       (ecase (numeric-type-complexp type)
         (:real
-         (if (and #!-(or x86 x86-64 arm) ;; Not implemented elsewhere yet
+         (if (and #!-(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
                   nil
                   (eql (numeric-type-class type) 'integer)
                   (eql (numeric-type-low type) 0)

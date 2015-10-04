@@ -269,9 +269,7 @@
 ;;; MOD type checks
 (defun power-of-two-limit-p (x)
   (and (fixnump x)
-       (= (logcount (1+ x)) 1)
-       ;; Immediate encodable
-       (> x (expt 2 23))))
+       (= (logcount (1+ x)) 1)))
 
 (define-vop (test-fixnum-mod-power-of-two)
   (:args (value :scs (any-reg descriptor-reg
@@ -296,7 +294,7 @@
                               unsigned-reg signed-reg
                               immediate)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
-              (:constant (satisfies encodable-immediate)))
+              (:constant (satisfies add-sub-immediate-p)))
   (:translate fixnum-mod-p)
   (:conditional :ls)
   (:info hi)
@@ -309,8 +307,8 @@
                           (fixnumize hi))))
        (inst cmp value fixnum-hi))))
 
-(defun encodable-immediate+1 (x)
-  (encodable-immediate (1+ x)))
+(defun add-sub-immediate+1-p (x)
+  (add-sub-immediate-p (1+ (fixnumize x))))
 
 ;;; Adding 1 and changing the codntions from <= to < allows to encode
 ;;; more immediates.
@@ -319,7 +317,7 @@
                               unsigned-reg signed-reg
                               immediate)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
-              (:constant (satisfies encodable-immediate+1)))
+              (:constant (satisfies add-sub-immediate+1-p)))
   (:translate fixnum-mod-p)
   (:conditional :cc)
   (:info hi)
@@ -352,20 +350,21 @@
        (load-immediate-word temp fixnum-hi)
        (inst cmp value temp))))
 
-(defun encodable-immediate/+1 (x)
-  (or (encodable-immediate x)
-      (encodable-immediate (1+ x))))
+(defun add-sub-immediate/+1-p (x)
+  (let ((x (fixnumize x)))
+    (or (add-sub-immediate-p x)
+        (add-sub-immediate-p (1+ x)))))
 
 (define-vop (test-fixnum-mod-*-imm)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (satisfies encodable-immediate/+1)))
+  (:arg-types * (:constant (satisfies add-sub-immediate/+1-p)))
   (:translate fixnum-mod-p)
   (:conditional)
   (:info target not-p hi)
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 5
-    (let* ((1+ (not (encodable-immediate hi)))
+    (let* ((1+ (not (add-sub-immediate-p (fixnumize hi))))
            (fixnum-hi (fixnumize (if 1+
                                      (1+ hi)
                                      hi)))
