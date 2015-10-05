@@ -324,10 +324,9 @@ undefined_tramp:
         add     reg_CODE,reg_LR,-SIMPLE_FUN_CODE_OFFSET
 
 
-        brk trap_Error
+        brk UNDEFINED_FUN_ERROR << 8 | trap_Error
 
-        .byte   .error_args_end - . - 1
-        .byte   UNDEFINED_FUN_ERROR
+        .byte  .error_args_end - . - 1
         // Encode LEXENV
         // produced with
         // (let ((result (make-array 10 :fill-pointer 0)))
@@ -355,11 +354,10 @@ undefined_tramp:
 undefined_alien_function:
         ldr     reg_CODE, = undefined_alien_function
 
-        brk     trap_Error
+        brk     UNDEFINED_ALIEN_FUN_ERROR << 8 | trap_Error
 
         // Error arguments for an undefined function.
-        .byte   4
-        .byte   UNDEFINED_ALIEN_FUN_ERROR
+        .byte   3
         // Encode unsigned X8, which comes from call_into_c
         .byte   0xFE
         .byte   0x11

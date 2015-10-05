@@ -284,9 +284,9 @@
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    (inst brk kind)
+    ;; Encode both kind and code as an argument to BRK
+    (inst brk (dpb code (byte 8 8) kind))
     (with-adjustable-vector (vector)
-      (write-var-integer code vector)
       (dolist (tn values)
         (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
                                            (or (tn-offset tn) 0))
