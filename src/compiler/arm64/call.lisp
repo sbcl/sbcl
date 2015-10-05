@@ -978,8 +978,7 @@
                       ;; have much more than this, SPARC, MIPS, PPC
                       ;; and HPPA encode (TN-OFFSET CALLABLE-TN),
                       ;; Alpha ignores stepping entirely.
-                      (inst debug-trap)
-                      (inst byte single-step-around-trap)
+                      (inst brk single-step-around-trap)
                       (inst byte (tn-offset callable-tn))
                       (emit-alignment 2)
 
@@ -1216,7 +1215,5 @@
     (note-this-location vop :step-before-vop)
     ;; A best-guess effort at a debug trap suitable for a
     ;; single-step-before-trap.
-    (inst debug-trap)
-    (inst byte single-step-before-trap)
-    (emit-alignment 2)
+    (inst brk single-step-before-trap)
     DONE))

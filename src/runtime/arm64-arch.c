@@ -126,16 +126,11 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
     u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
-
-    if (trap_instruction != 0xd4200000) {
-        lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
-             trap_instruction);
-    }
-
-    if (code == trap_PendingInterrupt) {
-      arch_skip_instruction(context);
+    unsigned code = trap_instruction >> 5 & 0xFFFF;
+    if ((trap_instruction >> 16) != 0xd420) {
+        lose("Unrecognized trap instruction %08lx in sigtrap_handler() (PC: %p)",
+             trap_instruction, *os_context_pc_addr(context));
     }
 
     handle_trap(context, code);

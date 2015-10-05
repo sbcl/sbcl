@@ -323,11 +323,9 @@ undefined_tramp:
         // function lowtag
         add     reg_CODE,reg_LR,-SIMPLE_FUN_CODE_OFFSET
 
-        // The magic (undefined) "BREAK_POINT" instruction.
-        brk 0
 
-        // Error arguments for an undefined function.
-        .byte   trap_Error
+        brk trap_Error
+
         .byte   .error_args_end - . - 1
         .byte   UNDEFINED_FUN_ERROR
         // Encode LEXENV
@@ -357,10 +355,9 @@ undefined_tramp:
 undefined_alien_function:
         ldr     reg_CODE, = undefined_alien_function
 
-        brk     0
+        brk     trap_Error
 
         // Error arguments for an undefined function.
-        .byte   trap_Error
         .byte   4
         .byte   UNDEFINED_ALIEN_FUN_ERROR
         // Encode unsigned X8, which comes from call_into_c
@@ -524,10 +521,6 @@ fpu_restore:
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
-        brk 0
-        .byte trap_PendingInterrupt
-        .byte 0
-        .byte 0
-        .byte 0
+        brk trap_PendingInterrupt
 	ret
         #endif

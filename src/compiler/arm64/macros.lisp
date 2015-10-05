@@ -284,11 +284,7 @@
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    ;; Use the magic officially-undefined instruction that Linux
-    ;; treats as generating SIGTRAP.
-    (inst debug-trap)
-    ;; The rest of this is "just" the encoded error details.
-    (inst byte kind)
+    (inst brk kind)
     (with-adjustable-vector (vector)
       (write-var-integer code vector)
       (dolist (tn values)

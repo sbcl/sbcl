@@ -1793,9 +1793,6 @@
 (def-exception brk #b001 #b00)
 (def-exception hlt #b010 #b00)
 
-(define-instruction-macro debug-trap ()
-  `(inst brk 0))
-
 ;;;
 
 (def-emitter pc-relative
