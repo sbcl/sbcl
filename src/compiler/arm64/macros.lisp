@@ -286,15 +286,17 @@
       (note-this-location vop :internal-error))
     ;; Encode both kind and code as an argument to BRK
     (inst brk (dpb code (byte 8 8) kind))
-    (with-adjustable-vector (vector)
-      (dolist (tn values)
-        (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
-                                           (or (tn-offset tn) 0))
-                           vector))
-      (inst byte (length vector))
-      (dotimes (i (length vector))
-        (inst byte (aref vector i)))
-      (emit-alignment 2))))
+    ;; NARGS is implicitely assumed for invalid-arg-count
+    (unless (= kind invalid-arg-count-trap)
+     (with-adjustable-vector (vector)
+       (dolist (tn values)
+         (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
+                                            (or (tn-offset tn) 0))
+                            vector))
+       (inst byte (length vector))
+       (dotimes (i (length vector))
+         (inst byte (aref vector i)))
+       (emit-alignment 2)))))
 
 (defun error-call (vop error-code &rest values)
   #!+sb-doc
@@ -308,7 +310,11 @@
   (assemble (*elsewhere*)
     (let ((start-lab (gen-label)))
       (emit-label start-lab)
-      (emit-error-break vop error-trap (error-number-or-lose error-code) values)
+      (emit-error-break vop
+                        (if (eq error-code 'invalid-arg-count-error)
+                            invalid-arg-count-trap
+                            error-trap)
+                        (error-number-or-lose error-code) values)
       start-lab)))
 
 ;;;; PSEUDO-ATOMIC

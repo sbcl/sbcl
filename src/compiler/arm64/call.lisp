@@ -583,7 +583,7 @@
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop 'invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error)))
       (flet ((load-immediate (x)
                (add-sub-immediate (fixnumize x))))
         (cond ((eql max 0)

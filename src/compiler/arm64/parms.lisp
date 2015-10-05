@@ -113,7 +113,8 @@
   breakpoint-trap
   fun-end-breakpoint-trap
   single-step-around-trap
-  single-step-before-trap)
+  single-step-before-trap
+  invalid-arg-count-trap)
 
 ;;;; Static symbols.
 
