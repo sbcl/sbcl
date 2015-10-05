@@ -962,14 +962,8 @@
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (assemble ()
-                      ;; Get the symbol-value of SB!IMPL::*STEPPING*
-                      ;; KLUDGE: ... into LIP.  Either it's NIL or it
-                      ;; isn't, and even taking a stray interrupt and
-                      ;; GC can't screw that up.
-                      (load-symbol-value lip sb!impl::*stepping*)
-                      (inst cmp lip null-tn)
-                      ;; If it's not null, trap.
-                      (inst b :eq step-done-label)
+                      (load-symbol-value tmp-tn sb!impl::*stepping*)
+                      (inst cbz tmp-tn step-done-label)
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the
                       ;; DEBUG-TRAP.
@@ -1207,9 +1201,7 @@
   (:vop-var vop)
   (:generator 3
     (load-symbol-value stepping sb!impl::*stepping*)
-    ;; If it's not NIL, trap.
-    (inst cmp stepping null-tn)
-    (inst b :eq DONE)
+    (inst cbz stepping DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
     (note-this-location vop :step-before-vop)

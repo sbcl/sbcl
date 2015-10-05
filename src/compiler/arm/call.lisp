@@ -973,7 +973,7 @@
                       ;; GC can't screw that up.
                       (load-symbol-value lip sb!impl::*stepping*)
                       (inst cmp lip 0)
-                      ;; If it's not null, trap.
+                      ;; If it's not 0, trap.
                       (inst b :eq step-done-label)
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the
