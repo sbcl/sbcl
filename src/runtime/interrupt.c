@@ -658,7 +658,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
                 *os_context_register_addr(context, reg_OCFP);
             access_control_frame_pointer(th)[1] =
                 *os_context_register_addr(context, reg_LRA);
-            access_control_frame_pointer(th) += 8;
+            access_control_frame_pointer(th) += 2;
             /* Build our frame on top of it. */
             oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
         }
@@ -684,7 +684,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
     }
 
-    access_control_stack_pointer(th) = access_control_frame_pointer(th) + N_WORD_BYTES * 2;
+    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
 
     access_control_frame_pointer(th)[0] = oldcont;
     access_control_frame_pointer(th)[1] = NIL;

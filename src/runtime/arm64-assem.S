@@ -24,9 +24,9 @@
 
 #define LEAVE_PA \
         STORE_STATIC_SYMBOL_VALUE(reg_NULL,PSEUDO_ATOMIC_ATOMIC) ;\
-        LOAD_STATIC_SYMBOL_VALUE(reg_OCFP,PSEUDO_ATOMIC_INTERRUPTED)      ;\
-        cbz     reg_OCFP, 1f; \
-	blr     reg_OCFP; \
+        LOAD_STATIC_SYMBOL_VALUE(reg_TMP,PSEUDO_ATOMIC_INTERRUPTED) ;\
+        cbz     reg_TMP, 1f     ; \
+	blr     reg_TMP         ; \
 1:
 	.align
 	.global	call_into_lisp
@@ -57,7 +57,7 @@ call_into_lisp:
 	ldr	reg_NULL, .known_nil
 
 	// Set up NARGS.
-	orr	reg_NARGS, xzr, x2, LSL #N_FIXNUM_TAG_BITS
+	lsl	reg_NARGS, x2, #N_FIXNUM_TAG_BITS
 
 	// Move args pointer out of the way of the args to be loaded.
 	mov	reg_R8, x1
@@ -81,11 +81,9 @@ call_into_lisp:
 
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
-	// And we need the frame pointer, but OCFP is in use, so use
-	// NFP instead.
-	ldr	reg_NFP, =current_control_frame_pointer
+	ldr	reg_OCFP, =current_control_frame_pointer
 	ldr	reg_CFP, =current_control_stack_pointer
-	ldr	reg_NFP, [reg_NFP]
+	ldr	reg_OCFP, [reg_OCFP]
 	ldr	reg_CFP, [reg_CFP]
 
         ENTER_PA
@@ -93,14 +91,14 @@ call_into_lisp:
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer into the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_OCFP, [reg_OCFP]
-        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
+        ldr     reg_NL3, =dynamic_space_free_pointer
+        ldr     reg_NL3, [reg_NL3]
+        STORE_STATIC_SYMBOL_VALUE(reg_NL3, ALLOCATION_POINTER)
 #endif
 
 	// Clear FFCA, so the runtime knows that we're "in lisp".
-	ldr     reg_OCFP, =foreign_function_call_active
-	str     reg_R2, [reg_OCFP]
+	ldr     reg_NL3, =foreign_function_call_active
+	str     xzr, [reg_NL3]
 
 	// We need to set up the lisp stack pointer and the basics of
 	// our stack frame while we're still in P-A.  Any sooner and
@@ -112,11 +110,11 @@ call_into_lisp:
         add     reg_CSP, reg_CFP, #16
 
 	// Set up the "frame link"
-	str     reg_NFP, [reg_CSP, #-16]
+	str     reg_OCFP, [reg_CFP]
 
 	// Set up the return address
 	ldr	reg_NL3, =.lra
-        str     reg_NL3, [reg_CSP, #-8]
+        str     reg_NL3, [reg_CFP, #8]
 
 	LEAVE_PA
 
