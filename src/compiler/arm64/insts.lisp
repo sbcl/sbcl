@@ -56,43 +56,12 @@
 
 ;;;; disassembler field definitions
 
-(defun current-instruction (dstate)
+(defun current-instruction (dstate &optional (offset 0))
   (sb!disassem::sap-ref-int
    (sb!disassem:dstate-segment-sap dstate)
-   (sb!disassem:dstate-cur-offs dstate)
+   (+ (sb!disassem:dstate-cur-offs dstate) offset)
    n-word-bytes
    (sb!disassem::dstate-byte-order dstate)))
-
-(defun maybe-add-notes (dstate)
-  (let* ((inst (current-instruction dstate))
-         (op (ldb (byte 8 20) inst))
-         (offset (ldb (byte 12 0) inst))
-         (rn (ldb (byte 5 5) inst)))
-    (cond ((and (= rn null-offset))
-           (let ((offset (+ nil-value offset)))
-             (case op
-               ((88 89) ;; LDR/STR
-                (sb!disassem:maybe-note-assembler-routine offset nil dstate)
-                (sb!disassem::maybe-note-static-symbol
-                 (logior offset other-pointer-lowtag) dstate))
-               (40 ;; ADD
-                (sb!disassem::maybe-note-static-symbol offset dstate)))))
-          (t
-           (case op
-             (89 ;; LDR
-              (case rn
-                (#.code-offset
-                 (sb!disassem:note-code-constant offset dstate))
-                ;; (#.pc-offset
-                ;;  (let ((value (sb!disassem::sap-ref-int
-                ;;                (sb!disassem:dstate-segment-sap dstate)
-                ;;                (+ (sb!disassem:dstate-cur-offs dstate)
-                ;;                   offset 8)
-                ;;                n-word-bytes
-                ;;                (sb!disassem::dstate-byte-order dstate))))
-                ;;    (sb!disassem:maybe-note-assembler-routine value nil dstate)))
-                )))))))
-
 
 (defun 32-bit-register-p (dstate)
   (not (logbitp 31 (current-instruction dstate))))
@@ -163,10 +132,13 @@
     (declare (ignore dstate))
     (format stream "#~D" value))
 
+  (defun decode-scaled-immediate (value)
+    (destructuring-bind (size opc value) value
+      (ash value (logior (ash opc 2) size))))
+
   (defun print-scaled-immediate (value stream dstate)
     (declare (ignore dstate))
-    (destructuring-bind (size opc value) value
-      (format stream "#~D" (ash value (logior (ash opc 2) size)))))
+    (format stream "#~D" (decode-scaled-immediate value)))
 
   (defun print-logical-immediate (value stream dstate)
     (declare (ignore dstate))
@@ -234,7 +206,48 @@
                      (logior (ldb (byte 2 0) (car value))
                              (ash (cadr value) 2))
                      value)))
-      (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate)))))
+      (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+
+
+  (defun annotate-ldr-str (register offset dstate)
+    (case register
+      (#.code-offset
+       (sb!disassem:note-code-constant offset dstate))
+      (#.null-offset
+       (let ((offset (+ nil-value offset)))
+         (sb!disassem:maybe-note-assembler-routine offset nil dstate)
+         (sb!disassem::maybe-note-static-symbol (logior offset other-pointer-lowtag)
+                                                dstate)))))
+
+  (defun find-value-from-previos-inst (register dstate)
+    ;; Needs to be MOVZ REGISTER, imm, LSL #0
+    ;; Should cover most offsets in sane code
+    (let ((inst (current-instruction dstate -4)))
+      (when (and (= (ldb (byte 9 23) inst) #b110100101) ;; MOVZ
+                 (= (ldb (byte 5 0) inst) register)
+                 (= (ldb (byte 2 21) inst) 0)) ;; LSL #0
+        (ldb (byte 16 5) inst))))
+
+  (defun annotate-ldr-str-reg (value stream dstate)
+    (declare (ignore stream))
+    (let* ((inst (current-instruction dstate))
+           (float (ldb-test (byte 1 26) inst)))
+      (unless float
+        (let ((value (find-value-from-previos-inst value dstate)))
+          (when value
+            (annotate-ldr-str (ldb (byte 5 5) inst) value dstate))))))
+
+  (defun annotate-ldr-str-imm (value stream dstate)
+    (declare (ignore stream))
+    (let* ((inst (current-instruction dstate))
+           (float-reg (ldb-test (byte 1 26) inst)))
+      (unless float-reg
+        (annotate-ldr-str (ldb (byte 5 5) inst)
+                          (if (consp value)
+                              (decode-scaled-immediate value)
+                              value)
+                          dstate)))))
+
 
 (progn
 
@@ -284,6 +297,12 @@
 
   (sb!disassem:define-arg-type cond
     :printer #'print-cond)
+
+  (sb!disassem:define-arg-type ldr-str-annotation
+    :printer #'annotate-ldr-str-imm)
+
+  (sb!disassem:define-arg-type ldr-str-reg-annotation
+    :printer #'annotate-ldr-str-reg)
 
   (sb!disassem:define-arg-type label
     :sign-extend t
@@ -1334,7 +1353,8 @@
     (op3 :field (byte 2 24) :value #b00)
     (op :field (byte 2 22))
     (rn :field (byte 5 5) :type 'reg-sp)
-    (rt :fields (list (byte 2 30) (byte 1 23) (byte 5 0)) :type 'reg-float-reg))
+    (rt :fields (list (byte 2 30) (byte 1 23) (byte 5 0)) :type 'reg-float-reg)
+    (ldr-str-annotation :type 'ldr-str-annotation))
 
 (def-emitter ldr-str-unsigned-imm
   (size 2 30)
@@ -1351,7 +1371,8 @@
      :default-printer '(:name :tab rt  ", [" rn "], " imm)
      :include ldr-str)
     (op3 :value #b01)
-    (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10)) :type 'scaled-immediate))
+    (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10)) :type 'scaled-immediate)
+    (ldr-str-annotation :fields (list (byte 2 30) (byte 1 23) (byte 12 10))))
 
 (def-emitter ldr-str-unscaled-imm
   (size 2 30)
@@ -1367,11 +1388,12 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-unscaled-imm 32
-     :default-printer '(:name :tab rt  ", [" rn "], " imm)
+     :default-printer '(:name :tab rt  ", [" rn "], " imm ldr-str-annotation)
      :include ldr-str)
     (op4 :field (byte 1 21) :value #b0)
     (imm :field (byte 9 12) :type 'immediate)
-    (op5 :field (byte 2 10) :value #b00))
+    (op5 :field (byte 2 10) :value #b00)
+    (ldr-str-annotation :field (byte 9 12)))
 
 (def-emitter ldr-str-imm-wb
   (size 2 30)
@@ -1402,11 +1424,12 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-reg 32
-     :default-printer '(:name :tab rt  ", [" rn ", " rm option "]")
+     :default-printer '(:name :tab rt  ", [" rn ", " rm option "]" ldr-str-annotation)
      :include ldr-str)
     (op4 :field (byte 1 21) :value 1)
     (rm :field (byte 5 16) :type 'reg)
-    (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend))
+    (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
+    (ldr-str-annotation :field (byte 5 16) :type 'ldr-str-reg-annotation))
 
 (def-emitter ldr-literal
   (opc 2 30)

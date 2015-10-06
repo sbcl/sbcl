@@ -74,8 +74,6 @@
            (let ((lra-label (gen-label))
                  (cur-nfp (current-nfp-tn vop)))
              ,@(moves (temp-names) (arg-names))
-             (inst mov tmp-tn (static-fun-offset symbol))
-
              (inst mov nargs (fixnumize ,num-args))
              (when cur-nfp
                (store-stack-tn nfp-save cur-nfp))
@@ -90,7 +88,7 @@
              (inst str lip (@ csp-tn -8))
              (inst sub cfp-tn csp-tn 16)
              (note-this-location vop :call-site)
-             (inst ldr lip (@ null-tn tmp-tn))
+             (inst ldr lip (@ null-tn (load-store-offset (static-fun-offset symbol))))
              (inst br lip)
 
              (emit-return-pc lra-label)

@@ -4927,7 +4927,7 @@
                      x)))))
 
 (with-test (:name :copy-more-arg
-            :fails-on '(not (or :x86 :x86-64 :arm)))
+            :fails-on '(not (or :x86 :x86-64 :arm :arm64)))
   ;; copy-more-arg might not copy in the right direction
   ;; when there are more fixed args than stack frame slots,
   ;; and thus end up splatting a single argument everywhere.
