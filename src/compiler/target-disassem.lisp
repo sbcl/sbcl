@@ -1981,6 +1981,8 @@
                (when note
                  (note note dstate))))
         (emit-err-arg)
+        ;; ARM64 encodes the error number in BRK instruction itself
+        #!-arm64
         (emit-err-arg)
         (emit-note (symbol-name (get-internal-error-name errnum)))
         (dolist (sc-offs sc-offsets)

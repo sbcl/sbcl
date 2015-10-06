@@ -309,59 +309,59 @@
     :use-label #'use-label))
 
 ;;;; special magic to support decoding internal-error and related traps
-
-;; snarf-error-junk is basically identical on all platforms that
-;; define it (meaning, not Alpha).  Shouldn't it be common somewhere?
 (defun snarf-error-junk (sap offset &optional length-only)
-  (let* ((length (sb!sys:sap-ref-8 sap offset))
-         (vector (make-array length :element-type '(unsigned-byte 8))))
+  (let ((length (sb!sys:sap-ref-8 sap offset)))
     (declare (type sb!sys:system-area-pointer sap)
-             (type (unsigned-byte 8) length)
-             (type (simple-array (unsigned-byte 8) (*)) vector))
+             (type (unsigned-byte 8) length))
     (cond (length-only
            (values 0 (1+ length) nil nil))
           (t
-           (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
-                                                vector 0 length)
-           (collect ((sc-offsets)
-                     (lengths))
-             (lengths 1)                ; the length byte
-             (let* ((index 0)
-                    (error-number (sb!c:read-var-integer vector index)))
-               (lengths index)
+           (let* ((inst (sb!sys:sap-ref-32 sap (- offset 4)))
+                  (vector (make-array length :element-type '(unsigned-byte 8)))
+                  (index 0)
+                  (error-number (ldb (byte 8 13) inst)))
+             (declare (type (simple-array (unsigned-byte 8) (*)) vector))
+             (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
+                                                  vector 0 length)
+             (collect ((sc-offsets)
+                       (lengths))
+               (lengths 1) ; the length byte
                (loop
-                 (when (>= index length)
-                   (return))
-                 (let ((old-index index))
-                   (sc-offsets (sb!c:read-var-integer vector index))
-                   (lengths (- index old-index))))
+                (when (>= index length)
+                  (return))
+                (let ((old-index index))
+                  (sc-offsets (sb!c:read-var-integer vector index))
+                  (lengths (- index old-index))))
                (values error-number
                        (1+ length)
                        (sc-offsets)
                        (lengths))))))))
 
-(defun debug-trap-control (chunk inst stream dstate)
-  (declare (ignore inst))
-  (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
-    (case (debug-trap-code chunk dstate)
-      (#.halt-trap
-       (nt "Halt trap"))
-      (#.pending-interrupt-trap
-       (nt "Pending interrupt trap"))
-      (#.error-trap
-       (nt "Error trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.cerror-trap
-       (nt "Cerror trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.breakpoint-trap
-       (nt "Breakpoint trap"))
-      (#.fun-end-breakpoint-trap
-       (nt "Function end breakpoint trap"))
-      (#.single-step-around-trap
-       (nt "Single step around trap"))
-      (#.single-step-before-trap
-       (nt "Single step before trap")))))
+(defun brk-control (chunk inst stream dstate)
+  (declare (ignore inst chunk))
+  (let ((code (ldb (byte 8 5) (current-instruction dstate))))
+    (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+      (case code
+        (#.halt-trap
+         (nt "Halt trap"))
+        (#.pending-interrupt-trap
+         (nt "Pending interrupt trap"))
+        (#.error-trap
+         (nt "Error trap")
+         (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+        (#.cerror-trap
+         (nt "Cerror trap")
+         (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+        (#.breakpoint-trap
+         (nt "Breakpoint trap"))
+        (#.fun-end-breakpoint-trap
+         (nt "Function end breakpoint trap"))
+        (#.single-step-around-trap
+         (nt "Single step around trap"))
+        (#.single-step-before-trap
+         (nt "Single step before trap"))
+        (#.invalid-arg-count-trap
+         (nt "Invalid argument count trap"))))))
 
 ;;;; primitive emitters
 
@@ -1808,12 +1808,23 @@
   (#b000 3 2)
   (ll 2 0))
 
-(defmacro def-exception (name opc ll)
+(sb!disassem:define-instruction-format
+    (exception 32 :default-printer '(:name :tab imm))
+    (op2 :field (byte 8 24) :value #b11010100)
+    (op  :field (byte 3 21))
+    (imm :field (byte 16 5) :type 'unsigned-immediate)
+    (ll :field (byte 2 0)))
+
+(defmacro def-exception (name opc ll &rest printer-options)
   `(define-instruction ,name (segment imm)
+     (:printer exception ((op ,opc) (ll ,ll))
+               ,@printer-options)
      (:emitter
       (emit-exception segment ,opc imm ,ll))))
 
-(def-exception brk #b001 #b00)
+(def-exception brk #b001 #b00
+  '(:name :tab imm) :control #'brk-control)
+
 (def-exception hlt #b010 #b00)
 
 ;;;
