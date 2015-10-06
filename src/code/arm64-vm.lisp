@@ -35,12 +35,12 @@
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
 (define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-int)
+  (* unsigned-long)
   (context (* os-context-t))
   (index int))
 
 (define-alien-routine ("os_context_pc_addr" context-register-pc-addr)
-  (* unsigned-int)
+  (* unsigned-long)
   (context (* os-context-t)))
 
 ;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
