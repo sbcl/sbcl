@@ -66,6 +66,7 @@ test -f "$BUILD_ROOT$SBCL_HOME"/sbcl.core && \
     mv "$BUILD_ROOT$SBCL_HOME"/sbcl.core "$BUILD_ROOT$SBCL_HOME"/sbcl.core.old
 
 cp src/runtime/$RUNTIME "$BUILD_ROOT$INSTALL_ROOT"/bin/
+cp src/runtime/sbcl.o "$BUILD_ROOT$SBCL_HOME"/sbcl.o
 cp output/sbcl.core "$BUILD_ROOT$SBCL_HOME"/sbcl.core
 
 # installing contrib
