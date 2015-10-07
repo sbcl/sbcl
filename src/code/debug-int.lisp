@@ -745,8 +745,9 @@
 ;;; calls into C. In this case, the code object is stored on the stack
 ;;; after the LRA, and the LRA is the word offset.
 #!-(or x86 x86-64)
-(defun compute-calling-frame (caller lra up-frame)
-  (declare (type system-area-pointer caller))
+(defun compute-calling-frame (caller lra up-frame &optional savedp)
+  (declare (type system-area-pointer caller)
+           (ignore savedp))
   (/noshow0 "entering COMPUTE-CALLING-FRAME")
   (when (control-stack-pointer-valid-p caller)
     (/noshow0 "in WHEN")

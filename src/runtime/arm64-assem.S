@@ -191,9 +191,9 @@ no_args:
 	.type	call_into_c, %function
 call_into_c:
 	// At this point, we have:
-	// X8 -- C function to call.
+	// R8 -- C function to call.
         // LR -- Return address within the code component.
-        // R0-R7 arguments
+        // X0-X7 arguments
         // All other C arguments are already stashed on the C stack.
 
 	// We need to convert our return address to a GC-safe format,
@@ -243,7 +243,7 @@ call_into_c:
 
         // And call the C function.
         //
-        // X8 is important for undefined_alien_function.
+        // R8 is important for undefined_alien_function.
         blr      reg_R8
 
         // We're back.  Our main tasks are to move the C return value
@@ -304,11 +304,12 @@ call_into_c:
 
 	.size	call_into_c, .-call_into_c
 
-	.align	3
+	.align	4
 	.global	undefined_tramp
 	.type	undefined_tramp, %object
+        .equ    undefined_tramp_header, . + FUN_POINTER_LOWTAG
 	.dword	SIMPLE_FUN_HEADER_WIDETAG
-        .dword	undefined_tramp - SIMPLE_FUN_CODE_OFFSET
+        .dword	undefined_tramp_header
 .known_nil:
         .dword	NIL
         .dword	NIL
@@ -319,7 +320,7 @@ undefined_tramp:
 
         // As in ppc-assem.S, point reg_CODE to the header with a
         // function lowtag
-        add     reg_CODE,reg_LR,-SIMPLE_FUN_CODE_OFFSET
+        adr     reg_CODE, undefined_tramp_header
 
 
         brk UNDEFINED_FUN_ERROR << 8 | trap_Error
@@ -338,31 +339,31 @@ undefined_tramp:
 .error_args_end:
 
 
-        .align	3
+        .align	4
 	.global	undefined_alien_function
 	.type	undefined_alien_function, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	undefined_alien_function, .+1
-	.word	undefined_alien_function
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
+        .equ    undefined_alien_function_header, . + FUN_POINTER_LOWTAG
+	.dword	SIMPLE_FUN_HEADER_WIDETAG
+        .dword	undefined_alien_function_header
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
+        .dword	NIL
 undefined_alien_function:
-        ldr     reg_CODE, = undefined_alien_function
+        adr     reg_CODE, undefined_alien_function_header
 
         brk     UNDEFINED_ALIEN_FUN_ERROR << 8 | trap_Error
 
         // Error arguments for an undefined function.
         .byte   3
-        // Encode unsigned X8, which comes from call_into_c
+        // Encode unsigned R8, which comes from call_into_c
         .byte   0xFE
-        .byte   0x11
-        .byte   0x02
+        .byte   0x92
+        .byte   0x04
 
 
-	.align	3
+	.align	4
 	.global	closure_tramp
 	.type	closure_tramp, %object
 	.dword	SIMPLE_FUN_HEADER_WIDETAG
@@ -378,11 +379,11 @@ closure_tramp:
 	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
         br      reg_LR
 
-	.align	3
+	.align	4
 	.global	funcallable_instance_tramp
 	.type	funcallable_instance_tramp, %object
+        .equ	funcallable_instance_tramp, .+ FUN_POINTER_LOWTAG
 	.dword	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	funcallable_instance_tramp, .+ FUN_POINTER_LOWTAG-N_WORD_BYTES
 	.dword	funcallable_instance_tramp
         .dword	NIL
         .dword	NIL
