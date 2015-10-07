@@ -128,21 +128,21 @@
 ;;;
 (defparameter *static-symbols*
   (append
-   *common-static-symbols*
-   *c-callable-static-symbols*
-   '(*allocation-pointer*
-
-     *binding-stack-pointer*
-
-     ;; interrupt handling
+   '(*binding-stack-pointer*
      *pseudo-atomic-atomic*
      *pseudo-atomic-interrupted*
+     *allocation-pointer*
+
+     ;; interrupt handling
+
 
      ;; Needed for callbacks to work across saving cores. see
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
      sb!alien::*enter-alien-callback*
-     #!+gencgc *restart-lisp-function*)))
+     #!+gencgc *restart-lisp-function*)
+   *common-static-symbols*
+   *c-callable-static-symbols*))
 
 (defparameter *static-funs*
   '(two-arg-gcd two-arg-lcm

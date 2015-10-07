@@ -60,20 +60,15 @@
     `(inst add ,reg null-tn (add-sub-immediate  (static-symbol-offset ,symbol)))))
 
 (defmacro load-symbol-value (reg symbol)
-  `(progn
-     (inst mov tmp-tn
-           (+ (static-symbol-offset ',symbol)
-              (ash symbol-value-slot word-shift)
-              (- other-pointer-lowtag)))
-     (inst ldr ,reg (@ null-tn tmp-tn))))
+  `(inst ldr ,reg (@ null-tn (load-store-offset (+ (static-symbol-offset ',symbol)
+                                                   (ash symbol-value-slot word-shift)
+                                                   (- other-pointer-lowtag))))))
 
 (defmacro store-symbol-value (reg symbol)
-  `(progn
-     (inst mov tmp-tn (+ (static-symbol-offset ',symbol)
-                         (ash symbol-value-slot word-shift)
-                         (- other-pointer-lowtag)))
-     (inst str ,reg
-           (@ null-tn tmp-tn))))
+  `(inst str ,reg
+         (@ null-tn (load-store-offset (+ (static-symbol-offset ',symbol)
+                                          (ash symbol-value-slot word-shift)
+                                          (- other-pointer-lowtag))))))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
@@ -185,14 +180,14 @@
     (when (integerp size)
       (load-immediate-word alloc-tn size))
     (inst stp
+          lr-tn
           (if (integerp size)
               alloc-tn
               size)
-          lr-tn
           (@ nsp-tn -16 :pre-index))
     (inst load-from-label alloc-tn fixup)
     (inst blr alloc-tn)
-    (inst ldp alloc-tn lr-tn (@ nsp-tn 16 :post-index))
+    (inst ldp lr-tn alloc-tn (@ nsp-tn 16 :post-index))
     (inst b back-label)
     (emit-label fixup)
     (inst dword (make-fixup "alloc_tramp" :foreign))))
@@ -235,7 +230,7 @@
                   (alloc (gen-label))
                   (back-from-alloc (gen-label)))
               (inst load-from-label ,flag-tn FIXUP)
-              (inst ldp ,flag-tn ,result-tn (@ ,flag-tn))
+              (inst ldp ,result-tn ,flag-tn (@ ,flag-tn))
               (inst add ,result-tn ,result-tn (add-sub-immediate ,size))
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
