@@ -112,7 +112,7 @@
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
+  (:args (object :scs (descriptor-reg) :to :save))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:save-p :compute-only)
@@ -179,10 +179,9 @@
   (:generator 5
     (loadw value-temp symbol symbol-value-slot other-pointer-lowtag)
     (load-symbol-value bsp-temp *binding-stack-pointer*)
-    (inst add bsp-temp bsp-temp (* 2 n-word-bytes))
+    (inst add bsp-temp bsp-temp (* binding-size n-word-bytes))
     (store-symbol-value bsp-temp *binding-stack-pointer*)
-    (storew value-temp bsp-temp (- binding-value-slot binding-size))
-    (storew symbol bsp-temp (- binding-symbol-slot binding-size))
+    (inst stp value-temp symbol (@ bsp-temp (* (- binding-value-slot binding-size) n-word-bytes)))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
 (define-vop (unbind)
@@ -193,9 +192,11 @@
     (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
     (loadw value bsp-temp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zr-tn bsp-temp (- binding-symbol-slot binding-size))
-    (storew zr-tn bsp-temp (- binding-value-slot binding-size))
-    (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
+    ;; The order of stores here is reversed with respect to interrupt safety,
+    ;; but STP cannot be interrupted in the middle.
+    (inst stp zr-tn zr-tn (@ bsp-temp (* (- binding-value-slot binding-size)
+                                                  n-word-bytes)))
+    (inst sub bsp-temp bsp-temp (* binding-size n-word-bytes))
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
 
 (define-vop (unbind-to-here)
@@ -218,7 +219,7 @@
     (storew zr-tn bsp-temp (- binding-symbol-slot binding-size))
     ZERO
     (storew zr-tn bsp-temp (- binding-value-slot binding-size))
-    (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
+    (inst sub bsp-temp bsp-temp (* binding-size n-word-bytes))
     (inst cmp where bsp-temp)
     (inst b :ne LOOP)
 
