@@ -116,7 +116,7 @@
                              (inst msr :nzcv tmp-tn)))
          (:known))
      (inst sub lip function (- other-pointer-lowtag 8))
-     (inst br lip)))
+     (inst ret lip)))
 
 (defmacro emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
