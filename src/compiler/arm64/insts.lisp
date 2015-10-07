@@ -138,7 +138,9 @@
 
   (defun print-scaled-immediate (value stream dstate)
     (declare (ignore dstate))
-    (format stream "#~D" (decode-scaled-immediate value)))
+    (format stream "#~D" (if (consp value)
+                             (decode-scaled-immediate value)
+                             (ash value 3))))
 
   (defun print-logical-immediate (value stream dstate)
     (declare (ignore dstate))
@@ -1581,9 +1583,9 @@
     (v :field (byte 1 26))
     (op3 :field (byte 1 25) :value #b00)
     (l :field (byte 1 22))
-    (imm :field (byte 7 15) :type 'immediate)
-    (rt2 :fields (list (byte 2 30) (byte 5 0)) :type 'reg-float-reg)
-    (rt :fields (list (byte 2 30) (byte 2 22))))
+    (imm :field (byte 7 15) :type 'scaled-immediate :sign-extend t)
+    (rt2 :fields (list (byte 2 30) (byte 5 10)) :type 'reg-float-reg)
+    (rt :fields (list (byte 2 30) (byte 5 0))))
 
 (defun emit-ldr-str-pair-inst (l segment rt1 rt2 address)
   (let* ((base (memory-operand-base address))
@@ -1615,7 +1617,7 @@
                          (:pre-index #b11)
                          (:offset #b10))
                        l
-                       (ash offset -3) (tn-offset rt1) (tn-offset base) (tn-offset rt2))))
+                       (ash offset -3) (tn-offset rt2) (tn-offset base) (tn-offset rt1))))
 
 (define-instruction stp (segment rt1 rt2 address)
   (:printer ldr-str-pair ((l 0)))
