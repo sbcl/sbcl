@@ -2467,12 +2467,11 @@ register."
                (char-code (the character value)))))
       (#.sb!vm:unsigned-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-word nfp (stack-frame-offset 1 0))
-               (the (unsigned-byte 32) value))))
+         (setf (sap-ref-word nfp (stack-frame-offset 1 0)) (the word value))))
       (#.sb!vm:signed-stack-sc-number
        (with-nfp (nfp)
          (setf (signed-sap-ref-word nfp (stack-frame-offset 1 0))
-               (the (signed-byte 32) value))))
+               (the signed-word value))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-sap nfp (stack-frame-offset 1 0))
