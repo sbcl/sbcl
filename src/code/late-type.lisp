@@ -822,6 +822,8 @@
          (values t t))
         ;; If args are not EQ, but both allow TYPE= optimization,
         ;; and at least one is interned, then return no and certainty.
+        ;; Most of the interned CTYPEs admit this optimization,
+        ;; NUMERIC and MEMBER types do as well.
         ((and (minusp (logior (type-hash-value type1) (type-hash-value type2)))
               (logtest (logand (type-hash-value type1) (type-hash-value type2))
                        +type-admits-type=-optimization+))

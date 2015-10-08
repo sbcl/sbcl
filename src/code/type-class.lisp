@@ -216,7 +216,7 @@
 ;; Each CTYPE instance (incl. subtypes thereof) has a random opaque hash value.
 ;; Hashes are mixed together to form a lookup key in the memoization wrappers
 ;; for most operations in CTYPES. This works because CTYPEs are immutable.
-;; But 2 bits are "stolen" from the hash to use as flag bits.
+;; But some bits are "stolen" from the hash as flag bits.
 ;; The sign bit indicates that the object is the *only* object representing
 ;; its type-specifier - it is an "interned" object.
 ;; The next highest bit indicates that the object, if compared for TYPE=
@@ -225,6 +225,17 @@
 ;; At any rate, the totally opaque pseudo-random bits are under this mask.
 (defconstant +ctype-hash-mask+
   (ldb (byte (1- sb!vm:n-positive-fixnum-bits) 0) -1))
+
+;;; When comparing two ctypes, if this bit is 1 in each and they are not EQ,
+;;; and at least one is interned, then they are not TYPE=.
+(defconstant +type-admits-type=-optimization+
+  (ash 1 (- sb!vm:n-positive-fixnum-bits 1)))
+
+;;; Represent an index into *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*
+;;; if applicable. For types which are not array specializations,
+;;; the bits are arbitrary.
+(defmacro !ctype-saetp-index (x)
+  `(ldb (byte 5 ,(- sb!vm:n-positive-fixnum-bits 6)) (type-hash-value ,x)))
 
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
@@ -258,16 +269,12 @@
               ;; be a read/write slot?
               :read-only nil))
 
-;; Set the sign bit (the "interned" bit) of the hash-value of OBJ to 1.
-;; This is an indicator that the object is the unique internal representation
-;; of any ctype that is TYPE= to this object.
-;; Everything starts out assumed non-unique.
-;; The hash-cache logic (a/k/a memoization) tends to ignore high bits when
-;; creating cache keys because the mixing function is XOR and the caches
-;; are power-of-2 sizes. Lkewise making the low bits non-random is bad
-;; for cache distribution.
-(defconstant +type-admits-type=-optimization+
-  (ash 1 (- sb!vm:n-positive-fixnum-bits 1))) ; highest bit in fixnum
+;;; The "interned" bit indicates uniqueness of the internal representation of
+;;; any specifier that parses to this object.
+;;; Not all interned types admit TYPE= optimization. As one example:
+;;; (type= (specifier-type '(array (unsigned-byte 6) (*)))
+;;;        (specifier-type '(array (unsigned-byte 7) (*)))) => T and T
+;;; because we preserve the difference in spelling of the two types.
 (defun mark-ctype-interned (obj)
   (setf (type-hash-value obj)
         (logior sb!xc:most-negative-fixnum

@@ -548,61 +548,49 @@
 ;; and 2 ctype objects for unknown-rank arrays, one each for simple
 ;; and maybe-simple. (Unknown rank, known-non-simple isn't important)
 (defglobal *canonical-array-ctypes* -1)
-(defconstant +canon-array-ctype-hash-divisor+ 37) ; arbitrary-ish
 (defun !intern-important-array-type-instances ()
   ;; Having made the canonical numeric and character ctypes
   ;; representing the points in the type lattice for which there
   ;; are array specializations, we can make the canonical array types.
-  (let* ((element-types
-          (list*
-           *universal-type* *wild-type* *empty-type*
-           *character-type*
-           #!+sb-unicode *base-char-type*
-           ;; FIXME: This one is can't be used by MAKE-ARRAY-TYPE?
-           #!+sb-unicode *extended-char-type*
-           *real-ffloat-type* *complex-ffloat-type*
-           *real-dfloat-type* *complex-dfloat-type*
-           (delete
-            nil
-            ;; Possibly could use the SAETP-IMPORTANCE as sort criterion
-            ;; so that collisions in a bucket place the more important
-            ;; array type first.
-            (mapcar
-             (lambda (x)
-               (cond ((typep x '(cons (eql unsigned-byte)))
-                      (aref *unsigned-byte-n-types* (cadr x)))
-                     ((eq x 'bit)
-                      (aref *unsigned-byte-n-types* 1))
-                     ((typep x '(cons (eql signed-byte)))
-                      ;; 1- because there is no such thing as (signed-byte 0)
-                      (aref *signed-byte-n-types* (1- (cadr x))))
-                     ;; FIXNUM is its own thing, why? See comment in vm-array
-                     ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
-                     ((eq x 'fixnum) ; One good kludge deserves another.
-                      (aref *signed-byte-n-types* (1- sb!vm:n-fixnum-bits)))))
-             '#.*specialized-array-element-types*))))
-         (n (length element-types))
-         (data-vector (make-array (* 5 n)))
-         (index 0)
-         (hashtable (make-array +canon-array-ctype-hash-divisor+
-                                :initial-element nil)))
-    ;; This is a compact binned table. A full-blown hashtable is unneeded.
-    #-sb-xc (aver (< (/ n (length hashtable)) 80/100)) ; assert reasonable load
-    (flet ((make-it (dims complexp type)
-             (setf (aref data-vector (prog1 index (incf index)))
-                   (mark-ctype-interned
-                    (%make-array-type dims complexp type type)))))
-      (dolist (element-type element-types)
-        (let ((bin (mod (type-hash-value element-type)
-                        +canon-array-ctype-hash-divisor+)))
-          (setf (aref hashtable bin)
-                (nconc (aref hashtable bin) (list (cons element-type index))))
-          (make-it '(*) nil    element-type)
-          (make-it '(*) :maybe element-type)
-          (make-it '(*) t      element-type)
-          (make-it '*   nil    element-type)
-          (make-it '*   :maybe element-type))))
-    (setq *canonical-array-ctypes* (cons data-vector hashtable))))
+  (setq *canonical-array-ctypes* (make-array (* 32 5)))
+  (labels ((make-1 (type-index dims complexp type)
+             (setf (!ctype-saetp-index type) type-index)
+             (mark-ctype-interned (%make-array-type dims complexp type type)))
+           (make-all (element-type type-index)
+             (replace *canonical-array-ctypes*
+                      (list (make-1 type-index '(*) nil    element-type)
+                            (make-1 type-index '(*) :maybe element-type)
+                            (make-1 type-index '(*) t      element-type)
+                            (make-1 type-index '*   nil    element-type)
+                            (make-1 type-index '*   :maybe element-type))
+                      :start1 (* type-index 5))))
+    (let ((index 0))
+      (dolist (x '#.*specialized-array-element-types*)
+        (make-all
+         (cond ((typep x '(cons (eql unsigned-byte)))
+                (aref *unsigned-byte-n-types* (cadr x)))
+               ((eq x 'bit) (aref *unsigned-byte-n-types* 1))
+               ((typep x '(cons (eql signed-byte)))
+                ;; 1- because there is no such thing as (signed-byte 0)
+                (aref *signed-byte-n-types* (1- (cadr x))))
+               ;; FIXNUM is its own thing, why? See comment in vm-array
+               ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
+               ((eq x 'fixnum) ; One good kludge deserves another.
+                (aref *signed-byte-n-types* (1- sb!vm:n-fixnum-bits)))
+               ((eq x 'single-float) *real-ffloat-type*)
+               ((eq x 'double-float) *real-dfloat-type*)
+               ((equal x '(complex single-float)) *complex-ffloat-type*)
+               ((equal x '(complex double-float)) *complex-dfloat-type*)
+               ((eq x 'character) *character-type*)
+               #!+sb-unicode ((eq x 'base-char) *base-char-type*)
+               ((eq x t) *universal-type*)
+               ((null x) *empty-type*))
+         index)
+        (incf index))
+      ;; Index 31 is available to store *WILD-TYPE*
+      ;; because there are fewer than 32 array widetags.
+      (aver (< index 31))
+      (make-all *wild-type* 31))))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
@@ -610,21 +598,15 @@
                            ctype) make-array-type))
 (defun make-array-type (dimensions &key (complexp :maybe) element-type
                                         (specialized-element-type *wild-type*))
-  (or (and (eq element-type specialized-element-type)
+  (if (and (eq element-type specialized-element-type)
            (or (and (eq dimensions '*) (neq complexp t))
-               (typep dimensions '(cons (eql *) null)))
-           (let ((table *canonical-array-ctypes*))
-             (dolist (cell (svref (cdr table)
-                                  (mod (type-hash-value element-type)
-                                       +canon-array-ctype-hash-divisor+)))
-               (when (eq (car cell) element-type)
-                 (return
-                  (truly-the ctype
-                   (svref (car table)
-                          (+ (cdr cell)
-                             (if (listp dimensions) 0 3)
-                             (ecase complexp
-                              ((nil) 0) ((:maybe) 1) ((t) 2))))))))))
+               (typep dimensions '(cons (eql *) null))))
+      (let ((res (svref *canonical-array-ctypes*
+                        (+ (* (!ctype-saetp-index element-type) 5)
+                           (if (listp dimensions) 0 3)
+                           (ecase complexp ((nil) 0) ((:maybe) 1) ((t) 2))))))
+        (aver (eq (array-type-element-type res) element-type))
+        res)
       (%make-array-type dimensions
                         complexp element-type specialized-element-type)))
 
