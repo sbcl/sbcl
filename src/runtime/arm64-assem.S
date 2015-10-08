@@ -139,7 +139,7 @@ no_args:
 	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
         br      reg_TMP
 
-	.align 3
+	.align 4
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
 	.dword	RETURN_PC_HEADER_WIDETAG
 

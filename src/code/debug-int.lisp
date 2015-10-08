@@ -989,7 +989,7 @@ register."
 ;;; undefined-function.
 #!-(or x86 x86-64)
 (defun code-object-from-bits (bits)
-  (declare (type (unsigned-byte 32) bits))
+  (declare (type word bits))
   (let ((object (make-lisp-obj bits nil)))
     (if (functionp object)
         (or (fun-code-header object)
@@ -2076,34 +2076,38 @@ register."
 ;;; context "scavenging" on such platforms, but there still may be a
 ;;; vulnerable window.
 (defun make-lisp-obj (val &optional (errorp t))
-  (if (or
-       ;; fixnum
-       (zerop (logand val sb!vm:fixnum-tag-mask))
-       ;; immediate single float, 64-bit only
-       #!+64-bit
-       (= (logand val #xff) sb!vm:single-float-widetag)
-       ;; character
-       (and (zerop (logandc2 val #x1fffffff)) ; Top bits zero
-            (= (logand val #xff) sb!vm:character-widetag)) ; char tag
-       ;; unbound marker
-       (= val sb!vm:unbound-marker-widetag)
-       ;; undefined_tramp doesn't validate properly as a pointer, and
-       ;; the actual value can vary by backend (x86oids need not
-       ;; apply)
-       #!+(or alpha hppa mips ppc)
-       (= val (+ (- (foreign-symbol-address "undefined_tramp")
-                    (* sb!vm:n-word-bytes sb!vm:simple-fun-code-offset))
-                 sb!vm:fun-pointer-lowtag))
-       #!+(or sparc arm)
-       (= val (foreign-symbol-address "undefined_tramp"))
-       ;; pointer
-       (not (zerop (valid-lisp-pointer-p (int-sap val)))))
-      (values (%make-lisp-obj val) t)
-      (if errorp
-          (error "~S is not a valid argument to ~S"
-                 val 'make-lisp-obj)
-          (values (make-unprintable-object (format nil "invalid object #x~X" val))
-                  nil))))
+  (macrolet ((maybe-tag-tramp (x)
+               #!-(or sparc arm)
+               `(+ (- ,x
+                      (* sb!vm:n-word-bytes sb!vm:simple-fun-code-offset))
+                   sb!vm:fun-pointer-lowtag)
+               #!+(or sparc arm)
+               x))
+    (if (or
+         ;; fixnum
+         (zerop (logand val sb!vm:fixnum-tag-mask))
+         ;; immediate single float, 64-bit only
+         #!+64-bit
+         (= (logand val #xff) sb!vm:single-float-widetag)
+         ;; character
+         (and (zerop (logandc2 val #x1fffffff)) ; Top bits zero
+              (= (logand val #xff) sb!vm:character-widetag)) ; char tag
+         ;; unbound marker
+         (= val sb!vm:unbound-marker-widetag)
+         ;; undefined_tramp doesn't validate properly as a pointer, and
+         ;; the actual value can vary by backend (x86oids need not apply)
+         #!-(or x86 x86-64)
+         (= val (maybe-tag-tramp (foreign-symbol-address "undefined_tramp")))
+         #!+(or arm arm64)
+         (= val (maybe-tag-tramp (foreign-symbol-address "undefined_alien_function")))
+         ;; pointer
+         (not (zerop (valid-lisp-pointer-p (int-sap val)))))
+        (values (%make-lisp-obj val) t)
+        (if errorp
+            (error "~S is not a valid argument to ~S"
+                   val 'make-lisp-obj)
+            (values (make-unprintable-object (format nil "invalid object #x~X" val))
+                    nil)))))
 
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
   ;; NOTE: The long-float support in here is obviously decayed.  When
