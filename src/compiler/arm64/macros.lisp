@@ -217,7 +217,8 @@
               (inst b :eq ALIGNED2)
               (storew zr-tn ,result-tn -1 0)
               ALIGNED2
-              (inst add ,result-tn ,result-tn ,lowtag)))
+              (when ,lowtag
+                (inst add ,result-tn ,result-tn ,lowtag))))
            #!-gencgc
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)

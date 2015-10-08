@@ -33,7 +33,7 @@
   #+arm 8
   #+(and ppc darwin) 16
   #+(and ppc (not darwin)) 8
-  #+x86-64 16
+  #+(or arm64 x86-64) 16
   #+(and x86 (not darwin)) 4
   #+(and x86 darwin) 16
   #+sparc 8
