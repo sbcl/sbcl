@@ -68,7 +68,7 @@
          (instruction (sap-ref-32 pc 0))
          (error-number (ldb (byte 8 13) instruction)))
     (declare (type system-area-pointer pc))
-    (if (= error-number #.(error-number-or-lose 'invalid-arg-count-error))
+    (if (= (ldb (byte 8 5) instruction) invalid-arg-count-trap)
         (values error-number '(#.arg-count-sc))
         (let* ((length (sap-ref-8 pc 4))
                (vector (make-array length :element-type '(unsigned-byte 8)))
