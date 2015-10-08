@@ -915,7 +915,7 @@
 ;;; performance of, the functions implementing string streams
 ;;; (e.g. SB!IMPL::STRING-OUCH).
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun make-replace-transform (saetp sequence-type1 sequence-type2)
+  (defun !make-replace-transform (saetp sequence-type1 sequence-type2)
     `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
                             (,sequence-type1 ,sequence-type2 &rest t)
                             ,sequence-type1
@@ -965,11 +965,11 @@
        (loop for saetp across sb!vm:*specialized-array-element-type-properties*
              for sequence-type = `(simple-array ,(sb!vm:saetp-specifier saetp) (*))
              unless (= (sb!vm:saetp-typecode saetp) sb!vm::simple-array-nil-widetag)
-             collect (make-replace-transform saetp sequence-type sequence-type)
+             collect (!make-replace-transform saetp sequence-type sequence-type)
              into forms
              finally (return `(progn ,@forms))))
      (define-one-transform (sequence-type1 sequence-type2)
-       (make-replace-transform nil sequence-type1 sequence-type2)))
+       (!make-replace-transform nil sequence-type1 sequence-type2)))
   (define-replace-transforms)
   #!+sb-unicode
   (progn
