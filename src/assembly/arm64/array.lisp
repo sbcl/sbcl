@@ -49,9 +49,7 @@
     ;; Do that before storing length, since nil-arrays don't have any
     ;; space, but may have non-zero length.
     #!-gencgc
-    (inst mov ndescr 0)
-    #!-gencgc
-    (storew ndescr pa-flag -1)
+    (storew zr-tn pa-flag -1)
     (storew length vector vector-length-slot other-pointer-lowtag)
     (move result vector)))
 
@@ -65,28 +63,23 @@
      (:arg words any-reg r2-offset)
      (:res result descriptor-reg r0-offset)
 
-     (:temp ndescr non-descriptor-reg nl2-offset)
-     (:temp pa-flag non-descriptor-reg ocfp-offset)
-     (:temp vector descriptor-reg r8-offset))
+     (:temp temp non-descriptor-reg nl0-offset))
   ;; See why :LINK NIL is needed in ALLOCATE-VECTOR-ON-HEAP above.
-  (pseudo-atomic (pa-flag :link nil)
-    (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
-    (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
-    (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
-    (allocation vector ndescr other-pointer-lowtag
-                :flag-tn pa-flag
-                :stack-allocate-p t)
-    (inst lsr pa-flag type n-fixnum-tag-bits)
-    (storew pa-flag vector 0 other-pointer-lowtag)
+  (pseudo-atomic (temp :link nil)
+    (inst lsr temp type n-fixnum-tag-bits)
+    (inst lsl words words (- word-shift n-fixnum-tag-bits))
+    (inst add words words (* (1+ vector-data-offset) n-word-bytes))
+    (inst and words words (bic-mask lowtag-mask)) ; double-word align
+    (allocation result words nil :stack-allocate-p t)
+
+    (inst stp temp length (@ result))
     ;; Zero fill
-    (let ((loop (gen-label)))
-      (inst sub result vector (- other-pointer-lowtag n-word-bytes))
+    (assemble ()
       ;; The header word has already been set, skip it.
-      (inst sub ndescr ndescr (fixnumize 1))
-      (inst mov pa-flag 0)
-      (emit-label loop)
-      (inst str pa-flag (@ result n-word-bytes :post-index))
-      (inst subs ndescr ndescr (fixnumize 1))
-      (inst b :gt loop))
-    (storew length vector vector-length-slot other-pointer-lowtag)
-    (move result vector)))
+      (inst add temp result (* n-word-bytes 2))
+      (inst add words result words)
+      LOOP
+      (inst stp zr-tn zr-tn (@ temp (* n-word-bytes 2) :post-index))
+      (inst cmp temp words)
+      (inst b :lt LOOP))
+    (inst orr result result other-pointer-lowtag)))
