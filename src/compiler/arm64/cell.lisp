@@ -211,15 +211,16 @@
     (inst b :eq DONE)
 
     LOOP
-    (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
+    (inst ldp value symbol (@ bsp-temp (* (- binding-value-slot binding-size)
+                                          n-word-bytes)))
     (inst cbz symbol ZERO)
 
-    (loadw value bsp-temp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zr-tn bsp-temp (- binding-symbol-slot binding-size))
     ZERO
-    (storew zr-tn bsp-temp (- binding-value-slot binding-size))
-    (inst sub bsp-temp bsp-temp (* binding-size n-word-bytes))
+    (inst stp zr-tn zr-tn (@ bsp-temp (* (- binding-value-slot binding-size)
+                                                n-word-bytes)
+                                             :post-index))
+
     (inst cmp where bsp-temp)
     (inst b :ne LOOP)
 
