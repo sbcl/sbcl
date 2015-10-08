@@ -162,7 +162,8 @@
                               (inst ,(case size
                                        (:byte (if signed 'ldrsb 'ldrb))
                                        (:short (if signed 'ldrsh 'ldrh))
-                                       (t (if signed 'ldrsw 'ldr)))
+                                       (:word (if signed 'ldrsw 'ldr))
+                                       (t 'ldr))
                                     ,(if (eq size :word)
                                          '(32-bit-reg result)
                                          'result)
