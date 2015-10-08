@@ -23,34 +23,6 @@
 
 ;;;; package hacking
 
-;;; Our cross-compilation host is out of the picture now, so we no
-;;; longer need to worry about collisions between our package names
-;;; and cross-compilation host package names, so now is a good time to
-;;; rename any package with a bootstrap-only name SB!FOO to its
-;;; permanent name SB-FOO.
-;;;
-;;; (In principle it might be tidier to do this when dumping the cold
-;;; image in genesis, but in practice the logic might be a little
-;;; messier because genesis dumps both symbols and packages, and we'd
-;;; need to make sure that dumped symbols were renamed in the same way
-;;; as dumped packages. Or we could do it in cold init, but it's
-;;; easier to experiment with and debug things here in warm init than
-;;; in cold init, so we do it here instead.)
-(let ((boot-prefix "SB!")
-      (perm-prefix "SB-"))
-  (dolist (package (list-all-packages))
-    (let ((old-package-name (package-name package)))
-      (when (and (>= (length old-package-name) (length boot-prefix))
-                 (string= boot-prefix old-package-name
-                          :end2 (length boot-prefix)))
-        (let ((new-package-name (concatenate 'string
-                                             perm-prefix
-                                             (subseq old-package-name
-                                                     (length boot-prefix)))))
-          (rename-package package
-                          new-package-name
-                          (package-nicknames package)))))))
-
 ;;; FIXME: This nickname is a deprecated hack for backwards
 ;;; compatibility with code which assumed the CMU-CL-style
 ;;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated

@@ -883,7 +883,7 @@
 ;;; unspecified. We try to signal errors in such cases.
 (defun find-undeleted-package-or-lose (package-designator)
   (let ((maybe-result (%find-package-or-lose package-designator)))
-    (if (package-name maybe-result)     ; if not deleted
+    (if (package-%name maybe-result)    ; if not deleted
         maybe-result
         (error 'simple-package-error
                :package maybe-result
@@ -994,14 +994,6 @@
      (%failed-aver ',expr)))
 
 (defun %failed-aver (expr)
-  ;; hackish way to tell we're in a cold sbcl and output the
-  ;; message before signalling error, as it may be this is too
-  ;; early in the cold init.
-  (when (find-package "SB!C")
-    (fresh-line)
-    (write-line "failed AVER:")
-    (write expr)
-    (terpri))
   (bug "~@<failed AVER: ~2I~_~A~:>" expr))
 
 (defun bug (format-control &rest format-arguments)

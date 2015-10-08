@@ -1145,7 +1145,8 @@ core and return a descriptor to it."
                  (patch-instance-layout cold-package *package-layout*)
                  ;; Initialize string slots
                  (write-slots cold-package package-layout
-                              :%name (base-string-to-core name)
+                              :%name (base-string-to-core
+                                      (target-package-name name))
                               :%nicknames (chill-nicknames name)
                               :doc-string (if docstring
                                               (base-string-to-core docstring)
@@ -1153,6 +1154,10 @@ core and return a descriptor to it."
                               :%use-list *nil-descriptor*)
                  ;; the cddr of this will accumulate the 'used-by' package list
                  (push (list name cold-package) target-pkg-list)))
+             (target-package-name (string)
+               (if (eql (mismatch string "SB!") 3)
+                   (concatenate 'string "SB-" (subseq string 3))
+                   string))
              (chill-nicknames (pkg-name)
                (let ((result *nil-descriptor*))
                  ;; Make the package nickname lists for the standard packages
@@ -1166,7 +1171,12 @@ core and return a descriptor to it."
                                 ((string= pkg-name "COMMON-LISP-USER")
                                  '("CL-USER"))
                                 ((string= pkg-name "KEYWORD") '())
-                                (t (package-nicknames (find-package pkg-name))))
+                                (t
+                                 ;; 'package-data-list' contains no nicknames.
+                                 ;; (See comment in 'set-up-cold-packages')
+                                 (aver (null (package-nicknames
+                                              (find-package pkg-name))))
+                                 nil))
                           result)
                    (cold-push (base-string-to-core nickname) result))))
              (find-cold-package (name)

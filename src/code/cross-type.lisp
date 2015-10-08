@@ -455,7 +455,7 @@
             ;; Beyond this, there seems to be no portable correspondence.
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
     (structure!object
-     (find-classoid (uncross (class-name (class-of x)))))
+     (find-classoid (uncross (class-name (class-of x))))) ; FIXME: TYPE-OF?
     (t
      ;; There might be more cases which we could handle with
      ;; sufficient effort; since all we *need* to handle are enough

@@ -219,10 +219,7 @@
                 ;; but it will immediately lead to undefined to behavior,
                 ;; since almost any operation on a deleted package is
                 ;; undefined.
-                ;; The "%" accessor avoids calling %FIND-PACKAGE-OR-LOSE,
-                ;; though it probably does not make much difference, if any.
-                (#+sb-xc-host package-name #-sb-xc-host package-%name
-                 maybe-package))
+                (package-%name maybe-package))
            maybe-package)
           (t
            ;; We're in the undefined behavior zone. First, munge the

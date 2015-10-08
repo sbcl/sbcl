@@ -223,6 +223,24 @@
   (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
 
+    (encapsulate
+     'find-package '!bootstrap
+     (lambda (f designator)
+       (cond ((packagep designator) designator)
+             (t (funcall f (let ((s (string designator)))
+                             (if (eql (mismatch s "SB!") 3)
+                                 (concatenate 'string "SB-" (subseq s 3))
+                                 s)))))))
+    (encapsulate '%failed-aver '!bootstrap
+                 (lambda (f expr)
+                   ;; output the message before signaling error,
+                   ;; as it may be this is too early in the cold init.
+                   (fresh-line)
+                   (write-line "failed AVER:")
+                   (write expr)
+                   (terpri)
+                   (funcall f expr)))
+
     (dolist (toplevel-thing (prog1
                                 (nreverse *!reversed-cold-toplevels*)
                               ;; (Now that we've NREVERSEd it, it's
@@ -255,6 +273,8 @@
             (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
         (t (!cold-lose "bogus operation in *!REVERSED-COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
+  (unencapsulate '%failed-aver '!bootstrap)
+  (unencapsulate 'find-package '!bootstrap)
 
   ;; Set sane values again, so that the user sees sane values instead
   ;; of whatever is left over from the last DECLAIM/PROCLAIM.

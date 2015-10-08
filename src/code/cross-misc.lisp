@@ -181,6 +181,11 @@
 
 (declaim (declaration enable-package-locks disable-package-locks))
 
+;; Nonstandard accessor for when you know you have a valid package in hand.
+;; This avoids double lookup in *PACKAGE-NAMES* in a few places.
+;; But portably we have to just fallback to PACKAGE-NAME.
+(defun package-%name (x) (package-name x))
+
 ;;; printing structures
 
 (defun default-structure-print (structure stream depth)
