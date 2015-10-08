@@ -133,8 +133,10 @@
     (format stream "#~D" value))
 
   (defun decode-scaled-immediate (value)
-    (destructuring-bind (size opc value) value
-      (ash value (logior (ash opc 2) size))))
+    (destructuring-bind (size opc value simd) value
+      (if (= simd 1)
+          (ash value (logior (ash opc 2) size))
+          (ash value size))))
 
   (defun print-scaled-immediate (value stream dstate)
     (declare (ignore dstate))
@@ -1373,8 +1375,9 @@
      :default-printer '(:name :tab rt  ", [" rn "], " imm)
      :include ldr-str)
     (op3 :value #b01)
-    (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10)) :type 'scaled-immediate)
-    (ldr-str-annotation :fields (list (byte 2 30) (byte 1 23) (byte 12 10))))
+    (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10) (byte 1 26))
+         :type 'scaled-immediate)
+    (ldr-str-annotation :fields (list (byte 2 30) (byte 1 23) (byte 12 10) (byte 1 26))))
 
 (def-emitter ldr-str-unscaled-imm
   (size 2 30)
@@ -1483,7 +1486,10 @@
                 (eq mode :offset))
            (emit-ldr-str-unsigned-imm segment size
                                       v opc
-                                      (ash offset (- (logior (ash (ldb (byte 1 1) opc) 2) size)))
+                                      (if fp
+                                          (ash offset (- (logior (ash (ldb (byte 1 1) opc) 2)
+                                                                 size)))
+                                          (ash offset (- size)))
                                       (tn-offset base)
                                       dst))
           ((and index-encoding
