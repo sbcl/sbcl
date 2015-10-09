@@ -1037,7 +1037,7 @@
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.
                               (mapcar #'find-package '(sb!c sb!int sb!impl
-                                                       sb!kernel sb!pcl)))))
+                                                       sb!kernel sb!pcl)) t)))
                 ;; Consistent treatment of *FOO* vs (SYMBOL-VALUE '*FOO*):
                 ;; we insert calls to SYMBOL-VALUE for most non-lexical
                 ;; variable references in order to avoid them being elided

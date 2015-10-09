@@ -412,7 +412,7 @@
                      (when variant
                        (write-char #\- s)
                        (write-string (symbol-name variant) s)))
-                   (load-time-value (find-package "SB!KERNEL")))
+                   (load-time-value (find-package "SB!KERNEL") t))
       (bug "Unknown list item seek transform: name=~S, key-functions=~S variant=~S"
            function-name key-functions variant)))
 
@@ -624,7 +624,8 @@
            (let* ((n-bits (sb!vm:saetp-n-bits saetp))
                   (basher-name (format nil "UB~D-BASH-FILL" n-bits))
                   (basher (or (find-symbol basher-name
-                                           (load-time-value (find-package "SB!KERNEL")))
+                                           (load-time-value
+                                            (find-package "SB!KERNEL") t))
                               (abort-ir1-transform
                                "Unknown fill basher, please report to sbcl-devel: ~A"
                                basher-name)))
