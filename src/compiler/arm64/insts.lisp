@@ -1532,12 +1532,14 @@
           (t
            (error "Invalid STR/LDR arguments: ~s ~s" dst address)))))
 
-(defmacro def-load-store (name size opc)
+(defmacro def-load-store (name size opc &rest printers)
   `(define-instruction ,name (segment dst address)
-     (:printer ldr-str-unsigned-imm ((size ,size) (op ,opc)))
-     (:printer ldr-str-reg ((size ,size) (op ,opc)))
+     (:printer ldr-str-unsigned-imm ((size ,size) (op ,opc) (v 0)))
+     (:printer ldr-str-reg ((size ,size) (op ,opc) (v 0)))
      (:printer ldr-str-unscaled-imm (,@(and size `((size ,size)))
-                                     (op ,opc)))
+                                     (op ,opc)
+                                     (v 0)))
+     ,@printers
      (:emitter
       (emit-load-store ,size ,opc segment dst address))))
 
@@ -1548,13 +1550,25 @@
 (def-load-store ldrh 1 #b01)
 (def-load-store ldrsh 1 #b10)
 (def-load-store ldrsw #b10 #b10)
-(def-load-store str nil #b00)
+
+(def-load-store str nil #b00
+  (:printer ldr-str-unsigned-imm ((op 0)))
+  (:printer ldr-str-reg ((op 0)))
+  (:printer ldr-str-unscaled-imm ((op 0)))
+  ;; 128-bit stores
+  (:printer ldr-str-unsigned-imm ((size #b00) (op #b10) (v 1)))
+  (:printer ldr-str-reg ((size #b00) (op #b10) (v 1)))
+  (:printer ldr-str-unscaled-imm ((size #b00) (op #b10) (v 1))))
 
 (define-instruction ldr (segment dst address)
   (:printer ldr-str-unsigned-imm ((op #b01)))
   (:printer ldr-str-reg ((op #b01)))
   (:printer ldr-str-unscaled-imm ((op #b01)))
   (:printer ldr-literal ())
+  ;; 128-bit loads
+  (:printer ldr-str-unsigned-imm ((op #b11)))
+  (:printer ldr-str-reg ((op #b11)))
+  (:printer ldr-str-unscaled-imm ((op #b11)))
   (:emitter
    (if (label-p address)
        (emit-back-patch segment 4
