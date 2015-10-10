@@ -68,11 +68,12 @@
   ;; [Also note, we won't encapsulate a macro or special-form, so this
   ;; introspective technique to decide what kind something is works either way]
   (let ((def (fdefinition symbol)))
-    (acond ((macro/special-guard-fun-p def)
-            (error (if (eq it :special)
-                       "~S names a special operator." "~S names a macro.")
-                   symbol))
-           (t def))))
+    (if (macro/special-guard-fun-p def)
+        (error (ecase (car (%fun-name def))
+                (:macro "~S names a macro.")
+                (:special "~S names a special operator."))
+               symbol)
+        def)))
 
 (defun coerce-to-fun (object)
   ;; (Unlike the other COERCE-TO-FOOs, this one isn't inline, because

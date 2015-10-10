@@ -281,8 +281,8 @@
   "A list of functions that (SETF FDEFINITION) invokes before storing the
    new value. The functions take the function name and the new value.")
 
-;; Return :MACRO or :SPECIAL if FUNCTION is the error-signaling trampoline
-;; for a macro or a special operator respectively. Test for this by seeing
+;; Return T if FUNCTION is the error-signaling trampoline
+;; for a macro or a special operator. Test for this by seeing
 ;; whether FUNCTION is the same closure as for a known macro.
 ;; For cold-init to work, this must pick any macro defined before
 ;; this function is. A safe choice is a macro from this same file.
@@ -292,10 +292,7 @@
        ;; %closure-fun to 0, which is ok - it returns NIL.
        (eq (load-time-value
             (%closure-fun (symbol-function '%coerce-name-to-fun)) t)
-           (%closure-fun function))
-       ;; This is not super-efficient, but every code path that gets
-       ;; here does so with the intent of signaling an error.
-       (car (%fun-name function))))
+           (%closure-fun function))))
 
 ;; Reject any "object of implementation-dependent nature" that
 ;; so happens to be a function in SBCL, but which must not be
