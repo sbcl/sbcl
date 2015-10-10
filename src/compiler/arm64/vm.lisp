@@ -314,7 +314,13 @@
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
-      (float-registers (format nil "F~D" offset)))))
+      (float-registers
+       (format nil "~A~D"
+               (sc-case tn
+                 (single-reg "S")
+                 ((double-reg complex-single-reg) "D")
+                 (complex-double-reg "Q"))
+               offset)))))
 
 (defun combination-implementation-style (node)
   (flet ((valid-funtype (args result)

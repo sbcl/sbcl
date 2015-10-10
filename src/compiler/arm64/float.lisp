@@ -670,9 +670,15 @@
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (tn-offset r)))
-         (unless (location= real r)
-           (storew real nfp offset))
-         (storew imag nfp (1+ offset)))))))
+         (cond ((location= real r)
+                (inst str imag
+                      (@ nfp (load-store-offset (+ (* offset n-word-bytes) 4)))))
+               ((ldp-stp-offset-p offset 32)
+                (inst stp real imag (@ nfp offset)))
+               (t
+                (storew real nfp offset)
+                (inst str imag
+                      (@ nfp (load-store-offset (+ (* offset n-word-bytes) 4)))))))))))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -694,9 +700,13 @@
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (tn-offset r)))
-         (unless (location= real r)
-           (storew real nfp offset))
-         (storew imag nfp (+ offset 2)))))))
+         (cond ((location= real r)
+                (storew imag nfp (1+ offset)))
+               ((ldp-stp-offset-p offset 64)
+                (inst stp real imag (@ nfp offset)))
+               (t
+                (storew real nfp offset)
+                (storew imag nfp (1+ offset)))))))))
 
 
 (define-vop (complex-single-float-value)
@@ -716,8 +726,13 @@
                            (:imag 1))
              :s))
       (complex-single-stack
-       (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 1))
-                                        (tn-offset x)))))))
+       (inst ldr r
+             (@ (current-nfp-tn vop)
+                (load-store-offset
+                 (+ (* n-word-bytes (tn-offset x))
+                    (ecase slot
+                      (:real 0)
+                      (:imag 4))))))))))
 
 (define-vop (realpart/complex-single-float complex-single-float-value)
   (:translate realpart)
@@ -746,7 +761,7 @@
                            (:imag 1))
              :d))
       (complex-double-stack
-       (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 2))
+       (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 1))
                                         (tn-offset x)))))))
 
 (define-vop (realpart/complex-double-float complex-double-float-value)

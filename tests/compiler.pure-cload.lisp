@@ -131,7 +131,7 @@
            (declare (type (simple-array (unsigned-byte 32) (*)) a))
            (declare (type (function (fixnum)) f))
            (funcall f (aref a 0))))
-    #-x86-64
+    #-64-bit
     (assert
      (eval `(let ((n (1+ most-positive-fixnum)))
               (if (not (typep n '(unsigned-byte 32)))
