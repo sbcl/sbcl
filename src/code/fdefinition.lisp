@@ -45,22 +45,20 @@
 ;; have been verified to be a symbol by the caller.
 (defun symbol-fdefn (symbol)
   (declare (optimize (safety 0)))
-  (info-vector-fdefn (symbol-info-vector (uncross symbol))))
+  (info-vector-fdefn (symbol-info-vector symbol)))
 
 ;; Return the fdefn object for NAME, or NIL if there is no fdefn.
 ;; Signal an error if name isn't valid.
 ;; Assume that exists-p implies LEGAL-FUN-NAME-P.
 ;;
 (declaim (ftype (sfunction ((or symbol list)) (or fdefn null)) find-fdefn))
-(defun find-fdefn (name0)
-  ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
-  (let ((name (uncross name0)))
-    (declare (optimize (safety 0)))
-    (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
-      (return-from find-fdefn (symbol-fdefn name)))
-    ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
-    ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
-    (with-globaldb-name (key1 key2 nil) name
+(defun find-fdefn (name)
+  (declare (optimize (safety 0)))
+  (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
+    (return-from find-fdefn (symbol-fdefn name)))
+  ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
+  ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
+  (with-globaldb-name (key1 key2 nil) name
       :hairy
       ;; INFO-GETHASH returns NIL or a vector. INFO-VECTOR-FDEFN accepts
       ;; either. If fdefn isn't found, fall through to the legality test.
@@ -84,15 +82,14 @@
                   (aref it (1- (the index data-idx))))))))
         (when (eq key1 'setf) ; bypass the legality test
           (return-from find-fdefn nil))))
-    (legal-fun-name-or-type-error name)))
+  (legal-fun-name-or-type-error name))
 
 (declaim (ftype (sfunction (t) fdefn) find-or-create-fdefn))
 (defun find-or-create-fdefn (name)
   (or (find-fdefn name)
       ;; We won't reach here if the name was not legal
-      (let ((name (uncross name)))
-        (get-info-value-initializing :function :definition name
-                                     (make-fdefn name)))))
+      (get-info-value-initializing :function :definition name
+                                   (make-fdefn name))))
 
 (defun maybe-clobber-ftype (name)
   (unless (eq :declared (info :function :where-from name))
