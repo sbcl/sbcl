@@ -180,7 +180,6 @@
    value expression. Evaluates all of the expressions in turn, then
    assigns the value of each expression to the place on its left,
    returning the value of the leftmost."
-  (declare (type sb!c::lexenv env))
   (when (< (length args) 2)
     (error "~S called with too few arguments: ~S" 'shiftf form))
   (collect ((let-bindings) (mv-bindings) (setters) (getters))
@@ -266,7 +265,6 @@
    expressions in turn, then assigns to each place the value of the form to
    its right. The rightmost form gets the value of the leftmost.
    Returns NIL."
-  (declare (type sb!c::lexenv env))
   (when args
     (collect ((let*-bindings) (mv-bindings) (setters) (getters))
       (dolist (arg args)
@@ -617,7 +615,6 @@
        (%defsetf ',access-fn ,def nil ,@(and doc `(,doc))))))
 
 (sb!xc:define-setf-expander values (&rest places &environment env)
-  (declare (type sb!c::lexenv env))
   (collect ((setters) (getters))
     (let ((all-dummies '())
           (all-vals '())
@@ -637,7 +634,6 @@
               `(values ,@(setters)) `(values ,@(getters))))))
 
 (sb!xc:define-setf-expander getf (place prop &optional default &environment env)
-  (declare (type sb!c::lexenv env))
   (binding* (((place-tempvars place-tempvals stores set get)
               (sb!xc:get-setf-expansion place env))
              ((call-tempvars call-tempvals call-args bitmask)
