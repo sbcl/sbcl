@@ -197,6 +197,16 @@
                              (#b01 "D")
                              (#b10 "Q"))
                            reg)))))))
+
+  (defun print-float-reg (value stream dstate)
+    (let* ((inst (current-instruction dstate))
+           (type (ldb (byte 1 22) inst)))
+      (format stream "~a~d"
+              (if (= type 1)
+                  "D"
+                  "S")
+              value)))
+
   (defun print-sys-reg (value stream dstate)
     (declare (ignore dstate))
     (princ (decode-sys-reg value) stream))
@@ -295,6 +305,9 @@
 
   (sb!disassem:define-arg-type reg-float-reg
     :printer #'print-reg-float-reg)
+
+  (sb!disassem:define-arg-type float-reg
+    :printer #'print-float-reg)
 
   (sb!disassem:define-arg-type sys-reg
     :printer #'print-sys-reg)
@@ -1607,6 +1620,14 @@
     (rt2 :fields (list (byte 2 30) (byte 5 10)) :type 'reg-float-reg)
     (rt :fields (list (byte 2 30) (byte 5 0))))
 
+(defun ldp-stp-offset-p (offset size)
+  (multiple-value-bind (quot rem) (truncate offset (ecase size
+                                                     (32 4)
+                                                     (64 8)
+                                                     (128 16)))
+    (and (zerop rem)
+         (typep quot '(signed-byte 7)))))
+
 (defun emit-ldr-str-pair-inst (l segment rt1 rt2 address)
   (let* ((base (memory-operand-base address))
          (offset (memory-operand-offset address))
@@ -1626,18 +1647,22 @@
          (v  (if fp
                  1
                  0))
+         (size 3)
          (opc (cond ((not fp)
                      #b10)
                      (t
                       (fp-reg-type rt1)))))
-    (assert (not (ldb-test (byte 3 0) offset)))
+    (when fp
+      (setf size (+ opc 2)))
+    (assert (not (ldb-test (byte size 0) offset)))
     (emit-ldr-str-pair segment opc v
                        (ecase mode
                          (:post-index #b01)
                          (:pre-index #b11)
                          (:offset #b10))
                        l
-                       (ash offset -3) (tn-offset rt2) (tn-offset base) (tn-offset rt1))))
+                       (ash offset (- size))
+                       (tn-offset rt2) (tn-offset base) (tn-offset rt1))))
 
 (define-instruction stp (segment rt1 rt2 address)
   (:printer ldr-str-pair ((l 0)))
@@ -1968,8 +1993,24 @@
   (z 1 3)
   (#b000 3 0))
 
+(sb!disassem:define-instruction-format
+    (fp-compare 32 :default-printer '(:name :tab rn ", " rm))
+    (op1 :field (byte 9 23) :value #b000111100)
+    (type :field (byte 1 22))
+    (rm :field (byte 5 16) :type 'float-reg)
+    (op2 :field (byte 6 10) :value #b001000)
+    (rn :field (byte 5 5) :type 'float-reg)
+    (op :field (byte 1 4))
+    (z :field (byte 1 3))
+    (op3 :field (byte 3 0) :value #b0))
+
 (defmacro def-fp-compare (name op)
   `(define-instruction ,name (segment rn rm)
+     (:printer fp-compare ((op ,op)))
+     (:printer fp-compare ((op ,op) (z 1) (type 0))
+               '(:name :tab rn ", " 0s0))
+     (:printer fp-compare ((op ,op) (z 1) (type 1))
+               '(:name :tab rn ", " 0d0))
      (:emitter
       (assert (or (eql rm 0)
                   (eq (tn-sc rn)
@@ -1990,6 +2031,11 @@
 (def-fp-compare fcmp #b0)
 (def-fp-compare fcmpe #b1)
 
+(sb!disassem:define-instruction-format
+    (fp-data-processing 32)
+    (rn :field (byte 5 5) :type 'float-reg)
+    (rd :field (byte 5 0) :type 'float-reg))
+
 (def-emitter fp-data-processing-1
   (#b000111100 9 23)
   (type 1 22)
@@ -1998,6 +2044,15 @@
   (#b10000 5 10)
   (rn 5 5)
   (rd 5 0))
+
+(sb!disassem:define-instruction-format
+    (fp-data-processing-1 32
+     :include fp-data-processing
+     :default-printer '(:name :tab rd ", " rn))
+    (op2 :field (byte 9 23) :value #b000111100)
+    (op3 :field (byte 3 19) :value #b100)
+    (op :field (byte 4 15))
+    (:op4 :field (byte 5 10) :value #b10000))
 
 (def-emitter fp-data-processing-2
   (#b000111100 9 23)
@@ -2009,8 +2064,18 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (fp-data-processing-2 32
+     :include fp-data-processing
+     :default-printer '(:name :tab rd ", " rn ", " rm))
+    (op2 :field (byte 9 23) :value #b000111100)
+    (op3 :field (byte 1 21) :value #b1)
+    (rm :field (byte 5 16) :type 'float-reg)
+    (op :field (byte 4 12))
+    (:op4 :field (byte 2 10) :value #b10))
+
 (def-emitter fp-data-processing-3
-    (#b000111110 9 23)
+  (#b000111110 9 23)
   (type 1 22)
   (o1 1 21)
   (rm 5 16)
@@ -2018,6 +2083,16 @@
   (ra 5 10)
   (rn 5 5)
   (rd 5 0))
+
+(sb!disassem:define-instruction-format
+    (fp-data-processing-3 32
+     :include fp-data-processing
+     :default-printer '(:name :tab rd ", " rn ", " rm ", " ra))
+    (op4 :field (byte 9 23) :value #b000011110)
+    (op1 :field (byte 1 21))
+    (op2 :field (byte 1 15))
+    (rm :field (byte 5 16) :type 'float-reg)
+    (ra :field (byte 5 10) :type 'float-reg))
 
 (def-emitter fp-conversion
   (size 1 31)
@@ -2029,8 +2104,19 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (fp-conversion 32
+     :include fp-data-processing
+     :default-printer '(:name :tab rd ", " rn))
+    (op2 :field (byte 8 23) :value #b00111100)
+    (type :field (byte 1 22))
+    (op1 :field (byte 1 21) :value #b1)
+    (op :field (byte 5 16))
+    (op3 :field (byte 6 10) :value #b0))
+
 (defmacro def-fp-data-processing-1 (name op)
   `(define-instruction ,name (segment rd rn)
+     (:printer fp-data-processing-1 ((op ,op)))
      (:emitter
       (assert (and (eq (tn-sc rd)
                        (tn-sc rn)))
@@ -2063,6 +2149,7 @@
 
 (defmacro def-fp-data-processing-2 (name op)
   `(define-instruction ,name (segment rd rn rm)
+     (:printer fp-data-processing-2 ((op ,op)))
      (:emitter
       (assert (and (eq (tn-sc rd)
                        (tn-sc rn))
@@ -2089,6 +2176,7 @@
 
 (defmacro def-fp-data-processing-3 (name o1 o2)
   `(define-instruction ,name (segment rd rn rm ra)
+     (:printer fp-data-processing-3 ((op1 ,o1) (op2 ,o2)))
      (:emitter
       (assert (and (eq (tn-sc rd)
                        (tn-sc rn))
@@ -2116,6 +2204,10 @@
 
 (defmacro def-fp-conversion (name op &optional from-int)
   `(define-instruction ,name (segment rd rn)
+     (:printer fp-conversion ((op ,op) (,(if from-int
+                                               'rn
+                                               'rd)
+                                          nil :type 'reg)))
      (:emitter
       ,@(if from-int
             `((assert (fp-register-p rd)
@@ -2153,6 +2245,9 @@
 (def-fp-conversion fcvtzu #b11001)
 
 (define-instruction fmov (segment rd rn)
+  (:printer fp-conversion ((op #b110) (rd nil :type 'reg)))
+  (:printer fp-conversion ((op #b111) (rn nil :type 'reg)))
+  (:printer fp-data-processing-1 ((op #b0)))
   (:emitter
    (cond ((or (sc-is rd complex-double-reg complex-single-reg)
               (sc-is rn complex-double-reg complex-single-reg)))
