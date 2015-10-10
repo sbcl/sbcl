@@ -910,19 +910,21 @@ unless :NAMED is also specified.")))
       (setf (layout-source-location layout) source-location))))
 
 
-;;; Return a form describing the writable place used for this slot
-;;; in the instance named INSTANCE-NAME.
-(defun %accessor-place-form (dd dsd instance-name)
-  (let (;; the operator that we'll use to access a typed slot
+;;; Return a form accessing the writable place used for the slot
+;;; described by DD and DSD in the INSTANCE (a form).
+(defun %accessor-place-form (dd dsd instance)
+  (let (;; Compute REF even if not using it, as a sanity-check of DD-TYPE.
         (ref (ecase (dd-type dd)
                (structure '%instance-ref)
-               (list 'nth-but-with-sane-arg-order)
+               (list 'nth)
                (vector 'aref)))
+        (index (dsd-index dsd))
         (raw-type (dsd-raw-type dsd)))
     (if (eq raw-type t) ; if not raw slot
-        `(,ref ,instance-name ,(dsd-index dsd))
-        `(,(raw-slot-data-accessor-name (raw-slot-data-or-lose raw-type))
-          ,instance-name ,(dsd-index dsd)))))
+        (multiple-value-call 'list ref
+         (if (eq ref 'nth) (values index instance) (values instance index)))
+        `(,(raw-slot-data-accessor-name
+            (raw-slot-data-or-lose raw-type)) ,instance ,index))))
 
 ;;; Return the transform of conceptual FUNCTION one of {:READ,:WRITE,:SETF}
 ;;; as applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.
@@ -1662,20 +1664,13 @@ or they must be declared locally notinline at each call site.~@:>")
 (defun accessor-definitions (dd)
   (loop for dsd in (dd-slots dd)
         for accessor-name = (dsd-accessor-name dsd)
-        for place-form = (%accessor-place-form dd dsd `(the ,(dd-name dd) instance))
         unless (accessor-inherited-data accessor-name dd)
-        collect
-        `(defun ,accessor-name (instance)
-           ,(cond ((not (dsd-type dsd))
-                   place-form)
-                  ((dsd-safe-p dsd)
-                   `(truly-the ,(dsd-type dsd) ,place-form))
-                  (t
-                   `(the ,(dsd-type dsd) ,place-form))))
-        and unless (dsd-read-only dsd)
-        collect
-        `(defun (setf ,accessor-name) (value instance)
-           (setf ,place-form (the ,(dsd-type dsd) value)))))
+        nconc (dx-let ((key (cons dd dsd)))
+                `(,@(unless (dsd-read-only dsd)
+                     `((defun (setf ,accessor-name) (value instance)
+                         ,(slot-access-transform :setf '(instance value) key))))
+                  (defun ,accessor-name (instance)
+                    ,(slot-access-transform :read '(instance) key))))))
 
 (defun copier-definition (dd)
   (when (dd-copier-name dd)

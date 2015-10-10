@@ -393,15 +393,6 @@
 (defun neq (x y)
   (not (eq x y)))
 
-;;; not really an old-fashioned function, but what the calling
-;;; convention should've been: like NTH, but with the same argument
-;;; order as in all the other indexed dereferencing functions, with
-;;; the collection first and the index second
-(declaim (inline nth-but-with-sane-arg-order))
-(declaim (ftype (function (list index) t) nth-but-with-sane-arg-order))
-(defun nth-but-with-sane-arg-order (list index)
-  (nth index list))
-
 (defun adjust-list (list length initial-element)
   (let ((old-length (length list)))
     (cond ((< old-length length)
