@@ -162,18 +162,18 @@
              (loadw (tn-ref-tn values) start)
              ZERO))
           (t
-           (inst cmp count (fixnumize 1))
            (do ((i 0 (1+ i))
                 (tn-ref values (tn-ref-across tn-ref)))
                ((null tn-ref))
              (let ((tn (tn-ref-tn tn-ref)))
+               (inst subs count count (fixnumize 1))
                (sc-case tn
                  ((descriptor-reg any-reg)
                   (assemble ()
-                            (move tn null-tn)
-                            (inst b :lt LESS-THAN)
-                            (loadw tn start i)
-                            LESS-THAN))
+                    (move tn null-tn)
+                    (inst b :lt LESS-THAN)
+                    (loadw tn start i)
+                    LESS-THAN))
                  (control-stack
                   (assemble ()
                     (move move-temp null-tn)
