@@ -195,8 +195,8 @@
     ;; The order of stores here is reversed with respect to interrupt safety,
     ;; but STP cannot be interrupted in the middle.
     (inst stp zr-tn zr-tn (@ bsp-temp (* (- binding-value-slot binding-size)
-                                                  n-word-bytes)))
-    (inst sub bsp-temp bsp-temp (* binding-size n-word-bytes))
+                                         n-word-bytes)
+                                      :pre-index))
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
 
 (define-vop (unbind-to-here)
