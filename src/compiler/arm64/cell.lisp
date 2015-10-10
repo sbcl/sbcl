@@ -218,8 +218,8 @@
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     ZERO
     (inst stp zr-tn zr-tn (@ bsp-temp (* (- binding-value-slot binding-size)
-                                                n-word-bytes)
-                                             :post-index))
+                                         n-word-bytes)
+                                      :pre-index))
 
     (inst cmp where bsp-temp)
     (inst b :ne LOOP)
