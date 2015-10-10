@@ -146,6 +146,9 @@ no_args:
 	// Correct stack pointer for return processing.
         csel reg_CSP, reg_OCFP, reg_CSP, eq
 
+        // Return value
+        mov     x0, reg_R0
+
 	ENTER_PA
 
 
