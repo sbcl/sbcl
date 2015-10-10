@@ -508,7 +508,7 @@ write_generation_stats(FILE *file)
     #define FPU_STATE_SIZE 8
     long long fpu_state[FPU_STATE_SIZE];
 #elif defined(LISP_FEATURE_ARM64)
-    #define FPU_STATE_SIZE 32
+    #define FPU_STATE_SIZE 64
     long fpu_state[FPU_STATE_SIZE];
 #endif
 
