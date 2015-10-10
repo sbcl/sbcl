@@ -1107,8 +1107,11 @@
                   (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
                ,@(when (and docstring (eq doc-string-allowed :internal))
                    (prog1 (list docstring) (setq docstring nil)))
-               ;; Normalize the lambda list by unparsing.
-               (declare (lambda-list ,(unparse-ds-lambda-list parse)))
+               ;; MACROLET doesn't produce an object capable of reflection,
+               ;; so don't bother inserting a different lambda-list.
+               ,@(unless (eq kind 'macrolet)
+                   ;; Normalize the lambda list by unparsing.
+                   `((declare (lambda-list ,(unparse-ds-lambda-list parse)))))
                ,@(if outer-decls (list outer-decls))
                ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
                ,@(sb!c:macro-policy-decls)
