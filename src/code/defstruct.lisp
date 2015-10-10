@@ -924,39 +924,46 @@ unless :NAMED is also specified.")))
         `(,(raw-slot-data-accessor-name (raw-slot-data-or-lose raw-type))
           ,instance-name ,(dsd-index dsd)))))
 
-;;; Return the transformation of conceptual FUNCTION (either :READ or :WRITE)
-;;; applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.
+;;; Return the transform of conceptual FUNCTION one of {:READ,:WRITE,:SETF}
+;;; as applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.
 ;;; Return NIL on failure.
 (defun slot-access-transform (function args slot-key)
   (when (consp args) ; need at least one arg
     (let* ((dd (car slot-key))
            (dsd (cdr slot-key))
            ;; optimistically compute PLACE before checking length of ARGS
-           ;; because we expect success, and this unifies the two cases.
-           ;; :WRITE has the arg order of (SETF fn), i.e. newval is first,
-           ;; so if more than one arg exists, take the second as the INSTANCE.
+           ;; because we expect success, and this unifies the three cases.
+           ;; :SETF is like an invocation of the SETF macro - newval is
+           ;; the second arg, but :WRITER is #'(SETF fn) - newval is first.
            (place
             (%accessor-place-form
              dd dsd `(the ,(dd-name dd)
-                          ,(car (if (consp (cdr args)) (cdr args) args)))))
+                       ,(car (if (eq function :write) (cdr args) args)))))
            (type-spec (dsd-type dsd)))
-      (ecase function
-        (:read
-         (when (singleton-p args)
-           (if (eq type-spec t)
-               place
-               `(,(if (dsd-safe-p dsd) 'truly-the 'the) ,type-spec ,place))))
-        (:write
-         (when (singleton-p (cdr args))
-           (once-only ((new (first args)))
-             ;; instance setters take newval last.
-             `(,(info :setf :inverse (car place)) ,@(cdr place)
-               ,(if (eq type-spec t) new `(the ,type-spec ,new))))))))))
+      (if (eq function :read)
+          (when (singleton-p args)
+            (if (eq type-spec t)
+                place
+                `(,(if (dsd-safe-p dsd) 'truly-the 'the) ,type-spec ,place)))
+          (when (singleton-p (cdr args))
+            (let ((inverse (info :setf :inverse (car place))))
+              (flet ((check (newval)
+                       (if (eq type-spec t) newval `(the ,type-spec ,newval))))
+                (ecase function
+                  (:setf
+                   ;; Instance setters take newval last, which matches
+                   ;; the order in which a use of SETF has them.
+                   `(,inverse ,@(cdr place) ,(check (second args))))
+                  (:write
+                   ;; The call to #'(SETF fn) had newval first.
+                   ;; We need to preserve L-to-R evaluation.
+                   (once-only ((new (first args)))
+                     `(,inverse ,@(cdr place) ,(check new))))))))))))
 
 ;;; Return a LAMBDA form which can be used to set a slot
 (defun slot-setter-lambda-form (dd dsd)
   `(lambda (newval instance)
-     ,(slot-access-transform :write '(newval instance) (cons dd dsd))))
+     ,(slot-access-transform :setf '(instance newval) (cons dd dsd))))
 
 ;;; Blow away all the compiler info for the structure CLASS. Iterate
 ;;; over this type, clearing the compiler structure type info, and

@@ -134,10 +134,39 @@
         (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
       (when (symbolp (setq place (macroexpand-for-setf place env)))
         (return-from setf `(setq ,place ,value-form)))
-      (let* ((fun (car place))
-             (inverse (info :setf :inverse fun)))
-        (when (and inverse (not (sb!c::fun-locally-defined-p fun env)))
-          (return-from setf `(,inverse ,@(cdr place) ,value-form))))
+
+      (let ((fun (car place)))
+        (when (and (symbolp fun)
+                   ;; Local definition of FUN precludes global knowledge.
+                   (not (sb!c::fun-locally-defined-p fun env)))
+          (awhen (info :setf :inverse fun)
+            (return-from setf `(,it ,@(cdr place) ,value-form)))
+
+          ;; If #'(SETF FUN) is a structure accessor, then source-transform it.
+          ;; Notinline declarations are obeyed, though technically needn't be.
+          ;; Implementators are free to treat SETF of struct slots however they
+          ;; choose, and users can't expect that declarations about (SETF ASLOT)
+          ;; are meaningful. Additionally, you're treading into undefined
+          ;; behavior by locally binding (SETF ASLOT) as a function name.
+          ;; This code will use the local fun, other implementations might not.
+          ;;
+          ;; Also this could be generalized by having GET-SETF-EXPANSION perform
+          ;; the transform, which could perhaps help INCF, but would complicate
+          ;; matters by requiring logic to delete extra LET bindings, which is
+          ;; the entire point of this - especially for an interpreter.
+          ;;
+          (when (singleton-p (cdr place)) ; if single argument call
+            (let ((slot-info (info :function :source-transform fun)))
+              (when (and (listp slot-info) ; is it a structure accessor?
+                         (typep (cdr slot-info) 'defstruct-slot-description))
+                (dx-let ((setter `(setf ,fun)))
+                  (when (and (not (sb!c::fun-locally-defined-p setter env))
+                             (let ((sb!c:*lexenv* env))
+                               (not (sb!c::fun-lexically-notinline-p setter))))
+                    (return-from setf
+                      (slot-access-transform
+                       :setf (list (cadr place) value-form) slot-info)))))))))
+
       (multiple-value-bind (temps vals newval setter)
           (sb!xc:get-setf-expansion place env)
         (car (gen-let* (mapcar #'list temps vals)
@@ -226,6 +255,7 @@
    forms have been evaluated."
     (expand pairs env 'psetq 'setq))))
 
+;;; FIXME: the following claim could not possibly be true, could it?
 ;;; FIXME: Compiling this definition of ROTATEF apparently blows away the
 ;;; definition in the cross-compiler itself, so that after that, any
 ;;; ROTATEF operations can no longer be compiled, because
