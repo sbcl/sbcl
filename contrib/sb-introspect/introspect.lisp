@@ -607,11 +607,14 @@ value."
     ((or null sb-kernel:funcallable-instance)
      nil)
     (sb-kernel:closure
+     ;; FIXME: should use ENCAPSULATION-INFO instead of hardwiring an index.
      (let ((fun (sb-kernel:%closure-fun functoid)))
        (if (and (eq (sb-kernel:%fun-name fun) 'sb-impl::encapsulation)
                 (plusp (sb-kernel:get-closure-length functoid))
                 (typep (sb-kernel:%closure-index-ref functoid 0) 'sb-impl::encapsulation-info))
-           (sb-impl::encapsulation-info-definition (sb-kernel:%closure-index-ref functoid 0))
+           (get-simple-fun
+            (sb-impl::encapsulation-info-definition
+             (sb-kernel:%closure-index-ref functoid 0)))
            fun)))
     (function
      (sb-kernel:%fun-fun functoid))))
