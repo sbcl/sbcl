@@ -57,6 +57,7 @@
   (assert (sb-unicode:confusable-p "l0" "1O"))
   (assert (sb-unicode:confusable-p "\"" "''"))
   (assert (not (sb-unicode:confusable-p "a" "A")))
+  (assert (not (sb-unicode:confusable-p "" "<")))
   #+sb-unicode
   (assert (sb-unicode:confusable-p
            (coerce '(#\a #\COMBINING_RING_ABOVE) 'string)

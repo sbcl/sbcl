@@ -4,6 +4,8 @@ changes relative to sbcl-1.2.16:
   * bug fix: calling COMPILE when SB-EXT:*EVALUATOR-MODE* was :INTERPRET
     would fail to perform "normal semantic processing such as macro expansion"
     as stipulated by X3J13 issue LOAD-TIME-EVAL.
+  * bug fix: SB-UNICODE:CONFUSABLE-P no longer treats "<" and the empty
+    string as confusable.  (lp#1504739)
 
 changes in sbcl-1.2.16 relative to sbcl-1.2.15:
   * enhancement: by default, timers with a repeat interval do not "catch up"
