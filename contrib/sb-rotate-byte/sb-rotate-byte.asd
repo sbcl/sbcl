@@ -12,6 +12,7 @@
     :pathname ""
     :components
     ((:file "arm-vm" :if-feature :arm)
+     (:file "arm64-vm" :if-feature :arm64)
      (:file "x86-vm" :if-feature :x86)
      (:file "x86-64-vm" :if-feature :x86-64)
      (:file "ppc-vm" :if-feature :ppc)))

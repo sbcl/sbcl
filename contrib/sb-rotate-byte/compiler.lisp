@@ -10,7 +10,7 @@
     (unsigned-byte 32)
   (foldable flushable)
   :overwrite-fndb-silently t)
-#+x86-64
+#+64-bit
 (defknown %unsigned-64-rotate-byte ((integer -63 63) (unsigned-byte 64))
     (unsigned-byte 64)
   (foldable flushable)
@@ -61,7 +61,7 @@
 
 ;; Generic implementation for platforms that don't supply VOPs for 32-bit
 ;; rotate.
-#-(or x86 x86-64 ppc arm)
+#-(or x86 x86-64 ppc arm arm64)
 (deftransform %unsigned-32-rotate-byte ((.count. .integer.)
                                         ((integer -31 31)
                                          (unsigned-byte 32)) *)
@@ -71,7 +71,7 @@
        (logior (ldb (byte 32 0) (ash .integer. .count.))
                (ash .integer. (- .count. 32)))))
 
-#+x86-64
+#+64-bit
 (deftransform %rotate-byte ((count size pos integer)
                             ((integer -63 63)
                              (constant-arg (member 64))

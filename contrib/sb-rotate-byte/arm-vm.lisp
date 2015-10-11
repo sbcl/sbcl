@@ -40,7 +40,7 @@
                (:policy :fast-safe)
                (:translate %unsigned-32-rotate-byte)
                (:note "inline 32-bit rotation")
-               (:args (count :scs (sb-vm::signed-reg)  :target res)
+               (:args (count :scs (sb-vm::signed-reg) :target res)
                       (integer :scs (sb-vm::unsigned-reg)))
                (:arg-types sb-vm::tagged-num ,arg-type)
                (:results (res :scs (sb-vm::unsigned-reg)))
