@@ -226,8 +226,11 @@
                            reg)))))))
 
   (defun print-float-reg (value stream dstate)
-    (let* ((inst (current-instruction dstate))
-           (type (ldb (byte 1 22) inst)))
+    (multiple-value-bind (type value)
+        (if (consp value)
+            (values (car value) (cadr value))
+            (values (ldb (byte 1 22) (current-instruction dstate))
+                    value))
       (format stream "~a~d"
               (if (= type 1)
                   "D"
@@ -2205,7 +2208,16 @@
 (def-fp-data-processing-1 frintx #b1110)
 (def-fp-data-processing-1 frinti #b1111)
 
+(sb!disassem:define-instruction-format
+    (fcvt 32
+     :include fp-data-processing-1
+     :default-printer '(:name :tab rd ", " rn))
+    (op :field (byte 2 17) :value #b01)
+    (rn :fields (list (byte 1 22) (byte 5 5)))
+    (rd :fields (list (byte 2 15) (byte 5 0))))
+
 (define-instruction fcvt (segment rd rn)
+  (:printer fcvt ())
   (:emitter
    (emit-fp-data-processing-1 segment
                               (fp-reg-type rn)
