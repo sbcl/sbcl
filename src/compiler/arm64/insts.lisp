@@ -398,6 +398,17 @@
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
 
+(defun reg-size (tn)
+  (if (sc-is tn 32-bit-reg)
+      0
+      1))
+
+(defmacro assert-same-size (&rest things)
+  `(assert (= ,@(loop for thing in things
+                      collect `(reg-size ,thing)))
+           ,things
+           "Registers should have the same size: ~@{~a~%, ~}" ,@things))
+
 (define-instruction byte (segment byte)
   (:emitter
    (emit-byte segment byte)))
@@ -1095,8 +1106,48 @@
                (- 63 shift))
          (inst lslv rd rn shift))))
 
+(define-instruction-macro ror (rd rs shift)
+  `(let ((rd ,rd)
+         (rs ,rs)
+         (shift ,shift))
+     (if (integerp shift)
+         (inst extr rd rs rs shift)
+         (inst rorv rd rs shift))))
+
 (define-instruction-macro sxtw (rd rn)
   `(inst sbfm ,rd ,rn 0 31))
+;;;
+
+(def-emitter extract
+  (size 1 31)
+  (#b00100111 8 23)
+  (n 1 22)
+  (#b0 1 21)
+  (rm 5 16)
+  (imm 6 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(sb!disassem:define-instruction-format
+    (extract 32
+     :default-printer '(:name :tab rd  ", " rn ", " rm ", " imm))
+    (op2 :field (byte 8 23) :value #b00100111)
+    (op3 :field (byte 1 21) :value #b0)
+    (rm :field (byte 5 16) :type 'reg)
+    (imm :field (byte 6 10) :type 'unsigned-immediate)
+    (rn :field (byte 5 5) :type 'reg)
+    (rd :field (byte 5 0) :type 'reg))
+
+(define-instruction extr (segment rd rn rm lsb)
+  (:printer extract ())
+  (:emitter
+   (assert-same-size rd rn rm)
+   (let ((size (reg-size rd)))
+    (emit-extract segment size size
+                  (tn-offset rm)
+                  lsb
+                  (tn-offset rn)
+                  (tn-offset rd)))))
 
 ;;;
 
@@ -1272,7 +1323,7 @@
 (sb!disassem:define-instruction-format
     (data-processing-2 32
      :default-printer '(:name :tab rd  ", " rn ", " rm))
-    (op :field (byte 10 21) :value #b0011010110)
+    (op2 :field (byte 10 21) :value #b0011010110)
     (rm :field (byte 5 16) :type 'reg)
     (op :field (byte 6 10))
     (rn :field (byte 5 5) :type 'reg)
@@ -1283,9 +1334,11 @@
   `(define-instruction ,name (segment rd rn rm)
      (:printer data-processing-2 ((op ,opc))
                ,@(and alias
-                      '('('`,alias :tab rd  ", " rn ", " rm))))
+                      `('(',alias :tab rd ", " rn ", " rm))))
      (:emitter
-      (emit-data-processing-2 segment +64-bit-size+ (tn-offset rm)
+      (assert-same-size rd rn rm)
+      (emit-data-processing-2 segment (reg-size rd)
+                              (tn-offset rm)
                               ,opc (tn-offset rn) (tn-offset rd)))))
 
 (def-data-processing-2 asrv #b001010 asr)

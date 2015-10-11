@@ -308,8 +308,9 @@
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
         (offset (tn-offset tn)))
     (ecase sb
-      (registers (or (svref *register-names* offset)
-                     (format nil "R~D" offset)))
+      (registers (format nil "~:[~;W~]~A"
+                         (sc-is tn 32-bit-reg)
+                         (svref *register-names* offset)))
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
