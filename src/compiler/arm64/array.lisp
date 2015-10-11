@@ -211,6 +211,25 @@
            (inst and result result ,(1- (ash 1 bits)))
            ;; And fixnum-tag the result.
            (inst lsl value result n-fixnum-tag-bits)))
+       (define-vop (,(symbolicate "DATA-VECTOR-REF/" type "-C"))
+         (:note "inline array access")
+         (:translate data-vector-ref)
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg)))
+         (:info index)
+         (:arg-types ,type (:constant index))
+         (:results (value :scs (any-reg)))
+         (:result-types positive-fixnum)
+         (:temporary (:scs (non-descriptor-reg) :to (:result 0)) result)
+         (:generator 15
+           (multiple-value-bind (index bit) (floor index ,elements-per-word)
+             (inst ldr result (@ object
+                                 (load-store-offset
+                                  (+ (* index n-word-bytes)
+                                     (- (* vector-data-offset n-word-bytes)
+                                        other-pointer-lowtag)))))
+             (inst ubfm result result (* bit ,bits) (+ (* bit ,bits) (1- ,bits)))
+             (inst lsl value result n-fixnum-tag-bits))))
        (define-vop (,(symbolicate "DATA-VECTOR-SET/" type))
          (:note "inline array store")
          (:translate data-vector-set)

@@ -1112,8 +1112,8 @@
     (op :field (byte 2 29))
     (op2 :field (byte 6 23) :value #b100110)
     (n :field (byte 1 22) :value +64-bit-size+)
-    (immr :field (byte 6 16) :type 'immediate)
-    (imms :field (byte 6 10) :type 'immediate)
+    (immr :field (byte 6 16) :type 'unsigned-immediate)
+    (imms :field (byte 6 10) :type 'unsigned-immediate)
     (rn :field (byte 5 5) :type 'reg)
     (rd :field (byte 5 0) :type 'reg))
 
