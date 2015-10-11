@@ -151,13 +151,14 @@
   (defun print-imm-writeback (value stream dstate)
     (declare (ignore dstate))
     (destructuring-bind (imm mode) value
-      (ecase mode
-        (#b00
-         (format stream ", #~D]" imm))
-        (#b01
-         (format stream "], #~D" imm))
-        (#b11
-         (format stream ", #~D]!" imm)))))
+      (let ((imm (sb!disassem:sign-extend imm 9)))
+       (ecase mode
+         (#b00
+          (format stream ", #~D]" imm))
+         (#b01
+          (format stream "], #~D" imm))
+         (#b11
+          (format stream ", #~D]!" imm))))))
 
   (defun decode-pair-scaled-immediate (opc value simd)
     (ash (sb!disassem:sign-extend value 7)
@@ -236,6 +237,24 @@
                   "D"
                   "S")
               value)))
+
+  (defun print-simd-reg (value stream dstate)
+    (declare (ignore dstate))
+    (destructuring-bind (size offset) value
+      (format stream "V~d.~a" offset
+              (if (zerop size)
+                  "8B"
+                  "16B"))))
+
+  (defun print-simd-copy-reg (value stream dstate)
+    (declare (ignore dstate))
+    (destructuring-bind (offset imm5 &optional imm4) value
+      (let ((index (lowest-set-bit-index imm5)))
+       (format stream "V~d.~a[~a]" offset
+               (char "BHSD" index)
+               (if imm4
+                   (ash imm4 (- index))
+                   (ash imm5 (- (1+ index))))))))
 
   (defun print-sys-reg (value stream dstate)
     (declare (ignore dstate))
@@ -343,6 +362,12 @@
 
   (sb!disassem:define-arg-type float-reg
     :printer #'print-float-reg)
+
+  (sb!disassem:define-arg-type simd-reg
+    :printer #'print-simd-reg)
+
+  (sb!disassem:define-arg-type simd-copy-reg
+    :printer #'print-simd-copy-reg)
 
   (sb!disassem:define-arg-type sys-reg
     :printer #'print-sys-reg)
@@ -2495,12 +2520,27 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (simd-three-same 32
+     :default-printer '(:name :tab rd ", " rn ", " rm))
+    (op3 :field (byte 1 31) :value #b0)
+    (u :field (byte 1 29))
+    (op4 :field (byte 5 24) :value #b01110)
+    (size :field (byte 2 22))
+    (op5 :field (byte 1 21) :value #b1)
+    (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
+    (op :field (byte 5 11))
+    (op6 :field (byte 1 10) :value #b1)
+    (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
+    (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+
 (defun decode-vector-size (size)
   (ecase size
     (:8b 0)
     (:16b 1)))
 
 (define-instruction s-orr (segment rd rn rm &optional (size :16b))
+  (:printer simd-three-same ((u #b0) (size #b10) (op #b00011)))
   (:emitter
    (emit-simd-three-same segment
                          (decode-vector-size size)
@@ -2541,7 +2581,7 @@
 
 ;;;
 
-(def-emitter simd-adv-copy
+(def-emitter simd-copy
   (#b0 1 31)
   (q 1 30)
   (op 1 29)
@@ -2553,10 +2593,24 @@
   (rn 5 5)
   (rd 5 0))
 
+(sb!disassem:define-instruction-format
+    (simd-copy 32
+     :default-printer '(:name :tab rd ", " rn))
+    (op3 :field (byte 1 31) :value #b0)
+    (q :field (byte 1 30))
+    (op :field (byte 1 29))
+    (op4 :field (byte 8 21) :value #b01110000)
+    (op5 :field (byte 1 15) :value #b0)
+    (op6 :field (byte 1 10) :value #b1)
+    (rn :fields (list (byte 5 5) (byte 5 16) (byte 4 11)) :type 'simd-copy-reg)
+    (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-copy-reg))
+
 (define-instruction s-ins (segment rd index1 rn index2 size)
+  (:printer simd-copy ((q 1) (op 1))
+            '('ins :tab rd ", " rn))
   (:emitter
    (let ((size (position size '(:B :H :S :D))))
-     (emit-simd-adv-copy segment
+     (emit-simd-copy segment
                          1
                          1
                          (logior (ash index1 (1+ size))
