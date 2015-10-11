@@ -148,6 +148,33 @@
     (declare (ignore dstate))
     (format stream "#~D" (apply #'decode-logical-immediate value)))
 
+  (defun print-imm-writeback (value stream dstate)
+    (declare (ignore dstate))
+    (destructuring-bind (imm mode) value
+      (ecase mode
+        (#b00
+         (format stream ", #~D]" imm))
+        (#b01
+         (format stream "], #~D" imm))
+        (#b11
+         (format stream ", #~D]!" imm)))))
+
+  (defun decode-pair-scaled-immediate (opc value simd)
+    (ash (sb!disassem:sign-extend value 7)
+         (+ 2 (ash opc (- (logxor 1 simd))))))
+
+  (defun print-pair-imm-writeback (value stream dstate)
+    (declare (ignore dstate))
+    (destructuring-bind (mode &rest imm) value
+      (let ((imm (apply #'decode-pair-scaled-immediate imm)))
+        (ecase mode
+          (#b01
+           (format stream "], #~D" imm))
+          (#b10
+           (format stream ", #~D]" imm))
+          (#b11
+           (format stream ", #~D]!" imm))))))
+
   (defun print-x-reg (value stream dstate)
     (declare (ignore dstate))
     (princ (aref *register-names* value) stream))
@@ -293,6 +320,11 @@
 
   (sb!disassem:define-arg-type logical-immediate
     :printer #'print-logical-immediate)
+
+  (sb!disassem:define-arg-type imm-writeback
+    :printer #'print-imm-writeback)
+  (sb!disassem:define-arg-type pair-imm-writeback
+    :printer #'print-pair-imm-writeback)
 
   (sb!disassem:define-arg-type reg
     :printer #'print-reg)
@@ -1438,7 +1470,7 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-unsigned-imm 32
-     :default-printer '(:name :tab rt  ", [" rn "], " imm)
+     :default-printer '(:name :tab rt  ", [" rn ", " imm "]")
      :include ldr-str)
     (op3 :value #b01)
     (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10) (byte 1 26))
@@ -1453,31 +1485,19 @@
   (opc 2 22)
   (#b0 1 21)
   (imm 9 12)
-  (#b00 2 10)
+  (mode 2 10)
   (rn 5 5)
   (rt 5 0))
 
 (sb!disassem:define-instruction-format
     (ldr-str-unscaled-imm 32
-     :default-printer '(:name :tab rt  ", [" rn "], " imm ldr-str-annotation)
+     :default-printer '(:name :tab rt  ", [" rn imm-writeback ldr-str-annotation)
      :include ldr-str)
     (op4 :field (byte 1 21) :value #b0)
-    (imm :field (byte 9 12) :type 'immediate)
+    (imm-writeback :fields (list (byte 9 12) (byte 2 10)) :type 'imm-writeback)
     (op5 :field (byte 2 10) :value #b00)
     (ldr-str-annotation :field (byte 9 12)))
 
-(def-emitter ldr-str-imm-wb
-  (size 2 30)
-  (#b111 3 27)
-  (v 1 26)
-  (#b00 2 24)
-  (opc 2 22)
-  (#b0 1 21)
-  (imm 9 12)
-  (mode 1 11)
-  (#b1 1 10)
-  (rn 5 5)
-  (rt 5 0))
 
 (def-emitter ldr-str-reg
   (size 2 30)
@@ -1528,7 +1548,7 @@
   (let* ((base (memory-operand-base address))
          (offset (memory-operand-offset address))
          (mode (memory-operand-mode address))
-         (index-encoding (position mode '(:post-index :pre-index)))
+         (index-encoding (position mode '(:offset :post-index 0 :pre-index)))
          (fp (fp-register-p dst))
          (v  (if fp
                  1
@@ -1558,12 +1578,6 @@
                                           (ash offset (- size)))
                                       (tn-offset base)
                                       dst))
-          ((and index-encoding
-                (typep offset '(signed-byte 9)))
-           (emit-ldr-str-imm-wb segment size
-                                v opc offset index-encoding
-                                (tn-offset base)
-                                dst))
           ((and (eq mode :offset)
                 (or (register-p offset)
                     (extend-p offset)))
@@ -1590,10 +1604,10 @@
                                dst)))
           ((and (typep offset '(signed-byte 9))
                 (or (register-p base)
-                    (fp-register-p base))
-                (eq mode :offset))
+                    (fp-register-p base)))
            (emit-ldr-str-unscaled-imm segment size v
                                       opc offset
+                                      index-encoding
                                       (tn-offset base) dst))
           (t
            (error "Invalid STR/LDR arguments: ~s ~s" dst address)))))
@@ -1602,9 +1616,7 @@
   `(define-instruction ,name (segment dst address)
      (:printer ldr-str-unsigned-imm ((size ,size) (op ,opc) (v 0)))
      (:printer ldr-str-reg ((size ,size) (op ,opc) (v 0)))
-     (:printer ldr-str-unscaled-imm (,@(and size `((size ,size)))
-                                     (op ,opc)
-                                     (v 0)))
+     (:printer ldr-str-unscaled-imm ((size ,size) (op ,opc) (v 0)))
      ,@printers
      (:emitter
       (emit-load-store ,size ,opc segment dst address))))
@@ -1662,14 +1674,15 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-pair 32
-     :default-printer '(:name :tab rt ", " rt2 ", [" rn "], " imm)
+     :default-printer '(:name :tab rt ", " rt2 ", [" rn pair-imm-writeback)
      :include ldr-str)
     (size :field (byte 2 30))
     (op2 :value #b101)
     (v :field (byte 1 26))
     (op3 :field (byte 1 25) :value #b00)
     (l :field (byte 1 22))
-    (imm :field (byte 7 15) :type 'scaled-immediate :sign-extend t)
+    (pair-imm-writeback :fields (list (byte 2 23) (byte 2 30) (byte 7 15) (byte 1 26))
+                        :type 'pair-imm-writeback)
     (rt2 :fields (list (byte 2 30) (byte 5 10)) :type 'reg-float-reg)
     (rt :fields (list (byte 2 30) (byte 5 0))))
 
