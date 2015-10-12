@@ -7,6 +7,36 @@
    (make-pathname :directory '(:relative :up "output"))
    (make-pathname :directory (pathname-directory *load-truename*))))
 
+(defparameter *unicode-character-database*
+  (make-pathname :directory (pathname-directory *load-truename*)))
+
+(defmacro with-input-txt-file ((s name) &body body)
+  `(with-open-file (,s (make-pathname :name ,name :type "txt"
+                                      :defaults *unicode-character-database*))
+     ,@body))
+
+(defmacro with-output-dat-file ((s name) &body body)
+  `(with-open-file (,s (make-pathname :name ,name :type "dat"
+                                      :defaults *output-directory*)
+                       :direction :output :element-type '(unsigned-byte 8)
+                       :if-exists :supersede :if-does-not-exist :create)
+     ,@body))
+
+(defmacro with-ucd-output-syntax (&body body)
+  `(with-standard-io-syntax
+     (let ((*readtable* (copy-readtable))
+           (*print-readably* nil)
+           (*print-pretty* t))
+       ,@body)))
+
+(defmacro with-output-lisp-expr-file ((s name) &body body)
+  `(with-open-file (,s (make-pathname :name ,name :type "lisp-expr"
+                                      :defaults *output-directory*)
+                       :direction :output :element-type 'character
+                       :if-exists :supersede :if-does-not-exist :create)
+     (with-ucd-output-syntax
+       ,@body)))
+
 (defun split-string (line character)
   (loop for prev-position = 0 then (1+ position)
      for position = (position character line :start prev-position)
@@ -46,9 +76,6 @@
 ;;; Output storage globals
 (defstruct ucd misc decomp)
 
-(defparameter *unicode-character-database*
-  (make-pathname :directory (pathname-directory *load-truename*)))
-
 (defparameter *unicode-names* (make-hash-table))
 (defparameter *unicode-1-names* (make-hash-table))
 
@@ -57,8 +84,7 @@
               :adjustable t)) ; 10000 is not a significant number
 
 (defparameter *decomposition-corrections*
-  (with-open-file (s (make-pathname :name "NormalizationCorrections" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "NormalizationCorrections")
     (loop with result = nil
        for line = (read-line s nil nil) while line
        do (when (position #\; line)
@@ -73,8 +99,7 @@
 
 (defparameter *compositions* (make-hash-table :test #'equal))
 (defparameter *composition-exclusions*
-  (with-open-file (s (make-pathname :name "CompositionExclusions" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "CompositionExclusions")
     (loop with result = nil
        for line = (read-line s nil nil) while line
        when (and (> (length line) 0) (char/= (char line 0) #\#))
@@ -86,8 +111,7 @@
 (defparameter *different-casefolds* nil)
 
 (defparameter *case-mapping*
-  (with-open-file (s (make-pathname :name "SpecialCasing" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "SpecialCasing")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -158,8 +182,7 @@ Length should be adjusted when the standard changes.")
      "SG" "SP" "SY" "WJ" "ZW")))
 
 (defparameter *east-asian-width-table*
-  (with-open-file (s (make-pathname :name "EastAsianWidth" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "EastAsianWidth")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -171,11 +194,10 @@ Length should be adjusted when the standard changes.")
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
-"Table of East Asian Widths. Used in the creation of misc entries.")
+  "Table of East Asian Widths. Used in the creation of misc entries.")
 
 (defparameter *script-table*
-  (with-open-file (s (make-pathname :name "Scripts" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "Scripts")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -190,8 +212,7 @@ Length should be adjusted when the standard changes.")
 "Table of scripts. Used in the creation of misc entries.")
 
 (defparameter *line-break-class-table*
-  (with-open-file (s (make-pathname :name "LineBreakProperty" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "LineBreakProperty")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -207,8 +228,7 @@ Length should be adjusted when the standard changes.")
 "Table of line break classes. Used in the creation of misc entries.")
 
 (defparameter *age-table*
-  (with-open-file (s (make-pathname :name "DerivedAge" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "DerivedAge")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -375,9 +395,7 @@ Length should be adjusted when the standard changes.")
          (ncount (* vcount tcount))
          (table (make-hash-table)))
     (declare (ignore lcount))
-    (with-open-file (*standard-input*
-                     (make-pathname :name "Jamo" :type "txt"
-                                    :defaults *unicode-character-database*))
+    (with-input-txt-file (*standard-input* "Jamo")
       (loop for line = (read-line nil nil)
             while line
             if (position #\; line)
@@ -564,8 +582,7 @@ Length should be adjusted when the standard changes.")
              (setf (ucd-misc (gethash code-point *ucd-entries*)) new-misc))))))
 
 (defun fixup-casefolding ()
-  (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "CaseFolding")
     (loop for line = (read-line s nil nil)
        while line
        unless (or (not (position #\; line)) (equal (position #\# line) 0))
@@ -595,11 +612,7 @@ Length should be adjusted when the standard changes.")
            (setf (gethash code-point *ucd-entries*) new-ucd)))))
 
 (defun slurp-ucd ()
-  (with-open-file (*standard-input*
-                   (make-pathname :name "UnicodeData"
-                                  :type "txt"
-                                  :defaults *unicode-character-database*)
-                   :direction :input)
+  (with-input-txt-file (*standard-input* "UnicodeData")
     (format t "~%//slurp-ucd~%")
     (loop for line = (read-line nil nil)
           while line
@@ -621,7 +634,7 @@ Length should be adjusted when the standard changes.")
 (defun parse-property (stream &optional name)
   (let ((result (make-array 1 :fill-pointer 0 :adjustable t)))
     (loop for line = (read-line stream nil nil)
-       ;; Deal with Blah=Blah in DerivedNormalizationPRops.txt
+       ;; Deal with Blah=Blah in DerivedNormalizationProps.txt
        while (and line (not (position #\= (substitute #\Space #\= line :count 1))))
        for entry = (subseq line 0 (position #\# line))
        when (and entry (string/= entry ""))
@@ -635,10 +648,7 @@ Length should be adjusted when the standard changes.")
       (push result **proplist-properties**))))
 
 (defun slurp-proplist ()
-  (with-open-file (s (make-pathname :name "PropList"
-                                    :type "txt"
-                                    :defaults *unicode-character-database*)
-                     :direction :input)
+  (with-input-txt-file (s "PropList")
     (parse-property s) ;; Initial comments
     (parse-property s :white-space)
     (parse-property s :bidi-control)
@@ -673,10 +683,7 @@ Length should be adjusted when the standard changes.")
     (parse-property s :pattern-white-space)
     (parse-property s :pattern-syntax))
 
-  (with-open-file (s (make-pathname :name "DerivedNormalizationProps"
-                                    :type "txt"
-                                    :defaults *unicode-character-database*)
-                     :direction :input)
+  (with-input-txt-file (s "DerivedNormalizationProps")
     (parse-property s) ;; Initial comments
     (parse-property s) ;; FC_NFKC_Closure
     (parse-property s) ;; FC_NFKC_Closure
@@ -727,8 +734,7 @@ Length should be adjusted when the standard changes.")
     (values code-points ret))))
 
 (defparameter *collation-table*
-  (with-open-file (stream (make-pathname :name "Allkeys70" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (stream "Allkeys70")
     (loop with hash = (make-hash-table :test #'equal)
        for line = (read-line stream nil nil) while line
        unless (eql 0 (position #\# line))
@@ -739,16 +745,14 @@ Length should be adjusted when the standard changes.")
 
 ;;; Other properties
 (defparameter *confusables*
-  (with-open-file (s (make-pathname :name "ConfusablesEdited" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "ConfusablesEdited")
     (loop for line = (read-line s nil nil) while line
        unless (eql 0 (position #\# line))
        collect (mapcar #'parse-codepoints (split-string line #\<))))
   "List of confusable codepoint sets")
 
 (defparameter *bidi-mirroring-glyphs*
-  (with-open-file (s (make-pathname :name "BidiMirroring" :type "txt"
-                                    :defaults *unicode-character-database*))
+  (with-input-txt-file (s "BidiMirroring")
     (loop for line = (read-line s nil nil) while line
           when (and (plusp (length line))
                     (char/= (char line 0) #\#))
@@ -759,8 +763,7 @@ Length should be adjusted when the standard changes.")
   "List of BIDI mirroring glyph pairs")
 
 (defparameter *block-ranges*
-  (with-open-file (stream (make-pathname :name "Blocks" :type "txt"
-                                         :defaults *unicode-character-database*))
+  (with-input-txt-file (stream "Blocks")
     (loop with result = (make-array (* 252 2) :fill-pointer 0)
        for line = (read-line stream nil nil) while line
        unless (or (string= line "") (position #\# line))
@@ -786,13 +789,7 @@ Used to look up block data.")
   (write-byte (ldb (byte 8 0) value) stream))
 
 (defun output-misc-data ()
-  (with-open-file (stream (make-pathname :name "ucdmisc"
-                                         :type "dat"
-                                         :defaults *output-directory*)
-                          :direction :output
-                          :element-type '(unsigned-byte 8)
-                          :if-exists :supersede
-                          :if-does-not-exist :create)
+  (with-output-dat-file (stream "ucdmisc")
     (loop for (gc-index bidi-index ccc digit decomposition-info flags
                         script line-break age)
        across *misc-table*
@@ -811,20 +808,8 @@ Used to look up block data.")
          (write-byte age stream))))
 
 (defun output-ucd-data ()
-  (with-open-file (high-pages (make-pathname :name "ucdhigh"
-                                             :type "dat"
-                                             :defaults *output-directory*)
-                              :direction :output
-                              :element-type '(unsigned-byte 8)
-                              :if-exists :supersede
-                              :if-does-not-exist :create)
-    (with-open-file (low-pages (make-pathname :name "ucdlow"
-                                              :type "dat"
-                                              :defaults *output-directory*)
-                               :direction :output
-                               :element-type '(unsigned-byte 8)
-                               :if-exists :supersede
-                               :if-does-not-exist :create)
+  (with-output-dat-file (high-pages "ucdhigh")
+    (with-output-dat-file (low-pages "ucdlow")
       ;; Output either the index into the misc array (if all the points in the
       ;; high-page have the same misc value) or an index into the law-pages
       ;; array / 256. For indexes into the misc array, set bit 15 (high bit).
@@ -861,22 +846,13 @@ Used to look up block data.")
          finally (assert (< low-pages-index (ash 1 15))) (print low-pages-index)))))
 
 (defun output-decomposition-data ()
-  (with-open-file (stream (make-pathname :name "decomp" :type "dat"
-                                         :defaults *output-directory*)
-                          :direction :output
-                          :element-type '(unsigned-byte 8)
-                          :if-exists :supersede
-                          :if-does-not-exist :create)
+  (with-output-dat-file (stream "decomp")
     (loop for cp across *decompositions* do
          (write-codepoint cp stream)))
   (print (length *decompositions*)))
 
 (defun output-composition-data ()
-  (with-open-file (stream (make-pathname :name "comp" :type "dat"
-                                         :defaults *output-directory*)
-                          :direction :output
-                          :element-type '(unsigned-byte 8)
-                          :if-exists :supersede :if-does-not-exist :create)
+  (with-output-dat-file (stream "comp")
     (let (comp)
       (maphash (lambda (k v) (push (cons k v) comp)) *compositions*)
       (setq comp (sort comp #'< :key #'cdr))
@@ -887,11 +863,7 @@ Used to look up block data.")
 
 (defun output-case-data ()
   (let (casing-pages points-with-case)
-    (with-open-file (stream (make-pathname :name "case" :type "dat"
-                                           :defaults *output-directory*)
-                            :direction :output
-                            :element-type '(unsigned-byte 8)
-                            :if-exists :supersede :if-does-not-exist :create)
+    (with-output-dat-file (stream "case")
       (loop for cp being the hash-keys in *case-mapping*
            do (push cp points-with-case))
       (setf points-with-case (sort points-with-case #'<))
@@ -912,26 +884,14 @@ Used to look up block data.")
            (page -1))
       (dolist (entry casing-pages)
         (setf (aref array entry) (incf page)))
-      (with-open-file (stream (make-pathname :name "casepages" :type "dat"
-                                             :defaults *output-directory*)
-                              :direction :output
-                              :element-type '(unsigned-byte 8)
-                              :if-exists :supersede :if-does-not-exist :create)
+      (with-output-dat-file (stream "casepages")
         (dotimes (i size)
           (write-byte (aref array i) stream))))
-    (with-open-file (stream (make-pathname :name "casepages" :type "lisp-expr"
-                                           :defaults *output-directory*)
-                            :direction :output
-                            :if-exists :supersede :if-does-not-exist :create)
-      (with-standard-io-syntax
-        (let ((*print-pretty* t)) (print casing-pages stream))))))
+    (with-output-lisp-expr-file (stream "casepages")
+      (print casing-pages stream))))
 
 (defun output-collation-data ()
-  (with-open-file (stream (make-pathname :name "collation" :type "dat"
-                                           :defaults *output-directory*)
-                          :direction :output
-                          :element-type '(unsigned-byte 8)
-                          :if-exists :supersede :if-does-not-exist :create)
+  (with-output-dat-file (stream "collation")
     (flet ((length-tag (list1 list2)
              ;; takes two lists of UB32 (with the caveat that list1[0]
              ;; needs its high 8 bits free (codepoints always have
@@ -953,18 +913,10 @@ Used to look up block data.")
           (setq coll (sort coll #'sorter :key #'car)))
         (loop for (k . v) in coll
            do (length-tag k v)))))
-  (with-open-file (*standard-output*
-                   (make-pathname :name "other-collation-info"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (write-string ";;; The highest primary variable collation index")
-        (terpri)
-        (prin1 *maximum-variable-key*) (terpri)))))
+  (with-output-lisp-expr-file (*standard-output* "other-collation-info")
+    (write-string ";;; The highest primary variable collation index")
+    (terpri)
+    (prin1 *maximum-variable-key*) (terpri)))
 
 (defun output ()
   (output-misc-data)
@@ -973,106 +925,41 @@ Used to look up block data.")
   (output-composition-data)
   (output-case-data)
   (output-collation-data)
-  (with-open-file (*standard-output*
-                   (make-pathname :name "misc-properties" :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 **proplist-properties**))))
+  (with-output-lisp-expr-file (*standard-output* "misc-properties")
+    (prin1 **proplist-properties**))
 
-  (with-open-file (f (make-pathname :name "ucd-names" :type "lisp-expr"
-                                    :defaults *output-directory*)
-                     :direction :output
-                     :if-exists :supersede
-                     :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (write-string ";;; Do not edit by hand: generated by ucd.lisp" f)
-      (maphash (lambda (code name)
-                 (when name
-                   (print code f)
-                   (prin1 name f)))
-               *unicode-names*))
+  (with-output-lisp-expr-file (f "ucd-names")
+    (write-string ";;; Do not edit by hand: generated by ucd.lisp" f)
+    (maphash (lambda (code name)
+               (when name
+                 (print code f)
+                 (prin1 name f)))
+             *unicode-names*)
     (setf *unicode-names* nil))
-  (with-open-file (f (make-pathname :name "ucd1-names" :type "lisp-expr"
-                                    :defaults *output-directory*)
-                     :direction :output
-                     :if-exists :supersede
-                     :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (write-string ";;; Do not edit by hand: generated by ucd.lisp" f)
-      (maphash (lambda (code name)
-                 (when name
-                   (print code f)
-                   (prin1 name f)))
-               *unicode-1-names*))
+  (with-output-lisp-expr-file (f "ucd1-names")
+    (write-string ";;; Do not edit by hand: generated by ucd.lisp" f)
+    (maphash (lambda (code name)
+               (when name
+                 (print code f)
+                 (prin1 name f)))
+             *unicode-1-names*)
     (setf *unicode-1-names* nil))
 
-  (with-open-file (*standard-output*
-                   (make-pathname :name "numerics"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t)
-            (result (make-array (* (length *different-numerics*) 2))))
-        (loop for (code . value) in (sort *different-numerics* #'< :key #'car)
-              for i by 2
-              do (setf (aref result i) code
-                       (aref result (1+ i)) (read-from-string value)))
-        (prin1 result))))
-  (with-open-file (*standard-output*
-                   (make-pathname :name "titlecases"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 *different-titlecases*))))
-  (with-open-file (*standard-output*
-                   (make-pathname :name "foldcases"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 *different-casefolds*))))
-  (with-open-file (*standard-output*
-                   (make-pathname :name "confusables"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 *confusables*))))
-  (with-open-file (*standard-output*
-                   (make-pathname :name "bidi-mirrors"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 *bidi-mirroring-glyphs*))))
-  (with-open-file (*standard-output*
-                   (make-pathname :name "blocks"
-                                  :type "lisp-expr"
-                                  :defaults *output-directory*)
-                   :direction :output
-                   :if-exists :supersede
-                   :if-does-not-exist :create)
-    (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 *block-ranges*))))
+  (with-output-lisp-expr-file (*standard-output* "numerics")
+    (let ((result (make-array (* (length *different-numerics*) 2))))
+      (loop for (code . value) in (sort *different-numerics* #'< :key #'car)
+         for i by 2
+         do (setf (aref result i) code
+                  (aref result (1+ i)) (read-from-string value)))
+      (prin1 result)))
+  (with-output-lisp-expr-file (*standard-output* "titlecases")
+    (prin1 *different-titlecases*))
+  (with-output-lisp-expr-file (*standard-output* "foldcases")
+    (prin1 *different-casefolds*))
+  (with-output-lisp-expr-file (*standard-output* "confusables")
+    (prin1 *confusables*))
+  (with-output-lisp-expr-file (*standard-output* "bidi-mirrors")
+    (prin1 *bidi-mirroring-glyphs*))
+  (with-output-lisp-expr-file (*standard-output* "blocks")
+    (prin1 *block-ranges*))
   (values))
