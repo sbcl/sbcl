@@ -928,27 +928,6 @@ line break."
     (cerror "Frob it anyway!" 'standard-pprint-dispatch-table-modified-error
             :operation operation)))
 
-;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but this is for when you
-;; want to pre-verify that TYPEP won't outright croak, given that you're
-;; going to call it really soon.
-;; Granted, certain checks could pass or fail by short-circuiting,
-;; such as (TYPEP 3 '(OR NUMBER (SATISFIES NO-SUCH-FUN))
-;; but this has to be maximally conservative.
-(defun testable-type-p (ctype)
-  (typecase ctype
-    (unknown-type nil) ; must precede HAIRY because an unknown is HAIRY
-    (hairy-type
-     (let ((spec (hairy-type-specifier ctype)))
-       ;; Anything other than (SATISFIES ...) is testable
-       ;; because there's no reason to suppose that it isn't.
-       (or (neq (car spec) 'satisfies) (fboundp (cadr spec)))))
-    (compound-type (every #'testable-type-p (compound-type-types ctype)))
-    (negation-type (testable-type-p (negation-type-type ctype)))
-    (cons-type (and (testable-type-p (cons-type-car-type ctype))
-                    (testable-type-p (cons-type-cdr-type ctype))))
-    (array-type (testable-type-p (array-type-element-type ctype)))
-    (t t)))
-
 (defun defer-type-checker (entry)
   (let ((saved-nonce sb!c::*type-cache-nonce*))
     (lambda (obj)

@@ -77,3 +77,12 @@
                            (the sb-impl::function-name x)))))
     (assert (equal (list (symbol-function 'sb-int:legal-fun-name-p))
                    (ctu:find-named-callees f)))))
+
+(with-test (:name :make-array-untestable-type-no-warning)
+  (assert-no-signal
+   (compile nil `(lambda () (make-array '(2 2)
+                                        :element-type `(satisfies foofa))))))
+
+(with-test (:name :make-array-nil-no-warning)
+  (assert-no-signal
+   (compile nil '(lambda () (make-array '(2 2) :element-type nil)))))

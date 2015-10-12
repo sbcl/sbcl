@@ -574,7 +574,9 @@
           ;; default
           (t
            #-sb-xc-host
-           (unless (ctypep default-initial-element elt-ctype)
+           (and (and (testable-type-p elt-ctype)
+                     (neq elt-ctype *empty-type*)
+                     (not (ctypep default-initial-element elt-ctype)))
              ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE
              ;; '(INTEGER 1 5)) ANSI's definition of MAKE-ARRAY says "If
              ;; INITIAL-ELEMENT is not supplied, the consequences of later

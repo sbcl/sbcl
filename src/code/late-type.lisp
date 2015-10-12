@@ -58,11 +58,32 @@
         (hierarchical-intersection2 type1 type2))))
 
 (defun contains-unknown-type-p (ctype)
-  (cond ((unknown-type-p ctype) t)
-        ((compound-type-p ctype)
-         (some #'contains-unknown-type-p (compound-type-types ctype)))
-        ((negation-type-p ctype)
-         (contains-unknown-type-p (negation-type-type ctype)))))
+  (typecase ctype
+   (unknown-type t)
+   (compound-type (some #'contains-unknown-type-p (compound-type-types ctype)))
+   (negation-type (contains-unknown-type-p (negation-type-type ctype)))
+   (cons-type (or (contains-unknown-type-p (cons-type-car-type ctype))
+                  (contains-unknown-type-p (cons-type-cdr-type ctype))))
+   (array-type (contains-unknown-type-p (array-type-element-type ctype)))))
+
+;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but report that (SATISFIES F)
+;; is not a testable type unless F is currently bound.
+(defun testable-type-p (ctype)
+  (typecase ctype
+    (unknown-type nil) ; must precede HAIRY because an unknown is HAIRY
+    (hairy-type
+     (let ((spec (hairy-type-specifier ctype)))
+       ;; Anything other than (SATISFIES ...) is testable
+       ;; because there's no reason to suppose that it isn't.
+       (or (neq (car spec) 'satisfies) (fboundp (cadr spec)))))
+    (compound-type (every #'testable-type-p (compound-type-types ctype)))
+    (negation-type (testable-type-p (negation-type-type ctype)))
+    (cons-type (and (testable-type-p (cons-type-car-type ctype))
+                    (testable-type-p (cons-type-cdr-type ctype))))
+    ;; This case could be too strict. I think an array type is testable
+    ;; if the upgraded type is testable. Probably nobody cares though.
+    (array-type (testable-type-p (array-type-element-type ctype)))
+    (t t)))
 
 ;;; This is used by !DEFINE-SUPERCLASSES to define the SUBTYPE-ARG1
 ;;; method. INFO is a list of conses
