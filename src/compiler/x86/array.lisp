@@ -26,7 +26,7 @@
   (:generator 13
     (inst lea bytes
           (make-ea :dword :base rank
-                   :disp (+ (* (1+ array-dimensions-offset) n-word-bytes)
+                   :disp (+ (* array-dimensions-offset n-word-bytes)
                             lowtag-mask)))
     (inst and bytes (lognot lowtag-mask))
     (inst lea header (make-ea :dword :base rank

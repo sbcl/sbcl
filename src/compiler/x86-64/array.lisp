@@ -32,7 +32,7 @@
     (inst lea bytes
           (make-ea :qword
                    :index rank :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                   :disp (+ (* (1+ array-dimensions-offset) n-word-bytes)
+                   :disp (+ (* array-dimensions-offset n-word-bytes)
                             lowtag-mask)))
     (inst and bytes (lognot lowtag-mask))
     (inst lea header (make-ea :qword :base rank

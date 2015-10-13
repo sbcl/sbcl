@@ -26,7 +26,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 5
     ;; Compute the allocation size.
-    (inst add ndescr rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
+    (inst add ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                              lowtag-mask))
     (inst bic ndescr ndescr lowtag-mask)
     (pseudo-atomic (pa-flag)

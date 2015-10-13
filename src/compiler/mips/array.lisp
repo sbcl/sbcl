@@ -22,7 +22,7 @@
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
-    (inst addu bytes rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
+    (inst addu bytes rank (+ (* array-dimensions-offset n-word-bytes)
                              lowtag-mask))
     (inst srl bytes n-lowtag-bits)
     (inst sll bytes n-lowtag-bits)

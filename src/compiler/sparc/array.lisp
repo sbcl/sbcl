@@ -24,7 +24,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 0
     (pseudo-atomic ()
-      (inst add ndescr rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
+      (inst add ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                lowtag-mask))
       (inst andn ndescr lowtag-mask)
       (allocation header ndescr other-pointer-lowtag :temp-tn gencgc-temp)
