@@ -1,9 +1,0 @@
-#!/bin/sh
-
-# Look for violations of whitespace canonicalization, handling them as
-# greppish matches:
-#   * Print human-readable description of each one.
-#   * Exit with 0 if >=1 found, or exit with 0 if none found.
-
-tools-for-build/whitespacely-canonical-filenames | \
-  xargs egrep --with-filename  '	| $'

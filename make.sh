@@ -35,7 +35,7 @@ echo "//Starting build: $build_started"
 echo "//Options: --prefix='$SBCL_PREFIX' --xc-host='$SBCL_XC_HOST'"
 
 # Enforce the source policy for no bogus whitespace
-tools-for-build/canonicalize-whitespace
+$SBCL_XC_HOST < tools-for-build/canonicalize-whitespace.lisp || exit 1
 
 # The make-host-*.sh scripts are run on the cross-compilation host,
 # and the make-target-*.sh scripts are run on the target machine. In
