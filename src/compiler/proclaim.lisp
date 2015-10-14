@@ -190,13 +190,13 @@
     (error 'simple-type-error
            :datum            state
            :expected-type    'deprecation-state
-           :format-control   "~<In declaration ~S, ~S state is not a ~
+           :format-control   "~@<In declaration ~S, ~S state is not a ~
                               valid deprecation state. Expected one ~
-                              of ~{~A~^, ~}.~@:>"
+                              of ~{~S~^, ~}.~@:>"
            :format-arguments (list form state
                                    (rest (typexpand 'deprecation-state)))))
   (multiple-value-call #'values
-    state (sb!impl::normalize-deprecation-since since)))
+    state (sb-impl::normalize-deprecation-since since)))
 
 (defun process-deprecation-declaration (thing state software version)
   (destructuring-bind (namespace name &key replacement) thing
