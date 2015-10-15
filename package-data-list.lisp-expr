@@ -155,8 +155,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                ;; are IN-PACKAGE SB-C. It would probably be cleaner
                ;; to move at least most of them to files which are
                ;; IN-PACKAGE SB-ASSEM.
-               "BRANCH" "DO-SSET-ELEMENTS" "FLUSHABLE" "MAKE-SSET" "SSET"
-               "SSET-ADJOIN" "SSET-DELETE" "SSET-ELEMENT" "SSET-EMPTY"))
+               "BRANCH"  "FLUSHABLE"))
 
    #s(sb-cold:package-data
       :name "SB!BIGNUM"
@@ -951,7 +950,8 @@ possibly temporarily, because it might be used internally."
                ;; Like WITH-LOCKED-HASH-TABLE, but disabled interrupts
                "WITH-LOCKED-SYSTEM-TABLE"
 
-               ;; generic set implementation
+               ;; generic set implementation backed by a list that upgrades
+               ;; to a hashtable if a certain size is exceeded.
                "ADD-TO-XSET"
                "ALLOC-XSET"
                "MAP-XSET"
@@ -963,6 +963,14 @@ possibly temporarily, because it might be used internally."
                "XSET-MEMBERS"
                "XSET-SUBSET-P"
                "XSET-UNION"
+
+               ;; sparse set implementation backed by a lightweight hashtable
+               "COPY-SSET"
+               "DO-SSET-ELEMENTS"
+               "MAKE-SSET"
+               "SSET"
+               "SSET-ADJOIN" "SSET-DELETE" "SSET-ELEMENT" "SSET-EMPTY"
+               "SSET-MEMBER"
 
                ;; communication between the runtime and Lisp
                "*CORE-STRING*"
@@ -2375,8 +2383,6 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual."
                      "SC-LOCATIONS" "SC-MOVE-FUNS" "SC-RESERVE-LOCATIONS"
                      "SC-SAVE-P" "SC-VECTOR"
                      "SET-BIT-VECTOR"
-                     "SSET" "SSET-ELEMENT" "SSET-ADJOIN" "SSET-DELETE"
-                     "SSET-MEMBER" "SSET-EMPTY" "COPY-SSET"
                      "TEMPLATE-NAME"
                      "TN" "TN-COST" "TN-GLOBAL-CONFLICTS" "TN-KIND" "TN-LEAF"
                      "TN-LOCAL" "TN-LOCAL-CONFLICTS" "TN-LOCAL-NUMBER"
