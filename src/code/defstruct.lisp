@@ -1800,8 +1800,6 @@ or they must be declared locally notinline at each call site.~@:>")
       (eval-when (:compile-toplevel :load-toplevel :execute)
         (%compiler-set-up-layout ',dd ',(!inherits-for-structure dd))))))
 
-(sb!xc:proclaim '(special *defstruct-hooks*))
-
 (sb!xc:defmacro !defstruct-with-alternate-metaclass
     (class-name &key
                 (slot-names (missing-arg))
@@ -1898,7 +1896,7 @@ or they must be declared locally notinline at each call site.~@:>")
          ;; It could be a def!macro perhaps, but ASSERT works just fine here
          ;; without adding to image size, since these toplevel forms
          ;; belong to code that is discarded after cold-init.
-         (assert (null *defstruct-hooks*))))))
+         (assert (null (symbol-value '*defstruct-hooks*)))))))
 
 ;;;; finalizing bootstrapping
 
