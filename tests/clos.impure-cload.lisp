@@ -184,3 +184,29 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmethod just-call-next-method (thing)
     (call-next-method)))
+
+(defvar *compile-count* 0)
+(sb-int:encapsulate 'compile 'call-counter
+                    (lambda (f name thing)
+                      (incf *compile-count*)
+                      (funcall f name thing)))
+
+(defstruct mystruct-r/w (some-slot))
+(defstruct mystruct-r/o (allegedly-immutable-slot 3 :read-only t))
+
+(with-test (:name :allocate-instance-of-struct)
+  (let ((old-count *compile-count*))
+    (make-instance 'mystruct-r/w)
+    (assert (= *compile-count* (+ old-count 2)))
+    (make-instance 'mystruct-r/w)
+    (assert (= *compile-count* (+ old-count 2))))) ; same as before
+
+(with-test (:name (:setf-slot-value-on-readonly-struct-slot))
+  (let ((myobj (make-mystruct-r/o))
+        (old-count *compile-count*)
+        ;; hide the slot name from the compiler so it doesn't optimize
+        (slot-name (eval ''allegedly-immutable-slot)))
+    (setf (slot-value myobj slot-name) :newval1)
+    (assert (= *compile-count* (1+ old-count)))
+    (setf (slot-value myobj slot-name) :newval2)
+    (assert (= *compile-count* (1+ old-count))))) ; same as before

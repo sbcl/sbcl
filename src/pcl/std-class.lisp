@@ -716,13 +716,38 @@
                (cons nil nil))))
       (values defstruct-form constructor reader-names writer-names))))
 
-(defun make-defstruct-allocation-function (name)
+;;; Return a thunk to allocate an instance of CLASS named NAME.
+;;; This is broken with regard to the expectation that all semantic
+;;; processing is done by the compiler. e.g. after COMPILE-FILE on
+;;; a file containing these two toplevel forms:
+;;;  (eval-when (:compile-toplevel) (defmacro maker () '(list 1)))
+;;;  (defstruct foo (a (maker)))
+;;; then LOADing the resulting fasl in a fresh image will err:
+;;;  (make-instance 'foo) => "The function MAKER is undefined."
+;;;
+;;; The way to fix that is to ensure that every defstruct has a zero-argument
+;;; constructor made by the compiler and stashed in a random symbol.
+(defun make-defstruct-allocation-function (name class)
   ;; FIXME: Why don't we go class->layout->info == dd
   (let ((dd (find-defstruct-description name)))
     (ecase (dd-type dd)
       (structure
-       (%make-structure-instance-allocator dd nil))
+       ;; This used to call COMPILE directly, which is basically pointless,
+       ;; because it certainly does not avoid compiling code at runtime,
+       ;; which seems to have been the goal. We're also compiling:
+       ;;  (LAMBDA () (SB-PCL::FAST-MAKE-INSTANCE #<STRUCTURE-CLASS THING>))
+       ;; So maybe we can figure out how to bundle two lambdas together?
+       (lambda ()
+         (let* ((dd (layout-info (class-wrapper class)))
+                (f (%make-structure-instance-allocator dd nil)))
+           (if (functionp f)
+               (funcall (setf (slot-value class 'defstruct-constructor) f))
+               (error "Can't allocate ~S" class)))))
       (funcallable-structure
+       ;; FIXME: you can't dynamically define new funcallable structures
+       ;; that are not GENERIC-FUNCTION subtypes, so why this branch?
+       ;; We should pull this out, fixup PCL bootstrap, and not pretend
+       ;; that this code is more general than it really is.
        (%make-funcallable-structure-instance-allocator dd nil)))))
 
 (defmethod shared-initialize :after
@@ -740,6 +765,8 @@
       (setq direct-superclasses (slot-value class 'direct-superclasses)))
   (let* ((name (slot-value class 'name))
          (from-defclass-p (slot-value class 'from-defclass-p))
+         ;; DEFSTRUCT-P means we should perform the effect of DEFSTRUCT,
+         ;; and not that this structure came from a DEFSTRUCT.
          (defstruct-p (or from-defclass-p (not (structure-type-p name)))))
     (if direct-slots-p
         (setf (slot-value class 'direct-slots)
@@ -772,10 +799,14 @@
                   direct-slots reader-names writer-names)
             (setf (slot-value class 'defstruct-form) defstruct-form)
             (setf (slot-value class 'defstruct-constructor) constructor)))
+        ;; FIXME: If we always need a default constructor, then why not just make
+        ;; a "hidden" one at actual-compile-time and store it?
+        ;; And this is very broken with regard to the lexical environment.
+        ;; And why isn't this just DD-DEFAULT-CONSTRUCTOR if there was one?
         (setf (slot-value class 'defstruct-constructor)
               ;; KLUDGE: not class; in fixup.lisp, can't access slots
               ;; outside methods yet.
-              (make-defstruct-allocation-function name)))
+              (make-defstruct-allocation-function name class)))
     (add-direct-subclasses class direct-superclasses)
     (setf (slot-value class '%class-precedence-list)
           (compute-class-precedence-list class))
