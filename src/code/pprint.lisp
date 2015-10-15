@@ -20,9 +20,6 @@
 ;;;           the output buffer
 (deftype column ()
   '(and fixnum unsigned-byte))
-;;; The INDEX type is picked up from the kernel package.
-(deftype posn ()
-  'fixnum) ; huh? was this supposed to be INDEX?
 
 (defconstant initial-buffer-size 128)
 
@@ -290,10 +287,6 @@
 
 ;;;; the pending operation queue
 
-(defstruct (queued-op (:constructor nil)
-                      (:copier nil))
-  (posn 0 :type posn))
-
 (defmacro enqueue (stream type &rest args)
   (let ((constructor (symbolicate "MAKE-" type)))
     (once-only ((stream stream)
@@ -311,17 +304,6 @@
              (setf (pretty-stream-queue-tail ,stream) ,op))
          (setf (pretty-stream-queue-head ,stream) ,op)
          ,entry))))
-
-(defstruct (section-start (:include queued-op)
-                          (:constructor nil)
-                          (:copier nil))
-  (depth 0 :type index)
-  (section-end nil :type (or null newline block-end)))
-
-(defstruct (newline (:include section-start)
-                    (:copier nil))
-  (kind (missing-arg)
-        :type (member :linear :fill :miser :literal :mandatory)))
 
 (defun enqueue-newline (stream kind)
   (let* ((depth (length (pretty-stream-pending-blocks stream)))
@@ -369,10 +351,6 @@
                          :depth (length pending-blocks))))
     (setf (pretty-stream-pending-blocks stream)
           (cons start pending-blocks))))
-
-(defstruct (block-end (:include queued-op)
-                      (:copier nil))
-  (suffix nil :type (or null simple-string)))
 
 (defun end-logical-block (stream)
   (let* ((start (pop (pretty-stream-pending-blocks stream)))

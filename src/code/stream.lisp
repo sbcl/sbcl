@@ -211,22 +211,6 @@
            "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
            :format-arguments (list stream))))
 
-;;; like FILE-POSITION, only using :FILE-LENGTH
-(defun file-length (stream)
-  ;; FIXME: The following declaration uses yet undefined types, which
-  ;; cause cross-compiler hangup.
-  ;;
-  ;; (declare (type (or file-stream synonym-stream) stream))
-  ;;
-  ;; The description for FILE-LENGTH says that an error must be raised
-  ;; for streams not associated with files (which broadcast streams
-  ;; aren't according to the glossary). However, the behaviour of
-  ;; FILE-LENGTH for broadcast streams is explicitly described in the
-  ;; BROADCAST-STREAM entry.
-  (unless (typep stream 'broadcast-stream)
-    (stream-must-be-associated-with-file stream))
-  (funcall (ansi-stream-misc stream) stream :file-length))
-
 (defun file-string-length (stream object)
   (funcall (ansi-stream-misc stream) stream :file-string-length object))
 
@@ -2146,4 +2130,24 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (output-seq-in-loop)))))))
   seq)
 
+
+;;; like FILE-POSITION, only using :FILE-LENGTH
+(defun file-length (stream)
+  ;; FIXME: the FIXME following this one seems wrong on 2 counts:
+  ;;  1. since when does cross-compiler hangup occur on undefined types?
+  ;;  2. why is that the correct set of types to check for?
+  ;; FIXME: The following declaration uses yet undefined types, which
+  ;; cause cross-compiler hangup.
+  ;;
+  ;; (declare (type (or file-stream synonym-stream) stream))
+  ;;
+  ;; The description for FILE-LENGTH says that an error must be raised
+  ;; for streams not associated with files (which broadcast streams
+  ;; aren't according to the glossary). However, the behaviour of
+  ;; FILE-LENGTH for broadcast streams is explicitly described in the
+  ;; BROADCAST-STREAM entry.
+  (unless (typep stream 'broadcast-stream)
+    (stream-must-be-associated-with-file stream))
+  (funcall (ansi-stream-misc stream) stream :file-length))
+
 ;;;; etc.

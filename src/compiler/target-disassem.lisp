@@ -936,6 +936,13 @@
   (let ((sap (sb!sys:int-sap address)))
     (lambda () sap)))
 
+(defstruct (source-form-cache (:conc-name sfcache-)
+                              (:copier nil))
+  (debug-source nil :type (or null sb!di:debug-source))
+  (toplevel-form-index -1 :type fixnum)
+  (last-location-retrieved nil :type (or null sb!di:code-location))
+  (last-form-retrieved -1 :type fixnum))
+
 ;;; Return a memory segment located at the system-area-pointer returned by
 ;;; SAP-MAKER and LENGTH bytes long in the disassem-state object DSTATE.
 ;;;
@@ -1015,13 +1022,6 @@
                  code (+ fun-offset sb!vm:simple-fun-type-slot)))))))
 
 ;;; getting at the source code...
-
-(defstruct (source-form-cache (:conc-name sfcache-)
-                              (:copier nil))
-  (debug-source nil :type (or null sb!di:debug-source))
-  (toplevel-form-index -1 :type fixnum)
-  (last-location-retrieved nil :type (or null sb!di:code-location))
-  (last-form-retrieved -1 :type fixnum))
 
 (defun get-different-source-form (loc context &optional cache)
   (if (and cache

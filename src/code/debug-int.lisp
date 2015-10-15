@@ -217,6 +217,91 @@
   (indirect-sc-offset nil :type (or sb!c:sc-offset null))
   (info nil))
 
+;;;; DEBUG-FUNs
+
+;;; These exist for caching data stored in packed binary form in
+;;; compiler DEBUG-FUNs. *COMPILED-DEBUG-FUNS* maps a SB!C::DEBUG-FUN
+;;; to a DEBUG-FUN. There should only be one DEBUG-FUN in existence
+;;; for any function; that is, all CODE-LOCATIONs and other objects
+;;; that reference DEBUG-FUNs point to unique objects. This is
+;;; due to the overhead in cached information.
+
+(defstruct (debug-fun (:constructor nil)
+                      (:copier nil))
+  ;; some representation of the function arguments. See
+  ;; DEBUG-FUN-LAMBDA-LIST.
+  ;; NOTE: must parse vars before parsing arg list stuff.
+  (%lambda-list :unparsed)
+  ;; cached DEBUG-VARS information (unexported).
+  ;; These are sorted by their name.
+  (%debug-vars :unparsed :type (or simple-vector null (member :unparsed)))
+  ;; cached debug-block information. This is NIL when we have tried to
+  ;; parse the packed binary info, but none is available.
+  (blocks :unparsed :type (or simple-vector null (member :unparsed)))
+  ;; the actual function if available
+  (%function :unparsed :type (or null function (member :unparsed))))
+(def!method print-object ((obj debug-fun) stream)
+  (print-unreadable-object (obj stream :type t)
+    (prin1 (debug-fun-name obj) stream)))
+
+(defstruct (bogus-debug-fun
+            (:include debug-fun)
+            (:constructor make-bogus-debug-fun
+                          (%name &aux
+                                 (%lambda-list nil)
+                                 (%debug-vars nil)
+                                 (blocks nil)
+                                 (%function nil)))
+            (:copier nil))
+  %name)
+
+;;;; DEBUG-BLOCKs
+
+;;; These exist for caching data stored in packed binary form in compiler
+;;; DEBUG-BLOCKs.
+(defstruct (debug-block (:constructor nil)
+                        (:copier nil))
+  ;; This indicates whether the block is a special glob of code shared
+  ;; by various functions and tucked away elsewhere in a component.
+  ;; This kind of block has no start code-location. This slot is in
+  ;; all debug-blocks since it is an exported interface.
+  (elsewhere-p nil :type boolean))
+(def!method print-object ((obj debug-block) str)
+  (print-unreadable-object (obj str :type t)
+    (prin1 (debug-block-fun-name obj) str)))
+
+#!+sb-doc
+(setf (fdocumentation 'debug-block-elsewhere-p 'function)
+  "Return whether debug-block represents elsewhere code.")
+
+(defstruct (compiled-debug-block (:include debug-block)
+                                 (:copier nil))
+  ;; code-location information for the block
+  (code-locations #() :type simple-vector))
+
+(defstruct (code-location (:constructor nil)
+                          (:copier nil))
+  ;; the DEBUG-FUN containing this CODE-LOCATION
+  (debug-fun nil :type debug-fun)
+  ;; This is initially :UNSURE. Upon first trying to access an
+  ;; :UNPARSED slot, if the data is unavailable, then this becomes T,
+  ;; and the code-location is unknown. If the data is available, this
+  ;; becomes NIL, a known location. We can't use a separate type
+  ;; code-location for this since we must return code-locations before
+  ;; we can tell whether they're known or unknown. For example, when
+  ;; parsing the stack, we don't want to unpack all the variables and
+  ;; blocks just to make frames.
+  (%unknown-p :unsure :type (member t nil :unsure))
+  ;; the DEBUG-BLOCK containing CODE-LOCATION. XXX Possibly toss this
+  ;; out and just find it in the blocks cache in DEBUG-FUN.
+  (%debug-block :unparsed :type (or debug-block (member :unparsed)))
+  ;; This is the number of forms processed by the compiler or loader
+  ;; before the top level form containing this code-location.
+  (%tlf-offset :unparsed :type (or index (member :unparsed)))
+  ;; This is the depth-first number of the node that begins
+  ;; code-location within its top level form.
+  (%form-number :unparsed :type (or index (member :unparsed))))
+
 ;;;; frames
 
 ;;; These represent call frames on the stack.
@@ -261,44 +346,6 @@
             (debug-fun-name (frame-debug-fun obj))
             (compiled-frame-escaped obj))))
 
-;;;; DEBUG-FUNs
-
-;;; These exist for caching data stored in packed binary form in
-;;; compiler DEBUG-FUNs. *COMPILED-DEBUG-FUNS* maps a SB!C::DEBUG-FUN
-;;; to a DEBUG-FUN. There should only be one DEBUG-FUN in existence
-;;; for any function; that is, all CODE-LOCATIONs and other objects
-;;; that reference DEBUG-FUNs point to unique objects. This is
-;;; due to the overhead in cached information.
-(defstruct (debug-fun (:constructor nil)
-                      (:copier nil))
-  ;; some representation of the function arguments. See
-  ;; DEBUG-FUN-LAMBDA-LIST.
-  ;; NOTE: must parse vars before parsing arg list stuff.
-  (%lambda-list :unparsed)
-  ;; cached DEBUG-VARS information (unexported).
-  ;; These are sorted by their name.
-  (%debug-vars :unparsed :type (or simple-vector null (member :unparsed)))
-  ;; cached debug-block information. This is NIL when we have tried to
-  ;; parse the packed binary info, but none is available.
-  (blocks :unparsed :type (or simple-vector null (member :unparsed)))
-  ;; the actual function if available
-  (%function :unparsed :type (or null function (member :unparsed))))
-(def!method print-object ((obj debug-fun) stream)
-  (print-unreadable-object (obj stream :type t)
-    (prin1 (debug-fun-name obj) stream)))
-
-(defstruct (compiled-debug-fun
-            (:include debug-fun)
-            (:constructor %make-compiled-debug-fun
-                          (compiler-debug-fun component))
-            (:copier nil))
-  ;; compiler's dumped DEBUG-FUN information (unexported)
-  (compiler-debug-fun nil :type sb!c::compiled-debug-fun)
-  ;; code object (unexported).
-  component
-  ;; the :FUN-START breakpoint (if any) used to facilitate
-  ;; function end breakpoints
-  (end-starter nil :type (or null breakpoint)))
 
 ;;; This maps SB!C::COMPILED-DEBUG-FUNs to
 ;;; COMPILED-DEBUG-FUNs, so we can get at cached stuff and not
@@ -318,41 +365,6 @@
       (or (gethash compiler-debug-fun table)
           (setf (gethash compiler-debug-fun table)
                 (%make-compiled-debug-fun compiler-debug-fun component))))))
-
-(defstruct (bogus-debug-fun
-            (:include debug-fun)
-            (:constructor make-bogus-debug-fun
-                          (%name &aux
-                                 (%lambda-list nil)
-                                 (%debug-vars nil)
-                                 (blocks nil)
-                                 (%function nil)))
-            (:copier nil))
-  %name)
-
-;;;; DEBUG-BLOCKs
-
-;;; These exist for caching data stored in packed binary form in compiler
-;;; DEBUG-BLOCKs.
-(defstruct (debug-block (:constructor nil)
-                        (:copier nil))
-  ;; This indicates whether the block is a special glob of code shared
-  ;; by various functions and tucked away elsewhere in a component.
-  ;; This kind of block has no start code-location. This slot is in
-  ;; all debug-blocks since it is an exported interface.
-  (elsewhere-p nil :type boolean))
-(def!method print-object ((obj debug-block) str)
-  (print-unreadable-object (obj str :type t)
-    (prin1 (debug-block-fun-name obj) str)))
-
-#!+sb-doc
-(setf (fdocumentation 'debug-block-elsewhere-p 'function)
-  "Return whether debug-block represents elsewhere code.")
-
-(defstruct (compiled-debug-block (:include debug-block)
-                                 (:copier nil))
-  ;; code-location information for the block
-  (code-locations #() :type simple-vector))
 
 ;;;; breakpoints
 
@@ -430,31 +442,22 @@
               (etypecase what
                 (code-location nil)
                 (debug-fun (breakpoint-kind obj)))))))
+
+(defstruct (compiled-debug-fun
+            (:include debug-fun)
+            (:constructor %make-compiled-debug-fun
+                          (compiler-debug-fun component))
+            (:copier nil))
+  ;; compiler's dumped DEBUG-FUN information (unexported)
+  (compiler-debug-fun nil :type sb!c::compiled-debug-fun)
+  ;; code object (unexported).
+  component
+  ;; the :FUN-START breakpoint (if any) used to facilitate
+  ;; function end breakpoints
+  (end-starter nil :type (or null breakpoint)))
 
 ;;;; CODE-LOCATIONs
 
-(defstruct (code-location (:constructor nil)
-                          (:copier nil))
-  ;; the DEBUG-FUN containing this CODE-LOCATION
-  (debug-fun nil :type debug-fun)
-  ;; This is initially :UNSURE. Upon first trying to access an
-  ;; :UNPARSED slot, if the data is unavailable, then this becomes T,
-  ;; and the code-location is unknown. If the data is available, this
-  ;; becomes NIL, a known location. We can't use a separate type
-  ;; code-location for this since we must return code-locations before
-  ;; we can tell whether they're known or unknown. For example, when
-  ;; parsing the stack, we don't want to unpack all the variables and
-  ;; blocks just to make frames.
-  (%unknown-p :unsure :type (member t nil :unsure))
-  ;; the DEBUG-BLOCK containing CODE-LOCATION. XXX Possibly toss this
-  ;; out and just find it in the blocks cache in DEBUG-FUN.
-  (%debug-block :unparsed :type (or debug-block (member :unparsed)))
-  ;; This is the number of forms processed by the compiler or loader
-  ;; before the top level form containing this code-location.
-  (%tlf-offset :unparsed :type (or index (member :unparsed)))
-  ;; This is the depth-first number of the node that begins
-  ;; code-location within its top level form.
-  (%form-number :unparsed :type (or index (member :unparsed))))
 (def!method print-object ((obj code-location) str)
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-fun-name (code-location-debug-fun obj))

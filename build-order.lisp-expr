@@ -149,6 +149,7 @@
  ;; mostly needed by stuff from comcom, but also used by "x86-vm"
  ("src/code/debug-var-io")
 
+ ("src/code/defbangstruct")
  ("src/code/early-thread")
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
@@ -167,8 +168,6 @@
 
  ("src/code/early-defstructs" :not-host) ; gotta-be-first DEFSTRUCTs
  ("src/code/early-raw-slots")
-
- ("src/code/defbangstruct")
 
  ("src/code/funutils" :not-host)
 
@@ -400,7 +399,6 @@
  ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
  ;; and all type-classes are defined.
  ("src/code/target-type" :not-host)
- ("src/code/pprint" :not-host)
  ("src/code/deftypes-for-target")
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
@@ -459,6 +457,7 @@
  ("src/code/readtable")
  ("src/code/pathname")
  ("src/code/host-pprint")
+ ("src/code/pprint" :not-host)
 
  ;; KLUDGE: Much stuff above here is the type system and/or the INFO
  ;; system, not really the compiler proper. It might be easier to

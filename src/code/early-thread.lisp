@@ -14,26 +14,6 @@
 
 (def!type thread-name () 'simple-string)
 
-;;; THREAD and MUTEX are mutually referential types, and the compiler isn't
-;;; generally intelligent enough to compile out-of-line setters efficiently
-;;; when it has to type-check an unknown, such as MUTEX-%OWNER which is
-;;; (OR NULL THREAD). But this is not a problem for the constructor,
-;;; because %OWNER's default is NIL which statically passes the test.
-;;; #'(SETF %OWNER) is suboptimally compiled, which is irrelevant,
-;;; because it is never called. But you can't use CAS on the slot unless it
-;;; is read/write, which necessarily defines a writer (that we don't want).
-
-(declaim (inline make-mutex)) ;; for possible DX-allocating
-(defstruct (mutex
-             (:constructor make-mutex (&key name)))
-  #!+sb-doc
-  "Mutex type."
-  (name   nil :type (or null thread-name))
-  (%owner nil :type (or null thread))
-  #!+(and sb-thread sb-futex)
-  (state    0 :type fixnum))
-(declaim (notinline make-mutex))
-
 (defstruct (thread (:constructor %make-thread))
   #!+sb-doc
   "Thread type. Do not rely on threads being structs as it may change
@@ -53,3 +33,16 @@ in future versions."
    (make-mutex :name "thread result lock")
    :type mutex)
   waiting-for)
+
+;; We don't actually want to inline this within MAKE-THREAD.
+;; If we did want to, we'd need DEF!STRUCT to reconstruct the inline
+;; constructor from the DD, which we could do, but have never needed.
+(declaim (sb!ext:maybe-inline make-mutex)) ;; for possible DX-allocating
+(def!struct (mutex (:constructor make-mutex (&key name)))
+  #!+sb-doc
+  "Mutex type."
+  (name   nil :type (or null thread-name))
+  (%owner nil :type (or null thread))
+  #!+(and sb-thread sb-futex)
+  (state    0 :type fixnum))
+(declaim (notinline make-mutex))

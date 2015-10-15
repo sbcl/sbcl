@@ -954,7 +954,7 @@
 ;;; lifetime analysis, the global conflicts structure is used during
 ;;; lifetime analysis to represent the set of TNs live at the start of
 ;;; the IR2 block.
-(defstruct (global-conflicts
+(def!struct (global-conflicts
             (:constructor make-global-conflicts (kind tn block number))
             (:copier nil))
   ;; the IR2-BLOCK that this structure represents the conflicts for
