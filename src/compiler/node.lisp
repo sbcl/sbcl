@@ -20,6 +20,19 @@
 ;;; blocks -- with BLOCK-SUCC/BLOCK-PRED lists; data transfers are
 ;;; represented with LVARs.
 
+;;; FIXME: this file contains a ton of DEF!STRUCT definitions most of which
+;;; could be DEFSTRUCT, except for the fact that we use def!struct as
+;;; a workaround for the compiler's inability to cope with mutally referential
+;;; structures, even ones within the same file. The IR1 structures are tightly
+;;; knitted together - for example, starting from a CRETURN, you can reach
+;;; at least 15 other structure objects, not counting some like HASH-TABLE
+;;; which are fundamental. e.g. we have:
+;;;  CRETURN -> {NODE,CTRAN,CLAMBDA,LVAR}
+;;;  CTRAN -> {BLOCK},
+;;;  CLAMBDA -> {FUNCTIONAL,COMBINATION,BIND,PHYSENV,OPTIONAL-DISPATCH}
+;;; and so on.  DEF!STRUCT solves this problem by way of a terrible hack
+;;; that works only for compiling the compiler.
+
 ;;; "Lead-in" Control TRANsfer [to some node]
 (def!struct (ctran
              (:make-load-form-fun ignore-it)
@@ -192,10 +205,10 @@
   (defattr block-type-asserted)
   (defattr block-test-modified))
 
-(defstruct (cloop (:conc-name loop-)
-                  (:predicate loop-p)
-                  (:constructor make-loop)
-                  (:copier copy-loop))
+(def!struct (cloop (:conc-name loop-)
+                   (:predicate loop-p)
+                   (:constructor make-loop)
+                   (:copier copy-loop))
   ;; The kind of loop that this is.  These values are legal:
   ;;
   ;;    :OUTER
@@ -334,6 +347,14 @@
 ;;;   size of flow analysis problems, this allows back-end data
 ;;;   structures to be reclaimed after the compilation of each
 ;;;   component.
+(locally
+  ;; This is really taking the low road. I couldn't think of a way to
+  ;; avoid a style warning regarding IR2-COMPONENT other than to declare
+  ;; the INFO slot as :type (or (satisfies ir2-component-p) ...)
+  ;; During make-host-2, the solution to this is the same hack
+  ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
+  #!+(and (host-feature sb-xc-host) (host-feature sbcl))
+  (declare (sb-ext:muffle-conditions style-warning))
 (def!struct (component (:copier nil)
                        (:constructor
                         make-component
@@ -444,7 +465,7 @@
   ;; The default LOOP in the component.
   (outer-loop (missing-arg) :type cloop)
   ;; The current sset index
-  (sset-number 0 :type fixnum))
+  (sset-number 0 :type fixnum)))
 (defprinter (component :identity t)
   name
   #!+sb-show id
@@ -458,6 +479,7 @@
   ;; COMPILE-COMPONENT hasn't happened yet. Might it be even better
   ;; (certainly stricter, possibly also correct...) to assert that
   ;; IR1-FINALIZE hasn't happened yet?
+  #+sb-xc-host (declare (notinline component-info)) ; unknown type
   (aver (not (eql (component-info component) :dead))))
 
 ;;; A CLEANUP structure represents some dynamic binding action. Blocks
@@ -683,22 +705,6 @@
 (defun leaf-source-name (leaf)
   (aver (leaf-has-source-name-p leaf))
   (leaf-%source-name leaf))
-
-;;; The CONSTANT structure is used to represent known constant values.
-;;; Since the same constant leaf may be shared between named and anonymous
-;;; constants, %SOURCE-NAME is never used.
-(def!struct (constant (:constructor make-constant (value
-                                                   &aux
-                                                   (type (ctype-of value))
-                                                   (%source-name '.anonymous.)
-                                                   (where-from :defined)))
-                      (:include leaf))
-  ;; the value of the constant
-  (value (missing-arg) :type t)
-  ;; Boxed TN for this constant, if any.
-  (boxed-tn nil :type (or null tn)))
-(defprinter (constant :identity t)
-  value)
 
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.
@@ -1472,6 +1478,10 @@
 
 ;;;; Freeze some structure types to speed type testing.
 
+;; FIXME: the frozen-ness can't actually help optimize anything
+;; until this file is compiled by the cross-compiler.
+;; Anything compiled prior to then uses the non-frozen classoid as existed
+;; at load-time of the cross-compiler. SB!XC:PROCLAIM would likely work here.
 #!-sb-fluid
-(declaim (freeze-type node leaf lexenv ctran lvar cblock component cleanup
+(declaim (freeze-type node lexenv ctran lvar cblock component cleanup
                       physenv tail-set nlx-info))

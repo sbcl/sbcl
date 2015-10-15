@@ -334,6 +334,7 @@
 
  ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
  ("src/compiler/vop")
+ ("src/compiler/constant-leaf")
 
  ;; needed by "vm" and "primtype"
  ("src/compiler/backend")

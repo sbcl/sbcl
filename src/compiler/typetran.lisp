@@ -297,6 +297,10 @@
   (declare (type hairy-type type))
   (let ((spec (hairy-type-specifier type)))
     (cond ((unknown-type-p type)
+           #+sb-xc-host
+           (warn "can't open-code test of unknown type ~S"
+                 (type-specifier type))
+           #-sb-xc-host
            (when (policy *lexenv* (> speed inhibit-warnings))
              (compiler-notify "can't open-code test of unknown type ~S"
                               (type-specifier type)))
