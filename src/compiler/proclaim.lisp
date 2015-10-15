@@ -196,7 +196,7 @@
            :format-arguments (list form state
                                    (rest (typexpand 'deprecation-state)))))
   (multiple-value-call #'values
-    state (sb-impl::normalize-deprecation-since since)))
+    state (sb!impl::normalize-deprecation-since since)))
 
 (defun process-deprecation-declaration (thing state software version)
   (destructuring-bind (namespace name &key replacement) thing
