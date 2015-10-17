@@ -29,29 +29,27 @@
 (def!method print-object ((table pprint-dispatch-table) stream)
   (print-unreadable-object (table stream :type t :identity t)))
 
-;;; Structures defined here only because we use DEF!STRUCT as a crutch
-;;; to solve the problem of mutually referential structures not being
-;;; efficiently compiled with regard to their type checks.
+;;; These structures are mutually referential and we want to compile their
+;;; type-checks efficiently. Essentially the way to do that is define
+;;; each structure during both make-host passes.
 
-(def!type posn () 'fixnum)
+(sb!xc:deftype posn () 'fixnum)
 
-(def!struct (queued-op (:constructor nil)
-                       (:copier nil))
+(sb!xc:defstruct (queued-op (:constructor nil)
+                            (:copier nil))
   (posn 0 :type posn))
 
-(def!struct (block-end (:include queued-op)
-                       (:copier nil))
+(sb!xc:defstruct (block-end (:include queued-op)
+                            (:copier nil))
   (suffix nil :type (or null simple-string)))
 
-(def!struct (section-start (:include queued-op)
-                           (:constructor nil)
-                           (:copier nil))
+(sb!xc:defstruct (section-start (:include queued-op)
+                                (:constructor nil)
+                                (:copier nil))
   (depth 0 :type index)
   (section-end nil :type (or null newline block-end)))
 
-(def!struct (newline (:include section-start)
-                     (:copier nil))
+(sb!xc:defstruct (newline (:include section-start)
+                          (:copier nil))
   (kind (missing-arg)
         :type (member :linear :fill :miser :literal :mandatory)))
-
-
