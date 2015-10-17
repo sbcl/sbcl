@@ -18,7 +18,8 @@
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp (setf custom:*suppress-check-redefinition* t)
 
-(load-or-cload-xcompiler #'host-cload-stem)
+(with-compilation-unit ()
+  (load-or-cload-xcompiler #'host-cload-stem))
 
 ;;; Let's check that the type system, and various other things, are
 ;;; reasonably sane. (It's easy to spend a long time wandering around

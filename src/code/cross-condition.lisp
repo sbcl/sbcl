@@ -102,12 +102,3 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 ;; both of which are specified to exist.
 (define-condition sb!c:inlining-dependency-failure
     (simple-condition style-warning) ())
-
-;; early-extensions seems to want to recognize these types.
-;; I'm not sure that it actually can or needs to. For one thing,
-;; the types didn't used to exist. More than likely the mechanism for handling
-;; deprecated types doesn't actually work in the cross-compiler.
-;; Anyway, the lesser evil is to make a few extra definitions rather than
-;; produce a PARSE-UNKNOWN-TYPE warning in reference to PARSE-UNKNOWN-TYPE.
-(define-condition parse-unknown-type () ())
-(define-condition parse-deprecated-type () ())
