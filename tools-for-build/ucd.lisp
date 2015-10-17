@@ -332,7 +332,7 @@ Length should be adjusted when the standard changes.")
 (defun fixup-decompositions ()
   (loop for did-something = nil
         do
-        (loop for code being the hash-key of *ucd-entries*
+        (loop for code being each hash-key of *ucd-entries*
               using (hash-value ucd)
               when (and (ucd-decomp ucd)
                         (not (logbitp 7 (elt (aref *misc-table* (ucd-misc ucd)) 4))))
@@ -633,6 +633,7 @@ Length should be adjusted when the standard changes.")
 
 (defun parse-property (stream &optional name)
   (let ((result (make-array 1 :fill-pointer 0 :adjustable t)))
+    ;; FIXME: something in this loop provokes a warning from CLISP
     (loop for line = (read-line stream nil nil)
        ;; Deal with Blah=Blah in DerivedNormalizationProps.txt
        while (and line (not (position #\= (substitute #\Space #\= line :count 1))))

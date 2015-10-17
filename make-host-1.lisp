@@ -16,10 +16,19 @@
 (set-dispatch-macro-character #\# #\- #'she-reader)
 
 ;; Supress function/macro redefinition warnings under clisp.
-#+clisp (setf custom:*suppress-check-redefinition* t)
+#+clisp
+(progn (setf custom:*suppress-check-redefinition* t)
+       ;; A compilation-unit seems to kill the compile. I'm not sure if it's
+       ;; running out of memory or what. I don't care to find out,
+       ;; but it's most definitely the cause of the breakage.
+       (defmacro maybe-with-compilation-unit (&body forms)
+         `(progn ,@forms)))
+#-clisp
+(defmacro maybe-with-compilation-unit (&body forms)
+  `(with-compilation-unit () ,@forms))
 
-(with-compilation-unit ()
-  (load-or-cload-xcompiler #'host-cload-stem))
+(maybe-with-compilation-unit
+ (load-or-cload-xcompiler #'host-cload-stem))
 
 ;;; Let's check that the type system, and various other things, are
 ;;; reasonably sane. (It's easy to spend a long time wandering around
@@ -28,7 +37,10 @@
   (load "tests/type.before-xc.lisp")
   (load "tests/info.before-xc.lisp")
   (load "tests/vm.before-xc.lisp"))
-(load "tools-for-build/ucd.lisp")
+;; When building on a slow host using a slow Lisp,
+;; the wait time in slurp-ucd seems interminable - over a minute.
+;; Compiling seems to help a bit, but maybe it's my imagination.
+(load (compile-file "tools-for-build/ucd.lisp"))
 
 ;;; Generate character database tables.
 (sb-cold::slurp-ucd)
