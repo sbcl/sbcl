@@ -6,6 +6,8 @@ changes relative to sbcl-1.2.16:
     as stipulated by X3J13 issue LOAD-TIME-EVAL.
   * bug fix: SB-UNICODE:CONFUSABLE-P no longer treats "<" and the empty
     string as confusable.  (lp#1504739)
+  * bug fix: (ASSERT (COMPUTE-IT ...)) would expand incorrectly
+    if COMPUTE-IT was a local macro that shadowed a global function.
 
 changes in sbcl-1.2.16 relative to sbcl-1.2.15:
   * enhancement: by default, timers with a repeat interval do not "catch up"

@@ -315,6 +315,24 @@
       (test ((a -1)) (my-plusp (signum a))
             "The assertion (MY-PLUSP (SIGNUM A)) failed with (SIGNUM A) = -1."))))
 
+;; If ASSERT thinks it's checking a function call form, it binds the arguments
+;; to local vars so that it can show them on failure. But it would accidentally
+;; treat a local macro as a function if its name coincided with a global.
+(defun compute (a b) (declare (ignore a b)))
+(defun compute-something-else (a b) (list a b))
+(defun assert-arg-eval-order (a b)
+  (let ((evals))
+    (flet ((eval-arg (arg) (setq evals (nconc evals (list arg))) arg))
+      (macrolet ((compute (x y z)
+                   (declare (ignore y)) ; does not appear in expansion
+                   `(compute-something-else ,z ,x)))
+        (assert (compute (eval-arg a)
+                         (eval-arg (error "bork"))
+                         (eval-arg b)))))
+    evals))
+(with-test (:name :assert-arg-eval-order)
+  (assert (equal (assert-arg-eval-order 1 2) '(2 1))))
+
 (with-test (:name (find-restart :recheck-conditions-and-tests :bug-774410))
   (let ((activep t))
     (restart-bind ((switchable-restart

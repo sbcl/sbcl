@@ -58,12 +58,16 @@
                 ;; attempt this if TEST-FORM is the application of a
                 ;; special operator because of argument evaluation
                 ;; order issues.
-                ((when (typep test-form '(cons symbol list))
-                   (let ((name (first test-form)))
-                     (when (or (eq (info :function :kind name) :function)
-                               (and (typep env 'sb!kernel:lexenv)
-                                    (sb!c::functional-p
-                                     (cdr (assoc name (sb!c::lexenv-funs env))))))
+               ((when (typep test-form '(cons symbol list))
+                   (let* ((name (first test-form))
+                          (global-fun-p
+                           (eq (info :function :kind name) :function)))
+                     (when (typecase env
+                             (sb!kernel:lexenv
+                              (let ((f (cdr (assoc name (sb!c::lexenv-funs env)))))
+                                (if (not f) global-fun-p (sb!c::functional-p f))))
+                             ;; Placeholder for other environment types.
+                             (null global-fun-p))
                        `(,name ,@(mapcar #'process-place (rest test-form)))))))
                 ;; For all other cases, just evaluate TEST-FORM and do
                 ;; not report any details if the assertion fails.
