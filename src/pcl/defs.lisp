@@ -62,6 +62,8 @@
 
 ;;; interface
 (defun specializer-from-type (type &aux args)
+  ;; Avoid style-warning about compiler-macro being unavailable.
+  (declare (notinline make-instance))
   (when (symbolp type)
     (return-from specializer-from-type (find-class type)))
   (when (consp type)
@@ -610,6 +612,8 @@
   (make-hash-table :test 'eql :weakness :value))
 
 (defun intern-eql-specializer (object)
+  ;; Avoid style-warning about compiler-macro being unavailable.
+  (declare (notinline make-instance))
   ;; Need to lock, so that two threads don't get non-EQ specializers
   ;; for an EQL object.
   (with-locked-system-table (*eql-specializer-table*)

@@ -120,6 +120,8 @@
 
 (defun make-emf-from-method
     (method cm-args &optional gf fmf-p method-alist wrappers)
+  ;; Avoid style-warning about compiler-macro being unavailable.
+  (declare (notinline make-instance))
   (multiple-value-bind (mf real-mf-p fmf pv)
       (get-method-function method method-alist wrappers)
     (if fmf
