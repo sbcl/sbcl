@@ -225,10 +225,15 @@
      ;; than typing the decoding expressions into the debugger to decipher
      ;; a backtrace. Anyway, if it ceases to print right, just fix it again!
      (set-pprint-dispatch
-      'generic-function
+      ;; Circumlocution avoids use of unknown type.
+      '(and function (satisfies sb-pcl::generic-function-p))
       (lambda (stream obj)
         (format stream "<~S ~S>" (type-of obj)
                 (svref (sb-kernel:%funcallable-instance-info obj 1) 5))))
+     ;; dangerous: this type doesn't exist, and the testable-type-p thing
+     ;; isn't working the way it should. It's supposed to enable the ppd entry
+     ;; as soon as CLASS becomes defined, but instead it goes bonkers.
+     #+nil
      (set-pprint-dispatch
       'class
       (lambda (stream obj)
