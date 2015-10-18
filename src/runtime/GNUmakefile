@@ -21,7 +21,6 @@ LINKFLAGS = -g
 NM = nm -gp
 DEPEND_FLAGS = -MM
 GREP = grep
-LD = ld
 
 include ../../output/prefix.def
 
@@ -55,13 +54,10 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 
-targets: $(TARGET) $(OBJTARGET) sbcl.nm
+targets: $(TARGET) sbcl.nm
 
-$(TARGET): sbcl.o
+$(TARGET): $(OBJS)
 	$(CC) ${LINKFLAGS} -o $@ $^ $(LIBS)
-
-sbcl.o: $(OBJS)
-	$(LD) -r -o $@ $^
 
 sbcl.nm: $(TARGET)
 	$(NM) $(TARGET) | $(GREP) -v " [FUw] " > ,$@
