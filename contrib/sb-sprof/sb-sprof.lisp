@@ -732,7 +732,7 @@ The following keyword args are recognized:
                               `((format t "~&===> ~d of ~d samples taken.~%"
                                         (samples-trace-count *samples*)
                                         (samples-max-samples *samples*))))
-                          (let ((,last-index, (samples-index *samples*)))
+                          (let ((,last-index (samples-index *samples*)))
                             (setf ,values (multiple-value-list (progn ,@body)))
                             (when (= ,last-index (samples-index *samples*))
                               (,oops)
