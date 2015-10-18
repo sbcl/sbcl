@@ -228,19 +228,7 @@
   (use-package :assertoid))
 
 (defun load-test (file)
-  ;; KLUDGE: while it may be the case that all test files should be opened
-  ;; as UTF-8, the 'reader' test file is particularly strange because it
-  ;; contains non-UTF-8 bytes, but the character decoding warning was not
-  ;; an intended test. It was happenstance that makes one think
-  ;;  "great! there _is_ a test for character decoding errors
-  ;;   in the file I would expect to find such a test in"
-  ;; except it isn't. A true test would assert something useful,
-  ;; AND not make scary meta-noise, or at least preface it with
-  ;;  ";; Expect warnings from the following test"
-  `(load ,file
-         ,@(if (search "reader.impure" (namestring file))
-               '(:external-format :latin-1))))
-
+  `(load ,file))
 
 (defun cload-test (file)
   `(let ((compile-name (compile-file-pathname ,file)))
