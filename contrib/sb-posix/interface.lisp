@@ -698,6 +698,7 @@ not supported."
  (defun cfsetispeed (speed &optional termios)
    (declare (type (or null termios) termios))
    (with-alien-termios a-termios ()
+     (termios-to-alien termios a-termios)
      (let ((r (alien-funcall
                (extern-alien "cfsetispeed"
                              (function int (* alien-termios) speed-t))
@@ -712,6 +713,7 @@ not supported."
  (defun cfsetospeed (speed &optional termios)
    (declare (type (or null termios) termios))
    (with-alien-termios a-termios ()
+     (termios-to-alien termios a-termios)
      (let ((r (alien-funcall
                (extern-alien "cfsetospeed"
                              (function int (* alien-termios) speed-t))
