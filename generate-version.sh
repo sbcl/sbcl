@@ -2,7 +2,7 @@
 
 git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
-    if ( which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null )
+    if ( command -v git >/dev/null && git describe >/dev/null 2>/dev/null )
     then
         echo "ok"
     else

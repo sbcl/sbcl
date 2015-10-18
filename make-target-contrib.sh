@@ -22,7 +22,7 @@ LC_ALL=C
 # Just doing CC=${CC:-cc} may be enough, but it needs to be checked
 # that cc is available on all platforms.
 if [ -z $CC ]; then
-    if [ -x "`which cc`" ]; then
+    if [ -x "`command -v cc`" ]; then
         CC=cc
     else
         CC=gcc

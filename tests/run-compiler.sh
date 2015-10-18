@@ -3,7 +3,7 @@
 platform="${SBCL_SOFTWARE_TYPE}-${SBCL_MACHINE_TYPE}"
 
 if [ -z $CC ]; then
-    if [ -x "`which cc`" ]; then
+    if [ -x "`command -v cc`" ]; then
         CC=cc
     else
         CC=gcc

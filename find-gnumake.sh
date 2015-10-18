@@ -8,10 +8,10 @@ find_gnumake() {
     GNUMAKE="$GNUMAKE"
   elif [ "GNU Make" = "`make -v 2>/dev/null | head -n 1 | cut -b 1-8`" ]; then
     GNUMAKE=make
-  elif [ -x "`which gmake`" ] ; then
+  elif [ -x "`command -v gmake`" ] ; then
     # "gmake" is the preferred name in *BSD.
     GNUMAKE=gmake
-  elif [ -x "`which gnumake`" ] ; then
+  elif [ -x "`command -v gnumake`" ] ; then
     # MacOS X aka Darwin
     GNUMAKE=gnumake
   else

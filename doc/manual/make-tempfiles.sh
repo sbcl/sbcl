@@ -27,7 +27,7 @@ then
         SBCL_HOME=$SBCL_PWD/../../obj/sbcl-home/; export SBCL_HOME
         SBCL_BUILDING_CONTRIB="please asdf install your hook"; export SBCL_BUILDING_CONTRIB
     else
-        SBCLRUNTIME="`which sbcl`"
+        SBCLRUNTIME="`command -v sbcl`"
     fi
 else
     SBCLRUNTIME="$1"
