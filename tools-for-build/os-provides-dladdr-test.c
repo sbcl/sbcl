@@ -7,9 +7,13 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 
+#ifdef __NetBSD__
+#include <sys/param.h>
+#endif
+
 int main ()
 {
-#if defined(__NetBSD_Version__) && __NetBSD_Version__ >= 700000001
+#if defined(__NetBSD_Version__) && __NetBSD_Version__ < 700000001
   /* dladdr(3) is broken on some NetBSD versions before 7.0 */
   return 1;
 #else
