@@ -508,11 +508,8 @@ function designator."
                                    (fdefinition function))))
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
-        #+sb-eval
-        ((typep function 'sb-eval:interpreted-function)
-         (sb-eval:interpreted-function-debug-lambda-list function))
         (t
-         (sb-kernel:%simple-fun-arglist (sb-kernel:%fun-fun function)))))
+         (sb-kernel:%fun-lambda-list function))))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return
