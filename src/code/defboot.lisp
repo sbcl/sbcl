@@ -237,6 +237,7 @@ evaluated as a PROGN."
     ;; Arguably (SETF FDEFINITION) and FMAKUNBOUND should do this check too,
     ;; but one would hope that those operations on compiler-defined functions
     ;; are uncommon enough that this makes no difference.
+    ;; *** See also https://bugs.launchpad.net/sbcl/+bug/540063
     #!+sb-fasteval
     (awhen (and (sb!interpreter:interpreted-function-p def)
                 (structure-instance-accessor-p name))
