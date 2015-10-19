@@ -19,10 +19,8 @@
 
 #ifdef LISP_FEATURE_GENCGC
 extern lispobj *general_alloc(sword_t bytes, int page_type_flag);
-#endif
-
-extern lispobj alloc_number(sword_t n);
 extern lispobj alloc_code_object(unsigned boxed, unsigned unboxed);
+#endif
 
 #define DX_ALLOC_SAP(var_name, ptr)                                        \
 lispobj var_name;                                                          \
