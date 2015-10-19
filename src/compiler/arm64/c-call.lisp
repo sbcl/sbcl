@@ -376,8 +376,8 @@
                          (t
                           (incf stack-argument-count)
                           (inst ldr temp-tn stack-arg-tn)
-                          (inst str temp-tn target-tn)
-                          (incf fp-registers)))
+                          (inst str temp-tn target-tn)))
+                   (incf fp-registers)
                    (incf arg-count))
                   (t
                    (bug "Unknown alien type: ~S" type)))))
