@@ -47,3 +47,15 @@
                                           :vars (sb-eval::special-bindings vars env))))
                             (progv vars values
                               (sb-eval::eval-progn body new-env))))))))
+
+#+sb-fasteval
+(sb-interpreter::defspecial compiler-let (bindings &body body)
+  :deferred (env)
+  (funcall sb-interpreter::*let-processor*
+           `(,bindings
+             (declare (special
+                       ,@(mapcar (lambda (binding)
+                                   (if (atom binding) binding (car binding)))
+                                 bindings)))
+             ,@body)
+           env))

@@ -450,6 +450,9 @@ If an unsupported TYPE is requested, the function will return NIL.
      (let ((source (translate-source-location
                     (sb-eval:interpreted-function-source-location object))))
        source))
+    #+sb-fasteval
+    (sb-interpreter:interpreted-function
+     (translate-source-location (sb-interpreter:fun-source-location object)))
     (function
      (find-function-definition-source object))
     ((or condition standard-object structure-object)

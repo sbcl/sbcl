@@ -242,6 +242,9 @@ CARS of the alist include:
 
 In addition to these declarations defined using DEFINE-DECLARATION may
 appear."
+  #+sb-fasteval
+  (when (typep env 'sb-interpreter:basic-env)
+    (setq env (sb-interpreter::lexenv-from-env env)))
   (let* ((*lexenv* (or env (make-null-lexenv)))
          (fun (lexenv-find name funs))
          binding localp ftype dx inlinep)
@@ -437,6 +440,27 @@ appear."
                     (info :variable :deprecated name))
                    (extra-pairs :variable name var *lexenv*)))))
 
+;;; Unlike policy-related declarations which the interpeter itself needs
+;;; for correct operation of some macros, muffled conditions are irrelevant,
+;;; since warnings are not signaled much, if at all.
+;;; This is even more useless than env-package-locks.
+;;; It's only for SB-CLTL2, and not tested in the least.
+#+sb-fasteval
+(defun compute-handled-conditions (env)
+  (named-let recurse ((env env))
+    (let ((result (acond ((sb-interpreter::env-parent env)
+                          (compute-handled-conditions it))
+                         (t sb-c::*handled-conditions*))))
+      (sb-interpreter::do-decl-spec
+          (declaration (sb-interpreter::env-declarations env) result)
+        (let ((f (case (car declaration)
+                  (sb-ext:muffle-conditions
+                    #'sb-c::process-muffle-conditions-decl)
+                  (sb-ext:unmuffle-conditions
+                   #'sb-c::process-unmuffle-conditions-decl))))
+          (when f
+            (setq result (funcall f declaration result))))))))
+
 (declaim (ftype (sfunction (symbol &optional lexenv-designator) t)
                 declaration-information))
 (defun declaration-information (declaration-name &optional env)
@@ -459,15 +483,29 @@ the condition types that have been muffled."
        ;; CLtL2-mandated behavior:
        ;; "The returned list always contains an entry for each of the standard
        ;; qualities and for each of the implementation-specific qualities"
-       (sb-c::policy-to-decl-spec (sb-c::lexenv-policy env) nil t))
+       (sb-c::policy-to-decl-spec
+        (typecase env
+          #+sb-fasteval
+          (sb-interpreter:basic-env (sb-interpreter:env-policy env))
+          (t (sb-c::lexenv-policy env)))
+        nil t))
       (sb-ext:muffle-conditions
-       (sb-int:awhen (car (rassoc 'muffle-warning
-                                  (sb-c::lexenv-handled-conditions env)))
-         (sb-kernel:type-specifier it)))
+       (let ((handled-conditions
+              (typecase env
+                #+sb-fasteval
+                (sb-interpreter:basic-env (compute-handled-conditions env))
+                (t (sb-c::lexenv-handled-conditions env)))))
+         (sb-int:awhen (car (rassoc 'muffle-warning handled-conditions))
+           (sb-kernel:type-specifier it))))
       (declaration
        (copy-list sb-c::*recognized-declarations*))
       (t (if (info :declaration :handler declaration-name)
-             (extra-decl-info declaration-name env)
+             (extra-decl-info
+              declaration-name
+              (typecase env
+                #+sb-fasteval
+                (sb-interpreter:basic-env (sb-interpreter::lexenv-from-env env))
+                (t env)))
              (error "Unsupported declaration ~S." declaration-name))))))
 
 
