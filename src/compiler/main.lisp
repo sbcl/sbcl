@@ -389,6 +389,41 @@ Examples:
          (clrhash *number-continuations*)
          (clrhash *label-ids*)
          (clrhash *id-labels*))))
+
+;;; THING is a kind of thing about which we'd like to issue a warning,
+;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.
+;;; The compiler does a good job of making sure not to print repetitive
+;;; warnings for code that it compiles, but this solves a different problem.
+;;; Specifically, for a warning from PARSE-LAMBDA-LIST, there are three calls:
+;;; - once in the expander for defmacro itself, as it calls MAKE-MACRO-LAMBDA
+;;;   which calls PARSE-LAMBDA-LIST. This is the toplevel form processing.
+;;; - again for :compile-toplevel, where the DS-BIND calls PARSE-LAMBDA-LIST.
+;;;   If compiling in compile-toplevel, then *COMPILE-OBJECT* is a core object,
+;;;   but if interpreting, then it is still a fasl.
+;;; - once for compiling to fasl. *COMPILE-OBJECT* is a fasl.
+;;; I'd have liked the data to be associated with the fasl, except that
+;;; as indicated above, the second line hides some information.
+(defun style-warn-once (thing fmt &rest args)
+  (declare (special *compile-object*))
+  (let* ((source-info *source-info*)
+         (file-info (and (source-info-p source-info)
+                         (source-info-file-info source-info)))
+         (file-compiling-p (file-info-p file-info)))
+    (flet ((match-p (entry &aux (rest (cdr entry)))
+             ;; THING is compared by EQ, FMT by STRING=.
+             (and (eq (car entry) thing)
+                  (string= (car rest) fmt)
+                  ;; We don't want to walk into default values,
+                  ;; e.g. (&optional (b #<insane-struct))
+                  ;; because #<insane-struct> might be circular.
+                  (equal-but-no-car-recursion (cdr rest) args))))
+      (unless (and file-compiling-p
+                   (find-if #'match-p
+                            (file-info-style-warning-tracker file-info)))
+        (when file-compiling-p
+          (push (list* thing fmt args)
+                (file-info-style-warning-tracker file-info)))
+        (apply 'style-warn fmt args)))))
 
 ;;;; component compilation
 

@@ -115,16 +115,15 @@
                (declare (optimize (sb!c::insert-array-bounds-checks 0)))
                (and (symbolp arg)
                     (let ((name (symbol-name arg)))
-                      (and (typep name 'simple-base-string)
-                           (plusp (length name))
+                      (and (plusp (length name))
                            (char= (char name 0) #\&)))))
              (check-suspicious (kind form)
                (and (probably-ll-keyword-p form)
                     (member form sb!xc:lambda-list-keywords)
                     (report-suspicious kind form)))
              (report-suspicious (kind what)
-               (style-warn "suspicious ~A ~S in lambda list: ~S."
-                           kind what list)
+               (style-warn-once list "suspicious ~A ~S in lambda list: ~S."
+                                kind what list)
                nil) ; Avoid "return convention is not fixed" optimizer note
              (need-arg (state)
                (croak "expecting variable after ~A in: ~S" state list))
@@ -276,8 +275,8 @@
 
       #-sb-xc-host ;; Supress &OPTIONAL + &KEY syle-warning on xc host
       (when (and (logtest (bits &key) seen) optional (not silent))
-        (style-warn
-         "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
+        (style-warn-once
+         list "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
 
       ;; For CONTEXT other than :VALUES-TYPE/:FUNCTION-TYPE we reject
       ;; illegal list elements. Type specifiers have arbitrary shapes,
@@ -1097,11 +1096,12 @@
     ;; - some would even say that it is idiomatic - and &AUX bindings are just
     ;; LET* bindings.
     ;; The obsolete PARSE-DEFMACRO signaled an error, but that seems harsh.
-    ;; Other implementations permit (X &OPTIONAL X), and the fact that
-    ;; nesting is allowed makes this issue even less clear.
+    ;; Other implementations permit (X &OPTIONAL X),
+    ;; and the allowance for nesting makes this issue even less clear.
     (mapl (lambda (tail)
             (when (memq (car tail) (cdr tail))
-              (style-warn "variable ~S occurs more than once" (car tail))))
+              (style-warn-once lambda-list "variable ~S occurs more than once"
+                               (car tail))))
           (append whole env (ds-lambda-list-variables parse nil)))
     (values `(,@(if lambda-name `(named-lambda ,lambda-name) '(lambda))
                   (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))

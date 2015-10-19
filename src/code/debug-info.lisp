@@ -354,7 +354,15 @@
   (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
   ;; A vector of character ranges than span each subform in the TLF,
   ;; reset to empty for each one, updated by form-tracking-stream-observer.
-  (subforms nil :type (or null (vector t)) :read-only t))
+  (subforms nil :type (or null (vector t)) :read-only t)
+  ;; A list of objects about which the compile may/would/should have signaled
+  ;; a style-warning in the :compile-toplevel situation, so we don't do it
+  ;; again in the :load-toplevel situation.
+  ;; This is a somewhat useless thing to track, but arguably
+  ;; the "&OPTIONAL and &KEY" warning is quite annoying to see repeated.
+  ;; And I doubt it changes anyone's mind about coding style anyway.
+  ;; Typically this matters for DEFTYPE and DEFMACRO.
+  (style-warning-tracker nil :type list))
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.
