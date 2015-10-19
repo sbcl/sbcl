@@ -173,7 +173,8 @@
 (!define-primitive-object (fdefn :type fdefn
                                 :lowtag other-pointer-lowtag
                                 :widetag fdefn-widetag)
-  (name :ref-trans fdefn-name)
+  (name :ref-trans fdefn-name
+        :set-trans %set-fdefn-name :set-known ())
   (fun :type (or function null) :ref-trans fdefn-fun)
   (raw-addr :c-type #!-alpha "char *" #!+alpha "u32"))
 
