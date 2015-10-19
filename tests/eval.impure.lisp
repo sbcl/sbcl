@@ -307,4 +307,17 @@
     (declare (special *out*))
     (assert-error (eval '(declare (print "foo" *out*))))
     (assert (string= (get-output-stream-string *out*) ""))))
+
+;; If the DEFUN macro produces a style-warning, it needs to perform the
+;; effect of defun no matter what. The style-warning comes from an EVAL-WHEN,
+;; not as part of the execution-time behavior of %DEFUN because it is neither
+;; polite nor useful to issue a warning about the co-existence of a DEFSETF
+;; and DEFUN SETF after compile-time. The other viable alternative would have
+;; been to remove the :EXECUTE situation from the expansion of DEFUN
+;; where it signal to warning.
+(with-test (:name :handler-case-does-not-bork-defun)
+  (defsetf bar set-bar)
+  (handler-case (defun (setf bar) (newval x) (declare (ignore newval x)))
+    (style-warning () 'drat))
+  (assert (fboundp '(setf bar))))
 ;;; success

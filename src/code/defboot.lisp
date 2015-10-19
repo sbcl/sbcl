@@ -204,12 +204,16 @@ evaluated as a PROGN."
       `(progn
          (eval-when (:compile-toplevel)
            (sb!c:%compiler-defun ',name ',inline-lambda t))
+         (%defun ',name ,named-lambda (sb!c:source-location)
+                 ,@(and inline-lambda `(',inline-lambda)))
+         ;; This warning, if produced, comes after the DEFUN happens.
+         ;; When compiling, there's no real difference, but when interpreting,
+         ;; if there is a handler for style-warning that nonlocally exits,
+         ;; it's wrong to have skipped the DEFUN itself, since if there is no
+         ;; function, then the warning ought not to have been issued at all.
          ,@(when (typep name '(cons (eql setf)))
              `((eval-when (:compile-toplevel :execute)
-                 (sb!c::warn-if-setf-macro ',name))))
-         (%defun ',name ,named-lambda (sb!c:source-location)
-                 ,@(and inline-lambda
-                        `(',inline-lambda)))))))
+                 (sb!c::warn-if-setf-macro ',name))))))))
 
 #-sb-xc-host
 (progn (defun %defun (name def source-location &optional inline-lambda)
@@ -696,8 +700,15 @@ evaluated as a PROGN."
                    ;; The predicate is used only if needed - it's not an error
                    ;; if not fboundp (though dangerously stupid) - so just
                    ;; reference #'F for the compiler to see the use of the name.
+                   ;; But (KLUDGE): since the ref is to force a compile-time
+                   ;; effect, the interpreter should not see that form,
+                   ;; because there is no way for it to perform an unsafe ref,
+                   ;; (and it wouldn't signal a style-warning anyway),
+                   ;; and so it would actually fail immediately if predicate
+                   ;; were not defined.
                    (let ((name (second type)))
-                     (dummy-forms `#',name)
+                     (when (typep env 'lexenv)
+                       (dummy-forms `#',name))
                      `(find-or-create-fdefn ',name)))
                   ((and (symbolp type)
                         (condition-classoid-p (find-classoid type nil)))
