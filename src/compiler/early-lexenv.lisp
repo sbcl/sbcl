@@ -14,10 +14,16 @@
 (defvar *handled-conditions* nil)
 (defvar *disabled-package-locks* nil)
 
+;;; Objects whose subclass is this class show up as the environment
+;;; to macroexpanders and inquiry functions.
+(defstruct (abstract-lexenv
+             (:constructor nil) (:copier nil) (:predicate nil)))
+
 ;;; The LEXENV represents the lexical environment used for IR1 conversion.
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 (defstruct (lexenv
+             (:include abstract-lexenv)
              #-no-ansi-print-object
              (:print-function
               (lambda (lexenv stream depth)
@@ -87,7 +93,7 @@
 
 ;;; an object suitable for input to standard functions that accept
 ;;; "environment objects" (of the ANSI glossary)
-(deftype lexenv-designator () '(or lexenv null))
+(deftype lexenv-designator () '(or abstract-lexenv null))
 
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))
