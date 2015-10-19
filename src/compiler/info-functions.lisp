@@ -190,7 +190,6 @@ only."
                   :name symbol))
          fun-name)))
 
-(declaim (ftype (sfunction (t t) boolean) fun-locally-defined-p))
 (defun sb!xc:compiler-macro-function (name &optional env)
   #!+sb-doc
   "If NAME names a compiler-macro in ENV, return the expansion function, else
