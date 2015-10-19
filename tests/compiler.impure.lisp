@@ -20,9 +20,7 @@
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:exit :code 104))
 
-(load "test-util.lisp")
 (load "compiler-test-util.lisp")
-(load "assertoid.lisp")
 (use-package "TEST-UTIL")
 (use-package "ASSERTOID")
 
