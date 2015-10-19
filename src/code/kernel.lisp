@@ -238,3 +238,4 @@
 (defun double-float-high-bits (x) (double-float-high-bits x))
 (defun double-float-low-bits (x) (double-float-low-bits x))
 
+(defun value-cell-ref (x) (value-cell-ref x))
