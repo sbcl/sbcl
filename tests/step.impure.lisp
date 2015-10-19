@@ -13,6 +13,7 @@
 
 (in-package :cl-user)
 
+#+interpreter (sb-ext:exit :code 104)
 ;; No stepper support on some platforms.
 #-(or x86 x86-64 ppc sparc mips arm)
 (sb-ext:exit :code 104)

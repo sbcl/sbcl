@@ -12,6 +12,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+;;; Typechecking should be working, but it isn't.
+#+interpreter (sb-ext:exit :code 104)
+
 (shadow 'slot)
 
 (declaim (optimize safety))

@@ -412,9 +412,11 @@
 (let ((x 3)) (defmacro macdaddy (a b &body z) a b z `(who-cares ,x)) (incf x))
 
 (with-test (:name :closure-macro-arglist)
-  ;; assert correct test setup - MACDADDY is a closure
+  ;; assert correct test setup - MACDADDY is a closure if compiling,
+  ;; or a funcallable-instance if not
   (assert (eq (sb-kernel:fun-subtype (macro-function 'macdaddy))
-              sb-vm:closure-header-widetag))
+              #-interpreter sb-vm:closure-header-widetag
+              #+interpreter sb-vm:funcallable-instance-header-widetag))
   ;; MACRO-INDENTATION used %simple-fun-arglist instead of %fun-arglist.
   ;; Depending on your luck it would either not return the right answer,
   ;; or crash, depending on what lay at 4 words past the function address.

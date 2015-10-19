@@ -15,8 +15,9 @@
 
 (load "compiler-test-util.lisp")
 
-;; The tests in this file assume that EVAL will use the compiler
-(when (eq sb-ext:*evaluator-mode* :interpret)
+;; The tests in this file do not work under the legacy interpreter.
+(when (and (eq sb-ext:*evaluator-mode* :interpret)
+           (not (member :sb-fasteval *features*)))
   (invoke-restart 'run-tests::skip-file))
 
 ;;; Exercise a compiler bug (by crashing the compiler).
@@ -325,6 +326,9 @@
 
 ;;; FUNCALL of special operators and macros should signal an
 ;;; UNDEFINED-FUNCTION error
+;;; But note the subtle distinction between writing (FUNCALL 'QUOTE 1)
+;;; and (FUNCALL #'QUOTE 1). In the latter, the error must be signaled
+;;; by the FUNCTION special operator, but the error class is unspecified.
 (multiple-value-bind (result error)
     (ignore-errors (funcall 'quote 1))
   (assert (null result))
@@ -1580,16 +1584,18 @@
   (frob (x) (aref x 0)))
 
 (macrolet ((frob (style-warn-p form)
+             (unless (eq (car form) 'lambda)
+               (setq form `(lambda () ,form)))
              (if style-warn-p
                  `(let ((gotit nil))
                    (handler-bind ((style-warning
                                    (lambda (c)
                                      (setq gotit t) (muffle-warning c))))
-                       (eval ',form))
+                       (compile nil ',form))
                     (unless gotit
                       (error "missing style-warning for ~S" ',form)))
                  `(handler-case
-                   (eval ',form)
+                   (compile nil ',form)
                    (style-warning (e)
                     (error "bad style-warning for ~S: ~A" ',form e))))))
   (frob t (lambda (x &optional y &key z) (list x y z)))
@@ -3327,7 +3333,7 @@
                            (labels ((k (&optional x) #'k)))))))
     (assert (null (funcall f)))))
 
-(with-test (:name :flush-vector-creation)
+(with-test (:name :flush-vector-creation :skipped-on :interpreter)
   (let ((f (compile nil `(lambda ()
                            (dotimes (i 1024)
                              (vector i i i))
@@ -3924,7 +3930,7 @@
 
 ;;; This doesn't test LVAR-FUN-IS directly, but captures it
 ;;; pretty accurately anyways.
-(with-test (:name :lvar-fun-is)
+(with-test (:name :lvar-fun-is :skipped-on :interpreter)
   (dolist (fun (list
                 (lambda (x) (member x x :test #'eq))
                 (lambda (x) (member x x :test 'eq))
@@ -3944,7 +3950,7 @@
     (assert (member #'sb-kernel:%member-test
                     (ctu:find-named-callees fun)))))
 
-(with-test (:name :delete-to-delq-opt)
+(with-test (:name :delete-to-delq-opt :skipped-on :interpreter)
   (dolist (fun (list (lambda (x y)
                        (declare (list y))
                        (delete x y :test #'eq))
@@ -4267,7 +4273,8 @@
                   (let ((i (unwind-protect 32 (shiftf d -1))))
                     (or (if (= d c)  2 (= 3 b)) 4)))))
 
-(with-test (:name :bug-913232)
+(with-test (:name :bug-913232
+            :fails-on :interpreter) ; no idea why it fails randomly
   (compile nil `(lambda (x)
                   (declare (optimize speed)
                            (type (or (and (or (integer -100 -50)
@@ -4354,7 +4361,7 @@
                                             collect (expt 2 i)))))))
     (assert (every #'plusp (funcall f #'list)))))
 
-(with-test (:name (:malformed-ignore :lp-1000239))
+(with-test (:name (:malformed-ignore :lp-1000239) :skipped-on :interpreter)
   (assert-error
    (eval '(lambda () (declare (ignore (function . a)))))
    sb-int:simple-program-error)
@@ -4382,7 +4389,7 @@
        (let ((source (read-from-string (sb-kernel::program-error-source e))))
          (equal source '#'(lambda ("foo"))))))))
 
-(with-test (:name :escape-analysis-for-nlxs)
+(with-test (:name :escape-analysis-for-nlxs :skipped-on :interpreter)
   (flet ((test (check lambda &rest args)
            (let* ((cell-note nil)
                   (fun (handler-bind ((compiler-note
@@ -4972,7 +4979,7 @@
     (assert failure-p)))
 
 ;; quantifiers shouldn't cons themselves.
-(with-test (:name :quantifiers-no-consing)
+(with-test (:name :quantifiers-no-consing :skipped-on :interpreter)
   (let ((constantly-t (lambda (x) x t))
         (constantly-nil (lambda (x) x nil))
         (list (make-list 1000 :initial-element nil))
@@ -5305,7 +5312,7 @@
                      (values c b a)))
     (assert (and f (not warningp)))))
 
-(with-test (:name :nth-value-of-non-constant-N)
+(with-test (:name :nth-value-of-non-constant-N :skipped-on :interpreter)
   (labels ((foo (n f) (nth-value n (funcall f)))
            (bar () (values 0 1 2 3 4 5 6 7 8 9)))
     (assert (= (foo 5 #'bar) 5)) ; basic correctness

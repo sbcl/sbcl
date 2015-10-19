@@ -254,7 +254,12 @@
 ;; *MACROEXPAND-HOOK* would see the SETF but not the expansion
 ;; of the symbol, except those expansions occurring with GET-SETF-EXPANSION.
 ;; Now it can see the first-round expansion too.
-(with-test (:name :compiled-setq-macroexpand-hook)
+;; The macroexpand hook for this test needs to be compiled, but you can't
+;; pass a quoted lambda (as a sexpr) to COMPILE because it needs to
+;; capture EXPANSIONS, but you can't pass an function-quoted lambda
+;; because WITH-TEST creates a too-complex environment for conversion
+;; from an interpreted lambda.
+(with-test (:name :compiled-setq-macroexpand-hook :skipped-on :interpreter)
   (sb-int:collect ((expansions))
     (let ((*macroexpand-hook*
            (lambda (expander form env)

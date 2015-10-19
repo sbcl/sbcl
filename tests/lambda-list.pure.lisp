@@ -19,11 +19,11 @@
                                             (throw 'd-b-error c)))))
                     (funcall fun form env))))))
   (macrolet ((maybe-funcall (&rest args)
-               ;; The evaluator will delay lambda-list checks until
+               ;; The interpreters will delay lambda-list checks until
                ;; the lambda is actually called.
-               (if (eq sb-ext:*evaluator-mode* :interpret)
-                   `(funcall ,@args)
-                   `(progn ,@args)))
+               (if (eq sb-ext:*evaluator-mode* :compile)
+                   `(progn ,@args)
+                   `(funcall ,@args)))
              (error-p (ll)
                `(progn
                   (multiple-value-bind (result error)

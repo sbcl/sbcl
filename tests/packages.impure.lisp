@@ -15,7 +15,9 @@
   (declare (optimize (safety 0)))
   (setq *package* x))
 
-(with-test (:name :set-bad-package)
+;; When interpreting, the error occurs in SET-BAD-PACKAGE,
+;; not at the INTERN call.
+(with-test (:name :set-bad-package :skipped-on :interpreter)
   (set-bad-package :cl-user)
   (assert-error (intern "FRED") type-error))
 

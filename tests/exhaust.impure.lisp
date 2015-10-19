@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+interpreter (sb-ext:exit :code 104)
+
 (cl:in-package :cl-user)
 
 (load "test-util.lisp")

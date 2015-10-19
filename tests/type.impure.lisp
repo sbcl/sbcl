@@ -575,6 +575,11 @@
  (subtypep '(and function (not compiled-function)
              (not sb-eval:interpreted-function))
            nil))
+#+sb-fasteval
+(assert-t-t
+ (subtypep '(and function (not compiled-function)
+             (not sb-interpreter:interpreted-function))
+           nil))
 
 ;;; weakening of union type checks
 (defun weaken-union-1 (x)

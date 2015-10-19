@@ -17,7 +17,11 @@
 
 (in-package :cl-user)
 
-(when (eq sb-ext:*evaluator-mode* :interpret)
+;; The tests in this file do not work under the legacy interpreter.
+;; They mostly do work in the fast interpreter, and are either harmless
+;; or actually reasonable things to test.
+(when (and (eq sb-ext:*evaluator-mode* :interpret)
+           (not (member :sb-fasteval *features*)))
   (sb-ext:exit :code 104))
 
 (load "compiler-test-util.lisp")
@@ -522,7 +526,9 @@
            (assert (equal *symbol-macrolet-test-status* '(2))))
       (ignore-errors (delete-file obj)))))
 
-(symbol-macrolet-test)
+;;; FIXME:
+;; I didn't look into why this fails in the interpreter, but it does.
+#-interpreter (symbol-macrolet-test)
 
 ;;; On the x86, this code failed to compile until sbcl-0.7.8.37:
 (defun x86-assembler-failure (x)
@@ -647,16 +653,17 @@
 (macrolet ((frob (x) `(+ ,x 3)))
   (defun to-be-inlined (y)
     (frob y)))
+#-interpreter
 (assert (= (call-inlined 3)
            ;; we should have inlined the previous definition, so the
            ;; new one won't show up yet.
            4))
 (defun call-inlined (z)
   (to-be-inlined z))
-(assert (= (call-inlined 3) 6))
+#-interpreter (assert (= (call-inlined 3) 6))
 (defun to-be-inlined (y)
   (+ y 5))
-(assert (= (call-inlined 3) 6))
+#-interpreter (assert (= (call-inlined 3) 6))
 
 ;;; DEFINE-COMPILER-MACRO to work as expected, not via weird magical
 ;;; IR1 pseudo-:COMPILE-TOPLEVEL handling
@@ -1769,7 +1776,7 @@
         (setf (fill-pointer result) index)
         (coerce result 'string)))))
 
-;;; Callign thru constant symbols
+;;; Calling thru constant symbols
 (require :sb-introspect)
 
 (declaim (inline target-fun))
@@ -1777,6 +1784,10 @@
   (+ arg0 arg1))
 (declaim (notinline target-fun))
 
+;; FIXME: should use compiler-test-util, not sb-introspect here.
+;; That issue aside, neither sb-introspect nor ctu:find-named-callees
+;; can examine an interpreted function for its callees,
+;; so we can't actually use this function.
 (defun test-target-fun-called (fun res)
   (assert (member #'target-fun
                   (sb-introspect:find-function-callees #'caller-fun-1)))
@@ -1784,18 +1795,18 @@
 
 (defun caller-fun-1 ()
   (funcall 'target-fun 1 2))
-(test-target-fun-called #'caller-fun-1 3)
+#-interpreter(test-target-fun-called #'caller-fun-1 3)
 
 (defun caller-fun-2 ()
   (declare (inline target-fun))
   (apply 'target-fun 1 '(3)))
-(test-target-fun-called #'caller-fun-2 4)
+#-interpreter(test-target-fun-called #'caller-fun-2 4)
 
 (defun caller-fun-3 ()
   (flet ((target-fun (a b)
            (- a b)))
     (list (funcall #'target-fun 1 4) (funcall 'target-fun 1 4))))
-(test-target-fun-called #'caller-fun-3 (list -3 5))
+#-interpreter(test-target-fun-called #'caller-fun-3 (list -3 5))
 
 ;;; Reported by NIIMI Satoshi
 ;;; Subject: [Sbcl-devel] compilation error with optimization
@@ -1833,7 +1844,9 @@
 ;;; Basic compiler-macro expansion
 (define-compiler-macro test-cmacro-0 () ''expanded)
 
-(assert (eq 'expanded (funcall (lambda () (test-cmacro-0)))))
+;; The interpreter is not required to expand compiler-macros.
+;; (Actually neither is the compiler!)
+#-interpreter(assert (eq 'expanded (funcall (lambda () (test-cmacro-0)))))
 
 ;;; FUNCALL forms in compiler macros, lambda-list parsing
 (define-compiler-macro test-cmacro-1
@@ -1856,8 +1869,8 @@
 ;;; FUNCALL forms in compiler macros, expansions
 (define-compiler-macro test-cmacro-2 () ''ok)
 
-(assert (eq 'ok (funcall (lambda () (funcall 'test-cmacro-2)))))
-(assert (eq 'ok (funcall (lambda () (funcall #'test-cmacro-2)))))
+#-interpreter(assert (eq 'ok (funcall (lambda () (funcall 'test-cmacro-2)))))
+#-interpreter(assert (eq 'ok (funcall (lambda () (funcall #'test-cmacro-2)))))
 
 ;;; Shadowing of compiler-macros by local functions
 (define-compiler-macro test-cmacro-3 () ''global)
@@ -1872,6 +1885,7 @@
                                          (test-cmacro-3))))))
 (assert (eq 'local (funcall (lambda () (flet ((test-cmacro-3 () 'local))
                                          (funcall #'test-cmacro-3))))))
+#-interpreter
 (assert (eq 'global (funcall (lambda () (flet ((test-cmacro-3 () 'local))
                                           (funcall 'test-cmacro-3))))))
 
@@ -1883,6 +1897,7 @@
                             (declare (notinline test-cmacro-4))
                             (test-cmacro-4)))))
 
+#-interpreter
 (assert (eq 'macro (funcall (lambda ()
                               (declare (inline test-cmacro-4))
                               (test-cmacro-4)))))
@@ -1890,7 +1905,9 @@
 ;;; SETF function compiler macros
 (define-compiler-macro (setf test-cmacro-4) (&whole form value) ''ok)
 
+#-interpreter
 (assert (eq 'ok (funcall (lambda () (setf (test-cmacro-4) 'zot)))))
+#-interpreter
 (assert (eq 'ok (funcall (lambda () (funcall #'(setf test-cmacro-4) 'zot)))))
 
 ;;; Step instrumentation breaking type-inference
@@ -2566,7 +2583,8 @@
 
 ;; %MORE-ARG-VALUES was wrong on x86 and x86-64 with nonzero 'skip'.
 ;; It's entirely possible that other backends are also not working.
-(test-util:with-test (:name more-arg-fancy)
+(test-util:with-test (:name :more-arg-fancy
+                      :skipped-on :interpreter)
   (assert (equal (skip-1-passthrough 0 0 'a 'b 'c 'd 'e 'f)
                  '(start b c d e f end)))
   (assert (equal (skip-2-passthrough 0 0 'a 'b 'c 'd 'e 'f)

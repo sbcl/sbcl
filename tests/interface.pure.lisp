@@ -91,7 +91,8 @@
 
 ;;; SLEEP should not cons except on 32-bit platforms when
 ;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9))
-(with-test (:name (sleep :non-consing) :fails-on :win32)
+(with-test (:name (sleep :non-consing) :fails-on :win32
+                  :skipped-on :interpreter)
   (handler-case (sb-ext:with-timeout 5
                   (ctu:assert-no-consing (sleep 0.00001s0))
                   (locally (declare (notinline sleep))
@@ -168,11 +169,13 @@
 ;;; so that the disassembler threw an error when they were used with
 ;;; one operand in memory.
 (with-test (:name :bug-814702)
-  (disassemble (lambda (x)
+  ;; Quote the lambdas, because WITH-TEST produces a hairy lexical environment
+  ;; which make an interpreted lambda uncompilable.
+  (disassemble '(lambda (x)
                  (= #C(2.0f0 3.0f0)
                     (the (complex single-float) x)))
                :stream (make-broadcast-stream))
-  (disassemble (lambda (x y)
+  (disassemble '(lambda (x y)
                  (= (the (complex single-float) x)
                     (the (complex single-float) y)))
                :stream (make-broadcast-stream)))

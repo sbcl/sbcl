@@ -17,16 +17,24 @@
 (use-package "TEST-UTIL")
 
 
-(with-test (:name :disassemble)
+;; Interpreted closure is a problem for COMPILE
+(with-test (:name :disassemble :skipped-on :interpreter)
 ;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
   (defun disassemble-fun (x) x)
   (disassemble 'disassemble-fun))
 
-(with-test (:name :disassemble-closure)
+(with-test (:name :disassemble-closure :skipped-on :interpreter)
   (let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
   (disassemble 'disassemble-closure))
 
 #+sb-eval
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (import 'sb-eval:interpreted-function-p))
+#+sb-fasteval
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (import 'sb-interpreter:interpreted-function-p))
+
+#+(or sb-eval sb-fasteval)
 (with-test (:name :disassemble-interpreted)
     ;; Nor should it fail on interpreted functions
     (let ((sb-ext:*evaluator-mode* :interpret))
@@ -37,7 +45,7 @@
     ;; clhs disassemble: "(If that function is an interpreted function,
     ;; it is first compiled but the result of this implicit compilation
     ;; is not installed.)"
-    (assert (sb-eval:interpreted-function-p #'disassemble-eval)))
+    (assert (interpreted-function-p #'disassemble-eval)))
 
 (with-test (:name :disassemble-generic)
   ;; nor should it fail on generic functions or other funcallable instances
@@ -64,14 +72,14 @@
      (make-instance 'generic-function))
     (function-lambda-expression
      (make-instance 'standard-generic-function))
-    #+sb-eval
+    #+(or sb-eval sb-fasteval)
     (progn
       (let ((sb-ext:*evaluator-mode* :interpret))
         (eval `(defun fle-eval (x) x))
         (assert (eql (fle-name #'fle-eval) 'fle-eval)))
 
       ;; fle-eval should still be an interpreted function.
-      (assert (sb-eval:interpreted-function-p #'fle-eval)))))
+      (assert (interpreted-function-p #'fle-eval)))))
 
 
 ;;; support for DESCRIBE tests

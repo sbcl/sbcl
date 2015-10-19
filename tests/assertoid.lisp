@@ -17,6 +17,7 @@
   (:export "GRAB-CONDITION" "ASSERT-ERROR"
            "HAS-ERROR?" "IS" "ASSERTOID"
            "ASSERT-SIGNAL" "ASSERT-NO-SIGNAL"
+           "LEGACY-EVAL-P"
            "EQUAL-MOD-GENSYMS"))
 
 (cl:in-package "ASSERTOID")
@@ -191,3 +192,7 @@
                      (t ; strings, numbers
                       (funcall pred a b)))))
       (recurse a b))))
+
+(defun legacy-eval-p ()
+  (and (eq sb-ext:*evaluator-mode* :interpret)
+       (find-package "SB-EVAL")))

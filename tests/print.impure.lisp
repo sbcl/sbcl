@@ -482,8 +482,9 @@
                    (write-to-string *random-state*)))))
 
 (with-test (:name :write-return-value)
-  (assert (= 123 (funcall (compile nil (lambda ()
-                                         (write 123)))))))
+  ;; COMPILE is called explicitly because there was a bug in the
+  ;; compiler-macro for WRITE, which isn't expanded by the evaluator.
+  (assert (= 123 (funcall (compile nil '(lambda () (write 123)))))))
 
 (with-test (:name :write/write-to-string-compiler-macro-lp/598374+581564)
   (let ((test (compile nil

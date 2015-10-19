@@ -39,7 +39,8 @@
   (assert (/= (sxhash (list 1 2 3)) (sxhash (list 3 2 1))))
   (assert (/= (sxhash #*1010) (sxhash #*0101))))
 
-(with-test (:name :address-based-hash-counter)
+;;; This test supposes that no un-accounted-for consing occurs.
+(with-test (:name :address-based-hash-counter :skipped-on :interpreter)
   ;; It doesn't particularly matter what ADDRESS-BASED-COUNTER-VAL returns,
   ;; but it's best to verify the assumption that each cons bumps the count
   ;; by 1, lest it be violated in a way that affects the quality of CTYPE

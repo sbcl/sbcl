@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+interpreter (sb-ext:exit :code 104)
+
 (load "compiler-test-util.lisp")
 (defpackage "CLOS-IMPURE"
   (:use "CL" "ASSERTOID" "TEST-UTIL" "COMPILER-TEST-UTIL"))

@@ -15,6 +15,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+interpreter (sb-ext:exit :code 104)
+
 (cl:in-package :cl-user)
 
 ;;; In sbcl-0.6.10, Douglas Brebner reported that (SETF EXTERN-ALIEN)

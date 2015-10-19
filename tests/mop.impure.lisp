@@ -687,7 +687,13 @@
                      (slot-value o 'instance))))))
 
 (defgeneric definitely-a-funcallable-instance (x))
-(with-test (:name (set-funcallable-instance-function :typechecking))
+(with-test (:name (set-funcallable-instance-function :typechecking)
+            ;; This is a bit of a problem. SET-FUNCALLABLE-INSTANCE-FUNCTION
+            ;; accepts any funcallable-instance as its first argument,
+            ;; not just a generic-function.
+            ;; But an interpreted function *is* a funcallable-instance
+            ;; See comment in src/pcl/low about possibly tightening this up.
+            :fails-on :interpreter)
   (assert-error (set-funcallable-instance-function
                   (lambda (y) (declare (ignore y)) nil)
                   #'definitely-a-funcallable-instance)

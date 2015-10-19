@@ -16,6 +16,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+;; These tests don't work unless compiling
+#+interpreter (sb-ext:exit :code 104)
+
 (defun f-with-macro (arg) (list arg))
 (defun f2-with-macro (a b) (list a b))
 (defun map-f-with-macro (l) (mapcar #'f-with-macro l))

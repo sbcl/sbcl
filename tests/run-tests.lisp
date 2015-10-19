@@ -91,7 +91,11 @@
         (format t "// Running ~a~%" file)
         (restart-case
             (handler-bind ((error (make-error-handler file)))
-              (eval (funcall test-fun file)))
+              (let ((*features*
+                     (if (eq sb-ext:*evaluator-mode* :interpret)
+                         (cons :interpreter *features*)
+                         *features*)))
+                (eval (funcall test-fun file))))
           (skip-file ())))
       (append-failures))))
 
@@ -136,6 +140,10 @@
       (setf test-util:*break-on-expected-failure*
             ,test-util:*break-on-expected-failure*)
       (let ((file ,test-file)
+            (*features*
+             (if (eq sb-ext:*evaluator-mode* :interpret)
+                 (cons :interpreter *features*)
+                 *features*))
             (*break-on-error* ,run-tests::*break-on-error*))
         (declare (special *break-on-error*))
         (format t "// Running ~a~%" file)

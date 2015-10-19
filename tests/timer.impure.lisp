@@ -9,6 +9,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+interpreter (sb-ext:exit :code 104)
+
 (in-package "CL-USER")
 
 (use-package :test-util)

@@ -347,7 +347,6 @@
   ;; it is hardcoded to *keyword-package*.
   (assert (equal (read-from-string "::(foo bar)") '(:foo :bar))))
 
-#+x86-64
 ;; I do not know the complete list of platforms for which this test
 ;; will not cons, but there were four different heap allocations
 ;; instead of using dx allocation or a recyclable resource:
@@ -355,7 +354,8 @@
 ;;  - calling SUBSEQ for package names
 ;;  - multiple-value-call in WITH-CHAR-MACRO-RESULT
 ;;  - the initial cons cell in READ-LIST
-(with-test (:name :read-does-not-cons-per-se)
+(with-test (:name :read-does-not-cons-per-se
+                  :skipped-on '(:or :interpreter (:not :x86-64)))
   (flet ((test-reading (string)
            (let ((s (make-string-input-stream string)))
              (read s) ; once outside the loop, to make A-SYMBOL

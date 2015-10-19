@@ -21,11 +21,11 @@
 (defstruct person age (name 007 :type string)) ; not an error until 007 used
 (make-person :name "James") ; not an error, 007 not used
 
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(assert-error (make-person) type-error)
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(assert-error (setf (person-name (make-person :name "Q")) 1)
-              type-error)
+#.(if (legacy-eval-p) (values)
+    '(assert-error (make-person) type-error))
+#.(if (legacy-eval-p) (values)
+    '(assert-error (setf (person-name (make-person :name "Q")) 1)
+                   type-error))
 
 ;;; An &AUX variable in a boa-constructor without a default value
 ;;; means "do not initialize slot" and does not cause type error

@@ -362,7 +362,12 @@
       (with-error-info ("compile locked illegal lexical form: ~S~%" form)
         (let ((fun (compile nil `(lambda () ,form))))
           (assert-error (funcall fun) program-error))
-        (assert-error (eval form) program-error)))))
+        (assert-error (eval form)
+                      ;; Let's not be pedantic here.
+                      ;; PACKAGE-LOCK-VIOLATION is right,
+                      ;; because the distinction between lexical analysis
+                      ;; and running is artificial for interpreted code.
+                      (or sb-ext:package-lock-violation program-error))))))
 
 ;;; Locked, WITHOUT-PACKAGE-LOCKS
 (reset-test t)
@@ -456,7 +461,7 @@
               ,form
               (locally (declare (enable-package-locks ,sym))
                 ,form)))
-     program-error)))
+     (or sb-ext:package-lock-violation program-error))))
 
 ;;;; See that trace on functions in locked packages doesn't break
 ;;;; anything.

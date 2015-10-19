@@ -19,6 +19,7 @@
 
 (defun unbound-marker ()
   (sb-c::%primitive sb-c:make-unbound-marker))
+(compile 'unbound-marker)
 
 (defun assert-foo-not-checked (fun)
   (let* ((marker (unbound-marker))
@@ -47,6 +48,9 @@
 (defun foo-safe ()
   (declare (optimize (safety 3)))
   *foo*)
+;; When run interpreted, FOO-SAFE cannot help but check BOUNDP on *foo*
+;; so the assertion would fail.
+(compile 'foo-safe)
 
 (with-test (:name :always-bound-elides-boundness-checking)
   (assert-foo-not-checked #'foo-safe))

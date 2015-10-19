@@ -14,7 +14,8 @@
 ;;; This file defines a structure, so is an 'impure' test
 (defstruct my-struct one two three four)
 
-#+(or x86 x86-64)
+#-(and (or x86 x86-64) (not interpreter)) (sb-ext:exit :code 104)
+
 (test-util:with-test (:name :basic-cpuid)
   (flet ((to-ascii (bits)
            (let ((s (make-array 4 :element-type 'base-char)))
@@ -27,7 +28,6 @@
               (concatenate 'string (to-ascii b) (to-ascii d) (to-ascii c))
               a))))
 
-#+(or x86 x86-64)
 (progn
   (defun test-a-cons (acons oldcar oldcdr newcar newcdr)
     (declare (optimize (safety 0)))
@@ -61,7 +61,6 @@
                      (eq (my-struct-four s) 'bootee)))))
     t))
 
-#+(or x86 x86-64)
 (test-util:with-test (:name :wide-compare-and-exchange)
   (multiple-value-bind (a b c d) (%cpu-identification 0 0)
     (declare (ignore b c d))

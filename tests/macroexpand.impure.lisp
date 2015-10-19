@@ -35,31 +35,41 @@
 
 (define-symbol-macro .foo. 'foobar)
 
+;;; An evaluated macroexpand-hook leads to infinite recursion.
+;;; These tests used to be runnable only if *evaluator-mode* started out
+;;; as :compile, but now we support running the test suite with any
+;;; *evaluator-mode*, so must explicitly COMPILE the macroexpand hook.
+;;; Notice that the lambda expressions being compiled are closures.
+;;; This is allowed by sb-interpreter but not sb-eval.
+
 (let* ((expanded-p nil)
-      (*macroexpand-hook* #'(lambda (fn form env)
-                              (when (eq form '.foo.)
-                                (setq expanded-p t))
-                              (funcall fn form env))))
+       (*macroexpand-hook*
+        (compile nil #'(lambda (fn form env)
+                         (when (eq form '.foo.)
+                           (setq expanded-p t))
+                         (funcall fn form env)))))
   (multiple-value-bind (expansion flag) (macroexpand '.foo.)
     (assert (equal expansion '(quote foobar)))
     (assert flag)
     (assert expanded-p)))
 
-#+sb-eval
-(let ((sb-ext::*evaluator-mode* :interpret))
+#+(or sb-eval sb-fasteval)
+(let ((sb-ext:*evaluator-mode* :interpret))
   (let* ((expanded-p nil)
-         (*macroexpand-hook* #'(lambda (fn form env)
-                                 (when (eq form '.foo.)
-                                   (setq expanded-p t))
-                                 (funcall fn form env))))
+         (*macroexpand-hook*
+          (compile nil #'(lambda (fn form env)
+                           (when (eq form '.foo.)
+                             (setq expanded-p t))
+                           (funcall fn form env)))))
     (eval '.foo.)
     (assert expanded-p)))
 
 (let* ((expanded-p nil)
-       (*macroexpand-hook* #'(lambda (fn form env)
-                               (when (eq form '/foo/)
-                                 (setq expanded-p t))
-                               (funcall fn form env))))
+       (*macroexpand-hook*
+        (compile nil #'(lambda (fn form env)
+                         (when (eq form '/foo/)
+                           (setq expanded-p t))
+                         (funcall fn form env)))))
   (compile nil '(lambda ()
                  (symbol-macrolet ((/foo/ 'foobar))
                    (macrolet ((expand (symbol &environment env)
