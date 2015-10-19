@@ -131,6 +131,7 @@
  ("src/code/unportable-float")
  ("src/compiler/policy")
  ("src/compiler/early-lexenv")
+ #!+sb-fasteval ("src/interpreter/basic-env")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
@@ -269,7 +270,6 @@
  ("src/code/huffman")
  ("src/code/target-char"    :not-host)
  ("src/code/target-unicode" :not-host)
- ("src/code/target-misc"    :not-host)
  ("src/code/misc")
 
  ("src/code/room"   :not-host)
@@ -366,6 +366,8 @@
  ("src/pcl/pre-warm")
  ("src/pcl/low" :not-host)
 
+ ;; The type definition for INTERPRETED-FUNCTION
+ #!+sb-fasteval ("src/interpreter/function")
  ("src/code/early-condition")
  ("src/code/condition" :not-host)
  ("src/code/toplevel"  :not-host)
@@ -681,6 +683,7 @@
  ("src/code/win32-pathname"    :not-host)
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
 
+ ("src/code/target-misc"       :not-host) ; dribble-stream, used by "save"
  ("src/code/save"              :not-host) ; uses the definition of PATHNAME
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"

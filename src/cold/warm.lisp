@@ -129,6 +129,14 @@
                 ;; to warm init to reduce peak memory requirement in
                 ;; cold init
                 "SRC;CODE;DESCRIBE"
+
+                #+sb-fasteval "SRC;INTERPRETER;MACROS"
+                #+sb-fasteval "SRC;INTERPRETER;CHECKFUNS"
+                #+sb-fasteval "SRC;INTERPRETER;ENV"
+                #+sb-fasteval "SRC;INTERPRETER;SEXPR"
+                #+sb-fasteval "SRC;INTERPRETER;SPECIAL-FORMS"
+                #+sb-fasteval "SRC;INTERPRETER;EVAL"
+
                 "SRC;CODE;DESCRIBE-POLICY"
                 "SRC;CODE;INSPECT"
                 "SRC;CODE;PROFILE"

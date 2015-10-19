@@ -49,4 +49,5 @@
   (loop (multiple-value-bind (winp symbol) (iter)
           (if winp (unintern symbol "CL-USER") (return)))))
 
+#+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 (sb-ext:save-lisp-and-die "output/sbcl.core")

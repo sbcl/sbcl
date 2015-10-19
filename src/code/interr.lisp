@@ -79,9 +79,30 @@
          "attempt to RETURN-FROM a block or GO to a tag that no longer exists"))
 
 (deferr unseen-throw-tag-error (tag)
-  (error 'simple-control-error
-         :format-control "attempt to THROW to a tag that does not exist: ~S"
-         :format-arguments (list tag)))
+  (let ((text "attempt to THROW to a tag that does not exist: ~S"))
+    #!+sb-fasteval
+    (when (listp tag)
+      (multiple-value-bind (name frame)
+          (sb!debug::find-interrupted-name-and-frame)
+        (let ((down (and (eq name 'sb!c::unwind) ; is this tautological ?
+                         (sb!di:frame-down frame))))
+          (when frame
+            ;; Is this really the canonical way to get a frame name?
+            (let ((prev-frame-name
+                   (sb!di:debug-fun-name (sb!di:frame-debug-fun down))))
+              (when (and (listp prev-frame-name)
+                         (eq (car prev-frame-name) 'sb!c::xep))
+                (setq prev-frame-name (second prev-frame-name)))
+              (cond ((equal prev-frame-name '(eval return-from))
+                     (setq text "attempt to RETURN-FROM an exited block: ~S"
+                           ;; block name was wrapped in a cons
+                           tag (car tag)))
+                    ((equal prev-frame-name '(eval go))
+                     ;; FIXME: can we reverse-engineer the tag name from
+                     ;; the object that was thrown, for a better diagnostic?
+                     (setq text "attempt to GO into an exited tagbody"))))))))
+    (error 'simple-control-error
+           :format-control text :format-arguments (list tag))))
 
 (deferr nil-fun-returned-error (function)
   (error 'simple-control-error

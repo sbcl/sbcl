@@ -174,6 +174,10 @@
           ;; updated to take the additional indirection into account.
           ;; Let's avoid this unusual combination.
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE and :SB-THREAD")
+         ("(and sb-eval sb-fasteval)"
+          ;; It sorta kinda works to have both, but there should be no need,
+          ;; and it's not really supported.
+          "At most one interpreter can be selected")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))

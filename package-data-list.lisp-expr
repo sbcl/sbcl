@@ -2094,7 +2094,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "ASTERISKS-AROUND-LEXICAL-VARIABLE-NAME"
                "ASTERISKS-AROUND-CONSTANT-VARIABLE-NAME"
                "UNDEFINED-ALIEN-STYLE-WARNING"
-               #!+sb-eval
+               #!+(or sb-eval sb-fasteval)
                "LEXICAL-ENVIRONMENT-TOO-COMPLEX"
                "CHARACTER-DECODING-ERROR-IN-COMMENT"
                "DEPRECATED-EVAL-WHEN-SITUATIONS"
@@ -3150,6 +3150,38 @@ structure representations"
                "EVAL-IN-NATIVE-ENVIRONMENT"
                "PREPARE-FOR-COMPILE"
                "*EVAL-LEVEL*"))
+
+   #!+sb-fasteval
+   #s(sb-cold:package-data
+      :name "SB!INTERPRETER"
+      :doc "internal: a new EVAL implementation with semantic preprocessing."
+      :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT")
+      :export ("BASIC-ENV"
+               "ENV-POLICY"
+               "EVAL-IN-ENVIRONMENT"
+               "INTERPRETED-FUNCTION"
+               "INTERPRETED-FUNCTION-P"
+               "FIND-LEXICAL-FUN"
+               "FIND-LEXICAL-VAR"
+               "FUN-DOCSTRING"
+               "FUN-LAMBDA-EXPRESSION"
+               "FUN-LAMBDA-LIST"
+               "FUN-NAME"
+               "FUN-PRETTY-ARGLIST"
+               "FUN-SOURCE-LOCATION"
+               "%FUN-TYPE" ; to avoid conflict with SB-KERNEL:FUN-TYPE
+               "LEXENV-FROM-ENV"
+               "PREPARE-FOR-COMPILE"
+               "SET-FUN-DOCSTRING"
+               "SET-FUN-NAME"
+               "SET-FUN-PRETTY-ARGLIST"
+               "TYPE-CHECK")
+      :import-from (("SB!C"
+                     "PARSE-EVAL-WHEN-SITUATIONS"
+                     "MAKE-GLOBAL-VAR" "MAKE-LAMBDA-VAR"
+                     "*LEXENV*")
+                    ("SB!ALIEN" "%HEAP-ALIEN" "ALIEN-VALUE")
+                    ("SB!KERNEL" "%%TYPEP")))
 
    #!+win32
    #s(sb-cold:package-data
