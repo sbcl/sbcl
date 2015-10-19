@@ -28,59 +28,85 @@
   whenever a runtime expansion is needed. Initially this is set to
   FUNCALL.")
 
+;;; Return *MACROEXPAND-HOOK* as a compiled function, or signal an error
+;;; if that's not possible. Having an interpreted function as the expander
+;;; hook can easily lead to an infinite loop.
+;;; Something insane like a generic function with an interpreted method
+;;; on CONS would appear to be a compiled-function. Nothing can prevent that,
+;;; but hopefully this wrapper protects against reasonable mistakes.
+(defun valid-macroexpand-hook (&optional (hook sb!xc:*macroexpand-hook*))
+  (when (eq hook 'funcall)
+    (return-from valid-macroexpand-hook #'funcall))
+  ;; If you mistakenly bind the hook to a un-fboundp symbol (esp. NIL),
+  ;; it is nicer to say that the hook is invalid rather than randomly
+  ;; getting "unbound function" at indeterminate places in your code.
+  (let ((fun (if (functionp hook)
+                 hook
+                 ;; We need to get the function named by the designator.
+                 ;; The type proclamation in 'cl-specials' seems to think
+                 ;; that SETF functions are permitted here, though that
+                 ;; really seems like a bug. If it is permitted,
+                 ;; we can't use SYMBOL-FUNCTION. But using FDEFINITION
+                 ;; would strip encapsulations, so use %COERCE-NAME-TO-FUN.
+                 ;; (This allows tracing the macroexpand-hook, e.g.)
+                 (and (fboundp hook)
+                      #+sb-xc-host (fdefinition hook)
+                      #-sb-xc-host (%coerce-name-to-fun hook)))))
+    ;; We could do one of several things instead of failing:
+    ;; - preprocess the body to ensure that there are no macros,
+    ;;   and install that body, letting it run interpreted.
+    ;; - call COMPILE and install it as the FIN-FUNCTION, and use that.
+    ;; - call COMPILE and just return the result, which is a horrible
+    ;;   technique, as it would call COMPILE once per macro usage.
+    (if (compiled-function-p fun)
+        fun
+        (error 'sb!kernel::macroexpand-hook-type-error
+               :datum hook
+               :expected-type 'compiled-function))))
+
 (defun sb!xc:macroexpand-1 (form &optional env)
   #!+sb-doc
   "If form is a macro (or symbol macro), expand it once. Return two values,
    the expanded form and a T-or-NIL flag indicating whether the form was, in
    fact, a macro. ENV is the lexical environment to expand in, which defaults
    to the null environment."
-  (flet ((perform-expansion (expander)
-           ;; I disagree that expanders need to receive a "proper" environment
-           ;; - whatever that is - in lieu of NIL because an environment is
-           ;; opaque, and the only thing an expander can do with it (per the
-           ;; CL standard, barring things that code-walkers might want)
-           ;; is recursively invoke macroexpand[-1] or one of the handful of
-           ;; other builtins (9 or so) accepting an environment.
-           ;; Those functions all must in turn accept NIL as an environment.
-           ;; Whether or not this is put back to the way it was in CMUCL, it's
-           ;; good to have a single entry point for macros and symbol-macros.
-           (values (funcall sb!xc:*macroexpand-hook*
-                            expander
-                            form
-                                ;; As far as I can tell, it's not clear from
-                                ;; the ANSI spec whether a MACRO-FUNCTION
-                                ;; function needs to be prepared to handle
-                                ;; NIL as a lexical environment. CMU CL
-                                ;; passed NIL through to the MACRO-FUNCTION
-                                ;; function, but I prefer SBCL "be conservative
-                                ;; in what it sends and liberal in what it
-                                ;; accepts" by doing the defaulting itself.
-                                ;; -- WHN 19991128
-                            (coerce-to-lexenv env))
-                   t)))
-    (cond ((consp form)
-           (let ((expander (and (symbolp (car form))
-                                (sb!xc:macro-function (car form) env))))
-             (if expander
-                 (perform-expansion expander)
-                 (values form nil))))
-          ((symbolp form)
-           (multiple-value-bind (expansion winp)
-               (let* ((venv (when env (sb!c::lexenv-vars env)))
-                      (local-def (cdr (assoc form venv))))
-                 (cond ((not local-def)
-                        (info :variable :macro-expansion form))
-                       ((and (consp local-def) (eq (car local-def) 'macro))
-                        (values (cdr local-def) t))))
-             (if winp
-                  ;; CLHS 3.1.2.1.1 specifies that symbol-macros are expanded
-                  ;; via the macroexpand hook, too.
-                 (perform-expansion (lambda (form env)
-                                      (declare (ignore form env))
-                                      expansion))
-                 (values form nil))))
-          (t
-           (values form nil)))))
+  (flet ((perform-expansion (expander &optional (expansion nil expansion-p))
+           ;; There is no compelling reason to coerce NIL to a LEXENV when
+           ;; supplying it to a user-defined macro which receives &ENVIRONMENT,
+           ;; and it is expressly the wrong thing to do. An environment is
+           ;; opaque, and the only thing you can legally do with one is pass
+           ;; it to a standard functions defined to receive it.
+           ;; The validity of NIL as an "environment object" is undeniably
+           ;; legal in *any* usage demanding one, based on CLHS 3.1.1.3.1.
+           ;; Importantly, macros can sense when they are producing code for the
+           ;; compiler or interpreter based on the type of environment.
+           (let ((hook (valid-macroexpand-hook)))
+             (values (if (eq hook #'funcall)
+                         (if expansion-p expansion (funcall expander form env))
+                         (funcall hook expander form env))
+                     t)))
+         (symbol-expansion (sym env)
+           (flet ((global-expansion () (info :variable :macro-expansion sym)))
+             (typecase env
+               (null (global-expansion))
+               (lexenv
+                (let ((def (cdr (assoc sym (sb!c::lexenv-vars env)))))
+                  (cond ((null def) (global-expansion))
+                        ((listp def) (values (cdr def) t))
+                        (t (values nil nil)))))))))
+    (acond ((symbolp form)
+            (multiple-value-bind (exp expanded-p) (symbol-expansion form env)
+              ;; CLHS 3.1.2.1.1 specifies that symbol-macros are expanded
+              ;; via the macroexpand hook.
+              (if expanded-p
+                  (perform-expansion #'symbol-expansion exp)
+                  (values form nil))))
+           ((and (listp form)
+                 (let ((fn (car form)))
+                   (and (symbolp fn) (sb!xc:macro-function fn env))))
+            (perform-expansion it))
+           (t
+            (values form nil)))))
 
 (defun sb!xc:macroexpand (form &optional env)
   #!+sb-doc

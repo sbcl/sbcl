@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.16:
+  * minor incompatible change: the environment passed to a macro/setf/deftype
+    expander is not always an object of type SB-KERNEL:LEXENV.
+    It can be nil, as is permissible by the standard.
   * enhancement: ported to ARM64 Linux.
   * bug fix: calling COMPILE when SB-EXT:*EVALUATOR-MODE* was :INTERPRET
     would fail to perform "normal semantic processing such as macro expansion"

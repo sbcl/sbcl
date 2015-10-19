@@ -929,7 +929,7 @@
                          (t
                           (compiler-error "~@<~A~@:_ ~A~:>"
                                           (wherestring) c))))))
-      (funcall sb!xc:*macroexpand-hook* fun form *lexenv*))))
+      (funcall (valid-macroexpand-hook) fun form *lexenv*))))
 
 ;;;; conversion utilities
 

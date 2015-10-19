@@ -963,12 +963,6 @@
         (sb!sys:with-pinned-objects ((car values))
           (eval-with-pinned-objects (cons (cdr values) body) env)))))
 
-(define-condition macroexpand-hook-type-error (type-error)
-  ()
-  (:report (lambda (condition stream)
-             (format stream "The value of *MACROEXPAND-HOOK* is not a designator for a compiled function: ~A"
-                     (type-error-datum condition)))))
-
 (defvar *eval-dispatch-functions* nil)
 
 ;;; Dispatch to the appropriate EVAL-FOO function based on the contents of EXP.
@@ -1033,18 +1027,8 @@
                  (:function (%apply function (eval-args (cdr exp) env)))
                  ;; CLHS 3.1.2.1.2.2 Macro Forms
                  (:macro
-                  (let ((hook *macroexpand-hook*))
-                    ;; Having an interpreted function as the
-                    ;; macroexpander hook could cause an infinite
-                    ;; loop.
-                    (unless (compiled-function-p
-                             (etypecase hook
-                               (function hook)
-                               (symbol (symbol-function hook))))
-                      (error 'macroexpand-hook-type-error
-                             :datum hook
-                             :expected-type 'compiled-function))
-                    (%eval (funcall hook
+                  (let ((hook (valid-macroexpand-hook)))
+                    (%eval (funcall (truly-the function hook)
                                     function
                                     exp
                                     (env-native-lexenv env))

@@ -1431,6 +1431,16 @@ the usual naming convention (names like *FOO*) for special variables"
                      (lexical-environment-too-complex-form warning)
                      (lexical-environment-too-complex-lexenv warning)))))
 
+;; If the interpreter is in use (and the REPL is interpreted),
+;; it's easy to accidentally make the macroexpand-hook an interpreted
+;; function. So MACROEXPAND-1 is a little more careful,
+;; and might signal this, instead of only EVAL being able to signal it.
+(define-condition macroexpand-hook-type-error (type-error)
+  ()
+  (:report (lambda (condition stream)
+             (format stream "The value of *MACROEXPAND-HOOK* is not a designator for a compiled function: ~S"
+                     (type-error-datum condition)))))
+
 ;; Although this has -ERROR- in the name, it's just a STYLE-WARNING.
 (define-condition character-decoding-error-in-comment (style-warning)
   ((stream :initarg :stream :reader decoding-error-in-comment-stream)

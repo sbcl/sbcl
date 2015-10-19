@@ -113,6 +113,10 @@
                        cl:*terminal-io*))
 
 ;;; FIXME: make an SB!INT:FUNCTION-DESIGNATOR type for these
+;;; DOUBLE-FIXME: I'm not convinced that either of these variables
+;;; is actually allowed to be a CONS.
+;;; CLHS would have said "_extended_ function designator"
+;;; if it meant to allows (SETF f) as a designator.
 (sb!xc:proclaim '(type (or function symbol cons)
                        cl:*debugger-hook*
                        cl:*macroexpand-hook*))
