@@ -202,3 +202,29 @@
   ;; 3.4.10 - DEFINE-METHOD-COMBINATION. Not even sure what this does.
 
   )
+
+(defstruct foo (a 0 :type fixnum))
+(defstruct bar (a 0 :type fixnum))
+(declaim (notinline (setf bar-a)))
+;; This macro definition is technically violating the dynamic-extent
+;; nature of environment objects (as per X3J13), but of course ours don't.
+(defmacro capture-env (&environment e &rest r)
+  (declare (ignore r))
+  e)
+(with-test (:name :macroexpand-of-setf-structure-access)
+  (assert (equal (macroexpand-1 '(setf (foo-a x) 3))
+                 '(sb-kernel:%instance-set (the foo x) 1 (the fixnum 3))))
+
+  ;; Lexical definition of (SETF FOO-A) inhibits source-transform.
+  ;; This is not required behavior - SETF of structure slots
+  ;; do not necessarily go through a function named (SETF your-slot),
+  ;; but it's this implementation's behavior, so should be asserted.
+  (flet (((setf foo-a) (new obj) (declare (ignore obj)) new))
+    (assert (equal-mod-gensyms
+             (macroexpand-1 '(setf (foo-a x) 3) (capture-env))
+             '(let* ((#1=#:x x) (new 3)) (funcall #'(setf foo-a) new #1#)))))
+
+  ;; Same, not required behavior - NOTINLINE inhibits transform.
+  (assert (equal-mod-gensyms
+           (macroexpand-1 '(setf (bar-a x) 3))
+           '(let* ((#2=#:x x) (new 3)) (funcall #'(setf bar-a) new #2#)))))

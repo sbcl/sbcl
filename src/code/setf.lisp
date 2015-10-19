@@ -155,17 +155,14 @@
           ;; matters by requiring logic to delete extra LET bindings, which is
           ;; the entire point of this - especially for an interpreter.
           ;;
-          (when (singleton-p (cdr place)) ; if single argument call
-            (let ((slot-info (info :function :source-transform fun)))
-              (when (and (listp slot-info) ; is it a structure accessor?
-                         (typep (cdr slot-info) 'defstruct-slot-description))
-                (dx-let ((setter `(setf ,fun)))
-                  (when (and (not (sb!c::fun-locally-defined-p setter env))
-                             (let ((sb!c:*lexenv* env))
-                               (not (sb!c::fun-lexically-notinline-p setter))))
-                    (return-from setf
-                      (slot-access-transform
-                       :setf (list (cadr place) value-form) slot-info)))))))))
+          (awhen (and (singleton-p (cdr place)) ; if single argument call
+                      (structure-instance-accessor-p fun))
+            (dx-let ((setter `(setf ,fun)))
+              (when (and (not (sb!c::fun-lexically-notinline-p setter env))
+                         (not (sb!c::fun-locally-defined-p setter env)))
+                (return-from setf
+                  (slot-access-transform :setf (list (cadr place) value-form)
+                                         it)))))))
 
       (multiple-value-bind (temps vals newval setter)
           (sb!xc:get-setf-expansion place env)
@@ -766,7 +763,6 @@ with bits from the corresponding position in the new value."
   (setf-expand-ldb bytespec place env 'deposit-field 'mask-field))
 
 (defun setf-expand-the (the type place env)
-  (declare (type sb!c::lexenv env))
   (multiple-value-bind (temps subforms store-vars setter getter)
       (sb!xc:get-setf-expansion place env)
     (values temps subforms store-vars

@@ -98,12 +98,23 @@
 
 ;;;; namespace management utilities
 
-(defun fun-lexically-notinline-p (name)
-  (let ((fun (lexenv-find name funs :test #'equal)))
-    ;; a declaration will trump a proclamation
-    (if (and fun (defined-fun-p fun))
-        (eq (defined-fun-inlinep fun) :notinline)
-        (eq (info :function :inlinep name) :notinline))))
+;; As with LEXENV-FIND, we assume use of *LEXENV*, but macroexpanders
+;; receive an explicit environment and should pass it.
+;; A declaration will trump a proclamation.
+(defun fun-lexically-notinline-p (name &optional (env *lexenv*))
+  (let ((answer
+         (typecase env
+           (null nil)
+           ;; Placeholder for other ENV types.
+           (t
+            (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
+              ;; FIXME: this seems to omit FUNCTIONAL
+              (when (defined-fun-p fun)
+                (return-from fun-lexically-notinline-p
+                  (eq (defined-fun-inlinep fun) :notinline))))))))
+    ;; If ANSWER is NIL, go for the global value
+    (eq (or answer (info :function :inlinep name))
+        :notinline)))
 
 ;; This will get redefined in PCL boot.
 (declaim (notinline maybe-update-info-for-gf))
