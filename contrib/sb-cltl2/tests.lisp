@@ -20,7 +20,11 @@
     (let ((*x* :outer))
       (compiler-let ((*x* :inner))
         (list *x* (*x*-value))))
-  (:outer :inner))
+  ;; See the X3J13 writeup for why the interpreter
+  ;; might return (and does return) a different answer.
+  #.(if (eq sb-ext:*evaluator-mode* :compile)
+        '(:outer :inner)
+        '(:inner :inner)))
 
 (defvar *expansions* nil)
 (defmacro macroexpand-macro (arg)
@@ -162,19 +166,25 @@
       (eval '(cadr (assoc 'speed (dinfo optimize)))))
   3)
 
+;; This usage is esoteric, and the expected answer differs based on whether the
+;; code is interpreted or compiled. Compiling RESTRICT-COMPILER-POLICY doesn't
+;; actually do anything to affect the compiler since it is not a toplevel form
+;; in an eval-when. (I suspect that it wouldn't normally be used this way)
+;; But the interpreter calls it, which has an immediate visible effect.
 (deftest declaration-information.restrict-compiler-policy.2
     (with-compilation-unit (:policy '(optimize) :override t)
       (restrict-compiler-policy 'speed 3)
       (locally (declare (optimize (speed 2)))
         (cadr (assoc 'speed (dinfo optimize)))))
-  2)
+  ;; sb-rt doesn't eval the "expected result" form.
+  #.(if (eq sb-ext:*evaluator-mode* :compile) 2 3))
 
 (deftest declaration-information.restrict-compiler-policy.3
     (locally (declare (optimize (speed 2)))
       (with-compilation-unit (:policy '(optimize) :override t)
         (restrict-compiler-policy 'speed 3)
         (cadr (assoc 'speed (dinfo optimize)))))
-  2)
+  #.(if (eq sb-ext:*evaluator-mode* :compile) 2 3))
 
 (deftest declaration-information.muffle-conditions.default
   (dinfo sb-ext:muffle-conditions)

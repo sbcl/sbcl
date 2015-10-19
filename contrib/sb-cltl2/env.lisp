@@ -51,14 +51,11 @@
 
        (let (x) (locally (declare (special x))) ...)
 "
+  (setq env (copy-structure (sb-c::coerce-to-lexenv env)))
   (collect ((lvars)
             (clambdas))
     (unless (or variable symbol-macro function macro declare)
       (return-from augment-environment env))
-
-    (if (null env)
-        (setq env (make-null-lexenv))
-        (setq env (copy-structure env)))
 
     ;; a null policy is used to identify a null lexenv
     (when (sb-c::null-lexenv-p env)
@@ -172,7 +169,7 @@
     `(when ,test
        (list (cons ,car ,cdr)))))
 
-(declaim (ftype (sfunction ((or symbol cons) &optional (or null lexenv))
+(declaim (ftype (sfunction ((or symbol cons) &optional lexenv-designator)
                            (values (member nil :function :macro :special-form)
                                    boolean
                                    list))
@@ -267,6 +264,8 @@ appear."
        (setf binding :macro
              localp t))
       (null
+       ;; FIXME: we document above that :MACRO trumps :SPECIAL-FORM
+       ;; but that is clearly untrue.
        (case (info :function :kind name)
          (:macro
           (setf binding :macro
@@ -291,12 +290,14 @@ appear."
                    (list-cons-when (and ftype (neq *universal-fun-type* ftype))
                      'ftype (type-specifier ftype))
                    (list-cons-when dx 'dynamic-extent t)
+                   ;; FIXME: a local name shadowing a deprecated global
+                   ;; wrongly returns deprecation info.
                    (maybe-deprecation-entry
                     (info :function :deprecated name))
                    (extra-pairs :function name fun *lexenv*)))))
 
 (declaim (ftype (sfunction
-                 (symbol &optional (or null lexenv))
+                 (symbol &optional lexenv-designator)
                  (values (member nil :special :lexical :symbol-macro :constant :global :alien)
                          boolean
                          list))
@@ -384,7 +385,7 @@ CARS of the alist include:
 
 In addition to these declarations defined using DEFINE-DECLARATION may
 appear."
-  (let* ((*lexenv* (or env (make-null-lexenv)))
+  (let* ((*lexenv* (sb-c::coerce-to-lexenv env))
          (kind (info :variable :kind name))
          (var (lexenv-find name vars))
          binding localp dx ignorep type)
@@ -436,7 +437,7 @@ appear."
                     (info :variable :deprecated name))
                    (extra-pairs :variable name var *lexenv*)))))
 
-(declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)
+(declaim (ftype (sfunction (symbol &optional lexenv-designator) t)
                 declaration-information))
 (defun declaration-information (declaration-name &optional env)
   "Return information about declarations named by DECLARATION-NAME.
