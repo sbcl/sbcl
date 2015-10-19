@@ -1292,6 +1292,11 @@ handled by any other handler, it will be muffled.")
     (return-from function-file-namestring
       (sb!c:definition-source-location-namestring
           (sb!eval:interpreted-function-source-location function))))
+  #!+sb-fasteval
+  (when (typep function 'sb!interpreter:interpreted-function)
+    (return-from function-file-namestring
+      (awhen (sb!interpreter:fun-source-location function)
+        (sb!c:definition-source-location-namestring it))))
   (let* ((fun (%fun-fun function))
          (code (fun-code-header fun))
          (debug-info (%code-debug-info code))
@@ -1309,9 +1314,10 @@ handled by any other handler, it will be muffled.")
      (and (typep old 'compiled-function)
           (typep new '(not compiled-function)))
      ;; fin->regular is interesting except for interpreted->compiled.
-     (and (typep old '(and funcallable-instance
-                           #!+sb-eval (not sb!eval:interpreted-function)))
-          (typep new '(not funcallable-instance)))
+     (and (typep new '(not funcallable-instance))
+          (typep old '(and funcallable-instance
+                           #!+sb-fasteval (not sb!interpreter:interpreted-function)
+                           #!+sb-eval (not sb!eval:interpreted-function))))
      ;; different file or unknown location is interesting.
      (let* ((old-namestring (function-file-namestring old))
             (new-namestring
@@ -1419,7 +1425,7 @@ the usual naming convention (names like *FOO*) for special variables"
              (format stream "Undefined alien: ~S"
                      (undefined-alien-symbol warning)))))
 
-#!+sb-eval
+#!+(or sb-eval sb-fasteval)
 (define-condition lexical-environment-too-complex (style-warning)
   ((form :initarg :form :reader lexical-environment-too-complex-form)
    (lexenv :initarg :lexenv :reader lexical-environment-too-complex-lexenv))

@@ -407,7 +407,11 @@ generic function lambda list ~S~:>"
                          qualifiers
                          lambda-list
                          body
-                         env)
+                         env
+                         ;; ENV could be of type SB!INTERPRETER:BASIC-ENV
+                         ;; but I don't care to figure out what parts of PCL
+                         ;; would have to change to accept that, so coerce.
+                         &aux (env (sb-kernel:coerce-to-lexenv env)))
   (multiple-value-bind (parameters unspecialized-lambda-list specializers)
       (parse-specialized-lambda-list lambda-list)
     (declare (ignore parameters))
@@ -544,6 +548,7 @@ generic function lambda list ~S~:>"
                                  proto-method
                                  method-function-lambda
                                  initargs
+                                 ;; FIXME: coerce-to-lexenv?
                                  env))))
 
 (defun real-make-method-initargs-form (proto-gf proto-method

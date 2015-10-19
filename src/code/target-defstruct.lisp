@@ -33,7 +33,7 @@
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.
-#!+sb-eval
+#!+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
   (let ((instance (%make-instance (dd-instance-length dd))))
     (setf (%instance-layout instance) (dd-layout-or-lose dd))

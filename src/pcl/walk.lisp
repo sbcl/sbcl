@@ -468,6 +468,9 @@
                              (lambda (subform context env)
                                (declare (ignore context env))
                                subform)))
+  #!+sb-fasteval
+  (when (typep environment 'sb!interpreter:basic-env)
+    (setq environment (sb!interpreter:lexenv-from-env environment)))
   (walker-environment-bind (new-env environment :walk-function walk-function)
     (walk-form-internal form :eval new-env)))
 

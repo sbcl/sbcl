@@ -225,16 +225,31 @@ evaluated expressions.
 
 #+sb-eval
 (defmethod inspected-parts ((object sb-eval:interpreted-function))
-  (values (format nil "The object is an interpreted function named ~S.~%"
-                  (nth-value 2 (function-lambda-expression object)))
-          t
+  (multiple-value-bind (defn closurep name) (function-lambda-expression object)
+   (declare (ignore closurep))
+   (values (format nil "The object is an interpreted function named ~S.~%" name)
+           t
           ;; Defined-from stuff used to be here. Someone took
           ;; it out. FIXME: We should make it easy to get
           ;; to DESCRIBE from the inspector.
           (list
            (cons "Lambda-list" (sb-eval:interpreted-function-lambda-list object))
            (cons "Definition" (function-lambda-expression object))
-           (cons "Documentation" (sb-eval:interpreted-function-documentation object)))))
+           (cons "Documentation" (sb-eval:interpreted-function-documentation object))))))
+
+#+sb-fasteval
+(defmethod inspected-parts ((object sb-interpreter:interpreted-function))
+  (multiple-value-bind (defn closurep name) (function-lambda-expression object)
+   (declare (ignore closurep))
+   (values (format nil "The object is an interpreted function named ~S.~%" name)
+           t
+          ;; Defined-from stuff used to be here. Someone took
+          ;; it out. FIXME: We should make it easy to get
+          ;; to DESCRIBE from the inspector.
+          (list
+           (cons "Lambda-list" (sb-interpreter:fun-lambda-list object))
+           (cons "Definition" defn)
+           (cons "Documentation" (sb-interpreter:fun-docstring object))))))
 
 (defmethod inspected-parts ((object vector))
   (values (format nil

@@ -12,11 +12,22 @@
 (in-package "SB!C")
 
 ;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
-;;; to be taken as a null lexical environment
+;;; to be taken as a null lexical environment.
+;;; Of course this is a mostly pointless "idiom" because NIL *is*
+;;; an environment, as far as most environment inquiry functions care.
 (defun coerce-to-lexenv (x)
   (etypecase x
     (null (make-null-lexenv))
-    (lexenv x)))
+    (lexenv x)
+    #!+sb-fasteval
+    (sb!interpreter:basic-env (sb!interpreter:lexenv-from-env x))))
+;;; For functions which don't want to process an interpreter environment,
+;;; but are perfectly happy to receive NIL as environment.
+(defun coerce-to-lexenv* (x)
+  (etypecase x
+    ((or null lexenv) x)
+    #+sb!interpret
+    (sb!interpreter:basic-env (sb!interpreter:lexenv-from-env x))))
 
 ;;; Take the lexenv surrounding an inlined function and extract things
 ;;; needed for the inline expansion suitable for dumping into fasls.
@@ -90,8 +101,11 @@
                      (not (null-lexenv-p parent))))
     result))
 
+;;; Return a sexpr for LAMBDA in LEXENV such that loading it from fasl
+;;; preserves the original lexical environment for inlining.
+;;; Return NIL if the lexical environment is too complicated.
 (defun maybe-inline-syntactic-closure (lambda lexenv)
-  (declare (type list lambda) (type lexenv lexenv))
+  (declare (type list lambda) (type lexenv-designator lexenv))
   (aver (eql (first lambda) 'lambda))
   ;; We used to have a trivial implementation, verifying that lexenv
   ;; was effectively null. However, this fails to take account of the
@@ -104,15 +118,21 @@
   ;; which, while too complicated for the cross-compiler to handle in
   ;; unfriendly foreign lisp environments, would be good to support in
   ;; the target compiler. -- CSR, 2002-05-13 and 2002-11-02
-  (let ((vars (lexenv-vars lexenv))
-        (funs (lexenv-funs lexenv)))
-    (cond
-      ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
-      ((and (null vars) (null funs)) lambda)
-      ;; too complicated for cross-compilation
-      #-sb-xc-host
-      (t
-       (let ((env (reconstruct-lexenv lexenv)))
-         (and env
-          `(lambda-with-lexenv ,env ,@(cdr lambda))))))))
-
+  (typecase lexenv
+   (lexenv
+    (let ((vars (lexenv-vars lexenv))
+          (funs (lexenv-funs lexenv)))
+      (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
+            ((and (null vars) (null funs)) lambda)
+            ;; too complicated for cross-compilation
+            #-sb-xc-host
+            (t
+             (let ((env (reconstruct-lexenv lexenv)))
+               (and env
+                    `(lambda-with-lexenv ,env ,@(cdr lambda))))))))
+   #!+sb-fasteval
+   (sb!interpreter:basic-env
+    (awhen (sb!interpreter::reconstruct-syntactic-closure-env lexenv)
+      `(lambda-with-lexenv ,it ,@(cdr lambda))))
+   #!+sb-fasteval
+   (null lambda))) ; trivial case. Never occurs in the compiler.

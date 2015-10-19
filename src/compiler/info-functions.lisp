@@ -140,14 +140,20 @@
   "If SYMBOL names a macro in ENV, returns the expansion function,
 else returns NIL. If ENV is unspecified or NIL, use the global environment
 only."
-  (declare (symbol symbol))
-  (let* ((fenv (when env (lexenv-funs env)))
-         (local-def (cdr (assoc symbol fenv))))
-    (if local-def
-        (if (and (consp local-def) (eq (car local-def) 'macro))
-            (cdr local-def)
-            nil)
-        (values (info :function :macro-function symbol)))))
+  ;; local function definitions (ordinary) can shadow a global macro
+  (typecase env
+    #!+sb-fasteval
+    (sb!interpreter:basic-env
+     (multiple-value-bind (kind def)
+         (sb!interpreter:find-lexical-fun env symbol)
+       (when def
+         (return-from sb!xc:macro-function (if (eq kind :macro) def)))))
+    (lexenv
+     (let ((def (cdr (assoc symbol (lexenv-funs env)))))
+       (when def
+         (return-from sb!xc:macro-function
+           (if (typep def '(cons (eql macro))) (cdr def)))))))
+  (values (info :function :macro-function symbol)))
 
 (defun (setf sb!xc:macro-function) (function symbol &optional environment)
   (declare (symbol symbol) (type function function))

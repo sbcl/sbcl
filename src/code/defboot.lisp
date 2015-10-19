@@ -225,6 +225,27 @@ evaluated as a PROGN."
     (when (fboundp name)
       (warn 'redefinition-with-defun
             :name name :new-function def :new-location source-location))
+    ;; If NAME has an existing structure slot source-transform and DEF does not
+    ;; coincide with the transform, then blow away the transform.
+    ;; It's important for the interpreter to do this because we prefer to
+    ;; use the transform when it exists - which is presently achieved by calling
+    ;; COMPILE on NAME. But we need to ensure that it is correct to call COMPILE
+    ;; on NAME in a null environment even if it appeared inside a toplevel LET.
+    ;; The indication of whether this will work is that DEF matches the
+    ;; expected source-transform for NAME. Users should not care that NAME
+    ;; ever got temporarily defined as an interpreted function.
+    ;; Arguably (SETF FDEFINITION) and FMAKUNBOUND should do this check too,
+    ;; but one would hope that those operations on compiler-defined functions
+    ;; are uncommon enough that this makes no difference.
+    #!+sb-fasteval
+    (awhen (and (sb!interpreter:interpreted-function-p def)
+                (structure-instance-accessor-p name))
+      (unless (structure-accessor-form-p
+               (if (consp name) :setf :read) it
+               (sb!interpreter:fun-lambda-list def)
+               (sb!interpreter::fun-forms def))
+        (clear-info :function :source-transform name)
+        (warn "structure slot accessor ~S incompatibly redefined" name)))
     (setf (sb!xc:fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF
@@ -239,6 +260,28 @@ evaluated as a PROGN."
     (sb!c::%set-inline-expansion name nil inline-lambda)
     ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.
     ))
+
+;; Return T if SEXPR is the lambda expression that corresponds
+;; to the structure slot reader for SLOT-INFO so that we can decide
+;; that an interpreted lambda is consistent with its source-transform.
+;; I think there's actually a better way than this heuristic: *always* remove
+;; a source-transform whenever an fdefn-fun is set, with a blanket exception
+;; for boostrap code. Then %TARGET-DEFSTRUCT, which is the last step to occur
+;; from DEFSTRUCT, can re-establish the source-transforms.
+(defun structure-accessor-form-p (kind slot-info lambda-list forms)
+  (if (and (equal lambda-list
+                  (if (eq kind :read) '(instance) '(sb!kernel::value instance)))
+           (singleton-p forms))
+      (let ((form (car forms)))
+        ;; FORM must match (BLOCK x subform)
+        (and (typep form '(cons (eql block) (cons t (cons t null))))
+             (equal (third form)
+                    (slot-access-transform
+                     kind
+                     (if (eq kind :read)
+                         '(instance)
+                         '(instance sb!kernel::value))
+                     slot-info))))))
 
 ;;;; DEFVAR and DEFPARAMETER
 

@@ -80,7 +80,7 @@
            ;; legal in *any* usage demanding one, based on CLHS 3.1.1.3.1.
            ;; Importantly, macros can sense when they are producing code for the
            ;; compiler or interpreter based on the type of environment.
-           (let ((hook (valid-macroexpand-hook)))
+           (let ((hook (truly-the function (valid-macroexpand-hook))))
              (values (if (eq hook #'funcall)
                          (if expansion-p expansion (funcall expander form env))
                          (funcall hook expander form env))
@@ -89,6 +89,14 @@
            (flet ((global-expansion () (info :variable :macro-expansion sym)))
              (typecase env
                (null (global-expansion))
+               #!+sb-fasteval
+               (sb!interpreter:basic-env
+                (multiple-value-bind (cell kind frame-ptr def)
+                    (sb!interpreter:find-lexical-var env sym)
+                  (declare (ignore cell frame-ptr))
+                  (cond ((eq kind :macro) (values def t))
+                        ((null kind) (global-expansion))
+                        (t (values nil nil)))))
                (lexenv
                 (let ((def (cdr (assoc sym (sb!c::lexenv-vars env)))))
                   (cond ((null def) (global-expansion))

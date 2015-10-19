@@ -1484,22 +1484,20 @@
     (disassemble-segments segments stream dstate)))
 
 (defun valid-extended-function-designators-for-disassemble-p (thing)
-  (cond ((legal-fun-name-p thing)
-         (compiled-funs-or-lose (fdefinition thing) thing))
-        #!+sb-eval
-        ((sb!eval:interpreted-function-p thing)
-         (compile nil thing))
-        ((typep thing 'sb!pcl::%method-function)
+  (typecase thing
+    ((satisfies legal-fun-name-p)
+     (compiled-funs-or-lose (fdefinition thing) thing))
+    (sb!pcl::%method-function
          ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
          ;; we to disassemble both.
          ;; FIXME: interpreted methods need to be compiled as above.
          (list thing (sb!pcl::%method-function-fast-function thing)))
-        ((functionp thing)
-         thing)
-        ((and (listp thing)
-              (eq (car thing) 'lambda))
-         (compile nil thing))
-        (t nil)))
+    ((or (cons (eql lambda))
+         #!+sb-fasteval sb!interpreter:interpreted-function
+         #!+sb-eval sb!eval:interpreted-function)
+     (compile nil thing))
+    (function thing)
+    (t nil)))
 
 (defun compiled-funs-or-lose (thing &optional (name thing))
   (let ((funs (valid-extended-function-designators-for-disassemble-p thing)))

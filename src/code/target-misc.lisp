@@ -32,6 +32,9 @@
 
 (defun %fun-lambda-list (function)
   (typecase function
+    #!+sb-fasteval
+    (sb!interpreter:interpreted-function
+     (sb!interpreter:fun-pretty-arglist function))
     #!+sb-eval
     (sb!eval:interpreted-function
      (sb!eval:interpreted-function-debug-lambda-list function))
@@ -40,6 +43,9 @@
 
 (defun (setf %fun-lambda-list) (new-value function)
   (typecase function
+    #!+sb-fasteval
+    (sb!interpreter:interpreted-function
+     (sb!interpreter:set-fun-pretty-arglist function new-value))
     #!+sb-eval
     (sb!eval:interpreted-function
      (setf (sb!eval:interpreted-function-debug-lambda-list function) new-value))
@@ -49,7 +55,12 @@
   new-value)
 
 (defun %fun-type (function)
-  (%simple-fun-type (%fun-fun function)))
+  (typecase function
+    #!+sb-fasteval
+    ;; Obtain a list of the right shape, usually with T for each
+    ;; arg type, but respecting local declarations if any.
+    (sb!interpreter:interpreted-function (sb!interpreter:%fun-type function))
+    (t (%simple-fun-type (%fun-fun function)))))
 
 (!defglobal *closure-name-marker* (make-symbol ".CLOSURE-NAME."))
 (defun closure-name (closure)
@@ -120,6 +131,8 @@
     #!+sb-eval
     (sb!eval:interpreted-function
      (sb!eval:interpreted-function-debug-name function))
+    #!+sb-fasteval
+    (sb!interpreter:interpreted-function (sb!interpreter:fun-name function))
     (t
      (let (name namedp)
        (if (and (closurep function)
@@ -134,6 +147,9 @@
     #!+sb-eval
     (sb!eval:interpreted-function
      (setf (sb!eval:interpreted-function-debug-name function) new-value))
+    #!+sb-fasteval
+    (sb!interpreter:interpreted-function
+     (sb!interpreter:set-fun-name function new-value))
     (generic-function
      ;; STANDARD-GENERIC-FUNCTION definitely has a NAME,
      ;; but other subtypes of GENERIC-FUNCTION could as well.
@@ -152,6 +168,9 @@
 
 (defun %fun-doc (function)
   (typecase function
+    #!+sb-fasteval
+    (sb!interpreter:interpreted-function
+     (sb!interpreter:fun-docstring function))
     #!+sb-eval
     (sb!eval:interpreted-function
      (sb!eval:interpreted-function-documentation function))
@@ -165,6 +184,9 @@
 (defun (setf %fun-doc) (new-value function)
   (declare (type (or null string) new-value))
   (typecase function
+    #!+sb-fasteval
+    (sb!interpreter:interpreted-function
+     (sb!interpreter:set-fun-docstring function new-value))
     #!+sb-eval
     (sb!eval:interpreted-function
      (setf (sb!eval:interpreted-function-documentation function) new-value))

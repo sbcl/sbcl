@@ -22,7 +22,7 @@
          proto-gf
          (sb-mop:class-prototype (sb-mop:generic-function-method-class proto-gf))
          lambda
-         env)
+         env) ; FIXME: coerce to lexenv?
       `(values #',lambda ',initargs))))
 
 (defun install-condition-slot-reader (name condition slot-name)

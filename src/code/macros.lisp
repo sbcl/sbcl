@@ -66,7 +66,11 @@
                              (sb!kernel:lexenv
                               (let ((f (cdr (assoc name (sb!c::lexenv-funs env)))))
                                 (if (not f) global-fun-p (sb!c::functional-p f))))
-                             ;; Placeholder for other environment types.
+                             #!+sb-fasteval
+                             (sb!interpreter:basic-env
+                              (let ((kind
+                                     (sb!interpreter::find-lexical-fun env name)))
+                                (if (null kind) global-fun-p (eq kind :function))))
                              (null global-fun-p))
                        `(,name ,@(mapcar #'process-place (rest test-form)))))))
                 ;; For all other cases, just evaluate TEST-FORM and do

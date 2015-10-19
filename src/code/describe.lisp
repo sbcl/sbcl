@@ -52,6 +52,9 @@
                   ,@(when declarations `((declare ,@declarations)))
                   ,@body)
                t name)))
+    #+sb-fasteval
+    (sb-interpreter:interpreted-function
+     (sb-interpreter:fun-lambda-expression fun))
     (function
      (let* ((name (fun-name fun))
             (fun (%simple-fun-self (%fun-fun fun)))
@@ -176,13 +179,10 @@
   (typecase x
     (simple-fun "compiled function")
     (closure "compiled closure")
-    #+sb-eval
-    (sb-eval:interpreted-function
-     "interpreted function")
-    (generic-function
-     "generic-function")
-    (t
-     "funcallable-instance")))
+    ((or #+sb-fasteval sb-interpreter:interpreted-function
+         #+sb-eval sb-eval:interpreted-function) "interpreted function")
+    (generic-function "generic-function")
+    (t "funcallable-instance")))
 
 (defmethod object-type-string ((x stream))
   "stream")
@@ -553,8 +553,14 @@
                       ((sb-di:debug-source-form source)
                        (format stream "~@:_Source form:~@:_  ~S"
                                (sb-di:debug-source-form source)))))))))
-      #+sb-eval
-      (let ((source (sb-eval:interpreted-function-source-location function)))
+      (let ((source
+             (etypecase function
+               #+sb-eval
+               (sb-eval:interpreted-function
+                (sb-eval:interpreted-function-source-location function))
+               #+sb-fasteval
+               (sb-interpreter:interpreted-function
+                (sb-interpreter:fun-source-location function)))))
         (when source
           (let ((namestring (sb-c:definition-source-location-namestring source)))
             (when namestring

@@ -1593,7 +1593,8 @@
 
 ;;; Default evaluator mode (interpeter / compiler)
 
-(declaim (type (member :compile #!+sb-eval :interpret) *evaluator-mode*))
+(declaim (type (member :compile #!+(or sb-eval sb-fasteval) :interpret)
+               *evaluator-mode*))
 (!defparameter *evaluator-mode* :compile
   #!+sb-doc
   "Toggle between different evaluator implementations. If set to :COMPILE,

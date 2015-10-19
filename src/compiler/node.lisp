@@ -726,10 +726,16 @@
   (defined-type :test (not (eq defined-type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   kind)
+
 (defun fun-locally-defined-p (name env)
-  (and env
-       (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
-         (and fun (not (global-var-p fun))))))
+  (typecase env
+    (null nil)
+    #!+sb-fasteval
+    (sb!interpreter:basic-env
+     (values (sb!interpreter:find-lexical-fun env name)))
+    (t
+     (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
+       (and fun (not (global-var-p fun)))))))
 
 ;;; A DEFINED-FUN represents a function that is defined in the same
 ;;; compilation block, or that has an inline expansion, or that has a
@@ -1469,12 +1475,15 @@
 ;;; which is a valid policy that makes each quality read as 1.
 ;;; In contrast, a LEXENV with NIL policy _does_ become *POLICY*.
 (defun %coerce-to-policy (thing)
-  (cond ((policy-p thing) thing)
-        (thing (lexenv-policy (etypecase thing
-                                (lexenv thing)
-                                (node (node-lexenv thing))
-                                (functional (functional-lexenv thing)))))
-        (t **baseline-policy**)))
+  (typecase thing
+    (policy thing)
+    #!+sb-fasteval
+    (sb!interpreter:basic-env (sb!interpreter:env-policy thing))
+    (null **baseline-policy**)
+    (t (lexenv-policy (etypecase thing
+                        (lexenv thing)
+                        (node (node-lexenv thing))
+                        (functional (functional-lexenv thing)))))))
 
 ;;;; Freeze some structure types to speed type testing.
 
