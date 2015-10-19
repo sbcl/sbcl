@@ -278,10 +278,7 @@
       (load-fixup tmp-tn (make-fixup 'unwind :assembly-routine) lip)
       (inst br tmp-tn)
 
-      (emit-label ENTRY-LABEL)
-      ;; KLUDGE: either COMPUTE-LRA computes or UNWIND jumps one
-      ;; instruction further.
-      (inst mov nargs 0)
+      (emit-return-pc ENTRY-LABEL)
       (inst mov nargs 0)
 
       (move lexenv saved-function)
