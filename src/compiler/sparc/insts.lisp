@@ -1004,8 +1004,7 @@ about function addresses and register values.")
   (define-f3-inst taddcc #b10 #b100000 :writes :psr)
 
   ;; taddcctv is deprecated on the Sparc V9.  Use taddcc and bpvs or
-  ;; taddcc and trap to get a similar effect.  (Requires changing the C
-  ;; code though!)
+  ;; taddcc and trap to get a similar effect.
   ;;(define-f3-inst taddcctv #b10 #b100010 :writes :psr)
 
   (define-f3-inst sub #b10 #b000100)
@@ -1015,8 +1014,7 @@ about function addresses and register values.")
   (define-f3-inst tsubcc #b10 #b100001 :writes :psr)
 
   ;; tsubcctv is deprecated on the Sparc V9.  Use tsubcc and bpvs or
-  ;; tsubcc and trap to get a similar effect.  (Requires changing the C
-  ;; code though!)
+  ;; tsubcc and trap to get a similar effect.
   ;;(define-f3-inst tsubcctv #b10 #b100011 :writes :psr)
 
   (define-f3-inst mulscc #b10 #b100100 :reads :y :writes (:psr :y))

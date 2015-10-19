@@ -4491,7 +4491,7 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
 #else
                 set_pseudo_atomic_interrupted(thread);
 #ifdef GENCGC_IS_PRECISE
-                /* PPC calls alloc() from a trap or from pa_alloc(),
+                /* PPC calls alloc() from a trap
                  * look up the most context if it's from a trap. */
                 {
                     os_context_t *context =

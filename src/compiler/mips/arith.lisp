@@ -177,39 +177,6 @@
   (:generator 4
     (inst nor r x y)))
 
-;;; Special case fixnum + and - that trap on overflow.  Useful when we don't
-;;; know that the result is going to be a fixnum.
-#+nil
-(progn
-  (define-vop (fast-+/fixnum fast-+/fixnum=>fixnum)
-      (:results (r :scs (any-reg descriptor-reg)))
-    (:result-types (:or signed-num unsigned-num))
-    (:note nil)
-    (:generator 4
-                (inst add r x y)))
-
-  (define-vop (fast-+-c/fixnum fast-+-c/fixnum=>fixnum)
-      (:results (r :scs (any-reg descriptor-reg)))
-    (:result-types (:or signed-num unsigned-num))
-    (:note nil)
-    (:generator 3
-                (inst add r x (fixnumize y))))
-
-  (define-vop (fast--/fixnum fast--/fixnum=>fixnum)
-      (:results (r :scs (any-reg descriptor-reg)))
-    (:result-types (:or signed-num unsigned-num))
-    (:note nil)
-    (:generator 4
-                (inst sub r x y)))
-
-  (define-vop (fast---c/fixnum fast---c/fixnum=>fixnum)
-      (:results (r :scs (any-reg descriptor-reg)))
-    (:result-types (:or signed-num unsigned-num))
-    (:note nil)
-    (:generator 3
-                (inst sub r x (fixnumize y))))
-) ; bogus trap-to-c-land +/-
-
 ;;; Shifting
 
 (define-vop (fast-ash/unsigned=>unsigned)
@@ -337,7 +304,7 @@
       (inst nor shift shift)
 
       (emit-label loop)
-      (inst add res (fixnumize 1))
+      (inst addu res (fixnumize 1))
 
       (emit-label test)
       (inst bne shift loop)

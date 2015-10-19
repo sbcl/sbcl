@@ -411,64 +411,10 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
         handle_trap(context,code & 0x1f);
 }
 
-#define FIXNUM_VALUE(lispobj) (((int)lispobj) >> N_FIXNUM_TAG_BITS)
-
 static void
 sigfpe_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    unsigned int bad_inst = os_context_insn(context);
-    unsigned int op, rs, rt, rd, funct, dest = 32;
-    int immed;
-    int result;
-
-    op = (bad_inst >> 26) & 0x3f;
-    rs = (bad_inst >> 21) & 0x1f;
-    rt = (bad_inst >> 16) & 0x1f;
-    rd = (bad_inst >> 11) & 0x1f;
-    funct = bad_inst & 0x3f;
-    immed = (((int)(bad_inst & 0xffff)) << 16) >> 16;
-
-    switch (op) {
-    case 0x0: /* SPECIAL */
-        switch (funct) {
-        case 0x20: /* ADD */
-            result = FIXNUM_VALUE(os_context_register(context, rs))
-                + FIXNUM_VALUE(os_context_register(context, rt));
-            dest = rd;
-            break;
-
-        case 0x22: /* SUB */
-            result = FIXNUM_VALUE(os_context_register(context, rs))
-                - FIXNUM_VALUE(os_context_register(context, rt));
-            dest = rd;
-            break;
-
-        default:
-            interrupt_handle_now(signal, info, context);
-            return;
-        }
-        break;
-
-    case 0x8: /* ADDI */
-        result = FIXNUM_VALUE(os_context_register(context,rs))
-                    + (immed >> N_FIXNUM_TAG_BITS);
-        dest = rt;
-        break;
-
-    default:
-        interrupt_handle_now(signal, info, context);
-        return;
-    }
-
-    dynamic_space_free_pointer =
-        (lispobj *)(unsigned int)*os_context_register_addr(context,reg_ALLOC);
-
-    *os_context_register_addr(context,dest) = alloc_number(result);
-
-    *os_context_register_addr(context, reg_ALLOC) =
-        (unsigned int) dynamic_space_free_pointer;
-
-    arch_skip_instruction(context);
+    interrupt_handle_now(signal, info, context);
 }
 
 unsigned int
@@ -491,7 +437,6 @@ void
 arch_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
-    undoably_install_low_level_interrupt_handler(SIGFPE,sigfpe_handler);
 }
 
 #ifdef LISP_FEATURE_LINKAGE_TABLE

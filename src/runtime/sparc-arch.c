@@ -353,92 +353,9 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
     }
 }
 
-static void sigemt_handler(int signal, siginfo_t *siginfo,
-                           os_context_t *context)
-{
-    unsigned int badinst;
-    boolean subtract, immed;
-    int rd, rs1, op1, rs2, op2, result;
-
-    badinst = *(unsigned int *)os_context_pc_addr(context);
-    if ((badinst >> 30) != 2 || ((badinst >> 20) & 0x1f) != 0x11) {
-        /* It wasn't a tagged add.  Pass the signal into lisp. */
-        interrupt_handle_now(signal, siginfo, context);
-        return;
-    }
-
-    fprintf(stderr, "SIGEMT trap handler with tagged op instruction!\n");
-
-    /* Extract the parts of the inst. */
-    subtract = badinst & (1<<19);
-    rs1 = (badinst>>14) & 0x1f;
-    op1 = *os_context_register_addr(context, rs1);
-
-    /* If the first arg is $ALLOC then it is really a signal-pending note */
-    /* for the pseudo-atomic noise. */
-    if (rs1 == reg_ALLOC) {
-        /* Perform the op anyway. */
-        op2 = badinst & 0x1fff;
-        if (op2 & (1<<12))
-            op2 |= -1<<13;
-        if (subtract)
-            result = op1 - op2;
-        else
-            result = op1 + op2;
-        /* KLUDGE: this & ~7 is a little bit magical but basically
-           clears pseudo_atomic bits if any */
-        *os_context_register_addr(context, reg_ALLOC) = result & ~7;
-        arch_skip_instruction(context);
-        interrupt_handle_pending(context);
-        return;
-    }
-
-    if ((op1 & 3) != 0) {
-        /* The first arg wan't a fixnum. */
-        interrupt_internal_error(context, 0);
-        return;
-    }
-
-    if (immed = badinst & (1<<13)) {
-        op2 = badinst & 0x1fff;
-        if (op2 & (1<<12))
-            op2 |= -1<<13;
-    }
-    else {
-        rs2 = badinst & 0x1f;
-        op2 = *os_context_register_addr(context, rs2);
-    }
-
-    if ((op2 & 3) != 0) {
-        /* The second arg wan't a fixnum. */
-        interrupt_internal_error(context, 0);
-        return;
-    }
-
-    rd = (badinst>>25) & 0x1f;
-    if (rd != 0) {
-        /* Don't bother computing the result unless we are going to use it. */
-        if (subtract)
-            result = (op1>>2) - (op2>>2);
-        else
-            result = (op1>>2) + (op2>>2);
-
-        dynamic_space_free_pointer =
-            (lispobj *) *os_context_register_addr(context, reg_ALLOC);
-
-        *os_context_register_addr(context, rd) = alloc_number(result);
-
-        *os_context_register_addr(context, reg_ALLOC) =
-            (unsigned long) dynamic_space_free_pointer;
-    }
-
-    arch_skip_instruction(context);
-}
-
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
-    undoably_install_low_level_interrupt_handler(SIGEMT, sigemt_handler);
+    undoably_install_low_level_interrupt_handler(SIGILL, sigill_handler);
 }
 
 

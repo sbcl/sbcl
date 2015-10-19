@@ -181,47 +181,6 @@
   (:arg-types signed-num unsigned-num)
   (:translate logand))
 
-;;; Special case fixnum + and - that trap on overflow.  Useful when we
-;;; don't know that the output type is a fixnum.
-
-;;; I (Raymond Toy) took these out. They don't seem to be used
-;;; anywhere at all.
-#+nil
-(progn
-(define-vop (+/fixnum fast-+/fixnum=>fixnum)
-  (:policy :safe)
-  (:results (r :scs (any-reg descriptor-reg)))
-  (:result-types tagged-num)
-  (:note "safe inline fixnum arithmetic")
-  (:generator 4
-    (inst taddcctv r x y)))
-
-(define-vop (+-c/fixnum fast-+-c/fixnum=>fixnum)
-  (:policy :safe)
-  (:results (r :scs (any-reg descriptor-reg)))
-  (:result-types tagged-num)
-  (:note "safe inline fixnum arithmetic")
-  (:generator 3
-    (inst taddcctv r x (fixnumize y))))
-
-(define-vop (-/fixnum fast--/fixnum=>fixnum)
-  (:policy :safe)
-  (:results (r :scs (any-reg descriptor-reg)))
-  (:result-types tagged-num)
-  (:note "safe inline fixnum arithmetic")
-  (:generator 4
-    (inst tsubcctv r x y)))
-
-(define-vop (--c/fixnum fast---c/fixnum=>fixnum)
-  (:policy :safe)
-  (:results (r :scs (any-reg descriptor-reg)))
-  (:result-types tagged-num)
-  (:note "safe inline fixnum arithmetic")
-  (:generator 3
-    (inst tsubcctv r x (fixnumize y))))
-
-)
-
 ;;; Truncate
 
 ;; This doesn't work for some reason.

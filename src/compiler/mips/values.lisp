@@ -53,23 +53,23 @@
     (inst nop) ; not strictly necessary
     LOOP
     (loadw temp src)
-    (inst add dest dest n-word-bytes)
-    (inst add src src n-word-bytes)
+    (inst addu dest dest n-word-bytes)
+    (inst addu src src n-word-bytes)
     (storew temp dest -1)
     (inst sltu temp src csp-tn)
     (inst bne temp LOOP)
     (inst nop)
     DONE
     (move csp-tn dest)
-    (inst sub src src dest)
+    (inst subu src src dest)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
           while moved
           do (sc-case (tn-ref-tn moved)
                ((descriptor-reg any-reg)
-                (inst sub (tn-ref-tn moved) (tn-ref-tn moved) src))
+                (inst subu (tn-ref-tn moved) (tn-ref-tn moved) src))
                ((control-stack)
                 (load-stack-tn temp (tn-ref-tn moved))
-                (inst sub temp temp src)
+                (inst subu temp temp src)
                 (store-stack-tn (tn-ref-tn moved) temp))))))
 
 ;;; Push some values onto the stack, returning the start and number of values
