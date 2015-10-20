@@ -111,7 +111,7 @@
            ;; quality - it affects convenience, which is considered inversely
            ;; correlated to SPEED.
            (setf (sexpr-handler sexpr)
-                 (specvar-reffer symbol type (< (sb-c::policy env speed) 2)))
+                 (specvar-reffer symbol type (< (policy env speed) 2)))
            (%dispatch sexpr env)))))) ; DISPATCH would be fine but for the noise
 
 (defun immediate-setq-1 (symbol newval env)
@@ -303,8 +303,8 @@
   ;; is not reached. (typep 3 '(and (not integer) no-such-type)) returns NIL.
   (defspecial the (type-specifier form)
     :immediate (env)
-    ;; Speed has to be totally unimportant to process THE forms.
-    (if (sb-c:policy env (and (= safety 3) (= speed 0)))
+    ;; If speed is more important than safety, don't process THE forms.
+    (if (policy env (> speed safety))
         (%eval form env)
         (let ((type (parse-type type-specifier)))
           (multiple-value-call (if (sb-kernel::%values-type-p type)
@@ -312,7 +312,7 @@
                                    #'enforce-single-type)
             type (%eval form env))))
     :deferred (env)
-    (if (sb-c:policy env (and (= safety 3) (= speed 0)))
+    (if (policy env (> speed safety))
         (handler #'digest-form form)
         (let ((type (parse-type type-specifier)))
           (if (eq type *universal-type*) ; don't type-check if T
@@ -352,7 +352,10 @@
            (hlambda IF (test else) (env)
              (if (dispatch test env) nil (dispatch else env))))
           (t
-           (return-constant nil)))))
+           ;; Does (IF (HAIRY-TEST) nil nil) actually occur in real life?
+           (hlambda IF (test) (env)
+             (dispatch test env)
+             nil)))))
 
 (defspecial catch (tag &body forms)
   :immediate (env) (catch (%eval tag env) (eval-progn forms env))
@@ -1148,7 +1151,7 @@
       ARRAY-DIMENSIONS ARRAY-ELEMENT-TYPE ARRAY-HAS-FILL-POINTER-P
       ARRAY-IN-BOUNDS-P ARRAY-RANK ARRAY-TOTAL-SIZE ARRAYP
       ATOM
-      BIT BIT-NOT BIT-VECTOR-P BOTH-CASE-P BOUNDP
+      BIT-NOT BIT-VECTOR-P BOTH-CASE-P BOUNDP
       BUTLAST BYTE-POSITION BYTE-SIZE
       CEILING CHAR-CODE CHAR-DOWNCASE CHAR-EQUAL CHAR-GREATERP
       CHAR-INT CHAR-LESSP CHAR-NOT-EQUAL

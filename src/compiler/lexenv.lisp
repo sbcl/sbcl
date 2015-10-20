@@ -21,13 +21,6 @@
     (lexenv x)
     #!+sb-fasteval
     (sb!interpreter:basic-env (sb!interpreter:lexenv-from-env x))))
-;;; For functions which don't want to process an interpreter environment,
-;;; but are perfectly happy to receive NIL as environment.
-(defun coerce-to-lexenv* (x)
-  (etypecase x
-    ((or null lexenv) x)
-    #+sb!interpret
-    (sb!interpreter:basic-env (sb!interpreter:lexenv-from-env x))))
 
 ;;; Take the lexenv surrounding an inlined function and extract things
 ;;; needed for the inline expansion suitable for dumping into fasls.

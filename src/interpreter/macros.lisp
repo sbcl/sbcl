@@ -194,3 +194,9 @@
      (sb-impl::eval-error (condition)
        ;; Just pull the original condition out and signal that.
        (error (encapsulated-condition condition)))))
+
+;;; Wrap SB-C:POLICY changing its accessor to convert to a policy.
+;;; The default of %COERCE-TO-POLICY is wrong for the interpreter -
+;;; it needs to be ENV-POLICY. The last macro arg is unevaluated
+;;; and names the function to call to get a policy from ENV-VAR.
+(defmacro policy (env-obj expr) `(sb-c:policy ,env-obj ,expr env-policy))

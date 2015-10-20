@@ -955,7 +955,7 @@
     ;; In the macro case it would entail arbitrary evaluation, and specials
     ;; might err with an unbound symbol. Symbol-macros are checked when storing
     ;; through them though.
-    (when (and binding-types-p (sb-c:policy env (>= safety 1)))
+    (when (and binding-types-p (policy env (>= safety 1)))
       (let ((checks (make-array (1+ (position-if #'cdr symbols :from-end t)))))
         (dotimes (i (length checks)
                     (setf (binding-typechecks decl-scope) checks))
@@ -966,8 +966,7 @@
     ;; type "for efficiency" it does not really help the interpreter any,
     ;; so don't do those checks unless SAFETY exceeds 2.
     ;; This is a somewhat arbitrary but reasonable stance to take.
-    (when (and new-lexical-bound-type-constraints
-               (sb-c:policy env (>= safety 2)))
+    (when (and new-lexical-bound-type-constraints (policy env (>= safety 2)))
       (let (extra)
         (dolist (check new-lexical-bound-type-constraints)
           ;; FIXME: is this right for a LET* frame?
@@ -977,6 +976,14 @@
                        (type-checker (cdr check)) extra)))
         (setf (extra-typechecks decl-scope) (coerce extra 'vector)))))
   decl-scope)
+
+;;; Return the innermost element of bound-var-type-restrictions in ENV
+;;; that refers to BINDING. This is only for cltl2.
+(defun var-type-restriction (env binding)
+  (do ((env env (env-parent env)))
+      ((null env) (cdr binding))
+    (awhen (assq binding (bound-var-type-restrictions (env-contour env)))
+      (return (cdr it)))))
 
 ;;; Return the thing that should be asserted about VARIABLE's type.
 ;;; If there is nothing to check - no declared type, or the current policy
@@ -1001,8 +1008,8 @@
     (return-from var-type-assertion nil))
   ;; ** these criteria are subject to change. Not sure they're the best.
   (when (ecase op
-          (:write (sb-c:policy env (>= safety 1)))
-          (:read  (sb-c:policy env (and (= safety 3) (= speed 0)))))
+          (:write (policy env (>= safety 1)))
+          (:read  (policy env (and (= safety 3) (= speed 0)))))
     (if frame-ptr
         (do ((env env (env-parent env))
              (n-iterations (frame-ptr-depth frame-ptr)))
@@ -1205,16 +1212,23 @@
                (loop for i fixnum from (1- end) downto 0
                      for cell = (svref symbols i)
                      for sym = (car cell)
-                  collect (cond ((or (>= i (length payload))
-                                     (logbitp i (frame-special-b
-                                                 (env-contour env))))
-                                 (specialize cell))
-                                ((eq reason 'compile)
-                                 ;; access interpreter's lexical vars
-                                 (macroize sym `(svref ,payload ,i)))
-                                (t (cons sym (make-lambda-var
-                                              :%source-name sym
-                                              :type (binding-type cell))))))))
+                  collect
+                  (cond ((or (>= i (length payload))
+                             (logbitp i (frame-special-b (env-contour env))))
+                         (specialize cell))
+                        ((eq reason 'compile)
+                         ;; access interpreter's lexical vars
+                         (macroize sym `(svref ,payload ,i)))
+                        (t
+                         ;; The type of the var is returned in a sort of
+                         ;; cheating way - we put the type restriction
+                         ;; into the leaf type even though a LEXENV would
+                         ;; ordinarily represent the leaf-type and separately
+                         ;; the type constraint, just as the interpreter does.
+                         ;; But sb-cltl2 is just going intersect those anyway.
+                         (cons sym (make-lambda-var
+                                    :%source-name sym
+                                    :type (var-type-restriction env cell))))))))
             (symbol-macro-env
              (nconc (map 'list
                          (lambda (cell expansion)

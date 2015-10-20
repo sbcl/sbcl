@@ -292,8 +292,8 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;;; Evaluate EXPR in terms of the optimization policy associated with
 ;;; THING. EXPR is a form which accesses optimization qualities by
 ;;; referring to them by name, e.g. (> SPEED SPACE).
-(defmacro policy (thing expr)
-  (let* ((n-policy (gensym "N-POLICY-"))
+(defmacro policy (thing expr &optional (coercion-fn '%coerce-to-policy))
+  (let* ((n-policy (make-symbol "P"))
          (binds (loop for name across **policy-primary-qualities**
                       for index downfrom -1
                       collect `(,name (%policy-quality ,n-policy ,index))))
@@ -304,10 +304,11 @@ EXPERIMENTAL INTERFACE: Subject to change."
                                  (if (= ,name 1)
                                      ,(policy-dependent-quality-expression info)
                                      ,name))))))
-    `(let* ((,n-policy (%coerce-to-policy ,thing)))
+    `(let ((,n-policy (,coercion-fn ,thing)))
+       ;; FIXME: automatically inserted IGNORABLE decls are
+       ;; often suggestive of poor style, as is this one.
        (declare (ignorable ,n-policy))
-       (symbol-macrolet (,@binds
-                         ,@dependent-binds)
+       (symbol-macrolet (,@binds ,@dependent-binds)
          ,expr))))
 
 ;;; Dependent qualities

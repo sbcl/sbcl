@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-eval
+#-(or sb-eval sb-fasteval)
 (sb-ext:exit :code 104)
 
 (setf sb-ext:*evaluator-mode* :interpret)

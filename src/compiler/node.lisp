@@ -1474,6 +1474,13 @@
 ;;; but no, NIL was always an empty alist representing no qualities,
 ;;; which is a valid policy that makes each quality read as 1.
 ;;; In contrast, a LEXENV with NIL policy _does_ become *POLICY*.
+;;; The reason for NIL mapping to baseline is that all nodes are annotated
+;;; with a LEXENV, and the only object type that can be a LEXENV is LEXENV.
+;;; An indicator is needed that a LEXENV is devoid of a policy, so this is
+;;; what the NIL is for in lexenv-policy. But sometimes the compiler needs
+;;; a policy without reference to an IR object - which is weird - and in that
+;;; case it has nothing better to go with but the baseline policy.
+;;; It still seems like a bug though.
 (defun %coerce-to-policy (thing)
   (typecase thing
     (policy thing)
