@@ -579,6 +579,66 @@
                                             (enumerable types))
                               (:copier nil)))
 
+;;; a list of all the float "formats" (i.e. internal representations;
+;;; nothing to do with #'FORMAT), in order of decreasing precision
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *float-formats*
+    '(long-float double-float single-float short-float)))
+
+;;; The type of a float format.
+(deftype float-format () `(member ,@*float-formats*))
+
+;;; A NUMERIC-TYPE represents any numeric type, including things
+;;; such as FIXNUM.
+(defstruct (numeric-type (:include ctype
+                                   (class-info (type-class-or-lose 'number)))
+                         (:constructor %make-numeric-type)
+                         (:copier nil))
+  ;; Formerly defined in every CTYPE, but now just in the ones
+  ;; for which enumerability is variable.
+  (enumerable nil :read-only t)
+  ;; the kind of numeric type we have, or NIL if not specified (just
+  ;; NUMBER or COMPLEX)
+  ;;
+  ;; KLUDGE: A slot named CLASS for a non-CLASS value is bad.
+  ;; Especially when a CLASS value *is* stored in another slot (called
+  ;; CLASS-INFO:-). Perhaps this should be called CLASS-NAME? Also
+  ;; weird that comment above says "Numeric-Type is used to represent
+  ;; all numeric types" but this slot doesn't allow COMPLEX as an
+  ;; option.. how does this fall into "not specified" NIL case above?
+  ;; Perhaps someday we can switch to CLOS and make NUMERIC-TYPE
+  ;; be an abstract base class and INTEGER-TYPE, RATIONAL-TYPE, and
+  ;; whatnot be concrete subclasses..
+  (class nil :type (member integer rational float nil) :read-only t)
+  ;; "format" for a float type (i.e. type specifier for a CPU
+  ;; representation of floating point, e.g. 'SINGLE-FLOAT -- nothing
+  ;; to do with #'FORMAT), or NIL if not specified or not a float.
+  ;; Formats which don't exist in a given implementation don't appear
+  ;; here.
+  (format nil :type (or float-format null) :read-only t)
+  ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
+  ;;
+  ;; FIXME: I'm bewildered by FOO-P names for things not intended to
+  ;; interpreted as truth values. Perhaps rename this COMPLEXNESS?
+  (complexp :real :type (member :real :complex nil) :read-only t)
+  ;; The upper and lower bounds on the value, or NIL if there is no
+  ;; bound. If a list of a number, the bound is exclusive. Integer
+  ;; types never have exclusive bounds, i.e. they may have them on
+  ;; input, but they're canonicalized to inclusive bounds before we
+  ;; store them here.
+  (low nil :type (or number cons null) :read-only t)
+  (high nil :type (or number cons null) :read-only t))
+
+;;; A CONS-TYPE is used to represent a CONS type.
+(defstruct (cons-type (:include ctype (class-info (type-class-or-lose 'cons)))
+                      (:constructor
+                       %make-cons-type (car-type
+                                        cdr-type))
+                      (:copier nil))
+  ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
+  (car-type (missing-arg) :type ctype :read-only t)
+  (cdr-type (missing-arg) :type ctype :read-only t))
+
 (in-package "SB!ALIEN")
 (def!struct (alien-type
              (:make-load-form-fun sb!kernel:just-dump-it-normally)
