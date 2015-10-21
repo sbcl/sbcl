@@ -182,18 +182,18 @@
           ;; CLHS 3.1.2.1.2.2 Macro Forms
           (multiple-value-bind (expansion keys)
               (tracing-macroexpand-1 form env)
-            (cond ((or (not keys) ; only builtin macros were used
-                       (eq *re-expand-macros* :NEVER))
-                   (digest-form expansion env sexpr))
-                  (t (setf expansion (%sexpr expansion)
+            (cond (keys
+                   (setf expansion (%sexpr expansion)
                            (sexpr-handler sexpr)
                            (digest-macro-form expansion fname keys))
-                     (dispatch expansion env))))
+                   (dispatch expansion env))
+                  (t
+                   (digest-form expansion env sexpr))))
         (progn
           (setf (sexpr-handler sexpr)
                 (if frame-ptr ; a lexical function
                     (digest-local-call frame-ptr (cdr form))
-                  (digest-global-call fname (cdr form) env)))
+                    (digest-global-call fname (cdr form) env)))
           (%dispatch sexpr env))))))
 
 ;;; full-eval has compiler-error-resignalling stuff in here.

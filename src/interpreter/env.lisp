@@ -483,13 +483,6 @@
 (declaim (type boolean *hook-all-functions*))
 (defvar *hook-all-functions-p* nil)
 
-;; Global macro re-expansion behavior:
-;;   :NEVER  will never re-expand.
-;;   :LAZILY will (usually) expand again if it looks like something changed.
-;;   :ALWAYS will always re-expand. * Not implemented *
-(declaim (type (member :lazily :never) *re-expand-macros*))
-(defvar *re-expand-macros* :lazily)
-
 (declaim (ftype function interpreter-trampoline interpreter-hooked-trampoline))
 
 (defun make-function (proto-fn env)

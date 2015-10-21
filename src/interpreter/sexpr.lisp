@@ -14,7 +14,7 @@
 ;;;; preprocessing implementations which produce code which emulates compiled
 ;;;; code as closely as possible by performing macroexpansion once only,
 ;;;; we attempt to emulate a non-preprocessing interpreter.
-;;;; The motivation for this is parenthetically revealed in; the X3J13 issue
+;;;; The motivation for this is parenthetically revealed in the X3J13 issue
 ;;;; discussing the removal of COMPILER-LET, saying:
 ;;;;   "Some users have indicated they dislike interpreters which do a semantic
 ;;;;    prepass, because they like to be able to dynamically redefine macros
@@ -930,6 +930,9 @@ Test case.
 (defun tracing-macroexpand-1 (form env &optional (predicate #'fluid-def-p)
                               &aux (original-hook (valid-macroexpand-hook))
                                    expanders)
+  (unless (allow-macro-redefinition env)
+    (return-from tracing-macroexpand-1
+      (values (macroexpand-1 form env) nil)))
   (flet ((macroexpand-hook (function form env)
            (let ((expansion (funcall original-hook function form env)))
              (if (atom form)
@@ -954,6 +957,13 @@ Test case.
         (format t "~&Expanded ~S~%    into ~S~%~@[   using ~S~]~%"
                 form expansion expanders))
       (values expansion expanders))))
+
+;;; Return T if the evaluator should always consider that macros
+;;; might be redefined. If NIL then cached expansions are permanent.
+(defun allow-macro-redefinition (env)
+  (if (policy env (and (= speed 3) (= debug 0) (= safety 0)))
+      nil
+      t))
 
 (defun arglist-to-sexprs (args)
   (let ((argc (or (list-length args)
@@ -1059,13 +1069,10 @@ Test case.
 ;;; BAZ is not defined, this works in compiled code:
 ;;;  (DEFUN FOO () (BAZ (SETF (SYMBOL-FUNCTION 'BAZ) (LAMBDA (X) `(HI ,X)))))
 ;;;
-;;; But if *re-expand-macros* is :NEVER, then only check for unbound
-;;; functions but don't check whether the function got redefined as a macro.
-;;;
 ;;; Interpreted code needs an explicit check for NIL in an fdefn-fun.
 ;;; Compiled code doesn't because the 'raw-addr' slot is always
 ;;; something valid to jump to.
-(defun apply-probably-fun (fdefinition args &aux (n-args 0))
+(defun apply-probably-fun (fdefinition args env &aux (n-args 0))
   (multiple-value-setq (args n-args) (arglist-to-sexprs args))
   (macrolet
       ((funcall-n (n)
@@ -1103,13 +1110,12 @@ Test case.
                                         (apply (sb-c:safe-fdefn-fun fdefn) arglist))
                               (rplaca tail (dispatch (svref data (1+ i)) env))
                               (pop tail)))))))))))))
-    (ecase *re-expand-macros*
-      (:LAZILY (macrolet ((re-expand-p ()
-                            '(let ((f (fdefn-fun fdefn)))
-                               (and f (%looks-like-macro-p f)))))
-                 (generate-switch)))
-      (:NEVER  (macrolet ((re-expand-p () nil))
-                 (generate-switch))))))
+    (if (allow-macro-redefinition env)
+        (macrolet ((re-expand-p ()
+                     '(let ((f (fdefn-fun fdefn)))
+                        (and f (%looks-like-macro-p f)))))
+          (generate-switch))
+        (macrolet ((re-expand-p () nil)) (generate-switch)))))
 
 ;;; Evaluate the arguments to a function that can't be called,
 ;;; then call it. Very weird, yes! But this is reached in two situations:
@@ -1181,7 +1187,7 @@ Test case.
     (when (fluid-def-p fname)
       ;; Return a handler that calls FNAME very carefully
       (return-from digest-global-call
-        (apply-probably-fun (find-or-create-fdefn fname) args))))
+        (apply-probably-fun (find-or-create-fdefn fname) args env))))
 
   ;; Try to recognize (FUNCALL constant-fun ...)
   ;; This syntax is required when using SETF functions, and it should
