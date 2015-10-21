@@ -98,11 +98,6 @@
   (queue-head nil :type list)
   ;; Block-start queue entries in effect at the queue head.
   (pending-blocks nil :type list))
-(def!method print-object ((pstream pretty-stream) stream)
-  ;; FIXME: CMU CL had #+NIL'ed out this code and done a hand-written
-  ;; FORMAT hack instead. Make sure that this code actually works instead
-  ;; of falling into infinite regress or something.
-  (print-unreadable-object (pstream stream :type t :identity t)))
 
 #!-sb-fluid (declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
