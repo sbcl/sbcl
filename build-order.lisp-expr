@@ -485,6 +485,7 @@
  ;; before "compiler/main.lisp" so that those can be coded efficiently
  ;; (and so that they don't cause lots of annoying compiler warnings
  ;; about undefined types).
+ ("src/compiler/fixup") ; for DEFSTRUCT FIXUP
  ("src/compiler/generic/core")
  ("src/code/thread")
  ("src/code/load")
@@ -549,8 +550,6 @@
  ;; the definition of the LOCATION-INFO structure (if structures in
  ;; the host lisp have setf expanders rather than setf functions).
  ("src/compiler/late-vmdef")
-
- ("src/compiler/fixup") ; for DEFSTRUCT FIXUP, used by insts.lisp
 
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
