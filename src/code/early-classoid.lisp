@@ -30,9 +30,8 @@
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
   (conc-name nil :type (or string null))
-  ;; the name of the primary standard keyword constructor, or NIL if none
-  (default-constructor nil :type symbol)
-  ;; all the explicit :CONSTRUCTOR specs, with name defaulted
+  ;; All the :CONSTRUCTOR specs and posssibly an implied constructor,
+  ;; keyword constructors first, then BOA constructors. NIL if none.
   (constructors () :type list)
   ;; name of copying function
   (copier-name nil :type symbol)
@@ -80,6 +79,11 @@
   ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :unspecified)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
+
+(defun dd-default-constructor (dd)
+  (let ((ctor (first (dd-constructors dd))))
+    (when (typep ctor '(cons symbol null))
+      (car ctor))))
 
 ;;;; basic LAYOUT stuff
 

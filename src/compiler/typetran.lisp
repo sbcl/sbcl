@@ -653,12 +653,8 @@
                    ;; There is no loss in the case where both fail, and there
                    ;; is a benefit in a passing case. Always try both though,
                    ;; because (MAKE-INSTANCE 'x) works on any structure class.
-                   (abstract-base-p
-                    (let ((dd (layout-info layout)))
-                      (and dd
-                           (not (dd-default-constructor dd))
-                           (let ((ctors (dd-constructors dd)))
-                             (or (not ctors) (equal ctors '((nil))))))))
+                   (abstract-base-p (awhen (layout-info layout)
+                                      (not (dd-constructors it))))
                    (get-ancestor
                     ;; Use DATA-VECTOR-REF directly, since that's what SVREF in
                     ;; a SAFETY 0 lexenv will eventually be transformed to.

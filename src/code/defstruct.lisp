@@ -204,10 +204,9 @@
     (awhen (dd-copier-name dd)
       (with-single-package-locked-error
           (:symbol it "defining ~s as a copier for ~s structure" name)))
-    (dolist (const (dd-constructors dd))
-      (awhen (car const)
-        (with-single-package-locked-error
-            (:symbol it "defining ~s as a constructor for ~s structure" name))))
+    (dolist (ctor (dd-constructors dd))
+      (with-single-package-locked-error
+          (:symbol (car ctor) "defining ~s as a constructor for ~s structure" name)))
     (dolist (dsd (dd-slots dd))
       (awhen (dsd-accessor-name dsd)
         (with-single-package-locked-error
@@ -275,9 +274,14 @@
                ,@(unless (eq expanding-into-code-for :host)
                    `((delay-defstruct-functions
                       ,name
-                      (progn ,@(awhen (copier-definition dd) (list it))
-                             ,@(awhen (predicate-definition dd) (list it))
-                             ,@(accessor-definitions dd)))
+                      (progn
+                        ,@(awhen (dd-copier-name dd)
+                           `((defun ,(dd-copier-name dd) (instance)
+                               (copy-structure (the ,(dd-name dd) instance)))))
+                        ,@(awhen (dd-predicate-name dd)
+                           `((defun ,(dd-predicate-name dd) (object)
+                               (typep object ',(dd-name dd)))))
+                        ,@(accessor-definitions dd)))
                 ;; This must be in the same lexical environment
                      ,@(constructor-definitions dd)
                      ,@print-method
@@ -472,7 +476,8 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
        (destructuring-bind (&optional (cname (symbolicate "MAKE-" name))
                             lambda-list) args
          (declare (ignore lambda-list))
-         (push (cons cname (cdr args)) (dd-constructors dd))))
+         (setf (dd-constructors dd) ; preserve order, just because
+               (nconc (dd-constructors dd) (list (cons cname (cdr args)))))))
       (:copier
        (setf (dd-copier-name dd) (if arg-p arg (symbolicate "COPY-" name))))
       (:predicate
@@ -1451,7 +1456,7 @@ or they must be declared locally notinline at each call site.~@:>")
    `(sfunction ,ftype-arglist ,(dd-name dd))))
 
 ;;; Create a default (non-BOA) keyword constructor.
-(defun create-keyword-constructor (defstruct creator)
+(defun create-keyword-constructor (name defstruct creator)
   (declare (type function creator))
   (collect ((arglist (list '&key))
             (vals)
@@ -1477,8 +1482,7 @@ or they must be declared locally notinline at each call site.~@:>")
           (unless (eq t type)
             (decls `(type ,type ,dum)))
           (ftype-args `(,keyword ,type)))))
-    (funcall creator
-             defstruct (dd-default-constructor defstruct)
+    (funcall creator defstruct name
              (arglist) `(&key ,@(ftype-args)) (decls) (vals))))
 
 ;;; Given a structure and a BOA constructor spec, call CREATOR with
@@ -1529,6 +1533,8 @@ or they must be declared locally notinline at each call site.~@:>")
             (arg-type (get-slot arg)))
 
           (when opt
+            ;; FIXME: the same problem exists with &OPTIONAL as &KEY -
+            ;; arguments are not type-checked when defaulted.
             (arglist '&optional)
             (ftype-args '&optional)
             (dolist (arg opt)
@@ -1619,47 +1625,58 @@ or they must be declared locally notinline at each call site.~@:>")
 
 ;;; Grovel the constructor options, and decide what constructors (if
 ;;; any) to create.
-(defun constructor-definitions (defstruct)
-  (let ((no-constructors nil)
-        (boas ())
-        (defaults ())
-        (creator (ecase (dd-type defstruct)
-                   (structure #'create-structure-constructor)
-                   (vector #'create-vector-constructor)
-                   (list #'create-list-constructor))))
-    (dolist (constructor (dd-constructors defstruct))
-      (destructuring-bind (name &optional (boa-ll nil boa-p)) constructor
-        (declare (ignore boa-ll))
-        (cond ((not name) (setq no-constructors t))
-              (boa-p (push constructor boas))
-              (t (push name defaults)))))
-
-    (when no-constructors
-      (when (or defaults boas)
-        (error "(:CONSTRUCTOR NIL) combined with other :CONSTRUCTORs"))
-      (return-from constructor-definitions ()))
-
-    (unless (or defaults boas)
-      (push (symbolicate "MAKE-" (dd-name defstruct)) defaults))
-
-    (collect ((res))
-      (when defaults
-        (let ((cname (first defaults)))
-          (setf (dd-default-constructor defstruct) cname)
-          (multiple-value-bind (cons ftype)
-              (create-keyword-constructor defstruct creator)
-            (res `(declaim (ftype ,ftype ,@defaults)))
-            (res cons))
-          (dolist (other-name (rest defaults))
-            (res `(setf (fdefinition ',other-name) (fdefinition ',cname))))))
-
-      (dolist (boa boas)
-        (multiple-value-bind (cons ftype)
-            (create-boa-constructor defstruct boa creator)
-          (res `(declaim (ftype ,ftype ,(first boa))))
-          (res cons)))
-
-      (res))))
+(defun constructor-definitions (dd)
+  (collect ((keyword-ctors) (boa-ctors))
+    (let (no-constructors)
+      (dolist (constructor (dd-constructors dd))
+        (destructuring-bind (name &optional (boa-ll nil boa-p)) constructor
+          (declare (ignore boa-ll))
+          (cond ((not name)
+                 ;; Implementations disagree on the meaning of
+                 ;;  (:constructor nil (a b c)).
+                 ;; The choices seem to be: don't define a constructor,
+                 ;; define a constructor named NIL, err, or crash hard.
+                 ;; The spec implies the behavior that we have,
+                 ;; but at least a style-warning seems appropriate.
+                 (when boa-p
+                   (style-warn "~S does not define a constructor" constructor))
+                 (setq no-constructors t))
+                (boa-p (boa-ctors constructor))
+                (t (keyword-ctors name)))))
+      (when no-constructors
+        (when (or (keyword-ctors) (boa-ctors))
+          (error "(:CONSTRUCTOR NIL) combined with other :CONSTRUCTORs"))
+        (setf (dd-constructors dd) nil)
+        (return-from constructor-definitions ())))
+    (let* ((keyword-ctors
+            (or (keyword-ctors)
+                (unless (boa-ctors)
+                  `(,(symbolicate "MAKE-" (dd-name dd))))))
+           (primary (car keyword-ctors))
+           (creator (ecase (dd-type dd)
+                      (structure #'create-structure-constructor)
+                      (vector #'create-vector-constructor)
+                      (list #'create-list-constructor))))
+      (setf (dd-constructors dd)
+            (nconc (mapcar #'list keyword-ctors) (boa-ctors)))
+      (nconc
+       (when primary
+         (multiple-value-bind (defun-form ftype)
+             (create-keyword-constructor primary dd creator)
+           (list* `(declaim (ftype ,ftype ,@keyword-ctors))
+                  defun-form
+                  (mapcar
+                   ;; Quasi-bogus: none of the right effects on globaldb
+                   ;; happen by defining functions this cheating way.
+                   (lambda (other-name)
+                     `(setf (fdefinition ',other-name) (fdefinition ',primary)))
+                   (rest keyword-ctors)))))
+       (mapcan (lambda (boa)
+                 (multiple-value-bind (defun-form ftype)
+                     (create-boa-constructor dd boa creator)
+                   (list `(declaim (ftype ,ftype ,(first boa)))
+                         defun-form)))
+               (boa-ctors))))))
 
 (defun accessor-definitions (dd)
   (loop for dsd in (dd-slots dd)
@@ -1671,17 +1688,6 @@ or they must be declared locally notinline at each call site.~@:>")
                          ,(slot-access-transform :setf '(instance value) key))))
                   (defun ,accessor-name (instance)
                     ,(slot-access-transform :read '(instance) key))))))
-
-(defun copier-definition (dd)
-  (when (dd-copier-name dd)
-    `(defun ,(dd-copier-name dd) (instance)
-       (copy-structure (the ,(dd-name dd) instance)))))
-
-(defun predicate-definition (dd)
-  (when (dd-predicate-name dd)
-    `(defun ,(dd-predicate-name dd) (object)
-       (typep object ',(dd-name dd)))))
-
 
 ;;;; instances with ALTERNATE-METACLASS
 ;;;;
