@@ -483,3 +483,19 @@ one-past-the-end"
          (if replacement
              (replacement-handlerify entry replacement)
              entry))))))
+
+(defun unintern-init-only-stuff ()
+  (let ((this-package (find-package "SB-IMPL")))
+    (dolist (s '(char-class char-class2 char-class3
+                 steve-splice))
+      (unintern s this-package))
+    (flet ((ends-with-p (s1 s2)
+             (let ((diff (- (length s1) (length s2))))
+               (and (>= diff 0) (string= s1 s2 :start1 diff)))))
+      (do-symbols (s this-package)
+        (let ((name (symbol-name s)))
+          (if (and (macro-function s)
+                   (eql (mismatch name "DEFINE-") 7)
+                   (or (ends-with-p name "->STRING")
+                       (ends-with-p name "->STRING*")))
+              (unintern s this-package)))))))

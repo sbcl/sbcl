@@ -33,7 +33,6 @@
         (*break-level* break-level)
         (*inspect-break* inspect)
         (*continuable-break* continuable))
-    (sb-int:/show0 "entering REPL")
     (loop
      (multiple-value-bind (reason reason-param)
          (catch 'repl-catcher

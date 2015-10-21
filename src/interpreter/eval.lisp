@@ -205,3 +205,12 @@
 (defun eval-in-environment (form env)
   (%eval form
          (typecase env (sb-kernel:lexenv (env-from-lexenv env)) (t env))))
+
+(defun unintern-init-only-stuff ()
+  (let ((this-pkg (find-package "SB-INTERPRETER")))
+    (do-symbols (s this-pkg)
+      (when (or (and (eq (symbol-package s) this-pkg)
+                     (macro-function s)
+                     (not (member s '(defspecial do-decl-spec)))) ; for SB-CLTL2
+                (eq s '%%eval)) ; got inlined
+        (unintern s this-pkg)))))

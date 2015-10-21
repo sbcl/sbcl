@@ -21,10 +21,14 @@
 ;;; which might be tedious to maintain, instead we use a hack:
 ;;; anything whose name matches a magic character pattern is
 ;;; uninterned.
-;;;
-;;; FIXME: Are there other tables that need to have entries removed?
-;;; What about symbols of the form DEF!FOO?
+;;; Additionally, you can specify an arbitrary way to destroy
+;;; random bootstrap stuff on per-package basis.
 (defun !unintern-init-only-stuff ()
+  (dolist (package (list-all-packages))
+    (awhen (find-symbol "UNINTERN-INIT-ONLY-STUFF" package)
+      (format t "~&Calling ~/sb-impl::print-symbol-with-prefix/~%" it)
+      (funcall it)
+      (unintern it package)))
   (flet ((uninternable-p (symbol)
            (let ((name (symbol-name symbol)))
              (or (and (>= (length name) 1) (char= (char name 0) #\!))
@@ -480,3 +484,18 @@ process to continue normally."
                     (%primitive print (hexstr obj)))))))
     (%cold-print x 0))
   (values))
+
+(in-package "SB!INT")
+(defun unintern-init-only-stuff ()
+  (let ((this-package (find-package "SB-INT")))
+    ;; For some reason uninterning these:
+    ;;    DEF!TYPE DEF!CONSTANT DEF!MACRO DEF!STRUCT
+    ;; does not work, they stick around as uninterned symbols.
+    ;; Some other macros must expand into them. Ugh.
+    (dolist (s '(defenum defmacro-mundanely defun-cached
+                 with-globaldb-name
+                 .
+                 #!+sb-show ()
+                 #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
+                             /primitive-print /show /show0 /xhow)))
+      (unintern s this-package))))

@@ -26,7 +26,6 @@
     (handler-bind ((sb-di:debug-condition
                     (lambda (condition)
                       (princ condition sb-debug::*debug-io*)
-                      (sb-int:/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
                       (throw 'debug-loop-catcher nil))))
       (fresh-line)
       ;;(sb-debug::print-frame-call sb-debug::*current-frame* :verbosity 2)
@@ -42,7 +41,6 @@
                                            "~&error flushed (because ~
                                              ~S is set)"
                                           'sb-debug::*flush-debug-errors*)
-                                   (sb-int:/show0 "throwing DEBUG-LOOP-CATCHER")
                                    (throw 'debug-loop-catcher nil)))))
 
            (if (zerop *break-level*) ; restart added by SBCL
