@@ -14,7 +14,7 @@
 ;;; We compile some trivial character operations via inline expansion.
 #!-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
-                 upper-case-p lower-case-p both-case-p alphanumericp
+                 upper-case-p lower-case-p both-case-p
                  char-int))
 (declaim (maybe-inline digit-char-p))
 
@@ -600,14 +600,6 @@ that digit stands, else returns NIL."
       (let ((number (ucd-decimal-digit char)))
         (when (and number (< (truly-the fixnum number) radix))
           number))))
-
-(defun alphanumericp (char)
-  #!+sb-doc
-  "Given a character-object argument, ALPHANUMERICP returns T if the argument
-is either numeric or alphabetic."
-  (let ((gc (ucd-general-category char)))
-    (or (< gc 5)
-        (= gc 13))))
 
 ;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.

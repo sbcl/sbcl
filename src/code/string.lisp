@@ -460,6 +460,16 @@ new string COUNT long filled with the fill character."
   (%downcase string start end))
 ) ; FLET
 
+;; Moved from 'target-char' because of inline-ness
+(declaim (inline alphanumericp))
+(defun alphanumericp (char)
+  #!+sb-doc
+  "Given a character-object argument, ALPHANUMERICP returns T if the argument
+is either numeric or alphabetic."
+  (let ((gc (ucd-general-category char)))
+    (or (< gc 5)
+        (= gc 13))))
+
 (flet ((%capitalize (string start end)
          (declare (string string) (index start) (type sequence-end end))
          (let ((saved-header string))
