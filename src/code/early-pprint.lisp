@@ -96,3 +96,91 @@
    If the LIST argument to PPRINT-LOGICAL-BLOCK was NIL, then nothing
    is popped, but the *PRINT-LENGTH* testing still happens."
   (error "PPRINT-POP must be lexically inside PPRINT-LOGICAL-BLOCK."))
+
+;;;; pretty streams
+
+;;; There are three different units for measuring character positions:
+;;;  COLUMN - offset (if characters) from the start of the current line
+;;;  INDEX  - index into the output buffer
+;;;  POSN   - some position in the stream of characters cycling through
+;;;           the output buffer
+(deftype column ()
+  '(and fixnum unsigned-byte))
+
+(defconstant initial-buffer-size 128)
+
+(defconstant default-line-length 80)
+
+;; We're allowed to DXify the pretty-stream used by PPRINT-LOGICAL-BLOCK.
+;;   "pprint-logical-block and the pretty printing stream it creates have
+;;    dynamic extent. The consequences are undefined if, outside of this
+;;    extent, output is attempted to the pretty printing stream it creates."
+;; However doing that is slightly dangerous since there are a zillion ways
+;; for users to get a hold of the stream and stash it somewhere.
+;; Anyway, just a thought...
+(declaim (maybe-inline make-pretty-stream))
+(defstruct (pretty-stream (:include ansi-stream
+                                    (out #'pretty-out)
+                                    (sout #'pretty-sout)
+                                    (misc #'pretty-misc))
+                          (:constructor make-pretty-stream (target))
+                          (:copier nil))
+  ;; Where the output is going to finally go.
+  (target (missing-arg) :type stream :read-only t)
+  ;; Line length we should format to. Cached here so we don't have to keep
+  ;; extracting it from the target stream.
+  (line-length (or *print-right-margin*
+                   (sb!impl::line-length target)
+                   default-line-length)
+               :type column
+               :read-only t)
+  ;; If non-nil, a function to call before performing OUT or SOUT
+  (char-out-oneshot-hook nil :type (or null function))
+  ;; A simple string holding all the text that has been output but not yet
+  ;; printed.
+  (buffer (make-string initial-buffer-size) :type (simple-array character (*)))
+  ;; The index into BUFFER where more text should be put.
+  (buffer-fill-pointer 0 :type index)
+  ;; Whenever we output stuff from the buffer, we shift the remaining noise
+  ;; over. This makes it difficult to keep references to locations in
+  ;; the buffer. Therefore, we have to keep track of the total amount of
+  ;; stuff that has been shifted out of the buffer.
+  (buffer-offset 0 :type posn)
+  ;; The column the first character in the buffer will appear in. Normally
+  ;; zero, but if we end up with a very long line with no breaks in it we
+  ;; might have to output part of it. Then this will no longer be zero.
+  (buffer-start-column (or (sb!impl::charpos target) 0) :type column)
+  ;; The line number we are currently on. Used for *PRINT-LINES*
+  ;; abbreviations and to tell when sections have been split across
+  ;; multiple lines.
+  (line-number 0 :type index)
+  ;; the value of *PRINT-LINES* captured at object creation time. We
+  ;; use this, instead of the dynamic *PRINT-LINES*, to avoid
+  ;; weirdness like
+  ;;   (let ((*print-lines* 50))
+  ;;     (pprint-logical-block ..
+  ;;       (dotimes (i 10)
+  ;;         (let ((*print-lines* 8))
+  ;;           (print (aref possiblybigthings i) prettystream)))))
+  ;; terminating the output of the entire logical blockafter 8 lines.
+  (print-lines *print-lines* :type (or index null) :read-only t)
+  ;; Stack of logical blocks in effect at the buffer start.
+  (blocks (list (make-logical-block)) :type list)
+  ;; Buffer holding the per-line prefix active at the buffer start.
+  ;; Indentation is included in this. The length of this is stored
+  ;; in the logical block stack.
+  (prefix (make-string initial-buffer-size) :type (simple-array character (*)))
+  ;; Buffer holding the total remaining suffix active at the buffer start.
+  ;; The characters are right-justified in the buffer to make it easier
+  ;; to output the buffer. The length is stored in the logical block
+  ;; stack.
+  (suffix (make-string initial-buffer-size) :type (simple-array character (*)))
+  ;; Queue of pending operations. When empty, HEAD=TAIL=NIL. Otherwise,
+  ;; TAIL holds the first (oldest) cons and HEAD holds the last (newest)
+  ;; cons. Adding things to the queue is basically (setf (cdr head) (list
+  ;; new)) and removing them is basically (pop tail) [except that care must
+  ;; be taken to handle the empty queue case correctly.]
+  (queue-tail nil :type list)
+  (queue-head nil :type list)
+  ;; Block-start queue entries in effect at the queue head.
+  (pending-blocks nil :type list))
