@@ -57,6 +57,7 @@
 
 ;;; Now that CLOS is working, we can replace our old temporary placeholder code
 ;;; for writing funcallable instances with permanent code:
+(fmakunbound 'sb-impl::printed-as-funcallable-standard-class)
 (defun sb-impl::printed-as-funcallable-standard-class (object stream)
   (when (funcallable-standard-class-p (class-of object))
     (print-object object stream)

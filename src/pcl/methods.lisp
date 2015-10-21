@@ -611,8 +611,8 @@
 ;; Tell INFO about the generic function's methods' keys so that the
 ;; compiler doesn't complain that the keys defined for some method are
 ;; unrecognized.
-(sb-ext:without-package-locks
-  (defun sb-c::maybe-update-info-for-gf (name)
+(fmakunbound 'sb-c::maybe-update-info-for-gf)
+(defun sb-c::maybe-update-info-for-gf (name)
     (let ((gf (if (fboundp name) (fdefinition name))))
       (when (and gf (generic-function-p gf) (not (early-gf-p gf))
                  (not (eq :declared (info :function :where-from name)))
@@ -660,7 +660,7 @@
               (setf (info :function :type name) ftype
                     (info :function :where-from name) :defined-method
                     (gf-info-needs-update gf) nil)
-              ftype)))))))
+              ftype))))))
 
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types

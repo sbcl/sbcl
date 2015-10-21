@@ -10,5 +10,5 @@
       (*compile-files-p* t))
   (declare (special *compile-files-p*))
 ;;; Do warm init.
-  #+sb-show (print "/about to LOAD warm.lisp (with *compile-files-p* = T)")
+  (print "/about to LOAD warm.lisp (with *compile-files-p* = T)")
   (load "src/cold/warm.lisp"))

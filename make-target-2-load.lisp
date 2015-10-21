@@ -1,10 +1,6 @@
-;;; Now that we use the compiler for macros, interpreted /SHOW doesn't
-;;; work until later in init.
-#+sb-show (print "/hello, world!")
-
 ;;; Do warm init without compiling files.
 (defvar *compile-files-p* nil)
-#+sb-show (print "/about to LOAD warm.lisp (with *compile-files-p* = NIL)")
+"about to LOAD warm.lisp (with *compile-files-p* = NIL)"
 (let ((*print-length* 10)
       (*print-level* 5)
       (*print-circle* t))
@@ -14,17 +10,13 @@
 ;;; SAVE-LISP-AND-DIE.
 #-sb-fluid (sb-impl::!unintern-init-only-stuff)
 
-(sb-int:/show "done with warm.lisp, about to GC :FULL T")
+"done with warm.lisp, about to GC :FULL T"
 (sb-ext:gc :full t)
 
 ;;; resetting compilation policy to neutral values in preparation for
 ;;; SAVE-LISP-AND-DIE as final SBCL core (not in warm.lisp because
 ;;; SB-C::*POLICY* has file scope)
-(sb-int:/show "setting compilation policy to neutral values")
-(proclaim
- '(optimize
-   (compilation-speed 1) (debug 1) (inhibit-warnings 1)
-   (safety 1) (space 1) (speed 1)))
+(setq sb-c::*policy* (copy-structure sb-c::**baseline-policy**))
 
 ;;; Lock internal packages
 #+sb-package-locks
@@ -32,7 +24,7 @@
   (unless (member p (mapcar #'find-package '("KEYWORD" "CL-USER")))
     (sb-ext:lock-package p)))
 
-(sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
+"done with warm.lisp, about to SAVE-LISP-AND-DIE"
 ;;; Even if /SHOW output was wanted during build, it's probably
 ;;; not wanted by default after build is complete. (And if it's
 ;;; wanted, it can easily be turned back on.)
