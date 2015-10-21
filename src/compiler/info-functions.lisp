@@ -147,12 +147,12 @@ only."
      (multiple-value-bind (kind def)
          (sb!interpreter:find-lexical-fun env symbol)
        (when def
-         (return-from sb!xc:macro-function (if (eq kind :macro) def)))))
+         (return-from sb!xc:macro-function (when (eq kind :macro) def)))))
     (lexenv
      (let ((def (cdr (assoc symbol (lexenv-funs env)))))
        (when def
          (return-from sb!xc:macro-function
-           (if (typep def '(cons (eql macro))) (cdr def)))))))
+           (when (typep def '(cons (eql macro))) (cdr def)))))))
   (values (info :function :macro-function symbol)))
 
 (defun (setf sb!xc:macro-function) (function symbol &optional environment)

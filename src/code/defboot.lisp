@@ -262,27 +262,27 @@ evaluated as a PROGN."
     ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.
     ))
 
-;; Return T if SEXPR is the lambda expression that corresponds
-;; to the structure slot reader for SLOT-INFO so that we can decide
-;; that an interpreted lambda is consistent with its source-transform.
-;; I think there's actually a better way than this heuristic: *always* remove
-;; a source-transform whenever an fdefn-fun is set, with a blanket exception
-;; for boostrap code. Then %TARGET-DEFSTRUCT, which is the last step to occur
-;; from DEFSTRUCT, can re-establish the source-transforms.
+;; Return T if LAMBDA-LIST and FORMS make up to the lambda expression
+;; that corresponds to the structure slot accessor for SLOT-INFO so
+;; that we can decide that an interpreted lambda is consistent with
+;; its source-transform.  I think there's actually a better way than
+;; this heuristic: *always* remove a source-transform whenever an
+;; fdefn-fun is set, with a blanket exception for boostrap code. Then
+;; %TARGET-DEFSTRUCT, which is the last step to occur from DEFSTRUCT,
+;; can re-establish the source-transforms.
 (defun structure-accessor-form-p (kind slot-info lambda-list forms)
-  (if (and (equal lambda-list
-                  (if (eq kind :read) '(instance) '(sb!kernel::value instance)))
-           (singleton-p forms))
+  (let ((expected-lambda-list
+         (ecase kind
+           (:read '(instance))
+           (:write '(sb!kernel::value instance)))))
+    (when (and (equal lambda-list expected-lambda-list)
+               (singleton-p forms))
       (let ((form (car forms)))
         ;; FORM must match (BLOCK x subform)
         (and (typep form '(cons (eql block) (cons t (cons t null))))
              (equal (third form)
                     (slot-access-transform
-                     kind
-                     (if (eq kind :read)
-                         '(instance)
-                         '(instance sb!kernel::value))
-                     slot-info))))))
+                     kind (reverse expected-lambda-list) slot-info)))))))
 
 ;;;; DEFVAR and DEFPARAMETER
 
