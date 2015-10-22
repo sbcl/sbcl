@@ -274,7 +274,7 @@ evaluated as a PROGN."
   (let ((expected-lambda-list
          (ecase kind
            (:read '(instance))
-           (:write '(sb!kernel::value instance)))))
+           (:setf '(sb!kernel::value instance)))))
     (when (and (equal lambda-list expected-lambda-list)
                (singleton-p forms))
       (let ((form (car forms)))
