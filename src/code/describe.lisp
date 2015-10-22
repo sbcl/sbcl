@@ -537,7 +537,7 @@
     (format stream "~@:_Lambda-list: ~:A" lambda-list)))
 
 (defun describe-function-source (function stream)
-  (if (compiled-function-p function)
+  (if (compiled-function-p (the function function))
       (let* ((code (fun-code-header (%fun-fun function)))
              (info (sb-kernel:%code-debug-info code)))
         (when info
@@ -554,7 +554,7 @@
                        (format stream "~@:_Source form:~@:_  ~S"
                                (sb-di:debug-source-form source)))))))))
       (let ((source
-             (etypecase function
+             (typecase function
                #+sb-eval
                (sb-eval:interpreted-function
                 (sb-eval:interpreted-function-source-location function))
