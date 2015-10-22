@@ -33,6 +33,8 @@
   ;; All the :CONSTRUCTOR specs and posssibly an implied constructor,
   ;; keyword constructors first, then BOA constructors. NIL if none.
   (constructors () :type list)
+  ;; True if the DEFSTRUCT appeared in a null lexical environment.
+  (null-lexenv-p nil :type boolean) ; the safe default is NIL
   ;; name of copying function
   (copier-name nil :type symbol)
   ;; name of type predicate

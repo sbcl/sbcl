@@ -185,13 +185,14 @@
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB!XC:DEFSTRUCT)
 
-(sb!xc:defmacro delay-defstruct-functions (name forms)
+(sb!xc:defmacro delay-defstruct-functions (name &rest forms)
   ;; KLUDGE: If DEFSTRUCT is not at the top-level,
   ;; (typep x 'name) and similar forms can't get optimized
   ;; and produce style-warnings for unknown types.
-  (if (compiler-layout-ready-p name)
-      forms
-      `(eval ',forms)))
+  (let ((forms (cons 'progn forms)))
+    (if (compiler-layout-ready-p name)
+        forms
+        `(eval ',forms))))
 
 (defun %defstruct-package-locks (dd)
   (let ((name (dd-name dd)))
@@ -214,17 +215,12 @@
 
 ;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
-(defun %expander-for-defstruct (name-and-options slot-descriptions
+;;; This monster has exactly one inline use in the final image,
+;;; and we can drop the definition.
+(declaim (inline !expander-for-defstruct))
+(defun !expander-for-defstruct (name-and-options slot-descriptions
                                 expanding-into-code-for)
-  ;; The host's version of this allows three choices for 'expanding-into'
-  ;; up until such time as the DEFMACRO is seen (again) for DEFSTRUCT,
-  ;; at which point things are ok because 'early-package' will have been
-  ;; processed. The target has only one possibility.
-  (aver (member expanding-into-code-for '(:target
-                                          #-sb-xc :cold-target
-                                          #-sb-xc :host)))
-  (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
-              name-and-options slot-descriptions))
+  (let* ((dd (parse-defstruct name-and-options slot-descriptions))
          (name (dd-name dd))
          (inherits
           (if (dd-class-p dd)
@@ -251,62 +247,67 @@
                      ;; just indicate that there was an expression there.
                      (setf (dd-printer-fname dd) t)))
               `((sb!xc:defmethod print-object ((,x ,name) ,s)
-                (funcall #',fname ,x ,s
-                         ,@(if depthp `(*current-level-in-print*)))))))))
-    `(progn
-       ,@(if (dd-class-p dd)
-             `(,@(when (eq expanding-into-code-for :target)
-                   `((eval-when (:compile-toplevel :load-toplevel :execute)
-                       ;; Note we intentionally enforce package locks and
-                       ;; call %DEFSTRUCT first, and especially before
-                       ;; %COMPILER-DEFSTRUCT. %DEFSTRUCT has the tests (and
-                       ;; resulting CERROR) for collisions with LAYOUTs which
-                       ;; already exist in the runtime. If there are any
-                       ;; collisions, we want the user's response to CERROR
-                       ;; to control what happens. Especially, if the user
-                       ;; responds to the collision with ABORT, we don't want
-                       ;; %COMPILER-DEFSTRUCT to modify the definition of the
-                       ;; class.
-                       (%defstruct-package-locks ',dd))))
-               (%defstruct ',dd ',inherits (sb!c:source-location))
-               (eval-when (:compile-toplevel :load-toplevel :execute)
-                 (%compiler-defstruct ',dd ',inherits))
-               ,@(unless (eq expanding-into-code-for :host)
-                   `((delay-defstruct-functions
-                      ,name
-                      (progn
-                        ,@(awhen (dd-copier-name dd)
-                           `((defun ,(dd-copier-name dd) (instance)
-                               (copy-structure (the ,(dd-name dd) instance)))))
-                        ,@(awhen (dd-predicate-name dd)
-                           `((defun ,(dd-predicate-name dd) (object)
-                               (typep object ',(dd-name dd)))))
-                        ,@(accessor-definitions dd)))
-                ;; This must be in the same lexical environment
-                     ,@(constructor-definitions dd)
-                     ,@print-method
-                ;; Various other operations only make sense on the target SBCL.
-                     (%target-defstruct ',dd))))
-            `((eval-when (:compile-toplevel :load-toplevel :execute)
-                (setf (info :typed-structure :info ',name) ',dd))
-              (setf (info :source-location :typed-structure ',name)
-                    (sb!c:source-location))
-              ,@(unless (eq expanding-into-code-for :host)
-                  (append (typed-accessor-definitions dd)
-                          (typed-predicate-definitions dd)
-                          (typed-copier-definitions dd)
-                          (constructor-definitions dd)
-                          (when (dd-doc dd)
-                            `((setf (fdocumentation ',(dd-name dd) 'structure)
-                                    ',(dd-doc dd))))))))
-       ',name)))
+                  (funcall #',fname ,x ,s
+                           ,@(if depthp `(*current-level-in-print*)))))))))
+    ;; Return a list of forms and the DD.
+    (values
+     (if (dd-class-p dd)
+         `(,@(when (eq expanding-into-code-for :target)
+               ;; Note we intentionally enforce package locks, calling
+               ;; %DEFSTRUCT first. %DEFSTRUCT has the tests (and resulting
+               ;; CERROR) for collisions with LAYOUTs which already exist in
+               ;; the runtime. If there are collisions, we want the user's
+               ;; response to CERROR to control what happens. If the ABORT
+               ;; restart is chosen, %COMPILER-DEFSTRUCT should not modify
+               ;; the definition the class.
+               `((eval-when (:compile-toplevel :load-toplevel :execute)
+                   (%defstruct-package-locks ',dd))))
+           (%defstruct ',dd ',inherits (sb!c:source-location))
+           (eval-when (:compile-toplevel :load-toplevel :execute)
+             (%compiler-defstruct ',dd ',inherits))
+           ,@(when (eq expanding-into-code-for :target)
+               `((delay-defstruct-functions
+                  ,name
+                  ,@(awhen (dd-copier-name dd)
+                      `((defun ,(dd-copier-name dd) (instance)
+                          (copy-structure (the ,(dd-name dd) instance)))))
+                  ,@(awhen (dd-predicate-name dd)
+                      `((defun ,(dd-predicate-name dd) (object)
+                          (typep object ',(dd-name dd)))))
+                  ,@(accessor-definitions dd))
+                 ;; This must be in the same lexical environment
+                 ,@(constructor-definitions dd)
+                 ,@print-method
+                 ;; Various other operations only make sense on the target SBCL.
+                 (%target-defstruct ',dd))))
+         ;; Not DD-CLASS-P
+         `((eval-when (:compile-toplevel :load-toplevel :execute)
+             (setf (info :typed-structure :info ',name) ',dd))
+           (setf (info :source-location :typed-structure ',name)
+                 (sb!c:source-location))
+           ,@(when (eq expanding-into-code-for :target)
+               `(,@(typed-accessor-definitions dd)
+                 ,@(typed-predicate-definitions dd)
+                 ,@(typed-copier-definitions dd)
+                 ,@(constructor-definitions dd)
+                 ,@(when (dd-doc dd)
+                     `((setf (fdocumentation ',(dd-name dd) 'structure)
+                             ',(dd-doc dd))))))))
+     dd)))
 
 #+sb-xc-host
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
-  (%expander-for-defstruct name-and-options slot-descriptions :cold-target))
+  (multiple-value-bind (forms dd)
+      (!expander-for-defstruct name-and-options slot-descriptions :target)
+    ;; The NULL-LEXENV-P slots defaults to NIL,
+    ;; since the conservative thing is to assume a hairy lexenv.
+    ;; But in SBCL's sources, all defstructs are toplevel.
+    (setf (dd-null-lexenv-p dd) t)
+    `(progn ,@forms))) ; doesn't really matter what the macro returns
 
 #+sb-xc
-(sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
+(sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions
+                           &environment env)
   #!+sb-doc
   "DEFSTRUCT {Name | (Name Option*)} [Documentation] {Slot | (Slot [Default] {Key Value}*)}
    Define the structure type Name. Instances are created by MAKE-<name>,
@@ -335,13 +336,26 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-  (%expander-for-defstruct name-and-options slot-descriptions :target))
+  (multiple-value-bind (forms dd)
+      (!expander-for-defstruct name-and-options slot-descriptions :target)
+    ;; If the lexenv is null, all default values in constructors will
+    ;; be evaluable in any context.
+    (setf (dd-null-lexenv-p dd)
+          (etypecase env
+            (sb!kernel:lexenv (sb!c::null-lexenv-p env))
+            ;; a LOCALLY environment would be fine,
+            ;; but is not an important case to handle.
+            #!+sb-fasteval (sb!interpreter:basic-env nil)
+            (null t)))
+    `(progn ,@forms ',(dd-name dd))))
+
 #+sb-xc-host
 (defmacro sb!xc:defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
   "Cause information about a target structure to be built into the
   cross-compiler."
-  (%expander-for-defstruct name-and-options slot-descriptions :host))
+  `(progn ,@(!expander-for-defstruct
+             name-and-options slot-descriptions :host)))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
@@ -602,8 +616,7 @@ unless :NAMED is also specified.")))
 ;;; Given name and options and slot descriptions (and possibly doc
 ;;; string at the head of slot descriptions) return a DD holding that
 ;;; info.
-(defun parse-defstruct-name-and-options-and-slot-descriptions
-    (name-and-options slot-descriptions)
+(defun parse-defstruct (name-and-options slot-descriptions)
   (let ((result (parse-defstruct-name-and-options (if (atom name-and-options)
                                                       (list name-and-options)
                                                       name-and-options))))
@@ -1927,9 +1940,7 @@ or they must be declared locally notinline at each call site.~@:>")
 (dolist (args
          '#.(sb-cold:read-from-file
              "src/code/early-defstruct-args.lisp-expr"))
-  (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
-              (first args)
-              (rest args)))
+  (let* ((dd (parse-defstruct (first args) (rest args)))
          (inherits (!inherits-for-structure dd)))
     (%compiler-defstruct dd inherits)))
 
