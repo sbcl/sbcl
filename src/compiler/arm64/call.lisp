@@ -879,9 +879,8 @@
                       :to :eval)
                  ,(if named 'name-pass 'lexenv))
 
-     ,@(and (not named)
-            '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-               function)))
+     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+               function)
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
@@ -1012,12 +1011,16 @@
              (if filler
                  (do-next-filler)
                  (return)))
-           ,(if named
-                `(loadw lip name-pass fdefn-raw-addr-slot
-                     other-pointer-lowtag)
-                `(inst add lip function
-                       (- (ash simple-fun-code-offset word-shift)
-                          fun-pointer-lowtag)))
+           ,@(if named
+                 ;; raw-addr is an untagged pointer to the function,
+                 ;; need to pair it up with the tagged pointer for the GC to see
+                 `((loadw function name-pass fdefn-fun-slot
+                       other-pointer-lowtag)
+                   (loadw lip name-pass fdefn-raw-addr-slot
+                       other-pointer-lowtag))
+                 `((inst add lip function
+                         (- (ash simple-fun-code-offset word-shift)
+                            fun-pointer-lowtag))))
 
            (note-this-location vop :call-site)
            (inst br lip))
