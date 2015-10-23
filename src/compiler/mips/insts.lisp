@@ -78,6 +78,13 @@
                   regname
                   dstate))))
 
+(sb!disassem:define-arg-type load-store-annotation
+  :printer (lambda (value stream dstate)
+             (declare (ignore stream))
+             (destructuring-bind (reg offset) value
+               (when (= reg code-offset)
+                 (sb!disassem:note-code-constant offset dstate)))))
+
 (defparameter *float-reg-symbols*
   (coerce
    (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
@@ -194,6 +201,23 @@
   (rs :field (byte 5 21) :type 'reg)
   (rt :field (byte 5 16) :type 'reg)
   (immediate :field (byte 16 0) :sign-extend t))
+
+(defconstant-eqx load-store-printer
+    '(:name :tab
+      rt ", "
+      rs
+      (:unless (:constant 0) "[" immediate "]"))
+  #'equalp)
+
+(sb!disassem:define-instruction-format
+    (load-store 32 :default-printer '(:name :tab
+                                      rt ", "
+                                      rs
+                                      (:unless (:constant 0) "[" immediate "]")
+                                      load-store-annotation)
+                   :include immediate)
+    (load-store-annotation :fields (list (byte 5 21) (byte 16 0))
+                           :type 'load-store-annotation))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter jump-printer
@@ -1242,13 +1266,6 @@
   (emit-immediate-inst segment opcode (reg-tn-encoding reg)
                        (+ (reg-tn-encoding base) oddhack) index))
 
-(defconstant-eqx load-store-printer
-  '(:name :tab
-          rt ", "
-          rs
-          (:unless (:constant 0) "[" immediate "]"))
-  #'equalp)
-
 (define-instruction lb (segment reg base &optional (index 0))
   (:declare (type tn reg base)
             (type (or (signed-byte 16) fixup) index))
@@ -1279,7 +1296,7 @@
 (define-instruction lw (segment reg base &optional (index 0))
   (:declare (type tn reg base)
             (type (or (signed-byte 16) fixup) index))
-  (:printer immediate ((op #b100011)) load-store-printer)
+  (:printer load-store ((op #b100011)))
   (:dependencies (reads base) (reads :memory) (writes reg))
   (:delay 1)
   (:emitter
