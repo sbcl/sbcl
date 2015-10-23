@@ -6,30 +6,31 @@ This file serves as guide to care-and-feeding of the new feature.
 Enabling
 ========
 
-To use the new interpreter, it must be compiled-in at build-time.
-This can be done either by adding '--with-sb-fasteval --without-sb-eval'
-to the "make.sh" invocation, or by adding :sb-fasteval and
-removing :sb-eval from the 'customize-target-features.lisp' file.
-If building worked right, there should be an SB-INTERPRETER package.
-There are external symbols in it, but none for public consumption.
+To use the new sb-fasteval interpreter, it must be compiled-in at
+build-time.  This can be done either by adding '--with-sb-fasteval
+--without-sb-eval' to the "make.sh" invocation, or by adding
+:sb-fasteval and removing :sb-eval from the
+'customize-target-features.lisp' file.  If building worked right,
+there should be an SB-INTERPRETER package.  There are external symbols
+in it, but none for public consumption.
 
 As with sb-eval, the SB-EXT:*EVALUATOR-MODE* variable can be
 set to :INTERPRET or :COMPILE.
 
-The REPL defaults to :INTERPRET if :sb-fasteval is enabled.
-This is a change relative to existing behavior in which the REPL
-defaulted to :COMPILE. For technical reasons, :INTERPRET is to
-be preferred, in that (COMPILE F) expressly requests compilation,
-whereas there is no means to expressly request interpretation
-other than having it be the default.
+The REPL defaults to :INTERPRET if :sb-fasteval is enabled.  This is a
+change relative to existing behavior in which the REPL defaulted to
+:COMPILE.  For technical reasons, :INTERPRET is to be preferred, in
+that (COMPILE F) expressly requests compilation, whereas there is no
+means to expressly request interpretation other than having it be the
+default.
 
 Advantages
 ==========
 
 Speed:
 
- * Toplevel form dispatch is slightly quicker. It is not
-   a linear scan over all 25 standard special operators.
+ * Toplevel form dispatch is slightly quicker.  It is not a linear
+   scan over all 25 standard special operators.
 
  * Macroexpansions are aggressively cached to avoid consing.
 
@@ -46,19 +47,20 @@ Safety:
 
 Convenience:
 
- * Maximal laziness - as per the the above points, semantic analysis
-   is performed to avoid subsequent work, however it is performed
-   only just-in-time to evaluate each subform. Huge swaths of code
-   which are never reached incur no penalty.
+ * Maximal laziness - as per the above points, semantic analysis is
+   performed to avoid subsequent work, however it is performed only
+   just-in-time to evaluate each subform.  Huge swaths of code which
+   are never reached incur no penalty.
 
  * Global declarations (macros, types, etc) may be made out-of-order
    with respect to their first "apparent" use, if such use is in a
    function that is not called, just as would be true with a plain
-   recursive-descent evaluator. While not strictly an improvement
-   over what the sb-eval interpreter offers, it is indeed more friendly
-   than an interpreter which bakes in all semantics in a pre-pass.
+   recursive-descent evaluator.  While not strictly an improvement
+   over what the sb-eval interpreter offers, it is indeed more
+   friendly than an interpreter which bakes in all semantics in a
+   pre-pass.
 
-OPTIMIZE settings
+OPTIMIZE Settings
 =================
 
 The interpreter pays heed to the SPEED and SAFETY qualities
@@ -77,13 +79,13 @@ Variable assignment (SETQ, etc):
  - checked if (>= SAFETY 1)
 
 Variable access:
-  - not checked, unless (AND (= SAFETY 3) (SPEED 0))
-  We normally assume that variables have their correct types
-  and that structure slots have their correct types.
-  As such, reads should be inherently type-correct.
+ - not checked, unless (AND (= SAFETY 3) (SPEED 0))
+   We normally assume that variables have their correct types and that
+   structure slots have their correct types.  As such, reads should be
+   inherently type-correct.
 
 THE forms:
-  - checked if (>= SAFETY SPEED)
+ - checked if (>= SAFETY SPEED)
 
 The effect of the above is that raising SPEED to 2 will continue
 to respect type-safety for binding and assignment, but ignore THE
@@ -113,13 +115,13 @@ Performance
 
 Having been tested extensively on the CL-bench suite of tests,
 the performance can be characterized as anywhere from a 10x
-to 100x (or more) improvement over the legacy interpreter.
+to 100x (or more) improvement over the sb-eval interpreter.
 Consing is also usually decreased by a factor of 5 to 10.
-However (as called out in KNOWN BUGS) there is possibly
+However (as called out in Known Bugs) there is possibly
 a problem with garbage retention.  That said, the interpreter
 sees daily use in a production setting with no problems.
 
-Technical notes
+Technical Notes
 ===============
 
 As mentioned in CLtL2, it is essentially impossible to use any
@@ -140,12 +142,12 @@ many times they are called are unportable.
 
 A more subtle problem is that while the MACRO-FUNCTION serves
 as part of the "key" to expansion, there is no such key
-for global symbol-macros. If a macro M, during its expansion,
+for global symbol-macros.  If a macro M, during its expansion,
 inquires whether a symbol S is a symbol-macro, and the answer
 is "no", then if the answer becomes "yes", it might not happen
 that a subsequent invocation of M computes a new expansion.
 
-KNOWN BUGS
+Known Bugs
 ==========
 
 * Regression tests of threading and foreign calls fail.
@@ -159,6 +161,6 @@ KNOWN BUGS
 
 * Reading through a symbol-macro is not inherently type-correct,
   but the interpreter does not cast the type onto the expansion.
-  It does cast for SETF. This is a compromise, as the existing
+  It does cast for SETF.  This is a compromise, as the existing
   behavior of the compiler is decidedly not ANSI-compliant.
   (It changes the macroexpansion to include a THE form).
