@@ -60,17 +60,17 @@
        (:float-status 66)
        (:ctrl-stat-reg 67)))))
 
-(defparameter reg-symbols
+(defparameter *reg-symbols*
   (map 'vector
-       #'(lambda (name)
-           (cond ((null name) nil)
-                 (t (make-symbol (concatenate 'string "$" name)))))
+       (lambda (name)
+         (and name
+              (make-symbol (concatenate 'string "$" name))))
        *register-names*))
 
 (sb!disassem:define-arg-type reg
   :printer #'(lambda (value stream dstate)
                (declare (stream stream) (fixnum value))
-               (let ((regname (aref reg-symbols value)))
+               (let ((regname (aref *reg-symbols* value)))
                  (princ regname stream)
                  (sb!disassem:maybe-note-associated-storage-ref
                   value
@@ -78,15 +78,15 @@
                   regname
                   dstate))))
 
-(defparameter float-reg-symbols
-  #.(coerce
-     (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
-     'vector))
+(defparameter *float-reg-symbols*
+  (coerce
+   (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
+   'vector))
 
 (sb!disassem:define-arg-type fp-reg
   :printer #'(lambda (value stream dstate)
                (declare (stream stream) (fixnum value))
-               (let ((regname (aref float-reg-symbols value)))
+               (let ((regname (aref *float-reg-symbols* value)))
                  (princ regname stream)
                  (sb!disassem:maybe-note-associated-storage-ref
                   value
