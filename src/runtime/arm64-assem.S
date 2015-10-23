@@ -416,6 +416,14 @@ fun_end_breakpoint_end:
 	.global	alloc_tramp
 	.type	alloc_tramp, %function
 alloc_tramp:
+        stp     reg_NL0,reg_NL1, [sp,#-80]!
+        stp     reg_NL2,reg_NL3, [sp,#16]
+        stp     reg_NL4,reg_NL5, [sp,#32]
+        stp     reg_NL6,reg_NL7, [sp,#48]
+        stp     reg_NL8,reg_NL9, [sp,#64]
+
+        mov     x0, reg_TMP // size
+
         ldr     reg_TMP, =foreign_function_call_active
         str     reg_TMP, [reg_TMP]
 
@@ -430,14 +438,6 @@ alloc_tramp:
         stp     reg_R6,reg_R7, [reg_CSP,#-48]
         stp     reg_R8,reg_R9, [reg_CSP,#-32]
         stp     x20,reg_LEXENV, [reg_CSP,#-16]
-
-        stp     reg_NL0,reg_NL1, [sp,#-80]!
-        stp     reg_NL2,reg_NL3, [sp,#16]
-        stp     reg_NL4,reg_NL5, [sp,#32]
-        stp     reg_NL6,reg_NL7, [sp,#48]
-        stp     reg_NL8,reg_NL9, [sp,#64]
-
-        ldr     x0,[sp,#88]
 
         stp     q0, q1, [sp,#-512]!
         stp     q2,q3, [sp,#32]
@@ -456,7 +456,7 @@ alloc_tramp:
         stp     q28,q29, [sp,#448]
         stp     q30,q31, [sp,#480]
 
-        bl     alloc
+        bl      alloc
 
         ldp     q30,q31, [sp,#480]
         ldp     q28,q29, [sp,#448]
@@ -475,15 +475,6 @@ alloc_tramp:
         ldp     q2,q3, [sp,#32]
         ldp     q0, q1, [sp],#512
 
-        str     x0, [sp,#88]
-
-
-        ldp     reg_NL8,reg_NL9, [sp,#64]
-        ldp     reg_NL6,reg_NL7, [sp,#48]
-        ldp     reg_NL4,reg_NL5, [sp,#32]
-        ldp     reg_NL2,reg_NL3, [sp,#16]
-        ldp     reg_NL0,reg_NL1, [sp],#80
-
         ldp     x20, reg_LEXENV, [reg_CSP, #-16]
         ldp     reg_R8,reg_R9, [reg_CSP,#-32]
         ldp     reg_R6,reg_R7, [reg_CSP,#-48]
@@ -496,6 +487,14 @@ alloc_tramp:
         sub     reg_CSP, reg_CSP, #32+96 // deallocate the frame
 
 	str     xzr, [reg_TMP] // foreign_function_call_active
+
+        mov     reg_TMP, x0
+
+        ldp     reg_NL8,reg_NL9, [sp,#64]
+        ldp     reg_NL6,reg_NL7, [sp,#48]
+        ldp     reg_NL4,reg_NL5, [sp,#32]
+        ldp     reg_NL2,reg_NL3, [sp,#16]
+        ldp     reg_NL0,reg_NL1, [sp],#80
 
 	ret
 

@@ -175,19 +175,14 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #!+gencgc
-(defun allocation-tramp (alloc-tn size back-label)
+(defun allocation-tramp (alloc-tn size back-label return-in-tmp)
   (let ((fixup (gen-label)))
-    (when (integerp size)
-      (load-immediate-word alloc-tn size))
-    (inst stp
-          lr-tn
-          (if (integerp size)
-              alloc-tn
-              size)
-          (@ nsp-tn -16 :pre-index))
+    (unless (eq size tmp-tn)
+      (inst mov tmp-tn size))
     (inst load-from-label alloc-tn fixup)
     (inst blr alloc-tn)
-    (inst ldp lr-tn alloc-tn (@ nsp-tn 16 :post-index))
+    (unless return-in-tmp
+      (move alloc-tn tmp-tn))
     (inst b back-label)
     (emit-label fixup)
     (inst dword (make-fixup "alloc_tramp" :foreign))))
@@ -233,23 +228,32 @@
            (t
             (let ((fixup (gen-label))
                   (alloc (gen-label))
-                  (back-from-alloc (gen-label)))
+                  (back-from-alloc (gen-label))
+                  size)
               (inst load-from-label ,temp FIXUP ,lip)
               (inst ldp ,result-tn ,flag-tn (@ ,temp))
-              (inst add ,result-tn ,result-tn (add-sub-immediate ,size))
+              (setf size (add-sub-immediate ,size))
+              (inst add ,result-tn ,result-tn size)
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
               (storew ,result-tn ,temp)
 
-              (inst sub ,result-tn ,result-tn (add-sub-immediate ,size))
+              ;; alloc_tramp uses tmp-tn for returning the result,
+              ;; save on a move when possible
+              (inst sub (if ,lowtag
+                            tmp-tn
+                            ,result-tn) ,result-tn size)
 
               (emit-label BACK-FROM-ALLOC)
               (when ,lowtag
-                (inst add ,result-tn ,result-tn ,lowtag))
+                (inst add ,result-tn tmp-tn ,lowtag))
 
               (assemble (*elsewhere*)
                 (emit-label ALLOC)
-                (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)
+                (allocation-tramp ,result-tn
+                                  ,size BACK-FROM-ALLOC
+                                  ;; see the comment above aboout alloc_tramp
+                                  (and ,lowtag t))
                 (emit-label FIXUP)
                 (inst dword (make-fixup "boxed_region" :foreign))))))))
 

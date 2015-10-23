@@ -25,8 +25,9 @@
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg nl3-offset)
      (:temp temp non-descriptor-reg nl4-offset)
+     (:temp lra-save non-descriptor-reg nl5-offset)
      (:temp vector descriptor-reg r8-offset)
-     (:temp lip interior-reg lr-offset))
+     (:temp lr interior-reg lr-offset))
   ;; Why :LINK NIL?
   ;; Either LR or PC need to always point into the code object.
   ;; Since this is a static assembly routine, PC is already not pointing there.
@@ -42,8 +43,11 @@
     (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
     (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
-    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip
+    (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
+    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag
+                                                   :lip nil ;; keep LR intact as per above
                                                    :temp temp)
+    (move lr lra-save)
     (inst lsr ndescr type n-fixnum-tag-bits)
     (storew ndescr vector 0 other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings
