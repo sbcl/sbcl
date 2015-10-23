@@ -9,7 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
 (load "compiler-test-util.lisp")
 (use-package "ASSERTOID")
 
@@ -49,8 +48,7 @@
                                         ; these two checks should be
                                         ; kept separated
 
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(with-test (:name :defstruct-boa-no-error)
+(with-test (:name :defstruct-boa-no-error :skipped-on :interpreter)
  (let ((s (make-boa-saux)))
    (locally (declare (optimize (safety 0))
                      (inline boa-saux-a))
@@ -141,7 +139,16 @@
                                   town-elevation))
       (assert (eql (funcall slot-accessor-name town1)
                    (funcall slot-accessor-name town2))))
-    (assert (not (fboundp '(setf town-elevation)))))) ; 'cause it's :READ-ONLY
+    (assert (not (fboundp '(setf town-elevation)))) ; 'cause it's :READ-ONLY
+    ;; The source-transform for SETF was too eager,
+    ;; and would accept read-only slots.
+    (assert-error
+     (setf (town-elevation (make-town)) 5))
+    (assert-error
+     (funcall (compile nil (lambda (x y)
+                             (setf (town-readonly x) y)
+                             x))
+              (make-town) 5))))
 
 ;;; example 2
 (defstruct (clown (:conc-name bozo-))
@@ -653,7 +660,7 @@
 
 
 ;;; bug 3d: type safety with redefined type constraints on slots
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+#+#.(cl:if (assertoid:legacy-eval-p) '(or) '(and))
 (macrolet
     ((test (type)
        (let* ((base-name (intern (format nil "bug3d-~A" type)))

@@ -763,6 +763,7 @@ if there is no such entry. Entries can be added using SETF."
     (%gethash3 key hash-table default)))
 
 ;;; so people can call #'(SETF GETHASH)
+;;; FIXME: this function is not mandated. Why do we have it?
 (defun (setf gethash) (new-value key table &optional default)
   (declare (ignore default))
   (%puthash key table new-value))

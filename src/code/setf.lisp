@@ -16,6 +16,23 @@
 
 (in-package "SB!IMPL")
 
+;;; Return T if FUN names a DEFSTRUCT slot accessor that we should
+;;; transform from SETF into %INSTANCE-SET directly - bypassing
+;;; #'(SETF MYSLOT) - which requires that the slot be read/writable.
+;;; A local function named (SETF MYSLOT) inhibits the transform,
+;;; though technically need not, as it is unspecified how SETF
+;;; of a structure slot expands. It is likewise unportable to
+;;; expect that a NOTINLINE does anything, but we'll check anyway.
+(defun transformable-struct-setf-p (form env)
+  (when (singleton-p (cdr form))
+    (let* ((fun (car form))
+           (slot-info (structure-instance-accessor-p fun)))
+      (when (and slot-info (not (dsd-read-only (cdr slot-info))))
+        (dx-let ((setter `(setf ,fun)))
+          (when (and (not (sb!c::fun-locally-defined-p setter env))
+                     (not (sb!c::fun-lexically-notinline-p setter env)))
+            slot-info)))))) ; caller needs the (DD . DSD) pair pack
+
 ;;; The inverse for a generalized-variable reference function is stored in
 ;;; one of two ways:
 ;;;
@@ -30,7 +47,10 @@
 ;;; and an accessing function.
 (declaim (ftype (function (t &optional lexenv-designator))
                 sb!xc:get-setf-expansion))
-(defun sb!xc:get-setf-expansion (form &optional environment)
+(defun sb!xc:get-setf-expansion (form &optional environment
+                                      ;; Assume we'll need one store temp.
+                                      ;; That's the expected thing.
+                                      &aux (store (sb!xc:gensym "NEW")))
   #!+sb-doc
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
@@ -40,36 +60,44 @@
           (sb!xc:macroexpand-1 form environment)
         (if expanded
             (sb!xc:get-setf-expansion expansion environment)
-            (let ((store (sb!xc:gensym "NEW")))
-              (values nil nil (list store) `(setq ,form ,store) form))))
-      (let ((name (car form)))
+            (values nil nil (list store) `(setq ,form ,store) form)))
+      (let ((fun (car form)))
         (flet ((expand (call arg-maker)
                  ;; Produce the expansion of a SETF form that calls either
                  ;; #'(SETF name) or an inverse given by short form DEFSETF.
                  (multiple-value-bind (temp-vars temp-vals args)
                      (collect-setf-temps (cdr form) environment nil)
-                   (let ((store (sb!xc:gensym "NEW")))
-                     (values temp-vars temp-vals (list store)
-                             `(,.call ,@(funcall arg-maker store args))
-                             `(,name ,@args))))))
+                   (values temp-vars temp-vals (list store)
+                           `(,.call ,@(funcall arg-maker store args))
+                           `(,fun ,@args)))))
           ;; Local functions inhibit global SETF methods.
-          (unless (sb!c::fun-locally-defined-p name environment)
-            (acond ((info :setf :inverse name)
+          (unless (sb!c::fun-locally-defined-p fun environment)
+            (acond ((info :setf :inverse fun)
                     (return-from sb!xc:get-setf-expansion
                       (expand `(,it) (lambda (new args) `(,@args ,new)))))
-                   ((info :setf :expander name)
+                   ((info :setf :expander fun)
                     (return-from sb!xc:get-setf-expansion
                       (if (consp it)
                           (make-setf-quintuple form environment
                                                (car it) (cdr it))
-                          (funcall it form environment))))))
+                          (funcall it form environment))))
+                   ((transformable-struct-setf-p form environment)
+                    (let ((instance (make-symbol "OBJ")))
+                      (return-from sb!xc:get-setf-expansion
+                        (values (list instance)
+                                (list (cadr form))
+                                (list store)
+                                (slot-access-transform
+                                 :setf (list instance store) it)
+                                (slot-access-transform
+                                 :read (list instance) it)))))))
           ;; When NAME is a macro, retry from the top.
           ;; Otherwise default to the function named `(SETF ,name).
           (multiple-value-bind (expansion expanded)
               (%macroexpand-1 form environment)
             (if expanded
                 (sb!xc:get-setf-expansion expansion environment)
-                (expand `(funcall #'(setf ,name)) #'cons)))))))
+                (expand `(funcall #'(setf ,fun)) #'cons)))))))
 
 ;; Expand PLACE until it is a form that SETF might know something about.
 ;; Macros are expanded only when no SETF expander (or inverse) exists.
@@ -141,28 +169,10 @@
                    (not (sb!c::fun-locally-defined-p fun env)))
           (awhen (info :setf :inverse fun)
             (return-from setf `(,it ,@(cdr place) ,value-form)))
-
-          ;; If #'(SETF FUN) is a structure accessor, then source-transform it.
-          ;; Notinline declarations are obeyed, though technically needn't be.
-          ;; Implementators are free to treat SETF of struct slots however they
-          ;; choose, and users can't expect that declarations about (SETF ASLOT)
-          ;; are meaningful. Additionally, you're treading into undefined
-          ;; behavior by locally binding (SETF ASLOT) as a function name.
-          ;; This code will use the local fun, other implementations might not.
-          ;;
-          ;; Also this could be generalized by having GET-SETF-EXPANSION perform
-          ;; the transform, which could perhaps help INCF, but would complicate
-          ;; matters by requiring logic to delete extra LET bindings, which is
-          ;; the entire point of this - especially for an interpreter.
-          ;;
-          (awhen (and (singleton-p (cdr place)) ; if single argument call
-                      (structure-instance-accessor-p fun))
-            (dx-let ((setter `(setf ,fun)))
-              (when (and (not (sb!c::fun-lexically-notinline-p setter env))
-                         (not (sb!c::fun-locally-defined-p setter env)))
-                (return-from setf
-                  (slot-access-transform :setf (list (cadr place) value-form)
-                                         it)))))))
+          (awhen (transformable-struct-setf-p place env)
+            (return-from setf
+              (slot-access-transform
+               :setf (list (cadr place) value-form) it)))))
 
       (multiple-value-bind (temps vals newval setter)
           (sb!xc:get-setf-expansion place env)
