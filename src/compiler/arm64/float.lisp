@@ -63,14 +63,14 @@
   (:args (x :scs (double-reg) :to :save))
   (:results (y))
   (:note "float to pointer coercion")
-  (:temporary (:sc non-descriptor-reg) tmp)
+  (:temporary (:sc non-descriptor-reg) flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:results (y :scs (descriptor-reg)))
   (:generator 13
-   (with-fixed-allocation (y tmp
+   (with-fixed-allocation (y flag
                            double-float-widetag
                            double-float-value-slot
-                           :lip lip)
+                           :lip lip :temp temp)
      (storew x y double-float-value-slot other-pointer-lowtag))))
 
 (define-move-vop move-from-double :move (double-reg) (descriptor-reg))
@@ -166,12 +166,12 @@
 (define-vop (move-from-complex-single)
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:note "complex single float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y pa-flag complex-single-float-widetag
-                             complex-single-float-size :lip lip)
+                             complex-single-float-size :lip lip :temp temp)
        (inst str x (@ y (- (* complex-single-float-data-slot
                               n-word-bytes)
                            other-pointer-lowtag))))))
@@ -181,12 +181,12 @@
 (define-vop (move-from-complex-double)
   (:args (x :scs (complex-double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:note "complex double float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y pa-flag complex-double-float-widetag
-                             complex-double-float-size :lip lip)
+                             complex-double-float-size :lip lip :temp temp)
        (inst str x (@ y (- (* complex-double-float-real-slot
                               n-word-bytes)
                            other-pointer-lowtag))))))

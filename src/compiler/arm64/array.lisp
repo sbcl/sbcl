@@ -21,8 +21,7 @@
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
-  (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:sc non-descriptor-reg) pa-flag ndescr temp)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 5
@@ -32,7 +31,7 @@
                                lowtag-mask))
     (inst and ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip)
+      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip :temp temp)
       ;; Now that we have the space allocated, compute the header
       ;; value.
       (inst lsl ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
@@ -48,7 +47,7 @@
   (:arg-types (:constant t) (:constant t))
   (:info type rank)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 4
@@ -61,7 +60,7 @@
                                      n-widetag-bits)
                                 type)))
       (pseudo-atomic (pa-flag)
-        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag :lip lip)
+        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag :lip lip :temp temp)
         (load-immediate-word pa-flag header-bits)
         (storew pa-flag header 0 other-pointer-lowtag)))
     (move result header)))

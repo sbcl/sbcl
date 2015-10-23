@@ -23,7 +23,8 @@
      (:res result descriptor-reg r0-offset)
 
      (:temp ndescr non-descriptor-reg nl2-offset)
-     (:temp pa-flag non-descriptor-reg ocfp-offset)
+     (:temp pa-flag non-descriptor-reg nl3-offset)
+     (:temp temp non-descriptor-reg nl4-offset)
      (:temp vector descriptor-reg r8-offset)
      (:temp lip interior-reg lr-offset))
   ;; Why :LINK NIL?
@@ -41,7 +42,8 @@
     (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
     (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
-    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip)
+    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip
+                                                   :temp temp)
     (inst lsr ndescr type n-fixnum-tag-bits)
     (storew ndescr vector 0 other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings

@@ -14,10 +14,9 @@
 (define-vop (list-or-list*)
   (:args (things :more t :scs (control-stack)))
   (:temporary (:scs (descriptor-reg) :type list) ptr)
-  (:temporary (:scs (any-reg)) temp)
   (:temporary (:scs (descriptor-reg) :type list :to (:result 0) :target result)
               res)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:info num)
   (:results (result :scs (descriptor-reg)))
@@ -45,7 +44,7 @@
                  (allocation res alloc list-pointer-lowtag
                              :flag-tn pa-flag
                              :stack-allocate-p (node-stack-allocate-p node)
-                             :lip lip)
+                             :lip lip :temp temp)
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (storew (maybe-load (tn-ref-tn things)) ptr
@@ -79,7 +78,7 @@
   (:temporary (:scs (non-descriptor-reg)) size)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
   (:temporary (:scs (non-descriptor-reg)) unboxed)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 100
     (inst add boxed boxed-arg (fixnumize (1+ code-constants-offset)))
@@ -99,14 +98,13 @@
 
 (define-vop (make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg) :from :argument))
   (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
-    (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size :lip lip)
+    (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size :lip lip :temp temp)
       (load-fixup temp (make-fixup "undefined_tramp" :foreign)
                        lip)
       (storew name result fdefn-name-slot other-pointer-lowtag)
@@ -116,7 +114,7 @@
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
@@ -127,7 +125,7 @@
                     fun-pointer-lowtag
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p
-                    :lip lip)
+                    :lip lip :temp temp)
         (load-immediate-word pa-flag
                              (logior
                               (ash (1- size) n-widetag-bits)
@@ -139,14 +137,14 @@
 ;;;
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg)))
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation (result pa-flag value-cell-header-widetag
                             value-cell-size :stack-allocate-p stack-allocate-p
-                            :lip lip)
+                            :lip lip :temp temp)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.
@@ -170,13 +168,13 @@
   (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 4
     (with-fixed-allocation (result pa-flag type words
                             :lowtag lowtag
                             :stack-allocate-p stack-allocate-p
-                            :lip lip))))
+                            :lip lip :temp temp))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -185,8 +183,7 @@
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (any-reg) :from :argument) bytes)
-  (:temporary (:scs (non-descriptor-reg)) header)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag temp header)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
@@ -201,5 +198,5 @@
     (inst and bytes bytes (bic-mask lowtag-mask))
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :flag-tn pa-flag :lip lip)
+      (allocation result bytes lowtag :flag-tn pa-flag :lip lip :temp temp)
       (storew header result 0 lowtag))))

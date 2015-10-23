@@ -506,7 +506,7 @@
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
   (:temporary (:scs (descriptor-reg) :from :eval) temp)
   (:temporary (:scs (any-reg) :from :eval) dst)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) alloc-temp pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
@@ -531,7 +531,7 @@
         (allocation dst size list-pointer-lowtag
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p
-                    :lip lip))
+                    :lip lip :temp alloc-temp))
       (move result dst)
 
       (inst b ENTER)

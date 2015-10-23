@@ -196,6 +196,9 @@
                                                  stack-allocate-p
                                                  (lip (if stack-allocate-p
                                                           nil
+                                                          (missing-arg)))
+                                                 (temp (if stack-allocate-p
+                                                          nil
                                                           (missing-arg))))
   ;; Normal allocation to the heap.
   (once-only ((result-tn result-tn)
@@ -203,7 +206,8 @@
               (lowtag lowtag)
               (flag-tn flag-tn)
               (stack-allocate-p stack-allocate-p)
-              (lip lip))
+              (lip lip)
+              (temp temp))
     `(cond (,stack-allocate-p
             (assemble ()
               (move ,result-tn csp-tn)
@@ -230,13 +234,12 @@
             (let ((fixup (gen-label))
                   (alloc (gen-label))
                   (back-from-alloc (gen-label)))
-              (inst load-from-label ,flag-tn FIXUP)
-              (inst ldp ,result-tn ,flag-tn (@ ,flag-tn))
+              (inst load-from-label ,temp FIXUP ,lip)
+              (inst ldp ,result-tn ,flag-tn (@ ,temp))
               (inst add ,result-tn ,result-tn (add-sub-immediate ,size))
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
-              (inst load-from-label ,flag-tn FIXUP ,lip)
-              (storew ,result-tn ,flag-tn)
+              (storew ,result-tn ,temp)
 
               (inst sub ,result-tn ,result-tn (add-sub-immediate ,size))
 
@@ -253,7 +256,8 @@
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p
-                                                 (lip (missing-arg)))
+                                                 (lip (missing-arg))
+                                                 (temp (missing-arg)))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -263,12 +267,14 @@
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag)
               (stack-allocate-p stack-allocate-p)
-              (lip lip))
+              (lip lip)
+              (temp temp))
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
-                   :lip ,lip)
+                   :lip ,lip
+                   :temp ,temp)
        (when ,type-code
          (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
          (inst add ,flag-tn ,flag-tn ,type-code)
