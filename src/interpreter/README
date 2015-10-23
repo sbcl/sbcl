@@ -1,0 +1,164 @@
+Files in this directory implement the :sb-fasteval feature.
+The implementation is by Douglas Katzman.
+
+This file serves as guide to care-and-feeding of the new feature.
+
+Enabling
+========
+
+To use the new interpreter, it must be compiled-in at build-time.
+This can be done either by adding '--with-sb-fasteval --without-sb-eval'
+to the "make.sh" invocation, or by adding :sb-fasteval and
+removing :sb-eval from the 'customize-target-features.lisp' file.
+If building worked right, there should be an SB-INTERPRETER package.
+There are external symbols in it, but none for public consumption.
+
+As with sb-eval, the SB-EXT:*EVALUATOR-MODE* variable can be
+set to :INTERPRET or :COMPILE.
+
+The REPL defaults to :INTERPRET if :sb-fasteval is enabled.
+This is a change relative to existing behavior in which the REPL
+defaulted to :COMPILE. For technical reasons, :INTERPRET is to
+be preferred, in that (COMPILE F) expressly requests compilation,
+whereas there is no means to expressly request interpretation
+other than having it be the default.
+
+Advantages
+==========
+
+Speed:
+
+ * Toplevel form dispatch is slightly quicker. It is not
+   a linear scan over all 25 standard special operators.
+
+ * Macroexpansions are aggressively cached to avoid consing.
+
+ * Repeated syntactic/semantic analysis of forms is avoided,
+   to the extent possible (subject to cache invalidation).
+
+ * LOAD on a source file is at least as fast as it would be
+   with sb-eval, and usually significantly faster.
+
+Safety:
+
+ * Type declarations and THE forms are respected unless
+   OPTIMIZE qualities contraindicate checking.
+
+Convenience:
+
+ * Maximal laziness - as per the the above points, semantic analysis
+   is performed to avoid subsequent work, however it is performed
+   only just-in-time to evaluate each subform. Huge swaths of code
+   which are never reached incur no penalty.
+
+ * Global declarations (macros, types, etc) may be made out-of-order
+   with respect to their first "apparent" use, if such use is in a
+   function that is not called, just as would be true with a plain
+   recursive-descent evaluator. While not strictly an improvement
+   over what the sb-eval interpreter offers, it is indeed more friendly
+   than an interpreter which bakes in all semantics in a pre-pass.
+
+OPTIMIZE settings
+=================
+
+The interpreter pays heed to the SPEED and SAFETY qualities
+in each lexical environment as they affect type-checking.
+
+Entrance to a new LET, LET*, or LAMBDA scope:
+ - initial bindings are checked if (>= SAFETY 1)
+
+ - declarations pertaining to lexically visible variables
+   in containing scopes are checked if (>= SAFETY 2).
+   The rationale is that tightening a type restriction
+   is rare and unlikely to be strictly necessary.
+   Weakening a restriction is correctly deemed a no-op.
+
+Variable assignment (SETQ, etc):
+ - checked if (>= SAFETY 1)
+
+Variable access:
+  - not checked, unless (AND (= SAFETY 3) (SPEED 0))
+  We normally assume that variables have their correct types
+  and that structure slots have their correct types.
+  As such, reads should be inherently type-correct.
+
+THE forms:
+  - checked if (>= SAFETY SPEED)
+
+The effect of the above is that raising SPEED to 2 will continue
+to respect type-safety for binding and assignment, but ignore THE
+forms that are typically introduced into code "for efficiency".
+In as much as interpreted code can not be made to execute faster
+by adding type-checks, THE forms can reasonably be disregarded
+for the most part, but not by default.
+
+If maximally fast interpreted code is desired, it is necessary
+to change three things: (SPEED 3) (SAFETY 0) (DEBUG 0).
+The DEBUG setting does not affect debuggability per se, however
+the combination of the above effectively disables macro cache flushes.
+That is, the interpreter forgoes any checking that it would
+otherwise do to see if a macro definition has changed.
+
+Note that it is virtually impossible to run truly unsafe code
+in the interpreter, as at no point does it produce machine code
+except through the compiler in one particular situation limited
+to structure slot access.
+
+Note also that FTYPE proclamations are always disregarded.
+It is unlikely that an enhancement to check FTYPE would be
+implemented, though it is within the realm of what could be done.
+
+Performance
+===========
+
+Having been tested extensively on the CL-bench suite of tests,
+the performance can be characterized as anywhere from a 10x
+to 100x (or more) improvement over the legacy interpreter.
+Consing is also usually decreased by a factor of 5 to 10.
+However (as called out in KNOWN BUGS) there is possibly
+a problem with garbage retention.  That said, the interpreter
+sees daily use in a production setting with no problems.
+
+Technical notes
+===============
+
+As mentioned in CLtL2, it is essentially impossible to use any
+standard mechanism to cache macros (notably *MACROEXPAND-HOOK*)
+because an identical form appearing in two distinct lexical
+environments may expand differently, and implementations are
+expressly permitted to stack-allocate environments,
+precluding their use as keys in persistent datastructures.
+
+Caching works by assuming that if (MACRO-FUNCTION M) did not change,
+then an invocation of (M args...) will always expand to the same
+thing, if in the identical lexical environment.
+This can fail in certain situations, but all such situations
+would *also* be nearly certainly wrong in compiled code.
+The biggest problem would be with nondeterministic macros.
+CLHS states specifically that macros which depend on when or how
+many times they are called are unportable.
+
+A more subtle problem is that while the MACRO-FUNCTION serves
+as part of the "key" to expansion, there is no such key
+for global symbol-macros. If a macro M, during its expansion,
+inquires whether a symbol S is a symbol-macro, and the answer
+is "no", then if the answer becomes "yes", it might not happen
+that a subsequent invocation of M computes a new expansion.
+
+KNOWN BUGS
+==========
+
+* Regression tests of threading and foreign calls fail.
+
+* Self-building SBCL exhausts memory if the default evaluator-mode
+  is :interpret in the hosting SBCL and :sb-after-xc-core is set.
+
+* Structure constructors do not check their argument types.
+
+* Local type declarations on special variables are usually ignored.
+
+* Reading through a symbol-macro is not inherently type-correct,
+  but the interpreter does not cast the type onto the expansion.
+  It does cast for SETF. This is a compromise, as the existing
+  behavior of the compiler is decidedly not ANSI-compliant.
+  (It changes the macroexpansion to include a THE form).

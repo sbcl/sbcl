@@ -4,6 +4,9 @@ changes relative to sbcl-1.2.16:
     expander is not always an object of type SB-KERNEL:LEXENV.
     It can be nil, as is permissible by the standard.
   * enhancement: ported to ARM64 Linux.
+  * enhancement: a new interpreter is included which has many benefits
+    over sb-eval. It is disabled by default. See src/interpreter/README
+    for instructions to enable it, and further details.
   * bug fix: calling COMPILE when SB-EXT:*EVALUATOR-MODE* was :INTERPRET
     would fail to perform "normal semantic processing such as macro expansion"
     as stipulated by X3J13 issue LOAD-TIME-EVAL.
