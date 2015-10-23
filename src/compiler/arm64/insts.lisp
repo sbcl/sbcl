@@ -71,7 +71,7 @@
     (declare (ignore dstate))
     (destructuring-bind (kind amount) value
       (when (plusp amount)
-        (princ ", ")
+        (princ ", " stream)
         (princ (ecase kind
                  (#b00 "LSL")
                  (#b01 "LSR")
@@ -111,7 +111,7 @@
                      (#b111 "SXTX")))
                stream))
       (when (plusp amount)
-        (format stream  " #~d" amount))))
+        (format stream " #~d" amount))))
 
   (defun print-ldr-str-extend (value stream dstate)
     (declare (ignore dstate))
@@ -1119,7 +1119,8 @@
     (immr :field (byte 6 16) :type 'unsigned-immediate)
     (imms :field (byte 6 10) :type 'unsigned-immediate)
     (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+    (rd :field (byte 5 0) :type 'reg)
+    (lsl-alias :fields (list (byte 6 16) (byte 6 10))))
 
 
 (define-instruction sbfm (segment rd rn immr imms)
@@ -1132,14 +1133,37 @@
 
 (define-instruction bfm (segment rd rn immr imms)
   (:printer bitfield ((op 1)))
-  (:printer bitfield ((op 1) (imms #b111111))
-            '('lsr :tab rd  ", " rn ", " immr))
   (:emitter
    (emit-bitfield segment +64-bit-size+ 1 +64-bit-size+
                   immr imms (tn-offset rn) (tn-offset rd))))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun print-lsl-alias-name (value stream dstate)
+    (declare (ignore dstate))
+    (destructuring-bind (immr imms) value
+      (princ (if (and (/= imms 63)
+                      (= (1+ imms) immr))
+                 'lsl
+                 'ubfm)
+             stream)))
+
+  (defun print-lsl-alias (value stream dstate)
+    (declare (ignore dstate))
+    (destructuring-bind (immr imms) value
+      (if (and (/= imms 63)
+               (= (1+ imms) immr))
+          (format stream "#~d" (- 63 imms))
+          (format stream "#~d, #~d" immr imms)))))
+
 (define-instruction ubfm (segment rd rn immr imms)
-  (:printer bitfield ((op #b10)))
+  (:printer bitfield ((op #b10) (imms #b111111))
+            '('lsr :tab rd  ", " rn ", " immr))
+  (:printer bitfield ((op #b10))
+            ;; This ought to have a better solution.
+            ;; The whole disassembler ought to be better...
+            '((:using #'print-lsl-alias-name lsl-alias)
+              :tab rd  ", " rn ", "
+              (:using #'print-lsl-alias lsl-alias)))
   (:emitter
    (emit-bitfield segment +64-bit-size+ #b10 +64-bit-size+
                   immr imms (tn-offset rn) (tn-offset rd))))
@@ -1193,8 +1217,7 @@
   (rd 5 0))
 
 (sb!disassem:define-instruction-format
-    (extract 32
-     :default-printer '(:name :tab rd  ", " rn ", " rm ", " imm))
+    (extract 32)
     (op2 :field (byte 8 23) :value #b00100111)
     (op3 :field (byte 1 21) :value #b0)
     (rm :field (byte 5 16) :type 'reg)
@@ -1203,7 +1226,11 @@
     (rd :field (byte 5 0) :type 'reg))
 
 (define-instruction extr (segment rd rn rm lsb)
-  (:printer extract ())
+  (:printer extract ()
+            '((:cond
+                ((rn :same-as rm) 'ror)
+                (t :name))
+              :tab rd  ", " rn (:unless (:same-as rn) "," rm) ", " imm))
   (:emitter
    (assert-same-size rd rn rm)
    (let ((size (reg-size rd)))
@@ -2545,7 +2572,11 @@
     (:16b 1)))
 
 (define-instruction s-orr (segment rd rn rm &optional (size :16b))
-  (:printer simd-three-same ((u #b0) (size #b10) (op #b00011)))
+  (:printer simd-three-same ((u #b0) (size #b10) (op #b00011))
+            '((:cond
+                ((rn :same-as rm) 'mov)
+                (t 'orr))
+              :tab rd  ", " rn (:unless (:same-as rn) "," rm)))
   (:emitter
    (emit-simd-three-same segment
                          (decode-vector-size size)
