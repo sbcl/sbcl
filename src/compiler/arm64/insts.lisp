@@ -152,13 +152,15 @@
     (declare (ignore dstate))
     (destructuring-bind (imm mode) value
       (let ((imm (sb!disassem:sign-extend imm 9)))
-       (ecase mode
-         (#b00
-          (format stream ", #~D]" imm))
-         (#b01
-          (format stream "], #~D" imm))
-         (#b11
-          (format stream ", #~D]!" imm))))))
+        (if (zerop imm)
+            (princ "]" stream)
+            (ecase mode
+              (#b00
+               (format stream ", #~D]" imm))
+              (#b01
+               (format stream "], #~D" imm))
+              (#b11
+               (format stream ", #~D]!" imm)))))))
 
   (defun decode-pair-scaled-immediate (opc value simd)
     (ash (sb!disassem:sign-extend value 7)
@@ -168,13 +170,15 @@
     (declare (ignore dstate))
     (destructuring-bind (mode &rest imm) value
       (let ((imm (apply #'decode-pair-scaled-immediate imm)))
-        (ecase mode
-          (#b01
-           (format stream "], #~D" imm))
-          (#b10
-           (format stream ", #~D]" imm))
-          (#b11
-           (format stream ", #~D]!" imm))))))
+        (if (zerop imm)
+            (princ "]" stream)
+            (ecase mode
+              (#b01
+               (format stream "], #~D" imm))
+              (#b10
+               (format stream ", #~D]" imm))
+              (#b11
+               (format stream ", #~D]!" imm)))))))
 
   (defun print-x-reg (value stream dstate)
     (declare (ignore dstate))
@@ -1498,9 +1502,10 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-unsigned-imm 32
-     :default-printer '(:name :tab rt  ", [" rn ", " imm "]")
+     :default-printer '(:name :tab rt  ", [" rn (:unless (just-imm :constant 0) ", " imm) "]")
      :include ldr-str)
     (op3 :value #b01)
+    (just-imm :field (byte 12 10))
     (imm :fields (list (byte 2 30) (byte 1 23) (byte 12 10) (byte 1 26))
          :type 'scaled-immediate)
     (ldr-str-annotation :fields (list (byte 2 30) (byte 1 23) (byte 12 10) (byte 1 26))))

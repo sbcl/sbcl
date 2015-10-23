@@ -21,7 +21,7 @@ contains the bits of INTEGER."
 
 (defun %unsigned-32-rotate-byte (count integer)
   ;; inhibit transforms
-  ;(declare (notinline %rotate-byte))
+  (declare (notinline %rotate-byte))
   (%rotate-byte count 32 0 integer))
 
 #+64-bit
