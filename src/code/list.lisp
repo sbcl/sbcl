@@ -23,6 +23,7 @@
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
           subst subst-if
+          ;; NSUBLIS is >400 lines of assembly. How is it helpful to inline?
           subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
 ;;; These functions perform basic list operations.
