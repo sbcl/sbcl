@@ -92,6 +92,7 @@
 
 #+sbcl
 (progn
+  (setq *compile-print* nil)
   (load "src/cold/muffler.lisp")
   ;; Let's just say we never care to see these.
   (declaim (sb-ext:muffle-conditions
