@@ -583,9 +583,15 @@
 (defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
   (movable foldable flushable always-translatable))
 
+(defknown %%dpb (integer unsigned-byte unsigned-byte integer) integer
+  (movable foldable flushable always-translatable))
+
 ;;; Constant folding
 (defun %%ldb (integer size posn)
   (%ldb size posn integer))
+
+(defun %%dpb (newbyte integer size posn)
+  (%dpb newbyte size posn integer))
 
 (define-vop (ldb-c/fixnum)
   (:translate %%ldb)
@@ -610,6 +616,51 @@
   (:policy :fast-safe)
   (:generator 3
     (inst ubfm res x posn (+ posn size -1))))
+
+(define-vop (dpb-c/fixnum)
+  (:translate %%dpb)
+  (:args (x :scs (signed-reg) :to :save)
+         (y :scs (any-reg)))
+  (:arg-types signed-num
+              (:constant integer) (:constant integer)
+              tagged-num)
+  (:info size posn)
+  (:results (res :scs (any-reg)))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:generator 2
+    (move res y)
+    (inst bfm res x (- (1- n-word-bits) posn) (1- size))))
+
+(define-vop (dpb-c/signed)
+  (:translate %%dpb)
+  (:args (x :scs (signed-reg) :to :save)
+         (y :scs (signed-reg)))
+  (:arg-types signed-num
+              (:constant integer) (:constant integer)
+              signed-num)
+  (:info size posn)
+  (:results (res :scs (signed-reg)))
+  (:result-types signed-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (move res y)
+    (inst bfm res x (- n-word-bits posn) (1- size))))
+
+(define-vop (dpb-c/unsigned)
+  (:translate %%dpb)
+  (:args (x :scs (unsigned-reg) :to :save)
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num
+              (:constant integer) (:constant integer)
+              unsigned-num)
+  (:info size posn)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (move res y)
+    (inst bfm res x (- n-word-bits posn) (1- size))))
 
 ;;; Modular functions
 (define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
