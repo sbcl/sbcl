@@ -272,8 +272,8 @@
     (let ((value (if (consp value)
                      (logior (ldb (byte 2 0) (car value))
                              (ash (cadr value) 2))
-                     value)))
-      (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+                     (ash value 2))))
+      (+ value (sb!disassem:dstate-cur-addr dstate))))
 
 
   (defun annotate-ldr-str (register offset dstate)
@@ -2422,68 +2422,63 @@
 
 ;;; Compute the address of a CODE object by parsing the header of a
 ;;; nearby LRA or SIMPLE-FUN.
+
+(defun emit-compute (segment vop dest lip compute-delta)
+  (labels ((multi-instruction-emitter (segment position)
+             (let* ((delta (funcall compute-delta position))
+                    (negative (minusp delta))
+                    (delta (abs delta))
+                    (low (* (if negative -1 1)
+                            (ldb (byte 19 0) delta)))
+                    (high (ldb (byte 16 19) delta)))
+               ;; ADR
+               (emit-pc-relative segment 0
+                                 (ldb (byte 2 0) low)
+                                 (ldb (byte 19 2) low)
+                                 (tn-offset lip))
+               (assemble (segment vop)
+                 (inst movz tmp-tn high 16)
+                 (if negative
+                     (inst sub dest lip (lsl tmp-tn 3))
+                     (inst add dest lip (lsl tmp-tn 3))))))
+           (one-instruction-emitter (segment position)
+             (let ((delta (funcall compute-delta position)))
+               ;; ADR
+               (emit-pc-relative segment 0
+                                 (ldb (byte 2 0) delta)
+                                 (ldb (byte 19 2) delta)
+                                 (tn-offset dest))))
+           (multi-instruction-maybe-shrink (segment posn magic-value)
+             (when (typep (funcall compute-delta posn magic-value)
+                          '(signed-byte 19))
+               (emit-back-patch segment 4
+                                #'one-instruction-emitter)
+               t)))
+    (emit-chooser
+     segment 12 2
+     #'multi-instruction-maybe-shrink
+     #'multi-instruction-emitter)))
+
 (define-instruction compute-code (segment code lip object-label temp)
   (:vop-var vop)
   (:emitter
-   (emit-back-patch
-    segment 16
-    (lambda (segment position)
-      (assemble (segment vop)
-        ;; Calculate the address of the code component.
-        (let ((offset (- (+ (label-position object-label) other-pointer-lowtag)
-                         position)))
-          ;; ADR
-          (emit-pc-relative segment 0
-                            (ldb (byte 2 0) offset)
-                            (ldb (byte 19 2) offset)
-                            (tn-offset lip)))
-        ;; Next, we read the function header.
-        (inst ldr temp (@ lip (- other-pointer-lowtag)))
-        ;; Strip the widetag
-        (inst lsr temp temp n-widetag-bits)
-        ;; This leaves the size in words, convert it to bytes and
-        ;; subtract from LIP
-        (inst sub code lip (lsl temp word-shift)))))))
+   (emit-compute segment vop code lip
+                 (lambda (position &optional magic-value)
+                   (declare (ignore magic-value))
+                   (- other-pointer-lowtag
+                      position
+                      (component-header-length))))))
 
 (define-instruction compute-lra (segment dest lip lra-label)
   (:vop-var vop)
   (:emitter
-   (labels ((compute-delta (position &optional magic-value)
-              (- (+ (label-position lra-label
-                                    (when magic-value position)
-                                    magic-value)
-                    other-pointer-lowtag)
-                 position))
-            (multi-instruction-emitter (segment position)
-              (when (minusp position)
-                (error "Implement negative offsets in compute-lra"))
-              (let* ((delta (compute-delta position))
-                     (low (ldb (byte 19 0) delta))
-                     (high (ldb (byte 45 19) delta)))
-                ;; ADR
-                (emit-pc-relative segment 0
-                                  (ldb (byte 2 0) low)
-                                  (ldb (byte 19 2) low)
-                                  (tn-offset lip))
-                (assemble (segment vop)
-                  (inst movz tmp-tn high 16)
-                  (inst add dest lip (lsl tmp-tn 3)))))
-            (one-instruction-emitter (segment position)
-              (let ((delta (compute-delta position)))
-                ;; ADR
-                (emit-pc-relative segment 0
-                                  (ldb (byte 2 0) delta)
-                                  (ldb (byte 19 2) delta)
-                                  (tn-offset dest))))
-            (multi-instruction-maybe-shrink (segment posn magic-value)
-              (when (typep (compute-delta posn magic-value) '(signed-byte 19))
-                (emit-back-patch segment 4
-                                 #'one-instruction-emitter)
-                t)))
-     (emit-chooser
-      segment 12 2
-      #'multi-instruction-maybe-shrink
-      #'multi-instruction-emitter))))
+   (emit-compute segment vop dest lip
+                 (lambda (position &optional magic-value)
+                   (- (+ (label-position lra-label
+                                         (when magic-value position)
+                                         magic-value)
+                         other-pointer-lowtag)
+                      position)))))
 
 (define-instruction load-from-label (segment dest label &optional lip)
   (:vop-var vop)
