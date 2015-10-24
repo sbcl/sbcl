@@ -305,22 +305,6 @@
   `(def!constant ,symbol
      (%defconstant-eqx-value ',symbol ,expr ,eqx)
      ,@(when doc (list doc))))
-(defun %defconstant-eqx-value (symbol expr eqx)
-  (declare (type function eqx))
-  (flet ((bummer (explanation)
-           (error "~@<bad DEFCONSTANT-EQX ~S ~2I~_~S: ~2I~_~A ~S~:>"
-                  symbol
-                  expr
-                  explanation
-                  (symbol-value symbol))))
-    (cond ((not (boundp symbol))
-           expr)
-          ((not (constantp symbol))
-           (bummer "already bound as a non-constant"))
-          ((not (funcall eqx (symbol-value symbol) expr))
-           (bummer "already bound as a different constant value"))
-          (t
-           (symbol-value symbol)))))
 
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.

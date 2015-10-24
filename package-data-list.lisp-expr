@@ -2126,7 +2126,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "!VM-TYPE-COLD-INIT" "!BACKQ-COLD-INIT"
                "!SHARPM-COLD-INIT" "!EARLY-PROCLAIM-COLD-INIT"
                "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
-               "!CONSTANTP-COLD-INIT"
+               "!CONSTANTP-COLD-INIT" "!CONSTANTP2-COLD-INIT"
                "!WORLD-LOCK-COLD-INIT"
 
                "FLOAT-COLD-INIT-OR-REINIT"

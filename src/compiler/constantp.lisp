@@ -79,26 +79,6 @@
 (defun constant-special-variable-p (name)
   (and (member name *special-constant-variables*) t))
 
-;;; FIXME: It would be nice to deal with inline functions
-;;; too.
-(defun constant-function-call-p (form environment envp)
-  (let ((name (car form)))
-    (if (and (legal-fun-name-p name)
-             (eq :function (info :function :kind name))
-             (let ((info (info :function :info name)))
-               (and info (ir1-attributep (fun-info-attributes info)
-                                         foldable)))
-             (and (every (lambda (arg)
-                           (%constantp arg environment envp))
-                         (cdr form))))
-        ;; Even though the function may be marked as foldable
-        ;; the call may still signal an error -- eg: (CAR 1).
-        (handler-case
-            (values t (constant-function-call-value form environment envp))
-          (error ()
-            (values nil nil)))
-        (values nil nil))))
-
 (defun constant-function-call-value (form environment envp)
   (apply (fdefinition (car form))
          (mapcar (lambda (arg)
@@ -188,29 +168,6 @@ constantness of the FORM in ENVIRONMENT."
    :test (every #'constantp* (cons protected-form cleanup-forms))
    :eval (constant-form-value* protected-form))
 
-(!defconstantp the (type form)
-   ;; We can't call TYPEP because the form might be (THE (FUNCTION (t) t) #<fn>)
-   ;; which is valid for declaration but not for discrimination.
-   ;; Instead use %%TYPEP in non-strict mode. FIXME:
-   ;; (1) CAREFUL-SPECIFIER-TYPE should never fail. See lp#1395910.
-   ;; (2) CONTAINS-UNKNOWN-TYPE-P should grovel into ARRAY-TYPE-ELEMENT-TYPE
-   ;; so that (C-U-T-P (SPECIFIER-TYPE '(OR (VECTOR BAD) FUNCTION))) => T
-   ;; and then we can parse, check for unknowns, and get rid of HANDLER-CASE.
-   :test (and (constantp* form)
-              (handler-case
-                  ;; in case the type-spec is malformed!
-                  (let ((parsed (careful-specifier-type type)))
-                    ;; xc can't rely on a "non-strict" mode of TYPEP.
-                    (and parsed
-                         #+sb-xc-host
-                         (typep (constant-form-value* form)
-                                (let ((*unparse-fun-type-simplify* t))
-                                  (type-specifier parsed)))
-                         #-sb-xc-host
-                         (%%typep (constant-form-value* form) parsed nil)))
-                (error () nil)))
-   :eval (constant-form-value* form))
-
 (!defconstantp block (name &body forms)
    ;; We currently fail to detect cases like
    ;;
@@ -244,3 +201,20 @@ constantness of the FORM in ENVIRONMENT."
 
 (!defun-from-collected-cold-init-forms !constantp-cold-init)
 
+;;; Was in 'primordial-extensions', but wants to inline CONSTANTP.
+(defun sb!impl::%defconstant-eqx-value (symbol expr eqx)
+  (declare (type function eqx))
+  (flet ((bummer (explanation)
+           (error "~@<bad DEFCONSTANT-EQX ~S ~2I~_~S: ~2I~_~A ~S~:>"
+                  symbol
+                  expr
+                  explanation
+                  (symbol-value symbol))))
+    (cond ((not (boundp symbol))
+           expr)
+          ((not (constantp symbol))
+           (bummer "already bound as a non-constant"))
+          ((not (funcall eqx (symbol-value symbol) expr))
+           (bummer "already bound as a different constant value"))
+          (t
+           (symbol-value symbol)))))

@@ -106,6 +106,7 @@
  ("src/compiler/early-lexenv")
  ("src/compiler/early-globaldb")
  ("src/code/primordial-extensions")
+ ("src/compiler/constantp")
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names")
@@ -307,6 +308,7 @@
  ("src/compiler/macros")
 
  ("src/compiler/fun-info")
+ ("src/compiler/late-constantp")
  ("src/code/early-classoid")
  ("src/compiler/globaldb")
  ("src/compiler/info-functions")
@@ -403,7 +405,6 @@
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
  ("src/compiler/knownfun")
- ("src/compiler/constantp")
 
  ;; needs FUN-INFO structure slot setters, defined in knownfun.lisp
  ("src/compiler/fun-info-funs")

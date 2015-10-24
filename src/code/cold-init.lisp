@@ -196,6 +196,7 @@
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
   (show-and-call !constantp-cold-init)
+  (show-and-call !constantp2-cold-init)
   ;; Must be done before toplevel forms are invoked
   ;; because a toplevel defstruct will need to add itself
   ;; to the subclasses of STRUCTURE-OBJECT.
