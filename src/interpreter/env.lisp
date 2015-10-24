@@ -334,7 +334,7 @@
     (setq env (env-parent env))))
 
 ;;; Hide an implementation detail of a partially bound environment,
-;;; that is is a vector and a count.
+;;; that it is a vector and a count.
 ;;; END indicates the length of the effective portion of the value vector.
 ;;; LENGTH of a simple-vector is in the same location as CAR of a cons,
 ;;; so regardless of whether ENV-SYMBOLS currently hold a cons or a vector
@@ -345,6 +345,12 @@
            (,end (locally (declare (optimize (safety 0))) (car it))))
        (declare (index-or-minus-1 ,end))
        ,@body)))
+(eval-when (:compile-toplevel)
+  ;; Assert that the claims made in the above comment remain true.
+  (assert (= (- (* sb-vm:n-word-bytes sb-vm:cons-car-slot)
+                sb-vm:list-pointer-lowtag)
+             (- (* sb-vm:n-word-bytes sb-vm:vector-length-slot)
+                sb-vm:other-pointer-lowtag))))
 
 (defmacro %cell-ref (env frame-ptr)
   `(svref (env-payload (env-ancestor ,env ,frame-ptr))
@@ -366,30 +372,38 @@
         unless (itypep val type)
         do (typecheck-fail/ref (frame-symbol env frame-ptr) val type)))
 
-(eval-when (:compile-toplevel)
-  ;; Assert that the claims made in the above comment remain true.
-  (assert (= (- (* sb-vm:n-word-bytes sb-vm:cons-car-slot)
-                sb-vm:list-pointer-lowtag)
-             (- (* sb-vm:n-word-bytes sb-vm:vector-length-slot)
-                sb-vm:other-pointer-lowtag))))
-
 (defun must-freeze-p (env)
   (and env
        (or (env-mutable-p env)
            (must-freeze-p (env-parent env)))))
 
+;; This is an important operation for creation of interpreted lexical closures.
+;; It should execute as fast as possible.
 (defun freeze-env (env)
-  (when env
-    (let ((parent-copy (freeze-env (env-parent env))) ; might not return a fresh copy!
-          (mutable (env-mutable-p env)))
-      (if (or mutable (neq parent-copy (env-parent env)))
-          (let ((new (copy-structure env)))
-            (setf (env-parent new) parent-copy)
-            (when mutable
-              (let ((symbols (env-symbols new)))
-                (setf (env-symbols new) (cons (car symbols) (cdr symbols)))))
-            new)
-          env))))
+  (declare (instance env)) ; just rule out NIL
+  (labels ((recurse (env)
+             (let* ((parent-copy (awhen (env-parent (truly-the basic-env env))
+                                   (recurse it)))
+                    ;; The reason we're grabbing ENV-SYMBOLS here is
+                    ;; to ensure that the slot is accessed exactly once.
+                    ;; (CONSP symbols) is the same as (mutable-p env).
+                    ;; See comment in 'macros' about figuring out
+                    ;; whether this is safe. Maybe I'm just paranoid?
+                    ;; Otoh, maybe I'm not, since the concurrency tests
+                    ;; are randomly hitting lose("Feh.") in gencgc.
+                    (symbols (env-symbols env))
+                    (mutable (consp symbols)))
+               ;; PARENT-COPY might not actually be a copy
+               (if (or mutable (neq parent-copy (env-parent env)))
+                   (let ((new (copy-structure env)))
+                     (setf (env-parent new) parent-copy)
+                     (when mutable
+                       (setf (env-symbols new)
+                             (cons (car (truly-the list symbols))
+                                   (cdr symbols))))
+                     new)
+                   env))))
+    (recurse env)))
 
 ;;; SBCL currently takes declarations affecting policy as if they were "hoisted"
 ;;; outside the form containing them, so that they apply to initialization forms

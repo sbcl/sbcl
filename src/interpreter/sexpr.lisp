@@ -1182,6 +1182,7 @@ Test case.
           ;; %DEFUN would have cleared the :source-transform, and fname would not
           ;; satisfy STRUCTURE-INSTANCE-ACCESSOR-P.
           #+nil (format t "~&; Interpreter: Compiling ~S~%" fname)
+          ;; FIXME: ensure that the compiled function is safe.
           (compile fname (function-lambda-expression f)))))
 
     (when (fluid-def-p fname)

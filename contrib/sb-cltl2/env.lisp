@@ -242,10 +242,12 @@ CARS of the alist include:
 
 In addition to these declarations defined using DEFINE-DECLARATION may
 appear."
-  #+sb-fasteval
-  (when (typep env 'sb-interpreter:basic-env)
-    (setq env (sb-interpreter::lexenv-from-env env)))
-  (let* ((*lexenv* (or env (make-null-lexenv)))
+  (let* ((*lexenv*
+           (typecase env
+             #+sb-fasteval
+             (sb-interpreter:basic-env (sb-interpreter::lexenv-from-env env))
+             (null (make-null-lexenv))
+             (t env)))
          (fun (lexenv-find name funs))
          binding localp ftype dx inlinep)
     (etypecase fun

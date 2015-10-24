@@ -76,10 +76,12 @@
              ;(:predicate nil)
              (:copier nil))
   (parent nil :type (or null basic-env))
-  (payload) ; whatever the particular ENV subtype wants to put here
+  (payload nil :read-only t) ; whatever the particular ENV subtype wants to put here
   ;; #(name1 ... nameN) or (#(name1 ... nameN) . fill-pointer)
   ;; All ENV subtypes except tagbody and block may have symbols,
   ;; either to create free specials or lexical bindings or both.
+  ;; FIXME: NIL should be +NONE+ so that we don't have to distinguish it from CONS,
+  ;; and then MUTABLE-P would be LISTP instead of CONSP for a faster test.
   (symbols nil :type (or null simple-vector
                                (cons (unsigned-byte #.+frame-size-bits+)
                                      simple-vector)))
@@ -88,4 +90,4 @@
   ;; It's analogous to a LEXENV, but naming it LEXENV would be confusing
   ;; as heck, since ENV-LEXENV could be reasonably construed as the function
   ;; that returns a compiler LEXENV corresponding to this BASIC-ENV.
-  (contour nil :type decl-scope))
+  (contour nil :type decl-scope :read-only t))

@@ -869,6 +869,8 @@
               ;; expression to start the recursion
               (let*-bind 0 (length values))
               ;; post-binding actions
+              ;; FIXME: this step is possibly not thread-safe. Figure it out.
+              ;; Maybe "once a mutable env, always a mutable env"?
               (setf (env-symbols new-env) symbols)
               (enforce-types frame env) ; the OLD env
               ,eval-body))))
@@ -893,7 +895,7 @@
 (defun eval-local-macros (env defs)
   ;; Is it necessary to freeze a macro env? You shouldn't look at
   ;; any lexical constructs except macros anyway.
-  (setq env (freeze-env env))
+  (when (must-freeze-p env) (setq env (freeze-env env)))
   (map 'vector
        (lambda (def)
          (with-subforms (name lambda-list &body body) def
@@ -901,7 +903,6 @@
                         (neq (info :function :kind name) :special-form))
              (ip-error "~S is not a valid macro name" name))
            (when (fboundp name)
-             ;; (format *debug-io* "checking lock on ~S~%" name) ; XXX
              (with-package-lock-context (env)
                (program-assert-symbol-home-package-unlocked
                 :eval name "binding ~S as a local macro")))
