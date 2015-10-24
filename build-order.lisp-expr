@@ -103,6 +103,7 @@
  ("src/code/defbangmacro")
  ("src/code/defbangconstant")
 
+ ("src/compiler/early-lexenv")
  ("src/compiler/early-globaldb")
  ("src/code/primordial-extensions")
 
@@ -127,7 +128,6 @@
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/unportable-float")
  ("src/compiler/policy")
- ("src/compiler/early-lexenv")
  #!+sb-fasteval ("src/interpreter/basic-env")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
