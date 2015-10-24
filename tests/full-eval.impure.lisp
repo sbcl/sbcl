@@ -36,7 +36,7 @@
   (eval '(progn
           (defstruct evaluated-struct
             (pointer nil)
-            (word 0 :type (unsigned-byte #.sb-vm:n-word-bytes))
+            (word 0 :type sb-ext:word)
             (single 0.0 :type single-float)
             (double 0.0d0 :type double-float)
             (csingle (complex 0.0 0.0) :type (complex single-float))
