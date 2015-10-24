@@ -168,9 +168,6 @@
   (return-pc (missing-arg) :type sc-offset)
   #!-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc-offset)
-  ;; SC-OFFSET for the number stack FP in this function, or NIL if no
-  ;; NFP allocated.
-  (nfp nil :type (or sc-offset null))
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
   (start-pc (missing-arg) :type index)
