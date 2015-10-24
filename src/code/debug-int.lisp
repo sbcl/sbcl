@@ -1730,8 +1730,12 @@ register."
                  (id (if (logtest sb!c::compiled-debug-var-id-p flags)
                          (geti)
                          0))
-                 (sc-offset (if deleted 0 (geti)))
-                 (save-sc-offset (and save (geti)))
+                 (sc-offset (if deleted 0
+                                #!-64-bit (geti)
+                                #!+64-bit (ldb (byte 27 8) flags)))
+                 (save-sc-offset (and save
+                                      #!-64-bit (geti)
+                                      #!+64-bit (ldb (byte 27 35) flags)))
                  (indirect-sc-offset (and indirect-p
                                           (geti))))
             (aver (not (and args-minimal (not minimal))))

@@ -346,20 +346,35 @@
          (setq flags (logior flags compiled-debug-var-more-context-p)))
         (:more-count
          (setq flags (logior flags compiled-debug-var-more-count-p)))))
+    #!+64-bit
+    (cond (indirect
+           (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
+           (when save-tn
+             (setf (ldb (byte 27 35) flags) (tn-sc-offset save-tn))))
+          (t
+           (if (and tn (tn-offset tn))
+               (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
+               (aver minimal))
+           (when save-tn
+             (setf (ldb (byte 27 35) flags) (tn-sc-offset save-tn)))))
     (vector-push-extend flags buffer)
     (unless minimal
       (vector-push-extend name buffer)
       (unless (zerop id)
         (vector-push-extend id buffer)))
+
     (cond (indirect
            ;; Indirect variables live in the parent frame, and are
            ;; accessed through a saved frame pointer.
            ;; The first one/two sc-offsets are for the frame pointer,
            ;; the third is for the stack offset.
+           #!-64-bit
            (vector-push-extend (tn-sc-offset tn) buffer)
+           #!-64-bit
            (when save-tn
              (vector-push-extend (tn-sc-offset save-tn) buffer))
            (vector-push-extend (tn-sc-offset (leaf-info var)) buffer))
+          #!-64-bit
           (t
            (if (and tn (tn-offset tn))
                (vector-push-extend (tn-sc-offset tn) buffer)
