@@ -1270,10 +1270,11 @@
                       ((and optional
                             (not (optional-dispatch-more-entry ef)))
                        (optional-dispatch-max-args ef)))))
-      (vop verify-arg-count node block
-           arg-count-location
-           min
-           max))))
+      (unless (and (eql min 0) (not max))
+        (vop verify-arg-count node block
+             arg-count-location
+             min
+             max)))))
 
 ;;; Do all the stuff that needs to be done on XEP entry:
 ;;; -- Create frame.
