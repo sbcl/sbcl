@@ -157,6 +157,7 @@
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
            (tin (meta-info-number meta-info)) ; info-type id number
            (type-spec (meta-info-type-spec meta-info))
+           (new (make-symbol "NEW"))
            (check
             (when (meta-info-validate-function meta-info)
               ;; is (or ... null), but non-null at macroexpansion time
@@ -164,14 +165,13 @@
               `(truly-the function
                 (meta-info-validate-function
                  (truly-the meta-info (svref *info-types* ,tin)))))))
-      (with-unique-names (new)
-        `(let ((,new ,new-value))
-           ;; enforce type-correctness regardless of enclosing policy
-           (let ((,new (locally (declare (optimize (safety 3)))
-                         (the ,type-spec ,new))))
-             ,@(when check
-                 `((funcall ,check ,name ,new)))
-             (set-info-value ,name ,tin ,new))))))
+      `(let ((,new ,new-value))
+         ;; enforce type-correctness regardless of enclosing policy
+         (let ((,new (locally (declare (optimize (safety 3)))
+                       (the ,type-spec ,new))))
+           ,@(when check
+               `((funcall ,check ,name ,new)))
+           (set-info-value ,name ,tin ,new)))))
 
   (def clear-info (category kind name)
     `(clear-info-values ,name '(,(meta-info-number meta-info)))))
@@ -187,10 +187,10 @@
 ;; A mutex-guarded table would probably be more appropriate in such cases.
 ;;
 (defmacro get-info-value-initializing (category kind name creation-form)
-  (with-unique-names (info-number proc)
-    `(let ((,info-number
-            ,(if (and (keywordp category) (keywordp kind))
-                 (meta-info-number (meta-info category kind))
-                 `(meta-info-number (meta-info ,category ,kind)))))
-       (dx-flet ((,proc () ,creation-form))
-         (%get-info-value-initializing ,name ,info-number #',proc)))))
+  (let ((proc (make-symbol "THUNK")))
+    `(dx-flet ((,proc () ,creation-form))
+       (%get-info-value-initializing
+        ,(if (and (keywordp category) (keywordp kind))
+             (meta-info-number (meta-info category kind))
+             `(meta-info-number (meta-info ,category ,kind)))
+        ,name #',proc))))

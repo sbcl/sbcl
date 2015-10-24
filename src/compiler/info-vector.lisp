@@ -1271,7 +1271,7 @@ This is interpreted as
 ;; Note also that we do not do an initial attempt to read once with INFO,
 ;; followed up by a double-checking get-or-set operation. It is assumed that
 ;; the user of this already did an initial check, if such is warranted.
-(defun %get-info-value-initializing (name info-number creation-thunk)
+(defun %get-info-value-initializing (info-number name creation-thunk)
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
   (let ((name (uncross name))

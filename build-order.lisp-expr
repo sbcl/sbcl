@@ -103,11 +103,8 @@
  ("src/code/defbangmacro")
  ("src/code/defbangconstant")
 
- ("src/code/primordial-extensions")
- ;; early-globaldb could go even earlier by changing one use of
- ;; WITH-UNIQUE-NAMES to just GENSYM, but the macros therein are
- ;; transforming everything they should, so it's fine.
  ("src/compiler/early-globaldb")
+ ("src/code/primordial-extensions")
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names")
