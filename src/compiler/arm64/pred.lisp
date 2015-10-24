@@ -53,7 +53,12 @@
 
 (define-vop (if-eq)
   (:args (x :scs (any-reg descriptor-reg null))
-         (y :scs (any-reg descriptor-reg null)))
+         (y :scs (any-reg descriptor-reg null)
+            :load-if (sc-case y
+                       ((any-reg descriptor-reg null))
+                       (immediate
+                        (not (fixnum-add-sub-immediate-p (tn-value y))))
+                       (t t))))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
@@ -65,5 +70,7 @@
             (t x))
           (sc-case y
             (null null-tn)
+            (immediate
+             (fixnumize (tn-value y)))
             (t y)))
     (inst b (if not-p :ne :eq) target)))

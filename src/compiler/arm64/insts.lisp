@@ -783,6 +783,13 @@
              (and (typep x '(unsigned-byte 24))
                   (not (ldb-test (byte 12 0) x)))))))
 
+(defun negative-add-sub-immediate-p (x)
+  (and (typep x '(integer * -1))
+       (let ((x (- x)))
+         (or (typep x '(unsigned-byte 12))
+             (and (typep x '(unsigned-byte 24))
+                  (not (ldb-test (byte 12 0) x)))))))
+
 (defmacro def-add-sub (name op &rest printers)
   `(define-instruction ,name (segment rd rn rm)
      ,@printers

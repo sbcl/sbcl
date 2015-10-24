@@ -716,7 +716,7 @@
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (unsigned-byte 8)))
+  (:arg-types tagged-num (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:info y))
 
 (define-vop (fast-conditional/signed fast-conditional)
@@ -727,7 +727,7 @@
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (unsigned-byte 8)))
+  (:arg-types signed-num (:constant (satisfies add-sub-immediate-p)))
   (:info y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
@@ -738,7 +738,7 @@
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (unsigned-byte 8)))
+  (:arg-types unsigned-num (:constant (satisfies add-sub-immediate-p)))
   (:info y))
 
 (defmacro define-conditional-vop (tran cond unsigned)
@@ -792,7 +792,7 @@
 
 (define-vop (fast-eql-c/fixnum)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (signed-byte 9)))
+  (:arg-types tagged-num (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:info y)
   (:translate eql)
   (:policy :fast-safe)
@@ -804,7 +804,7 @@
 
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
   (:args (x :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (signed-byte 9)))
+  (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:variant-cost 6))
 
 ;; (macrolet ((define-logtest-vops ()
