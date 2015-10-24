@@ -579,6 +579,37 @@
     (inst add num num (lsr num 16))
     (inst add num num (lsr num 32))
     (inst and res num #xff)))
+
+(defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
+  (movable foldable flushable always-translatable))
+
+;;; Constant folding
+(defun %%ldb (integer size posn)
+  (%ldb size posn integer))
+
+(define-vop (ldb-c/fixnum)
+  (:translate %%ldb)
+  (:args (x :scs (any-reg)))
+  (:arg-types tagged-num
+              (:constant integer) (:constant integer))
+  (:info size posn)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst ubfm res x (1+ posn) (+ posn size))))
+
+(define-vop (ldb-c)
+  (:translate %%ldb)
+  (:args (x :scs (unsigned-reg signed-reg)))
+  (:arg-types (:or unsigned-num signed-num)
+              (:constant integer) (:constant integer))
+  (:info size posn)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst ubfm res x posn (+ posn size -1))))
 
 ;;; Modular functions
 (define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
