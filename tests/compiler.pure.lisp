@@ -27,42 +27,47 @@
 ;;;
 ;;; The bug was fixed by Douglas Crosher's patch, massaged for SBCL by
 ;;; Martin Atzmueller (2000-09-13 on sbcl-devel).
-(funcall (compile nil
-                  '(lambda ()
-                     (labels ((fun1 ()
-                                (fun2))
-                              (fun2 ()
-                                (when nil
-                                  (tagbody
-                                   tag
-                                   (fun2)
-                                   (go tag)))
-                                (when nil
-                                  (tagbody
-                                   tag
-                                   (fun1)
-                                   (go tag)))))
-
-                       (fun1)
-                       nil))))
+(with-test (:name (:compiler-bug labels tagbody))
+  (funcall (checked-compile
+            `(lambda ()
+               (labels ((fun1 ()
+                          (fun2))
+                        (fun2 ()
+                          (when nil
+                            (tagbody
+                             tag
+                               (fun2)
+                               (go tag)))
+                          (when nil
+                            (tagbody
+                             tag
+                               (fun1)
+                               (go tag)))))
+                 (fun1)
+                 nil)))))
 
 ;;; Exercise a compiler bug (by crashing the compiler).
 ;;;
 ;;; Tim Moore gave a patch for this bug in CMU CL 2000-05-24 on
 ;;; cmucl-imp, and Martin Atzmueller applied it to SBCL.
-(funcall (compile nil
-                  '(lambda (x)
-                     (or (integerp x)
-                         (block used-by-some-y?
-                           (flet ((frob (stk)
-                                    (dolist (y stk)
-                                      (unless (rejected? y)
-                                        (return-from used-by-some-y? t)))))
-                             (declare (inline frob))
-                             (frob (rstk x))
-                             (frob (mrstk x)))
-                           nil))))
-         13)
+(with-test (:name (:compiler-bug flet inline :undefined-function))
+  (multiple-value-bind (fun failure-p warnings style-warnings)
+      (checked-compile
+       `(lambda (x)
+          (or (integerp x)
+              (block used-by-some-y?
+                (flet ((frob (stk)
+                         (dolist (y stk)
+                           (unless (rejected? y)
+                             (return-from used-by-some-y? t)))))
+                  (declare (inline frob))
+                  (frob (rstk x))
+                  (frob (mrstk x)))
+                nil)))
+       :allow-style-warnings t)
+    (declare (ignore failure-p warnings))
+    (assert (= 3 (length style-warnings)))
+    (funcall fun 13)))
 
 ;;; bug 112, reported by Martin Atzmueller 2001-06-25 (originally
 ;;; from Bruno Haible in CMU CL bugs collection), fixed by
@@ -82,45 +87,41 @@
 
 ;;; another LET-related bug fixed by Alexey Dejneka at the same
 ;;; time as bug 112
-(multiple-value-bind (fun warnings-p failure-p)
-    ;; should complain about duplicate variable names in LET binding
-    (compile nil
-             '(lambda ()
-               (let (x
-                     (x 1))
-                 (list x))))
-  (declare (ignore warnings-p))
-  (assert (functionp fun))
-  (assert failure-p))
+(with-test (:name (let :repeated-name :bug-112))
+  ;; Should complain about duplicate variable names in LET binding
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda ()
+                          (let (x
+                                (x 1))
+                            (list x)))
+                       :allow-failure t)
+    (assert (functionp fun))
+    (assert failure-p)))
 
 ;;; bug 169 (reported by Alexey Dejneka 2002-05-12, fixed by David
 ;;; Lichteblau 2002-05-21)
-(progn
-  (multiple-value-bind (fun warnings-p failure-p)
-      (compile nil
-               ;; Compiling this code should cause a STYLE-WARNING
-               ;; about *X* looking like a special variable but not
-               ;; being one.
-               '(lambda (n)
-                  (let ((*x* n))
-                    (funcall (symbol-function 'x-getter))
-                    (print *x*))))
+(with-test (:name (let :earmuffs))
+  ;; Compiling this code should cause a STYLE-WARNING about *X*
+  ;; looking like a special variable but not being one.
+  (multiple-value-bind (fun failure-p warnings style-warnings)
+      (checked-compile
+       `(lambda (n)
+          (let ((*x* n))
+            (funcall (symbol-function 'x-getter))
+            (print *x*)))
+       :allow-style-warnings 'sb-kernel:asterisks-around-lexical-variable-name)
+    (declare (ignore failure-p warnings))
     (assert (functionp fun))
-    (assert warnings-p)
-    (assert (not failure-p)))
-  (multiple-value-bind (fun warnings-p failure-p)
-      (compile nil
-               ;; Compiling this code should not cause a warning
-               ;; (because the DECLARE turns *X* into a special
-               ;; variable as its name suggests it should be).
-               '(lambda (n)
-                  (let ((*x* n))
-                    (declare (special *x*))
-                    (funcall (symbol-function 'x-getter))
-                    (print *x*))))
-    (assert (functionp fun))
-    (assert (not warnings-p))
-    (assert (not failure-p))))
+    (assert (= 1 (length style-warnings))))
+  ;; Compiling this code should not cause a warning (because the
+  ;; DECLARE turns *X* into a special variable as its name suggests it
+  ;; should be).
+  (let ((fun (checked-compile `(lambda (n)
+                                 (let ((*x* n))
+                                   (declare (special *x*))
+                                   (funcall (symbol-function 'x-getter))
+                                   (print *x*))))))
+    (assert (functionp fun))))
 
 ;;; a bug in 0.7.4.11
 (dolist (i '(a b 1 2 "x" "y"))
@@ -146,7 +147,11 @@
 
 ;;; bug caught and fixed by Raymond Toy cmucl-imp 2002-07-10: &REST
 ;;; variable is not optional.
-(assert (null (ignore-errors (eval '(funcall (lambda (&rest) 12))))))
+(with-test (:name (:lambda-list &rest :missing-name))
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda (&rest) 12) :allow-failure t)
+    (assert failure-p)
+    (assert-error (funcall fun))))
 
 ;;; on the PPC, we got the magic numbers in undefined_tramp wrong for
 ;;; a while; fixed by CSR 2002-07-18
@@ -174,18 +179,32 @@
 
 ;;; Non-symbols shouldn't be allowed as VARs in lambda lists. (Where VAR
 ;;; is a variable name, as in section 3.4.1 of the ANSI spec.)
-(assert (null (ignore-errors (eval '(lambda ("foo") 12)))))
-(assert (ignore-errors (eval '(lambda (foo) 12))))
-(assert (null (ignore-errors (eval '(lambda (&optional 12) "foo")))))
-(assert (ignore-errors (eval '(lambda (&optional twelve) "foo"))))
-(assert (null (ignore-errors (eval '(lambda (&optional (12 12)) "foo")))))
-(assert (ignore-errors (eval '(lambda (&optional (twelve 12)) "foo"))))
-(assert (null (ignore-errors (eval '(lambda (&key #\c) "foo")))))
-(assert (ignore-errors (eval '(lambda (&key c) "foo"))))
-(assert (null (ignore-errors (eval '(lambda (&key (#\c #\c)) "foo")))))
-(assert (ignore-errors (eval '(lambda (&key (c #\c)) "foo"))))
-(assert (null (ignore-errors (eval '(lambda (&key ((#\c #\c) #\c)) "foo")))))
-(assert (ignore-errors (eval '(lambda (&key ((:c cbyanyothername) #\c)) "foo"))))
+(with-test (:name (:lambda-list :non-symbols))
+  (mapc (lambda (case)
+          (destructuring-bind (form wrongp) case
+            (multiple-value-bind (fun failure-p)
+                (checked-compile form :allow-failure wrongp)
+              (assert (functionp fun))
+              (when wrongp
+                (assert failure-p)
+                (assert-error (funcall fun))))))
+        '(((lambda ("foo") 12)                     t)
+          ((lambda (foo) foo)                      nil)
+
+          ((lambda (&optional 12) "foo")           t)
+          ((lambda (&optional twelve) twelve)      nil)
+
+          ((lambda (&optional (12 12)) "foo")      t)
+          ((lambda (&optional (twelve 12)) twelve) nil)
+
+          ((lambda (&key #\c) "foo")               t)
+          ((lambda (&key c) c)                     nil)
+
+          ((lambda (&key (#\c #\c)) "foo")         t)
+          ((lambda (&key (c #\c)) c)               nil)
+
+          ((lambda (&key ((#\c #\c) #\c)) "foo")   t)
+          ((lambda (&key ((:c c-var) #\c)) c-var)  nil))))
 
 ;;; As reported and fixed by Antonio Martinez-Shotton sbcl-devel
 ;;; 2002-09-12, this failed in sbcl-0.7.7.23. (with failed AVER
@@ -194,13 +213,26 @@
            17))
 
 ;;; bug 181: bad type specifier dropped compiler into debugger
-(assert (list (compile nil '(lambda (x)
-                             (declare (type (0) x))
-                             x))))
+(with-test (:name (compile declare :bad-type-specifier :bug-181))
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda (x)
+                          (declare (type (0) x))
+                          x)
+                       :allow-failure t)
+    (assert failure-p)
+    (assert (functionp fun))
+    (assert-error (funcall fun 1))))
 
-(let ((f (compile nil '(lambda (x)
-                        (make-array 1 :element-type '(0))))))
-  (assert (null (ignore-errors (funcall f)))))
+(with-test (:name (compile make-array :bad-type-specifier :bug-181))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile `(lambda (x)
+                          (declare (ignore x))
+                          (make-array 1 :element-type '(0)))
+                       :allow-warnings t)
+    (declare (ignore failure-p warnings))
+    ;; FIXME (assert (= 1 (length warnings)))
+    (assert (functionp fun))
+    (assert-error (funcall fun 1))))
 
 ;;; the following functions must not be flushable
 (dolist (form '((make-sequence 'fixnum 10)
@@ -261,30 +293,26 @@
            "The return value of NSET-EXCLUSIVE-OR should not be discarded."))
         for expected = (sb-int:ensure-list expected-des)
         do
-        (multiple-value-bind (fun warnings-p failure-p)
-            (handler-bind ((style-warning (lambda (c)
-                                            (if expected
-                                                (let ((expect-one (pop expected)))
-                                                  (assert (search expect-one
-                                                                  (with-standard-io-syntax
-                                                                    (let ((*print-right-margin* nil))
-                                                                      (princ-to-string c))))
-                                                          ()
-                                                          "~S should have warned ~S, but instead warned: ~A"
-                                                          form expect-one c))
-                                                (error "~S shouldn't give a(nother) warning, but did: ~A" form c)))))
-              (compile nil `(lambda () ,form)))
-          (declare (ignore warnings-p))
-          (assert (functionp fun))
-          (assert (null expected)
-                  ()
-                  "~S should have warned ~S, but didn't."
-                  form expected)
-          (assert (not failure-p)))))
+       (multiple-value-bind (fun failure-p warnings style-warnings)
+           (checked-compile `(lambda () ,form) :allow-style-warnings (when expected t))
+         (declare (ignore failure-p warnings))
+         (when expected
+           (assert (= (length expected) (length style-warnings)))
+           (dolist (warning style-warnings)
+             (let ((expect-one (pop expected)))
+               (assert (search expect-one
+                               (with-standard-io-syntax
+                                 (let ((*print-right-margin* nil))
+                                   (princ-to-string warning))))
+                       ()
+                       "~S should have warned ~S, but instead warned: ~A"
+                       form expect-one warning))))
+         (assert (functionp fun)))))
 
 ;;; a bug in the MAP deftransform caused non-VECTOR array specifiers
 ;;; to cause errors in the compiler.  Fixed by CSR in 0.7.8.10
-(assert (list (compile nil '(lambda (x) (map 'simple-array 'identity x)))))
+(with-test (:name (map :non-vector))
+  (checked-compile `(lambda (x) (map 'simple-array 'identity x))))
 
 ;;; bug 129: insufficient syntax checking in MACROLET
 (multiple-value-bind (result error)
@@ -386,22 +414,24 @@
 
 ;;; Bug reported by Robert E. Brown sbcl-devel 2003-02-02: compiler
 ;;; failure
-(compile nil
-         '(lambda (key tree collect-path-p)
-           (let ((lessp (key-lessp tree))
-                 (equalp (key-equalp tree)))
-             (declare (type (function (t t) boolean) lessp equalp))
-             (let ((path '(nil)))
-               (loop for node = (root-node tree)
-                  then (if (funcall lessp key (node-key node))
-                           (left-child node)
-                           (right-child node))
-                  when (null node)
-                  do (return (values nil nil nil))
-                  do (when collect-path-p
-                       (push node path))
-                  (when (funcall equalp key (node-key node))
-                    (return (values node path t))))))))
+(with-test (:name (:compiler-bug declare type loop))
+  (checked-compile
+   `(lambda (key tree collect-path-p)
+      (let ((lessp (key-lessp tree))
+            (equalp (key-equalp tree)))
+        (declare (type (function (t t) boolean) lessp equalp))
+        (let ((path '(nil)))
+          (loop for node = (root-node tree)
+             then (if (funcall lessp key (node-key node))
+                      (left-child node)
+                      (right-child node))
+             when (null node)
+             do (return (values nil nil nil))
+             do (when collect-path-p
+                  (push node path))
+               (when (funcall equalp key (node-key node))
+                 (return (values node path t)))))))
+   :allow-style-warnings t))
 
 ;;; CONSTANTLY should return a side-effect-free function (bug caught
 ;;; by Paul Dietz' test suite)
@@ -414,15 +444,18 @@
     (assert (= i 1))))
 
 ;;; Bug 240 reported by tonyms on #lisp IRC 2003-02-25 (modified version)
-(loop for (fun warns-p) in
-     '(((lambda (&optional *x*) *x*) t)
-       ((lambda (&optional *x* &rest y) (values *x* y)) t)
-       ((lambda (&optional *print-length*) (values *print-length*)) nil)
-       ((lambda (&optional *print-length* &rest y) (values *print-length* y)) nil)
-       ((lambda (&optional *x*) (declare (special *x*)) (values *x*)) nil)
-       ((lambda (&optional *x* &rest y) (declare (special *x*)) (values *x* y)) nil))
-   for real-warns-p = (nth-value 1 (compile nil fun))
-   do (assert (eq warns-p real-warns-p)))
+(with-test (:name (:lambda-list &optional :earmuffs))
+  (loop for (form warns-p) in
+       '(((lambda (&optional *x*) *x*) t)
+         ((lambda (&optional *x* &rest y) (values *x* y)) t)
+         ((lambda (&optional *print-length*) (values *print-length*)) nil)
+         ((lambda (&optional *print-length* &rest y) (values *print-length* y)) nil)
+         ((lambda (&optional *x*) (declare (special *x*)) (values *x*)) nil)
+         ((lambda (&optional *x* &rest y) (declare (special *x*)) (values *x* y)) nil))
+     do (let ((style-warnings (nth-value
+                               3 (checked-compile
+                                  form :allow-style-warnings warns-p))))
+          (assert (= (if warns-p 1 0) (length style-warnings))))))
 
 ;;; Bug reported by Gilbert Baumann on #lisp IRC 2003-03-26
 (assert (equal (funcall (eval '(lambda (x &optional (y (pop x))) (list x y)))
@@ -456,40 +489,46 @@
              1))
 
 ;;; MACROLET should check for duplicated names
-(dolist (ll '((x (z x))
-              (x y &optional z x w)
-              (x y &optional z z)
-              (x &rest x)
-              (x &rest (y x))
-              (x &optional (y nil x))
-              (x &optional (y nil y))
-              (x &key x)
-              (x &key (y nil x))
-              (&key (y nil z) (z nil w))
-              (&whole x &optional x)
-              ;; Uh, this test is semi-bogus - it's trying to test that
-              ;; you can't repeat, but it's now actually testing that
-              ;; &WHOLE has to appear first, per the formal spec.
-              (&environment x &whole x)))
-  (assert (nth-value 2
-                     (handler-case
-                         (compile nil
-                                  `(lambda ()
-                                     (macrolet ((foo ,ll nil)
-                                                (bar (&environment env)
-                                                  `',(macro-function 'foo env)))
-                                       (bar))))
-                       ((or warning error) (c)
-                         (declare (ignore c))
-                         (values nil t t))))))
+(with-test (:name (macrolet :lambda-list :repeated-names))
+  (dolist (ll '((x (z x))
+                (x y &optional z x w)
+                (x y &optional z z)
+                (x &rest x)
+                (x &rest (y x))
+                (x &optional (y nil x))
+                (x &optional (y nil y)) ; TODO this case prints "caught ERROR: ..." but doesn't set failure-p
+                (x &key x)
+                (x &key (y nil x))
+                (&key (y nil z) (z nil w))
+                (&whole x &optional x)))
+    (let ((style-warnings (nth-value
+                           3 (checked-compile
+                              `(lambda ()
+                                 (macrolet ((foo ,ll nil)
+                                            (bar (&environment env)
+                                              `',(macro-function 'foo env)))
+                                   (bar)))
+                              :allow-style-warnings t))))
+      (assert style-warnings))))
+
+;; Uh, this test is semi-bogus - it's trying to test that you can't
+;; repeat, but it's now actually testing that &WHOLE has to appear
+;; first, per the formal spec.
+(with-test (:name (macrolet :lambda-list &whole :must-be-first))
+  (assert-error (checked-compile
+                 `(lambda ()
+                    (macrolet ((foo (&environment x &whole x) nil)
+                               (bar (&environment env)
+                                 `',(macro-function 'foo env)))
+                      (bar))))))
 
 (assert (typep (eval `(the arithmetic-error
                            ',(make-condition 'arithmetic-error)))
                'arithmetic-error))
 
-(assert (not (nth-value
-              2 (compile nil '(lambda ()
-                               (make-array nil :initial-element 11))))))
+(with-test (:name (compile make-array :dimensions nil))
+  (checked-compile `(lambda ()
+                      (make-array nil :initial-element 11))))
 
 (assert-error (funcall (eval #'open) "assertoid.lisp"
                        :external-format '#:nonsense))

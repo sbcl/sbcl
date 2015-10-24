@@ -1160,19 +1160,15 @@
 
 ;;; Both :TEST and :TEST-NOT provided
 (with-test (:name :test-and-test-not-to-adjoin)
-  (let* ((wc 0) ; warning counter
-         (fun
-          (handler-bind (((and warning (not style-warning))
-                          (lambda (w) (declare (ignore w)) (incf wc))))
-            (compile nil `(lambda (item test test-not) (adjoin item '(1 2 3 :foo)
-                                                               :test test
-                                                               :test-not test-not))))))
-    (assert (= 1 wc))
-    (assert (eq :error
-                (handler-case
-                    (funcall fun 1 #'eql (complement #'eql))
-                  (error ()
-                    :error))))))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile `(lambda (item test test-not)
+                          (adjoin item '(1 2 3 :foo)
+                                  :test test
+                                  :test-not test-not))
+                       :allow-warnings t)
+    (declare (ignore failure-p))
+    (assert (= 1 (length warnings)))
+    (assert-error (funcall fun 1 #'eql (complement #'eql)))))
 
 ;;; tests of deftype types equivalent to STRING or SIMPLE-STRING
 (deftype %string () 'string)

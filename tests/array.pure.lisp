@@ -13,54 +13,65 @@
 
 ;;; Array initialization has complicated defaulting for :ELEMENT-TYPE,
 ;;; and both compile-time and run-time logic takes a whack at it.
-(let ((testcases '(;; Bug 126, confusion between high-level default string
-                   ;; initial element #\SPACE and low-level default array
-                   ;; element #\NULL, is gone.
-                   (#\null (make-array 11 :element-type 'character) simple-string)
-                   (#\space (make-string 11 :initial-element #\space) string)
-                   (#\* (make-string 11 :initial-element #\*))
-                   (#\null (make-string 11))
-                   (#\null (make-string 11 :initial-element #\null))
-                   (#\x (make-string 11 :initial-element #\x))
-                   ;; And the other tweaks made when fixing bug 126 didn't
-                   ;; mess things up too badly either.
-                   (0 (make-array 11) simple-vector)
-                   (nil (make-array 11 :initial-element nil))
-                   (12 (make-array 11 :initial-element 12))
-                   (0 (make-array 11 :element-type '(unsigned-byte 4)) (simple-array (unsigned-byte 4) (*)))
-                   (12 (make-array 11
-                                   :element-type '(unsigned-byte 4)
-                                   :initial-element 12)))))
-  (dolist (testcase testcases)
-    (destructuring-bind (expected-result form &optional type) testcase
-      (unless (eql expected-result (aref (eval form) 3))
-        (error "expected ~S in EVAL ~S" expected-result form))
-      (unless (eql expected-result
-                   (aref (funcall (compile nil `(lambda () ,form))) 3))
-        (error "expected ~S in FUNCALL COMPILE ~S" expected-result form))
-      ;; also do some testing of compilation and verification that
-      ;; errors are thrown appropriately.
-      (unless (eql expected-result
-                   (funcall (compile nil `(lambda () (aref ,form 3)))))
-        (error "expected ~S in COMPILED-AREF ~S" expected-result form))
-      (when type
+(with-test (:name (make-array :element-type :bug-126))
+  (let ((testcases '(;; Bug 126, confusion between high-level default string
+                     ;; initial element #\SPACE and low-level default array
+                     ;; element #\NULL, is gone.
+                     (#\null (make-array 11 :element-type 'character) simple-string)
+                     (#\space (make-string 11 :initial-element #\space) string)
+                     (#\* (make-string 11 :initial-element #\*))
+                     (#\null (make-string 11))
+                     (#\null (make-string 11 :initial-element #\null))
+                     (#\x (make-string 11 :initial-element #\x))
+                     ;; And the other tweaks made when fixing bug 126 didn't
+                     ;; mess things up too badly either.
+                     (0 (make-array 11) simple-vector)
+                     (nil (make-array 11 :initial-element nil))
+                     (12 (make-array 11 :initial-element 12))
+                     (0 (make-array 11 :element-type '(unsigned-byte 4)) (simple-array (unsigned-byte 4) (*)))
+                     (12 (make-array 11
+                          :element-type '(unsigned-byte 4)
+                          :initial-element 12)))))
+    (dolist (testcase testcases)
+      (destructuring-bind (expected-result form &optional type) testcase
+        (unless (eql expected-result (aref (eval form) 3))
+          (error "expected ~S in EVAL ~S" expected-result form))
         (unless (eql expected-result
-                     (funcall (compile nil `(lambda () (let ((x ,form))
-                                                         (declare (type ,type x))
-                                                         (aref x 3))))))
-          (error "expected ~S in COMPILED-DECLARED-AREF ~S" expected-result form)))
-      (when (ignore-errors (aref (eval form) 12))
-        (error "error not thrown in EVAL ~S" form))
-      (when (ignore-errors (aref (funcall (compile nil `(lambda () ,form))) 12))
-        (error "error not thrown in FUNCALL COMPILE ~S" form))
-      (when (ignore-errors (funcall (compile nil `(lambda () (aref ,form 12)))))
-        (error "error not thrown in COMPILED-AREF ~S" form))
-      (when type
-        (when (ignore-errors (funcall
-                              (compile nil `(lambda () (let ((x ,form))
-                                                         (declare (type ,type x))
-                                                         (aref x 12))))))
-          (error "error not thrown in COMPILED-DECLARED-AREF ~S" form))))))
+                     (aref (funcall (checked-compile `(lambda () ,form)
+                                                     :allow-warnings t))
+                           3))
+          (error "expected ~S in FUNCALL COMPILE ~S" expected-result form))
+        ;; also do some testing of compilation and verification that
+        ;; errors are thrown appropriately.
+        (unless (eql expected-result
+                     (funcall (checked-compile `(lambda () (aref ,form 3))
+                                               :allow-warnings t)))
+          (error "expected ~S in COMPILED-AREF ~S" expected-result form))
+        (when type
+          (unless (eql expected-result
+                       (funcall (checked-compile `(lambda ()
+                                                    (let ((x ,form))
+                                                      (declare (type ,type x))
+                                                      (aref x 3)))
+                                                 :allow-warnings t)))
+            (error "expected ~S in COMPILED-DECLARED-AREF ~S" expected-result form)))
+        (when (ignore-errors (aref (eval form) 12))
+          (error "error not thrown in EVAL ~S" form))
+        (when (ignore-errors (aref (funcall (checked-compile `(lambda () ,form)
+                                                             :allow-warnings t))
+                                   12))
+          (error "error not thrown in FUNCALL COMPILE ~S" form))
+        (when (ignore-errors (funcall (checked-compile `(lambda () (aref ,form 12))
+                                                       :allow-warnings t)))
+          (error "error not thrown in COMPILED-AREF ~S" form))
+        (when type
+          (when (ignore-errors (funcall
+                                (checked-compile `(lambda ()
+                                                    (let ((x ,form))
+                                                      (declare (type ,type x))
+                                                      (aref x 12)))
+                                                 :allow-warnings t)))
+            (error "error not thrown in COMPILED-DECLARED-AREF ~S" form)))))))
 
 ;;; On the SPARC, until sbcl-0.7.7.20, there was a bug in array
 ;;; references for small vector elements (spotted by Raymond Toy); the
@@ -97,15 +108,15 @@
             (assert (,(if expected 'progn 'not)
                       (array-in-bounds-p ,array ,subscript)))
             (assert (,(if expected 'progn 'not)
-                      (funcall (compile nil '(lambda (array subscript)
-                                              (array-in-bounds-p array subscript)))
+                      (funcall (checked-compile `(lambda (array subscript)
+                                                   (array-in-bounds-p array subscript)))
                                ,array ,subscript))))))
-   (let ((a (make-array 10 :fill-pointer 5)))
-     (test-case a -1                        nil)
-     (test-case a  3                        t)
-     (test-case a  7                        t)
-     (test-case a 11                        nil)
-     (test-case a (1+ most-positive-fixnum) nil))))
+    (let ((a (make-array 10 :fill-pointer 5)))
+      (test-case a -1                        nil)
+      (test-case a  3                        t)
+      (test-case a  7                        t)
+      (test-case a 11                        nil)
+      (test-case a (1+ most-positive-fixnum) nil))))
 
 ;;; arrays of bits should work:
 (let ((a (make-array '(10 10) :element-type 'bit :adjustable t)))
@@ -127,22 +138,26 @@
 
 (assert (eq (upgraded-array-element-type 'nil) 'nil))
 
-(multiple-value-bind (fun warn fail)
-    (compile nil '(lambda () (aref (make-array 0) 0)))
-  (declare (ignore warn))
-  (assert fail)
-  (assert-error (funcall fun) sb-int:invalid-array-index-error))
+(with-test (:name (aref 0 :compile-time-error))
+  (multiple-value-bind (fun fail)
+      (checked-compile `(lambda () (aref (make-array 0) 0))
+                       :allow-warnings t)
+    (assert fail)
+    (assert-error (funcall fun) sb-int:invalid-array-index-error)))
 
-(multiple-value-bind (fun warn fail)
-    (compile nil '(lambda () (aref (make-array 1) 1)))
-  (declare (ignore warn))
-  (assert fail)
-  (assert-error (funcall fun) sb-int:invalid-array-index-error))
+(with-test (:name (aref 1 :compile-time-error))
+  (multiple-value-bind (fun fail)
+      (checked-compile `(lambda () (aref (make-array 1) 1))
+                       :allow-warnings t)
+    (assert fail)
+    (assert-error (funcall fun) sb-int:invalid-array-index-error)))
 
-(multiple-value-bind (fun warn fail)
-    (compile nil '(lambda () (make-array 5 :element-type 'undefined-type)))
-  (declare (ignore fun fail))
-  (assert warn))
+(with-test (:name (make-array :element-type :compile-time-error))
+  (multiple-value-bind (fun fail warnings style-warnings)
+      (checked-compile `(lambda () (make-array 5 :element-type 'undefined-type))
+                       :allow-style-warnings t)
+    (declare (ignore fun fail warnings))
+    (assert style-warnings)))
 
 (flet ((opaque-identity (x) x))
   (declare (notinline opaque-identity))
@@ -192,39 +207,43 @@
 
 ;;; MISC.527: bit-vector bitwise operations used LENGTH to get a size
 ;;; of a vector
-(flet ((bit-vector-equal (v1 v2)
-         (and (bit-vector-p v1) (bit-vector-p v2)
-              (equal (array-dimension v1 0) (array-dimension v2 0))
-              (loop for i below (array-dimension v1 0)
-                    always (eql (aref v1 i) (aref v2 i))))))
-  (let* ((length 1024)
-         (v1 (make-array length :element-type 'bit :fill-pointer 0))
-         (v2 (make-array length :element-type 'bit :fill-pointer 1)))
-    (loop for i from 0 below length
-          for x1 in '#1=(0 0 1 1 . #1#)
-          and x2 in '#2=(0 1 0 1 . #2#)
-          do (setf (aref v1 i) x1)
-          do (setf (aref v2 i) x2))
-    (loop for (bf lf) in '((bit-and logand)
-                           (bit-andc1 logandc1)
-                           (bit-andc2 logandc2)
-                           (bit-eqv logeqv)
-                           (bit-ior logior)
-                           (bit-nand lognand)
-                           (bit-nor lognor)
-                           (bit-orc1 logorc1)
-                           (bit-orc2 logorc2)
-                           (bit-xor logxor)
-                           ((lambda (x y) (bit-not x)) #.(lambda (x y) (lognot x))))
-          for fun = (compile nil `(lambda (v)
-                                    (declare (type (array bit (*)) v))
-                                    (declare (optimize (speed 3) (safety 0)))
-                                    (,bf v ,v2)))
-          for r1 = (funcall fun v1)
-          and r2 = (coerce (loop for i below length
-                                 collect (logand 1 (funcall lf (aref v1 i) (aref v2 i))))
-                           'bit-vector)
-          do (assert (bit-vector-equal r1 r2)))))
+(with-test (:name (bit-vector :bitwise-operations))
+  (flet ((bit-vector-equal (v1 v2)
+           (and (bit-vector-p v1) (bit-vector-p v2)
+                (equal (array-dimension v1 0) (array-dimension v2 0))
+                (loop for i below (array-dimension v1 0)
+                   always (eql (aref v1 i) (aref v2 i))))))
+    (let* ((length 1024)
+           (v1 (make-array length :element-type 'bit :fill-pointer 0))
+           (v2 (make-array length :element-type 'bit :fill-pointer 1)))
+      (loop for i from 0 below length
+         for x1 in '#1=(0 0 1 1 . #1#)
+         and x2 in '#2=(0 1 0 1 . #2#)
+         do (setf (aref v1 i) x1)
+         do (setf (aref v2 i) x2))
+      (loop for (bf lf) in '((bit-and logand)
+                             (bit-andc1 logandc1)
+                             (bit-andc2 logandc2)
+                             (bit-eqv logeqv)
+                             (bit-ior logior)
+                             (bit-nand lognand)
+                             (bit-nor lognor)
+                             (bit-orc1 logorc1)
+                             (bit-orc2 logorc2)
+                             (bit-xor logxor)
+                             ((lambda (x y) (bit-not x)) #.(lambda (x y)
+                                                             (declare (ignore y))
+                                                             (lognot x))))
+         for fun = (checked-compile `(lambda (v)
+                                       (declare (type (array bit (*)) v))
+                                       (declare (optimize (speed 3) (safety 0)))
+                                       (,bf v ,v2))
+                                    :allow-style-warnings t)
+         for r1 = (funcall fun v1)
+         and r2 = (coerce (loop for i below length
+                             collect (logand 1 (funcall lf (aref v1 i) (aref v2 i))))
+                          'bit-vector)
+         do (assert (bit-vector-equal r1 r2))))))
 
 (with-test (:name (adjust-array fill-pointer))
   ;; CLHS, ADJUST-ARRAY: An error of type error is signaled if
@@ -291,10 +310,11 @@
                     :good))))))
 
 (with-test (:name :odd-keys-for-make-array)
-  (assert (eq :good
-              (handler-case
-                  (compile nil '(lambda (m) (make-array m 1)))
-                (simple-warning () :good)))))
+  (multiple-value-bind (fun fail warnings)
+      (checked-compile `(lambda (m) (make-array m 1))
+                       :allow-warnings 'simple-warning)
+    (declare (ignore fun fail))
+    (assert (= 1 (length warnings)))))
 
 
 (with-test (:name :bug-1096359)

@@ -68,9 +68,14 @@
   (assert (= &key 3))
   (assert (null &allow-other-keys)))
 
-(let ((fn (lambda (&foo &rest &bar) (cons &foo &bar))))
-  (assert (equal (funcall fn 1) '(1)))
-  (assert (equal (funcall fn 1 2 3) '(1 2 3))))
+(with-test (:name (:lambda-list :suspicious-variables))
+  (multiple-value-bind (fun failure-p warnings style-warnings)
+      (checked-compile `(lambda (&foo &rest &bar) (cons &foo &bar))
+                       :allow-style-warnings t)
+    (declare (ignore failure-p warnings))
+    (assert (= 2 (length style-warnings)))
+    (assert (equal (funcall fun 1) '(1)))
+    (assert (equal (funcall fun 1 2 3) '(1 2 3)))))
 
 ;;; Failure to save a core is an error
 (with-test (:name :save-lisp-and-die-error)

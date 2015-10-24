@@ -17,25 +17,37 @@
 ;;; to SBCL, multiplications were excitingly broken.  While it's
 ;;; unlikely that anything with such fundamental arithmetic errors as
 ;;; these are going to get this far, it's probably worth checking.
-(macrolet ((test (op res1 res2)
-             `(progn
-               (assert (= (,op 4 2) ,res1))
-               (assert (= (,op 2 4) ,res2))
-               (assert (= (funcall (compile nil '(lambda (x y) (,op x y))) 4 2)
-                        ,res1))
-               (assert (= (funcall (compile nil '(lambda (x y) (,op x y))) 2 4)
-                        ,res2)))))
-  (test + 6 6)
-  (test - 2 -2)
-  (test * 8 8)
-  (test / 2 1/2)
-  (test expt 16 16))
+(with-test (:name (:fundamental-arithmetic :smoke))
+  (macrolet ((test (op res1 res2)
+               `(progn
+                  (assert (= (,op 4 2) ,res1))
+                  (assert (= (,op 2 4) ,res2))
+                  (assert (= (funcall (checked-compile '(lambda (x y) (,op x y)))
+                                      4 2)
+                             ,res1))
+                  (assert (= (funcall (checked-compile '(lambda (x y) (,op x y)))
+                                      2 4)
+                             ,res2)))))
+    (test + 6 6)
+    (test - 2 -2)
+    (test * 8 8)
+    (test / 2 1/2)
+    (test expt 16 16)))
 
 ;;; In a bug reported by Wolfhard Buss on cmucl-imp 2002-06-18 (BUG
 ;;; 184), sbcl didn't catch all divisions by zero, notably divisions
 ;;; of bignums and ratios by 0.  Fixed in sbcl-0.7.6.13.
-(assert-error (/ 2/3 0) division-by-zero)
-(assert-error (/ (1+ most-positive-fixnum) 0) division-by-zero)
+(with-test (:name (/ :division-by-zero ratio))
+  (assert-error (funcall (checked-compile
+                          `(lambda () (/ 2/3 0))
+                          :allow-style-warnings t))
+                division-by-zero))
+
+(with-test (:name (/ :division-by-zero bignum))
+  (assert-error (funcall (checked-compile
+                          `(lambda () (/ (1+ most-positive-fixnum) 0))
+                          :allow-style-warnings t))
+                division-by-zero))
 
 ;;; In a bug reported by Raymond Toy on cmucl-imp 2002-07-18, (COERCE
 ;;; <RATIONAL> '(COMPLEX FLOAT)) was failing to return a complex
@@ -51,25 +63,45 @@
 ;;; COERCE also sometimes failed to verify that a particular coercion
 ;;; was possible (in particular coercing rationals to bounded float
 ;;; types.
-(assert-error (coerce 1 '(float 2.0 3.0)) type-error)
-(assert-error (coerce 1 '(single-float -1.0 0.0)) type-error)
-(assert (eql (coerce 1 '(single-float -1.0 2.0)) 1.0))
+(with-test (:name (coerce :to float :outside-bounds))
+  (assert-error (funcall (checked-compile
+                          `(lambda () (coerce 1 '(float 2.0 3.0)))
+                          :allow-style-warnings t))
+                type-error)
+  (assert-error (funcall (checked-compile
+                          `(lambda () (coerce 1 '(single-float -1.0 0.0)))
+                          :allow-style-warnings t))
+                type-error)
+  (assert (eql (coerce 1 '(single-float -1.0 2.0)) 1.0)))
 
 ;;; ANSI says MIN and MAX should signal TYPE-ERROR if any argument
 ;;; isn't REAL. SBCL 0.7.7 didn't in the 1-arg case. (reported as a
 ;;; bug in CMU CL on #lisp IRC by lrasinen 2002-09-01)
-(assert (null (ignore-errors (min '(1 2 3)))))
-(assert (= (min -1) -1))
-(assert (null (ignore-errors (min 1 #(1 2 3)))))
-(assert (= (min 10 11) 10))
-(assert (null (ignore-errors (min (find-package "CL") -5.0))))
-(assert (= (min 5.0 -3) -3))
-(assert (null (ignore-errors (max #c(4 3)))))
-(assert (= (max 0) 0))
-(assert (null (ignore-errors (max "MIX" 3))))
-(assert (= (max -1 10.0) 10.0))
-(assert (null (ignore-errors (max 3 #'max))))
-(assert (= (max -3 0) 0))
+(with-test (:name (min max type-error))
+  (assert (null (ignore-errors (funcall
+                                (checked-compile `(lambda () (min '(1 2 3)))
+                                                 :allow-style-warnings t)))))
+  (assert (= (min -1) -1))
+  (assert (null (ignore-errors (funcall
+                                (checked-compile `(lambda () (min 1 #(1 2 3)))
+                                                 :allow-style-warnings t)))))
+  (assert (= (min 10 11) 10))
+  (assert (null (ignore-errors (funcall
+                                (checked-compile
+                                 `(lambda () (min (find-package "CL") -5.0))
+                                 :allow-style-warnings t)))))
+  (assert (= (min 5.0 -3) -3))
+  (assert (null (ignore-errors (checked-compile `(lambda () (max #c(4 3)))
+                                                :allow-style-warnings t))))
+  (assert (= (max 0) 0))
+  (assert (null (ignore-errors (funcall
+                                (checked-compile `(lambda () (max "MIX" 3))
+                                                 :allow-style-warnings t)))))
+  (assert (= (max -1 10.0) 10.0))
+  (assert (null (ignore-errors (funcall
+                                (checked-compile `(lambda () (max 3 #'max))
+                                                 :allow-style-warnings t)))))
+  (assert (= (max -3 0) 0)))
 
 (with-test (:name :numeric-inequality-&rest-arguments)
   (dolist (f '(= < <= > >=))
@@ -126,23 +158,20 @@
 ;;; 100 may seem low, but (a) it caught CSR's initial errors, and (b)
 ;;; before checking in, CSR tested with 10000.  So one hundred
 ;;; checkins later, we'll have doubled the coverage.
-(dotimes (i 100)
-  (let* ((x (random most-positive-fixnum))
-         (x2 (* x 2))
-         (x3 (* x 3)))
-    (let ((fn (handler-bind ((sb-ext:compiler-note
-                              (lambda (c)
-                                (when (<= x3 most-positive-fixnum)
-                                  (error c)))))
-                (compile nil
-                         `(lambda (y)
-                            (declare (optimize speed) (type (integer 0 3) y))
-                            (* y ,x))))))
-      (unless (and (= (funcall fn 0) 0)
-                   (= (funcall fn 1) x)
-                   (= (funcall fn 2) x2)
-                   (= (funcall fn 3) x3))
-        (error "bad results for ~D" x)))))
+(with-test (:name (* :multiplication :constant :optimization))
+  (dotimes (i 100)
+    (let* ((x (random most-positive-fixnum))
+           (x2 (* x 2))
+           (x3 (* x 3))
+           (fn (checked-compile
+                `(lambda (y)
+                   (declare (optimize speed) (type (integer 0 3) y))
+                   (* y ,x))
+                :allow-notes (> x3 most-positive-fixnum))))
+      (assert (= (funcall fn 0) 0))
+      (assert (= (funcall fn 1) x))
+      (assert (= (funcall fn 2) x2))
+      (assert (= (funcall fn 3) x3)))))
 
 ;;; Bugs reported by Paul Dietz:
 
@@ -203,29 +232,32 @@
 
 ;;; Alpha middlenum (yes, really! Affecting numbers between 2^32 and
 ;;; 2^64 :) arithmetic bug
-(let ((fn (compile nil '(LAMBDA (A B C D)
-          (DECLARE (TYPE (INTEGER -1621 -513) A)
-                   (TYPE (INTEGER -3 34163) B)
-                   (TYPE (INTEGER -9485132993 81272960) C)
-                   (TYPE (INTEGER -255340814 519943) D)
-                   (IGNORABLE A B C D)
-                   (OPTIMIZE (SPEED 3) (SAFETY 1) (DEBUG 1)))
-          (TRUNCATE C (MIN -100 4149605))))))
-  (assert (= (funcall fn -1332 5864 -6963328729 -43789079) 69633287)))
+(with-test (:name (truncate :middlenum))
+  (let ((fn (checked-compile
+             `(lambda (a b c d)
+                (declare (type (integer -1621 -513) a)
+                         (type (integer -3 34163) b)
+                         (type (integer -9485132993 81272960) c)
+                         (type (integer -255340814 519943) d)
+                         (ignorable a b c d)
+                         (optimize (speed 3) (safety 1) (debug 1)))
+                (truncate c (min -100 4149605))))))
+    (assert (= (funcall fn -1332 5864 -6963328729 -43789079) 69633287))))
 
 ;;; Here's another fantastic Alpha backend bug: the code to load
 ;;; immediate 64-bit constants into a register was wrong.
-(let ((fn (compile nil '(LAMBDA (A B C D)
-          (DECLARE (TYPE (INTEGER -3563 2733564) A)
-                   (TYPE (INTEGER -548947 7159) B)
-                   (TYPE (INTEGER -19 0) C)
-                   (TYPE (INTEGER -2546009 0) D)
-                   (IGNORABLE A B C D)
-                   (OPTIMIZE (SPEED 3) (SAFETY 1) (DEBUG 1)))
-          (CASE A
-            ((89 125 16) (ASH A (MIN 18 -706)))
-            (T (DPB -3 (BYTE 30 30) -1)))))))
-  (assert (= (funcall fn 1227072 -529823 -18 -792831) -2147483649)))
+(with-test (:name (dpb :constants))
+  (let ((fn (checked-compile `(lambda (a b c d)
+                                (declare (type (integer -3563 2733564) a)
+                                         (type (integer -548947 7159) b)
+                                         (type (integer -19 0) c)
+                                         (type (integer -2546009 0) d)
+                                         (ignorable a b c d)
+                                         (optimize (speed 3) (safety 1) (debug 1)))
+                                (case a
+                                  ((89 125 16) (ash a (min 18 -706)))
+                                  (t (dpb -3 (byte 30 30) -1)))))))
+    (assert (= (funcall fn 1227072 -529823 -18 -792831) -2147483649))))
 
 ;;; ASH of a negative bignum by a bignum count would erroneously
 ;;; return 0 prior to sbcl-0.8.4.4
@@ -233,17 +265,14 @@
 
 ;;; Whoops.  Too much optimization in division operators for 0
 ;;; divisor.
-(macrolet ((frob (name)
-             `(let ((fn (compile nil '(lambda (x)
-                                       (declare (optimize speed) (fixnum x))
-                                       (,name x 0)))))
-                (assert-error (funcall fn 1) division-by-zero))))
-  (frob mod)
-  (frob truncate)
-  (frob rem)
-  (frob /)
-  (frob floor)
-  (frob ceiling))
+(with-test (:name (mod truncate rem / floor ceiling :division-by-zero fixnum))
+  (flet ((frob (name)
+           (let ((fn (checked-compile
+                      `(lambda (x)
+                         (declare (optimize speed) (fixnum x))
+                         (,name x 0)))))
+             (assert-error (funcall fn 1) division-by-zero))))
+    (mapc #'frob '(mod truncate rem / floor ceiling))))
 
 ;; Check that the logic in SB-KERNEL::BASIC-COMPARE for doing fixnum/float
 ;; comparisons without rationalizing the floats still gives the right anwers
@@ -320,7 +349,7 @@
   (labels ((test-forms (op x y header &rest forms)
              (let ((val (funcall op x y)))
                (dolist (form forms)
-                 (let ((new-val (funcall (compile nil (append header form)) x y)))
+                 (let ((new-val (funcall (checked-compile (append header form)) x y)))
                    (unless (eql val new-val)
                      (error "~S /= ~S: ~S ~S ~S~%" val new-val (append header form) x y))))))
            (test-case (op x y type)
@@ -399,10 +428,14 @@
                       2596148429267413814265248164610048))))
 
 (with-test (:name :expt-zero-zero)
-  ;; Check that (expt 0.0 0.0) and (expt 0 0.0) signal error, but (expt 0.0 0)
-  ;; returns 1.0
-  (assert-error (expt 0.0 0.0) sb-int:arguments-out-of-domain-error)
-  (assert-error (expt 0 0.0) sb-int:arguments-out-of-domain-error)
+  ;; Check that (expt 0.0 0.0) and (expt 0 0.0) signal error, but
+  ;; (expt 0.0 0) returns 1.0
+  (flet ((error-case (expr)
+           (assert-error (funcall (checked-compile `(lambda () ,expr)
+                                                   :allow-style-warnings t))
+                         sb-int:arguments-out-of-domain-error)))
+    (error-case '(expt 0.0 0.0))
+    (error-case '(expt 0 0.0)))
   (assert (eql (expt 0.0 0) 1.0)))
 
 (with-test (:name :multiple-constant-folding)
@@ -419,11 +452,15 @@
       (dolist (op '(+ * logior logxor logand logeqv gcd lcm - /))
         (loop repeat 10
               do (multiple-value-bind (args vars) (make-args)
-                   (let ((fast (compile nil `(lambda ,vars
-                                               (,op ,@args))))
-                         (slow (compile nil `(lambda ,vars
-                                               (declare (notinline ,op))
-                                               (,op ,@args)))))
+                   (let ((fast (checked-compile
+                                `(lambda ,vars
+                                   (,op ,@args))
+                                :allow-style-warnings (eq op '/)))
+                         (slow (checked-compile
+                                `(lambda ,vars
+                                   (declare (notinline ,op))
+                                   (,op ,@args))
+                                :allow-style-warnings (eq op '/))))
                      (loop repeat 3
                            do (let* ((call-args (loop repeat (length vars)
                                                       collect (- (random 21) 10)))
@@ -444,13 +481,13 @@
 (with-test (:name (:integer-division-using-multiplication :used)
                   :skipped-on '(not (or :x86-64 :x86)))
   (dolist (fun '(truncate floor ceiling mod rem))
-    (let* ((foo (compile nil `(lambda (x)
-                                (declare (optimize (speed 3)
-                                                   (space 1)
-                                                   (compilation-speed 0))
-                                         (type (unsigned-byte
-                                                ,sb-vm:n-word-bits) x))
-                                (,fun x 9))))
+    (let* ((foo (checked-compile
+                 `(lambda (x)
+                    (declare (optimize (speed 3)
+                                       (space 1)
+                                       (compilation-speed 0))
+                             (type (unsigned-byte ,sb-vm:n-word-bits) x))
+                    (,fun x 9))))
            (disassembly (with-output-to-string (s)
                           (disassemble foo :stream s))))
       ;; KLUDGE copied from test :float-division-using-exact-reciprocal
@@ -476,12 +513,13 @@
                                  when (not (zerop (logand r (1- r))))
                                  collect r)))
         (dolist (fun '(truncate ceiling floor mod rem))
-          (let ((foo (compile nil `(lambda (x)
-                                     (declare (optimize (speed 3)
-                                                        (space 1)
-                                                        (compilation-speed 0))
-                                              (type ,dividend-type x))
-                                     (,fun x ,divisor)))))
+          (let ((foo (checked-compile
+                      `(lambda (x)
+                         (declare (optimize (speed 3)
+                                            (space 1)
+                                            (compilation-speed 0))
+                                  (type ,dividend-type x))
+                         (,fun x ,divisor)))))
             (dolist (dividend `(0 1 ,most-positive-fixnum
                                 ,(1- divisor) ,divisor
                                 ,(1- (* divisor 2)) ,(* divisor 2)
@@ -574,10 +612,10 @@
         (error "Number of broken combinations: ~a" n-broken)))))
 
 (with-test (:name (:ldb :rlwinm :ppc))
-  (let ((one (compile nil '(lambda (a) (ldb (byte 9 27) a))))
-        (two (compile nil '(lambda (a)
-                            (declare (type (integer -3 57216651) a))
-                            (ldb (byte 9 27) a)))))
+  (let ((one (checked-compile `(lambda (a) (ldb (byte 9 27) a))))
+        (two (checked-compile `(lambda (a)
+                                 (declare (type (integer -3 57216651) a))
+                                 (ldb (byte 9 27) a)))))
     (assert (= 0 (- (funcall one 10) (funcall two 10))))))
 
 ;; The ISQRT implementation is sufficiently complicated that it should
@@ -610,22 +648,24 @@
 ;; bug 1026634 (reported by Eric Marsden on sbcl-devel)
 (with-test (:name :recursive-cut-to-width)
   (assert (eql (funcall
-                (compile nil
-                         `(lambda (x)
-                            (declare (optimize (space 3))
-                                     (type (integer 12417236377505266230
-                                                    12417274239874990070) x))
-                            (logand 8459622733968096971 x)))
+                (checked-compile
+                 `(lambda (x)
+                    (declare (optimize (space 3))
+                             (type (integer 12417236377505266230
+                                            12417274239874990070)
+                                   x))
+                    (logand 8459622733968096971 x)))
                 12417237222845306758)
                2612793697039849090)))
 
 ;; Also reported by Eric Marsden on sbcl-devel (2013-06-06)
 (with-test (:name :more-recursive-cut-to-width)
   (assert (eql (funcall
-                (compile nil `(lambda (a b)
-                                (declare (optimize (speed 2) (safety 0)))
-                                (logand (the (eql 16779072918521075607) a)
-                                        (the (integer 21371810342718833225 21371810343571293860) b))))
+                (checked-compile
+                 `(lambda (a b)
+                    (declare (optimize (speed 2) (safety 0)))
+                    (logand (the (eql 16779072918521075607) a)
+                            (the (integer 21371810342718833225 21371810343571293860) b))))
                 16779072918521075607 21371810342718833263)
                2923729245085762055)))
 
@@ -633,9 +673,9 @@
   (loop for k from -8 upto 8 do
     (loop for min from -16 upto 16 do
       (loop for max from min upto 16 do
-        (let ((f (compile nil `(lambda (x)
-                                 (declare (type (integer ,min ,max) x))
-                                 (logand x ,k)))))
+        (let ((f (checked-compile `(lambda (x)
+                                     (declare (type (integer ,min ,max) x))
+                                     (logand x ,k)))))
           (loop for x from min upto max do
             (assert (eql (logand x k) (funcall f x)))))))))
 
@@ -643,45 +683,41 @@
   (loop for k from -8 upto 8 do
     (loop for min from -16 upto 16 do
       (loop for max from min upto 16 do
-        (let ((f (compile nil `(lambda (x)
-                                 (declare (type (integer ,min ,max) x))
-                                 (logior x ,k)))))
+        (let ((f (checked-compile `(lambda (x)
+                                     (declare (type (integer ,min ,max) x))
+                                     (logior x ,k)))))
           (loop for x from min upto max do
             (assert (eql (logior x k) (funcall f x)))))))))
 
 (with-test (:name :ldb-negative-index-no-error)
   (assert-error
-   (funcall (compile nil
-                     `(lambda (x y)
-                        (ldb (byte x y) 100)))
+   (funcall (checked-compile `(lambda (x y)
+                                (ldb (byte x y) 100)))
             -1 -2))
   (assert-error
-   (funcall (compile nil
-                     `(lambda (x y)
-                        (mask-field (byte x y) 100)))
+   (funcall (checked-compile `(lambda (x y)
+                                (mask-field (byte x y) 100)))
             -1 -2))
   (assert-error
-   (funcall (compile nil
-                     `(lambda (x y)
-                        (dpb 0 (byte x y) 100)))
+   (funcall (checked-compile `(lambda (x y)
+                                (dpb 0 (byte x y) 100)))
             -1 -2))
   (assert-error
-   (funcall (compile nil
-                     `(lambda (x y)
-                        (deposit-field 0 (byte x y) 100)))
+   (funcall (checked-compile `(lambda (x y)
+                                (deposit-field 0 (byte x y) 100)))
             -1 -2)))
 
 (with-test (:name :setf-mask-field)
   (assert (= (funcall
-              (compile nil
-                       `(lambda (a)
-                          (setf (mask-field (byte 2 0) a) 1) a))
+              (checked-compile `(lambda (a)
+                                  (setf (mask-field (byte 2 0) a) 1) a))
               15))))
 
 (with-test (:name :complex-multiply)
   (assert (= (funcall
-              (compile nil `(lambda ()
-                              (declare (optimize speed))
-                              (let (z)
-                                (expt (setf z (complex -0.123 -0.789)) 2)))))
+              (checked-compile
+               `(lambda ()
+                  (declare (optimize speed))
+                  (let (z)
+                    (expt (setf z (complex -0.123 -0.789)) 2)))))
              #C(-0.60739195 0.194094))))
