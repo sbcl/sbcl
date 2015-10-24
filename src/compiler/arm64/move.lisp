@@ -21,6 +21,15 @@
          (inst movn y (lognot val)))
         ((encode-logical-immediate val)
          (inst orr y zr-tn val))
+        ((minusp val)
+         (loop with first = t
+               for i below 64 by 16
+               for part = (ldb (byte 16 i) val)
+               unless (= part #xFFFF)
+               do
+               (if (shiftf first nil)
+                   (inst movn y (ldb (byte 16 0) (lognot part)) i)
+                   (inst movk y part i))))
         (t
          (loop with first = t
                for i below 64 by 16
