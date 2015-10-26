@@ -803,8 +803,8 @@ default-value-8
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (load-symbol-value stepping sb!impl::*stepping*)
-                    ;; If it's not NIL, trap.
-                    (inst beq stepping null-tn step-done-label)
+                    ;; If it's not 0, trap.
+                    (inst beq stepping STEP-DONE-LABEL)
                     (inst nop)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the BREAK.
@@ -1320,7 +1320,7 @@ default-value-8
   (:generator 3
     (load-symbol-value stepping sb!impl::*stepping*)
     ;; If it's not 0, trap.
-    (inst bne stepping DONE)
+    (inst beq stepping DONE)
     (inst nop)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
