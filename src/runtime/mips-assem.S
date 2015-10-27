@@ -382,6 +382,19 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	lui	reg_CODE, %hi(undefined_tramp)
 	addiu	reg_CODE, %lo(undefined_tramp)
 	addiu	reg_CODE, -SIMPLE_FUN_CODE_OFFSET
+
+	/* If we are called with stack arguments (or in a tail-call
+	   scenario), we end up with an allocated stack frame, but the
+	   frame link information is uninitialized.  Fix things by
+	   allocating and initializing our stack frame "properly". */
+	addiu reg_NL0,reg_NARGS,-24
+	bltz reg_NL0,1f
+	addu reg_CSP,reg_CFP,reg_NARGS
+	addiu reg_CSP,reg_CFP,24
+1:	sw reg_OCFP,0(reg_CFP)
+	sw reg_LRA,4(reg_CFP)
+
+	/* Now that the preliminaries are dealt with, actually trap. */
 	.set	noreorder
 	b	1f
 	 break	0x0, trap_Cerror
