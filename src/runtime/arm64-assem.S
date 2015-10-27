@@ -301,8 +301,8 @@ call_into_c:
 
         // Return
         sub     reg_NL8, reg_NL8, #OTHER_POINTER_LOWTAG
-        add     reg_TMP, reg_NL8, reg_CODE
-        br      reg_TMP
+        add     reg_LR, reg_NL8, reg_CODE
+        ret
 
 	.size	call_into_c, .-call_into_c
 
