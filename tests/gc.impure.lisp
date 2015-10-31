@@ -116,7 +116,7 @@
                  (storage-condition ()
                    :oom))))))
 
-(with-test (:name :gc-logfile)
+(with-test (:name :gc-logfile :skipped-on '(not :gencgc))
   (assert (not (gc-logfile)))
   (let ((p #p"gc.log"))
     (assert (not (probe-file p)))
