@@ -136,8 +136,8 @@ no_args:
         ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	// And, finally, call into Lisp!
-	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-        br      reg_TMP
+	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+        br      reg_LR
 
 	.align 4
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
@@ -186,7 +186,7 @@ no_args:
         ldp     x21,x22, [sp,#16]
         ldp     x19,x20, [sp],#160
 
-	ret	reg_LR
+	ret
 	.size	call_into_lisp, .-call_into_lisp
 
 
@@ -208,8 +208,8 @@ call_into_c:
         // our stack frame, restore the return address, and return to
         // our caller.
 
-        sub     reg_NFP, reg_LR, reg_CODE
-        add     reg_NFP, reg_NFP, #OTHER_POINTER_LOWTAG
+        sub     reg_NARGS, reg_LR, reg_CODE
+        add     reg_NFP, reg_NARGS, #OTHER_POINTER_LOWTAG
 
         // Build a Lisp stack frame.  We need to stash our frame link,
         // the code component, and our return offset.  Frame link goes
@@ -232,14 +232,14 @@ call_into_c:
 
 
 	// Set FFCA, so the runtime knows that we're not "in lisp".
-	ldr     reg_NFP, =foreign_function_call_active
-	str     reg_NFP, [reg_NFP]
+	ldr     reg_OCFP, =foreign_function_call_active
+	str     reg_OCFP, [reg_OCFP]
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
+        ldr     reg_NL9, =dynamic_space_free_pointer
         LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
+        str     reg_NFP, [reg_NL9]
 #endif
 
 	LEAVE_PA
@@ -274,13 +274,12 @@ call_into_c:
 	ENTER_PA
 
 	// Clear FFCA, so the runtime knows that we're "in lisp".
-	ldr     reg_OCFP, =foreign_function_call_active
 	str     XZR, [reg_OCFP]
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer into the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_OCFP, [reg_OCFP]
+        ldr     reg_NL9, =dynamic_space_free_pointer
+        ldr     reg_NL9, [reg_NL9]
         STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
 #endif
 
@@ -295,13 +294,12 @@ call_into_c:
 	LEAVE_PA
 
         // Restore our caller state from our stack frame.
-        ldp     reg_NL8, reg_CODE, [reg_NFP, #8]
+        ldr     reg_CODE, [reg_NFP, #16]
         ldr     reg_CFP, [reg_NFP]
         mov     reg_CSP, reg_NFP
 
         // Return
-        sub     reg_NL8, reg_NL8, #OTHER_POINTER_LOWTAG
-        add     reg_LR, reg_NL8, reg_CODE
+        add     reg_LR, reg_NARGS, reg_CODE // reg_NARGS has the offset from reg_CODE
         ret
 
 	.size	call_into_c, .-call_into_c
