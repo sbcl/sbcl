@@ -1771,7 +1771,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun print-compile-start-note (source-info)
   (declare (type source-info source-info))
   (let ((file-info (source-info-file-info source-info)))
-    (compiler-mumble "~&; compiling file ~S (written ~A):~%"
+    (compiler-mumble #+sb-xc-host "~&; cross-compiling file ~S (written ~A):~%"
+                     #-sb-xc-host "~&; compiling file ~S (written ~A):~%"
                      (namestring (file-info-name file-info))
                      (sb!int:format-universal-time nil
                                                    (file-info-write-date
