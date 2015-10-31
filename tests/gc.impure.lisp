@@ -22,7 +22,7 @@
                                   :dynamic '*posix-argv*)
   (let ((v (sb-kernel:symbol-info 'satisfies)) referers)
     (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
-                                    :dynamic v)
+                                    #+gencgc :dynamic #-gencgc :static v)
     (assert (member 'satisfies referers))))
 
 (defparameter *x* ())
