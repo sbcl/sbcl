@@ -21,7 +21,7 @@
 #include "genesis/funcallable-instance.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
-		
+
 #define zero $0
 #define AT $1
 #define v0 $2
@@ -99,7 +99,7 @@ symbol:
 
 
 	.text
-	
+
 /*
  * Function to transfer control into lisp.
  */
@@ -273,9 +273,10 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	/* Convert the return address to an offset and save it on the stack. */
 	subu	reg_NFP, reg_LIP, reg_CODE
 	addu	reg_NFP, OTHER_POINTER_LOWTAG
-	sw	reg_LRA, (reg_CFP)
-	sw	reg_CODE, 4(reg_CFP)
-	sw	gp, 8(reg_CFP)
+        sw      reg_OCFP, (reg_CFP)
+	sw	reg_NFP, 4(reg_CFP)
+	sw	reg_CODE, 8(reg_CFP)
+	sw	gp, 12(reg_CFP) // should this be saved? on the control stack?
 
 	/* Save LISP state. */
 	subu	reg_A0, reg_ALLOC, 1
@@ -295,9 +296,9 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	move    t9, reg_CFUNC		# reg_ALLOC
 	jalr	t9
 
-	lw	gp, 8(reg_CFP)
+	lw	gp, 12(reg_CFP)
 
-	/* Pass 64bit return value to lisp land. */ 
+	/* Pass 64bit return value to lisp land. */
 	move	reg_NL0, v0		# reg_CFUNC
 	move	reg_NL1, v1		# reg_NL4
 
@@ -336,9 +337,9 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 
 	lw	reg_BSP, current_binding_stack_pointer
 
-	/* Restore LRA & CODE */
-	lw	reg_LRA, (reg_CFP)
-	lw	reg_CODE, 4(reg_CFP)
+	/* Restore CODE */
+	lw	reg_CODE, 8(reg_CFP)
+        /* Setup the return address */
 	subu	reg_LIP, reg_NFP, OTHER_POINTER_LOWTAG
 	addu	reg_LIP, reg_CODE
 
