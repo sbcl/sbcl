@@ -9,23 +9,38 @@
 
 (load "colorize.lisp")
 
+(defvar *test-evaluator-mode* :compile)
 (defvar *all-failures* nil)
 (defvar *break-on-error* nil)
 (defvar *report-skipped-tests* nil)
 (defvar *explicit-test-files* nil)
 
 (defun run-all ()
-  (dolist (arg (cdr *posix-argv*))
-    (cond ((string= arg "--break-on-failure")
-           (setf *break-on-error* t)
-           (setf test-util:*break-on-failure* t))
-          ((string= arg "--break-on-expected-failure")
-           (setf test-util:*break-on-expected-failure* t))
-          ((string= arg "--report-skipped-tests")
-           (setf *report-skipped-tests* t))
-          ((string= arg "--no-color"))
-          (t
-           (push (truename (parse-namestring arg)) *explicit-test-files*))))
+  (loop :with remainder = (rest *posix-argv*)
+     :while remainder
+     :for arg = (pop remainder)
+     :do (cond
+           ((string= arg "--evaluator-mode")
+            (let ((mode (pop remainder)))
+              (cond
+                ((string= mode "interpret")
+                 (setf *test-evaluator-mode* :interpret))
+                ((string= mode "compile")
+                 (setf *test-evaluator-mode* :compile))
+                (t
+                 (error "~@<Invalid evaluator mode: ~A. Must be one ~
+                           of interpret, compile.~@:>"
+                        mode)))))
+           ((string= arg "--break-on-failure")
+            (setf *break-on-error* t)
+            (setf test-util:*break-on-failure* t))
+           ((string= arg "--break-on-expected-failure")
+            (setf test-util:*break-on-expected-failure* t))
+           ((string= arg "--report-skipped-tests")
+            (setf *report-skipped-tests* t))
+           ((string= arg "--no-color"))
+           (t
+            (push (truename (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
   (pure-runner (pure-load-files) #'load-test)
   (pure-runner (pure-cload-files) #'cload-test)
@@ -88,13 +103,15 @@
           (*failures* nil))
       (setup-cl-user)
       (dolist (file files)
-        (format t "// Running ~a~%" file)
+        (format t "// Running ~a in ~a evaluator mode~%"
+                file *test-evaluator-mode*)
         (restart-case
             (handler-bind ((error (make-error-handler file)))
-              (let ((*features*
-                     (if (eq sb-ext:*evaluator-mode* :interpret)
-                         (cons :interpreter *features*)
-                         *features*)))
+              (let* ((sb-ext:*evaluator-mode* *test-evaluator-mode*)
+                     (*features*
+                       (if (eq sb-ext:*evaluator-mode* :interpret)
+                           (cons :interpreter *features*)
+                           *features*)))
                 (eval (funcall test-fun file))))
           (skip-file ())))
       (append-failures))))
@@ -128,42 +145,44 @@
 (defun run-impure-in-child-sbcl (test-file test-code)
   (clear-test-status)
   (run-in-child-sbcl
-    `((load "test-util")
-      (load "assertoid")
-      (defpackage :run-tests
-        (:use :cl :test-util :sb-ext)))
+   `((load "test-util")
+     (load "assertoid")
+     (defpackage :run-tests
+       (:use :cl :test-util :sb-ext)))
 
-    `((in-package :cl-user)
-      (use-package :test-util)
-      (use-package :assertoid)
-      (setf test-util:*break-on-failure* ,test-util:*break-on-failure*)
-      (setf test-util:*break-on-expected-failure*
-            ,test-util:*break-on-expected-failure*)
-      (let ((file ,test-file)
+   `((in-package :cl-user)
+     (use-package :test-util)
+     (use-package :assertoid)
+     (setf test-util:*break-on-failure* ,test-util:*break-on-failure*)
+     (setf test-util:*break-on-expected-failure*
+           ,test-util:*break-on-expected-failure*)
+     (let* ((file ,test-file)
+            (sb-ext:*evaluator-mode* ,*test-evaluator-mode*)
             (*features*
              (if (eq sb-ext:*evaluator-mode* :interpret)
                  (cons :interpreter *features*)
                  *features*))
             (*break-on-error* ,run-tests::*break-on-error*))
-        (declare (special *break-on-error*))
-        (format t "// Running ~a~%" file)
-        (restart-case
-            (handler-bind
-                ((error (lambda (condition)
-                          (push (list :unhandled-error file)
-                                test-util::*failures*)
-                          (cond (*break-on-error*
-                                 (test-util:really-invoke-debugger condition))
-                                (t
-                                 (format *error-output* "~&Unhandled ~a: ~a~%"
-                                         (type-of condition) condition)
-                                 (sb-debug:print-backtrace)))
-                          (invoke-restart 'skip-file))))
-              ,test-code)
-          (skip-file ()
-            (format t ">>>~a<<<~%" test-util::*failures*)))
-        (test-util:report-test-status)
-        (sb-ext:exit :code 104)))))
+       (declare (special *break-on-error*))
+       (format t "// Running ~a in ~a evaluator mode~%"
+               file sb-ext:*evaluator-mode*)
+       (restart-case
+           (handler-bind
+               ((error (lambda (condition)
+                         (push (list :unhandled-error file)
+                               test-util::*failures*)
+                         (cond (*break-on-error*
+                                (test-util:really-invoke-debugger condition))
+                               (t
+                                (format *error-output* "~&Unhandled ~a: ~a~%"
+                                        (type-of condition) condition)
+                                (sb-debug:print-backtrace)))
+                         (invoke-restart 'skip-file))))
+             ,test-code)
+         (skip-file ()
+           (format t ">>>~a<<<~%" test-util::*failures*)))
+       (test-util:report-test-status)
+       (sb-ext:exit :code 104)))))
 
 (defun impure-runner (files test-fun)
   (when files
@@ -235,12 +254,16 @@
 (defun sh-test (file)
   ;; What? No SB-POSIX:EXECV?
   (clear-test-status)
-  `(let ((process (sb-ext:run-program "/bin/sh"
-                                      (list (native-namestring ,file))
-                                      :output *error-output*)))
-     (let ((*failures* nil))
-       (test-util:report-test-status))
-     (sb-ext:exit :code (process-exit-code process))))
+  `(progn
+     (sb-posix:setenv "TEST_SBCL_EVALUATOR_MODE"
+                      (string-downcase ,*test-evaluator-mode*)
+                      1)
+     (let ((process (sb-ext:run-program "/bin/sh"
+                                        (list (native-namestring ,file))
+                                        :output *error-output*)))
+       (let ((*failures* nil))
+         (test-util:report-test-status))
+       (sb-ext:exit :code (process-exit-code process)))))
 
 (defun filter-test-files (wild-mask)
   (if *explicit-test-files*

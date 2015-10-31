@@ -61,15 +61,15 @@ set +a
 run_sbcl () (
     set -u
     if [ $# -gt 0 ]; then
-	"$SBCL_RUNTIME" --core "$SBCL_CORE" $SBCL_ARGS "$@"
+	"$SBCL_RUNTIME" --core "$SBCL_CORE" $SBCL_ARGS --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" "$@"
     else
-	"$SBCL_RUNTIME" --core "$SBCL_CORE" $SBCL_ARGS
+	"$SBCL_RUNTIME" --core "$SBCL_CORE" $SBCL_ARGS --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})"
     fi
 )
 
 run_sbcl_with_args () (
     set -u
-    "$SBCL_RUNTIME" --core "$SBCL_CORE" "$@"
+    "$SBCL_RUNTIME" --core "$SBCL_CORE" --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" "$@"
 )
 
 run_sbcl_with_core () (
@@ -77,9 +77,9 @@ run_sbcl_with_core () (
     core="$1"
     shift
     if [ $# -gt 0 ]; then
-	"$SBCL_RUNTIME" --core "$core" "$@"
+	"$SBCL_RUNTIME" --core "$core" --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" "$@"
     else
-	"$SBCL_RUNTIME" --core "$core" $SBCL_ARGS
+	"$SBCL_RUNTIME" --core "$core" --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" $SBCL_ARGS
     fi
 )
 
