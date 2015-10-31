@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.16:
+changes in sbcl-1.3.0 relative to sbcl-1.2.16:
   * minor incompatible change: the environment passed to a macro/setf/deftype
     expander is not always an object of type SB-KERNEL:LEXENV.
     It can be nil, as is permissible by the standard.
