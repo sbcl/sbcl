@@ -184,7 +184,7 @@
 
 
 (with-test (:name :nan-comparisons
-            :fails-on '(or :sparc :mips))
+            :fails-on '(or :sparc))
   (sb-int:with-float-traps-masked (:invalid)
     (macrolet ((test (form)
                  (let ((nform (subst '(/ 0.0 0.0) 'nan form)))

@@ -252,7 +252,7 @@
 (defun throw-test ()
   (throw 'no-such-tag t))
 (with-test (:name (:backtrace :throw :no-such-tag)
-                  :fails-on '(or (and :sparc :linux) :alpha :mips))
+                  :fails-on '(or (and :sparc :linux) :alpha))
   (assert-backtrace #'throw-test '((throw-test))))
 
 (defun bug-308926 (x)

@@ -98,7 +98,7 @@
 ;;; suspicions that the breakpoint trace might corrupt the whole image
 ;;; on that platform.
 (with-test (:name (trace :encapsulate nil)
-            :fails-on '(or (and :ppc (not :linux)) :sparc :mips)
+            :fails-on '(or (and :ppc (not :linux)) :sparc)
             :broken-on '(or :darwin :sunos))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-this :encapsulate nil)
@@ -108,7 +108,7 @@
     (assert (search "returned OK" out))))
 
 (with-test (:name (:trace-recursive :encapsulate nil)
-            :fails-on '(or (and :ppc (not :linux)) :sparc :mips :sunos)
+            :fails-on '(or (and :ppc (not :linux)) :sparc :sunos)
             :broken-on '(or :darwin (and :x86 :sunos)))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-fact :encapsulate nil)
