@@ -190,7 +190,7 @@
 (in-package "SB!KERNEL")
 (defsetf code-header-ref code-header-set)
 
-;;; from x86-vm.lisp
+;;; from arch-vm.lisp
 (in-package "SB!VM")
 (defsetf context-register %set-context-register)
 (defsetf context-float-register %set-context-float-register)

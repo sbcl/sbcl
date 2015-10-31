@@ -114,6 +114,9 @@
   (context (* os-context-t))
   (index int))
 
+(define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
+  (* unsigned) (context (* os-context-t)) (index int))
+
 (declaim (inline context-register))
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
@@ -129,18 +132,38 @@
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
-;;;
-;;; As of sbcl-0.6.7, there is no working code which calls this code,
-;;; so it's stubbed out. Someday, in order to make the debugger work
-;;; better, it may be necessary to unstubify it.
+
 (defun context-float-register (context index format)
-  (declare (ignore context index))
-  (warn "stub CONTEXT-FLOAT-REGISTER")
-  (coerce 0.0 format))
-(defun %set-context-float-register (context index format new-value)
-  (declare (ignore context index))
-  (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
-  (coerce new-value format))
+  (let ((sap (alien-sap (context-float-register-addr context index))))
+    (ecase format
+      (single-float
+       (sap-ref-single sap 0))
+      (double-float
+       (sap-ref-double sap 0))
+      (complex-single-float
+       (complex (sap-ref-single sap 0)
+                (sap-ref-single sap 4)))
+      (complex-double-float
+       (complex (sap-ref-double sap 0)
+                (sap-ref-double sap 8))))))
+
+(defun %set-context-float-register (context index format value)
+  (let ((sap (alien-sap (context-float-register-addr context index))))
+    (ecase format
+      (single-float
+       (setf (sap-ref-single sap 0) value))
+      (double-float
+       (setf (sap-ref-double sap 0) value))
+      (complex-single-float
+       (locally
+           (declare (type (complex single-float) value))
+         (setf (sap-ref-single sap 0) (realpart value)
+               (sap-ref-single sap 4) (imagpart value))))
+      (complex-double-float
+       (locally
+           (declare (type (complex double-float) value))
+         (setf (sap-ref-double sap 0) (realpart value)
+               (sap-ref-double sap 8) (imagpart value)))))))
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.

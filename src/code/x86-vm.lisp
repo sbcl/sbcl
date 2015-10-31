@@ -165,6 +165,9 @@
   (context (* os-context-t))
   (index int))
 
+(define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
+  (* unsigned) (context (* os-context-t)) (index int))
+
 (declaim (inline context-register))
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
@@ -178,16 +181,20 @@
     (declare (type (alien (* unsigned-int)) addr))
     (setf (deref addr) new)))
 
-;;; This is like CONTEXT-REGISTER, but returns the value of a float
-;;; register. FORMAT is the type of float to return.
-;;;
-;;; As of sbcl-0.6.7, there is no working code which calls this code,
-;;; so it's stubbed out. Someday, in order to make the debugger work
-;;; better, it may be necessary to unstubify it.
 (defun context-float-register (context index format)
-  (declare (ignore context index))
-  (warn "stub CONTEXT-FLOAT-REGISTER")
-  (coerce 0.0 format))
+  (let ((sap (alien-sap (context-float-register-addr context index))))
+    (ecase format
+      (single-float
+       (coerce (sap-ref-long sap 0) 'single-float))
+      (double-float
+       (sap-ref-long sap 0))
+      (complex-single-float
+       (complex (coerce (sap-ref-long sap 0) 'single-float)
+                (coerce (sap-ref-long sap 10) 'single-float)))
+      (complex-double-float
+       (complex (sap-ref-long sap 0)
+                (sap-ref-long sap 10))))))
+
 (defun %set-context-float-register (context index format new-value)
   (declare (ignore context index))
   (warn "stub %SET-CONTEXT-FLOAT-REGISTER")

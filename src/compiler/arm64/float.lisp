@@ -618,7 +618,7 @@
              (@ float
                 (- (+ (* double-float-value-slot n-word-bytes)
                       (if (eq *backend-byte-order* :big-endian)
-                          1
+                          4
                           0))
                    other-pointer-lowtag)))))))
 

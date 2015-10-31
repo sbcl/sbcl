@@ -2132,24 +2132,15 @@ register."
                `(if escaped
                     (sb!vm:context-float-register
                      escaped
-                     (sb!c:sc-offset-offset sc-offset)
-                     ',format)
-                    :invalid-value-for-unescaped-register-storage))
-             (escaped-complex-float-value (format offset)
-               `(if escaped
-                    (complex
-                     (sb!vm:context-float-register
-                      escaped (sb!c:sc-offset-offset sc-offset) ',format)
-                     (sb!vm:context-float-register
-                      escaped (+ (sb!c:sc-offset-offset sc-offset) ,offset) ',format))
+                     (sb!c:sc-offset-offset sc-offset) ',format)
                     :invalid-value-for-unescaped-register-storage))
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
                ;; up for them.
-               #!+(or x86 x86-64)
+               #!+c-stack-is-control-stack
                `(let ((,var fp))
                   ,@body)
-               #!-(or x86 x86-64)
+               #!-c-stack-is-control-stack
                `(let ((,var (if escaped
                                 (int-sap
                                  (sb!vm:context-register escaped
@@ -2162,20 +2153,16 @@ register."
                                  (sap-ref-32 fp (* nfp-save-offset
                                                    sb!vm:n-word-bytes))))))
                   ,@body))
-             (stack-frame-offset (data-width offset)
+             (number-stack-offset (&optional (offset 0))
                #!+(or x86 x86-64)
-               `(sb!vm::frame-byte-offset (+ (sb!c:sc-offset-offset sc-offset)
-                                           (1- ,data-width)
-                                           ,offset))
+               `(+ (sb!vm::frame-byte-offset (sb!c:sc-offset-offset sc-offset))
+                   ,offset)
                #!-(or x86 x86-64)
-               (declare (ignore data-width))
-               #!-(or x86 x86-64)
-               `(* (+ (sb!c:sc-offset-offset sc-offset) ,offset)
-                   sb!vm:n-word-bytes)))
+               `(+ (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes)
+                   ,offset)))
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number
-        #.sb!vm:descriptor-reg-sc-number
-        #!+rt #.sb!vm:word-pointer-reg-sc-number)
+        #.sb!vm:descriptor-reg-sc-number)
        (without-gcing
         (with-escaped-value (val)
           (values (make-lisp-obj val nil)))))
@@ -2207,57 +2194,54 @@ register."
       (#.sb!vm:long-reg-sc-number
        (escaped-float-value long-float))
       (#.sb!vm:complex-single-reg-sc-number
-       (escaped-complex-float-value single-float 1))
+       (escaped-float-value complex-single-float))
       (#.sb!vm:complex-double-reg-sc-number
-       (escaped-complex-float-value double-float #!+sparc 2 #!-sparc 1))
+       (escaped-float-value complex-double-float))
       #!+long-float
       (#.sb!vm:complex-long-reg-sc-number
-       (escaped-complex-float-value long-float
-                                    #!+sparc 4 #!+(or x86 x86-64) 1
-                                    #!-(or sparc x86 x86-64) 0))
+       (escaped-float-value sb!kernel::complex-long-float))
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
-         (sap-ref-single nfp (stack-frame-offset 1 0))))
+         (sap-ref-single nfp (number-stack-offset))))
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
-         (sap-ref-double nfp (stack-frame-offset 2 0))))
+         (sap-ref-double nfp (number-stack-offset))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (with-nfp (nfp)
-         (sap-ref-long nfp (stack-frame-offset 3 0))))
+         (sap-ref-long nfp (number-stack-offset))))
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
          (complex
-          (sap-ref-single nfp (stack-frame-offset 1 0))
-          (sap-ref-single nfp (stack-frame-offset 1 1)))))
+          (sap-ref-single nfp (number-stack-offset))
+          (sap-ref-single nfp (number-stack-offset 4)))))
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
          (complex
-          (sap-ref-double nfp (stack-frame-offset 2 0))
-          (sap-ref-double nfp (stack-frame-offset 2 2)))))
+          (sap-ref-double nfp (number-stack-offset))
+          (sap-ref-double nfp (number-stack-offset 8)))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (complex
-          (sap-ref-long nfp (stack-frame-offset 3 0))
+          (sap-ref-long nfp (number-stack-offset))
           (sap-ref-long nfp
-                        (stack-frame-offset 3 #!+sparc 4
-                                              #!+(or x86 x86-64) 3
-                                              #!-(or sparc x86 x86-64) 0)))))
+                        (number-stack-offset #!+sparc 4
+                                             #!+(or x86 x86-64) 3)))))
       (#.sb!vm:control-stack-sc-number
        (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
       (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
-         (code-char (sap-ref-word nfp (stack-frame-offset 1 0)))))
+         (code-char (sap-ref-word nfp (number-stack-offset)))))
       (#.sb!vm:unsigned-stack-sc-number
        (with-nfp (nfp)
-         (sap-ref-word nfp (stack-frame-offset 1 0))))
+         (sap-ref-word nfp (number-stack-offset))))
       (#.sb!vm:signed-stack-sc-number
        (with-nfp (nfp)
-         (signed-sap-ref-word nfp (stack-frame-offset 1 0))))
+         (signed-sap-ref-word nfp (number-stack-offset))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
-         (sap-ref-sap nfp (stack-frame-offset 1 0))))
+         (sap-ref-sap nfp (number-stack-offset))))
       (#.constant-sc-number
        (if escaped
            (code-header-ref
@@ -2326,17 +2310,6 @@ register."
                            ',format)
                           ,val)
                     value))
-             (set-escaped-complex-float-value (format offset val)
-               `(progn
-                  (when escaped
-                    (setf (sb!vm:context-float-register
-                           escaped (sb!c:sc-offset-offset sc-offset) ',format)
-                          (realpart value))
-                    (setf (sb!vm:context-float-register
-                           escaped (+ (sb!c:sc-offset-offset sc-offset) ,offset)
-                           ',format)
-                          (imagpart value)))
-                  ,val))
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
                ;; up for them.
@@ -2358,20 +2331,16 @@ register."
                                              (* nfp-save-offset
                                                 sb!vm:n-word-bytes))))))
                   ,@body))
-             (stack-frame-offset (data-width offset)
+             (number-stack-offset (&optional (offset 0))
                #!+(or x86 x86-64)
-               `(sb!vm::frame-byte-offset (+ (sb!c:sc-offset-offset sc-offset)
-                                           (1- ,data-width)
-                                           ,offset))
+               `(+ (sb!vm::frame-byte-offset (sb!c:sc-offset-offset sc-offset))
+                   ,offset)
                #!-(or x86 x86-64)
-               (declare (ignore data-width))
-               #!-(or x86 x86-64)
-               `(* (+ (sb!c:sc-offset-offset sc-offset) ,offset)
-                   sb!vm:n-word-bytes)))
+               `(+ (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes)
+                   ,offset)))
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number
-        #.sb!vm:descriptor-reg-sc-number
-        #!+rt #.sb!vm:word-pointer-reg-sc-number)
+        #.sb!vm:descriptor-reg-sc-number)
        (without-gcing
         (set-escaped-value
           (get-lisp-obj-address value))))
@@ -2393,58 +2362,50 @@ register."
        #!-(or x86 x86-64) ;; don't have escaped floats.
        (set-escaped-float-value single-float value))
       (#.sb!vm:double-reg-sc-number
-       #!-(or x86 x86-64) ;; don't have escaped floats -- still in npx?
        (set-escaped-float-value double-float value))
       #!+long-float
       (#.sb!vm:long-reg-sc-number
-       #!-(or x86 x86-64) ;; don't have escaped floats -- still in npx?
        (set-escaped-float-value long-float value))
-      #!-(or x86 x86-64)
       (#.sb!vm:complex-single-reg-sc-number
-       (set-escaped-complex-float-value single-float 1 value))
-      #!-(or x86 x86-64)
+       (set-escaped-float-value complex-single-float value))
       (#.sb!vm:complex-double-reg-sc-number
-       (set-escaped-complex-float-value double-float #!+sparc 2 #!-sparc 1 value))
-      #!+(and long-float (not (or x86 x86-64)))
+       (set-escaped-float-value complex-double-float value))
+      #!+long-float
       (#.sb!vm:complex-long-reg-sc-number
-       (set-escaped-complex-float-value long-float #!+sparc 4 #!-sparc 0 value))
+       (set-escaped-float-value complex-long-float))
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-single nfp (stack-frame-offset 1 0))
+         (setf (sap-ref-single nfp (number-stack-offset))
                (the single-float value))))
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-double nfp (stack-frame-offset 2 0))
+         (setf (sap-ref-double nfp (number-stack-offset))
                (the double-float value))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-long nfp (stack-frame-offset 3 0))
+         (setf (sap-ref-long nfp (number-stack-offset))
                (the long-float value))))
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-single
-                nfp (stack-frame-offset 1 0))
+         (setf (sap-ref-single nfp (number-stack-offset))
                #!+(or x86 x86-64)
                (realpart (the (complex single-float) value))
                #!-(or x86 x86-64)
                (the single-float (realpart value)))
-         (setf (sap-ref-single
-                nfp (stack-frame-offset 1 1))
+         (setf (sap-ref-single nfp (number-stack-offset 4))
                #!+(or x86 x86-64)
                (imagpart (the (complex single-float) value))
                #!-(or x86 x86-64)
                (the single-float (realpart value)))))
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-double
-                nfp (stack-frame-offset 2 0))
+         (setf (sap-ref-double nfp (number-stack-offset))
                #!+(or x86 x86-64)
                (realpart (the (complex double-float) value))
                #!-(or x86 x86-64)
                (the double-float (realpart value)))
-         (setf (sap-ref-double
-                nfp (stack-frame-offset 2 2))
+         (setf (sap-ref-double nfp (number-stack-offset 8))
                #!+(or x86 x86-64)
                (imagpart (the (complex double-float) value))
                #!-(or x86 x86-64)
@@ -2453,15 +2414,14 @@ register."
       (#.sb!vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-long
-                nfp (stack-frame-offset 3 0))
+                nfp (number-stack-offset))
                #!+(or x86 x86-64)
                (realpart (the (complex long-float) value))
                #!-(or x86 x86-64)
                (the long-float (realpart value)))
          (setf (sap-ref-long
-                nfp (stack-frame-offset 3 #!+sparc 4
-                                        #!+(or x86 x86-64) 3
-                                        #!-(or sparc x86 x86-64) 0))
+                nfp (number-stack-offset #!+sparc 4
+                                        #!+(or x86 x86-64) 3))
                #!+(or x86 x86-64)
                (imagpart (the (complex long-float) value))
                #!-(or x86 x86-64)
@@ -2470,18 +2430,18 @@ register."
        (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
       (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-word nfp (stack-frame-offset 1 0))
+         (setf (sap-ref-word nfp (number-stack-offset 0))
                (char-code (the character value)))))
       (#.sb!vm:unsigned-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-word nfp (stack-frame-offset 1 0)) (the word value))))
+         (setf (sap-ref-word nfp (number-stack-offset 0)) (the word value))))
       (#.sb!vm:signed-stack-sc-number
        (with-nfp (nfp)
-         (setf (signed-sap-ref-word nfp (stack-frame-offset 1 0))
+         (setf (signed-sap-ref-word nfp (number-stack-offset))
                (the signed-word value))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-sap nfp (stack-frame-offset 1 0))
+         (setf (sap-ref-sap nfp (number-stack-offset))
                (the system-area-pointer value)))))))
 
 ;;; The method for setting and accessing COMPILED-DEBUG-VAR values use

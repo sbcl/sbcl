@@ -112,14 +112,8 @@ extern boolean is_valid_lisp_addr(os_vm_address_t test);
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset);
 
-/* FIXME: Pending investigation, this #ifdef stays as alpha. If it
- * turns out that the alpha truly requires this, it can change to
- * ARCH_HAS_FLOAT_REGISTERS (currently #defined in alpha-arch.h -- CSR
- * 2002-02-04 */
-#ifdef LISP_FEATURE_ALPHA
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset);
-#endif
 
 /* Given a signal context, return the address for storage of the
  * program counter for that context. */

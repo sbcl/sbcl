@@ -134,11 +134,14 @@ os_context_fp_addr(os_context_t *context)
 unsigned long
 os_context_fp_control(os_context_t *context)
 {
-    /* return the x87 exception flags ored in with the sse2
-     * control+status flags */
-    unsigned int result = (context->uc_mcontext.fpregs->swd & 0x3F) | context->uc_mcontext.fpregs->mxcsr;
-    /* flip exception mask bits */
-    return result ^ (0x3F << 7);
+    return (os_context_register_t*)&context->uc_mcontext.gregs[REG_RSP];
+
+}
+
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    return (os_context_register_t*)&context->uc_mcontext.fpregs->_xmm[offset];
 }
 
 sigset_t *
