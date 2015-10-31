@@ -114,8 +114,7 @@
   (context (* os-context-t))
   (index int))
 
-;; FIXME: assumes linux
-#!+linux
+#!+(or linux win32)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
@@ -136,6 +135,12 @@
 ;;; register. FORMAT is the type of float to return.
 
 (defun context-float-register (context index format)
+  (declare (ignorable context index))
+  #!-(or linux win32)
+  (progn
+    (warn "stub CONTEXT-FLOAT-REGISTER")
+    (coerce 0 format))
+  #!+(or linux win32)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
@@ -150,6 +155,12 @@
                 (sap-ref-double sap 8))))))
 
 (defun %set-context-float-register (context index format value)
+  (declare (ignorable context index))
+  #!-(or linux win32)
+  (progn
+    (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
+    value)
+  #!+(or linux win32)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float

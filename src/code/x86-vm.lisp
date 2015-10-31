@@ -165,6 +165,7 @@
   (context (* os-context-t))
   (index int))
 
+#!+(or linux win32)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
@@ -182,6 +183,12 @@
     (setf (deref addr) new)))
 
 (defun context-float-register (context index format)
+  (declare (ignorable context index))
+  #!-(or linux win32)
+  (progn
+    (warn "stub CONTEXT-FLOAT-REGISTER")
+    (coerce 0 format))
+  #!+(or linux win32)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
