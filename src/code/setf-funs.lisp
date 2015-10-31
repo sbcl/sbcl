@@ -49,7 +49,7 @@
     `(progn
       ,@(mapcan
          (lambda (sym)
-           (let ((type (type-specifier (info :function :type sym))))
+           (let ((type (type-specifier (proclaimed-ftype sym))))
              (aver (consp type))
              (list
               #!-sb-fluid `(declaim (inline (setf ,sym)))

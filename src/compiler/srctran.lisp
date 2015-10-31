@@ -2972,7 +2972,7 @@
     (labels ((reoptimize-node (node name)
                (setf (node-derived-type node)
                      (fun-type-returns
-                      (info :function :type name)))
+                      (proclaimed-ftype name)))
                (setf (lvar-%derived-type (node-lvar node)) nil)
                (setf (node-reoptimize node) t)
                (setf (block-reoptimize (node-block node)) t)

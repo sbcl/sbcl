@@ -44,7 +44,7 @@
 #||
 (assert
   (equal
-   (format nil "~A" (sb-int:info :function :type 'foo))
+   (format nil "~A" (sb-int:proclaimed-ftype 'foo))
    "#<FUN-TYPE (FUNCTION (T T) LIST)>"))
 ||#
 

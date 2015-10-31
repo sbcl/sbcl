@@ -808,7 +808,7 @@
 ;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.
 (defun assert-global-function-definition-type (name fun)
   (declare (type functional fun))
-  (let ((type (info :function :type name))
+  (let ((type (proclaimed-ftype name))
         (where (info :function :where-from name)))
     (when (eq where :declared)
       (let ((type (massage-global-definition-type type fun)))

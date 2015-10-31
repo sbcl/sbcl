@@ -1291,7 +1291,7 @@
                       (let ((defined-fun
                              (sb-c::make-defined-fun
                               :%source-name fname
-                              :type (sb-int:info :function :type fname))))
+                              :type (sb-int:proclaimed-ftype fname))))
                         (setf (sb-c::defined-fun-inlinep defined-fun) inlinep)
                         (push (cons fname defined-fun) funs))))))))
             (ftype

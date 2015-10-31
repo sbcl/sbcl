@@ -158,6 +158,8 @@
     (setf (info :function :type name) type
           (info :function :where-from name) where-from)))
 
+(defun proclaimed-ftype (name) (info :function :type name))
+
 (defun seal-class (class)
   (declare (type classoid class))
   (setf (classoid-state class) :sealed)

@@ -579,7 +579,7 @@
                 (pprint-indent :block 2 stream)
                 (format stream "~@:_~:(~A~) type: ~S"
                         from
-                        (type-specifier (info :function :type name)))))))
+                        (type-specifier (proclaimed-ftype name)))))))
         ;; Defined.
         (multiple-value-bind (fun what lambda-list derived-type declared-type
                               inline methods)
@@ -597,7 +597,7 @@
                                              (%fun-type function)))
                           (legal-name-p (legal-fun-name-p name))
                           (ctype (and legal-name-p
-                                      (info :function :type name)))
+                                      (proclaimed-ftype name)))
                           (type (and ctype (type-specifier ctype)))
                           (from (and legal-name-p
                                      (info :function :where-from name)))

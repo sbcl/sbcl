@@ -966,10 +966,10 @@
         (*evaluator-mode* :compile))
     (eval `(defun ,name (x) x))
     (assert (equal '(function (t) (values t &optional))
-                   (sb-kernel:type-specifier (sb-int:info :function :type name))))
+                   (sb-kernel:type-specifier (sb-int:proclaimed-ftype name))))
     (eval `(defun ,name (x &optional y) (or x y)))
     (assert (equal '(function (t &optional t) (values t &optional))
-                   (sb-kernel:type-specifier (sb-int:info :function :type name))))))
+                   (sb-kernel:type-specifier (sb-int:proclaimed-ftype name))))))
 
 ;;;; inline & maybe inline nested calls
 
@@ -1530,7 +1530,7 @@
       ;; dunno.
       (return t))
     (let ((types (template-result-types template))
-          (result-type (fun-type-returns (info :function :type function))))
+          (result-type (fun-type-returns (proclaimed-ftype function))))
       (cond
         ((values-type-p result-type)
          (do ((ltypes (append (args-type-required result-type)
@@ -1566,7 +1566,7 @@
    (lambda (name)
      ;; LEGAL-FUN-NAME-P test is necessary, since (INFO :FUNCTION :TYPE)
      ;; has a defaulting expression that involves calling FDEFINITION.
-     (when (and (legal-fun-name-p name) (info :function :type name))
+     (when (and (legal-fun-name-p name) (proclaimed-ftype name))
       ;; OK, so we have an entry in the INFO database. Now, if ...
       (let* ((info (info :function :info name))
              (templates (and info (fun-info-templates info))))

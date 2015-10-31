@@ -282,7 +282,7 @@ appear."
           (setf binding :function
                 localp nil
                 ftype (when (eq :declared (info :function :where-from name))
-                        (info :function :type name))
+                        (proclaimed-ftype name))
                 inlinep (info :function :inlinep name))))))
     (values binding
             localp

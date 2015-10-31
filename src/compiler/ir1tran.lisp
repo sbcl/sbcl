@@ -150,7 +150,7 @@
                ;; complain about undefined functions.
                (not latep))
       (note-undefined-reference name :function))
-    (let ((ftype (info :function :type name))
+    (let ((ftype (proclaimed-ftype name))
           (notinline (fun-lexically-notinline-p name)))
       (make-global-var
        :kind :global-function
@@ -251,7 +251,7 @@
                         :type (if (and (eq inlinep :notinline)
                                        (neq where :declared))
                                   (specifier-type 'function)
-                                  (info :function :type name))))
+                                  (proclaimed-ftype name))))
                      (find-global-fun name nil))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function

@@ -91,7 +91,12 @@
       (get-info-value-initializing :function :definition name
                                    (make-fdefn name))))
 
-(defun maybe-clobber-ftype (name)
+;;; Remove NAME's FTYPE information unless it was explicitly PROCLAIMED.
+;;; The NEW-FUNCTION argument is presently unused, but could be used
+;;; for checking compatibility of the NEW-FUNCTION against a proclamation.
+;;; (We could issue a warning and/or remove the type if incompatible.)
+(defun maybe-clobber-ftype (name new-function)
+  (declare (ignore new-function))
   (unless (eq :declared (info :function :where-from name))
     (clear-info :function :type name)))
 
@@ -307,7 +312,7 @@
   (declare (type function new-value) (optimize (safety 1)))
   (err-if-unacceptable-function new-value '(setf fdefinition))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
-    (maybe-clobber-ftype name)
+    (maybe-clobber-ftype name new-value)
 
     ;; Check for hash-table stuff. Woe onto him that mixes encapsulation
     ;; with this.

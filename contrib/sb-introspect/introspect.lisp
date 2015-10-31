@@ -532,7 +532,7 @@ value."
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
   (flet ((ftype-of (function-designator)
            (sb-kernel:type-specifier
-            (sb-int:info :function :type function-designator))))
+            (sb-int:proclaimed-ftype function-designator))))
     (etypecase function-designator
       (symbol
        (when (and (fboundp function-designator)

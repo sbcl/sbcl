@@ -1658,7 +1658,7 @@ generic function lambda list ~S~:>"
   (multiple-value-bind (llks nrequired noptional keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
-    (let* ((old (info :function :type name)) ;FIXME:FDOCUMENTATION instead?
+    (let* ((old (proclaimed-ftype name)) ;FIXME:FDOCUMENTATION instead?
            (old-ftype (if (fun-type-p old) old nil))
            (old-restp (and old-ftype (fun-type-rest old-ftype)))
            (old-keys (and old-ftype
@@ -2209,7 +2209,7 @@ generic function lambda list ~S~:>"
     ;; is a subtype of the old one, though -- even though the type is not
     ;; trusted anymore, the warning is still not quite as interesting.
     (when (and (eq :declared (info :function :where-from fun-name))
-               (not (csubtypep gf-type (setf old-type (info :function :type fun-name)))))
+               (not (csubtypep gf-type (setf old-type (proclaimed-ftype fun-name)))))
       (style-warn "~@<Generic function ~S clobbers an earlier ~S proclamation ~S ~
                    for the same name with ~S.~:@>"
                   fun-name 'ftype

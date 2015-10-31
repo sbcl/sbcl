@@ -992,6 +992,7 @@ possibly temporarily, because it might be used internally."
                "INFO-VECTOR-FDEFN"
                "PACKED-INFO-FIELD"
                "PACKED-INFO-INSERT"
+               "PROCLAIMED-FTYPE"
                "UPDATE-SYMBOL-INFO"
                "WITH-GLOBALDB-NAME"
 
