@@ -114,6 +114,8 @@
   (context (* os-context-t))
   (index int))
 
+;; FIXME: assumes linux
+#!+linux
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
