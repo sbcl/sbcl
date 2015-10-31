@@ -86,3 +86,9 @@
 (with-test (:name :make-array-nil-no-warning)
   (assert-no-signal
    (compile nil '(lambda () (make-array '(2 2) :element-type nil)))))
+
+(with-test (:name :nth-value-huge-n-works)
+  (flet ((return-a-ton-of-values ()
+           (values-list (loop for i below 5000 collect i))))
+    (assert (= (nth-value 1 (return-a-ton-of-values)) 1))
+    (assert (= (nth-value 4000 (return-a-ton-of-values)) 4000))))

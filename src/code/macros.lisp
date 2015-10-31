@@ -480,7 +480,7 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; miscellaneous macros
 
-(defmacro-mundanely nth-value (n form)
+(defmacro-mundanely nth-value (n form &environment env)
   #!+sb-doc
   "Evaluate FORM and return the Nth value (zero based)
  without consing a temporary list of values."
@@ -491,18 +491,20 @@ invoked. In that case it will store into PLACE and start over."
   ;; form will take longer than can be described as adequate, as the
   ;; optional dispatch mechanism for the M-V-B gets increasingly
   ;; hairy.
-  (if (integerp n)
-      (let ((dummy-list (make-gensym-list n))
-            (keeper (sb!xc:gensym "KEEPER")))
-        `(multiple-value-bind (,@dummy-list ,keeper) ,form
-           (declare (ignore ,@dummy-list))
-           ,keeper))
+  (let ((val (and (sb!xc:constantp n env) (constant-form-value n env))))
+    (if (and (integerp val) (<= 0 val 10)) ; Arbitrary limit.
+        (let ((dummy-list (make-gensym-list val))
+              (keeper (sb!xc:gensym "KEEPER")))
+          `(multiple-value-bind (,@dummy-list ,keeper) ,form
+             (declare (ignore ,@dummy-list))
+             ,keeper))
       ;; &MORE conversion handily deals with non-constant N,
       ;; avoiding the unstylish practice of inserting FORM into the
       ;; expansion more than once to pick off a few small values.
-      `(multiple-value-call
-           (lambda (n &rest list) (nth (truly-the index n) list))
-         (the index ,n) ,form)))
+      ;; This is not as good as above, because it uses TAIL-CALL-VARIABLE.
+        `(multiple-value-call
+             (lambda (n &rest list) (nth (truly-the index n) list))
+           (the index ,n) ,form))))
 
 (defmacro-mundanely declaim (&rest specs)
   #!+sb-doc
