@@ -206,13 +206,7 @@
                (find-if #'aux-defn-matches (auxiliary-type-definitions env)))))
       (if in-auxiliaries
           (values (third in-auxiliaries) t)
-          (ecase kind
-            (:struct
-             (info :alien-type :struct name))
-            (:union
-             (info :alien-type :union name))
-            (:enum
-             (info :alien-type :enum name)))))))
+          (info :alien-type kind name)))))
 
 (defun (setf auxiliary-alien-type) (new-value kind name env)
   (declare (type sb!kernel:lexenv-designator env))
@@ -229,13 +223,7 @@
   (dolist (info *new-auxiliary-types*)
     (destructuring-bind (kind name defn) info
       (declare (ignore defn))
-      (when (ecase kind
-              (:struct
-               (info :alien-type :struct name))
-              (:union
-               (info :alien-type :union name))
-              (:enum
-               (info :alien-type :enum name)))
+      (when (info :alien-type kind name)
         (error "attempt to shadow definition of ~A ~S" kind name)))))
 
 (defun unparse-alien-type (type)
@@ -298,19 +286,12 @@
                             (and (eq (first a) (first b))
                                  (eq (second a) (second b))))))
       (destructuring-bind (kind name defn) info
-        (macrolet ((frob (kind)
-                         `(let ((old (info :alien-type ,kind name)))
-                            (unless (or (null old) (alien-type-= old defn))
-                              (warn
-                               "redefining ~A ~S to be:~%  ~S,~%was:~%  ~S"
-                               kind name defn old))
-                            (setf (info :alien-type ,kind name) defn
-                                  (info :source-location :alien-type name)
-                                  source-location))))
-          (ecase kind
-            (:struct (frob :struct))
-            (:union (frob :union))
-            (:enum (frob :enum)))))))
+        (let ((old (info :alien-type kind name)))
+          (unless (or (null old) (alien-type-= old defn))
+            (warn "redefining ~A ~S to be:~%  ~S,~%was:~%  ~S"
+                  kind name defn old)))
+        (setf (info :alien-type kind name) defn
+              (info :source-location :alien-type name) source-location))))
 
   (defun %define-alien-type (name new)
     (ecase (info :alien-type :kind name)
