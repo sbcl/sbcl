@@ -55,6 +55,7 @@
 (sb!xc:defstruct (package
                   (:constructor %make-package
                                 (%name internal-symbols external-symbols))
+                  (:copier nil)
                   (:predicate packagep))
   #!+sb-doc
   "the standard structure for the description of a package"

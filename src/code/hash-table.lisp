@@ -13,7 +13,8 @@
 (in-package "SB!IMPL")
 
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
-(sb!xc:defstruct (hash-table (:constructor %make-hash-table
+(sb!xc:defstruct (hash-table (:copier nil)
+                             (:constructor %make-hash-table
                                (test
                                 test-fun
                                 hash-fun
