@@ -5088,7 +5088,13 @@
            (frob-some-stuff *print-base* (car foo)))))
     (assert (and fun (not warnings-p) (not failure-p)))))
 
-(with-test (:name :interr-type-specifier-hashing)
+(with-test (:name :interr-type-specifier-hashing
+            ;; Fails due to lack of VOP TYPE-CHECK-ERROR/C, see
+            ;; compiler/checkgen.lisp (DEFGLOBAL
+            ;; **TYPE-SPEC-INTERR-SYMBOLS**) and
+            ;; compiler/generic/type-error.lisp (DEFINE-VOP
+            ;; TYPE-CHECK-ERROR/C) for details.
+            :fails-on '(or :alpha :hppa :mips))
   (let ((specifiers
          (remove
           'simple-vector
