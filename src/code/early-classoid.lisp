@@ -82,11 +82,6 @@
   (pure :unspecified :type (member t nil :unspecified)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
 
-(defun dd-default-constructor (dd)
-  (let ((ctor (first (dd-constructors dd))))
-    (when (typep ctor '(cons symbol null))
-      (car ctor))))
-
 ;;;; basic LAYOUT stuff
 
 ;;; Note: This bound is set somewhat less than MOST-POSITIVE-FIXNUM

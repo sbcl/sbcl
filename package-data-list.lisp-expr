@@ -1872,6 +1872,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                                "*SIMD-PACK-ELEMENT-TYPES*")
                "STACK-REF" "STREAM-DESIGNATOR" "STRING-DESIGNATOR"
                "STRING-FILL*"
+               "STRUCTURE-CTOR-LAMBDA-PARTS"
                "STRUCTURE-INSTANCE-ACCESSOR-P"
                "SUB-GC"
                "SYMBOLS-DESIGNATOR"

@@ -1306,3 +1306,12 @@ redefinition."
              (defstruct (s (:type (vector (or (eql s) integer))) :named) x y)
              ))
     (assert-error (macroexpand form))))
+
+(defstruct (foo-not-too-something
+            (:constructor make-foo-not-too-strong (x &aux (x (abs x))))
+            (:constructor make-foo-not-too-weak (&optional x)))
+  (x nil :type unsigned-byte))
+
+(with-test (:name :defstruct-ftype-correctness)
+  (assert (make-foo-not-too-strong -3)) ; should be allowed
+  (assert-error (make-foo-not-too-weak))) ; should not set X slot to NIL

@@ -1,6 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.3.0:
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
+  * bug fix: structure constructor type checking is better. (lp#1508735)
 
 changes in sbcl-1.3.0 relative to sbcl-1.2.16:
   * minor incompatible change: the environment passed to a macro/setf/deftype
