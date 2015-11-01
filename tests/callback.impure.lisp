@@ -415,7 +415,7 @@
 
 (with-test (:name :define-float-double-callback)
   (define-callback-adder double float double))
-(with-test (:name :call-double-float-callback)
+(with-test (:name :call-float-double-callback)
   (assert (= (alien-funcall *add-f-d* 1.0s0 2.0d0) 3.0d0)))
 
 (with-test (:name :define-double-float-int-callback)
