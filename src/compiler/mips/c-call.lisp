@@ -383,23 +383,23 @@ and a pointer to the arguments."
                         (let* ((gpr1 (pop gprs))
                                (gpr2 (pop gprs))
                                (fpr (pop fprs)))
-                          (if int-seen
-                            (when gpr1
-                              (ecase *backend-byte-order*
-                                (:big-endian
-                                 (inst sw gpr1 nsp-tn offset)
-                                 (inst sw gpr2 nsp-tn (+ offset n-word-bytes)))
-                                (:little-endian
-                                 (inst sw gpr2 nsp-tn offset)
-                                 (inst sw gpr1 nsp-tn (+ offset n-word-bytes)))))
-                            (when fpr
-                              (ecase *backend-byte-order*
-                                (:big-endian
-                                 (inst swc1 fpr nsp-tn (+ offset n-word-bytes))
-                                 (inst swc1-odd fpr nsp-tn offset))
-                                (:little-endian
-                                 (inst swc1 fpr nsp-tn offset)
-                                 (inst swc1-odd fpr nsp-tn (+ offset n-word-bytes)))))))
+                          (cond
+                           ((and (not int-seen) fpr)
+                            (ecase *backend-byte-order*
+                              (:big-endian
+                               (inst swc1 fpr nsp-tn (+ offset n-word-bytes))
+                               (inst swc1-odd fpr nsp-tn offset))
+                              (:little-endian
+                               (inst swc1 fpr nsp-tn offset)
+                               (inst swc1-odd fpr nsp-tn (+ offset n-word-bytes)))))
+                           (gpr1
+                            (ecase *backend-byte-order*
+                              (:big-endian
+                               (inst sw gpr1 nsp-tn offset)
+                               (inst sw gpr2 nsp-tn (+ offset n-word-bytes)))
+                              (:little-endian
+                               (inst sw gpr2 nsp-tn offset)
+                               (inst sw gpr1 nsp-tn (+ offset n-word-bytes)))))))
                         (incf words-processed 2)))
                      (t
                       (bug "Unknown alien floating point type: ~S" type))))))
