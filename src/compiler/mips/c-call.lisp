@@ -299,18 +299,22 @@
 
 #-sb-xc-host
 (defun alien-callback-accessor-form (type sap offset)
-  (let ((parsed-type type))
-    (if (alien-integer-type-p parsed-type)
-        (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
-               (let ((byte-offset
-                      (cond ((< bits n-word-bits)
-                             (- n-word-bytes
-                                (ceiling bits n-byte-bits)))
-                            (t 0))))
-                 `(deref (sap-alien (sap+ ,sap
-                                          ,(+ byte-offset offset))
-                                    (* ,type)))))
-        `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
+  (ecase *backend-byte-order*
+    (:big-endian
+     (let ((parsed-type (sb!alien::parse-alien-type type (make-null-lexenv))))
+       (if (alien-integer-type-p parsed-type)
+           (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+             (let ((byte-offset
+                    (cond ((< bits n-word-bits)
+                           (- n-word-bytes
+                              (ceiling bits n-byte-bits)))
+                          (t 0))))
+               `(deref (sap-alien (sap+ ,sap
+                                        ,(+ byte-offset offset))
+                                  (* ,type)))))
+         `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
+    (:little-endian
+     `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
 
 ;;; Returns a vector in static space containing machine code for the
 ;;; callback wrapper
