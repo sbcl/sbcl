@@ -202,6 +202,8 @@
     (sb-alien:unsigned-int . "ui")
     ((sb-alien:integer 64) . "l")
     ((sb-alien:unsigned 64) . "ul")
+    (sb-alien:long-long . "ll")
+    (sb-alien:unsigned-long-long . "ull")
     (sb-alien:float . "f")
     (sb-alien:double . "d")))
 
@@ -432,3 +434,13 @@
   (define-callback-adder double int float double))
 (with-test (:name :call-int-float-double-callback)
   (assert (= (alien-funcall *add-i-f-d* 1 1.0s0 2.0d0) 4.0d0)))
+
+(with-test (:name :define-int-ulonglong-callback)
+  (define-callback-adder unsigned-long-long int unsigned-long-long))
+(with-test (:name :call-int-ulonglong-callback)
+  (assert (= (alien-funcall *add-i-ull* 1 #x200000003) #x200000004)))
+
+(with-test (:name :define-int-int-int-int-int-ulonglong-callback)
+  (define-callback-adder unsigned-long-long int int int int int unsigned-long-long))
+(with-test (:name :call-int-int-int-int-int-ulonglong-callback)
+  (assert (= (alien-funcall *add-i-i-i-i-i-ull* 0 0 0 0 1 #x200000003) #x200000004)))
