@@ -368,9 +368,11 @@ and a pointer to the arguments."
                       (when gprs
                         (let ((gpr (pop gprs))
                               (fpr (pop fprs)))
-                          (if int-seen
-                              (when gpr (inst sw gpr nsp-tn offset))
-                              (when fpr (inst swc1 fpr nsp-tn offset))))
+                          (cond
+                           ((and (not int-seen) fpr)
+                            (inst swc1 fpr nsp-tn offset))
+                           (gpr
+                            (inst sw gpr nsp-tn offset))))
                         (incf words-processed)))
                      ((alien-double-float-type-p type)
                       (when (oddp words-processed)
