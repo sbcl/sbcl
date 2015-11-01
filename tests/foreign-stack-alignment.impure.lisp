@@ -31,6 +31,7 @@
 
 (defvar *required-alignment*
   #+arm 8
+  #+mips 8
   #+(and ppc darwin) 16
   #+(and ppc (not darwin)) 8
   #+(or arm64 x86-64) 16
