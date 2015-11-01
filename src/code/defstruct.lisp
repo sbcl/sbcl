@@ -282,6 +282,7 @@
                  ;; Various other operations only make sense on the target SBCL.
                  (%target-defstruct ',dd))))
          ;; Not DD-CLASS-P
+         ;; FIXME: missing package lock checks
          `((eval-when (:compile-toplevel :load-toplevel :execute)
              (setf (info :typed-structure :info ',name) ',dd))
            (setf (info :source-location :typed-structure ',name)
@@ -631,6 +632,8 @@ unless :NAMED is also specified.")))
                    (symbol (setf name slot)
                     t))
               do (let ((dsd (find name  (dd-slots dd)
+                            ;; FIXME: Not sure why this is #'EQ.
+                            ;; Everywhere else we use STRING=.
                                   :key #'dsd-name
                                   :test #'eq)))
                    (when dsd
@@ -1023,6 +1026,7 @@ unless :NAMED is also specified.")))
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
         (clear-info :type :compiler-layout type)
+        ;; FIXME: shouldn't this undeclare any constructors too?
         (undefine-fun-name (dd-copier-name info))
         (undefine-fun-name (dd-predicate-name info))
         (dolist (slot (dd-slots info))

@@ -275,6 +275,7 @@
 
       #-sb-xc-host ;; Supress &OPTIONAL + &KEY syle-warning on xc host
       (when (and (logtest (bits &key) seen) optional (not silent))
+        ;; FIXME: add a condition class for this
         (style-warn-once
          list "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
 
