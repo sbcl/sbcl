@@ -434,9 +434,15 @@ and a pointer to the arguments."
               ((alien-single-float-type-p result-type)
                (inst lwc1 (make-fpr 0) sp n-callee-register-args-bytes))
               ((alien-double-float-type-p result-type)
-               (inst lwc1 (make-fpr 0) sp n-callee-register-args-bytes)
-               (inst lwc1 (make-fpr 1) sp (+ n-callee-register-args-bytes
-                                             n-word-bytes)))
+               (ecase *backend-byte-order*
+                 (:big-endian
+                  (inst lwc1 (make-fpr 0) sp (+ n-callee-register-args-bytes
+                                                n-word-bytes))
+                  (inst lwc1 (make-fpr 1) sp n-callee-register-args-bytes))
+                 (:little-endian
+                  (inst lwc1 (make-fpr 0) sp n-callee-register-args-bytes)
+                  (inst lwc1 (make-fpr 1) sp (+ n-callee-register-args-bytes
+                                                n-word-bytes)))))
               ((and (alien-integer-type-p result-type)
                     (> (sb!alien::alien-integer-type-bits result-type)
                        n-word-bits))
