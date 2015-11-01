@@ -123,16 +123,20 @@
     (setf (info :variable :type name) type
           (info :variable :where-from name) where-from)))
 
-(defun proclaim-ftype (name type type-specifier where-from)
+(defun proclaim-ftype (name type-oid type-specifier where-from)
+  (declare (type (or ctype defstruct-description) type-oid))
   (unless (legal-fun-name-p name)
     (error "Cannot declare FTYPE of illegal function name ~S" name))
-  (unless (csubtypep type (specifier-type 'function))
-    (error "Not a function type: ~S" (type-specifier type)))
-
+  (when (and (ctype-p type-oid)
+             (not (csubtypep type-oid (specifier-type 'function))))
+    (error "Not a function type: ~S" (type-specifier type-oid)))
   (with-single-package-locked-error
       (:symbol name "globally declaring the FTYPE of ~A")
     (when (eq (info :function :where-from name) :declared)
-      (let ((old-type (info :function :type name)))
+      (let ((old-type (proclaimed-ftype name))
+            (type (if (ctype-p type-oid)
+                      type-oid
+                      (specifier-type type-specifier))))
         (cond
           ((not (type/= type old-type))) ; not changed
           ((not (info :function :info name)) ; not a known function
@@ -155,10 +159,8 @@
     (note-name-defined name :function)
 
     ;; The actual type declaration.
-    (setf (info :function :type name) type
+    (setf (info :function :type name) type-oid
           (info :function :where-from name) where-from)))
-
-(defun proclaimed-ftype (name) (info :function :type name))
 
 (defun seal-class (class)
   (declare (type classoid class))

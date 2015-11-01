@@ -173,9 +173,73 @@
         (loop for arg in args
               and i from 1
               do (check-arg-type arg *wild-type* i)))
+    ;; One more check for structure constructors:
+    (awhen (lvar-fun-name (combination-fun call) t)
+      (let ((info (info :function :type it)))
+        (when (typep info 'defstruct-description)
+          (awhen (assq it (dd-constructors info))
+            (check-structure-constructor-call call info (cdr it))))))
     (cond (*lossage-detected* (values nil t))
           (*unwinnage-detected* (values nil nil))
           (t (values t t)))))
+
+(defun check-structure-constructor-call (call dd ctor-ll-parts)
+  (destructuring-bind (&optional req opt rest keys aux)
+      (and (listp ctor-ll-parts) (cdr ctor-ll-parts))
+    (declare (ignore rest))
+    (let* ((call-args (combination-args call))
+           (n-req (length req))
+           (keyword-lvars (nthcdr (+ n-req (length opt)) call-args))
+           (const-keysp (check-key-args-constant keyword-lvars))
+           (n-call-args (length call-args)))
+      (dolist (slot (dd-slots dd))
+        (let ((name (dsd-name slot))
+              (suppliedp :maybe)
+              (lambda-list-element nil))
+          ;; Ignore &AUX vars - it's not the caller's fault if wrong.
+          (unless (find name aux :key (lambda (x) (if (listp x) (car x) x))
+                        ;; is this right, or should it be EQ
+                        ;; like in DETERMINE-UNSAFE-SLOTS ?
+                        :test #'string=)
+            (multiple-value-bind (arg position)
+                (%find-position name opt nil 0 nil #'parse-optional-arg-spec
+                                #'string=)
+              (when arg
+                (setq suppliedp (< (+ n-req position) n-call-args)
+                      lambda-list-element arg)))
+            (when (and (eq suppliedp :maybe) const-keysp)
+              ;; Deduce the keyword (if any) that initializes this slot.
+              (multiple-value-bind (keyword arg)
+                  (if (listp ctor-ll-parts)
+                      (dolist (arg keys)
+                        (multiple-value-bind (key var) (parse-key-arg-spec arg)
+                          (when (string= name var) (return (values key arg)))))
+                      (values (keywordicate name) t))
+                (when arg
+                  (setq suppliedp (find-keyword-lvar keyword-lvars keyword)
+                        lambda-list-element arg))))
+            (when (eq suppliedp nil)
+              (let ((initform (if (typep lambda-list-element '(cons t cons))
+                                  (second lambda-list-element)
+                                  (dsd-default slot))))
+                ;; Return T if value-form definitely does not satisfy
+                ;; the type-check for DSD. Return NIL if we can't decide.
+                (when (if (sb!xc:constantp initform)
+                          (not (sb!xc:typep (constant-form-value initform)
+                                            (dsd-type slot)))
+                          ;; Find uses of nil-returning functions as defaults,
+                          ;; like ERROR and MISSING-ARG.
+                          (and (sb!kernel::dd-null-lexenv-p dd)
+                               (listp initform)
+                               (let ((f (car initform)))
+                                 ;; Don't examine :function :type of macros!
+                                 (and (eq (info :function :kind f) :function)
+                                      (let ((info (info :function :type f)))
+                                        (and (fun-type-p info)
+                                             (type= (fun-type-returns info)
+                                                    *empty-type*)))))))
+                  (note-lossage "The slot ~S does not have a suitable default, ~
+and no value was provided for it." name))))))))))
 
 ;;; Check that the derived type of the LVAR is compatible with TYPE. N
 ;;; is the arg number, for error message purposes. We return true if

@@ -380,9 +380,12 @@
 (declaim (ftype (sfunction (t) ctype)
                 specifier-type ctype-of sb!kernel::ctype-of-array))
 
-;;; The type specifier for this function.
+;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION.
+;;; If a DD, it must contain a constructor whose name is
+;;; the one being sought in globaldb.
+;;; The DD can be used to derive the constructor's type signature.
 (define-info-type (:function :type)
-  :type-spec ctype
+  :type-spec (or ctype defstruct-description)
   ;; Again [as in (DEFINE-INFO-TYPE (:FUNCTION :TYPE) ...)] it's
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990330

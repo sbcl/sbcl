@@ -1051,8 +1051,11 @@
   (declare (type sb!kernel:code-component code))
   (sb!c::compiled-debug-info-fun-map (sb!kernel:%code-debug-info code)))
 
-(defstruct (location-group (:copier nil))
-  (locations #() :type (vector (or list fixnum))))
+(defstruct (location-group (:copier nil) (:predicate nil))
+  ;; This was (VECTOR (OR LIST FIXNUM)) but that doesn't have any
+  ;; specialization other than T, and the cross-compiler has trouble
+  ;; with (SB!XC:TYPEP #() '(VECTOR (OR LIST FIXNUM)))
+  (locations #() :type simple-vector))
 
 ;;; Return the vector of DEBUG-VARs currently associated with DSTATE.
 (defun dstate-debug-vars (dstate)

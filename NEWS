@@ -1,5 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.3.0:
+  * enhancement: compiling an out-of-line DEFSTRUCT constructor call
+    will warn if a defaulted value is incompatible with its slot type.
+  * enhancement: a local INLINE declaration on a structure constructor
+    will work as intended, subject to any other factors that inhibit
+    inlining, even if the DEFSTRUCT was not itself within a global
+    INLINE proclamation for the named constructor
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
   * bug fix: structure constructor type checking is better. (lp#1508735)
 

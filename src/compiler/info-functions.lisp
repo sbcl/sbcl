@@ -130,7 +130,17 @@
 ;;; Trivially wrap (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
 (declaim (ftype (function ((or symbol cons)) list) fun-name-inline-expansion))
 (defun fun-name-inline-expansion (fun-name)
-  (info :function :inline-expansion-designator fun-name))
+  (multiple-value-bind (answer winp)
+      (info :function :inline-expansion-designator fun-name)
+    (when (and (not winp) (symbolp fun-name))
+      (let ((info (info :function :type fun-name)))
+        (when (typep info 'defstruct-description)
+          (let ((spec (assq fun-name (dd-constructors info))))
+            (aver spec)
+            (setq answer `(lambda ,@(structure-ctor-lambda-parts
+                                     info (cdr spec)))
+                  winp t)))))
+    (values answer winp)))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database

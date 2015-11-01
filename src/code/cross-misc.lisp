@@ -191,3 +191,9 @@
 (defun default-structure-print (structure stream depth)
   (declare (ignore depth))
   (write structure :stream stream :circle t))
+
+(in-package "SB!KERNEL")
+(defun %find-position (item seq from-end start end key test)
+  (let ((position (position item seq :from-end from-end
+                            :start start :end end :key key :test test)))
+    (values (if position (elt seq position) nil) position)))

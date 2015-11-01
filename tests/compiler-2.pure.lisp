@@ -92,3 +92,31 @@
            (values-list (loop for i below 5000 collect i))))
     (assert (= (nth-value 1 (return-a-ton-of-values)) 1))
     (assert (= (nth-value 4000 (return-a-ton-of-values)) 4000))))
+
+(defstruct (a-test-structure-foo
+            (:constructor make-a-foo-1)
+            (:constructor make-a-foo-2 (b &optional a)))
+  (a 0 :type symbol)
+  (b nil :type integer))
+
+(with-test (:name :improperly-initialized-slot-warns)
+  (with-open-stream (*error-output* (make-broadcast-stream))
+    (multiple-value-bind (f warn err)
+        (compile nil '(lambda () (make-a-foo-1 :a 'what)))
+      ;; should warn because B's default is NIL, not an integer.
+      (assert (and f warn err)))
+    (multiple-value-bind (f warn err)
+        (compile nil '(lambda () (make-a-foo-2 3)))
+      ;; should warn because A's default is 0
+      (assert (and f warn err)))))
+
+(with-test (:name :inline-structure-ctor-no-declaim)
+  (let ((f (compile nil
+                    '(lambda ()
+                       (make-a-foo-1 :a 'wat :b 3)))))
+    (assert (ctu:find-named-callees f)))
+  (let ((f (compile nil
+                    '(lambda ()
+                       (declare (inline make-a-foo-1))
+                       (make-a-foo-1 :a 'wat :b 3)))))
+    (assert (not (ctu:find-named-callees f)))))

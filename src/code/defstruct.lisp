@@ -1132,7 +1132,7 @@ unless :NAMED is also specified.")))
 (defun %proclaim-defstruct-ctors (dd)
   (dolist (ctor (dd-constructors dd))
     (let ((ftype (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
-      (sb!xc:proclaim `(ftype ,ftype ,(car ctor))))))
+      (sb!c:proclaim-ftype (car ctor) dd ftype :declared))))
 
 ;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
 ;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
@@ -1541,7 +1541,6 @@ or they must be declared locally notinline at each call site.~@:>")
 ;;; The FTYPE is actually not a strong enough constraint anyway, so when IR1
 ;;; tests for the call compatibility it will test for correctness *after*
 ;;; argument defaulting.
-;;; CTOR is an entry from DD-CONSTRUCTORS
 (defun %struct-ctor-ftype (dd args elt-type)
   (flet ((elt-type-intersect (dsd &aux (slot-type (dsd-type dsd)))
            (cond ((eq slot-type t) elt-type)
@@ -1577,6 +1576,18 @@ or they must be declared locally notinline at each call site.~@:>")
                      ((eq (dd-type dd) 'list) 'list)
                      (t `(vector ,(dd-element-type dd) ,(dd-length dd))))
               &optional))))
+
+(defun struct-ctor-ftype (dd name)
+  (let ((ctor (assq name (dd-constructors dd))))
+    (aver ctor)
+    (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
+
+(defun proclaimed-ftype (name)
+  (multiple-value-bind (info foundp) (info :function :type name)
+    (values (if (defstruct-description-p info)
+                (specifier-type (struct-ctor-ftype info name))
+                info)
+            foundp)))
 
 ;;; Given a DD and a constructor spec (a cons of name and pre-parsed
 ;;; BOA lambda list, or the symbol :DEFAULT), return the effective
