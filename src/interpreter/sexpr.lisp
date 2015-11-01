@@ -437,66 +437,61 @@
 ;;; ENV is for package-lock checks and also to make a quick guess about
 ;;; whether a block can be created at the same time as the variable bindings.
 (defun digest-lambda (env proto-fn)
-  (multiple-value-bind (required-args other-args keyword-bits decoder n-opt)
-      (encode-lambda-bindings (proto-fn-lambda-list proto-fn)
-                              (lambda (x) (%sexpr (second x))))
-    (let* ((decls (proto-fn-decls proto-fn))
-           (declared-specials (declared-specials decls))
-           (free-specials
-            (remove-if (lambda (sym)
-                         (or (memq sym required-args) (memq sym other-args)))
-                       declared-specials))
-           (n-required (length required-args))
-           (n-other (length other-args))
-           (n-lambda-vars (+ n-required n-other))
-           (symbols (make-array (+ n-lambda-vars (length free-specials)))))
-      ;; Fill in the SYMBOLS
-      (replace symbols required-args)
-      (replace symbols other-args :start1 n-required)
-      (replace symbols free-specials :start1 n-lambda-vars)
-      (dotimes (i (length symbols))
-        (setf (svref symbols i)
-              (cons (svref symbols i)
-                    (and (< i n-lambda-vars) *universal-type*))))
-      (multiple-value-bind (block-name forms block-share-env-p)
-          (extract-lambda-block (proto-fn-forms proto-fn) decoder env)
-        (let* ((special-b
-                (mark-bound-specials env declared-specials
-                                     symbols n-lambda-vars))
-               (required-mask (lognot (ash -1 n-required)))
-               (required-specials ; one list for PROGV in WITH-LET-BINDINGS
-                (nreverse ; WITH-LET-BINDINGS uses PUSH to accumulate values
-                 (collect-progv-symbols
-                  symbols n-lambda-vars (logand special-b required-mask))))
-               (other-specials ; one list per PROGV in WITH-LET*-BINDINGS.
-                (mapcar #'list (collect-progv-symbols
-                                symbols n-lambda-vars
-                                (logandc2 special-b required-mask))))
-               (frame
-                (make-lambda-frame
-                 :min-args n-required :n-optional n-opt
-                 :n-bound-vars n-lambda-vars :keyword-bits keyword-bits
-                 :symbols symbols :values (or decoder #())
-                 :special-b special-b
-                 :specials (if required-specials
-                               (cons required-specials other-specials)
-                               other-specials)
-                 :declarations decls
-                 :%old-policy (env-policy env)
-                 :%policy (new-policy env decls)
-                 :block-name block-name :share-block-p block-share-env-p
-                 :sexpr (%progn forms))))
-          (process-typedecls frame env symbols)
-          (setf (proto-fn-%frame proto-fn) frame
-                (proto-fn-cookie proto-fn) *globaldb-cookie*)
-          (values frame *globaldb-cookie*))))))
+  (binding*
+      (((required-args other-args keyword-bits decoder n-opt)
+        (encode-lambda-bindings (proto-fn-lambda-list proto-fn)
+                                (lambda (x) (%sexpr (second x)))))
+       (decls (proto-fn-decls proto-fn))
+       (n-required (length required-args))
+       (n-other (length other-args))
+       (n-lambda-vars (+ n-required n-other))
+       (declared-specials (declared-specials decls))
+       (free-specials
+        (remove-if (lambda (sym)
+                     (or (memq sym required-args) (memq sym other-args)))
+                   declared-specials))
+       (symbols
+        (let ((a (make-array (+ n-lambda-vars (length free-specials)))))
+          (replace a required-args)
+          (replace a other-args :start1 n-required)
+          (replace a free-specials :start1 n-lambda-vars)
+          (dotimes (i n-lambda-vars a) ; Unique-ify the binding cells.
+            (setf (svref a i) (list (svref a i))))))
+       (special-b
+        (mark-bound-specials env declared-specials symbols n-lambda-vars))
+       (required-mask (lognot (ash -1 n-required)))
+       (required-specials ; one list for PROGV in WITH-LET-BINDINGS
+        (nreverse ; WITH-LET-BINDINGS uses PUSH to accumulate values
+         (collect-progv-symbols
+          symbols n-lambda-vars (logand special-b required-mask))))
+       (other-specials ; one list per PROGV in WITH-LET*-BINDINGS.
+        (mapcar #'list
+                (collect-progv-symbols
+                 symbols n-lambda-vars (logandc2 special-b required-mask))))
+       ((block-name forms block-share-env-p)
+        (extract-lambda-block (proto-fn-forms proto-fn) decoder env))
+       (frame (make-lambda-frame
+               :min-args n-required :n-optional n-opt
+               :n-bound-vars n-lambda-vars :keyword-bits keyword-bits
+               :symbols symbols :values (or decoder #())
+               :special-b special-b
+               :specials (if required-specials
+                             (cons required-specials other-specials)
+                             other-specials)
+               :declarations decls :%policy (new-policy env decls)
+               :block-name block-name :share-block-p block-share-env-p
+               :sexpr (%progn forms))))
+    (process-typedecls frame env n-lambda-vars symbols)
+    (setf (proto-fn-%frame proto-fn) frame
+          (proto-fn-cookie proto-fn) *globaldb-cookie*)
+    (values frame *globaldb-cookie*)))
 
 (defun make-local-fn-scope (decls funs forms env)
   (let ((specials (free-specials env decls)))
     (process-typedecls (%make-local-fn-scope
                         decls (new-policy env decls)
                         funs (%progn forms) specials)
-                       env specials)))
+                       env 0 specials)))
 
 (defun err-too-few-args (fun n-args)
   (let ((frame (interpreted-function-frame fun)))

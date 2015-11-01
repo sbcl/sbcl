@@ -29,27 +29,17 @@
 
   ;; A vector parallel to the bound symbols in a LET or LAMBDA frame.
   (binding-typechecks +none+ :type value-vector)
-  ;; A vector of checks performed for lexical variables in containing scopes
-  ;; on entry to this scope. Each check takes 2 cells to represent: a frame-ptr
-  ;; and a CTYPE. The frame-ptr must refer to a strictly enclosing scope.
-  ;; Only lexicals of enclosing scopes are checked - never specials
-  ;; because those could signal an "unbound" error.
-  ;; [Perhaps we could check a special var's type only when BOUNDP?]
+  ;; A vector of extra checks performed on entry to this scope.
+  ;; Each check takes 2 cells to represent: a binding and a ctype.
+  ;; The binding is either a frame-ptr or a symbol.
   (extra-typechecks +none+ :type value-vector)
 
-  ;; (VARIABLE . CTYPE) where VARIABLE is the binding cell - a cons - from
-  ;; the contour which established the binding. Name ambiguities are thereby
-  ;; resolved, since no direct reference is made to the symbol.
+  ;; (BINDING . CTYPE) where BINDING is either a binding cell - a cons -
+  ;; or a symbol in the case of free specials.
+  ;; Name ambiguities are resolved when the cell is a cons.
   ;; Restrictions are stored even when current policy precludes type checking,
   ;; so that a nested scope in a safer policy works as it should.
-  (bound-var-type-restrictions nil :type list)
-  ;; (SYMBOL . CTYPE) for free type restrictions.
-  ;; Mostly unused, but sometimes used for symbol-macros,
-  ;; if only to get some existing regression tests to pass.
-  ;; Why this isn't an alist from binding cell to ctype is that declarations
-  ;; can be made on things which have no binding cell, such as FTYPEs
-  ;; and symbols which aren't even lexically declared free specials.
-  (free-var-type-restrictions nil :type list))
+  (type-restrictions nil :type list))
 
 ;; Some limits of the number of levels of lexical nesting and number
 ;; of things that can be bound at one level.

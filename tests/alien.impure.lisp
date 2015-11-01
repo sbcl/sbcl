@@ -15,8 +15,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+interpreter (sb-ext:exit :code 104)
-
 (cl:in-package :cl-user)
 
 ;;; In sbcl-0.6.10, Douglas Brebner reported that (SETF EXTERN-ALIEN)
@@ -226,13 +224,15 @@
     (when x
       (return-from try-to-leak-alien-stack 'going))
     (never)))
-(with-test (:name :nlx-causes-alien-stack-leak)
+(with-test (:name :nlx-causes-alien-stack-leak
+                  :fails-on :interpreter) ; should it work?
   (let ((*sap-int* nil))
     (loop repeat 1024
           do (try-to-leak-alien-stack t))))
 
 ;;; bug 431
-(with-test (:name :alien-struct-redefinition)
+(with-test (:name :alien-struct-redefinition
+                  :fails-on :interpreter)
   (eval '(progn
           (define-alien-type nil (struct mystruct (myshort short) (mychar char)))
           (with-alien ((myst (struct mystruct)))
@@ -257,7 +257,12 @@
 (sb-alien:define-alien-routine bug-316075 void (result char :out))
 (with-test (:name :bug-316075 :fails-on :win32)
   #+win32 (error "fail")
-  (handler-bind ((warning #'error))
+  ;; The interpreter gives you a style-warning because the "undefined alien"
+  ;; first occurs here during compilation of the test case. But if compiling
+  ;; by default, then the warning already happened above at DEFINE-ALIEN-ROUTINE
+  ;; because when that got compiled, it warned, which inhibited further
+  ;; warnings for the same foreign symbol.
+  (handler-bind (((and warning (not style-warning)) #'error))
     (compile nil '(lambda () (multiple-value-list (bug-316075))))))
 
 
@@ -272,7 +277,8 @@
     ((foo (unsigned 32)))
   foo)
 
-(with-test (:name :bug-316325 :skipped-on '(not (or :x86-64 :x86)))
+(with-test (:name :bug-316325 :skipped-on '(not (or :x86-64 :x86))
+                  :fails-on :interpreter)
   ;; This test works by defining a callback function that provides an
   ;; identity transform over a full-width machine word, then calling
   ;; it as if it returned a narrower type and checking to see if any
@@ -390,6 +396,7 @@
               (catch 'out
                 (handler-bind ((sb-int:character-decoding-error
                                  (lambda (stream-condition)
+                                   (declare (ignore stream-condition))
                                    (handler-bind ((sb-int:character-decoding-error
                                                     (lambda (c-string-condition)
                                                       (throw 'out

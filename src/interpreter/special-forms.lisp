@@ -58,7 +58,7 @@
 ;;;
 (defun symeval (symbol env sexpr)
   (binding* (((binding kind frame-ptr expansion) (find-lexical-var env symbol))
-             (type (var-type-assertion env frame-ptr (or binding symbol) :read)))
+             (type (var-type-assertion env symbol binding :read)))
     (if kind ; lexically apparent binding (possibly special or macro)
         (if (eq kind :macro)
             ;; digest-form would lose the type constraint, so pass it in using
@@ -116,7 +116,7 @@
 
 (defun immediate-setq-1 (symbol newval env)
   (binding* (((binding kind frame-ptr value) (find-lexical-var env symbol))
-             (type (var-type-assertion env frame-ptr (or binding symbol) :write)))
+             (type (var-type-assertion env symbol binding :write)))
     (flet ((setf-it (expansion)
              (%eval `(setf ,expansion ,(cast-to type newval)) env))
            (eval-it ()
@@ -154,7 +154,7 @@
 ;;; The globaldb cookie will take care of any loose ends.
 (defun deferred-setq-1 (symbol newval env sexpr)
   (binding* (((binding kind frame-ptr expansion) (find-lexical-var env symbol))
-             (type (var-type-assertion env frame-ptr (or binding symbol) :write)))
+             (type (var-type-assertion env symbol binding :write)))
     (aver (neq type *universal-type*))
     (if kind ; lexically apparent binding (possibly special or macro)
         (if (eq kind :macro)
@@ -692,7 +692,7 @@
                (scope (process-typedecls
                        (%make-local-scope decls (new-policy env decls)
                                           (%progn forms) specials)
-                       env specials)))
+                       env 0 specials)))
           (hlambda LOCALLY (scope) (env)
             (enforce-types scope env)
             (dispatch (local-scope-body scope)
@@ -705,36 +705,35 @@
     (let* ((specials (free-specials env decls))
            (scope (process-typedecls
                    (make-decl-scope decls (new-policy env decls))
-                   env specials)))
+                   env 0 specials)))
       (enforce-types scope env)
       (eval-progn forms (make-basic-env env nil specials scope))))
   :deferred (env) (digest-locally env body))
 
 (defun parse-symbol-macrolet (env bindings body wrap-fn)
   (multiple-value-bind (forms decls) (iparse-body body)
-    (let* ((specials (declared-specials decls))
-           (n-specials (length specials))
-           (n-macros (length bindings))
-           (symbols (make-array (+ n-specials n-macros)))
-           (expansions (make-array n-macros))
-           (checker (sb-c::symbol-macrolet-definitionize-fun :eval))
-           (index -1))
+    (binding* (((specials n-specials) (declared-specials decls))
+               (n-macros (length bindings))
+               (symbols (make-array (+ n-macros n-specials)))
+               (expansions (make-array n-macros))
+               (checker (sb-c::symbol-macrolet-definitionize-fun :eval))
+               (index -1))
       (with-package-lock-context (env)
         (dolist (binding bindings)
           (let* ((binding (funcall checker binding))
                  (symbol (car binding))
                  (expansion (cddr binding)))
-            (setf (svref symbols (incf index)) (cons symbol *universal-type*)
+            (setf (svref symbols (incf index)) (list symbol)
                   (svref expansions index) expansion)))
         (assert-declarable-as-special env specials))
       (dolist (symbol specials)
         (if (find symbol symbols :end n-macros :key #'car)
             (ip-error "~S can not be both a symbol-macro and special" symbol))
-        (setf (svref symbols (incf index)) (list symbol)))
+        (setf (svref symbols (incf index)) (find-special-binding env symbol)))
       (process-typedecls
        (%make-symbol-macro-scope decls (new-policy env decls)
                                  symbols expansions (funcall wrap-fn forms))
-       env symbols))))
+       env n-macros symbols))))
 
 (macrolet ((new-env ()
              `(make-symbol-macro-env env
@@ -754,47 +753,42 @@
             (enforce-types scope env)
             (dispatch (symbol-macro-body scope) (new-env)))))))
 
-(defun parse-let (operator env bindings body specials-listifier)
+(defun parse-let (maker env bindings body specials-listifier)
   (multiple-value-bind (forms decls) (iparse-body body)
-    (let ((declared-specials (declared-specials decls))
-          (n-bound (length bindings))
-          (n-free 0))
+    (binding* (((declared-specials n-declared) (declared-specials decls))
+               (n-bindings 0)
+               (n-free-specials
+                (let ((boundp 0)) ; mask over declared-specials of bound ones
+                  (dolist (binding bindings (- n-declared (logcount boundp)))
+                    (let ((p (posq (binding-symbol binding) declared-specials)))
+                      (when p (setf (logbitp p boundp) t)))
+                    (incf n-bindings))))
+               (symbols (make-array (+ n-bindings n-free-specials)))
+               (values (make-array n-bindings))
+               (index -1))
+      (dolist (binding bindings)
+        (multiple-value-bind (symbol value-form)
+            (if (atom binding)
+                (values binding nil)
+                (with-subforms (symbol &optional value) binding
+                  (values symbol value)))
+          (unless (symbolp symbol)
+            (ip-error "~S is not a symbol" symbol))
+          (incf index)
+          (setf (svref symbols index) (list symbol)
+                (svref values index) value-form)))
       (dolist (sym declared-specials)
-        (unless (member sym bindings
-                        :key (lambda (x) (if (listp x) (car x) x)))
-          (incf n-free)))
-      (let ((symbols (make-array (+ n-bound n-free)))
-            (values (make-array n-bound))
-            (index -1))
-        (dolist (binding bindings)
-          (multiple-value-bind (symbol value-form)
-              (if (atom binding)
-                  (values binding nil)
-                  (with-subforms (symbol &optional value) binding
-                    (values symbol value)))
-            (unless (symbolp symbol)
-              (ip-error "~S is not a symbol" symbol))
-            (incf index)
-            (setf (svref symbols index) (cons symbol *universal-type*)
-                  (svref values index) value-form)))
-        (dolist (symbol declared-specials)
-          (unless (find (the symbol symbol) symbols :end n-bound :key #'car)
-            (setf (svref symbols (incf index)) (list symbol))))
-        (let ((special-b
-               (mark-bound-specials env declared-specials symbols n-bound)))
-          (process-typedecls
-           (let ((new-policy (new-policy env decls))
-                 (forms (%progn forms))
-                 (specials (funcall specials-listifier
-                                    (collect-progv-symbols symbols n-bound
-                                                           special-b))))
-             (if (eq operator 'let)
-                 (make-let-frame
-                  decls new-policy symbols special-b values forms specials)
-                 (make-let*-frame
-                  decls (env-policy env) new-policy symbols special-b values
-                  forms specials)))
-           env symbols))))))
+        (unless (find (the symbol sym) symbols :end n-bindings :key #'car)
+          (setf (svref symbols (incf index)) (find-special-binding env sym))))
+      (let ((special-b ; mask over symbols of special ones
+             (mark-bound-specials env declared-specials symbols n-bindings)))
+        (process-typedecls
+         (funcall maker decls (new-policy env decls) symbols special-b
+                  values (%progn forms)
+                  (funcall specials-listifier
+                           (collect-progv-symbols symbols n-bindings
+                                                  special-b)))
+         env n-bindings symbols)))))
 
 (defglobal *let-processor* nil)
 
@@ -810,8 +804,8 @@
               `((when (singleton-p bindings)
                   (return-from let*
                    (funcall *let-processor* `(,bindings ,@body) env)))))
-          (let ((frame (parse-let ',operator env bindings body
-                                  ,transform-specials)))
+          (let ((frame (parse-let ',(symbolicate "MAKE-" operator "-FRAME")
+                                  env bindings body ,transform-specials)))
             (let ((values (frame-values frame)))
               (map-into values #'%sexpr values))
             (symbol-macrolet ((symbols (frame-symbols frame)))
@@ -920,7 +914,7 @@
     (let* ((specials (free-specials env decls))
            (scope (process-typedecls
                    (make-decl-scope decls (new-policy env decls))
-                   env specials)))
+                   env 0 specials)))
       (enforce-types scope env)
       (eval-progn forms
                   (make-macro-env env

@@ -16,9 +16,7 @@
 (unless (eq sb-ext:*evaluator-mode* :compile)
   (setq sb-rt::*expected-failures*
         (union sb-rt::*expected-failures*
-               '(variable-info.lexical.type
-                 variable-info.lexical.type.3
-                 function-info.notinline/local
+               '(function-info.notinline/local
                  function-information.known-inline
                  function-information.ftype
                  define-declaration.function.mask))))

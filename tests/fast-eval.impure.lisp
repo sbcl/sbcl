@@ -190,22 +190,20 @@
   (expect-type-error (macroexpand '(nice-macro :third (x))))
 
   ;; SETQ of MUMBLE which is a "free" (not bound) typed special variable
-  #+nil
   (expect-type-error
    (let* ((foo 3) (baz foo))
       (declare (special foo mumble) (real mumble))
       (setq mumble 'a)))
 
-  #+nil
   (expect-type-error
    (let ((x 3))
       (declare (special x) (integer x))
-      (print x)
+      ; (print x)
       (let ((x 'a))
         (declare (symbol x))
-        (print x)
+        ; (print x)
         (locally (declare (special x))
-          (print x)
+          ; (print x)
           ;; this references the special X, not the lexical X
           (setq x 'foo)))))
 

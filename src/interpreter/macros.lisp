@@ -200,3 +200,12 @@
 ;;; it needs to be ENV-POLICY. The last macro arg is unevaluated
 ;;; and names the function to call to get a policy from ENV-VAR.
 (defmacro policy (env-obj expr) `(sb-c:policy ,env-obj ,expr env-policy))
+
+;;; This is used for two different things, which happen to be identical
+;;; in their operation - extracting the symbol from:
+;;; 1. a binding cell in a LET environment symbol vector, like #((A) ... B)
+;;;    in which A is lexically bound and B is a free special var.
+;;; 2. the symbol from the original LET form, as in (LET ((A 3) ... B) ...)
+;;;    in which A had a non-nil default and B did not.
+(declaim (inline binding-symbol))
+(defun binding-symbol (x) (if (listp x) (car x) x))

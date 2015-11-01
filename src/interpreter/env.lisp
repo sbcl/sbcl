@@ -193,11 +193,11 @@
 (defun frame-size (frame) (length (frame-values frame)))
 
 ;;; A LET* frame is just like a LET frame, but needs two policies.
-(defstruct (let*-frame (:include frame) (:predicate nil) (:copier nil)
-                       (:constructor make-let*-frame
-                                     (declarations %old-policy %policy
-                                      symbols special-b values sexpr specials)))
-  (%old-policy nil :type sb-c::policy :read-only t))
+(defstruct (let*-frame
+             (:include frame) (:predicate nil) (:copier nil)
+             (:constructor make-let*-frame
+                           (declarations %policy symbols special-b
+                            values sexpr specials))))
 
 ;;; BASIC-ENV stores a policy for its body, but if evaluation has not reached
 ;;; the body forms of a LET*, then the old policy is in effect. This is due to
@@ -206,7 +206,7 @@
 ;;; that the body forms see.
 (defun env-policy (env)
   (cond ((not env) sb-c::*policy*)
-        ((env-mutable-p env) (let*-frame-%old-policy (env-contour env)))
+        ((env-mutable-p env) (env-policy (env-parent env)))
         (t (let ((policy (%policy (env-contour env))))
              ;; If the policy contains no qualities, look to the parent env.
              ;; This happens with a BLOCK or TAGBODY, as well as the
@@ -364,13 +364,24 @@
                 (frame-ptr-cell-index frame-ptr)))))
 
 (defun %enforce-types (typechecks env)
-  (loop for i fixnum from 0 below (length typechecks) by 2
-        for frame-ptr = (svref typechecks i)
-        ;; FIXME: fast accessor for small values of FRAME-PTR ?
-        for val = (%cell-ref env frame-ptr)
-        for type = (svref typechecks (logior i 1))
-        unless (itypep val type)
-        do (typecheck-fail/ref (frame-symbol env frame-ptr) val type)))
+  (do ((i 0 (+ i 2))
+       (n (length typechecks)))
+      ((eq i n))
+    (declare (index i n))
+    (let ((ref (svref typechecks i)))
+      (when (fixnump ref)
+        (do ((i i (+ i 2)))
+            ((eq i n) (return-from %enforce-types))
+          (let* ((frame-ptr (svref typechecks i))
+                 (val (%cell-ref env frame-ptr))
+                 (type (svref typechecks (logior i 1))))
+            (unless (itypep val type)
+              (typecheck-fail/ref (frame-symbol env frame-ptr) val type)))))
+      (when (boundp ref)
+        (let ((val (symbol-value ref))
+              (type (svref typechecks (logior i 1))))
+          (unless (itypep val type)
+            (typecheck-fail/ref ref val type)))))))
 
 (defun must-freeze-p (env)
   (and env
@@ -461,37 +472,34 @@
         (print-unreadable-object (obj stream :type t)
           (prin1 name stream)))))
 
-;; Return approximately a type specifier for LAMBDA-LIST.
-;; e.g. after doing (DEFUN FOO (A B) ...), you want (FUNCTION (T T) *)
-;; This is mainly to get accurate information from DESCRIBE
-;; when properly hooked in. Attempting to intercept %FUN-TYPE caused
-;; some problems, pending investigation.
+;;; Return approximately a type specifier for LAMBDA-LIST.
+;;; e.g. after doing (DEFUN FOO (A B) ...), you want (FUNCTION (T T) *)
+;;; This is mainly to get accurate information from DESCRIBE
+;;; when properly hooked in.
+;;; FIXME: this returns T for all &OPTIONAL and &KEY args.
 (defun approximate-proto-fn-type (lambda-list bound-symbols)
   (declare (notinline member cons))
-  (labels ((recurse (list var-index)
-             (unless (or (endp list) (eq (car list) '&aux))
-               (let* ((elt (car list))
-                      (ll-keyword-p (member elt lambda-list-keywords))
-                      (rest (cdr list)))
+  (labels ((recurse (list var-index &aux (elt (car list)))
+             (unless (or (eq elt '&aux) (null list))
+               (let ((ll-keyword-p (member elt lambda-list-keywords))
+                     (rest (cdr list)))
                  (cons (cond (ll-keyword-p elt)
                              ((not var-index) 't)
-                             (t (type-specifier
-                                 (cdr (svref bound-symbols var-indeX)))))
+                             (t
+                              (acond ((cdr (svref bound-symbols var-index))
+                                      (type-specifier it))
+                                     (t t))))
                        (if (eq elt '&key)
                            (keys rest)
                            (recurse rest
                                     (and var-index
                                          (not ll-keyword-p)
                                          (1+ var-index))))))))
-           (keys (list)
-             (unless (or (endp list) (eq (car list) '&aux))
-               (let ((elt (car list)))
-                 (cons (if (member elt lambda-list-keywords)
-                           elt
-                           (let ((sym (if (listp elt) (car elt) elt)))
-                             `(,(if (atom sym) (keywordicate sym) (car sym))
-                               t)))
-                       (keys (cdr list)))))))
+           (keys (list &aux (elt (car list)))
+             (unless (or (eq elt '&aux) (null list))
+               (cons (cond ((member elt lambda-list-keywords) elt)
+                           (t `(,(parse-key-arg-spec elt) t)))
+                     (keys (cdr list))))))
     `(function ,(recurse lambda-list 0) *)))
 
 (declaim (type boolean *hook-all-functions*))
@@ -590,12 +598,16 @@
 ;;; has decls-list (((SPECIAL X) (SPECIAL Y)) ((SPECIAL Z W)))
 ;;;
 (defun declared-specials (decls-list)
-  (let ((specials nil))
-    (do-decl-spec (decl-spec decls-list)
-      (when (eql (car decl-spec) 'special)
-        (dolist (var (cdr decl-spec))
-          (pushnew var specials :test #'eq))))
-    specials))
+  (let ((count 0))
+    (declare (fixnum count))
+    (collect ((specials))
+      (do-decl-spec (decl-spec decls-list)
+        (when (eql (car decl-spec) 'special)
+          (dolist (var (cdr decl-spec))
+            (unless (memq var (specials))
+              (incf count)
+              (specials var)))))
+      (values (specials) count))))
 
 ;;; See if all SYMBOLS can be declare special.
 ;;; This applies to both free and bound variables.
@@ -617,15 +629,17 @@
 ;; which have their own way of creating the free specials along with
 ;; bound variables.
 (defun free-specials (env decls)
-  (let ((symbols (declared-specials decls)))
+  (multiple-value-bind (symbols n) (declared-specials decls)
     (when symbols
       (with-package-lock-context (env)
         (assert-declarable-as-special env symbols))
-      (map 'vector #'list (the list symbols)))))
-
-;;; Return the type of a lexically bound lexical var.
-;;; Doesn't work for specially bound or free special.
-(defun binding-type (cell) (cdr cell))
+      (let ((a (make-array n)))
+        ;; If any special declaration exposes a bound special
+        ;; from an enclosing scope, the original binding cell
+        ;; is made visible in this binding scope.
+        ;; This causes any type declaration to be carried forward.
+        (dotimes (i n a)
+          (setf (aref a i) (find-special-binding env (pop symbols))))))))
 
 (defmacro specially-bind-p (symbol lexically-special-p)
   ;; Don't signal errors here: allow the interpreter to attempt to bind
@@ -777,85 +791,86 @@
       ;; Emulate find/position with :FROM-END T here, but faster.
       (loop
        (when (minusp (decf index)) (return))
-       (let ((cell (truly-the cons (svref symbols index))))
-         (when (eq (car cell) sym)
+       (let ((cell (svref symbols index)))
+         (when (eq (binding-symbol cell)  sym)
            (multiple-value-bind (kind value)
                (cond ((or (var-env-p env) (lambda-env-p env))
                       (let ((values (the simple-vector (env-payload env))))
-                        (if (and (< index (length values))
-                                 (not (logbitp index
-                                               (frame-special-b
-                                                (env-contour env)))))
-                            (values :normal (svref values index))
-                            :special)))
+                        (if (or (>= index (length values))
+                                (logbitp index
+                                         (frame-special-b (env-contour env))))
+                            :special
+                            (values :normal (svref values index)))))
                      ((symbol-macro-env-p env)
                       (let ((values (the simple-vector (env-payload env))))
-                        (if (< index (length values))
-                            (values :macro (svref values index))
-                            :special)))
+                        (if (>= index (length values))
+                            :special
+                            (values :macro (svref values index)))))
                      (t ; function-env, macro-env, basic-env (locally).
                       :special)) ; no symbol is bound
              (return-from find-lexical-var
                (values cell kind (make-frame-ptr index level) value)))))))))
 
+;;; Search ENV for BINDING and return a frame-pointer if the variable
+;;; is a lexical var, or :SPECIAL or :MACRO if it is one of those.
+;;; Lexically visible special bindings return :SPECIAL.
+;;; This is similar to FIND-LEXICAL-VAR in its operation,
+;;; but simpler, as bindings are unique objects.
+(defun find-binding (env binding)
+  (do ((env env (env-parent env))
+       (level 0 (1+ level)))
+      ((null env) nil)
+    (declare (type (unsigned-byte #.+frame-depth-bits+) level))
+    (with-environment-vars (bindings index) env ; skipped if no symbols
+      (declare (ignore index))
+      (let ((payload (env-payload env))
+            (index (position binding bindings)))
+        (when index
+          (return
+            (cond ((or (var-env-p env) (lambda-env-p env))
+                   (if (or (>= index (length (the simple-vector payload)))
+                           (logbitp index (frame-special-b (env-contour env))))
+                       :special
+                       (make-frame-ptr index level)))
+                  ((symbol-macro-env-p env)
+                   (if (>= index (length (the simple-vector payload)))
+                       :special
+                       :macro))
+                  (t ; function-env, macro-env, basic-env (locally).
+                   :special)))))))) ; no symbol is bound
+
 ;;; Similar to the above, but only return a lexically visible special binding.
 ;;; This is required to locate the intended binding in cases such as this:
 #|
- (let ((a 3)) ; special A
+ (let ((a 3)) ; special A[1]
    (declare (special a))
-   (symbol-macrolet ((a x)) ; macro A
-     (let ((a (foo))) ; lexical A
+   (symbol-macrolet ((a x)) ; macro A[2]
+     (let ((a (foo))) ; lexical A[3]
        (macrolet ((foo () ...))
-         (declare (real a) (special a)) ; declares the type of special A
+         (declare (real a) (special a)) ; declares the type of A[1]
+         A)))) ; references A[1]
 |#
-(defun find-bound-special (env sym)
-  (do ((env env (env-parent env))
-       (level 0 (1+ level)))
-      ((null env) (values nil nil nil))
-    (declare (type (unsigned-byte #.+frame-depth-bits+) level))
-    ;; Only LET-like frames can create special bindings.
+(defun find-special-binding (env sym)
+  (do ((env env (env-parent env)))
+      ((null env) sym) ; Return just SYM if no binding found.
+    ;; Only a LET-like frames can create special bindings.
     (when (or (var-env-p env) (lambda-env-p env))
       (with-environment-vars (symbols index) env ; skipped if no symbols
-        (loop
-         (when (minusp (decf index)) (return))
-         (let ((cell (truly-the cons (svref symbols index))))
-           (when (eq (car cell) sym)
-             ;; If this frame declare SYM as a free special,
-             ;; it can't also bind it, so bail out now.
-             (unless (cdr cell) (return))
-             (when (logbitp index (frame-special-b (env-contour env)))
-               (return-from find-bound-special cell))
-             ;; If it was not special, then there can be no other match
-             ;; in this frame - if duplicately named bindings exists,
-             ;; at most the last one could be special.
-             (return))))))))
+        (let ((index (position sym symbols
+                               :end (min index (length (env-payload env)))
+                               :key #'car :test #'eq :from-end t)))
+          (when (and index (logbitp index (frame-special-b (env-contour env))))
+            (return (svref symbols index))))))))
 
-;;; Look backwards for any type restriction pertinent to BINDING.
-;;; If none is found then return the restriction in BINDING itself.
-;;; We skip over LET* (or LAMBDA) frames whose body has not been
-;;; entered but which are present in the environment chain.
-;;; This potentially scans backwards beyond the frame in which
-;;; BINDING is made, but no harm can come of it,
-;;; since bindings are unique objects - you can't find the wrong one.
-(defun find-bound-type-restriction (env binding)
-  (do ((env env (env-parent env))
-       (level 0 (1+ level)))
-      ((null env) (cdr binding))
-    (declare (type (unsigned-byte #.+frame-depth-bits+) level))
+;;; BINDING is either a cell or a symbol (if a free special).
+(defun find-type-restriction (env binding)
+  (do ((env env (env-parent env)))
+      ((null env)
+       (if (listp binding)
+           (or (cdr binding) *universal-type*)
+           *universal-type*))
     (unless (env-mutable-p env)
-      (awhen (assq binding
-                   (bound-var-type-restrictions (env-contour env)))
-        (return (cdr it))))))
-
-;;; As above but look for SYMBOL in the free type restrictions,
-;;; and if not found, return *UNIVERSAL-TYPE*.
-(defun find-free-type-restriction (env symbol)
-  (do ((env env (env-parent env))
-       (level 0 (1+ level)))
-      ((null env) *universal-type*)
-    (declare (type (unsigned-byte #.+frame-depth-bits+) level))
-    (unless (env-mutable-p env)
-      (awhen (assq symbol (free-var-type-restrictions (env-contour env)))
+      (awhen (assq binding (type-restrictions (env-contour env)))
         (return (cdr it))))))
 
 ;;; Update DECL-SCOPE with type restrictions based on its declarations.
@@ -867,130 +882,88 @@
 ;;;
 ;;; Bound lexical and special variables in the new scope have the CTYPE
 ;;; as stored in the CDR of the binding cell altered to reflect the
-;;; restriction. Bound variables of containing scopes get a new restriction
-;;; placed in the BOUND-VAR-TYPE-RESTRICTIONS of this new scope.
-;;; Free declarations go in FREE-VAR-TYPE-RESTRICTIONS.
+;;; restriction.
 ;;;
 ;;; FIXME: global DECLAIM that affects the interpreter's TYPE-CHECK policy
 ;;; needs to kick the globaldb so that all intepreted function re-consider
 ;;; whether to perform checks.
-(defun process-typedecls (decl-scope env symbols)
-  (let (binding-types-p ; T if any binding made in this scope has a type declaration
-        new-lexical-bound-type-constraints
-        new-special-bound-type-constraints
-        new-free-type-constraints
-        (symbols (if symbols (the simple-vector symbols) #())))
-    ;; Intersect all the declarations made about a single symbol in the
-    ;; current scope with the prevailing type from enclosing context.
-    (flet ((add-bound-type-constraint (binding ctype list)
-             (let ((found (assq binding list)))
-               (if found
-                   (progn (rplacd found (type-intersection (cdr found) ctype))
-                          list)
-                   (let* ((old-type (find-bound-type-restriction env binding))
-                          (new-type (type-intersection ctype old-type)))
-                     (if (type= old-type new-type)
-                         list ; don't create a new irrelevant constraint
-                         (acons binding new-type list)))))))
-      ;; First we compute the effective set of type restrictions.
-      (do-decl-spec (decl (declarations decl-scope))
-        (when (eq (applies-to-variables-p decl) 'type)
-          (multiple-value-bind (type-spec names)
-              (if (eq (car decl) 'type)
-                  (values (cadr decl) (cddr decl))
-                  (values (car decl) (cdr decl)))
-            (let ((ctype (specifier-type type-spec)))
-              (unless (eq ctype *universal-type*)
-                (dolist (symbol names)
-                  (block done
-                    (acond ((find (the symbol symbol) symbols
-                                  :test #'eq :key #'car :from-end t)
-                            ;; Type restrictions aren't pervasive downward,
-                            ;; so this is the only case that doesn't have to
-                            ;; search backward for the most recent restriction.
-                            ;; [Global declamations are pervasive downward,
-                            ;; but violations will be caught by the runtime]
-                            (when (cdr it) ; binding is established by this scope
-                              (return-from done
-                                (setf (cdr it) (type-intersection (cdr it) ctype)
-                                      binding-types-p t)))
-                            ;; The symbol is declared special in this scope.
-                            ;; Either it exposes a special binding that was
-                            ;; hidden by a non-special, or it's a free special.
-                            (awhen (find-bound-special env symbol)
-                              (return-from done
-                                (setq new-special-bound-type-constraints
-                                      (add-bound-type-constraint
-                                       it ctype new-special-bound-type-constraints)))))
-                           (t ; otherwise search in enclosing scopes
-                            (multiple-value-bind (binding kind)
-                                (find-lexical-var env symbol)
-                              (when (cdr binding) ; found a lexical or special bound var
-                                (case kind
-                                  (:normal
-                                   (setq new-lexical-bound-type-constraints
-                                         (add-bound-type-constraint
-                                          binding ctype new-lexical-bound-type-constraints)))
-                                  (:special
-                                   (setq new-special-bound-type-constraints
-                                         (add-bound-type-constraint
-                                          binding ctype new-special-bound-type-constraints))))
-                                (return-from done)))))
-                    ;; Add a free constraint
-                    (let ((found (assq symbol new-free-type-constraints)))
-                      (if found
-                          (rplacd found (type-intersection (cdr found) ctype))
-                          (let* ((old-type (find-free-type-restriction env symbol))
-                                 (new-type (type-intersection ctype old-type)))
+(defun process-typedecls (decl-scope env n-var-bindings symbols
+                          &aux new-restrictions)
+  ;; First compute the effective set of type restrictions.
+  (do-decl-spec (decl (declarations decl-scope))
+    (when (eq (applies-to-variables-p decl) 'type)
+      (multiple-value-bind (type-spec names)
+          (if (eq (car decl) 'type)
+              (values (cadr decl) (cddr decl))
+              (values (car decl) (cdr decl)))
+        (let ((ctype (specifier-type type-spec)))
+          (unless (eq ctype *universal-type*)
+            (dolist (symbol names)
+              (multiple-value-bind (binding index)
+                  (%find-position symbol symbols t 0 nil #'binding-symbol #'eq)
+                (if (and index (< index n-var-bindings))
+                    ;; Any kind of binding created in directly this frame.
+                    ;; Type restrictions aren't pervasive downward,
+                    ;; so this case doesn't intersect the new type with a
+                    ;; prevailing restriction. Global proclamations are
+                    ;; pervasive, but violations are caught by the runtime.
+                    (rplacd binding
+                            (acond ((cdr binding) (type-intersection it ctype))
+                                   (t ctype)))
+                    ;; Three possibilities now:
+                    ;; 1. INDEX was past the number of bindings in this scope.
+                    ;;    This is either a locally declared free special,
+                    ;;    or a special declaration that exposes a special
+                    ;;    var bound in some containing scope, possibly with
+                    ;;    intervening non-special bindings of the same name.
+                    ;; 2. A binding from an earlier scope not covered by case 1.
+                    ;; 3. Something global: an assumed or proclaimed special,
+                    ;;    or a global symbol-macro.
+                    (let* ((thing (or binding ; case 1
+                                      (find-lexical-var env symbol) ; case 2
+                                      symbol)) ; case 3
+                           (restriction (assq thing new-restrictions)))
+                      (if restriction
+                          (rplacd restriction
+                                  (type-intersection (cdr restriction) ctype))
+                          (let* ((old-type (find-type-restriction env thing))
+                                 (new-type (type-intersection old-type ctype)))
                             (unless (type= old-type new-type)
-                              (push (cons symbol new-type)
-                                    new-free-type-constraints)))))))))))))
-
-    (setf (bound-var-type-restrictions decl-scope)
-          (nconc new-lexical-bound-type-constraints
-                 new-special-bound-type-constraints
-                 (bound-var-type-restrictions decl-scope)))
-    (setf (free-var-type-restrictions decl-scope)
-          (nconc new-free-type-constraints
-                 (free-var-type-restrictions decl-scope)))
-
-    ;; Now if the enclosing policy - not the new policy - demands typechecks,
-    ;; then insert assertions for all variables bound by this scope,
-    ;; as well as bound lexicals declared to have a more restrictive type
-    ;; in this scope than in the prevailing scope. Symbol-macros do not generate
-    ;; checks, nor do free specials nor bound specials from enclosing scopes.
-    ;; In the macro case it would entail arbitrary evaluation, and specials
-    ;; might err with an unbound symbol. Symbol-macros are checked when storing
-    ;; through them though.
-    (when (and binding-types-p (policy env (>= safety 1)))
-      (let ((checks (make-array (1+ (position-if #'cdr symbols :from-end t)))))
-        (dotimes (i (length checks)
-                    (setf (binding-typechecks decl-scope) checks))
-          (let ((ctype (cdr (svref symbols i))))
-            (when (neq ctype *universal-type*)
-              (setf (svref checks i) (type-checker ctype)))))))
-    ;; If a nested scope re-declares a variable to be of a more constrained
-    ;; type "for efficiency" it does not really help the interpreter any,
-    ;; so don't do those checks unless SAFETY exceeds 2.
-    ;; This is a somewhat arbitrary but reasonable stance to take.
-    (when (and new-lexical-bound-type-constraints (policy env (>= safety 2)))
-      (let (extra)
-        (dolist (check new-lexical-bound-type-constraints)
-          ;; FIXME: is this right for a LET* frame?
-          (setf extra
-                ;; (NTH-VALUE 2) is the frame pointer.
-                (list* (nth-value 2 (find-lexical-var env (caar check)))
-                       (type-checker (cdr check)) extra)))
-        (setf (extra-typechecks decl-scope) (coerce extra 'vector)))))
+                              (push (cons thing new-type)
+                                    new-restrictions)))))))))))))
+  (setf (type-restrictions decl-scope) new-restrictions)
+  ;; Done computing effective restrictions.
+  ;; If the enclosing policy - not the new policy - demands typechecks,
+  ;; then insert assertions for all variables bound by this scope,
+  (when (and (policy env (>= safety 1))
+             (find-if #'cdr symbols :end n-var-bindings))
+    (let ((checks (make-array n-var-bindings)))
+      (dotimes (i n-var-bindings (setf (binding-typechecks decl-scope) checks))
+        (awhen (cdr (svref symbols i))
+          (setf (svref checks i) (type-checker it))))))
+  ;; If a nested scope re-declares a variable to be of a more constrained
+  ;; type "for efficiency" it does not really help the interpreter any,
+  ;; so don't do those checks unless SAFETY exceeds 2.
+  ;; This is a somewhat arbitrary but reasonable stance to take.
+  (when (and (policy env (>= safety 2)) new-restrictions)
+    (collect ((lexical-var-checks) (special-var-checks))
+      (dolist (check new-restrictions)
+        (let ((binding (car check))
+              (checkfun (type-checker (cdr check))))
+          (if (consp binding) ; some kind of binding, not sure what
+              (let ((frame-ptr (find-binding env binding)))
+                (case frame-ptr
+                  (:macro) ; ignore it
+                  (:special (special-var-checks (car binding) checkfun))
+                  (t (lexical-var-checks frame-ptr checkfun))))
+              (special-var-checks binding checkfun))))
+      ;; Restrictions could pertain to symbol-macros only,
+      ;; which are not checked on entry to the scope.
+      (when (or (lexical-var-checks) (special-var-checks))
+        (setf (extra-typechecks decl-scope)
+              (coerce (nconc (special-var-checks) (lexical-var-checks))
+                      'vector)))))
   decl-scope)
-
-;;; Return the innermost element of bound-var-type-restrictions in ENV
-;;; that refers to BINDING. This is only for cltl2.
-(defun var-type-restriction (env binding)
-  (do ((env env (env-parent env)))
-      ((null env) (cdr binding))
-    (awhen (assq binding (bound-var-type-restrictions (env-contour env)))
-      (return (cdr it)))))
 
 ;;; Return the thing that should be asserted about VARIABLE's type.
 ;;; If there is nothing to check - no declared type, or the current policy
@@ -1005,34 +978,13 @@
 ;;; the others are kind of spread out. It might be nice to consolidate
 ;;; the policy-related decisions somewhere.
 ;;;
-;;; VARIABLE is a cell, if a lexical variable binding,
-;;; or just a symbol, if a lexical symbol-macro.
-;;; The FRAME-PTR should be supplied as an optimization when VARIABLE is a cell
-;;; (the answer doesn't depend on this) but is required for correct semantics
-;;; when VARIABLE is a symbol. It prevents scanning backwards too far.
-(defun var-type-assertion (env frame-ptr variable op)
-  (unless variable
-    (return-from var-type-assertion nil))
+(defun var-type-assertion (env symbol binding op)
   ;; ** these criteria are subject to change. Not sure they're the best.
   (when (ecase op
           (:write (policy env (>= safety 1)))
           (:read  (policy env (and (= safety 3) (= speed 0)))))
-    (if frame-ptr
-        (do ((env env (env-parent env))
-             (n-iterations (frame-ptr-depth frame-ptr)))
-            ((null env) (bug "can't get here"))
-          (when (zerop n-iterations)
-            (let ((answer (cdr variable)))
-              (return (unless (eq answer *universal-type*) answer))))
-          (awhen (assq variable
-                       (bound-var-type-restrictions (env-contour env)))
-            (return (cdr it)))
-          (decf n-iterations))
-        (do ((env env (env-parent env)))
-            ((null env) nil)
-          (awhen (assq variable
-                       (free-var-type-restrictions (env-contour env)))
-            (return (cdr it)))))))
+    (let ((type (find-type-restriction env (or binding symbol))))
+      (if (eq type *universal-type*) nil (type-checker type)))))
 
 ;; Convert compiler env to interpreter env
 (defun env-from-lexenv (lexenv)
@@ -1200,13 +1152,16 @@
 ;;; Also the parts for sb-cltl2 are fairly odious.
 
 (defun lexenv-from-env (env &optional reason)
-  (let ((lexenv (acond ((env-parent env) (lexenv-from-env it))
+  (%lexenv-from-env (make-hash-table :test 'eq) env reason))
+
+(defun %lexenv-from-env (var-map env &optional reason)
+  (let ((lexenv (acond ((env-parent env) (%lexenv-from-env var-map it reason))
                        ;; The null-lexenv has to be copied into a new
                        ;; lexenv to get a snapshot of *POLICY*.
                        (t (sb-c::make-lexenv :default (make-null-lexenv)))))
         (payload (env-payload env)))
-    (flet ((specialize (sym) ; = make a global var, not make less general
-             (let ((sym (car sym)))
+    (flet ((specialize (binding) ; = make a global var, not make less general
+             (let ((sym (binding-symbol binding)))
                (cons sym (make-global-var :%source-name sym
                                           :kind :special
                                           :where-from :declared))))
@@ -1217,34 +1172,27 @@
             ((or var-env lambda-env)
              (with-environment-vars (symbols end) env
                (loop for i fixnum from (1- end) downto 0
-                     for cell = (svref symbols i)
-                     for sym = (car cell)
+                     for binding = (svref symbols i)
+                     for sym = (binding-symbol binding)
                   collect
                   (cond ((or (>= i (length payload))
                              (logbitp i (frame-special-b (env-contour env))))
-                         (specialize cell))
+                         (specialize binding))
                         ((eq reason 'compile)
                          ;; access interpreter's lexical vars
                          (macroize sym `(svref ,payload ,i)))
                         (t
-                         ;; The type of the var is returned in a sort of
-                         ;; cheating way - we put the type restriction
-                         ;; into the leaf type even though a LEXENV would
-                         ;; ordinarily represent the leaf-type and separately
-                         ;; the type constraint, just as the interpreter does.
-                         ;; But sb-cltl2 is just going intersect those anyway.
-                         (cons sym (make-lambda-var
-                                    :%source-name sym
-                                    :type (var-type-restriction env cell))))))))
+                         (let ((leaf (make-lambda-var
+                                      :%source-name sym
+                                      :type (or (cdr binding) *universal-type*))))
+                           (setf (gethash binding var-map) leaf)
+                           (cons sym leaf)))))))
             (symbol-macro-env
              (nconc (map 'list
                          (lambda (cell expansion)
-                           (let ((type (cdr cell)))
-                             (list* (car cell)
-                                    'sb-sys:macro
-                                    (if (eq type *universal-type*)
-                                        expansion
-                                        `(the ,type ,expansion)))))
+                           (list* (car cell) 'sb-sys:macro
+                                  (acond ((cdr cell) `(the ,it ,expansion))
+                                         (t expansion))))
                          (env-symbols env) payload)
                     ;; symbols without values are free specials
                     (map 'list #'specialize
@@ -1324,6 +1272,13 @@
                          vars)
                         ;; And surely this is wrong...
                         funs)))))))
+
+        ;; type-restrictions are represented in the same way essentially.
+        (dolist (restriction (type-restrictions (env-contour env)))
+          (let ((binding (car restriction)))
+            (if (consp binding)
+                (push (cons (gethash binding var-map) (cdr restriction))
+                      (sb-c::lexenv-type-restrictions lexenv)))))
         ;;
         (setf (sb-c::lexenv-vars lexenv) (nconc vars (sb-c::lexenv-vars lexenv))
               (sb-c::lexenv-funs lexenv) (nconc funs (sb-c::lexenv-funs lexenv))
