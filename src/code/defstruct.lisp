@@ -489,10 +489,21 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
        (setf (dd-conc-name dd) (if arg (string arg))))
       (:constructor ; takes 0 to 2 arguments.
        (destructuring-bind (&optional (cname (symbolicate "MAKE-" name))
-                            lambda-list) args
-         (declare (ignore lambda-list))
+                                      (lambda-list nil ll-supplied-p)) args
+         (when (null cname)
+           ;; Implementations disagree on the meaning of
+           ;;   (:CONSTRUCTOR NIL (A B C)).
+           ;; The choices seem to be: don't define a constructor,
+           ;; define a constructor named NIL, signal a user error,
+           ;; or crash the system itself. The spec implies
+           ;; the behavior that we have, but at least a
+           ;; style-warning seems appropriate.
+           (when ll-supplied-p
+             (style-warn "~S does not define a constructor" option))
+           (setq lambda-list nil ll-supplied-p nil))
          (setf (dd-constructors dd) ; preserve order, just because
-               (nconc (dd-constructors dd) (list (cons cname (cdr args)))))))
+               (nconc (dd-constructors dd)
+                      (list (cons cname (if cname (cdr args))))))))
       (:copier
        (setf (dd-copier-name dd) (if arg-p arg (symbolicate "COPY-" name))))
       (:predicate
@@ -522,71 +533,87 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
        (error "unknown DEFSTRUCT option:~%  ~S" option)))
     seen-options))
 
-;;; Given name and options, return a DD holding that info.
-(defun parse-defstruct-name-and-options (name-and-options)
-  (destructuring-bind (name &rest options) name-and-options
-    (let ((dd (make-defstruct-description name))
-          (seen-options 0))
-      (dolist (option options)
-        (if (eq option :named)
-            (setf (dd-named dd) t)
-            (setq seen-options
-                  (parse-1-dd-option
-                   (cond ((consp option) option)
-                         ((member option
-                                  '(:conc-name :constructor :copier :predicate))
-                          (list option))
-                         (t
-                          ;; FIXME: ugly message (defstruct (s :include) a)
-                          ;; saying "unrecognized" when it means "bad syntax"
-                          (error "unrecognized DEFSTRUCT option: ~S" option)))
-                   dd seen-options))))
-      (case (dd-type dd)
-        (structure
-         (when (dd-offset dd)
-           (error ":OFFSET can't be specified unless :TYPE is specified."))
-         (unless (dd-include dd)
-           ;; FIXME: It'd be cleaner to treat no-:INCLUDE as defaulting
-           ;; to :INCLUDE STRUCTURE-OBJECT, and then let the general-case
-           ;; (INCF (DD-LENGTH DD) (DD-LENGTH included-DD)) logic take
-           ;; care of this. (Except that the :TYPE VECTOR and :TYPE
-           ;; LIST cases, with their :NAMED and un-:NAMED flavors,
-           ;; make that messy, alas.)
-           (incf (dd-length dd))))
-        (t
-         ;; In case we are here, :TYPE is specified.
-         (if (dd-named dd)
-             ;; CLHS - "The structure can be :named only if the type SYMBOL
-             ;; is a subtype of the supplied element-type."
-             (multiple-value-bind (winp certainp)
-                 (subtypep 'symbol (dd-element-type dd))
-               (when (and (not winp) certainp)
-                 (error ":NAMED option is incompatible with element type ~S"
-                        (dd-element-type dd))))
-             (when (dd-predicate-name dd)
-               (error ":PREDICATE cannot be used with :TYPE ~
+;;; Parse OPTIONS into the given DD.
+(defun parse-defstruct-options (options dd)
+  (let ((seen-options 0)
+        (named-p nil))
+    (dolist (option options)
+      (if (eq option :named)
+          (setf named-p t (dd-named dd) t)
+          (setq seen-options
+                (parse-1-dd-option
+                 (cond ((consp option) option)
+                       ((member option
+                                '(:conc-name :constructor :copier :predicate))
+                        (list option))
+                       (t
+                        ;; FIXME: ugly message (defstruct (s :include) a)
+                        ;; saying "unrecognized" when it means "bad syntax"
+                        (error "unrecognized DEFSTRUCT option: ~S" option)))
+                 dd seen-options))))
+    (case (dd-type dd)
+      (structure
+       (when (dd-offset dd)
+         (error ":OFFSET can't be specified unless :TYPE is specified."))
+       (unless (dd-include dd)
+         ;; FIXME: It'd be cleaner to treat no-:INCLUDE as defaulting
+         ;; to :INCLUDE STRUCTURE-OBJECT, and then let the general-case
+         ;; (INCF (DD-LENGTH DD) (DD-LENGTH included-DD)) logic take
+         ;; care of this. (Except that the :TYPE VECTOR and :TYPE
+         ;; LIST cases, with their :NAMED and un-:NAMED flavors,
+         ;; make that messy, alas.)
+         (incf (dd-length dd))))
+      (t
+       ;; In case we are here, :TYPE is specified.
+       (if named-p
+           ;; CLHS - "The structure can be :named only if the type SYMBOL
+           ;; is a subtype of the supplied element-type."
+           (multiple-value-bind (winp certainp)
+               (subtypep 'symbol (dd-element-type dd))
+             (when (and (not winp) certainp)
+               (error ":NAMED option is incompatible with element type ~S"
+                      (dd-element-type dd))))
+           (when (dd-predicate-name dd)
+             (error ":PREDICATE cannot be used with :TYPE ~
 unless :NAMED is also specified.")))
-         (awhen (dd-print-option dd)
-           (error ":TYPE option precludes specification of ~S option" it))
-         (when (dd-named dd)
-           (incf (dd-length dd)))
-         (let ((offset (dd-offset dd)))
-           (when offset (incf (dd-length dd) offset)))))
+       (awhen (dd-print-option dd)
+         (error ":TYPE option precludes specification of ~S option" it))
+       (when named-p
+         (incf (dd-length dd)))
+       (let ((offset (dd-offset dd)))
+         (when offset (incf (dd-length dd) offset)))))
+
+    (let ((name (dd-name dd)))
+      (collect ((keyword-ctors) (boa-ctors))
+        (let (no-constructors)
+          (dolist (constructor (dd-constructors dd))
+            (destructuring-bind (ctor-name . ll) constructor
+              (cond ((not ctor-name) (setq no-constructors t))
+                    ((not ll) (keyword-ctors constructor))
+                    (t (boa-ctors constructor)))))
+          ;; Remove (NIL) and sort so that BOA constructors are last.
+          (setf (dd-constructors dd)
+                (if no-constructors
+                    (progn
+                      (when (or (keyword-ctors) (boa-ctors))
+                        (error "(:CONSTRUCTOR NIL) combined with other :CONSTRUCTORs"))
+                      nil)
+                    (append (or (keyword-ctors)
+                                (unless (boa-ctors)
+                                  `((,(symbolicate "MAKE-" name)))))
+                            (boa-ctors))))))
 
       (flet ((option-present-p (bit-name)
                (logbitp (position bit-name +dd-option-names+) seen-options)))
         (declare (inline option-present-p))
         (when (and (not (option-present-p :predicate))
-                   (or (dd-class-p dd) (dd-named dd)))
+                   (or (dd-class-p dd) named-p))
           (setf (dd-predicate-name dd) (symbolicate name "-P")))
         (unless (option-present-p :conc-name)
           (setf (dd-conc-name dd) (concatenate 'string (string name) "-")))
         (unless (option-present-p :copier)
-          (setf (dd-copier-name dd) (symbolicate "COPY-" name))))
-      (when (dd-include dd)
-        (frob-dd-inclusion-stuff dd))
-
-      dd)))
+          (setf (dd-copier-name dd) (symbolicate "COPY-" name))))))
+  dd)
 
 ;;; BOA constructors is (&aux x), i.e. without the default value, the
 ;;; value of the slot is unspecified, but it should signal a type
@@ -618,9 +645,14 @@ unless :NAMED is also specified.")))
 ;;; string at the head of slot descriptions) return a DD holding that
 ;;; info.
 (defun parse-defstruct (name-and-options slot-descriptions)
-  (let ((result (parse-defstruct-name-and-options (if (atom name-and-options)
-                                                      (list name-and-options)
-                                                      name-and-options))))
+  (binding* (((name options)
+              (if (listp name-and-options)
+                  (values (car name-and-options) (cdr name-and-options))
+                  (values name-and-options nil)))
+             (result (make-defstruct-description name)))
+    (parse-defstruct-options options result)
+    (when (dd-include result)
+      (frob-dd-inclusion-stuff result))
     (when (stringp (car slot-descriptions))
       (setf (dd-doc result) (pop slot-descriptions)))
     (dolist (slot-description slot-descriptions)
@@ -1636,40 +1668,14 @@ or they must be declared locally notinline at each call site.~@:>")
 ;;; Grovel the constructor options, and decide what constructors (if
 ;;; any) to create.
 (defun constructor-definitions (dd)
-  (collect ((keyword-ctors) (boa-ctors))
-    (let (no-constructors)
-      (dolist (constructor (dd-constructors dd))
-        (destructuring-bind (name &optional (boa-ll nil boa-p)) constructor
-          (declare (ignore boa-ll))
-          (cond ((not name)
-                 ;; Implementations disagree on the meaning of
-                 ;;  (:constructor nil (a b c)).
-                 ;; The choices seem to be: don't define a constructor,
-                 ;; define a constructor named NIL, err, or crash hard.
-                 ;; The spec implies the behavior that we have,
-                 ;; but at least a style-warning seems appropriate.
-                 (when boa-p
-                   (style-warn "~S does not define a constructor" constructor))
-                 (setq no-constructors t))
-                (boa-p (boa-ctors constructor))
-                (t (keyword-ctors name)))))
-      (when no-constructors
-        (when (or (keyword-ctors) (boa-ctors))
-          (error "(:CONSTRUCTOR NIL) combined with other :CONSTRUCTORs"))
-        (setf (dd-constructors dd) nil)
-        (return-from constructor-definitions ())))
-    (let* ((keyword-ctors
-            (or (keyword-ctors)
-                (unless (boa-ctors)
-                  `(,(symbolicate "MAKE-" (dd-name dd))))))
-           (primary (car keyword-ctors))
-           (creator (ecase (dd-type dd)
+  (let* ((boa-ctors (member-if #'cdr (dd-constructors dd)))
+         (keyword-ctors (mapcar #'car (ldiff (dd-constructors dd) boa-ctors)))
+         (primary (car keyword-ctors))
+         (creator (ecase (dd-type dd)
                       (structure #'create-structure-constructor)
                       (vector #'create-vector-constructor)
                       (list #'create-list-constructor))))
-      (setf (dd-constructors dd)
-            (nconc (mapcar #'list keyword-ctors) (boa-ctors)))
-      (nconc
+    (nconc
        (when primary
          (multiple-value-bind (defun-form ftype)
              (create-keyword-constructor primary dd creator)
@@ -1686,7 +1692,7 @@ or they must be declared locally notinline at each call site.~@:>")
                      (create-boa-constructor dd boa creator)
                    (list `(declaim (ftype ,ftype ,(first boa)))
                          defun-form)))
-               (boa-ctors))))))
+               boa-ctors))))
 
 (defun accessor-definitions (dd)
   (loop for dsd in (dd-slots dd)
