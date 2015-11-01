@@ -279,7 +279,7 @@
                 (ecase *backend-byte-order*
                   (:big-endian
                    '((inst swc1 value object (+ offset n-word-bytes))
-                     (inst swc1-odd value object (+ offset n-word-bytes))
+                     (inst swc1-odd value object offset)
                      (unless (location= result value)
                        (inst fmove :double result value))))
                   (:little-endian
