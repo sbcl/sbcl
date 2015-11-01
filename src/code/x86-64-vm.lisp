@@ -155,7 +155,7 @@
                 (sap-ref-double sap 8))))))
 
 (defun %set-context-float-register (context index format value)
-  (declare (ignorable context index))
+  (declare (ignorable context index format))
   #!-(or linux win32)
   (progn
     (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
