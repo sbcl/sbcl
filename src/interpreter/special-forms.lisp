@@ -284,15 +284,16 @@
        (enforce-single-type (type &rest values)
          (cond ((null values)
                 (error "~S received no values"
-                       (list 'the (type-specifier type))))
+                       (list 'the (specifier-from-checkfun type))))
                ((itypep (first values) type)
                 (apply #'values values))
                (t
-                (error 'type-error :datum (first values)
-                                   :expected-type (type-specifier type)))))
+                (error 'type-error
+                       :datum (first values)
+                       :expected-type (specifier-from-checkfun type)))))
 
        (parse-type (spec-or-obj)
-         (checkable-type
+         (type-checker
           (if (ctype-p spec-or-obj)
               spec-or-obj
               (values-specifier-type spec-or-obj)))))

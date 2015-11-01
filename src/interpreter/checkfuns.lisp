@@ -30,37 +30,97 @@
 ;;; that as #'INTEGERP, it should be possible to locally declare
 ;;; that X is (MOD n) and compute that the intersection is just (MOD n),
 ;;; which requires that we know that #'INTEGERP is the test for INTEGER.
-
+;;;
+;;; We also need to ensure that TYPE is checkable at all,
+;;; because FUNCTION types are not good for answering questions about
+;;; the type of an object, only for declaring the type.
+;;; Passing ":STRICT NIL" to %%TYPEP won't work, because interpreted functions
+;;; know nothing about their type, and the non-strict test uses %FUN-TYPE.
+;;;
+;;; The easy way of simplifying hairy FUNCTION types, namely
+;;; binding *UNPARSE-FUN-TYPE-SIMPLIFY* to T and then doing:
+;;;   (VALUES-SPECIFIER-TYPE (TYPE-SPECIFIER x))
+;;; does not work, because ALIEN-TYPE-TYPES are incompatibly altered -
+;;; they fail to retain correct offsets that were manually specified.
+;;; Probably nobody ever cared that round-tripping was not possible,
+;;; because that is not an operation that the compiler needs to do,
+;;; though that's surprising because plenty of code exists that normalizes
+;;; types by unparsing and re-parsing.
+;;;
 (defun type-checker (type)
-  (let ((checkable-type (checkable-type type)))
-    (cond ((type= checkable-type (specifier-type 'fixnum)) #'fixnump)
-          ((type= checkable-type (specifier-type 'integer)) #'integerp)
-          ((type= checkable-type (specifier-type 'number)) #'numberp)
-          ((type= checkable-type (specifier-type 'list)) #'listp)
-          ((type= checkable-type (specifier-type 'cons)) #'consp)
-          (t checkable-type))))
+  (labels
+      ((get-unary-predicate (type)
+         (dolist (entry sb-c::*backend-type-predicates*)
+           ;; Slowish, because there's no hashtable for TYPE=, but better
+           ;; than the alternative of not using these at all!
+           (when (type= type (car entry))
+             (return (symbol-function (cdr entry))))))
+       (simplify (type)
+         (etypecase type
+           ((or named-type numeric-type member-type classoid
+                character-set-type unknown-type hairy-type
+                alien-type-type #+sb-simd-pack simd-pack-type)
+            type)
+           (fun-type #'functionp)
+           (compound-type
+            (let* ((original (compound-type-types type))
+                   (new (mapcar #'simplify original)))
+              (if (every #'eq original new)
+                  type
+                  (apply (if (union-type-p type) #'type-union #'type-intersection)
+                         new))))
+           (cons-type
+            (let* ((old-car (cons-type-car-type type))
+                   (new-car (simplify old-car))
+                   (old-cdr (cons-type-cdr-type type))
+                   (new-cdr (simplify old-cdr)))
+              (if (and (eq old-car new-car) (eq old-cdr new-cdr))
+                  type
+                  (make-cons-type new-car new-cdr))))
+           (values-type
+            (let* ((old-req (values-type-required type))
+                   (new-req (mapcar #'simplify old-req))
+                   (old-opt (values-type-optional type))
+                   (new-opt (mapcar #'simplify old-opt))
+                   (old-rest (values-type-rest type))
+                   (new-rest (when old-rest (simplify old-rest))))
+              ;; VALUES types that are not fun-types can't have &KEY.
+              (aver (and (null (sb-kernel::values-type-keyp type))
+                         (null (sb-kernel::values-type-keywords type))
+                         (null (sb-kernel::values-type-allowp type))))
+              (if (and (every #'eq old-req new-req)
+                       (every #'eq old-opt new-opt)
+                       (eq old-rest new-rest))
+                  type
+                  (make-values-type :required new-req
+                                    :optional new-opt
+                                    :rest new-rest))))
+           (array-type
+            (let* ((original (array-type-element-type type))
+                   (new (simplify original)))
+              (cond ((eq new original) type)
+                    (t
+                     ;; It must have been an (ARRAY T).
+                     (aver (eq (array-type-specialized-element-type type)
+                               *universal-type*))
+                     (sb-kernel::%make-array-type (array-type-dimensions type)
+                                                  (array-type-complexp type)
+                                                  new *universal-type*)))))
+           (negation-type
+            (let* ((original (negation-type-type type))
+                   (new (simplify original)))
+              (if (eq new original) type (make-negation-type new)))))))
+    (or (get-unary-predicate type)
+        ;; If we simplify, try again for a predicate.
+        (let ((simplified (simplify type)))
+          (or (get-unary-predicate simplified) simplified)))))
 
 (defun specifier-from-checkfun (fun-or-ctype)
-  (if (ctype-p fun-or-ctype)
-      (type-specifier fun-or-ctype)
-      (ecase (%fun-name fun-or-ctype)
-        (fixnump  'fixnum)
-        (integerp 'integer)
-        (numberp  'number)
-        (listp    'list)
-        (consp    'cons))))
-
-;; Given a ctype TYPE, return a possibly modified ctype that is acceptable
-;; as the second argument to TYPEP (and %%TYPEP) by collapsing subtypes
-;; of function into just FUNCTION.  CL's function typing is not as powerful
-;; as in Haskell or ML-style typing where distinct function types each occupy
-;; a point in the type lattice. Although it sometimes works to inquire of the
-;; runtime whether a function is (FUNCTION (FIXNUM) FIXNUM) for example,
-;; it can not be assumed to work. When it doesn't, %%TYPEP says NIL and T
-;; meanining "no" and "certain" when it might instead say "not sure".
-(defun checkable-type (type)
-  (values-specifier-type
-   (let ((*unparse-fun-type-simplify* t)) (type-specifier type))))
+  (if (functionp fun-or-ctype)
+      (or (gethash (%fun-name fun-or-ctype)
+                   sb-c::*backend-predicate-types*)
+          (bug "No type specifier for function ~S" fun-or-ctype))
+      (type-specifier fun-or-ctype)))
 
 (defun typecheck-fail (symbol value type)
   (error 'interpreter-type-error
