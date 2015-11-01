@@ -76,6 +76,7 @@
 #!+linux
 ;;; For now.
 (defun context-floating-point-modes (context)
+  (declare (ignore context))
   (warn "stub CONTEXT-FLOATING-POINT-MODES")
   0)
 
