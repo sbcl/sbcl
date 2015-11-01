@@ -422,3 +422,13 @@
   (define-callback-adder double double float int))
 (with-test (:name :call-double-float-int-callback)
   (assert (= (alien-funcall *add-d-f-i* 2.0d0 1.0s0 1) 4.0d0)))
+
+(with-test (:name :define-float-float-double-callback)
+  (define-callback-adder double float float double))
+(with-test (:name :call-float-float-double-callback)
+  (assert (= (alien-funcall *add-f-f-d* 2.0s0 1.0s0 3.0d0) 6.0d0)))
+
+(with-test (:name :define-int-float-double-callback)
+  (define-callback-adder double int float double))
+(with-test (:name :call-int-float-double-callback)
+  (assert (= (alien-funcall *add-i-f-d* 1 1.0s0 2.0d0) 4.0d0)))
