@@ -57,7 +57,11 @@
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* os-context-register-t)) addr))
-    (deref addr)))
+    ;; The 32-bit Linux ABI uses 64-bit slots for register storage in
+    ;; the context structure.  At least some hardware sign extends
+    ;; 32-bit values in these registers, leading to badness in the
+    ;; debugger.  Mask it down here.
+    (mask-field (byte 32 0) (deref addr))))
 
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
