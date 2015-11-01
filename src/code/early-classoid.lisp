@@ -23,7 +23,7 @@
              (:conc-name dd-)
              (:make-load-form-fun just-dump-it-normally)
              #-sb-xc-host (:pure t)
-             (:constructor make-defstruct-description (name)))
+             (:constructor make-defstruct-description (null-lexenv-p name)))
   ;; name of the structure
   (name (missing-arg) :type symbol :read-only t)
   ;; documentation on the structure
@@ -34,7 +34,7 @@
   ;; keyword constructors first, then BOA constructors. NIL if none.
   (constructors () :type list)
   ;; True if the DEFSTRUCT appeared in a null lexical environment.
-  (null-lexenv-p nil :type boolean) ; the safe default is NIL
+  (null-lexenv-p nil :type boolean :read-only t) ; the safe default is NIL
   ;; name of copying function
   (copier-name nil :type symbol)
   ;; name of type predicate

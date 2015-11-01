@@ -219,9 +219,9 @@
 ;;; This monster has exactly one inline use in the final image,
 ;;; and we can drop the definition.
 (declaim (inline !expander-for-defstruct))
-(defun !expander-for-defstruct (name-and-options slot-descriptions
+(defun !expander-for-defstruct (null-env-p name-and-options slot-descriptions
                                 expanding-into-code-for)
-  (let* ((dd (parse-defstruct name-and-options slot-descriptions))
+  (let* ((dd (parse-defstruct null-env-p name-and-options slot-descriptions))
          (name (dd-name dd))
          (inherits
           (if (dd-class-p dd)
@@ -250,7 +250,7 @@
               `((sb!xc:defmethod print-object ((,x ,name) ,s)
                   (funcall #',fname ,x ,s
                            ,@(if depthp `(*current-level-in-print*)))))))))
-    ;; Return a list of forms and the DD.
+    ;; Return a list of forms and the DD-NAME.
     (values
      (if (dd-class-p dd)
          `(,@(when (eq expanding-into-code-for :target)
@@ -294,17 +294,14 @@
                  ,@(when (dd-doc dd)
                      `((setf (fdocumentation ',(dd-name dd) 'structure)
                              ',(dd-doc dd))))))))
-     dd)))
+     name)))
 
 #+sb-xc-host
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
-  (multiple-value-bind (forms dd)
-      (!expander-for-defstruct name-and-options slot-descriptions :target)
-    ;; The NULL-LEXENV-P slots defaults to NIL,
-    ;; since the conservative thing is to assume a hairy lexenv.
-    ;; But in SBCL's sources, all defstructs are toplevel.
-    (setf (dd-null-lexenv-p dd) t)
-    `(progn ,@forms))) ; doesn't really matter what the macro returns
+  ;; All defstructs are toplevel in SBCL's own source code,
+  ;; so pass T for null-lexenv.
+  `(progn ,@(!expander-for-defstruct
+             t name-and-options slot-descriptions :target)))
 
 #+sb-xc
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions
@@ -337,18 +334,16 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-  (multiple-value-bind (forms dd)
-      (!expander-for-defstruct name-and-options slot-descriptions :target)
-    ;; If the lexenv is null, all default values in constructors will
-    ;; be evaluable in any context.
-    (setf (dd-null-lexenv-p dd)
-          (etypecase env
-            (sb!kernel:lexenv (sb!c::null-lexenv-p env))
-            ;; a LOCALLY environment would be fine,
-            ;; but is not an important case to handle.
-            #!+sb-fasteval (sb!interpreter:basic-env nil)
-            (null t)))
-    `(progn ,@forms ',(dd-name dd))))
+  (multiple-value-bind (forms name)
+      (!expander-for-defstruct
+       (etypecase env
+         (sb!kernel:lexenv (sb!c::null-lexenv-p env))
+         ;; a LOCALLY environment would be fine,
+         ;; but is not an important case to handle.
+         #!+sb-fasteval (sb!interpreter:basic-env nil)
+         (null t))
+       name-and-options slot-descriptions :target)
+    `(progn ,@forms ',name)))
 
 #+sb-xc-host
 (defmacro sb!xc:defstruct (name-and-options &rest slot-descriptions)
@@ -356,7 +351,7 @@
   "Cause information about a target structure to be built into the
   cross-compiler."
   `(progn ,@(!expander-for-defstruct
-             name-and-options slot-descriptions :host)))
+             t name-and-options slot-descriptions :host)))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
@@ -644,12 +639,12 @@ unless :NAMED is also specified.")))
 ;;; Given name and options and slot descriptions (and possibly doc
 ;;; string at the head of slot descriptions) return a DD holding that
 ;;; info.
-(defun parse-defstruct (name-and-options slot-descriptions)
+(defun parse-defstruct (null-env-p name-and-options slot-descriptions)
   (binding* (((name options)
               (if (listp name-and-options)
                   (values (car name-and-options) (cdr name-and-options))
                   (values name-and-options nil)))
-             (result (make-defstruct-description name)))
+             (result (make-defstruct-description null-env-p name)))
     (parse-defstruct-options options result)
     (when (dd-include result)
       (frob-dd-inclusion-stuff result))
@@ -1742,7 +1737,7 @@ or they must be declared locally notinline at each call site.~@:>")
                                               (dd-type (missing-arg))
                                               metaclass-constructor
                                               slot-names)
-  (let* ((dd (make-defstruct-description class-name))
+  (let* ((dd (make-defstruct-description t class-name))
          (conc-name (concatenate 'string (symbol-name class-name) "-"))
          (dd-slots (let ((reversed-result nil)
                          ;; The index starts at 1 for ordinary named
@@ -1930,7 +1925,7 @@ or they must be declared locally notinline at each call site.~@:>")
 ;;; special enough (and simple enough) that we just build it by hand
 ;;; instead of trying to generalize the ordinary DEFSTRUCT code.
 (defun !set-up-structure-object-class ()
-  (let ((dd (make-defstruct-description 'structure-object)))
+  (let ((dd (make-defstruct-description t 'structure-object)))
     (setf
      (dd-slots dd) nil
      (dd-length dd) 1
@@ -1943,7 +1938,7 @@ or they must be declared locally notinline at each call site.~@:>")
 (dolist (args
          '#.(sb-cold:read-from-file
              "src/code/early-defstruct-args.lisp-expr"))
-  (let* ((dd (parse-defstruct (first args) (rest args)))
+  (let* ((dd (parse-defstruct t (first args) (rest args)))
          (inherits (!inherits-for-structure dd)))
     (%compiler-defstruct dd inherits)))
 
