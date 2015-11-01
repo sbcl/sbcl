@@ -90,6 +90,13 @@ os_restore_fp_control(os_context_t *context)
     /* FIXME: Implement. */
 }
 
+os_context_register_t   *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    return (os_context_register_t*)
+        &((struct fpsimd_context *)context->uc_mcontext.__reserved)->vregs[offset];
+}
+
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
