@@ -299,22 +299,39 @@
 
 #-sb-xc-host
 (defun alien-callback-accessor-form (type sap offset)
-  (ecase *backend-byte-order*
-    (:big-endian
-     (let ((parsed-type (sb!alien::parse-alien-type type (make-null-lexenv))))
-       (if (alien-integer-type-p parsed-type)
-           (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
-             (let ((byte-offset
-                    (cond ((< bits n-word-bits)
-                           (- n-word-bytes
-                              (ceiling bits n-byte-bits)))
-                          (t 0))))
-               `(deref (sap-alien (sap+ ,sap
-                                        ,(+ byte-offset offset))
-                                  (* ,type)))))
-         `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
-    (:little-endian
-     `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
+  ;; KLUDGE: OFFSET is given to be word-aligned (32-bit aligned), but
+  ;; double-float and long-long (both 64-bit wide) arguments need to
+  ;; be 64-bit aligned.  And then there's the bit where sub-word-wide
+  ;; values are aligned towards the END of the word on big-endian
+  ;; systems.  For both cases, we need to parse the alien type, but we
+  ;; aren't given the environment that our caller has access to, so we
+  ;; substitute a null lexenv (KLUDGE number one), then we do some bit
+  ;; twiddling to determine how much alignment we need.  Why, oh why
+  ;; can't we have something like the :ARG-TN methods for all of this
+  ;; mess?  -- AB, 2015-Nov-02
+  (let* ((parsed-type (sb!alien::parse-alien-type type (make-null-lexenv)))
+         (alignment-bits (sb!alien::alien-type-alignment parsed-type))
+         (alignment-bytes (truncate alignment-bits n-byte-bits))
+         ;; OFFSET is at least 32-bit aligned, we're trying to pick
+         ;; out the cases where we need 64-bit alignment.
+         (delta (logand offset (1- alignment-bytes))))
+    (values
+     (ecase *backend-byte-order*
+       (:big-endian
+        (if (alien-integer-type-p parsed-type)
+            (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+              (let ((byte-offset
+                     (cond ((< bits n-word-bits)
+                            (- n-word-bytes
+                               (ceiling bits n-byte-bits)))
+                           (t 0))))
+                `(deref (sap-alien (sap+ ,sap
+                                         ,(+ byte-offset offset delta))
+                                   (* ,type)))))
+          `(deref (sap-alien (sap+ ,sap ,(+ offset delta)) (* ,type)))))
+       (:little-endian
+        `(deref (sap-alien (sap+ ,sap ,(+ offset delta)) (* ,type)))))
+     delta)))
 
 ;;; Returns a vector in static space containing machine code for the
 ;;; callback wrapper
