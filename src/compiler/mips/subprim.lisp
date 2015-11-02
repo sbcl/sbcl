@@ -36,7 +36,7 @@
       (inst addu count count (fixnumize 1))
 
       (emit-label not-list)
-      (cerror-call vop done object-not-list-error ptr)
+      (cerror-call vop done 'object-not-list-error ptr)
 
       (emit-label done)
       (move result count))))

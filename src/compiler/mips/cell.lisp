@@ -59,7 +59,7 @@
   (:generator 9
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
-    (let ((err-lab (generate-error-code vop unbound-symbol-error obj-temp)))
+    (let ((err-lab (generate-error-code vop 'unbound-symbol-error obj-temp)))
       (inst xor temp value unbound-marker-widetag)
       (inst beq temp err-lab)
       (inst nop))))
@@ -127,7 +127,7 @@
   (:generator 10
     (move obj-temp object)
     (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
-    (let ((err-lab (generate-error-code vop undefined-fun-error obj-temp)))
+    (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
       (inst beq value null-tn err-lab))
     (inst nop)))
 

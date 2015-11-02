@@ -167,7 +167,7 @@
      (:temp target-uwp any-reg nl2-offset))
   (declare (ignore start count))
 
-  (let ((error (generate-error-code nil invalid-unwind-error)))
+  (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst beq block error)
     (inst nop))
 
@@ -203,7 +203,7 @@
   (load-symbol-value catch *current-catch-block*)
 
   LOOP
-  (let ((error (generate-error-code nil unseen-throw-tag-error target)))
+  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst beq catch error)
     (inst nop))
 

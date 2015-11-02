@@ -218,67 +218,62 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
 
 
 ;;;; Error Code
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun emit-error-break (vop kind code values)
-    (let ((vector (gensym)))
-      `((let ((vop ,vop))
-          (when vop
-            (note-this-location vop :internal-error)))
-        (inst break 0 ,kind)
-        (with-adjustable-vector (,vector)
-          (write-var-integer (error-number-or-lose ',code) ,vector)
-          ,@(mapcar #'(lambda (tn)
-                        `(let ((tn ,tn))
-                           (write-var-integer (make-sc-offset (sc-number
-                                                               (tn-sc tn))
-                                                              (tn-offset tn))
-                                              ,vector)))
-                    values)
-          (inst byte (length ,vector))
-          (dotimes (i (length ,vector))
-            (inst byte (aref ,vector i))))
-        (emit-alignment word-shift)))))
+(defun emit-error-break (vop kind code values)
+  (assemble ()
+    (when vop
+      (note-this-location vop :internal-error))
+    (inst break 0 kind)
+    (with-adjustable-vector (vector)
+      (write-var-integer code vector)
+      (dolist (tn values)
+        (write-var-integer (make-sc-offset (sc-number
+                                            (tn-sc tn))
+                                           (tn-offset tn))
+                           vector))
+      (inst byte (length vector))
+      (dotimes (i (length vector))
+        (inst byte (aref vector i))))
+    (emit-alignment word-shift)))
 
-(defmacro error-call (vop error-code &rest values)
+(defun error-call (vop error-code &rest values)
   #!+sb-doc
   "Cause an error.  ERROR-CODE is the error to cause."
-  (cons 'progn
-        (emit-error-break vop error-trap error-code values)))
+  (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 
-(defmacro cerror-call (vop label error-code &rest values)
+(defun cerror-call (vop label error-code &rest values)
   #!+sb-doc
   "Cause a continuable error.  If the error is continued, execution resumes at
   LABEL."
-  `(progn
-     (without-scheduling ()
-       (inst b ,label)
-       ,@(emit-error-break vop cerror-trap error-code values))))
+  (assemble ()
+    (without-scheduling ()
+      (inst b label)
+      (emit-error-break vop cerror-trap (error-number-or-lose error-code) values))))
 
-(defmacro generate-error-code (vop error-code &rest values)
+(defun generate-error-code (vop error-code &rest values)
   #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
-  `(assemble (*elsewhere*)
-     (let ((start-lab (gen-label)))
-       (emit-label start-lab)
-       (error-call ,vop ,error-code ,@values)
-       start-lab)))
+  (assemble (*elsewhere*)
+    (let ((start-lab (gen-label)))
+      (emit-label start-lab)
+      (apply #'error-call vop error-code values)
+      start-lab)))
 
-(defmacro generate-cerror-code (vop error-code &rest values)
+(defun generate-cerror-code (vop error-code &rest values)
   #!+sb-doc
   "Generate-CError-Code Error-code Value*
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after
   the GENERATE-CERROR-CODE form."
-  (with-unique-names (continue error)
-    `(let ((,continue (gen-label)))
-       (emit-label ,continue)
-       (assemble (*elsewhere*)
-         (let ((,error (gen-label)))
-           (emit-label ,error)
-           (cerror-call ,vop ,continue ,error-code ,@values)
-           ,error)))))
+  (assemble ()
+    (let ((continue (gen-label)))
+      (emit-label continue)
+      (assemble (*elsewhere*)
+        (let ((error (gen-label)))
+          (emit-label error)
+          (apply #'cerror-call vop continue error-code values)
+          error)))))
 
 ;;;; PSEUDO-ATOMIC
 

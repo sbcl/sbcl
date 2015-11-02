@@ -70,7 +70,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
-    (let ((error (generate-error-code vop invalid-array-index-error
+    (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index)))
       (inst sltu temp index bound)
       (inst beq temp error)
