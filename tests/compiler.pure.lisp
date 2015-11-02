@@ -5094,7 +5094,7 @@
             ;; **TYPE-SPEC-INTERR-SYMBOLS**) and
             ;; compiler/generic/type-error.lisp (DEFINE-VOP
             ;; TYPE-CHECK-ERROR/C) for details.
-            :fails-on '(or :alpha :hppa :mips))
+            :fails-on '(or :alpha :hppa))
   (let ((specifiers
          (remove
           'simple-vector

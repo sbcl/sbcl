@@ -77,9 +77,9 @@
                 #!+(or alpha hppa) nil-array-accessed-error
                 object)))
 
-;; The only way to define this VOP on Alpha/HPPA/MIPS would be with
+;; The only way to define this VOP on Alpha/HPPA would be with
 ;; a big CASE statement since the ERRCODE is not eval'ed by ERROR-CALL.
-#!-(or alpha hppa mips)
+#!-(or alpha hppa)
 (define-vop (type-check-error/c)
   (:policy :fast-safe)
   (:translate sb!c::%type-check-error/c)
