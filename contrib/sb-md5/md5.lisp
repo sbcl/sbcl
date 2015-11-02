@@ -42,22 +42,7 @@
    ;; High-Level functions on sequences, streams and files
    #:md5sum-sequence #:md5sum-string #:md5sum-stream #:md5sum-file))
 
-(in-package :SB-MD5)
-
-#+cmu
-(eval-when (:compile-toplevel)
-  (defparameter *old-expansion-limit* ext:*inline-expansion-limit*)
-  (setq ext:*inline-expansion-limit* (max ext:*inline-expansion-limit* 1000)))
-
-#+cmu
-(eval-when (:compile-toplevel :execute)
-  (defparameter *old-features* *features*)
-  (pushnew (c:backend-byte-order c:*target-backend*) *features*))
-
-#+sbcl
-(eval-when (:compile-toplevel)
-  (defparameter *old-features* *features*)
-  (pushnew sb-c:*backend-byte-order* *features*))
+(in-package :sb-md5)
 
 ;;; Section 2:  Basic Datatypes
 
@@ -78,35 +63,21 @@ where a is the intended low-order byte and d the high-order byte."
 (defun f (x y z)
   (declare (type ub32 x y z)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+cmu
-  (kernel:32bit-logical-or (kernel:32bit-logical-and x y)
-                           (kernel:32bit-logical-andc1 x z))
-  #-cmu
   (logior (logand x y) (logandc1 x z)))
 
 (defun g (x y z)
   (declare (type ub32 x y z)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+cmu
-  (kernel:32bit-logical-or (kernel:32bit-logical-and x z)
-                           (kernel:32bit-logical-andc2 y z))
-  #-cmu
   (logior (logand x z) (logandc2 y z)))
 
 (defun h (x y z)
   (declare (type ub32 x y z)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+cmu
-  (kernel:32bit-logical-xor x (kernel:32bit-logical-xor y z))
-  #-cmu
   (logxor x y z))
 
 (defun i (x y z)
   (declare (type ub32 x y z)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+cmu
-  (kernel:32bit-logical-xor y (kernel:32bit-logical-orc2 x z))
-  #-cmu
   (ldb (byte 32 0) (logxor y (logorc2 x z))))
 
 (declaim (inline mod32+)
@@ -115,13 +86,8 @@ where a is the intended low-order byte and d the high-order byte."
   (declare (type ub32 a b) (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   (ldb (byte 32 0) (+ a b)))
 
-#+cmu
-(define-compiler-macro mod32+ (a b)
-  `(ext:truly-the ub32 (+ ,a ,b)))
-
 ;;; Dunno why we need this, but without it MOD32+ wasn't being
 ;;; inlined.  Oh well.  -- CSR, 2003-09-14
-#+sbcl
 (define-compiler-macro mod32+ (a b)
   `(ldb (byte 32 0) (+ ,a ,b)))
 
@@ -130,14 +96,7 @@ where a is the intended low-order byte and d the high-order byte."
 (defun rol32 (a s)
   (declare (type ub32 a) (type (unsigned-byte 5) s)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+cmu
-  (kernel:32bit-logical-or #+little-endian (kernel:shift-towards-end a s)
-                           #+big-endian (kernel:shift-towards-start a s)
-                           (ash a (- s 32)))
-  #+sbcl
-  (sb-rotate-byte:rotate-byte s (byte 32 0) a)
-  #-(or cmu sbcl)
-  (logior (ldb (byte 32 0) (ash a s)) (ash a (- s 32))))
+  (sb-rotate-byte:rotate-byte s (byte 32 0) a))
 
 ;;; Section 3.4:  Table T
 
@@ -271,14 +230,9 @@ starting from offset into the given 16 word MD5 block."
            (type (simple-array ub32 (16)) block)
            (type (simple-array (unsigned-byte 8) (*)) buffer)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+(and :cmu :little-endian)
-  (kernel:bit-bash-copy
-   buffer (+ (* vm:vector-data-offset vm:word-bits) (* offset vm:byte-bits))
-   block (* vm:vector-data-offset vm:word-bits)
-   (* 64 vm:byte-bits))
-  #+(and :sbcl :little-endian)
+  #+little-endian
   (sb-kernel:ub8-bash-copy buffer offset block 0 64)
-  #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
+  #+big-endian
   (loop for i of-type (integer 0 16) from 0
         for j of-type (integer 0 #.most-positive-fixnum)
         from offset to (+ offset 63) by 4
@@ -296,14 +250,9 @@ offset into the given 16 word MD5 block."
            (type (simple-array ub32 (16)) block)
            (type simple-string buffer)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  #+(and :cmu :little-endian)
-  (kernel:bit-bash-copy
-   buffer (+ (* vm:vector-data-offset vm:word-bits) (* offset vm:byte-bits))
-   block (* vm:vector-data-offset vm:word-bits)
-   (* 64 vm:byte-bits))
-  #+(and :sbcl :little-endian)
+  #+little-endian
   (sb-kernel:ub8-bash-copy buffer offset block 0 64)
-  #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
+  #+big-endian
   (loop for i of-type (integer 0 16) from 0
         for j of-type (integer 0 #.most-positive-fixnum)
         from offset to (+ offset 63) by 4
@@ -365,31 +314,7 @@ starting at buffer-offset."
            (type (integer 0 63) count buffer-offset)
            (type (simple-array * (*)) from)
            (type (simple-array (unsigned-byte 8) (64)) buffer))
-  #+cmu
-  (kernel:bit-bash-copy
-   from (+ (* vm:vector-data-offset vm:word-bits) (* from-offset vm:byte-bits))
-   buffer (+ (* vm:vector-data-offset vm:word-bits)
-             (* buffer-offset vm:byte-bits))
-   (* count vm:byte-bits))
-  #+sbcl
-  (sb-kernel:ub8-bash-copy from from-offset buffer buffer-offset count)
-  #-(or cmu sbcl)
-  (etypecase from
-    (simple-string
-     (loop for buffer-index of-type (integer 0 64) from buffer-offset
-           for from-index of-type fixnum from from-offset
-           below (+ from-offset count)
-           do
-           (setf (aref buffer buffer-index)
-                 (char-code (schar (the simple-string from) from-index)))))
-    ((simple-array (unsigned-byte 8) (*))
-     (loop for buffer-index of-type (integer 0 64) from buffer-offset
-           for from-index of-type fixnum from from-offset
-           below (+ from-offset count)
-           do
-           (setf (aref buffer buffer-index)
-                 (aref (the (simple-array (unsigned-byte 8) (*)) from)
-                       from-index))))))
+  (sb-kernel:ub8-bash-copy from from-offset buffer buffer-offset count))
 
 (defun update-md5-state (state sequence &key (start 0) (end (length sequence)))
   "Update the given md5-state from sequence, which is either a
@@ -398,9 +323,7 @@ bounded by start and end, which must be numeric bounding-indices."
   (declare (type md5-state state)
            (type (simple-array * (*)) sequence)
            (type fixnum start end)
-           (optimize (speed 3) #+(or cmu sbcl) (safety 0) (space 0) (debug 0))
-           #+cmu
-           (ext:optimize-interface (safety 1) (debug 1)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   (let ((regs (md5-state-regs state))
         (block (md5-state-block state))
         (buffer (md5-state-buffer state))
@@ -467,9 +390,7 @@ The resulting MD5 message-digest is returned as an array of sixteen
 (unsigned-byte 8) values.  Calling `update-md5-state' after a call to
 `finalize-md5-state' results in unspecified behaviour."
   (declare (type md5-state state)
-           (optimize (speed 3) #+(or cmu sbcl) (safety 0) (space 0) (debug 0))
-           #+cmu
-           (ext:optimize-interface (safety 1) (debug 1)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   (or (md5-state-finalized-p state)
       (let ((regs (md5-state-regs state))
             (block (md5-state-block state))
@@ -515,14 +436,6 @@ in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
     (declare (optimize (safety 1) (debug 0)))
     (let ((state (make-md5-state)))
       (declare (type md5-state state))
-      #+cmu
-      ;; respect the fill pointer
-      (let ((end (or end (length sequence))))
-        (lisp::with-array-data ((data sequence) (real-start start) (real-end end))
-          (declare (ignore real-end))
-          (update-md5-state state data :start real-start
-                            :end (+ real-start (- end start)))))
-      #+sbcl
       ;; respect the fill pointer
       (let ((end (or end (length sequence))))
         (sb-kernel:with-array-data ((data sequence)
@@ -532,10 +445,6 @@ in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
           (declare (ignore real-end))
           (update-md5-state state data :start real-start
                             :end (+ real-start (- end start)))))
-      #-(or cmu sbcl)
-      (let ((real-end (or end (length sequence))))
-        (declare (type fixnum real-end))
-        (update-md5-state state sequence :start start :end real-end))
       (finalize-md5-state state))))
 
 (defun md5sum-string (string &key (external-format :default) (start 0) end)
@@ -599,15 +508,3 @@ pathname."
     (declare (optimize (safety 1) (debug 0)))
     (with-open-file (stream pathname :element-type '(unsigned-byte 8))
       (md5sum-stream stream))))
-
-#+cmu
-(eval-when (:compile-toplevel :execute)
-  (setq *features* *old-features*))
-
-#+cmu
-(eval-when (:compile-toplevel)
-  (setq ext:*inline-expansion-limit* *old-expansion-limit*))
-
-#+sbcl
-(eval-when (:compile-toplevel)
-  (setq *features* *old-features*))
