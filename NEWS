@@ -6,11 +6,24 @@ changes relative to sbcl-1.3.0:
     will work as intended, subject to any other factors that inhibit
     inlining, even if the DEFSTRUCT was not itself within a global
     INLINE proclamation for the named constructor
+  * enhancement: SB-EXT:DYNAMIC-SPACE-SIZE is now defined for cheneygc.
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
   * bug fix: structure constructor type checking is better. (lp#1508735)
   * bug fix: supplied-p variables for unused optional or keyword variables no
     longer confuse SB-DI:PARSE-COMPILED-DEBUG-FUN-LAMBDA-LIST (and thus the
     backtrace machinery) (lp#1498644)
+  * bug fix: Backtrace correctly handles undefined-function frames on MIPS.
+  * bug fix: WITH-FLOAT-TRAPS-MASKED correctly clears accrued traps on MIPS
+    (fixes issues with floating-point type derivation in the compiler).
+  * bug fix: FLOAT-NAN-P and FLOAT-TRAPPING-NAN-P now work correctly on MIPS
+    and HPPA.
+  * bug fix: MIPS context register access now masks to 32 bits (fixing issues
+    parsing negative-fixnum values for internal-error arguments and escaped
+    debug variables on 64-bit CPUs).
+  * bug fix: (SETF SAP-REF-DOUBLE) with constant offset on big-endian MIPS
+    now works correctly.
+  * bug fix: Callback parameter (argument) handling on MIPS is now vastly
+    more correct.
 
 changes in sbcl-1.3.0 relative to sbcl-1.2.16:
   * minor incompatible change: the environment passed to a macro/setf/deftype
