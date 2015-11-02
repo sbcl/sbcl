@@ -938,10 +938,20 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
              ,(loop
                  with offset = 0
                  for spec in argument-specs
+                 ;; KLUDGE: At least one platform requires additional
+                 ;; alignment beyond a single machine word for certain
+                 ;; arguments.  Accept an additional delta (for the
+                 ;; alignment) to apply to subsequent arguments to
+                 ;; account for the alignment gaps as a secondary
+                 ;; value, so that we don't have to update unaffected
+                 ;; backends.
+                 for (accessor-form alignment)
+                   = (multiple-value-list
+                      (alien-callback-accessor-form spec 'args-sap offset))
                  collect `(,(pop argument-names) ,spec
-                            :local ,(alien-callback-accessor-form
-                                     spec 'args-sap offset))
-                 do (incf offset (alien-callback-argument-bytes spec env)))
+                            :local ,accessor-form)
+                 do (incf offset (+ (alien-callback-argument-bytes spec env)
+                                    (or alignment 0))))
            ,(flet ((store (spec real-type)
                           (if spec
                               `(setf (deref (sap-alien res-sap (* ,spec)))
