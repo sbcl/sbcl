@@ -131,37 +131,29 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (let ((closure-tramp-fixup (gen-label)))
-      (assemble (*elsewhere*)
-        (emit-label closure-tramp-fixup)
-        (inst dword (make-fixup "closure_tramp" :foreign)))
-      (assemble ()
-        (inst add lip function (- (* simple-fun-code-offset n-word-bytes)
-                                  fun-pointer-lowtag))
-        (load-type type function (- fun-pointer-lowtag))
-        (inst cmp type simple-fun-header-widetag)
-        (inst b :eq SIMPLE-FUN)
-        (inst load-from-label lip closure-tramp-fixup)
-        SIMPLE-FUN
-        (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-        (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-        (move result function)))))
+    (inst add lip function (- (* simple-fun-code-offset n-word-bytes)
+                              fun-pointer-lowtag))
+    (load-type type function (- fun-pointer-lowtag))
+    (inst cmp type simple-fun-header-widetag)
+    (inst b :eq SIMPLE-FUN)
+    (load-inline-constant lip '(:fixup "closure_tramp" :foreign) lip)
+    SIMPLE-FUN
+    (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+    (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
+    (move result function)))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (let ((undefined-tramp-fixup (gen-label)))
-      (assemble (*elsewhere*)
-        (emit-label undefined-tramp-fixup)
-        (inst dword (make-fixup "undefined_tramp" :foreign)))
-      (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-      (inst load-from-label temp undefined-tramp-fixup)
-      (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-      (move result fdefn))))
+    (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
+    (load-inline-constant temp '(:fixup "undefined_tramp" :foreign) lip)
+    (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+    (move result fdefn)))
 
 
 

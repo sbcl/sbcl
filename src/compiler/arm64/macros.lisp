@@ -175,17 +175,14 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #!+gencgc
-(defun allocation-tramp (alloc-tn size back-label return-in-tmp)
-  (let ((fixup (gen-label)))
-    (unless (eq size tmp-tn)
-      (inst mov tmp-tn size))
-    (inst load-from-label alloc-tn fixup)
-    (inst blr alloc-tn)
-    (unless return-in-tmp
-      (move alloc-tn tmp-tn))
-    (inst b back-label)
-    (emit-label fixup)
-    (inst dword (make-fixup "alloc_tramp" :foreign))))
+(defun allocation-tramp (alloc-tn size back-label return-in-tmp lip)
+  (unless (eq size tmp-tn)
+    (inst mov tmp-tn size))
+  (load-inline-constant alloc-tn '(:fixup "alloc_tramp" :foreign) lip)
+  (inst blr alloc-tn)
+  (unless return-in-tmp
+    (move alloc-tn tmp-tn))
+  (inst b back-label))
 
 (defmacro allocation (result-tn size lowtag &key flag-tn
                                                  stack-allocate-p
@@ -226,11 +223,10 @@
             (store-symbol-value ,flag-tn *allocation-pointer*))
            #!+gencgc
            (t
-            (let ((fixup (gen-label))
-                  (alloc (gen-label))
+            (let ((alloc (gen-label))
                   (back-from-alloc (gen-label))
                   size)
-              (inst load-from-label ,temp FIXUP ,lip)
+              (load-inline-constant ,temp '(:fixup "boxed_region" :foreign) ,lip)
               (inst ldp ,result-tn ,flag-tn (@ ,temp))
               (setf size (add-sub-immediate ,size))
               (inst add ,result-tn ,result-tn size)
@@ -253,9 +249,8 @@
                 (allocation-tramp ,result-tn
                                   ,size BACK-FROM-ALLOC
                                   ;; see the comment above aboout alloc_tramp
-                                  (and ,lowtag t))
-                (emit-label FIXUP)
-                (inst dword (make-fixup "boxed_region" :foreign))))))))
+                                  (and ,lowtag t)
+                                  ,lip)))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
@@ -454,9 +449,8 @@ garbage collection.  This is currently implemented by disabling GC"
      (declare (truly-dynamic-extent *pinned-objects*))
      ,@body))
 
-(defun load-fixup (dst fixup &optional lip)
-  (let ((label (gen-label)))
-    (assemble (*elsewhere*)
-      (emit-label label)
-      (inst dword fixup))
-    (inst load-from-label dst label lip)))
+(defun load-inline-constant (dst value &optional lip)
+  (destructuring-bind (size . label) (register-inline-constant value)
+    (ecase size
+      (:qword
+       (inst load-from-label dst label lip)))))

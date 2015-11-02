@@ -735,7 +735,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
-    printf ' :alien-callbacks :precise-arg-count-error' >> $ltf
+    printf ' :alien-callbacks :precise-arg-count-error :inline-constants' >> $ltf
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf

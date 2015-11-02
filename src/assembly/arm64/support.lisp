@@ -18,9 +18,9 @@
      (values
       `((progn
           ,@(if (eq style :none)
-                `((load-fixup tmp-tn (make-fixup ',name :assembly-routine))
+                `((load-inline-constant tmp-tn '(:fixup ,name :assembly-routine))
                   (inst br tmp-tn))
-                `((load-fixup lr-tn (make-fixup ',name :assembly-routine))
+                `((load-inline-constant lr-tn '(:fixup ,name :assembly-routine))
                   (inst blr lr-tn)))))
       nil))
     #+(or)

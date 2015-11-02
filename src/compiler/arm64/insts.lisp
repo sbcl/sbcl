@@ -1659,17 +1659,19 @@
           ((and (eq mode :offset)
                 (or (register-p offset)
                     (extend-p offset)))
-           (let* ((shift 0)
-                  (register (if (extend-p offset)
+           (let* ((register (if (extend-p offset)
                                 (extend-register offset)
                                 offset))
+                  (shift (cond ((extend-p offset)
+                                (aver (or (= (extend-operand offset) 0)
+                                          (= (extend-operand offset) 3)))
+                                (ash (extend-operand offset) -1))
+                               (t
+                                0)))
                   (extend (if (extend-p offset)
                               (ecase (extend-kind offset)
                                 (:uxtw #b010)
                                 (:lsl
-                                 (aver (or (= (extend-operand offset) 0)
-                                           (= (extend-operand offset) 3)))
-                                 (setf shift 1)
                                  #b011)
                                 (:sxtw #b110)
                                 (:sxtx #b111))
@@ -2507,23 +2509,26 @@
                                  magic-value)
                  position))
             (multi-instruction-emitter (segment position)
-              (when (minusp position)
-                (error "Implement negative offsets in load-from-label"))
               (let* ((delta (compute-delta position))
+                     (negative (minusp delta))
                      (low (ldb (byte 19 0) delta))
-                     (high (ldb (byte 45 19) delta)))
-                ;; ADR
-                (emit-pc-relative segment 0
-                                  (ldb (byte 2 0) low)
-                                  (ldb (byte 19 2) low)
-                                  (tn-offset lip))
-                (assemble (segment vop)
-                  (inst movz tmp-tn high 16)
-                  (inst ldr dest (@ lip (extend tmp-tn :lsl 3))))))
+                     (high (ldb (byte 16 19) delta)))
+               ;; ADR
+               (emit-pc-relative segment 0
+                                 (ldb (byte 2 0) low)
+                                 (ldb (byte 19 2) low)
+                                 (tn-offset lip))
+               (assemble (segment vop)
+                 (inst movz tmp-tn high 16)
+                 (inst ldr dest (@ lip (extend tmp-tn (if negative
+                                                          :sxtw
+                                                          :lsl)
+                                               3))))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
                                 #b01 0
-                                (ash (compute-delta position) -2)
+                                (ldb (byte 19 0)
+                                     (ash (compute-delta position) -2))
                                 (tn-offset dest)))
             (multi-instruction-maybe-shrink (segment posn magic-value)
               (let ((delta (compute-delta posn magic-value)))
@@ -2667,3 +2672,100 @@
                          (ash index2 size)
                          (tn-offset rn)
                          (tn-offset rd)))))
+
+;;; Inline constants
+(defun canonicalize-inline-constant (constant)
+  (let ((first (car constant))
+        alignedp)
+    (when (eql first :aligned)
+      (setf alignedp t)
+      (pop constant)
+      (setf first (car constant)))
+    (typecase first
+      ((cons (eql :fixup))
+       (setf constant (list :fixup (cdr first))))
+      (single-float (setf constant (list :single-float first)))
+      (double-float (setf constant (list :double-float first)))
+      .
+      #+sb-xc-host
+      ((complex
+        ;; It's an error (perhaps) on the host to use simd-pack type.
+        ;; [and btw it's disconcerting that this isn't an ETYPECASE.]
+        (error "xc-host can't reference complex float")))
+      #-sb-xc-host
+      (((complex single-float)
+        (setf constant (list :complex-single-float first)))
+       ((complex double-float)
+        (setf constant (list :complex-double-float first)))))
+    (destructuring-bind (type value) constant
+      (ecase type
+        ((:byte :word :dword :qword)
+         (aver (integerp value))
+         (cons type value))
+        (:base-char
+         #!+sb-unicode (aver (base-char-p value))
+         (cons :byte (char-code value)))
+        (:character
+         (aver (characterp value))
+         (cons :dword (char-code value)))
+        (:single-float
+         (aver (typep value 'single-float))
+         (cons (if alignedp :oword :dword)
+               (ldb (byte 32 0) (single-float-bits value))))
+        (:double-float
+         (aver (typep value 'double-float))
+         (cons (if alignedp :oword :qword)
+               (ldb (byte 64 0) (logior (ash (double-float-high-bits value) 32)
+                                        (double-float-low-bits value)))))
+        (:complex-single-float
+         (aver (typep value '(complex single-float)))
+         (cons (if alignedp :oword :qword)
+               (ldb (byte 64 0)
+                    (logior (ash (single-float-bits (imagpart value)) 32)
+                            (ldb (byte 32 0)
+                                 (single-float-bits (realpart value)))))))
+        (:complex-double-float
+         (aver (typep value '(complex double-float)))
+         (cons :oword
+               (logior (ash (double-float-high-bits (imagpart value)) 96)
+                       (ash (double-float-low-bits (imagpart value)) 64)
+                       (ash (ldb (byte 32 0)
+                                 (double-float-high-bits (realpart value)))
+                            32)
+                       (double-float-low-bits (realpart value)))))
+        (:fixup
+         (cons :fixup value))))))
+
+(defun inline-constant-value (constant)
+  (let ((label (gen-label))
+        (size  (ecase (car constant)
+                 ((:byte :word :dword :qword) (car constant))
+                 ((:oword :fixup) :qword))))
+    (values label (cons size label))))
+
+(defun size-nbyte (size)
+  (ecase size
+    (:byte  1)
+    (:word  2)
+    (:dword 4)
+    ((:qword :fixup) 8)
+    (:oword 16)))
+
+(defun sort-inline-constants (constants)
+  (stable-sort constants #'> :key (lambda (constant)
+                                    (size-nbyte (caar constant)))))
+
+(defun emit-inline-constant (constant label)
+  (let* ((type (car constant))
+         (size (size-nbyte type)))
+    (emit-alignment (integer-length (1- size)))
+    (emit-label label)
+    (let ((val (cdr constant)))
+      (case type
+        (:fixup
+         (inst word (apply #'make-fixup val)))
+        (t
+         (loop repeat size
+               do (inst byte (ldb (byte 8 0) val))
+                  (setf val (ash val -8))))))))
+

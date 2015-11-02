@@ -1074,8 +1074,7 @@
         (inst add cur-nfp cur-nfp (add-sub-immediate
                                    (bytes-needed-for-non-descriptor-stack-frame)))
         (inst mov-sp nsp-tn cur-nfp)))
-    (load-fixup tmp-tn (make-fixup 'tail-call-variable :assembly-routine)
-                lip)
+    (load-inline-constant tmp-tn '(:fixup tail-call-variable :assembly-routine) lip)
     (inst br tmp-tn)))
 
 ;;;; Unknown values return:
@@ -1199,7 +1198,7 @@
     (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
-    (load-fixup tmp-tn (make-fixup 'return-multiple :assembly-routine) lip)
+    (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine) lip)
     (inst br tmp-tn)))
 
 ;;; Single-stepping

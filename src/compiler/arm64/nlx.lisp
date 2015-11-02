@@ -275,7 +275,7 @@
       (storew temp block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
-      (load-fixup tmp-tn (make-fixup 'unwind :assembly-routine) lip)
+      (load-inline-constant tmp-tn '(:fixup unwind :assembly-routine) lip)
       (inst br tmp-tn)
 
       (emit-return-pc ENTRY-LABEL)

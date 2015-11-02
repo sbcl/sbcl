@@ -161,14 +161,11 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (let ((fixup-label (gen-label)))
-      (inst load-from-label res fixup-label)
-      (assemble (*elsewhere*)
-        (emit-label fixup-label)
-        (inst dword (make-fixup foreign-symbol :foreign))))))
+    (load-inline-constant res `(:fixup ,foreign-symbol :foreign) lip)))
 
 #!+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
@@ -177,15 +174,12 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (let ((fixup-label (gen-label)))
-      (inst load-from-label res fixup-label)
-      (inst ldr res (@ res))
-      (assemble (*elsewhere*)
-        (emit-label fixup-label)
-        (inst dword (make-fixup foreign-symbol :foreign-dataref))))))
+    (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref) lip)
+    (inst ldr res (@ res))))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg sap-stack))
@@ -203,7 +197,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (load-fixup temp (make-fixup "call_into_c" :foreign) lip)
+      (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
       (sc-case function
         (sap-reg (move cfunc function))
         (sap-stack
