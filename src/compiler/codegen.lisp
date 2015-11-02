@@ -128,6 +128,20 @@
         *constant-vector* (make-array 16 :adjustable t :fill-pointer 0))
   (values))
 
+#!+inline-constants
+(defun emit-inline-constants ()
+  (unless (zerop (length *constant-vector*))
+    (let ((constants (sb!vm:sort-inline-constants *constant-vector*)))
+      (assemble (*constant-segment*)
+        (map nil (lambda (constant)
+                   (sb!vm:emit-inline-constant (car constant) (cdr constant)))
+             constants)))
+    (sb!assem:append-segment *constant-segment* *code-segment*)
+    (setf *code-segment* *constant-segment*))
+  (setf *constant-segment* nil
+        *constant-vector*  nil
+        *constant-table*   nil))
+
 (defun generate-code (component)
   (when *compiler-trace-output*
     (format *compiler-trace-output*
@@ -180,26 +194,7 @@
     (sb!assem:append-segment *code-segment* *elsewhere*)
     (setf *elsewhere* nil)
     #!+inline-constants
-    (progn
-      (unless (zerop (length *constant-vector*))
-        (let ((constants (sb!vm:sort-inline-constants *constant-vector*)))
-          (assemble (*constant-segment*)
-            #+nil
-            (sb!vm:emit-constant-segment-header
-             *constant-segment*
-             constants
-             (do-ir2-blocks (2block component nil)
-               (when (policy (block-last (ir2-block-block 2block))
-                             (> speed space))
-                 (return t))))
-            (map nil (lambda (constant)
-                       (sb!vm:emit-inline-constant (car constant) (cdr constant)))
-                 constants)))
-        (sb!assem:append-segment *constant-segment* *code-segment*)
-        (setq *code-segment* *constant-segment*))
-      (setf *constant-segment* nil
-            *constant-vector*  nil
-            *constant-table*   nil))
+    (emit-inline-constants)
     (values (sb!assem:finalize-segment *code-segment*)
             *fixup-notes*)))
 

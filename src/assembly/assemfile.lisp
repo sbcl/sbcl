@@ -40,13 +40,21 @@
          (*code-segment* nil)
          (*elsewhere* nil)
          (*assembly-optimize* nil)
-         (*fixup-notes* nil))
+         (*fixup-notes* nil)
+         #!+inline-constants
+         *constant-segment*
+         #!+inline-constants
+         *constant-table*
+         #!+inline-constants
+         *constant-vector*)
     (unwind-protect
         (let ((*features* (cons :sb-assembling *features*)))
           (init-assembler)
           (load (merge-pathnames name (make-pathname :type "lisp")))
           (sb!assem:append-segment *code-segment* *elsewhere*)
           (setf *elsewhere* nil)
+          #!+inline-constants
+          (emit-inline-constants)
           (let ((length (sb!assem:finalize-segment *code-segment*)))
             (dump-assembler-routines *code-segment*
                                      length
