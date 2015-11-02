@@ -60,25 +60,25 @@ long long powish(unsigned int x, unsigned int y) {
   return xx*acc;
 }
 
-float return9th(float f1, float f2, float f3, float f4, float f5, 
-		float f6, float f7, float f8, float f9, float f10, 
-		float f11, float f12) { 
-    return f9; 
+float return9th(float f1, float f2, float f3, float f4, float f5,
+		float f6, float f7, float f8, float f9, float f10,
+		float f11, float f12) {
+    return f9;
 }
 
-double return9thd(double f1, double f2, double f3, double f4, double f5, 
+double return9thd(double f1, double f2, double f3, double f4, double f5,
 		  double f6, double f7, double f8, double f9, double f10,
-		  double f11, double f12) { 
-    return f9; 
+		  double f11, double f12) {
+    return f9;
 }
 
-int long_test8(int a1, int a2, int a3, int a4, int a5, 
-	       int a6, int a7, long long l1) { 
+int long_test8(int a1, int a2, int a3, int a4, int a5,
+	       int a6, int a7, long long l1) {
     return (l1 == powish(2,34));
 }
 
-int long_test9(int a1, int a2, int a3, int a4, int a5, 
-	       int a6, int a7, long long l1, int a8) { 
+int long_test9(int a1, int a2, int a3, int a4, int a5,
+	       int a6, int a7, long long l1, int a8) {
     return (l1 == powish(2,35));
 }
 
@@ -284,7 +284,7 @@ test_use small
 test_use fast
 
 test_save() {
-    echo testing save $1 
+    echo testing save $1
     x="$1"
     run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
 #+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$x.core")
@@ -301,7 +301,9 @@ test_save fast
 test_start() {
     echo testing start $1
     run_sbcl_with_core $TEST_FILESTEM.$1.core \
-	--no-sysinit --no-userinit --load $TEST_FILESTEM.test.lisp
+        --no-sysinit --no-userinit \
+        --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+        --load $TEST_FILESTEM.test.lisp
     check_status_maybe_lose "start $1" $?
 }
 
@@ -310,7 +312,9 @@ test_start small
 
 # missing object file
 rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
-run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit <<EOF
+run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
+    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+    <<EOF
   (assert (= 22 (summish 10 11)))
   (multiple-value-bind (val err) (ignore-errors (eval 'foo))
     (assert (not val))

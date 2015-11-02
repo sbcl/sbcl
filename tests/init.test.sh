@@ -33,7 +33,9 @@ if [ $? != 0 ]; then
     echo "failure saving core"
     exit 1
 fi
-run_sbcl_with_core "$tmpcore" --disable-debugger <<EOF
+run_sbcl_with_core "$tmpcore" --disable-debugger \
+    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+    <<EOF
   (assert (string= (custom-sysinit-pathname)
                    (namestring
                     (sb-introspect:definition-source-pathname

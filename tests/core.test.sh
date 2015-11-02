@@ -23,7 +23,8 @@ tmpoutput=$TEST_FILESTEM.txt
 run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42))
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})"
 check_status_maybe_lose "SAVE-LISP-AND-DIE :TOPLEVEL" $? 0 "(saved core ran)"
 
 # In sbcl-0.7.7 SAVE-LISP-AND-DIE didn't work at all because of
@@ -38,7 +39,9 @@ run_sbcl <<EOF
   (defun foo (x) (+ x 11))
   (save-lisp-and-die "$tmpcore")
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit <<EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+    <<EOF
   (exit :code (foo 10))
 EOF
 check_status_maybe_lose "Basic SAVE-LISP-AND-DIE" $? 21 "(saved core ran)"
@@ -54,7 +57,9 @@ run_sbcl <<EOF
     (defun bar () (exit :code (alien-funcall foo))))
   (save-lisp-and-die "$tmpcore")
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit <<EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+    <<EOF
   (bar)
 EOF
 check_status_maybe_lose "Callbacks after SAVE-LISP-AND-DIE" $? \
@@ -65,7 +70,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF 
+./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF
   (exit :code 71)
 EOF
 status=$?
@@ -90,7 +95,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit <<EOF 
+./"$tmpcore" --no-userinit <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
@@ -109,7 +114,8 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42)
                       :compression (and (member :sb-core-compression *features*) t))
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})"
 check_status_maybe_lose "SAVE-LISP-AND-DIE :COMPRESS" $? 0 "(compressed saved core ran)"
 
 rm "$tmpcore"

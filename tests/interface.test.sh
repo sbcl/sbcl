@@ -29,7 +29,9 @@ case "$SBCL_MACHINE_TYPE" in
   (eval x)
   (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
-        run_sbcl_with_args --dynamic-space-size 5GB $SBCL_ARGS --load $tmpscript
+        run_sbcl_with_args --dynamic-space-size 5GB $SBCL_ARGS \
+            --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+            --load $tmpscript
         check_status_maybe_lose "bug 881445" $?
         ;;
 esac
