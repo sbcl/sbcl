@@ -9,8 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -g -marm -march=armv5
-#LINKFLAGS += -v -rdynamic -m32
+CFLAGS += -marm -march=armv5
 NM = ./linux-nm
 
 ASSEM_SRC = arm-assem.S ldso-stubs.S

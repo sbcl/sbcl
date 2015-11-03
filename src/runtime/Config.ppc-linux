@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -g -m32
+CFLAGS += -m32
 LINKFLAGS += -v -rdynamic -m32
 NM = ./linux-nm
 

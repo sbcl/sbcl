@@ -10,7 +10,7 @@
 # files for more informration.
 
 CC=${NDK_PATH}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/arm-linux-androideabi/bin/gcc
-CFLAGS = -g -marm -march=armv5 --sysroot=${NDK_PATH}/platforms/android-15/arch-arm/
+CFLAGS += -marm -march=armv5 --sysroot=${NDK_PATH}/platforms/android-15/arch-arm/
 LINKFLAGS += --sysroot=${NDK_PATH}/platforms/android-15/arch-arm/
 NM = ${NDK_PATH}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/arm-linux-androideabi/bin/nm
 
