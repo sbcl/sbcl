@@ -83,8 +83,23 @@
                        (set-known nil set-known-p) set-trans
                        cas-trans
                        special
+                       pointer
                        &allow-other-keys)
             (if (atom spec) (list spec) spec)
+          #!-alpha
+          (declare (ignorable pointer))
+          #!+alpha
+          (when pointer
+            ;; Pointer values on ALPHA are 64 bits wide, and
+            ;; double-word aligned.  We may also wish to have such a
+            ;; mode for other 64-bit hardware outside of any defined
+            ;; 32-on-64 ABI (which would presumably have 32-bit
+            ;; pointers in the first place, obviating the alignment
+            ;; and size requirements).
+            (unless rest-p
+              (setf length 2))
+            (when (oddp offset)
+              (incf offset)))
           (slots (make-slot slot-name docs rest-p offset special
                             (remove-keywords options
                                              '(:docs :rest-p :length))))

@@ -270,16 +270,9 @@
          :ref-known (flushable)
          :init :arg))
 
-#!+alpha
 (!define-primitive-object (sap :lowtag other-pointer-lowtag
                               :widetag sap-widetag)
-  (padding)
-  (pointer :c-type "char *" :length 2))
-
-#!-alpha
-(!define-primitive-object (sap :lowtag other-pointer-lowtag
-                              :widetag sap-widetag)
-  (pointer :c-type "char *"))
+  (pointer :c-type "char *" :pointer t))
 
 
 (!define-primitive-object (weak-pointer :type weak-pointer
@@ -399,7 +392,7 @@
   ;; which may have different alignment then what we prefer to use.
   ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
-  (os-address :c-type "void *" :length #!+alpha 2 #!-alpha 1)
+  (os-address :c-type "void *" :pointer t)
 
   ;; Keep these next six slots (alloc-region being figured in as 1 slot)
   ;; near the beginning of the structure so that x86[-64] assembly code
@@ -414,46 +407,46 @@
   (current-catch-block :special *current-catch-block*)
   #!+(and x86-64 sb-thread)
   (current-unwind-protect-block :special *current-unwind-protect-block*)
-  (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+  (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
-  (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+  (binding-stack-pointer :c-type "lispobj *" :pointer t
                          :special *binding-stack-pointer*)
   (stepping)
   ;; END of slots to keep near the beginning.
 
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
-  (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+  (alien-stack-start :c-type "lispobj *" :pointer t)
+  (binding-stack-start :c-type "lispobj *" :pointer t
                        :special *binding-stack-start*)
 
   #!+sb-thread
-  (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
+  (os-attr :c-type "pthread_attr_t *" :pointer t)
   #!+(and sb-thread (not sb-safepoint))
-  (state-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
+  (state-sem :c-type "os_sem_t *" :pointer t)
   #!+(and sb-thread (not sb-safepoint))
-  (state-not-running-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
+  (state-not-running-sem :c-type "os_sem_t *" :pointer t)
   #!+(and sb-thread (not sb-safepoint))
   (state-not-running-waitcount :c-type "int" :length 1)
   #!+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
+  (state-not-stopped-sem :c-type "os_sem_t *" :pointer t)
   #!+(and sb-thread (not sb-safepoint))
   (state-not-stopped-waitcount :c-type "int" :length 1)
-  (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+  (control-stack-start :c-type "lispobj *" :pointer t
                        :special *control-stack-start*)
-  (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+  (control-stack-end :c-type "lispobj *" :pointer t
                      :special *control-stack-end*)
   (control-stack-guard-page-protected)
   #!+win32 (private-events :c-type "struct private_events" :length 2)
-  (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
-  (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
-  (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
+  (this :c-type "struct thread *" :pointer t)
+  (prev :c-type "struct thread *" :pointer t)
+  (next :c-type "struct thread *" :pointer t)
   ;; starting, running, suspended, dead
   (state :c-type "lispobj")
 
   #!+x86 (tls-cookie)                          ;  LDT index
   (interrupt-data :c-type "struct interrupt_data *"
-                  :length #!+alpha 2 #!-alpha 1)
+                  :pointer t)
   ;; For various reasons related to pseudo-atomic and interrupt
   ;; handling, we need to know if the machine context is in Lisp code
   ;; or not.  On non-threaded targets, this is a global variable in
@@ -480,10 +473,4 @@
   #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #!+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 5)
-  ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
-  ;; bit slots came in pairs. However the C compiler will align
-  ;; interrupt_contexts on a double word boundary. This logic should
-  ;; be handled by !DEFINE-PRIMITIVE-OBJECT.
-  #!+alpha
-  (padding)
-  (interrupt-contexts :c-type "os_context_t *" :rest-p t))
+  (interrupt-contexts :c-type "os_context_t *" :rest-p t :pointer t))
