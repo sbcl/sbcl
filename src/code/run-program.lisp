@@ -501,14 +501,14 @@ status slot."
 #-win32
 (defmacro round-null-terminated-bytes-to-words (n)
   `(logandc2 (the sb-vm:signed-word (+ (the fixnum ,n)
-                                       4 (1- sb-vm:n-word-bytes)))
-             (1- sb-vm:n-word-bytes)))
+                                       4 (1- sb-vm:n-machine-word-bytes)))
+             (1- sb-vm:n-machine-word-bytes)))
 
 #-win32
 (defun string-list-to-c-strvec (string-list)
   (let* (;; We need an extra for the null, and an extra 'cause exect
          ;; clobbers argv[-1].
-         (vec-bytes (* sb-vm:n-word-bytes (+ (length string-list) 2)))
+         (vec-bytes (* sb-vm:n-machine-word-bytes (+ (length string-list) 2)))
          (octet-vector-list (mapcar (lambda (s)
                                       (string-to-octets s))
                                     string-list))
@@ -521,7 +521,7 @@ status slot."
          (vec-sap (allocate-system-memory total-bytes))
          (string-sap (sap+ vec-sap vec-bytes))
          ;; Index starts from [1]!
-         (vec-index-offset sb-vm:n-word-bytes))
+         (vec-index-offset sb-vm:n-machine-word-bytes))
     (declare (sb-vm:signed-word vec-bytes)
              (sb-vm:word string-bytes total-bytes)
              (system-area-pointer vec-sap string-sap))
@@ -537,10 +537,10 @@ status slot."
         ;; Advance string-sap for the next string.
         (setf string-sap (sap+ string-sap
                                (round-null-terminated-bytes-to-words size)))
-        (incf vec-index-offset sb-vm:n-word-bytes)))
+        (incf vec-index-offset sb-vm:n-machine-word-bytes)))
     ;; Final null pointer.
     (setf (sap-ref-sap vec-sap vec-index-offset) (int-sap 0))
-    (values vec-sap (sap+ vec-sap sb-vm:n-word-bytes) total-bytes)))
+    (values vec-sap (sap+ vec-sap sb-vm:n-machine-word-bytes) total-bytes)))
 
 #-win32
 (defmacro with-args ((var str-list) &body body)
