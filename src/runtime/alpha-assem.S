@@ -274,8 +274,8 @@ undefined_tramp= call_into_lisp_LRA_page+0x140
         .byte    4                         /* what are these numbers? */
         .byte    UNDEFINED_FUN_ERROR
         .byte    254
-        .byte    (0xe0 + sc_DescriptorReg)
-        .byte    2
+        .byte    (0xc0 + sc_DescriptorReg)
+        .byte    5
         .align 2
         .end     undefined_tramp_offset
 
