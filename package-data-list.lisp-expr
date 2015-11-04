@@ -3133,7 +3133,7 @@ structure representations"
                "WEAK-POINTER-BROKEN-SLOT" "WEAK-POINTER-NEXT-SLOT"
                "WEAK-POINTER-SIZE" "WEAK-POINTER-WIDETAG"
                "WEAK-POINTER-VALUE-SLOT"
-               "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS"
+               "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS" "N-MACHINE-WORD-BYTES"
                "WORD-REG-SC-NUMBER" "WORD-SHIFT"
                #!+win32 "CONTEXT-RESTORE-TRAP"
                "ZERO-SC-NUMBER"))

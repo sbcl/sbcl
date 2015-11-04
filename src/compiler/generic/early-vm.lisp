@@ -49,6 +49,9 @@
 ;;; the number of bytes in a word
 (def!constant n-word-bytes (/ n-word-bits n-byte-bits))
 
+;;; the number of bytes in a machine word
+(def!constant n-machine-word-bytes (/ n-machine-word-bits n-byte-bits))
+
 ;;; the number of bits used in the header word of a data block to store
 ;;; the type
 (def!constant n-widetag-bits 8)
