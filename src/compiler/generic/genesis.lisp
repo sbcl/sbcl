@@ -3248,7 +3248,7 @@ core and return a descriptor to it."
           (toggle (sb!vm:saetp-typecode saetp))
           (awhen (sb!vm:saetp-complex-typecode saetp) (toggle it)))))
     (format out
-            "~%static unsigned char unprintable_array_types[32] = ~% {~{~d~^,~}};~%"
+            "~%static unsigned char unprintable_array_types[32] =~% {~{~d~^,~}};~%"
             (coerce array-type-bits 'list)))
   (values))
 
