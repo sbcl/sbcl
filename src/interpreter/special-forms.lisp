@@ -514,77 +514,81 @@
 ;;; deeper subforms, but picking off the shallow cases is easy.
 ;;;
 (defun parse-tagbody (body env)
-  (labels ((conditional-go-p (form tags)
-             ;; Given ({WHEN|UNLESS} TEST <forms> ... (GO tag)) rewrite as
-             ;; -> (op (TEST) <forms> T) (GO tag))
-             ;; but if <forms> is empty, only encode the test and the go tag
-             ;; in a way that indicates the test sense.
-             (and (member (car form) '(when unless))
-                  (consp (cddr form))
-                  (let ((tag (go-p (car (last form)) tags)))
-                    (and tag
-                         (let ((op (car form))
-                               (test (cadr form))
-                               (more (butlast (cddr form))))
-                           (declare (index tag))
-                           (if more
-                               (cons (%sexpr `(,op ,test ,@more t)) tag)
-                               (cons (%sexpr test)
-                                     (if (eq op 'when) tag (- tag)))))))))
-           (go-p (form tags)
-             (and (typep form '(cons (eql go) (cons t null)))
-                  (cdr (assoc (cadr form) tags)))))
-  (collect ((tags) (forms))
-    (let ((line-num 1)
-          (optimize-p (and (not (find-lexical-fun env 'when))
-                           (not (find-lexical-fun env 'unless)))))
+  (collect ((tags) (new-body))
+    ;; First pass: just collect the tags
+    (let (any-forms)
       (dolist (item body)
-        (cond ((or (symbolp item) (integerp item))
+        (cond ((consp item) (setq any-forms t))
+              ((or (symbolp item) (integerp item))
                (if (assoc item (tags))
                    (ip-error "Duplicate tag ~S in tagbody" item)
-                   (tags (cons item line-num))))
-              ((atom item)
-               (ip-error "Bad thing to appear in a tagbody: ~S" item))
+                   (tags (list item))))
               (t
-               (forms item)
-               (incf line-num))))
-      (cond ((not (forms))
+               (ip-error "Bad thing to appear in a tagbody: ~S" item))))
+      (cond ((not any-forms)
              (return-from parse-tagbody (return-constant nil)))
             ((not (tags))
-             (return-from parse-tagbody (digest-progn `(,@body nil)))))
-      (when optimize-p
-        ;; Try to convert IF ... GO into WHEN or UNLESS.
-        (let ((forms (forms)) (index 1))
-          (loop
-           (let ((form (car forms)))
-             ;; If FORM is a well-formed IF form and either branch
-             ;; is a GO within this tagbody, rewrite it.
-             (when (typep form
-                          '(cons (eql if)
-                                 (cons t (cons t (or null (cons t null))))))
-               (destructuring-bind (test then &optional else) (cdr form)
-                 (when (cond ((go-p then (tags))
-                              (rplaca forms `(when ,test ,then))
-                              (when else
-                                (rplacd forms (cons else (cdr forms))))
-                              t)
-                             ((go-p else (tags))
-                              (rplaca forms `(unless ,test ,else))
-                              (rplacd forms (cons then (cdr forms)))))
-                   (dolist (tag (tags))
-                     (when (> (cdr tag) index) (incf (cdr tag)))))))
-             (incf index)
-             (pop forms)
-             (unless forms
-               (return))))))
-      (let ((body (coerce (cons (tags) (forms)) 'vector)))
-        (do ((i (1- (length body)) (1- i)))
-            ((zerop i) (handler #'eval-tagbody body))
-          (let ((expr (svref body i)))
-            (setf (svref body i)
-                  (or (go-p expr (tags))
-                      (and optimize-p (conditional-go-p expr (tags)))
-                      (%sexpr expr))))))))))
+             (return-from parse-tagbody (digest-progn `(,@body nil))))))
+    (flet ((go-p (form)
+             (and (typep form '(cons (eql go) (cons t null)))
+                  (assoc (cadr form) (tags)))))
+      ;; Second pass: rewrite conditioned GO forms appearing directly in
+      ;; this tagbody which transfer control to a tag in this tagbody.
+      ;; Local function bindings for WHEN/UNLESS will inhibit this.
+      (dolist (item (unless (or (find-lexical-fun env 'when)
+                                (find-lexical-fun env 'unless))
+                      body))
+        (or (and (typep item '(cons (eql if)
+                                    (cons t (cons t (or null (cons t null))))))
+                 ;; Look for IF forms in which either consequent is a branch.
+                 (destructuring-bind (test then &optional else) (cdr item)
+                   (multiple-value-bind (op branch fallthru)
+                       (cond ((go-p then) (values 'when then else))
+                             ((go-p else) (values 'unless else then)))
+                     (when op
+                       (new-body `(,op ,test ,branch))
+                       (when fallthru
+                         (new-body
+                          (if (atom fallthru) `(progn ,fallthru) fallthru)))
+                       t))))
+            ;; Transform a WHEN or UNLESS if there is more than one subform
+            ;; in the consequent, and the last subform is a control transfer.
+            ;; This is necessary because the tagbody handler recognizes
+            ;; only (WHEN|UNLESS c (GO tag)) as a fast conditional GO.
+            ;; (WHEN (TEST) (stmt1) ... (stmtN) (GO tag)) becomes
+            ;;   (WHEN (WHEN (TEST) (stmt1) ... (stmtN) T) (GO tag))
+            ;; (UNLESS (TEST) (stmt1) ... (stmtN) (GO tag)) becomes
+            ;;   (WHEN (UNLESS (TEST) (stmt1) ... (stmtN) T) (GO tag))
+            (and (typep item '(cons (member when unless)))
+                 (cdddr item)
+                 (awhen (go-p (car (last item)))
+                   (new-body
+                    `(when (,(car item) ,(cadr item) ,@(butlast (cddr item)) t)
+                       (go ,(car it))))))
+            (new-body item))) ; everything else
+      (let ((body (or (new-body) body)))
+        ;; Next assign tags their indices. Interleaving this with the final
+        ;; pass would need a fixup step for forward branches, so do this first.
+        (let ((line-num 1))
+          (dolist (item body)
+            (if (atom item)
+                (rplacd (assoc item (tags)) line-num)
+                (incf line-num))))
+        ;; Collect the executable statements.
+        (let ((line-num 1)
+              (lines (make-array (- (1+ (length body)) (length (tags))))))
+          (setf (aref lines 0) (tags))
+          (dolist (form body (handler #'eval-tagbody lines))
+            (unless (atom form)
+              (setf (aref lines (prog1 line-num (incf line-num)))
+                    (acond ((go-p form) (cdr it)) ; just the line number
+                           ((and (typep form '(cons (member when unless)))
+                                 (singleton-p (cddr form))
+                                 (go-p (third form)))
+                            (let ((line (cdr it)))
+                              (cons (%sexpr (second form))
+                                    (if (eq (car form) 'when) line (- line)))))
+                           (t (%sexpr form)))))))))))
 
 (defun eval-tagbody (code env sexpr)
   (declare (simple-vector code) (ignore sexpr)

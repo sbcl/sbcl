@@ -877,16 +877,12 @@
 ;;; Restrictions are separated into those which apply to bindings made by
 ;;; this scope - each being pertinent as soon as the variable to which it
 ;;; applies is bound - and those which apply to the body forms.
-;;; The latter are further subdivided into restrictions which apply to
-;;; a lexically visible binding (possibly special) versus a free declaration.
-;;;
 ;;; Bound lexical and special variables in the new scope have the CTYPE
 ;;; as stored in the CDR of the binding cell altered to reflect the
-;;; restriction.
-;;;
-;;; FIXME: global DECLAIM that affects the interpreter's TYPE-CHECK policy
-;;; needs to kick the globaldb so that all intepreted function re-consider
-;;; whether to perform checks.
+;;; restriction, other restrictions go into the TYPE-RESTRICTIONS slot.
+;;; A special falls into the latter category if the binding is lexically
+;;; visible but did not occur in exactly this scope. This avoids stomping
+;;; on the type that was stored in the scope which made the binding.
 (defun process-typedecls (decl-scope env n-var-bindings symbols
                           &aux new-restrictions)
   ;; First compute the effective set of type restrictions.
@@ -934,7 +930,7 @@
   (setf (type-restrictions decl-scope) new-restrictions)
   ;; Done computing effective restrictions.
   ;; If the enclosing policy - not the new policy - demands typechecks,
-  ;; then insert assertions for all variables bound by this scope,
+  ;; then insert assertions for all variables bound by this scope.
   (when (and (policy env (>= safety 1))
              (find-if #'cdr symbols :end n-var-bindings))
     (let ((checks (make-array n-var-bindings)))

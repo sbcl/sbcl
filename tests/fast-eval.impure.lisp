@@ -214,3 +214,19 @@
   (handler-case (let ((x 3)) (declare (type (or blurf integer) x)) x)
     (simple-error ()) ; "unknown type"
     (:no-error () "Expected an ERROR")))
+
+(test-util:with-test (:name :tagbody-if-optimizer)
+  (assert
+   (string= "ABC"
+            (with-output-to-string (*standard-output*)
+             (tagbody
+              (go :a)
+              :b
+              (princ :b)
+              (if nil (go :b))
+              (go :c)
+              :a
+              (princ :a)
+              (go :b)
+              :c
+              (princ :c))))))
