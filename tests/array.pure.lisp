@@ -52,7 +52,7 @@
       (when (ignore-errors (aref (eval form) 12))
         (error "error not thrown in EVAL ~S" form))
       (when (ignore-errors (aref (funcall (compile nil `(lambda () ,form))) 12))
-        (error "error not thrown in FUNCALL COMPILE ~S"))
+        (error "error not thrown in FUNCALL COMPILE ~S" form))
       (when (ignore-errors (funcall (compile nil `(lambda () (aref ,form 12)))))
         (error "error not thrown in COMPILED-AREF ~S" form))
       (when type
