@@ -191,7 +191,7 @@
 
 ;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
 
-#!-64-bit
+#!-64-bit-registers
 (progn
 #!+#.(cl:if (cl:eq :little-endian sb!c:*backend-byte-order*) '(and) '(or))
 (progn

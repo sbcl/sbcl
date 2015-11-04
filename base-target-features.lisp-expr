@@ -426,6 +426,10 @@
  ;;   :64-bit
  ;;     means (= sb-vm:n-word-bits 64) currently true for x86-64 and arm64
  ;;
+ ;;   :64-bit-registers
+ ;;     means (= sb-vm:n-machine-word-bits 64) currently true for alpha,
+ ;;     arm64, and x86-64.
+ ;;
  ;;   :control-stack-grows-downward-not-upward
  ;;     On the X86, the Lisp control stack grows downward. On the
  ;;     other supported CPU architectures as of sbcl-0.7.1.40, the

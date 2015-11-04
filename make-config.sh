@@ -657,7 +657,7 @@ if [ "$sbcl_arch" = "x86" ]; then
         sh tools-for-build/openbsd-sigcontext.sh > src/runtime/openbsd-sigcontext.h
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
-    printf ' :64-bit :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
+    printf ' :64-bit :64-bit-registers :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
     printf ' :interleaved-raw-slots :precise-arg-count-error :fp-and-pc-standard-save' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
@@ -719,6 +719,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     printf ' :interleaved-raw-slots' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
     printf ' :cheneygc' >> $ltf
+    printf ' :64-bit-registers' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :cheneygc' >> $ltf
@@ -736,7 +737,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
-    printf ' :64-bit :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
+    printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks :precise-arg-count-error :inline-constants' >> $ltf
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
