@@ -261,6 +261,13 @@ start_of_tramps:
 	.globl	undefined_tramp
 	.globl	undefined_tramp_offset
         .ent    undefined_tramp_offset
+        .long   SIMPLE_FUN_HEADER_WIDETAG                       /* header */
+        .long   undefined_tramp - SIMPLE_FUN_CODE_OFFSET        /* self */
+        .long   NIL                                             /* next */
+        .long   NIL                                             /* name */
+        .long   NIL                                             /* arglist */
+        .long   NIL                                             /* type */
+        .long   NIL                                             /* xref */
 undefined_tramp_offset:
 	/* an explanation is called for here.  0x140 is the difference
 	 * between undefined_tramp_offset and call_into_lisp_LRA, but
@@ -268,7 +275,8 @@ undefined_tramp_offset:
 	 * So, change this number whenever you add or remove any code
 	 * in this file */
 
-undefined_tramp= call_into_lisp_LRA_page+0x140
+undefined_tramp= call_into_lisp_LRA_page+0x15c
+        subl    reg_LIP, SIMPLE_FUN_CODE_OFFSET, reg_CODE
 	call_pal PAL_bugchk
 	.long    trap_Error
         .byte    4                         /* what are these numbers? */
@@ -286,7 +294,7 @@ undefined_tramp= call_into_lisp_LRA_page+0x140
         .globl  closure_tramp_offset
         .ent    closure_tramp_offset
 closure_tramp_offset:
-closure_tramp= call_into_lisp_LRA_page+0x150
+closure_tramp= call_into_lisp_LRA_page+0x170
         ldl     reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
         ldl     reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
         addl    reg_L0, SIMPLE_FUN_CODE_OFFSET, reg_LIP
