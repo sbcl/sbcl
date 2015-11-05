@@ -124,7 +124,17 @@
 
 (define-vop (character-compare/c)
   (:args (x :scs (character-reg)))
-  (:arg-types character (:constant character))
+  (:arg-types character
+              ;; KLUDGE: having a SATISFIES type here is too hairy for
+              ;; the cross-compiler (running on an arbitrary CL host)
+              ;; to cope with.  Since we know we only have standard
+              ;; characters in the build anyway, we can restrict the
+              ;; cross-compiler's arg type to standard char, and all
+              ;; is well.
+              #+sb-xc-host
+              (:constant standard-char)
+              #-sb-xc-host
+              (:constant (satisfies inlinable-character-constant-p)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:conditional)
   (:info target not-p y)
