@@ -583,7 +583,9 @@
 (with-test (:name (:no-consing :dx-closures) :skipped-on '(not :stack-allocatable-closures))
   (assert-no-consing (dxclosure 42)))
 
-(with-test (:name (:no-consing :dx-lists) :skipped-on '(not :stack-allocatable-lists))
+(with-test (:name (:no-consing :dx-lists)
+            :skipped-on '(not (and :stack-allocatable-lists
+                               :stack-allocatable-fixed-objects)))
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
   (assert-no-consing (dxlength))
@@ -852,7 +854,8 @@
 (with-test (:name :length-and-words-packed-in-same-tn)
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 
-(with-test (:name :handler-case-bogus-compiler-note)
+(with-test (:name :handler-case-bogus-compiler-note
+            :skipped-on '(not :stack-allocatable-fixed-objects))
   (handler-bind
       ((compiler-note (lambda (note)
                         (error "compiler issued note ~S during test" note))))
@@ -886,7 +889,8 @@
     v))
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
-(with-test (:name :dx-compiler-notes)
+(with-test (:name :dx-compiler-notes
+            :skipped-on '(not :stack-allocatable-vectors))
   (flet ((assert-notes (j lambda)
            (let ((n 0))
              (handler-bind ((compiler-note (lambda (c)
@@ -947,7 +951,8 @@
       (if sp
           (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
-(with-test (:name :handler-case-eating-stack)
+(with-test (:name :handler-case-eating-stack
+            :skipped-on '(not :stack-allocatable-fixed-objects))
   (assert-no-consing (handler-case-eating-stack)))
 
 ;;; A nasty bug where RECHECK-DYNAMIC-EXTENT-LVARS thought something was going
@@ -965,7 +970,8 @@
     (let ((vec (vec (aref vec 0) (aref vec 1) (aref vec 2))))
       (declare (dynamic-extent vec))
       (funcall fun vec))))
-(with-test (:name :recheck-nested-dx-bug)
+(with-test (:name :recheck-nested-dx-bug
+            :skipped-on '(not :stack-allocatable-vectors))
   (assert (funcall (bad-boy (vec 1.0 2.0 3.3))
                    (lambda (vec) (equalp vec (vec 1.0 2.0 3.3)))))
   (flet ((foo (x) (declare (ignore x))))

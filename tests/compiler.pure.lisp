@@ -4921,7 +4921,8 @@
               (list "lisT")))))
 
 (with-test (:name (restart-case optimize speed compiler-note)
-                 :skipped-on :sparc) ; crashes the test driver
+            ;; Cannot-DX note crashes test driver unless we have this:
+            :skipped-on '(not :stack-allocatable-fixed-objects))
   (handler-bind ((compiler-note #'error))
     (compile nil '(lambda ()
                    (declare (optimize speed))
