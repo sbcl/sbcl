@@ -2187,7 +2187,7 @@ register."
         #.sb!vm:descriptor-reg-sc-number)
        (without-gcing
         (with-escaped-value (val)
-          (values (make-lisp-obj val nil)))))
+          (values (make-lisp-obj (mask-field (byte #.sb!vm:n-word-bits 0) val) nil)))))
       (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
