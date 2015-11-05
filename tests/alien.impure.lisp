@@ -344,7 +344,8 @@
     (assert (equal "This comes from lisp!" (cast alien c-string)))
     (free-alien alien)))
 
-(with-test (:name :malloc-failure)
+(with-test (:name :malloc-failure
+                  :fails-on :alpha) ;; Alpha has address space to burn
   (assert (eq :enomem
               (handler-case
                   (loop repeat 128
