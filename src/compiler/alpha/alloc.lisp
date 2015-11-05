@@ -166,12 +166,19 @@
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name stack-allocate-p)
+  (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
-    (pseudo-atomic (:extra (pad-data-block words))
-      (inst bis alloc-tn lowtag result)
+     (pseudo-atomic (:extra (if stack-allocate-p
+                                0
+                                (pad-data-block words)))
+      (cond (stack-allocate-p
+             (align-csp result)
+             (inst bis csp-tn lowtag result)
+             (inst addq csp-tn (pad-data-block words) csp-tn))
+            (t
+             (inst bis alloc-tn lowtag result)))
       (when type
         (inst li (logior (ash (1- words) n-widetag-bits) type) temp)
         (storew temp result 0 lowtag)))))
