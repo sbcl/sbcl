@@ -130,7 +130,7 @@
   (:generator 1
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-        (inst addq nfp (bytes-needed-for-non-descriptor-stack-frame) val)))))
+        (inst lda val (bytes-needed-for-non-descriptor-stack-frame) nfp)))))
 
 ;;; Accessing a slot from an earlier stack frame is definite hackery.
 (define-vop (ancestor-frame-ref)
@@ -180,8 +180,7 @@
           cfp-tn)
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-        (inst subq nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
-              nsp-tn)
+        (inst lda nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)) nsp-tn)
         (move nsp-tn nfp)))))
 
 (define-vop (allocate-frame)
@@ -195,8 +194,7 @@
           (* n-word-bytes (sb-allocated-size 'control-stack))
           csp-tn)
     (when (ir2-physenv-number-stack-p callee)
-      (inst subq nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
-            nsp-tn)
+      (inst lda nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)) nsp-tn)
       (move nsp-tn nfp))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full
@@ -573,8 +571,8 @@ default-value-8
     (move cfp-tn csp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
-              nsp-tn)))
+        (inst lda nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
+              cur-nfp)))
     (inst subq return-pc-temp (- other-pointer-lowtag n-word-bytes) lip)
     (move ocfp-temp cfp-tn)
     (inst ret zero-tn lip 1)))
@@ -765,9 +763,9 @@ default-value-8
                                              word-shift)
                                          cfp-tn))))
                               (:frob-nfp
-                               (inst addq cur-nfp
+                               (inst lda nsp-tn
                                      (bytes-needed-for-non-descriptor-stack-frame)
-                                     nsp-tn)))
+                                     cur-nfp)))
                             `(#!-gengc
                               (:comp-lra
                                (inst compute-lra-from-code
@@ -889,8 +887,8 @@ default-value-8
     ;; Clear the number stack if anything is there.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
-              nsp-tn)))
+        (inst lda nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
+              cur-nfp)))
 
     ;; And jump to the assembly-routine that does the bliting.
     (inst li (make-fixup 'tail-call-variable :assembly-routine) temp)
@@ -913,8 +911,8 @@ default-value-8
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
-              nsp-tn)))
+        (inst lda nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
+              cur-nfp)))
     ;; Clear the control stack, and restore the frame pointer.
     (move cfp-tn csp-tn)
     (move ocfp cfp-tn)
@@ -962,8 +960,8 @@ default-value-8
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
-              nsp-tn)))
+        (inst lda nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
+              cur-nfp)))
     ;; Establish the values pointer and values count.
     (move cfp-tn val-ptr)
     (inst li (fixnumize nvals) nargs)
@@ -1014,8 +1012,8 @@ default-value-8
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
         (when cur-nfp
-          (inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
-                nsp-tn)))
+          (inst lda nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
+                cur-nfp)))
 
       ;; Check for the single case.
       (inst li (fixnumize 1) a0)
