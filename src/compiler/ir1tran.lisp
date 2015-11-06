@@ -866,10 +866,6 @@
                           (find-free-fun fun "shouldn't happen! (no-cmacro)")
                           form))))
 
-(defun muffle-warning-or-die ()
-  (muffle-warning)
-  (bug "no MUFFLE-WARNING restart"))
-
 ;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
 ;;; errors which occur during the macroexpansion.
 (defun careful-expand-macro (fun form &optional cmacro)
@@ -918,7 +914,8 @@
                                    ignoring anything  horrible here..)~:@>~:>"
                                (wherestring)
                                c)
-                              (muffle-warning-or-die)))
+                              (muffle-warning)
+                              (bug "no MUFFLE-WARNING restart")))
                    (error
                      (lambda (c)
                        (cond
