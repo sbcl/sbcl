@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(setf sb!disassem:*disassem-inst-alignment-bytes* 1)
+(setf sb!disassem:*disassem-inst-alignment-bytes* 4)
 
 
 ;;;; utility functions
