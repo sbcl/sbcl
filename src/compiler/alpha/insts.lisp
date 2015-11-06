@@ -91,7 +91,13 @@
                         (type sb!disassem:disassem-state dstate))
                (+ 4 (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
 
-
+;; We use CALL-PAL BUGCHK as part of our trap logic.  It is invariably
+;; followed by a trap-code word, which we pick out with the
+;; semi-traditional prefilter approach.
+(sb!disassem:define-arg-type bugchk-trap-code
+    :prefilter (lambda (value dstate)
+                 (declare (ignore value))
+                 (sb!disassem:read-suffix 32 dstate)))
 
 ;;;; DEFINE-INSTRUCTION-FORMATs for the disassembler
 
@@ -150,6 +156,11 @@
   (op      :field (byte 6 26) :value 0)
   (palcode :field (byte 26 0)))
 
+(sb!disassem:define-instruction-format
+    (bugchk 32 :default-printer '('call_pal :tab 'pal_bugchk "," code))
+  (op      :field (byte 6 26) :value 0)
+  (palcode :field (byte 26 0) :value #x81)
+  (code :type 'bugchk-trap-code :reader bugchk-trap-code))
 
 ;;;; emitters
 
@@ -463,8 +474,61 @@
 (define-instruction imb (segment)
   (:emitter (emit-lword segment #x00000086)))
 
+(defun snarf-error-junk (sap offset &optional length-only)
+  (let* ((length (sap-ref-8 sap offset))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type system-area-pointer sap)
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
+    (cond (length-only
+           (values 0 (1+ length) nil nil))
+          (t
+           (copy-ub8-from-system-area sap (1+ offset) vector 0 length)
+           (collect ((sc-offsets)
+                     (lengths))
+             (lengths 1)                ; the length byte
+             (let* ((index 0)
+                    (error-number (read-var-integer vector index)))
+               (lengths index)
+               (loop
+                 (when (>= index length)
+                   (return))
+                 (let ((old-index index))
+                   (sc-offsets (read-var-integer vector index))
+                   (lengths (- index old-index))))
+               (values error-number
+                       (1+ length)
+                       (sc-offsets)
+                       (lengths))))))))
+
+(defun bugchk-trap-control (chunk inst stream dstate)
+  (declare (ignore inst))
+  (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+    (case (bugchk-trap-code chunk dstate)
+      (#.halt-trap
+       (nt "Halt trap"))
+      (#.pending-interrupt-trap
+       (nt "Pending interrupt trap"))
+      (#.error-trap
+       (nt "Error trap")
+       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+      (#.cerror-trap
+       (nt "Cerror trap")
+       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+      (#.breakpoint-trap
+       (nt "Breakpoint trap"))
+      (#.fun-end-breakpoint-trap
+       (nt "Function end breakpoint trap"))
+      (#.single-step-breakpoint-trap
+       (nt "Single step breakpoint trap"))
+      (#.single-step-around-trap
+       (nt "Single step around trap"))
+      (#.single-step-before-trap
+       (nt "Single step before trap")))))
+
 (define-instruction gentrap (segment code)
-  (:printer call-pal ((palcode #xaa0000)))
+  (:printer bugchk () :default
+            :control #'bugchk-trap-control)
   (:emitter
    (emit-lword segment #x000081)        ;actually bugchk
    (emit-lword segment code)))
