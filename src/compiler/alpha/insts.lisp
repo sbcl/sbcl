@@ -58,6 +58,16 @@
                 regname
                 dstate))))
 
+(sb!disassem:define-arg-type memory-address-annotation
+  :printer (lambda (value stream dstate)
+             (declare (ignore stream))
+             (destructuring-bind (reg offset) value
+               (cond
+                 ((= reg code-offset)
+                  (sb!disassem:note-code-constant offset dstate))
+                 ((= reg null-offset)
+                  (sb!disassem:maybe-note-nil-indexed-object offset dstate))))))
+
 (defparameter float-reg-symbols
   #.(coerce
      (loop for n from 0 to 31 collect (make-symbol (format nil "~D" n)))
@@ -86,11 +96,13 @@
 ;;;; DEFINE-INSTRUCTION-FORMATs for the disassembler
 
 (sb!disassem:define-instruction-format
-    (memory 32 :default-printer '(:name :tab ra "," disp "(" rb ")"))
+    (memory 32 :default-printer '(:name :tab ra "," disp "(" rb ")" memory-address-annotation))
   (op   :field (byte 6 26))
   (ra   :field (byte 5 21) :type 'reg)
   (rb   :field (byte 5 16) :type 'reg)
-  (disp :field (byte 16 0) :sign-extend t))
+  (disp :field (byte 16 0) :sign-extend t)
+  (memory-address-annotation :fields (list (byte 5 16) (byte 16 0))
+                             :type 'memory-address-annotation))
 
 (sb!disassem:define-instruction-format
     (jump 32 :default-printer '(:name :tab ra ",(" rb ")," hint))
@@ -179,7 +191,12 @@
                                 '((type (or (unsigned-byte 16) (signed-byte 16) fixup)
                                         disp))
                               '((type (or (unsigned-byte 16) (signed-byte 16)) disp))))
-                (:printer memory ((op ,op)))
+                (:printer memory ((op ,op))
+                          ,@(when fixup
+                              ;; Don't try to parse a constant
+                              ;; reference if we're doing LDA or LDAH
+                              ;; against $CODE.
+                              '('(:name :tab ra "," disp "(" rb ")"))))
                 (:emitter
                  ,@(when fixup
                      `((when (fixup-p disp)
