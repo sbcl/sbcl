@@ -89,7 +89,7 @@
   :use-label (lambda (value dstate)
                (declare (type (signed-byte 21) value)
                         (type sb!disassem:disassem-state dstate))
-               (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+               (+ 4 (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
 
 
 
