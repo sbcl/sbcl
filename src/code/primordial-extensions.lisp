@@ -375,5 +375,8 @@
         (let ((it (copy-symbol 'it)))
           `(let ((,it ,test))
              (if ,it
-                 (let ((it ,it)) (declare (ignorable it)) ,@body)
+                 ;; Just like COND - no body means return the tested value.
+                 ,(if body
+                      `(let ((it ,it)) (declare (ignorable it)) ,@body)
+                      it)
                  (acond ,@rest)))))))
