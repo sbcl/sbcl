@@ -148,12 +148,16 @@
   ())
 (defknown %instance-length (instance) index
   (foldable flushable))
+(defknown %instance-cas (instance index t t) t ())
 (defknown %instance-ref (instance index) t
   (flushable always-translatable))
 (defknown %instance-set (instance index t) t
   (always-translatable))
 (defknown %layout-invalid-error (t layout) nil)
 
+#!+(or x86-64)
+(defknown %raw-instance-cas/word (instance index sb!vm:word sb!vm:word)
+  sb!vm:word ())
 (defknown %raw-instance-ref/word (instance index) sb!vm:word
   (flushable always-translatable))
 (defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word

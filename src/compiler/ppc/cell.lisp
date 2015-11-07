@@ -478,9 +478,9 @@
   (:arg-types instance positive-fixnum *))
 
 #!+compare-and-swap-vops
-(define-vop (%compare-and-swap-instance-ref word-index-cas)
+(define-vop (%instance-cas word-index-cas)
   (:policy :fast-safe)
-  (:translate %compare-and-swap-instance-ref)
+  (:translate %instance-cas)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance tagged-num * *))
 

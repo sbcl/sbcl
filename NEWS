@@ -7,6 +7,8 @@ changes relative to sbcl-1.3.0:
     inlining, even if the DEFSTRUCT was not itself within a global
     INLINE proclamation for the named constructor
   * enhancement: SB-EXT:DYNAMIC-SPACE-SIZE is now defined for cheneygc.
+  * enhancement: x86-64 platforms support SB-EXT:CAS on structure slots
+    of type SB-EXT:WORD
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
   * bug fix: structure constructor type checking is better. (lp#1508735)
   * bug fix: supplied-p variables for unused optional or keyword variables no

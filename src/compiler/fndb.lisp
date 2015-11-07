@@ -1833,8 +1833,6 @@
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t
     ())
-(defknown %compare-and-swap-instance-ref (instance index t t) t
-    ())
 (defknown %compare-and-swap-symbol-value (symbol t t) t
     (unwind))
 (defknown (%atomic-dec-symbol-global-value %atomic-inc-symbol-global-value)

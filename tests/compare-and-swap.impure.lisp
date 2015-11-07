@@ -151,6 +151,13 @@
     (sb-ext:atomic-decf (box-word box) 2)
     (assert (= (- (ash 1 sb-vm:n-word-bits) 2) (box-word box)))))
 
+(with-test (:name :cas-raw-instance-ref-word
+            :skipped-on '(not (or :x86-64)))
+  (let ((foo (make-box :word 42)))
+    ;; basic smoke test - not checking for atomicity or anything
+    (assert (eql (cas (box-word foo) 42 43) 42))
+    (assert (eql (cas (box-word foo) 43 44) 43))))
+
 (with-test (:name :atomic-incf-full-call-lp1381867
             :skipped-on '(not (or :x86 :x86-64 :ppc)))
   ;; contortions to avoid reader errors

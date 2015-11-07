@@ -118,8 +118,13 @@ EXPERIMENTAL: Interface subject to change."
          (structure (dd-name dd))
          (slotd (cdr info))
          (index (dsd-index slotd))
-         (type (dsd-type slotd)))
-    (unless (eq t (dsd-raw-type slotd))
+         (type (dsd-type slotd))
+         (casser
+          (case (dsd-raw-type slotd)
+            ((t) '%instance-cas)
+            #!+(or x86-64)
+            ((word) '%raw-instance-cas/word))))
+    (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
                 for a typed slot: ~S"
              place))
@@ -131,13 +136,11 @@ EXPERIMENTAL: Interface subject to change."
       (aver (eq op name))
       (with-unique-names (instance old new)
         (values (list instance)
-                (list arg)
+                (list `(the ,structure ,arg))
                 old
                 new
                 `(truly-the (values ,type &optional)
-                            (%compare-and-swap-instance-ref
-                             (the ,structure ,instance)
-                             ,index
+                            (,casser ,instance ,index
                              (the ,type ,old)
                              (the ,type ,new)))
                 `(,op ,instance))))))
@@ -244,7 +247,10 @@ been defined. (See SB-EXT:CAS for more information.)
                     current)))))
   (def %compare-and-swap-car (cons) car)
   (def %compare-and-swap-cdr (cons) cdr)
-  (def %compare-and-swap-instance-ref (instance index) %instance-ref %instance-set)
+  (def %instance-cas (instance index) %instance-ref %instance-set)
+  #!+x86-64 (def %raw-instance-cas/word (instance index)
+                 %raw-instance-ref/word
+                 %raw-instance-set/word)
   (def %compare-and-swap-symbol-info (symbol) symbol-info)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
