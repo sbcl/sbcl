@@ -29,6 +29,8 @@ changes relative to sbcl-1.3.0:
     now works correctly.
   * bug fix: Callback parameter (argument) handling on MIPS is now vastly
     more correct.
+  * bug fix: %DECREMENT-SEMAPHORE adjusts the remaining timeout after a
+    spurious wakeup
 
 changes in sbcl-1.3.0 relative to sbcl-1.2.16:
   * minor incompatible change: the environment passed to a macro/setf/deftype

@@ -831,6 +831,110 @@ IF-NOT-OWNER is :FORCE)."
     :structure waitqueue
     :slot token)
 
+(declaim (inline %condition-wait))
+(defun %condition-wait (queue mutex timeout to-sec to-usec stop-sec stop-usec deadlinep)
+  (let ((me *current-thread*))
+    (barrier (:read))
+    (assert (eq me (mutex-%owner mutex)))
+    (let ((status :interrupted))
+      ;; Need to disable interrupts so that we don't miss grabbing the
+      ;; mutex on our way out.
+      (without-interrupts
+        (unwind-protect
+             (progn
+               #!-sb-futex
+               (progn
+                 (%with-cas-lock ((waitqueue-%owner queue))
+                   (%waitqueue-enqueue me queue))
+                 (release-mutex mutex)
+                 (setf status
+                       (or (flet ((wakeup ()
+                                    (barrier (:read))
+                                    (unless (eq queue (thread-waiting-for me))
+                                      :ok)))
+                             (declare (dynamic-extent #'wakeup))
+                             (allow-with-interrupts
+                               (sb!impl::%%wait-for #'wakeup stop-sec stop-usec)))
+                           :timeout)))
+               #!+sb-futex
+               (with-pinned-objects (queue me)
+                 (setf (waitqueue-token queue) me)
+                 (release-mutex mutex)
+                 ;; Now we go to sleep using futex-wait. If anyone else
+                 ;; manages to grab MUTEX and call CONDITION-NOTIFY during
+                 ;; this comment, it will change the token, and so futex-wait
+                 ;; returns immediately instead of sleeping. Ergo, no lost
+                 ;; wakeup. We may get spurious wakeups, but that's ok.
+                 (setf status
+                       (case (allow-with-interrupts
+                               (futex-wait (waitqueue-token-address queue)
+                                           (get-lisp-obj-address me)
+                                           ;; our way of saying "no
+                                           ;; timeout":
+                                           (or to-sec -1)
+                                           (or to-usec 0)))
+                         ((1)
+                          ;;  1 = ETIMEDOUT
+                          :timeout)
+                         (t
+                          ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+                          ;;  0 = normal wakeup
+                          ;;  2 = EINTR, a spurious wakeup
+                          :ok)))))
+          #!-sb-futex
+          (%with-cas-lock ((waitqueue-%owner queue))
+            (if (eq queue (thread-waiting-for me))
+                (%waitqueue-drop me queue)
+                (unless (eq :ok status)
+                  ;; CONDITION-NOTIFY thinks we've been woken up, but really
+                  ;; we're unwinding. Wake someone else up.
+                  (%waitqueue-wakeup queue 1))))
+          ;; Update timeout for mutex re-aquisition unless we are
+          ;; already past the requested timeout.
+          (when (and (eq :ok status) to-sec)
+            (setf (values to-sec to-usec)
+                  (sb!impl::relative-decoded-times stop-sec stop-usec))
+            (when (and (zerop to-sec) (not (plusp to-usec)))
+              (setf status :timeout)))
+          ;; If we ran into deadline, try to get the mutex before
+          ;; signaling. If we don't unwind it will look like a normal
+          ;; return from user perspective.
+          (when (and (eq :timeout status) deadlinep)
+            (let ((got-it (%try-mutex mutex me)))
+              (allow-with-interrupts
+                (signal-deadline)
+                (cond (got-it
+                       (return-from %condition-wait t))
+                      (t
+                       ;; The deadline may have changed.
+                       (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
+                             (decode-timeout timeout))
+                       (setf status :ok))))))
+          ;; Re-acquire the mutex for normal return.
+          (when (eq :ok status)
+            (unless (or (%try-mutex mutex me)
+                        (allow-with-interrupts
+                          (%wait-for-mutex mutex me timeout
+                                           to-sec to-usec
+                                           stop-sec stop-usec deadlinep)))
+              (setf status :timeout)))))
+      ;; Determine actual return value. :ok means (potentially
+      ;; spurious) wakeup => T. :timeout => NIL.
+      (case status
+        (:ok
+         (if timeout
+             (multiple-value-bind (sec usec)
+                 (sb!impl::relative-decoded-times stop-sec stop-usec)
+               (values t sec usec))
+             t))
+        (:timeout
+         nil)
+        (t
+         ;; The only case we return normally without re-acquiring
+         ;; the mutex is when there is a :TIMEOUT that runs out.
+         (bug "%CONDITION-WAIT: invalid status on normal return: ~S" status))))))
+(declaim (notinline %condition-wait))
+
 (defun condition-wait (queue mutex &key timeout)
   #!+sb-doc
   "Atomically release MUTEX and start waiting on QUEUE for till another thread
@@ -875,95 +979,11 @@ around the call, checking the the associated data:
   #!-sb-thread
   (sb!ext:wait-for nil :timeout timeout) ; Yeah...
   #!+sb-thread
-  (let ((me *current-thread*))
-    (barrier (:read))
-    (assert (eq me (mutex-%owner mutex)))
+  (locally (declare (inline %condition-wait))
     (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
         (decode-timeout timeout)
-      (let ((status :interrupted))
-        ;; Need to disable interrupts so that we don't miss grabbing the
-        ;; mutex on our way out.
-        (without-interrupts
-          (unwind-protect
-               (progn
-                 #!-sb-futex
-                 (progn
-                   (%with-cas-lock ((waitqueue-%owner queue))
-                     (%waitqueue-enqueue me queue))
-                   (release-mutex mutex)
-                   (setf status
-                         (or (flet ((wakeup ()
-                                      (barrier (:read))
-                                      (unless (eq queue (thread-waiting-for me))
-                                        :ok)))
-                               (declare (dynamic-extent #'wakeup))
-                               (allow-with-interrupts
-                                 (sb!impl::%%wait-for #'wakeup stop-sec stop-usec)))
-                             :timeout)))
-                 #!+sb-futex
-                 (with-pinned-objects (queue me)
-                   (setf (waitqueue-token queue) me)
-                   (release-mutex mutex)
-                   ;; Now we go to sleep using futex-wait. If anyone else
-                   ;; manages to grab MUTEX and call CONDITION-NOTIFY during
-                   ;; this comment, it will change the token, and so futex-wait
-                   ;; returns immediately instead of sleeping. Ergo, no lost
-                   ;; wakeup. We may get spurious wakeups, but that's ok.
-                   (setf status
-                         (case (allow-with-interrupts
-                                 (futex-wait (waitqueue-token-address queue)
-                                             (get-lisp-obj-address me)
-                                             ;; our way of saying "no
-                                             ;; timeout":
-                                             (or to-sec -1)
-                                             (or to-usec 0)))
-                           ((1)
-                            ;;  1 = ETIMEDOUT
-                            :timeout)
-                           (t
-                            ;; -1 = EWOULDBLOCK, possibly spurious wakeup
-                            ;;  0 = normal wakeup
-                            ;;  2 = EINTR, a spurious wakeup
-                            :ok)))))
-            #!-sb-futex
-            (%with-cas-lock ((waitqueue-%owner queue))
-              (if (eq queue (thread-waiting-for me))
-                  (%waitqueue-drop me queue)
-                  (unless (eq :ok status)
-                    ;; CONDITION-NOTIFY thinks we've been woken up, but really
-                    ;; we're unwinding. Wake someone else up.
-                    (%waitqueue-wakeup queue 1))))
-            ;; Update timeout for mutex re-aquisition.
-            (when (and (eq :ok status) to-sec)
-              (setf (values to-sec to-usec)
-                    (sb!impl::relative-decoded-times stop-sec stop-usec)))
-            ;; If we ran into deadline, try to get the mutex before
-            ;; signaling. If we don't unwind it will look like a normal
-            ;; return from user perspective.
-            (when (and (eq :timeout status) deadlinep)
-              (let ((got-it (%try-mutex mutex me)))
-                (allow-with-interrupts
-                  (signal-deadline)
-                  (cond (got-it
-                         (return-from condition-wait t))
-                        (t
-                         ;; The deadline may have changed.
-                         (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
-                               (decode-timeout timeout))
-                         (setf status :ok))))))
-            ;; Re-acquire the mutex for normal return.
-            (when (eq :ok status)
-              (unless (or (%try-mutex mutex me)
-                          (allow-with-interrupts
-                            (%wait-for-mutex mutex me timeout
-                                             to-sec to-usec
-                                             stop-sec stop-usec deadlinep)))
-                (setf status :timeout)))))
-        (or (eq :ok status)
-            (unless (eq :timeout status)
-              ;; The only case we return normally without re-acquiring the
-              ;; mutex is when there is a :TIMEOUT that runs out.
-              (bug "CONDITION-WAIT: invalid status on normal return: ~S" status)))))))
+      (%condition-wait queue mutex timeout
+                       to-sec to-usec stop-sec stop-usec deadlinep))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
@@ -1105,8 +1125,11 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
          nil)
         (t
          (unwind-protect
-              (let (old-count
-                    (timeout (when (realp wait) wait)))
+              (binding* ((old-count nil)
+                         (timeout (when (realp wait) wait))
+                         ((to-sec to-usec stop-sec stop-usec deadlinep)
+                          (when wait
+                            (decode-timeout timeout))))
                 ;; Need to use ATOMIC-INCF despite the lock, because
                 ;; on our way out from here we might not be locked
                 ;; anymore -- so another thread might be tweaking this
@@ -1115,10 +1138,18 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
                 ;; thread waiting on the semaphore.
                 (sb!ext:atomic-incf (semaphore-waitcount semaphore))
                 (loop until (>= (setf old-count (semaphore-%count semaphore)) n)
-                   do (or (condition-wait (semaphore-queue semaphore)
-                                          (semaphore-mutex semaphore)
-                                          :timeout timeout)
-                          (return-from %decrement-semaphore nil)))
+                   do (multiple-value-bind (wakeup-p remaining-sec remaining-usec)
+                          (%condition-wait
+                           (semaphore-queue semaphore)
+                           (semaphore-mutex semaphore)
+                           timeout to-sec to-usec stop-sec stop-usec deadlinep)
+                        (when (or (not wakeup-p)
+                                  (and (eql remaining-sec 0)
+                                       (eql remaining-usec 0)))
+                          (return-from %decrement-semaphore nil)) ; timeout
+                        (when remaining-sec
+                          (setf to-sec remaining-sec
+                                to-usec remaining-usec))))
                 (success (- old-count n)))
            ;; Need to use ATOMIC-DECF as we may unwind without the
            ;; lock being held!

@@ -544,6 +544,22 @@
       (assert (zerop (count-live-threads waiters)))
       (assert (zerop (count-live-threads more-waiters))))))
 
+;; At some point %DECREMENT-SEMAPHORE did not adjust the remaining
+;; timeout after spurious wakeups, potentially leading to
+;; longer/infinite waiting despite the specified timeout.
+(with-test (:name (:semaphore :timeout :spurious-wakeup))
+  (let* ((semaphore (make-semaphore))
+         (done nil)
+         (thread (make-thread (lambda ()
+                                (let ((mutex (semaphore-mutex semaphore))
+                                      (queue (semaphore-queue semaphore)))
+                                  (loop :until done :do
+                                     (with-mutex (mutex)
+                                       (condition-notify queue))))))))
+    (assert (eq nil (wait-on-semaphore semaphore :timeout .5)))
+    (setf done t)
+    (join-thread thread)))
+
 (format t "~&semaphore tests done~%")
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
