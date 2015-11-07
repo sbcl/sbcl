@@ -247,3 +247,32 @@
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0))
+
+;;; Barriers
+(define-vop (%compiler-barrier)
+  (:policy :fast-safe)
+  (:translate %compiler-barrier)
+  (:generator 3))
+
+(define-vop (%memory-barrier)
+  (:policy :fast-safe)
+  (:translate %memory-barrier)
+  (:generator 3
+    (inst dmb)))
+
+(define-vop (%read-barrier)
+  (:policy :fast-safe)
+  (:translate %read-barrier)
+  (:generator 3
+    (inst dmb)))
+
+(define-vop (%write-barrier)
+  (:policy :fast-safe)
+  (:translate %write-barrier)
+  (:generator 3
+    (inst dmb)))
+
+(define-vop (%data-dependency-barrier)
+  (:policy :fast-safe)
+  (:translate %data-dependency-barrier)
+  (:generator 3))
