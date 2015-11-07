@@ -355,10 +355,10 @@ run_sbcl <<EOF
   (defvar *outer* (make-alien outer))
   (defvar *inner* (make-alien inner))
   (setf (slot *inner* 'var) 20)
-  (setf (slot *outer* 'one) *inner*)
+  (setf (slot *outer* 'one) (deref *inner*)) ; lp#1514023 (?)
   (assert (= (slot (slot *outer* 'one) 'var) 20))
   (setf (slot *inner* 'var) 40)
-  (setf (slot *outer* 'two) *inner*)
+  (setf (slot *outer* 'two) (deref *inner*)) ; lp#1514023 (?)
   (assert (= (slot (slot *outer* 'two) 'var) 40))
   (exit :code $EXIT_LISP_WIN)
 EOF
