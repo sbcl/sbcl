@@ -180,6 +180,10 @@
               (#b11
                (format stream ", #~D]!" imm)))))))
 
+  (defun print-w-reg (value stream dstate)
+    (declare (ignore dstate))
+    (princ "W" stream)
+    (princ (aref *register-names* value) stream))
   (defun print-x-reg (value stream dstate)
     (declare (ignore dstate))
     (princ (aref *register-names* value) stream))
@@ -357,6 +361,9 @@
 
   (sb!disassem:define-arg-type x-reg
     :printer #'print-x-reg)
+
+  (sb!disassem:define-arg-type w-reg
+    :printer #'print-w-reg)
 
   (sb!disassem:define-arg-type reg-sp
     :printer #'print-reg-sp)
@@ -577,11 +584,11 @@
 (defun encode-shifted-register (operand)
   (etypecase operand
     (tn
-     (values 0 0 (tn-offset operand)))
+     (values 0 0 operand))
     (shifter-operand
      (values (shifter-operand-function-code operand)
              (shifter-operand-operand operand)
-             (tn-offset (shifter-operand-register operand))))))
+             (shifter-operand-register operand)))))
 
 
 ;;;; Addressing mode 2 support
@@ -794,39 +801,45 @@
   `(define-instruction ,name (segment rd rn rm)
      ,@printers
      (:emitter
-      (let ((rd (tn-offset rd)))
-        (cond ((or (register-p rm)
-                   (shifter-operand-p rm))
-               (multiple-value-bind (shift amount source) (encode-shifted-register rm)
-                 (emit-add-sub-shift-reg segment +64-bit-size+ ,op shift source amount (tn-offset rn) rd)))
-              ((extend-p rm)
-               (let* ((shift 0)
-                      (extend (ecase (extend-kind rm)
-                                (:uxtb #b00)
-                                (:uxth #b001)
-                                (:uxtw #b010)
-                                (:lsl
-                                 (aver (or (= (extend-operand rm) 0)
-                                           (= (extend-operand rm) 3)))
-                                 (setf shift 1)
-                                 #b011)
-                                (:uxtx #b011)
-                                (:sxtb #b100)
-                                (:sxth #b101)
-                                (:sxtw #b110)
-                                (:sxtx #b111))))
-                 (emit-add-sub-ext-reg segment +64-bit-size+ ,op
-                                       (tn-offset (extend-register rm))
-                                       extend shift (tn-offset rn) rd)))
-              (t
-               (let ((imm rm)
-                     (shift 0))
-                 (when (and (typep imm '(unsigned-byte 24))
-                            (not (zerop imm))
-                            (not (ldb-test (byte 12 0) imm)))
-                   (setf imm (ash imm -12)
-                         shift 1))
-                 (emit-add-sub-imm segment +64-bit-size+ ,op shift imm (tn-offset rn) rd))))))))
+      (let ((size (reg-size rn)))
+       (cond ((or (register-p rm)
+                  (shifter-operand-p rm))
+              (multiple-value-bind (shift amount rm) (encode-shifted-register rm)
+                (assert-same-size rd rn rm)
+                (emit-add-sub-shift-reg segment size ,op shift (tn-offset rm)
+                                        amount (tn-offset rn) (tn-offset rd))))
+             ((extend-p rm)
+              (let* ((shift 0)
+                     (extend (ecase (extend-kind rm)
+                               (:uxtb #b00)
+                               (:uxth #b001)
+                               (:uxtw #b010)
+                               (:lsl
+                                (aver (or (= (extend-operand rm) 0)
+                                          (= (extend-operand rm) 3)))
+                                (setf shift 1)
+                                #b011)
+                               (:uxtx #b011)
+                               (:sxtb #b100)
+                               (:sxth #b101)
+                               (:sxtw #b110)
+                               (:sxtx #b111)))
+                     (rm (extend-register rm)))
+                (assert-same-size rd rn rm)
+                (emit-add-sub-ext-reg segment size ,op
+                                      (tn-offset rm)
+                                      extend shift (tn-offset rn) (tn-offset rd))))
+             (t
+              (let ((imm rm)
+                    (shift 0))
+                (when (and (typep imm '(unsigned-byte 24))
+                           (not (zerop imm))
+                           (not (ldb-test (byte 12 0) imm)))
+                  (setf imm (ash imm -12)
+                        shift 1))
+                (assert-same-size rn rd)
+                (emit-add-sub-imm segment size ,op shift imm
+                                  (tn-offset rn) (tn-offset rd)))))))))
 
 (def-add-sub add #b00
   (:printer add-sub-imm ((op #b00)))
@@ -865,16 +878,36 @@
             '('negs :tab rd ", " rm shift)))
 
 (define-instruction-macro cmp (rn rm)
-  `(inst subs zr-tn ,rn ,rm))
+  `(let ((rn ,rn)
+         (rm ,rm))
+     (inst subs (if (sc-is rn 32-bit-reg)
+                    (32-bit-reg zr-tn)
+                    zr-tn)
+           rn rm)))
 
 (define-instruction-macro cmn (rn rm)
-  `(inst adds zr-tn ,rn ,rm))
+  `(let ((rn ,rn)
+         (rm ,rm))
+     (inst adds (if (sc-is rn 32-bit-reg)
+                    (32-bit-reg zr-tn)
+                    zr-tn)
+           rn rm)))
 
 (define-instruction-macro neg (rd rm)
-  `(inst sub ,rd zr-tn ,rm))
+  `(let ((rd ,rd)
+         (rm ,rm))
+     (inst sub rd (if (sc-is rd 32-bit-reg)
+                      (32-bit-reg zr-tn)
+                      zr-tn)
+           rm)))
 
 (define-instruction-macro negs (rd rm)
-  `(inst subs ,rd zr-tn ,rm))
+  `(let ((rd ,rd)
+         (rm ,rm))
+     (inst subs rd (if (sc-is rd 32-bit-reg)
+                       (32-bit-reg zr-tn)
+                       zr-tn)
+           rm)))
 
 ;;;
 
@@ -1822,6 +1855,71 @@
 
 ;;;
 
+(def-emitter ldr-str-exclusive
+  (size 2 30)
+  (#b001000 6 24)
+  (o2 1 23)
+  (l 1 22)
+  (o1 1 21)
+  (rs 5 16)
+  (o0 1 15)
+  (rt2 5 10)
+  (rn 5 5)
+  (rt 5 0))
+
+(sb!disassem:define-instruction-format
+    (ldr-str-exclusive 32)
+    (size :field (byte 2 30))
+    (op2 :field (byte 6 24) :value #b001000)
+    (o2 :field (byte 1 23))
+    (l :field (byte 1 22))
+    (o1 :field (byte 1 21))
+    (rs :field (byte 5 16) :type 'w-reg)
+    (o0 :field (byte 1 15))
+    (rt2 :field (byte 5 5) :type 'reg)
+    (rn :field (byte 5 5) :type 'reg-sp)
+    (rt :field (byte 5 0) :type 'reg))
+
+(defmacro def-store-exclusive (name o0 o1 o2 rs &rest printers)
+  `(define-instruction ,name (segment ,@(and rs '(rs)) rt rn)
+     (:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 0))
+               '(:name :tab ,@(and rs '(rs ", ")) rt ", [" rn "]"))
+     ,@printers
+     (:emitter
+      (emit-ldr-str-exclusive segment (logior #b10 (reg-size rt))
+                              ,o2 0 ,o1
+                              ,(if rs
+                                   '(tn-offset rs)
+                                   31)
+                              ,o0
+                              31
+                              (tn-offset rn)
+                              (tn-offset rt)))))
+
+(def-store-exclusive stxr 0 0 0 t)
+(def-store-exclusive stxlr 1 0 0 t)
+(def-store-exclusive stlr 1 0 1 nil)
+
+(defmacro def-load-exclusive (name o0 o1 o2 &rest printers)
+  `(define-instruction ,name (segment rt rn)
+     (:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 1))
+               '(:name :tab rt ", [" rn "]"))
+     ,@printers
+     (:emitter
+      (emit-ldr-str-exclusive segment (logior #b10 (reg-size rt))
+                              ,o2 1 ,o1
+                              31
+                              ,o0
+                              31
+                              (tn-offset rn)
+                              (tn-offset rt)))))
+
+(def-load-exclusive ldxr 0 0 0)
+(def-load-exclusive ldaxr 1 0 0)
+(def-load-exclusive ldar 1 0 1)
+
+;;;
+
 (def-emitter cond-branch
   (#b01010100 8 24)
   (imm 19 5)
@@ -1955,7 +2053,7 @@
    (emit-back-patch segment 4
                     (lambda (segment posn)
                       (emit-compare-branch-imm segment
-                                               +64-bit-size+
+                                               (reg-size rt)
                                                1
                                                (ash (- (label-position label) posn) -2)
                                                (tn-offset rt))))))
@@ -2060,7 +2158,7 @@
 
 ;;;
 
-(def-emitter system
+(def-emitter system-reg
   (#b1101010100 10 22)
   (l 1 21)
   (sys-reg 16 5)
@@ -2090,12 +2188,72 @@
 (define-instruction msr (segment sys-reg rt)
   (:printer sys-reg ((l 0)) '(:name :tab sys-reg ", " rt))
   (:emitter
-   (emit-system segment 0 (encode-sys-reg sys-reg) (tn-offset rt))))
+   (emit-system-reg segment 0 (encode-sys-reg sys-reg) (tn-offset rt))))
 
 (define-instruction mrs (segment rt sys-reg)
   (:printer sys-reg ((l 1)) '(:name :tab rt ", " sys-reg))
   (:emitter
-   (emit-system segment 1 (encode-sys-reg sys-reg) (tn-offset rt))))
+   (emit-system-reg segment 1 (encode-sys-reg sys-reg) (tn-offset rt))))
+
+;;;
+
+(def-emitter system
+  (#b11010101000000110011 20 12)
+  (crm 4 8)
+  (op 3 5)
+  (#b11111 5 0))
+
+(sb!disassem:define-instruction-format
+    (system 32)
+    (op1 :field (byte 20 12) :value #b11010101000000110011)
+    (crm :field (byte 4 8))
+    (op :field (byte 3 5))
+    (op2 :field (byte 5 0) :value #b11111))
+
+
+(define-instruction clrex (segment &optional (imm 15))
+  (:printer system ((op #b010))
+            '(:name (:unless (crm :constant 15) :tab "#" crm)))
+  (:emitter
+   (emit-system segment imm  #b010)))
+
+(defglobal **mem-bar-kinds**
+    '((:sy . #b1111)
+      (:st . #b1110)
+      (:ld . #b1101)
+      (:ish . #b1011)
+      (:ishst . #b1010)
+      (:ishld . #b1001)
+      (:nsh . #b0111)
+      (:nsht . #b0110)
+      (:osh . #b0011)
+      (:oshst . #b0010)
+      (:oshld . #b0001)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun print-mem-bar-kind (value stream dstate)
+    (declare (ignore dstate))
+    (let ((kind (car (rassoc value **mem-bar-kinds**))))
+      (if kind
+          (princ kind stream)
+          (format stream "#~d" value)))))
+
+(defmacro def-mem-bar (name op)
+  `(define-instruction ,name (segment &optional (kind :sy))
+     (:printer system ((op ,op))
+               '(:name :tab (:using #'print-mem-bar-kind crm)))
+     (:emitter
+      (emit-system segment
+                   (cond ((integerp kind)
+                          kind)
+                         ((cdr (assoc kind **mem-bar-kinds**)))
+                         (t
+                          (error "Unknown memory barrier kind: ~s" kind)))
+                   ,op))))
+
+(def-mem-bar dsb #b100)
+(def-mem-bar dmb #b101)
+(def-mem-bar isb #b110)
 
 ;;;
 
@@ -2768,4 +2926,3 @@
          (loop repeat size
                do (inst byte (ldb (byte 8 0) val))
                   (setf val (ash val -8))))))))
-
