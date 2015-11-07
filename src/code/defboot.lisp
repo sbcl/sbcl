@@ -97,17 +97,21 @@
                            (progn ,@forms)
                            ,(when more `(cond ,@more))))))))))
 
-(defmacro-mundanely when (test &body forms)
+(flet ((prognify (forms)
+         (cond ((singleton-p forms) (car forms))
+               ((not forms) nil)
+               (t `(progn ,@forms)))))
+  (defmacro-mundanely when (test &body forms)
   #!+sb-doc
   "If the first argument is true, the rest of the forms are
 evaluated as a PROGN."
-  `(if ,test (progn ,@forms) nil))
+  `(if ,test ,(prognify forms)))
 
-(defmacro-mundanely unless (test &body forms)
+  (defmacro-mundanely unless (test &body forms)
   #!+sb-doc
   "If the first argument is not true, the rest of the forms are
 evaluated as a PROGN."
-  `(if ,test nil (progn ,@forms)))
+  `(if ,test nil ,(prognify forms))))
 
 (defmacro-mundanely and (&rest forms)
   (cond ((endp forms) t)

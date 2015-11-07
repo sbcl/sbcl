@@ -93,7 +93,7 @@
     ;; is evaluable though unlikely to appear in real code. Unless F is a
     ;; macro, this form when evaluated does not comprise a well-formed sexpr.
     (equalp (macroexpand-all '(progn `(f ,(when x y) . `(,b ,,(and z)))))
-            '(progn `(f ,(if x (progn y) nil) . `(,b ,,(the t z)))))
+            '(progn `(f ,(if x y) . `(,b ,,(the t z)))))
   t)
 
 ;;; Symbol macros
