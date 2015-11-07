@@ -249,8 +249,10 @@ code:
                       '("-arch" "x86_64"
                         "-mmacosx-version-min=10.4")
                       #+(and x86 darwin)
-                      '("-arch" "i386"
-                        "-mmacosx-version-min=10.4")
+                      `("-arch" "i386"
+                       ,(format nil "-mmacosx-version-min=~A"
+                                (or (sb-ext:posix-getenv "SBCL_MACOSX_VERSION_MIN")
+                                     "10.4")))
                       #+(and x86-64 sunos) '("-m64")
                       (list "-o"
                             (namestring tmp-a-dot-out)

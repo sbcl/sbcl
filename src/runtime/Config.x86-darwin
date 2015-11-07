@@ -10,13 +10,19 @@
 # files for more information.
 
 CFLAGS = -arch i386 -g -Wall -O2 -fdollars-in-identifiers -fno-omit-frame-pointer
+
 LINKFLAGS += -arch i386
-ifdef LISP_FEATURE_DARWIN9_OR_BETTER
-CFLAGS += -mmacosx-version-min=10.5
-LINKFLAGS += -mmacosx-version-min=10.5
+ifdef SBCL_MACOSX_VERSION_MIN
+  CFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
+  LINKFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
 else
-CFLAGS += -mmacosx-version-min=10.4
-LINKFLAGS += -mmacosx-version-min=10.4
+  ifdef LISP_FEATURE_DARWIN9_OR_BETTER
+    CFLAGS += -mmacosx-version-min=10.5
+    LINKFLAGS += -mmacosx-version-min=10.5
+  else
+    CFLAGS += -mmacosx-version-min=10.4
+    LINKFLAGS += -mmacosx-version-min=10.4
+  endif
 endif
 
 OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c
