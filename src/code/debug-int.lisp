@@ -1255,8 +1255,13 @@ register."
   (declare (type debug-fun debug-fun))
   (etypecase debug-fun
     (compiled-debug-fun
-     (sb!c::compiled-debug-fun-name
-      (compiled-debug-fun-compiler-debug-fun debug-fun)))
+     (let ((name (sb!c::compiled-debug-fun-name
+                  (compiled-debug-fun-compiler-debug-fun debug-fun))))
+       ;; Frames named (.EVAL. special-operator) should show the operator name.
+       (cond #!+sb-fasteval
+             ((typep name '(cons (eql sb!interpreter::.eval.)))
+              (if (singleton-p (cdr name)) (cadr name) (cdr name)))
+             (t name))))
     (bogus-debug-fun
      (bogus-debug-fun-%name debug-fun))))
 
@@ -1277,12 +1282,21 @@ register."
 
 ;; Return the name of the closure, if named, otherwise nil.
 (defun debug-fun-closure-name (debug-fun frame)
-  (when (typep debug-fun 'compiled-debug-fun)
-    (let* ((compiler-debug-fun
-             (compiled-debug-fun-compiler-debug-fun debug-fun))
-           (closure-save
-             (sb!c::compiled-debug-fun-closure-save compiler-debug-fun)))
-      (when closure-save
+  (unless (typep debug-fun 'compiled-debug-fun)
+    (return-from debug-fun-closure-name nil))
+  (let ((compiler-debug-fun (compiled-debug-fun-compiler-debug-fun debug-fun)))
+    (acond
+       ;; Frames named (.APPLY. something) are interpreted function applicators.
+       ;; Show them as the name of the interpreted function being applied.
+       #!+sb-fasteval
+       ((let ((name (sb!c::compiled-debug-fun-name compiler-debug-fun)))
+          (when (typep name '(cons (eql sb!interpreter::.apply.)))
+            ;; Find a variable named FUN.
+            (awhen (car (debug-fun-symbol-vars debug-fun 'sb!interpreter::fun))
+              (let ((val (debug-var-value it frame))) ; Ensure it's a function
+                (when (typep val 'sb!interpreter:interpreted-function)
+                  (sb!interpreter:fun-name val))))))) ; Get its name
+       ((sb!c::compiled-debug-fun-closure-save compiler-debug-fun)
         (let ((closure-name
                 (sb!impl::closure-name
                  #!+precise-arg-count-error
@@ -1290,11 +1304,9 @@ register."
                      (sub-access-debug-var-slot (frame-pointer frame)
                                                 sb!c:closure-sc
                                                 (compiled-frame-escaped frame))
-                     (sub-access-debug-var-slot (frame-pointer frame)
-                                                closure-save))
+                     (sub-access-debug-var-slot (frame-pointer frame) it))
                  #!-precise-arg-count-error
-                 (sub-access-debug-var-slot (frame-pointer frame)
-                                            closure-save))))
+                 (sub-access-debug-var-slot (frame-pointer frame) it))))
           (if closure-name
               ;; The logic in CLEAN-FRAME-CALL is based on the frame name,
               ;; so if the simple-fun is named (XEP mumble) then the closure

@@ -92,7 +92,7 @@
         (let ((sexpr (make-symbol "SEXPR")))
           (setq vars (nconc (subseq vars 0 1) (list sexpr) aux-vars)
                 ignore `((ignore ,sexpr))))))
-    (setq name (cons 'eval (if (listp name) name (list name))))
+    (setq name (cons '.eval. (if (listp name) name (list name))))
     `(handler ,(if captured-vars
                    (if (= (length captured-vars) 1)
                        `(named-lambda ,name (,(first captured-vars) ,@vars)
@@ -699,14 +699,14 @@
        (invoke (n &aux (args (subseq '(arg1 arg2 arg3 arg4 arg5) 0 n)))
          `(if (eql (lambda-frame-block-name (interpreted-function-frame fun))
                    0)
-              (lambda ,args
+              (named-lambda (.apply. ,n) ,args
                 (declare #.+handler-optimize+ (optimize sb-c:verify-arg-count))
                 (with-lambda-frame
                     (frame fun (interpreter-trampoline fun ,@args))
                   (dispatch (lambda-frame-sexpr frame)
                             (new-env make-var-env
                                      ,(if (zerop n) nil `(vector ,@args))))))
-              (lambda ,args
+              (named-lambda (.apply. ,n) ,args
                 (declare #.+handler-optimize+ (optimize sb-c:verify-arg-count))
                 (with-lambda-frame
                     (frame fun (interpreter-trampoline fun ,@args))
@@ -735,13 +735,13 @@
                    (dotimes (i (lambda-frame-min-args frame) ,form)
                      (setf (svref cells i) (nth i args)))))))
          (if (eql (lambda-frame-block-name (interpreted-function-frame fun)) 0)
-             (lambda (&rest args)
+             (named-lambda (.apply.) (&rest args)
                (declare #.+handler-optimize+)
                (with-lambda-frame
                    (frame fun (apply #'interpreter-trampoline fun args))
                  (with-args (dispatch (lambda-frame-sexpr frame)
                                       (new-env make-var-env cells)))))
-             (lambda (&rest args)
+             (named-lambda (.apply.) (&rest args)
                (declare #.+handler-optimize+)
                (with-lambda-frame
                    (frame fun (apply #'interpreter-trampoline fun args))
@@ -756,7 +756,7 @@
 ;;; are never listified (it's an implicit &MORE arg). I don't want to write code
 ;;; to manually listify, nor hand-roll GETF. Also no special bindings permitted.
 (defun applicator/&optional (fun)
-  (lambda (&rest args)
+  (named-lambda (.apply. &optional) (&rest args)
     (declare #.+handler-optimize+)
     (with-lambda-frame (frame fun (apply #'interpreter-trampoline fun args))
       (let* ((n-actual (let* ((min (lambda-frame-min-args frame))

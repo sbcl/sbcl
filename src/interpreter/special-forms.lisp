@@ -1205,7 +1205,7 @@
                 (mapcar
                  (lambda (f)
                    `(cons ',f
-                          (named-lambda (EVAL ,(symbolicate "2-ARG-" f))
+                          (named-lambda (.eval. ,(symbolicate "2-ARG-" f))
                                         (data env sexpr)
                             (declare (ignore sexpr)
                                      (optimize (sb-c:verify-arg-count 0))

@@ -181,6 +181,7 @@
          (funcall fun)))
 
   (with-test (:name (:backtrace :undefined-function :bug-346)
+                    :skipped-on :interpreter
                     ;; Failures on ALPHA, SPARC, and probably HPPA are
                     ;; due to not having a full and valid stack frame
                     ;; for the undefined function frame.  See PPC
@@ -193,7 +194,8 @@
 
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
-  (with-test (:name (:backtrace :undefined-function :bug-353))
+  (with-test (:name (:backtrace :undefined-function :bug-353)
+              :skipped-on :interpreter)
     (assert-backtrace
      (lambda () (test #'not-optimized))
      (list *undefined-function-frame*
@@ -237,12 +239,14 @@
          (funcall fun)))
 
   (with-test (:name (:backtrace :divide-by-zero :bug-346)
+                    :skipped-on :interpreter
                     :fails-on :alpha)  ; bug 346
     (assert-backtrace (lambda () (test #'optimized))
                       `((/ 42 &rest)
                         ((flet test :in ,*p*) ,#'optimized))))
 
   (with-test (:name (:backtrace :divide-by-zero :bug-356)
+                    :skipped-on :interpreter
                     :fails-on :alpha)  ; bug 356
     (assert-backtrace (lambda () (test #'not-optimized))
                       `((/ 42 &rest)
@@ -262,7 +266,7 @@
              (oops z v)))
       (bar x)
       (bar v))))
-(with-test (:name (:backtrace :bug-308926))
+(with-test (:name (:backtrace :bug-308926) :skipped-on :interpreter)
   (assert-backtrace (lambda () (bug-308926 13))
                     '(((flet bar :in bug-308926) 13)
                       (bug-308926 &rest t))))
@@ -277,7 +281,8 @@
                `(flet ((,test-name (x y)
                          ;; make sure it's not in tail position
                          (list (,fun x y))))
-                  (with-test (:name (:backtrace :bug-800343 ,fun))
+                  (with-test (:name (:backtrace :bug-800343 ,fun)
+                              :skipped-on :interpreter)
                     (assert-backtrace
                      (lambda ()
                        (eval `(funcall ,#',test-name 42 t)))
@@ -303,7 +308,8 @@
 
 ;;; test entry point handling in backtraces
 
-(with-test (:name (:backtrace :xep-too-many-arguments))
+(with-test (:name (:backtrace :xep-too-many-arguments)
+            :skipped-on :interpreter)
   (assert-backtrace (lambda () (oops 1 2 3 4 5 6))
                     '((oops ? ? ? ? ? ?))))
 
@@ -527,3 +533,21 @@
                                          (declare (notinline tail))
                                          (tail))))))
    '((test))))
+
+(defun fact (n) (if (zerop n) (error "nope") (* n (fact (1- n)))))
+
+(with-test (:name (:backtrace :interpreted-factorial)
+            :skipped-on '(not :interpreter))
+  (assert-backtrace
+   (lambda () (fact 5))
+   '((fact 0)
+     (sb-interpreter::2-arg-* &rest)
+     (fact 1)
+     (sb-interpreter::2-arg-* &rest)
+     (fact 2)
+     (sb-interpreter::2-arg-* &rest)
+     (fact 3)
+     (sb-interpreter::2-arg-* &rest)
+     (fact 4)
+     (sb-interpreter::2-arg-* &rest)
+     (fact 5))))
