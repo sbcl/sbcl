@@ -48,7 +48,7 @@ void arch_skip_instruction(os_context_t *context)
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context) + 5);
+    return (unsigned char *)*os_context_pc_addr(context);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)

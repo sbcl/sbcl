@@ -164,12 +164,23 @@ describe_internal_error(os_context_t *context)
     unsigned char *ptr = arch_internal_error_arguments(context);
     int len, scoffset, sc, offset, ch;
 
+#ifdef LISP_FEATURE_ARM64
+    u32 trap_instruction = *(u32 *)ptr;
+    unsigned code = trap_instruction >> 13 & 0xFF;
+    printf("Internal error #%d \"%s\" at %p\n", code,
+           internal_error_descriptions[code],
+           (void*)*os_context_pc_addr(context));
+    ptr += 4;
+    len = *ptr++;
+#else
     len = *ptr++;
     printf("Internal error #%d \"%s\" at %p\n", *ptr,
            internal_error_descriptions[*ptr],
            (void*)*os_context_pc_addr(context));
     ptr++;
     len--;
+#endif
+
     while (len > 0) {
         scoffset = *ptr++;
         len--;
@@ -187,8 +198,8 @@ describe_internal_error(os_context_t *context)
             ptr += 4;
             len -= 4;
         }
-        sc = scoffset & 0x1f;
-        offset = scoffset >> 5;
+        sc = scoffset & 0x3F;
+        offset = scoffset >> 6;
 
         printf("    SC: %d, Offset: %d", sc, offset);
         switch (sc) {
