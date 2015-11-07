@@ -28,9 +28,11 @@
 (defvar *calls* nil)
 
 (defmethod reader-method-class ((c my-class) s &rest initargs)
+  (declare (ignore initargs))
   (push (cons (slot-definition-name s) 'reader) *calls*)
   (find-class 'my-reader))
 (defmethod writer-method-class ((c my-class) s &rest initargs)
+  (declare (ignore initargs))
   (push (cons (slot-definition-name s) 'writer) *calls*)
   (find-class 'my-writer))
 
@@ -59,10 +61,12 @@
 (defclass my-direct-slot-definition (standard-direct-slot-definition) ())
 
 (defmethod direct-slot-definition-class ((c my-other-class) &rest args)
+  (declare (ignore args))
   (find-class 'my-direct-slot-definition))
 
 (defmethod reader-method-class :around
     (class (s my-direct-slot-definition) &rest initargs)
+  (declare (ignore initargs))
   (find-class 'my-other-reader))
 
 (defclass bar ()
