@@ -1054,8 +1054,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; We parse declarations and then recursively process the body.
 (defun process-toplevel-locally (body path compile-time-too &key vars funs)
   (declare (list path))
-  (multiple-value-bind (forms decls)
-      (parse-body body :doc-string-allowed nil :toplevel t)
+  (multiple-value-bind (forms decls) (parse-body body nil t)
     (with-ir1-namespace
       (let* ((*lexenv* (process-decls decls vars funs))
              ;; FIXME: VALUES declaration

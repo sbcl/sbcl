@@ -490,7 +490,7 @@
                                '(&optional &rest &key &allow-other-keys
                                  &environment))
                     :context "a DEFSETF lambda list"))
-                  ((forms decls doc) (parse-body body))
+                  ((forms decls doc) (parse-body body t))
                   ((outer-decls inner-decls)
                    (extract-var-decls decls (append env stores)))
                   (subforms (copy-symbol 'subforms))

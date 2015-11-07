@@ -666,60 +666,6 @@
                                    :key #'car))))
           (setf (logbitp i special-b) t))))))
 
-;;; Split off the declarations (and the docstring, if DOCSTRING-ALLOWED
-;;; is true) from the actual forms of BODY.
-;;; Also do some rudimentary checks on the declarations (if any).
-;;; Return three values: the cons in BODY containing the first evaluable
-;;; subform, a list of the declarations, and a docstring if present.
-;;; KLUDGE: would be nice to share the compiler's PARSE-BODY,
-;;; except that because this is called potentially a lot more than
-;;; once per input form, we don't want the "DECLAIM where DECLARE"
-;;; style-warning every time. It's only a warning, not an error.
-;;; KLUDGE: Genesis can't shadow parse-body, so name it differently.
-(defun iparse-body (body &optional docstring-allowed)
-  (let (decls-list docstring)
-    (flet ((quick-validate-decls (subexpr &aux (specs (cdr subexpr)))
-             (unless (and (proper-list-p specs) (every #'consp specs))
-               (ip-error "malformed declaration ~S" subexpr))
-             ;; It's faster to store the list of DECLARE expressions
-             ;; sans initial DECLARE rather than append together
-             ;; into a list of just the decl-specs of all of them.
-             (dolist (decl specs)
-               (when (eq (car decl) 'optimize)
-                 (dolist (element (cdr decl))
-                   (let ((quality
-                           (if (atom element)
-                               element
-                               (with-subforms (quality value) element
-                                 (declare (ignore value))
-                                 quality))))
-                     (unless (sb-c::policy-quality-name-p quality)
-                       (warn "ignoring unknown optimization quality ~S in ~S"
-                             quality subexpr))))))
-             (push specs decls-list)))
-      (macrolet
-          ((scan (checking-docstring)
-             `(loop
-               (let ((form (car body)))
-                 (cond ((listp form)
-                        (cond ((eql (car form) 'declare)
-                               (quick-validate-decls form)
-                               (pop body))
-                              (t
-                               (return))))
-                       ((and ,checking-docstring (stringp form))
-                        ;; CLHS 3.4.11
-                        (cond ((not (cdr body)) (return))
-                              (docstring ; "consequences are unspecified"
-                               (ip-error "~@<Duplicate doc string ~S.~:@>"
-                                         form))
-                              (t
-                               (pop body) (setf docstring form))))
-                       (t (return)))))))
-        ;; slight optimization: two variations of the loop
-        (if docstring-allowed (scan t) (scan nil))
-        (values body (nreverse decls-list) docstring)))))
-
 (defun make-proto-fn (lambda-expression &optional (silent t))
   (multiple-value-bind (name lambda-list body)
       (if (eq (car lambda-expression) 'named-lambda)
@@ -731,7 +677,7 @@
     ;; If lexical environment is NIL, :silent will be passed as NIL,
     ;; and we can warn about "suspcious variables" and such.
     (parse-lambda-list lambda-list :silent silent)
-    (multiple-value-bind (forms decls docstring) (iparse-body body t)
+    (multiple-value-bind (forms decls docstring) (parse-body body t t)
       (%make-proto-fn name lambda-list decls forms docstring
                       (do-decl-spec (spec decls lambda-list)
                         (when (eq (car spec) 'sb-c::lambda-list)

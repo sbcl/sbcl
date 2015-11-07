@@ -592,7 +592,7 @@ generic function lambda list ~S~:>"
             is not a lambda form."
            method-lambda))
   (multiple-value-bind (real-body declarations documentation)
-      (parse-body (cddr method-lambda))
+      (parse-body (cddr method-lambda) t)
     ;; We have the %METHOD-NAME declaration in the place where we expect it only
     ;; if there is are no non-standard prior MAKE-METHOD-LAMBDA methods -- or
     ;; unless they're fantastically unintrusive.
@@ -701,7 +701,7 @@ generic function lambda list ~S~:>"
             (multiple-value-bind (walked-lambda-body
                                   walked-declarations
                                   walked-documentation)
-                (parse-body (cddr walked-lambda))
+                (parse-body (cddr walked-lambda) t)
               (declare (ignore walked-documentation))
               (when (some #'cdr slots)
                 (let ((slot-name-lists (slot-name-lists-from-slots slots)))

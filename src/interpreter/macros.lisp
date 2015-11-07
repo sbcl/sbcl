@@ -160,12 +160,11 @@
 ;;; subexpresssions whose head was DECLARE in a form accepting declarations.
 ;;; The list as stored is doubly-nested because each DECLARE expression
 ;;; is preserved separately, and within it the declarations.
-;;;  e.g. (locally (declare foo) (declare bar baz)) = ((foo) (bar baz))
 (defmacro do-decl-spec ((var input &optional result) &body body)
   (let ((outer (gensym))
         (inner (gensym)))
     `(dolist (,outer ,input ,result)
-       (do-anonymous ((,inner ,outer (cdr ,inner))) ((endp ,inner))
+       (do-anonymous ((,inner (cdr ,outer) (cdr ,inner))) ((endp ,inner))
          (let ((,var (car ,inner)))
            ,@body)))))
 

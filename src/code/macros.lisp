@@ -412,8 +412,7 @@ invoked. In that case it will store into PLACE and start over."
 ;;;; WITH-FOO i/o-related macros
 
 (defmacro-mundanely with-open-stream ((var stream) &body forms-decls)
-  (multiple-value-bind (forms decls)
-      (parse-body forms-decls :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
     (let ((abortp (gensym)))
       `(let ((,var ,stream)
              (,abortp t))
@@ -432,8 +431,7 @@ invoked. In that case it will store into PLACE and start over."
 
 (defmacro-mundanely with-input-from-string ((var string &key index start end)
                                             &body forms-decls)
-  (multiple-value-bind (forms decls)
-      (parse-body forms-decls :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
     `(let ((,var
             ;; Should (WITH-INPUT-FROM-STRING (stream str :start nil :end 5))
             ;; pass the explicit NIL, and thus get an error? It's logical
@@ -453,8 +451,7 @@ invoked. In that case it will store into PLACE and start over."
 (defmacro-mundanely with-output-to-string
     ((var &optional string &key (element-type ''character))
      &body forms-decls)
-  (multiple-value-bind (forms decls)
-      (parse-body forms-decls :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
     (if string
         (let ((element-type-var (gensym)))
           `(let ((,var (make-fill-pointer-output-stream ,string))

@@ -594,7 +594,7 @@ of specialized arrays is supported."
 
 ;;; Like DOVECTOR, but more magical -- can't use this on host.
 (defmacro do-vector-data ((elt vector &optional result) &body body)
-  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (with-unique-names (index vec start end ref)
       `(with-array-data ((,vec ,vector)
                          (,start)

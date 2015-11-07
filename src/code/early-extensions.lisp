@@ -427,7 +427,7 @@
           decls))
 ;;; just like DOLIST, but with one-dimensional arrays
 (defmacro dovector ((elt vector &optional result) &body body)
-  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (with-unique-names (index length vec)
       `(let ((,vec ,vector))
         (declare (type vector ,vec))
@@ -445,7 +445,7 @@
 ;;; Iterate over the entries in a HASH-TABLE, first obtaining the lock
 ;;; if the table is a synchronized table.
 (defmacro dohash (((key-var value-var) table &key result locked) &body body)
-  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (with-unique-names (gen n-more n-table)
       (let ((iter-form `(with-hash-table-iterator (,gen ,n-table)
                          (loop
@@ -489,7 +489,7 @@
 (def!macro binding* ((&rest clauses) &body body)
   (unless clauses ; wrap in LET to preserve non-toplevelness
     (return-from binding* `(let () ,@body)))
-  (multiple-value-bind (body decls) (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (body decls) (parse-body body nil)
     ;; Generate an abstract representation that combines LET* clauses.
     (let (repr)
       (dolist (clause clauses)
@@ -812,7 +812,7 @@
                                         memoizer-supplied-p)
                               &allow-other-keys)
                         args &body body-decls-doc)
-  (binding* (((forms decls doc) (parse-body body-decls-doc))
+  (binding* (((forms decls doc) (parse-body body-decls-doc t))
              ((inputs aux-vars)
               (let ((aux (member '&aux args)))
                 (if aux
@@ -1700,8 +1700,7 @@ to :INTERPRET, an interpreter will be used.")
 (defmacro with-simple-output-to-string
     ((var &optional string)
      &body body)
-  (multiple-value-bind (forms decls)
-      (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (if string
         `(let ((,var (sb!impl::make-fill-pointer-output-stream ,string)))
            ,@decls

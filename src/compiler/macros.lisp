@@ -95,7 +95,7 @@
   ;; except that it needs a "silently do nothing" mode, which may or may not
   ;; be a generally exposed feature.
   (binding*
-      (((forms decls) (parse-body body))
+      (((forms decls) (parse-body body nil))
        ((llks req opt rest keys aux env whole)
         (parse-lambda-list
          lambda-list
@@ -422,7 +422,7 @@
   (declare (type (member nil :slightly t) important))
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
-  (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
+  (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
     (let ((n-node (or node (make-symbol "NODE")))
           (n-decls (sb!xc:gensym))
           (n-lambda (sb!xc:gensym)))
@@ -541,7 +541,7 @@
                     what
                     (symbolicate (function-name (first what))
                                  "-" (second what) "-OPTIMIZER"))))
-             ((forms decls) (parse-body body :doc-string-allowed nil))
+             ((forms decls) (parse-body body nil))
              ((var-decls more-decls) (extract-var-decls decls vars))
              ;; In case the BODY declares IGNORE of the formal NODE var,
              ;; we rebind it from N-NODE and never reference it from BINDS.

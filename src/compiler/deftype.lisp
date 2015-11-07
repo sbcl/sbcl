@@ -33,7 +33,7 @@
     (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
               form))
   (multiple-value-bind (expander-form doc source-location-form)
-      (multiple-value-bind (forms decls doc) (parse-body body)
+      (multiple-value-bind (forms decls doc) (parse-body body t)
         ;; FIXME: We could use CONSTANTP here to deal with slightly more
         ;; complex deftypes using CONSTANT-TYPE-EXPANDER, but that XC:CONSTANTP
         ;; is not availble early enough.

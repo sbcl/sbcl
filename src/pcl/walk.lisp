@@ -780,7 +780,7 @@
           (bindings (cadr form))
           (body (cddr form)))
       (multiple-value-bind (names inits) (let*-bindings bindings)
-        (multiple-value-bind (newbody decls doc) (parse-body body :doc-string-allowed nil)
+        (multiple-value-bind (newbody decls doc) (parse-body body nil)
           (declare (ignore newbody))
           (aver (null doc))
           (labels ((maybe-process-and-munge-declaration (name declaration env)

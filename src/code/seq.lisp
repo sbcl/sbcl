@@ -84,8 +84,7 @@
               (or null function))))
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
-  (multiple-value-bind (body declarations docstring)
-      (parse-body body :doc-string-allowed t)
+  (multiple-value-bind (body declarations docstring) (parse-body body t)
     (collect ((new-args)
               (new-declarations)
               ;; Things which are definitely used in any code path.
@@ -837,7 +836,7 @@ many elements are copied."
   #!+sb-doc
   "Executes BODY with ELEMENT subsequently bound to each element of
   SEQUENCE, then returns RETURN."
-  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (once-only ((sequence sequence))
       (with-unique-names (state limit from-end step endp elt)
         `(block nil

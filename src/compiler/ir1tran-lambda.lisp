@@ -945,7 +945,7 @@
     (setf debug-name (name-lambdalike form)))
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
-    (multiple-value-bind (forms decls doc) (parse-body (cddr form))
+    (multiple-value-bind (forms decls doc) (parse-body (cddr form) t)
       (binding* (((*lexenv* result-type post-binding-lexenv lambda-list)
                   (process-decls decls (append aux-vars vars) nil
                                  :binding-form-p t :allow-lambda-list t))

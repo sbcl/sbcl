@@ -98,8 +98,7 @@
                          (t (illegal-varlist)))))
                 (t (illegal-varlist)))))
       ;; Construct the new form.
-      (multiple-value-bind (code decls)
-          (parse-body decls-and-code :doc-string-allowed nil)
+      (multiple-value-bind (code decls) (parse-body decls-and-code nil)
         `(block ,block
            (,bind ,(nreverse r-inits)
                   ,@decls

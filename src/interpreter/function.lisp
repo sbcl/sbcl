@@ -56,9 +56,6 @@
   (cookie      nil) ; nonce for memoization of macros
   (%frame      nil))
 
-(defun unparse-decls (list)
-  (mapcar (lambda (x) `(declare ,@x)) list))
-
 (defun fun-forms (fun)
   (proto-fn-forms (interpreted-function-proto-fn fun)))
 
@@ -66,11 +63,10 @@
   (let* ((proto-fn (interpreted-function-proto-fn fun))
          (name (proto-fn-name proto-fn))
          (named-p (neq name 0)))
-    (values (cons (if named-p 'named-lambda 'lambda)
-                  (nconc (if named-p (list name))
-                         (list (proto-fn-lambda-list proto-fn))
-                         (unparse-decls (proto-fn-decls proto-fn))
-                         (proto-fn-forms proto-fn)))
+    (values (append (if named-p (list 'named-lambda name) '(lambda))
+                    (list (proto-fn-lambda-list proto-fn))
+                    (proto-fn-decls proto-fn)
+                    (proto-fn-forms proto-fn))
             ;; CLHS permits returning T as the safe default,
             ;; but we can return a better value. No function's env is NIL,
             ;; because it needs to capture a policy. If the only elements

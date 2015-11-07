@@ -689,7 +689,7 @@
 ;;; of the complicated ...
 
 (defun digest-locally (env body)
-  (multiple-value-bind (forms decls) (iparse-body body)
+  (multiple-value-bind (forms decls) (parse-body body nil t)
     (if (not decls)
         (digest-progn forms)
         (let* ((specials (free-specials env decls))
@@ -705,7 +705,7 @@
 
 (defspecial locally (&body body)
   :immediate (env)
-  (multiple-value-bind (forms decls) (iparse-body body)
+  (multiple-value-bind (forms decls) (parse-body body nil t)
     (let* ((specials (free-specials env decls))
            (scope (process-typedecls
                    (make-decl-scope decls (new-policy env decls))
@@ -715,7 +715,7 @@
   :deferred (env) (digest-locally env body))
 
 (defun parse-symbol-macrolet (env bindings body wrap-fn)
-  (multiple-value-bind (forms decls) (iparse-body body)
+  (multiple-value-bind (forms decls) (parse-body body nil t)
     (binding* (((specials n-specials) (declared-specials decls))
                (n-macros (length bindings))
                (symbols (make-array (+ n-macros n-specials)))
@@ -758,7 +758,7 @@
             (dispatch (symbol-macro-body scope) (new-env)))))))
 
 (defun parse-let (maker env bindings body specials-listifier)
-  (multiple-value-bind (forms decls) (iparse-body body)
+  (multiple-value-bind (forms decls) (parse-body body nil t)
     (binding* (((declared-specials n-declared) (declared-specials decls))
                (n-bindings 0)
                (n-free-specials
@@ -914,7 +914,7 @@
 ;;; MACROLET has an immediate-mode handler since it is common at toplevel.
 (defspecial macrolet (defs &body body)
   :immediate (env)
-  (multiple-value-bind (forms decls) (iparse-body body)
+  (multiple-value-bind (forms decls) (parse-body body nil t)
     (let* ((specials (free-specials env decls))
            (scope (process-typedecls
                    (make-decl-scope decls (new-policy env decls))
@@ -927,7 +927,7 @@
   :deferred (env)
   (if (not defs)
       (digest-locally env body)
-      (multiple-value-bind (forms decls) (iparse-body body)
+      (multiple-value-bind (forms decls) (parse-body body nil t)
         (let ((scope (make-local-fn-scope decls (eval-local-macros env defs)
                                           forms env)))
           (hlambda MACROLET (scope) (env)
@@ -944,7 +944,7 @@
 (defun digest-local-fns (env kind bindings body) ; KIND is FLET or LABELS
   (flet ((proto-functionize (def)
            (with-subforms (name lambda-list &body body) def
-             (multiple-value-bind (forms decls docstring) (iparse-body body t)
+             (multiple-value-bind (forms decls docstring) (parse-body body t t)
                ;; *** Test LEGAL-FUN-NAME-P before asking for an info-value.
                ;; This is because (INFO :FUNCTION :KIND) uses FBOUNDP when it
                ;; does not have an entry for NAME. But calling FBOUNDP
@@ -986,7 +986,7 @@
                                    forms)))
                    (%make-proto-fn `(,kind ,name) lambda-list decls forms
                                    docstring)))))))
-    (multiple-value-bind (forms decls) (iparse-body body)
+    (multiple-value-bind (forms decls) (parse-body body nil t)
       (make-local-fn-scope decls (map 'vector #'proto-functionize bindings)
                            forms env))))
 

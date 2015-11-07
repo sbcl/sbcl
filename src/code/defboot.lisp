@@ -134,8 +134,7 @@ evaluated as a PROGN."
 ;;;; various sequencing constructs
 
 (flet ((prog-expansion-from-let (varlist body-decls let)
-         (multiple-value-bind (body decls)
-             (parse-body body-decls :doc-string-allowed nil)
+         (multiple-value-bind (body decls) (parse-body body-decls nil)
            `(block nil
               (,let ,varlist
                 ,@decls
@@ -182,7 +181,7 @@ evaluated as a PROGN."
   #+sb-xc-host
   (unless (symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
-  (multiple-value-bind (forms decls doc) (parse-body body)
+  (multiple-value-bind (forms decls doc) (parse-body body t)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
            (lambda-guts `(,args
                           ,@(when doc (list doc))
@@ -402,7 +401,7 @@ evaluated as a PROGN."
   ;; environment. We spuriously reference the gratuitous variable,
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
-  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (let* ((n-list (gensym "N-LIST"))
            (start (gensym "START")))
       (multiple-value-bind (clist members clist-ok)

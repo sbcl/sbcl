@@ -199,8 +199,7 @@
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
-    (multiple-value-bind (body decls)
-        (parse-body (cdr args) :doc-string-allowed nil)
+    (multiple-value-bind (body decls) (parse-body (cdr args) nil)
       (declare (ignore body))
       (let* ((orig-lexenv *lexenv*)
              (*lexenv* (make-lexenv)))

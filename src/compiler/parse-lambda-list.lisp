@@ -1064,8 +1064,7 @@
           ((:environment envp) t) (wrap-block name))
   (declare (type (member t nil :ignore) envp))
   (declare (type (member nil :external :internal) doc-string-allowed))
-  (binding* (((forms decls docstring)
-              (parse-body body :doc-string-allowed doc-string-allowed))
+  (binding* (((forms decls docstring) (parse-body body doc-string-allowed))
              ;; Parse the lambda list, but not recursively.
              ((llks req opt rest keys aux env whole)
               (parse-lambda-list

@@ -269,7 +269,7 @@
        (type-name ll method-group-specifiers args-option gf-var body)
   (declare (ignore type-name))
   (multiple-value-bind (real-body declarations documentation)
-      (parse-body body)
+      (parse-body body t)
     (let ((wrapped-body
             (wrap-method-group-specifier-bindings method-group-specifiers
                                                   declarations

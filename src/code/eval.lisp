@@ -74,8 +74,7 @@
         (return (simple-eval-in-lexenv (first i) lexenv)))))
 
 (defun simple-eval-locally (exp lexenv &key vars)
-  (multiple-value-bind (body decls)
-      (parse-body (rest exp) :doc-string-allowed nil)
+  (multiple-value-bind (body decls) (parse-body (rest exp) nil)
     (let ((lexenv
            ;; KLUDGE: Uh, yeah.  I'm not anticipating
            ;; winning any prizes for this code, which was
