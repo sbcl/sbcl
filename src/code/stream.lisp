@@ -59,6 +59,21 @@
 
 ;;; stream manipulation functions
 
+;;; SYNONYM-STREAM type is needed by ANSI-STREAM-{INPUT,OUTPUT}-STREAM-P
+(defstruct (synonym-stream (:include ansi-stream
+                                     (in #'synonym-in)
+                                     (bin #'synonym-bin)
+                                     (n-bin #'synonym-n-bin)
+                                     (out #'synonym-out)
+                                     (bout #'synonym-bout)
+                                     (sout #'synonym-sout)
+                                     (misc #'synonym-misc))
+                           (:constructor make-synonym-stream (symbol))
+                           (:copier nil))
+  ;; This is the symbol, the value of which is the stream we are synonym to.
+  (symbol nil :type symbol :read-only t))
+(declaim (freeze-type synonym-stream))
+
 (defun ansi-stream-input-stream-p (stream)
   (declare (type ansi-stream stream))
   (if (synonym-stream-p stream)
@@ -71,6 +86,7 @@
            (or (not (eq (ansi-stream-in stream) #'ill-in))
                (not (eq (ansi-stream-bin stream) #'ill-bin))))))
 
+;;; Temporary definition that gets overwritten by pcl/gray-streams
 (defun input-stream-p (stream)
   (declare (type stream stream))
   (and (ansi-stream-p stream)
@@ -84,9 +100,9 @@
            (or (not (eq (ansi-stream-out stream) #'ill-out))
                (not (eq (ansi-stream-bout stream) #'ill-bout))))))
 
+;;; Temporary definition that gets overwritten by pcl/gray-streams
 (defun output-stream-p (stream)
   (declare (type stream stream))
-
   (and (ansi-stream-p stream)
        (ansi-stream-output-stream-p stream)))
 
@@ -820,21 +836,6 @@
                      (stream-misc-dispatch stream operation arg1 arg2)))))))))
 
 ;;;; synonym streams
-
-(defstruct (synonym-stream (:include ansi-stream
-                                     (in #'synonym-in)
-                                     (bin #'synonym-bin)
-                                     (n-bin #'synonym-n-bin)
-                                     (out #'synonym-out)
-                                     (bout #'synonym-bout)
-                                     (sout #'synonym-sout)
-                                     (misc #'synonym-misc))
-                           (:constructor make-synonym-stream (symbol))
-                           (:copier nil))
-  ;; This is the symbol, the value of which is the stream we are synonym to.
-  (symbol nil :type symbol :read-only t))
-
-(declaim (freeze-type synonym-stream))
 
 (def!method print-object ((x synonym-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
