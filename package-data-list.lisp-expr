@@ -25,6 +25,24 @@
 ;;;; (which prevents spurious conflicts in CVS) each longish list should
 ;;;; have only one string on the first line. Silly, but there you go.
 
+;;;; NOTE:
+;;;; It is generally not necessary to use reader conditionals
+;;;; within this file. If A-NICE-FUNCTION is external in SB-KERNEL
+;;;; but not defined for a particular backend, it will not get
+;;;; interned during cold load, and hence will not exist in the target.
+;;;; This is exactly as desired - it is not necessary for the writer
+;;;; of architecture-specific code to clutter up the list of package
+;;;; definitions to avoid exporting some stuff. You just export what you
+;;;; need, and genesis will do the right thing. Most of the pre-existing
+;;;; conditionals are historical baggage, and should be removed.
+;;;; EXCEPTION: packages whose symbols are created mainly during
+;;;; warm load might have a reason to use reader conditionals.
+;;;; For those packages, all symbols listed here are interned during
+;;;; genesis, since otherwise the symbols would all disappear,
+;;;; and then warm load would intern them as internals, not externals.
+;;;; This list of exceptional packages can be found in the
+;;;; definition of the FINISH-SYMBOLS function.
+
 (#s(sb-cold:package-data
     :name "SB!ALIEN"
     :doc "public: the ALIEN foreign function interface (If you're
