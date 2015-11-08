@@ -317,8 +317,8 @@
     (:temporary (:sc any-reg) tls-index bsp)
     (:generator 0
       (load-binding-stack-pointer bsp)
-      (loadw tls-index bsp (- binding-symbol-slot binding-size))
-      (loadw value bsp (- binding-value-slot binding-size))
+      (inst ldp value tls-index (@ bsp (* (- binding-value-slot binding-size)
+                                          n-word-bytes)))
       (inst str value (@ thread-tn tls-index))
 
       ;; The order of stores here is reversed with respect to interrupt safety,
@@ -366,27 +366,27 @@
     (:temporary (:scs (descriptor-reg)) value-temp)
     (:temporary (:scs (any-reg)) bsp-temp)
     (:generator 5
-                (loadw value-temp symbol symbol-value-slot other-pointer-lowtag)
-                (load-symbol-value bsp-temp *binding-stack-pointer*)
-                (inst add bsp-temp bsp-temp (* binding-size n-word-bytes))
-                (store-symbol-value bsp-temp *binding-stack-pointer*)
-                (inst stp value-temp symbol (@ bsp-temp (* (- binding-value-slot binding-size) n-word-bytes)))
-                (storew val symbol symbol-value-slot other-pointer-lowtag)))
+      (loadw value-temp symbol symbol-value-slot other-pointer-lowtag)
+      (load-symbol-value bsp-temp *binding-stack-pointer*)
+      (inst add bsp-temp bsp-temp (* binding-size n-word-bytes))
+      (store-symbol-value bsp-temp *binding-stack-pointer*)
+      (inst stp value-temp symbol (@ bsp-temp (* (- binding-value-slot binding-size) n-word-bytes)))
+      (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
  (define-vop (unbind)
    (:temporary (:scs (descriptor-reg)) symbol value)
    (:temporary (:scs (any-reg)) bsp-temp)
    (:generator 0
-               (load-symbol-value bsp-temp *binding-stack-pointer*)
-               (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
-               (loadw value bsp-temp (- binding-value-slot binding-size))
-               (storew value symbol symbol-value-slot other-pointer-lowtag)
-               ;; The order of stores here is reversed with respect to interrupt safety,
-               ;; but STP cannot be interrupted in the middle.
-               (inst stp zr-tn zr-tn (@ bsp-temp (* (- binding-value-slot binding-size)
-                                                    n-word-bytes)
-                                                 :pre-index))
-               (store-symbol-value bsp-temp *binding-stack-pointer*))))
+     (load-symbol-value bsp-temp *binding-stack-pointer*)
+     (inst ldp value symbol (@ bsp (* (- binding-value-slot binding-size)
+                                     n-word-bytes)))
+     (storew value symbol symbol-value-slot other-pointer-lowtag)
+     ;; The order of stores here is reversed with respect to interrupt safety,
+     ;; but STP cannot be interrupted in the middle.
+     (inst stp zr-tn zr-tn (@ bsp-temp (* (- binding-value-slot binding-size)
+                                          n-word-bytes)
+                                       :pre-index))
+     (store-symbol-value bsp-temp *binding-stack-pointer*))))
 
 ;;;; Closure indexing.
 
