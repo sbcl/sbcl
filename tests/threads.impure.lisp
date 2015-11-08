@@ -190,6 +190,10 @@
                  (multiple-value-list
                   (join-thread (make-thread (lambda () (values 1 2 3))))))))
 
+;; Used to signal a SIMPLE-ERROR about a recursive lock attempt.
+(with-test (:name (join-thread :self-join))
+  (assert-error (join-thread *current-thread*) join-thread-error))
+
 ;;; We had appalling scaling properties for a while.  Make sure they
 ;;; don't reappear.
 (defun scaling-test (function &optional (nthreads 5))

@@ -12,6 +12,8 @@ changes relative to sbcl-1.3.0:
     of type SB-EXT:WORD
   * enhancement: the interleaved structure slot optimization from
     release 1.2.6 has been ported to 32-bit x86, Sparc, PowerPC, ARM64.
+  * enhancement: SB-THREAD:JOIN-THREAD signals a proper error when an attempt
+    is made to join the current thread
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
   * bug fix: structure constructor type checking is better. (lp#1508735)
   * bug fix: supplied-p variables for unused optional or keyword variables no

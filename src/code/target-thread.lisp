@@ -130,6 +130,10 @@ offending thread using THREAD-ERROR-THREAD."))
                (:timeout
                 (format s "Joining thread timed out: thread ~A ~
                            did not exit in time."
+                        (thread-error-thread c)))
+               (:self-join
+                (format s "In thread ~A, attempt to join the current ~
+                           thread."
                         (thread-error-thread c))))))
   #!+sb-doc
   (:documentation
@@ -1590,15 +1594,18 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   "Suspend current thread until THREAD exits. Return the result values
 of the thread function.
 
-If the thread does not exit within TIMEOUT seconds and DEFAULT is
+If THREAD does not exit within TIMEOUT seconds and DEFAULT is
 supplied, return two values: 1) DEFAULT 2) :TIMEOUT. If DEFAULT is not
-supplied, signal a JOIN-THREAD-ERROR with JOIN-THREAD-ERROR-PROBLEM
-equal to :TIMEOUT.
+supplied, signal a JOIN-THREAD-ERROR with JOIN-THREAD-PROBLEM equal
+to :TIMEOUT.
 
-If the thread did not exit normally (i.e. aborted) and DEFAULT is
+If THREAD did not exit normally (i.e. aborted) and DEFAULT is
 supplied, return two values: 1) DEFAULT 2) :ABORT. If DEFAULT is not
-supplied, signal a JOIN-THREAD-THREAD-ERROR with problem equal
+supplied, signal a JOIN-THREAD-ERROR with JOIN-THREAD-PROBLEM equal
 to :ABORT.
+
+If THREAD is the current thread, signal a JOIN-THREAD-ERROR with
+JOIN-THREAD-PROBLEM equal to :SELF-JOIN.
 
 Trying to join the main thread will cause JOIN-THREAD to block until
 TIMEOUT occurs or the process exits: when main thread exits, the
@@ -1606,6 +1613,9 @@ entire process exits.
 
 NOTE: Return convention in case of a timeout is experimental and
 subject to change."
+  (when (eq thread *current-thread*)
+    (error 'join-thread-error :thread thread :problem :self-join))
+
   (let ((lock (thread-result-lock thread))
         (got-it nil)
         (problem :timeout))
