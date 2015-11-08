@@ -10,6 +10,7 @@ changes relative to sbcl-1.3.0:
   * enhancement: SB-EXT:DYNAMIC-SPACE-SIZE is now defined for cheneygc.
   * enhancement: x86-64 platforms support SB-EXT:CAS on structure slots
     of type SB-EXT:WORD
+  * enhancement: interleaved raw/tagged slots are supported on 32-bit x86.
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
   * bug fix: structure constructor type checking is better. (lp#1508735)
   * bug fix: supplied-p variables for unused optional or keyword variables no

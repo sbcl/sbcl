@@ -102,33 +102,34 @@
 
 ;; for testing the comparator
 (defstruct foo1
-  (df 1d0 :type double-float) ; index 1
-  (a 'aaay) ; index 2
-  (sf 1f0 :type single-float) ; index 3
-  (cdf #c(1d0 1d0) :type (complex double-float)) ; indices 4 and 5
-  (b 'bee) ; index 6
-  (csf #c(2f0 2f0) :type (complex single-float)) ; index 7
-  (w 0 :type sb-ext:word) ; index 8
-  (c 'cee)) ; index 9
+  ;;                                  INDICES:    32-bit  64-bit
+  ;;                                  ========   =======  ======
+  (df 1d0 :type double-float)                    ;   1,2       1
+  (a 'aaay)                                      ;     3       2
+  (sf 1f0 :type single-float)                    ;     4       3
+  (cdf #c(1d0 1d0) :type (complex double-float)) ;  5..8     4,5
+  (b 'bee)                                       ;     9       6
+  (csf #c(2f0 2f0) :type (complex single-float)) ; 10,11       7
+  (w 0 :type sb-ext:word)                        ;    12       8
+  (c 'cee))                                      ;    13       9
 
 (defvar *afoo* (make-foo1))
 (with-test (:name :tagged-slot-iterator-macro)
-  (setf (sb-kernel:%instance-ref *afoo* 10) 'magic)
+  ;; on 32-bit, slots 1 through 14 exist, keeping the total length even.
+  #-64-bit (setf (sb-kernel:%instance-ref *afoo* 14) 'magic)
+  ;; on 64-bit, slots 1 through 10 exist, keeping the total length even.
+  #+64-bit (setf (sb-kernel:%instance-ref *afoo* 10) 'magic)
   (let (l)
-    (push `(0 ,(sb-kernel:%instance-layout *afoo*)) l)
     (sb-kernel:do-instance-tagged-slot (i *afoo*)
       (push `(,i ,(sb-kernel:%instance-ref *afoo* i)) l))
     (assert (oddp (sb-kernel:%instance-length *afoo*)))
     (assert (= (sb-kernel:layout-length (sb-kernel:layout-of *afoo*))
                (1- (sb-kernel:%instance-length *afoo*))))
     (assert (equalp (nreverse l)
-                    `((0 ,(sb-kernel:find-layout 'foo1))
-                      (2 aaay)
-                      (6 bee)
-                      (9 cee)
-                      ;; slots 1 through 10 exist, to keep total
-                      ;; object length EVEN.
-                      (10 magic))))))
+                    #-64-bit
+                    `((3 aaay) (9 bee) (13 cee) (14 magic))
+                    #+64-bit
+                    `((2 aaay) (6 bee) (9 cee) (10 magic))))))
 
 (defvar *anotherfoo* (make-foo1))
 
