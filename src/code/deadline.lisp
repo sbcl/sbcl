@@ -64,6 +64,7 @@ Experimental."
 (defun decode-internal-time (time)
   #!+sb-doc
   "Returns internal time value TIME decoded into seconds and microseconds."
+  (declare (type sb!kernel:internal-time time))
   (multiple-value-bind (sec frac)
       (truncate time sb!xc:internal-time-units-per-second)
     (values sec (* frac sb!unix::micro-seconds-per-internal-time-unit))))
@@ -123,17 +124,22 @@ CONDITION, or return NIL if the restart is not found."
 (declaim (inline relative-decoded-times))
 (defun relative-decoded-times (abs-sec abs-usec)
   #!+sb-doc
-  "Returns relative decoded times: difference between SEC and USEC and
-current real time."
-  (multiple-value-bind (now-sec now-usec)
-      (decode-internal-time (get-internal-real-time))
-    (let ((rel-sec (- abs-sec now-sec)))
-      (cond ((> now-usec abs-usec)
-             (values (max 0 (1- rel-sec))
-                     (- (+ abs-usec 1000000) now-usec)))
-            (t
-             (values (max 0 rel-sec)
-                     (- abs-usec now-usec)))))))
+"Returns relative decoded time as two values: difference between
+ABS-SEC and ABS-USEC and current real time.
+
+If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
+  (declare (type sb!kernel:internal-seconds abs-sec)
+           (type (mod 1000000) abs-usec))
+  (binding* (((now-sec now-usec)
+              (decode-internal-time (get-internal-real-time)))
+             (rel-sec (- abs-sec now-sec))
+             (rel-usec (- abs-usec now-usec)))
+    (when (minusp rel-usec)
+      (decf rel-sec)
+      (incf rel-usec 1000000))
+    (if (minusp rel-sec)
+        (values 0 0)
+        (values rel-sec rel-usec))))
 
 ;;; Returns TIMEOUT-SEC, TIMEOUT-USEC, DEADLINE-SEC, DEADLINE-USEC, SIGNALP
 ;;;
