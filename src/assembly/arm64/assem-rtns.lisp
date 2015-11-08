@@ -179,7 +179,7 @@
     ((:arg block (any-reg descriptor-reg) r0-offset)
      (:arg start (any-reg descriptor-reg) r8-offset)
      (:arg count (any-reg descriptor-reg) nargs-offset)
-     (:temp ocfp non-descriptor-reg ocfp-offset)
+     (:temp ocfp any-reg ocfp-offset)
      (:temp lra descriptor-reg lexenv-offset)
      (:temp cur-uwp any-reg nl2-offset)
      (:temp lip interior-reg lr-offset))

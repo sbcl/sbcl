@@ -346,15 +346,14 @@
 ;;; thing this handles is allocation of the result temporaries.
 (define-vop (unknown-values-receiver)
   (:results
-   (start :scs (any-reg))
-   (count :scs (any-reg)))
-  (:temporary (:sc descriptor-reg :offset ocfp-offset
-                   :from :eval :to (:result 0))
+   (start :scs (any-reg) :from (:save 0))
+   (count :scs (any-reg) :from (:save 1)))
+  (:temporary (:sc any-reg :offset ocfp-offset
+               :from :eval :to :save)
               values-start)
   (:temporary (:sc any-reg :offset nargs-offset
-               :from :eval :to (:result 1))
-              nvals)
-  (:temporary (:scs (non-descriptor-reg)) temp))
+               :from :eval :to :save)
+              nvals))
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
@@ -879,7 +878,7 @@
                       :to :eval)
                  ,(if named 'name-pass 'lexenv))
 
-     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+     (:temporary (:scs (descriptor-reg) :to :eval)
                function)
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
@@ -888,12 +887,12 @@
          (mapcar #'(lambda (name offset)
                      `(:temporary (:sc descriptor-reg
                                    :offset ,offset
-                                   :to :eval)
+                                   :to :result)
                          ,name))
                  *register-arg-names* *register-arg-offsets*))
      ,@(when (eq return :fixed)
          '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
-           (:temporary (:sc non-descriptor-reg :from :eval :offset ocfp-offset) ocfp-temp)))
+           (:temporary (:sc any-reg :from :eval :offset ocfp-offset) ocfp-temp)))
 
      ,@(unless (eq return :tail)
          '((:temporary (:scs (non-descriptor-reg)) temp)
