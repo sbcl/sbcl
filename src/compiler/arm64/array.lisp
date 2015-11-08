@@ -21,7 +21,7 @@
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg) pa-flag ndescr temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag ndescr)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 5
@@ -31,7 +31,7 @@
                                lowtag-mask))
     (inst and ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip :temp temp)
+      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag :lip lip)
       ;; Now that we have the space allocated, compute the header
       ;; value.
       (inst lsl ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
@@ -47,7 +47,7 @@
   (:arg-types (:constant t) (:constant t))
   (:info type rank)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 4
@@ -60,7 +60,7 @@
                                      n-widetag-bits)
                                 type)))
       (pseudo-atomic (pa-flag)
-        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag :lip lip :temp temp)
+        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag :lip lip)
         (load-immediate-word pa-flag header-bits)
         (storew pa-flag header 0 other-pointer-lowtag)))
     (move result header)))
@@ -435,3 +435,36 @@
   (unsigned-reg) unsigned-num %vector-raw-bits)
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
+
+(define-vop (%compare-and-swap-svref word-index-cas)
+  (:note "inline array compare-and-swap")
+  (:policy :fast-safe)
+  (:variant vector-data-offset other-pointer-lowtag)
+  (:translate %compare-and-swap-svref)
+  (:arg-types simple-vector positive-fixnum * *))
+
+(define-vop (array-atomic-incf/word)
+  (:translate %array-atomic-incf/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg) :target offset)
+         (diff :scs (unsigned-reg)))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) offset)
+  (:temporary (:sc non-descriptor-reg) sum)
+  (:temporary (:sc interior-reg) lip)
+  (:generator 4
+    (inst lsl offset index (- word-shift n-fixnum-tag-bits))
+    (inst add offset offset (- (* vector-data-offset n-word-bytes)
+                               other-pointer-lowtag))
+    (inst add lip object offset)
+
+    (inst dsb)
+    LOOP
+    (inst ldxr result lip)
+    (inst add sum result diff)
+    (inst stlxr tmp-tn sum lip)
+    (inst cbnz tmp-tn LOOP)
+    (inst dmb)))

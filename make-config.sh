@@ -484,7 +484,7 @@ case "$sbcl_os" in
             x86 | x86-64)
 		printf ' :sb-futex :largefile' >> $ltf
 		;;
-            ppc)
+            ppc | arm64)
 		printf ' :sb-futex' >> $ltf
 		;;
         esac
@@ -740,7 +740,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :memory-barrier-vops' >> $ltf
+    printf ' :compare-and-swap-vops :memory-barrier-vops' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

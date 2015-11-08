@@ -1656,7 +1656,8 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
-        lose("Control stack exhausted");
+        lose("Control stack exhausted, fault: %p, PC: %p",
+             addr, *os_context_pc_addr(context));
     }
     else if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
             addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {

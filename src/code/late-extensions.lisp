@@ -113,12 +113,12 @@
            (invalid-place))
          (with-unique-names (array)
            `(let ((,array (the (simple-array word (*)) ,(car args))))
-              #!+(or x86 x86-64 ppc)
+              #!+compare-and-swap-vops
               (%array-atomic-incf/word
                ,array
                (%check-bound ,array (array-dimension ,array 0) ,(cadr args))
                ,(compute-delta))
-              #!-(or x86 x86-64 ppc)
+              #!-compare-and-swap-vops
               ,(with-unique-names (index old-value)
                 `(without-interrupts
                   (let* ((,index ,(cadr args))
@@ -156,14 +156,13 @@
            (when (dsd-read-only slotd)
              (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
                     name place))
-           #!+(or x86 x86-64 ppc)
+           #!+compare-and-swap-vops
            `(truly-the sb!vm:word
              (%raw-instance-atomic-incf/word
               (the ,(dd-name (car accessor-info)) ,@args)
               ,(dsd-index slotd)
               ,(compute-delta)))
-                 ;; No threads outside x86 and x86-64 for now, so this is easy...
-           #!-(or x86 x86-64 ppc)
+           #!-compare-and-swap-vops
            (with-unique-names (structure old-value)
              `(without-interrupts
                (let* ((,structure ,@args)
@@ -232,7 +231,7 @@ EXPERIMENTAL: Interface subject to change."
   (expand-atomic-frob 'atomic-decf place diff env))
 
 ;; Interpreter stubs for ATOMIC-INCF.
-#!+(or x86 x86-64 ppc)
+#!+compare-and-swap-vops
 (progn
   ;; argument types are declared in vm-fndb
   (defun %array-atomic-incf/word (array index diff)

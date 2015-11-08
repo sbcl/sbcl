@@ -4981,7 +4981,7 @@
     (give-up-ir1-transform "not a real transform"))
   (defun /report-lvar (x message)
     (declare (ignore x message))))
-
+
 (deftransform encode-universal-time
     ((second minute hour date month year &optional time-zone)
      ((constant-arg (mod 60)) (constant-arg (mod 60))
@@ -5013,3 +5013,18 @@
       (if (> seconds (expt 10 8))
           (give-up-ir1-transform)
           `(sb!unix:nanosleep ,seconds ,nano)))))
+
+;; On 64-bit architectures the TLS index is in the symbol header,
+;; !DEFINE-PRIMITIVE-OBJECT doesn't define an accessor for it.
+;; In the architectures where tls-index is an ordinary slot holding a tagged
+;; object, it represents the byte offset to an aligned object and looks
+;; in Lisp like a fixnum that is off by a factor of (EXPT 2 N-FIXNUM-TAG-BITS).
+;; We're reading with a raw SAP accessor, so must make it look equally "off".
+;; Also we don't get the defknown automatically.
+#!+(and 64-bit sb-thread)
+(defknown symbol-tls-index (t) fixnum (flushable))
+#!+(and 64-bit sb-thread)
+(define-source-transform symbol-tls-index (sym)
+  `(ash (sap-ref-32 (int-sap (get-lisp-obj-address (the symbol ,sym)))
+                    (- 4 sb!vm:other-pointer-lowtag))
+        (- sb!vm:n-fixnum-tag-bits)))

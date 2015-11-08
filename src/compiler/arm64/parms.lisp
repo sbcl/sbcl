@@ -128,11 +128,11 @@
 ;;;
 (defparameter *static-symbols*
   (append
+   #!-sb-thread
    '(*binding-stack-pointer*
      *pseudo-atomic-atomic*
-     *pseudo-atomic-interrupted*
-     *allocation-pointer*
-
+     *pseudo-atomic-interrupted*)
+   '(*allocation-pointer*
      ;; interrupt handling
 
 

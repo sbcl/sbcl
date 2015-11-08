@@ -155,7 +155,7 @@
                           (:temp tag descriptor-reg r2-offset))
   (declare (ignore start count))
 
-  (load-symbol-value catch *current-catch-block*)
+  (load-tl-symbol-value catch *current-catch-block*)
 
   LOOP
 
@@ -186,12 +186,12 @@
   (declare (ignore start count))
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst cbz block error))
-  (load-symbol-value cur-uwp *current-unwind-protect-block*)
+  (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw ocfp block unwind-block-current-uwp-slot)
   (inst cmp cur-uwp ocfp)
   (inst b :eq EQ)
   (loadw ocfp cur-uwp unwind-block-current-uwp-slot)
-  (store-symbol-value ocfp *current-unwind-protect-block*)
+  (store-tl-symbol-value ocfp *current-unwind-protect-block*)
   EQ
   (inst csel cur-uwp block cur-uwp :eq)
 

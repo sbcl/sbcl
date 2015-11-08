@@ -909,6 +909,13 @@
                        zr-tn)
            rm)))
 
+(define-instruction-macro add-sub (rd rm immediate)
+  `(let ((rd ,rd)
+         (rm ,rm)
+         (imm ,immediate))
+     (if (minusp imm)
+         (inst sub rd rm (add-sub-immediate (- imm)))
+         (inst add rd rm (add-sub-immediate imm)))))
 ;;;
 
 (def-emitter add-sub-carry
@@ -940,8 +947,6 @@
 (def-add-sub-carry adcs #b01)
 (def-add-sub-carry sbc #b10)
 (def-add-sub-carry sbcs #b11)
-
-
 
 ;;;
 
@@ -1897,7 +1902,7 @@
                               (tn-offset rt)))))
 
 (def-store-exclusive stxr 0 0 0 t)
-(def-store-exclusive stxlr 1 0 0 t)
+(def-store-exclusive stlxr 1 0 0 t)
 (def-store-exclusive stlr 1 0 1 nil)
 
 (defmacro def-load-exclusive (name o0 o1 o2 &rest printers)

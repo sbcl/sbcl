@@ -93,7 +93,7 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 
 #undef LISPOBJ_ASM_SUFFIX
 
-#elif defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64
+#elif (defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64) && !defined LISP_FEATURE_SB_THREAD
 static inline int
 get_pseudo_atomic_atomic(struct thread *thread)
 {
@@ -130,15 +130,11 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
 }
 
-#define set_alloc_pointer(value)                \
-    SetSymbolValue(ALLOCATION_POINTER, value, 0)
-#define get_alloc_pointer()                     \
-    SymbolValue(ALLOCATION_POINTER, 0)
-
 #elif defined(LISP_FEATURE_GENCGC)
 
 /* FIXME: Are these async signal safe? Compiler reordering? */
 
+#if !defined LISP_FEATURE_ARM && !defined LISP_FEATURE_ARM64
 #define set_alloc_pointer(value) \
     (dynamic_space_free_pointer = \
      ((lispobj *) \
@@ -146,6 +142,7 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 
 #define get_alloc_pointer()                                     \
     ((uword_t) dynamic_space_free_pointer & ~LOWTAG_MASK)
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define get_pseudo_atomic_atomic(thread) \
@@ -181,4 +178,10 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 
 #endif
 
+#if defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64
+#define set_alloc_pointer(value)                \
+    SetSymbolValue(ALLOCATION_POINTER, value, 0)
+#define get_alloc_pointer()                     \
+    SymbolValue(ALLOCATION_POINTER, 0)
+#endif
 #endif /* PSEUDO_ATOMIC_H */

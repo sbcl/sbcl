@@ -1803,13 +1803,12 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
                 (sap-ref-sap thread-sap (* sb!vm:n-word-bytes
                                            sb!vm::thread-next-slot)))))))
 
-  (defun %symbol-value-in-thread (symbol thread)
+(defun %symbol-value-in-thread (symbol thread)
     ;; Prevent the thread from dying completely while we look for the TLS
     ;; area...
     (with-all-threads-lock
       (if (thread-alive-p thread)
-          (let* ((offset (get-lisp-obj-address
-                          (sb!vm::symbol-tls-index symbol)))
+          (let* ((offset (get-lisp-obj-address (symbol-tls-index symbol)))
                  (obj (sap-ref-lispobj (%thread-sap thread) offset))
                  (tl-val (get-lisp-obj-address obj)))
             (cond ((zerop offset)
@@ -1827,8 +1826,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
       ;; area...
       (with-all-threads-lock
         (if (thread-alive-p thread)
-            (let ((offset (get-lisp-obj-address
-                           (sb!vm::symbol-tls-index symbol))))
+            (let ((offset (get-lisp-obj-address (symbol-tls-index symbol))))
               (cond ((zerop offset)
                      (values nil :no-tls-value))
                     (t

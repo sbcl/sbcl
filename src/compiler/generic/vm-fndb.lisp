@@ -185,10 +185,10 @@
   (complex double-float)
   (always-translatable))
 
-#!+(or x86 x86-64 ppc)
+#!+compare-and-swap-vops
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
     (always-translatable))
-#!+(or x86 x86-64 ppc)
+#!+compare-and-swap-vops
 (defknown %array-atomic-incf/word (t index sb!vm:word) sb!vm:word
   (always-translatable))
 

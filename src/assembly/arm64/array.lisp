@@ -24,29 +24,17 @@
 
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg nl3-offset)
-     (:temp temp non-descriptor-reg nl4-offset)
      (:temp lra-save non-descriptor-reg nl5-offset)
      (:temp vector descriptor-reg r8-offset)
      (:temp lr interior-reg lr-offset))
-  ;; Why :LINK NIL?
-  ;; Either LR or PC need to always point into the code object.
-  ;; Since this is a static assembly routine, PC is already not pointing there.
-  ;; But it's called using blx, so LR is still good.
-  ;; Normally PSEUDO-ATOMIC calls do_pending_interrupt using BLX too,
-  ;; which will make LR point here, now GC can collect the parent function away.
-  ;; But the call to do_pending_interrupt is at the end, and there's
-  ;; nothing more needed to be done by the routine, so
-  ;; do_pending_interrupt can return to the parent function directly.
-  ;; This still uses the normal :return-style, BX LR, since the call
-  ;; to do_pending_interrupt interrupt is conditional.
-  (pseudo-atomic (pa-flag :link nil)
+  (pseudo-atomic (pa-flag)
     (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
     (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag
-                                                   :lip nil ;; keep LR intact as per above
-                                                   :temp temp)
+                                                   :lip nil) ;; keep LR intact as per above
+
     (move lr lra-save)
     (inst lsr ndescr type n-fixnum-tag-bits)
     (storew ndescr vector 0 other-pointer-lowtag)
@@ -70,8 +58,7 @@
      (:res result descriptor-reg r0-offset)
 
      (:temp temp non-descriptor-reg nl0-offset))
-  ;; See why :LINK NIL is needed in ALLOCATE-VECTOR-ON-HEAP above.
-  (pseudo-atomic (temp :link nil)
+  (pseudo-atomic (temp)
     (inst lsr temp type n-fixnum-tag-bits)
     (inst lsl words words (- word-shift n-fixnum-tag-bits))
     (inst add words words (* (1+ vector-data-offset) n-word-bytes))

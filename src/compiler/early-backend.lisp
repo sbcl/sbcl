@@ -16,5 +16,5 @@
 #!+sb-thread
 (progn
   (defglobal sb!vm::*free-tls-index* 0)
-  #!-x86-64 ; on 64-bit, a single lisp word holds the index and lock flag
+  #!-64-bit ; on 64-bit, a single lisp word holds the index and lock flag
   (!defglobal sb!vm::*tls-index-lock* 0))

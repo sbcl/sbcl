@@ -23,6 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "monitor.h"
+#include "pseudo-atomic.h"
 
 void arch_init(void)
 {
@@ -64,7 +65,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
 #ifdef LISP_FEATURE_GENCGC
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
+    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
 #else
     return (!foreign_function_call_active)
         && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
@@ -73,12 +74,12 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, do_pending_interrupt, 0);
+    set_pseudo_atomic_interrupted(arch_os_get_current_thread());
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
+    clear_pseudo_atomic_interrupted(arch_os_get_current_thread());
 }
 
 unsigned int arch_install_breakpoint(void *pc)

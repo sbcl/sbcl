@@ -53,3 +53,29 @@
   (:info offset)
   (:generator 4
     (storew value object (+ base offset) lowtag)))
+;;;
+(define-vop (word-index-cas)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (old-value :scs (any-reg descriptor-reg))
+         (new-value :scs (any-reg descriptor-reg)))
+  (:arg-types * tagged-num * *)
+  (:temporary (:sc interior-reg) lip)
+  (:results (result :scs (any-reg descriptor-reg) :from :load))
+  (:result-types *)
+  (:variant-vars offset lowtag)
+  (:policy :fast-safe)
+  (:generator 5
+    (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+    (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))
+
+    (inst dsb)
+    LOOP
+    (inst ldxr result lip)
+    (inst cmp result old-value)
+    (inst b :ne EXIT)
+    (inst stlxr tmp-tn new-value lip)
+    (inst cbnz (32-bit-reg tmp-tn) LOOP)
+    EXIT
+    (inst clrex)
+    (inst dmb)))

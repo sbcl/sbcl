@@ -132,7 +132,7 @@ extern int dynamic_values_bytes;
 #  define tls_index_of(x) 0
 #  define per_thread_value(sym, thread) sym->value
 #else
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_64_BIT
 static inline int
 tls_index_of(struct symbol *symbol) // untagged pointer
 {

@@ -506,7 +506,7 @@
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
   (:temporary (:scs (descriptor-reg) :from :eval) temp)
   (:temporary (:scs (any-reg) :from :eval) dst)
-  (:temporary (:sc non-descriptor-reg) alloc-temp pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
@@ -531,7 +531,7 @@
         (allocation dst size list-pointer-lowtag
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p
-                    :lip lip :temp alloc-temp))
+                    :lip lip))
       (move result dst)
 
       (inst b ENTER)
@@ -967,7 +967,10 @@
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (assemble ()
+                      #!-sb-thread
                       (load-symbol-value tmp-tn sb!impl::*stepping*)
+                      #!+sb-thread
+                      (inst ldr tmp-tn (@ thread-tn thread-stepping-slot))
                       (inst cbz tmp-tn step-done-label)
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the
@@ -1208,7 +1211,10 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (load-symbol-value stepping sb!impl::*stepping*)
+    #!-sb-thread
+    (load-symbol-value tmp-tn sb!impl::*stepping*)
+    #!+sb-thread
+    (inst ldr stepping (@ thread-tn thread-stepping-slot))
     (inst cbz stepping DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.

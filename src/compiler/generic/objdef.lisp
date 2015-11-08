@@ -353,8 +353,8 @@
            :set-trans %set-symbol-package
            :init :null)
   ;; 0 tls-index means no tls-index is allocated
-  ;; x86-64 puts the tls-index in the header word.
-  #!+(and sb-thread (not x86-64))
+  ;; 64-bit put the tls-index in the header word.
+  #!+(and sb-thread (not 64-bit))
   (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
 
 (!define-primitive-object (complex-single-float
@@ -408,7 +408,7 @@
   ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
   ;; aligned displacement fitting in a signed byte.
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
-  #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits :special *pseudo-atomic-bits*)
+  #!+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
   ;; next two not used in C, but this wires the TLS offsets to small values
   #!+(and x86-64 sb-thread)
   (current-catch-block :special *current-catch-block*)

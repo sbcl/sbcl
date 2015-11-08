@@ -188,9 +188,6 @@
                                                  stack-allocate-p
                                                  (lip (if stack-allocate-p
                                                           nil
-                                                          (missing-arg)))
-                                                 (temp (if stack-allocate-p
-                                                          nil
                                                           (missing-arg))))
   ;; Normal allocation to the heap.
   (once-only ((result-tn result-tn)
@@ -198,8 +195,7 @@
               (lowtag lowtag)
               (flag-tn flag-tn)
               (stack-allocate-p stack-allocate-p)
-              (lip lip)
-              (temp temp))
+              (lip lip))
     `(cond (,stack-allocate-p
             (assemble ()
               (move ,result-tn csp-tn)
@@ -226,13 +222,23 @@
             (let ((alloc (gen-label))
                   (back-from-alloc (gen-label))
                   size)
-              (load-inline-constant ,temp '(:fixup "boxed_region" :foreign) ,lip)
-              (inst ldp ,result-tn ,flag-tn (@ ,temp))
+              #!-sb-thread
+              (progn
+                (load-inline-constant ,flag-tn '(:fixup "boxed_region" :foreign) ,lip)
+                (inst ldp ,result-tn ,flag-tn (@ ,flag-tn)))
+              #!+sb-thread
+              (inst ldp ,result-tn ,flag-tn (@ thread-tn
+                                               (* n-word-bytes thread-alloc-region-slot)))
               (setf size (add-sub-immediate ,size))
               (inst add ,result-tn ,result-tn size)
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
-              (storew ,result-tn ,temp)
+              #!-sb-thread
+              (progn
+                (load-inline-constant ,flag-tn '(:fixup "boxed_region" :foreign) ,lip)
+                (storew ,result-tn ,flag-tn))
+              #!+sb-thread
+              (storew ,result-tn thread-tn thread-alloc-region-slot)
 
               ;; alloc_tramp uses tmp-tn for returning the result,
               ;; save on a move when possible
@@ -255,8 +261,7 @@
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p
-                                                 (lip (missing-arg))
-                                                 (temp (missing-arg)))
+                                                 (lip (missing-arg)))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -266,14 +271,12 @@
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag)
               (stack-allocate-p stack-allocate-p)
-              (lip lip)
-              (temp temp))
+              (lip lip))
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
-                   :lip ,lip
-                   :temp ,temp)
+                   :lip ,lip)
        (when ,type-code
          (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
          (inst add ,flag-tn ,flag-tn ,type-code)
@@ -322,27 +325,36 @@
 
 
 ;;; handy macro for making sequences look atomic
-
-;;; With LINK being NIL this doesn't store the next PC in LR when
-;;; calling do_pending_interrupt.
-;;; This used by allocate-vector-on-heap, there's a comment explaining
-;;; why it needs that.
-(defmacro pseudo-atomic ((flag-tn &key (link t)) &body forms)
+(defmacro pseudo-atomic ((flag-tn) &body forms)
   `(progn
      (without-scheduling ()
-       (store-symbol-value csp-tn *pseudo-atomic-atomic*))
+       #!-sb-thread
+       (store-symbol-value csp-tn *pseudo-atomic-atomic*)
+       #!+sb-thread
+       (inst str (32-bit-reg null-tn)
+             (@ thread-tn
+                (* n-word-bytes thread-pseudo-atomic-bits-slot))))
      (assemble ()
        ,@forms)
      (without-scheduling ()
-       (store-symbol-value null-tn *pseudo-atomic-atomic*)
-       (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+       #!-sb-thread
+       (progn
+         (store-symbol-value null-tn *pseudo-atomic-atomic*)
+         (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*))
+       #!+sb-thread
+       (progn
+         (inst dmb)
+         (inst str (32-bit-reg zr-tn)
+               (@ thread-tn
+                  (* n-word-bytes thread-pseudo-atomic-bits-slot)))
+         (inst ldr (32-bit-reg ,flag-tn)
+               (@ thread-tn
+                  (+ (* n-word-bytes thread-pseudo-atomic-bits-slot) 4))))
        ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
        ;; do_pending_interrupt
        (let ((not-interrputed (gen-label)))
          (inst cbz ,flag-tn not-interrputed)
-         ,(if link
-              `(inst blr ,flag-tn)
-              `(inst br ,flag-tn))
+         (inst brk pending-interrupt-trap)
          (emit-label not-interrputed)))))
 
 ;;;; memory accessor vop generators
@@ -454,3 +466,35 @@ garbage collection.  This is currently implemented by disabling GC"
     (ecase size
       (:qword
        (inst load-from-label dst label lip)))))
+
+;;;
+
+(defmacro load-binding-stack-pointer (reg)
+  #!+sb-thread `(loadw ,reg thread-tn thread-binding-stack-pointer-slot)
+  #!-sb-thread `(load-symbol-value ,reg *binding-stack-pointer*))
+
+(defmacro store-binding-stack-pointer (reg)
+  #!+sb-thread `(storew ,reg thread-tn thread-binding-stack-pointer-slot)
+  #!-sb-thread `(store-symbol-value ,reg *binding-stack-pointer*))
+
+#!+sb-thread
+(defmacro tls-index-of (sym)
+  `(@ ,sym (- #!+little-endian 4 other-pointer-lowtag)))
+
+(defmacro load-tl-symbol-value (reg symbol)
+  #!+sb-thread
+  `(let ((reg ,reg))
+     (load-symbol tmp-tn ',symbol)
+     (inst ldr tmp-tn (tls-index-of tmp-tn))
+     (inst ldr reg (@ thread-tn tmp-tn)))
+  #!-sb-thread
+  `(load-symbol-value ,reg ,symbol))
+
+(defmacro store-tl-symbol-value (reg symbol)
+  #!+sb-thread
+  `(let ((reg ,reg))
+     (load-symbol tmp-tn ',symbol)
+     (inst ldr tmp-tn (tls-index-of tmp-tn))
+     (inst str reg (@ thread-tn tmp-tn)))
+  #!-sb-thread
+  `(store-symbol-value ,reg ,symbol))

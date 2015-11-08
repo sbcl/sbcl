@@ -160,7 +160,7 @@
   (:translate binding-stack-pointer-sap)
   (:policy :fast-safe)
   (:generator 1
-    (load-symbol-value int *binding-stack-pointer*)))
+    (load-binding-stack-pointer int)))
 
 (define-vop (control-stack-pointer-sap)
   (:results (int :scs (sap-reg)))
@@ -247,6 +247,36 @@
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0))
+
+;;;
+
+#!+sb-thread
+(progn
+  (defknown current-thread-offset-sap (word)
+      system-area-pointer (flushable))
+
+  (defun ldr-str-word-offset-encodable (x)
+    (ldr-str-offset-encodable (ash x word-shift)))
+
+  (define-vop (current-thread-offset-sap/c)
+    (:results (sap :scs (sap-reg)))
+    (:result-types system-area-pointer)
+    (:translate current-thread-offset-sap)
+    (:info n)
+    (:arg-types (:constant (satisfies ldr-str-offset-encodable)))
+    (:policy :fast-safe)
+    (:generator 1
+                (inst ldr sap (@ thread-tn (ash n word-shift)))))
+
+  (define-vop (current-thread-offset-sap)
+    (:results (sap :scs (sap-reg)))
+    (:result-types system-area-pointer)
+    (:translate current-thread-offset-sap)
+    (:args (n :scs (unsigned-reg) :target sap))
+    (:arg-types unsigned-num)
+    (:policy :fast-safe)
+    (:generator 2
+                (inst ldr sap (@ thread-tn (extend n :lsl word-shift))))))
 
 ;;; Barriers
 (define-vop (%compiler-barrier)

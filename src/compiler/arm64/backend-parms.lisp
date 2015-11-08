@@ -4,7 +4,7 @@
 
 (setf *backend-byte-order*
       #!+little-endian :little-endian
-      #!-little-endian :big-endian)
+      #!+big-endian :big-endian)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Minumum observed value, not authoritative.
@@ -22,3 +22,11 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (def!constant gencgc-release-granularity *backend-page-bytes*)
+
+;;; null-tn will be used for setting it, just check the lowtag
+#!+sb-thread
+(def!constant pseudo-atomic-flag
+    (ash list-pointer-lowtag #!+little-endian 0 #!+big-endian 32))
+#!+sb-thread
+(def!constant pseudo-atomic-interrupted-flag
+    (ash list-pointer-lowtag #!+little-endian 32 #!+big-endian 0))

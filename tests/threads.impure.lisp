@@ -911,7 +911,7 @@
         (fool1 (cons 1 2))
         (fool2 (cons 2 3)))
     (progv (list mysym) '(nil)
-      (let* ((i (get-lisp-obj-address (sb-vm:symbol-tls-index mysym)))
+      (let* ((i (get-lisp-obj-address (sb-kernel:symbol-tls-index mysym)))
              (j (+ i sb-vm:n-word-bytes)))
         (assert (eql (sap-ref-word (current-thread-sap) j)
                      sb-vm:no-tls-value-marker-widetag))

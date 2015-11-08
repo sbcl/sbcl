@@ -551,14 +551,3 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
    (move b ebx)
    (move c ecx)
    (move d edx)))
-
-;; In the architectures where tls-index is an ordinary slot holding a tagged
-;; object, it represents the byte offset to an aligned object and looks
-;; in Lisp like a fixnum that is off by a factor of (EXPT 2 N-FIXNUM-TAG-BITS).
-;; We're reading with a raw SAP accessor, so must make it look equally "off".
-;; Also we don't get the defknown automatically.
-(defknown symbol-tls-index (t) fixnum (flushable))
-(define-source-transform symbol-tls-index (sym)
-  `(ash (sap-ref-32 (int-sap (get-lisp-obj-address (the symbol ,sym)))
-                    (- 4 other-pointer-lowtag))
-        (- n-fixnum-tag-bits)))

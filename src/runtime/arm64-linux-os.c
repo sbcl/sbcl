@@ -38,11 +38,16 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-#ifdef LISP_FEATURE_SB_THREAD
-#error "Define threading support functions"
-#else
+
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
+#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = thread;
+#else
+    pthread_setspecific(specials,thread);
+#endif
+#endif
     /* Signal handlers are normally run on the main stack, but we've
      * swapped stacks, require that the control stack contain only
      * boxed data, and expands upwards while the C stack expands
@@ -58,7 +63,6 @@ int arch_os_thread_init(struct thread *thread) {
 int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                   /* success */
 }
-#endif
 
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)

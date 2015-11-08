@@ -74,7 +74,7 @@
       null cfp nsp lr code)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #!-sb-thread r10 #!+sb-thread thread lexenv)
+      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #!-sb-thread r10 lexenv)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
@@ -255,7 +255,9 @@
   (defregtn zr any-reg)
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
-  (defregtn lr interior-reg))
+  (defregtn lr interior-reg)
+  #!+sb-thread
+  (defregtn thread interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.

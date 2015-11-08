@@ -826,12 +826,12 @@ core and return a descriptor to it."
   ;; This is a backend support routine, but the style within this file
   ;; is to conditionalize by the target features.
   (defun cold-assign-tls-index (symbol index)
-    #!+x86-64
+    #!+64-bit
     (let ((header-word
            (logior (ash index 32)
                    (descriptor-bits (read-memory symbol)))))
       (write-wordindexed symbol 0 (make-random-descriptor header-word)))
-    #!-x86-64
+    #!-64-bit
     (write-wordindexed symbol sb!vm:symbol-tls-index-slot
                        (make-random-descriptor index)))
 
@@ -840,9 +840,9 @@ core and return a descriptor to it."
   (defun ensure-symbol-tls-index (symbol)
     (let* ((cold-sym (cold-intern symbol))
            (tls-index
-            #!+x86-64
+            #!+64-bit
             (ldb (byte 32 32) (descriptor-bits (read-memory cold-sym)))
-            #!-x86-64
+            #!-64-bit
             (descriptor-bits
              (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot))))
       (unless (plusp tls-index)

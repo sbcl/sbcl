@@ -1215,7 +1215,8 @@ between the ~A definition and the ~A definition"
                                      (list (car inherits))
                                      '(t))))
         x
-      (declare (ignore codes state translation prototype-form))
+      (declare (ignore codes state translation prototype-form)
+               (notinline info (setf info)))
       (let ((inherits-list (if (eq name t)
                                ()
                                (cons t (reverse inherits))))

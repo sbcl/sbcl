@@ -44,7 +44,7 @@
                  (allocation res alloc list-pointer-lowtag
                              :flag-tn pa-flag
                              :stack-allocate-p (node-stack-allocate-p node)
-                             :lip lip :temp temp)
+                             :lip lip)
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (storew (maybe-load (tn-ref-tn things)) ptr
@@ -104,7 +104,7 @@
   (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
-    (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size :lip lip :temp temp)
+    (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size :lip lip)
       (load-inline-constant temp '(:fixup "undefined_tramp" :foreign) lip)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
@@ -113,7 +113,7 @@
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
-  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
@@ -124,7 +124,7 @@
                     fun-pointer-lowtag
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p
-                    :lip lip :temp temp)
+                    :lip lip)
         (load-immediate-word pa-flag
                              (logior
                               (ash (1- size) n-widetag-bits)
@@ -136,14 +136,14 @@
 ;;;
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg)))
-  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation (result pa-flag value-cell-header-widetag
                             value-cell-size :stack-allocate-p stack-allocate-p
-                            :lip lip :temp temp)
+                            :lip lip)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.
@@ -166,13 +166,13 @@
   (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 4
     (with-fixed-allocation (result pa-flag type words
                             :lowtag lowtag
                             :stack-allocate-p stack-allocate-p
-                            :lip lip :temp temp))))
+                            :lip lip))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -181,7 +181,7 @@
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (any-reg) :from :argument) bytes)
-  (:temporary (:sc non-descriptor-reg) pa-flag temp header)
+  (:temporary (:sc non-descriptor-reg) pa-flag header)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
@@ -196,5 +196,5 @@
     (inst and bytes bytes (bic-mask lowtag-mask))
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :flag-tn pa-flag :lip lip :temp temp)
+      (allocation result bytes lowtag :flag-tn pa-flag :lip lip)
       (storew header result 0 lowtag))))
