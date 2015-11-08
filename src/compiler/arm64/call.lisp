@@ -970,7 +970,7 @@
                       #!-sb-thread
                       (load-symbol-value tmp-tn sb!impl::*stepping*)
                       #!+sb-thread
-                      (inst ldr tmp-tn (@ thread-tn thread-stepping-slot))
+                      (loadw tmp-tn thread-tn thread-stepping-slot)
                       (inst cbz tmp-tn step-done-label)
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the
@@ -1207,15 +1207,14 @@
 ;;; Single-stepping
 
 (define-vop (step-instrument-before-vop)
-  (:temporary (:scs (descriptor-reg)) stepping)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     #!-sb-thread
     (load-symbol-value tmp-tn sb!impl::*stepping*)
     #!+sb-thread
-    (inst ldr stepping (@ thread-tn thread-stepping-slot))
-    (inst cbz stepping DONE)
+    (loadw tmp-tn thread-tn thread-stepping-slot)
+    (inst cbz tmp-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
     (note-this-location vop :step-before-vop)
