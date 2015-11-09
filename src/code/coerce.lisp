@@ -11,9 +11,10 @@
 
 (in-package "SB!IMPL")
 
-(macrolet ((def (name constructor access src-type)
+(macrolet ((def (name constructor access src-type &optional explicit-check)
              `(defun ,name (object type)
                 (declare (type ,src-type object))
+                ,@(when explicit-check `((declare (explicit-check))))
                 (do* ((index 0 (1+ index))
                       (length (length object))
                       (result ,constructor)
@@ -27,9 +28,9 @@
                            (vector '(aref in-object index))
                            (sequence '(elt in-object index))))))))
 
-  (def list-to-vector* (make-sequence type length) aref list)
+  (def list-to-vector* (make-sequence type length) aref list t)
 
-  (def vector-to-vector* (make-sequence type length) aref vector)
+  (def vector-to-vector* (make-sequence type length) aref vector t)
 
   (def sequence-to-vector* (make-sequence type length) aref sequence))
 
@@ -120,6 +121,7 @@
 (defun coerce (object output-type-spec)
   #!+sb-doc
   "Coerce the Object to an object of type Output-Type-Spec."
+  (declare (explicit-check))
   (flet ((coerce-error ()
            (error 'simple-type-error
                   :format-control "~S can't be converted to type ~S."

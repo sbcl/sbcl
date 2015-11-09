@@ -550,6 +550,7 @@
                                        wrapper prototype))))))
 
 (defun class-of (x)
+  (declare (explicit-check))
   (wrapper-class* (layout-of x)))
 
 (defun eval-form (form)

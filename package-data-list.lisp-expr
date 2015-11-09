@@ -962,6 +962,8 @@ possibly temporarily, because it might be used internally."
                "FP-ZERO-P"
                "NEG-FP-ZERO"
 
+               ;; Advice to the compiler that it doesn't need to assert types.
+               "EXPLICIT-CHECK"
                ;; Stack allocation without any questions asked
                "TRULY-DYNAMIC-EXTENT"
 

@@ -24,3 +24,5 @@
 ;;; SB!C::LAMBDA-LIST declarations can be ignored.
 ;;; Cross-compilation does not rely on introspection for anything.
 (declaim (declaration sb!c::lambda-list))
+
+(declaim (declaration explicit-check))

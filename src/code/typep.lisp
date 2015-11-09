@@ -17,6 +17,7 @@
   #!+sb-doc
   "Is OBJECT of type TYPE?"
   (declare (type lexenv-designator environment) (ignore environment))
+  (declare (explicit-check))
   ;; Actually interpreting types at runtime is done by %TYPEP. The
   ;; cost of the extra function call here should be negligible
   ;; compared to the cost of interpreting types. (And the compiler
@@ -29,6 +30,7 @@
 (defun %typep (object specifier)
   ;; Checking CTYPE-P on the specifier, as used to be done, is not right.
   ;; If the specifier were a CTYPE we shouldn't have gotten here.
+  (declare (explicit-check))
   (%%typep object (specifier-type specifier)))
 
 (defun %%typep (object type &optional (strict t))

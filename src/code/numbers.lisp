@@ -262,6 +262,7 @@
 (defun complex (realpart &optional (imagpart 0))
   #!+sb-doc
   "Return a complex number with the specified real and imaginary components."
+  (declare (explicit-check))
   (flet ((%%make-complex (realpart imagpart)
            (cond #!+long-float
                  ((and (typep realpart 'long-float)
@@ -321,7 +322,7 @@
   #!+sb-doc
   "Return the complex conjugate of NUMBER. For non-complex numbers, this is
   an identity."
-  (declare (type number number))
+  (declare (type number number) (explicit-check))
   (if (complexp number)
       (complex (realpart number) (- (imagpart number)))
       number))
@@ -329,6 +330,7 @@
 (defun signum (number)
   #!+sb-doc
   "If NUMBER is zero, return NUMBER, else return (/ NUMBER (ABS NUMBER))."
+  (declare (explicit-check))
   (if (zerop number)
       number
       (if (rationalp number)
@@ -360,8 +362,8 @@
 (macrolet ((define-arith (op init doc)
              #!-sb-doc (declare (ignore doc))
              `(defun ,op (&rest numbers)
-                #!+sb-doc
-                ,doc
+                (declare (explicit-check))
+                #!+sb-doc ,doc
                 (if numbers
                     (let ((result (the number (fast-&rest-nth 0 numbers))))
                       (do-rest-arg ((n) numbers 1 result)
@@ -376,6 +378,7 @@
   #!+sb-doc
   "Subtract the second and all subsequent arguments from the first;
   or with one argument, negate the first argument."
+  (declare (explicit-check))
   (if more-numbers
       (let ((result number))
         (do-rest-arg ((n) more-numbers 0 result)
@@ -386,6 +389,7 @@
   #!+sb-doc
   "Divide the first argument by each of the following arguments, in turn.
   With one argument, return reciprocal."
+  (declare (explicit-check))
   (if more-numbers
       (let ((result number))
         (do-rest-arg ((n) more-numbers 0 result)
@@ -395,11 +399,13 @@
 (defun 1+ (number)
   #!+sb-doc
   "Return NUMBER + 1."
+  (declare (explicit-check))
   (1+ number))
 
 (defun 1- (number)
   #!+sb-doc
   "Return NUMBER - 1."
+  (declare (explicit-check))
   (1- number))
 
 (eval-when (:compile-toplevel)
@@ -583,6 +589,7 @@
                     (* (maybe-truncate y gcd) (denominator x)))))))
 
 (defun %negate (n)
+  (declare (explicit-check))
   (number-dispatch ((n number))
     (((foreach fixnum single-float double-float #!+long-float long-float))
      (%negate n))
@@ -599,6 +606,7 @@
   #!+sb-doc
   "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
+  (declare (explicit-check))
   (macrolet ((truncate-float (rtype)
                `(let* ((float-div (coerce divisor ',rtype))
                        (res (%unary-truncate (/ number float-div))))
@@ -655,28 +663,33 @@
   #!+sb-doc
   "Return the greatest integer not greater than number, or number/divisor.
   The second returned value is (mod number divisor)."
+  (declare (explicit-check))
   (floor number divisor))
 
 (defun ceiling (number &optional (divisor 1))
   #!+sb-doc
   "Return the smallest integer not less than number, or number/divisor.
   The second returned value is the remainder."
+  (declare (explicit-check))
   (ceiling number divisor))
 
 (defun rem (number divisor)
   #!+sb-doc
   "Return second result of TRUNCATE."
+  (declare (explicit-check))
   (rem number divisor))
 
 (defun mod (number divisor)
   #!+sb-doc
   "Return second result of FLOOR."
+  (declare (explicit-check))
   (mod number divisor))
 
 (defun round (number &optional (divisor 1))
   #!+sb-doc
   "Rounds number (or number/divisor) to nearest integer.
   The second returned value is the remainder."
+  (declare (explicit-check))
   (if (eql divisor 1)
       (round number)
       (multiple-value-bind (tru rem) (truncate number divisor)
@@ -710,6 +723,7 @@
 (defun ftruncate (number &optional (divisor 1))
   #!+sb-doc
   "Same as TRUNCATE, but returns first value as a float."
+  (declare (explicit-check))
   (macrolet ((ftruncate-float (rtype)
                `(let* ((float-div (coerce divisor ',rtype))
                        (res (%unary-ftruncate (/ number float-div))))
@@ -744,6 +758,7 @@
 (defun ffloor (number &optional (divisor 1))
   #!+sb-doc
   "Same as FLOOR, but returns first value as a float."
+  (declare (explicit-check))
   (multiple-value-bind (tru rem) (ftruncate number divisor)
     (if (and (not (zerop rem))
              (if (minusp divisor)
@@ -755,6 +770,7 @@
 (defun fceiling (number &optional (divisor 1))
   #!+sb-doc
   "Same as CEILING, but returns first value as a float."
+  (declare (explicit-check))
   (multiple-value-bind (tru rem) (ftruncate number divisor)
     (if (and (not (zerop rem))
              (if (minusp divisor)
@@ -768,6 +784,7 @@
 (defun fround (number &optional (divisor 1))
   #!+sb-doc
   "Same as ROUND, but returns first value as a float."
+  (declare (explicit-check))
   (multiple-value-bind (res rem)
       (round number divisor)
     (values (float res (if (floatp rem) rem 1.0)) rem)))
@@ -777,7 +794,7 @@
 (defun = (number &rest more-numbers)
   #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
-  (declare (number number))
+  (declare (number number) (explicit-check))
   (do-rest-arg ((n i) more-numbers 0 t)
     (unless (= number n)
       (return (do-rest-arg ((n) more-numbers (1+ i))
@@ -786,7 +803,7 @@
 (defun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
-  (declare (number number))
+  (declare (number number) (explicit-check))
   (if more-numbers
       (do ((n number (nth i more-numbers))
             (i 0 (1+ i)))
@@ -801,6 +818,7 @@
              (declare (ignorable doc))
              `(defun ,op (number &rest more-numbers)
                 #!+sb-doc ,doc
+                (declare (explicit-check))
                 (let ((n1 number))
                   (declare (real n1))
                   (do-rest-arg ((n2 i) more-numbers 0 t)
@@ -817,6 +835,7 @@
   #!+sb-doc
   "Return the greatest of its arguments; among EQUALP greatest, return
 the first."
+  (declare (explicit-check))
   (let ((n number))
     (declare (real n))
     (do-rest-arg ((arg) more-numbers 0 n)
@@ -827,6 +846,7 @@ the first."
   #!+sb-doc
   "Return the least of its arguments; among EQUALP least, return
 the first."
+  (declare (explicit-check))
   (let ((n number))
     (declare (real n))
     (do-rest-arg ((arg) more-numbers 0 n)
@@ -973,6 +993,7 @@ the first."
              #!-sb-doc (declare (ignore doc))
              `(defun ,op (&rest integers)
                 #!+sb-doc ,doc
+                (declare (explicit-check))
                 (if integers
                     (do ((result (fast-&rest-nth 0 integers)
                                  (,op result (fast-&rest-nth i integers)))
@@ -989,41 +1010,42 @@ the first."
 (defun lognot (number)
   #!+sb-doc
   "Return the bit-wise logical not of integer."
+  (declare (explicit-check))
   (etypecase number
     (fixnum (lognot (truly-the fixnum number)))
     (bignum (bignum-logical-not number))))
 
-(macrolet ((def (name op big-op &optional doc)
+(macrolet ((def (name explicit-check op big-op &optional doc)
              `(defun ,name (integer1 integer2)
-                ,@(when doc
-                    (list doc))
+                ,@(when doc (list doc))
+                ,@(when explicit-check `((declare (explicit-check))))
                 (let ((x integer1)
                       (y integer2))
                   (number-dispatch ((x integer) (y integer))
                     (bignum-cross-fixnum ,op ,big-op))))))
-  (def two-arg-and logand bignum-logical-and)
-  (def two-arg-ior logior bignum-logical-ior)
-  (def two-arg-xor logxor bignum-logical-xor)
+  (def two-arg-and nil logand bignum-logical-and)
+  (def two-arg-ior nil logior bignum-logical-ior)
+  (def two-arg-xor nil logxor bignum-logical-xor)
   ;; BIGNUM-LOGICAL-{AND,IOR,XOR} need not return a bignum, so must
   ;; call the generic LOGNOT...
-  (def two-arg-eqv logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
-  (def lognand lognand
+  (def two-arg-eqv nil logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
+  (def lognand t lognand
        (lambda (x y) (lognot (bignum-logical-and x y)))
        #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
-  (def lognor lognor
+  (def lognor t lognor
        (lambda (x y) (lognot (bignum-logical-ior x y)))
        #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
   ;; ... but BIGNUM-LOGICAL-NOT on a bignum will always return a bignum
-  (def logandc1 logandc1
+  (def logandc1 t logandc1
        (lambda (x y) (bignum-logical-and (bignum-logical-not x) y))
        #!+sb-doc "Bitwise AND (LOGNOT INTEGER1) with INTEGER2.")
-  (def logandc2 logandc2
+  (def logandc2 t logandc2
        (lambda (x y) (bignum-logical-and x (bignum-logical-not y)))
        #!+sb-doc "Bitwise AND INTEGER1 with (LOGNOT INTEGER2).")
-  (def logorc1 logorc1
+  (def logorc1 t logorc1
        (lambda (x y) (bignum-logical-ior (bignum-logical-not x) y))
        #!+sb-doc "Bitwise OR (LOGNOT INTEGER1) with INTEGER2.")
-  (def logorc2 logorc2
+  (def logorc2 t logorc2
        (lambda (x y) (bignum-logical-ior x (bignum-logical-not y)))
        #!+sb-doc "Bitwise OR INTEGER1 with (LOGNOT INTEGER2)."))
 
@@ -1031,6 +1053,7 @@ the first."
   #!+sb-doc
   "Count the number of 1 bits if INTEGER is non-negative,
 and the number of 0 bits if INTEGER is negative."
+  (declare (explicit-check))
   (etypecase integer
     (fixnum
      (logcount (truly-the (integer 0
@@ -1060,7 +1083,7 @@ and the number of 0 bits if INTEGER is negative."
 (defun ash (integer count)
   #!+sb-doc
   "Shifts integer left by count places preserving sign. - count shifts right."
-  (declare (integer integer count))
+  (declare (integer integer count) (explicit-check))
   (etypecase integer
     (fixnum
      (cond ((zerop integer)
@@ -1089,6 +1112,7 @@ and the number of 0 bits if INTEGER is negative."
   #!+sb-doc
   "Return the number of non-sign bits in the twos-complement representation
   of INTEGER."
+  (declare (explicit-check))
   (etypecase integer
     (fixnum
      (integer-length (truly-the fixnum integer)))
@@ -1139,22 +1163,22 @@ and the number of 0 bits if INTEGER is negative."
   (deposit-field newbyte bytespec integer))
 
 (defun %ldb (size posn integer)
-  (declare (type bit-index size posn))
+  (declare (type bit-index size posn) (explicit-check))
   (logand (ash integer (- posn))
           (1- (ash 1 size))))
 
 (defun %mask-field (size posn integer)
-  (declare (type bit-index size posn))
+  (declare (type bit-index size posn) (explicit-check))
   (logand integer (ash (1- (ash 1 size)) posn)))
 
 (defun %dpb (newbyte size posn integer)
-  (declare (type bit-index size posn))
+  (declare (type bit-index size posn) (explicit-check))
   (let ((mask (1- (ash 1 size))))
     (logior (logand integer (lognot (ash mask posn)))
             (ash (logand newbyte mask) posn))))
 
 (defun %deposit-field (newbyte size posn integer)
-  (declare (type bit-index size posn))
+  (declare (type bit-index size posn) (explicit-check))
   (let ((mask (ash (ldb (byte size 0) -1) posn)))
     (logior (logand newbyte mask)
             (logand integer (lognot mask)))))
@@ -1286,6 +1310,7 @@ and the number of 0 bits if INTEGER is negative."
   #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
   integers. GCD with no arguments is defined to be 0."
+  (declare (explicit-check))
   (case (length integers)
     (0 0)
     (1 (abs (the integer (fast-&rest-nth 0 integers))))
@@ -1301,6 +1326,7 @@ and the number of 0 bits if INTEGER is negative."
   #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
+  (declare (explicit-check))
   (case (length integers)
     (0 1)
     (1 (abs (the integer (fast-&rest-nth 0 integers))))
@@ -1383,7 +1409,7 @@ and the number of 0 bits if INTEGER is negative."
 (defun isqrt (n)
   #!+sb-doc
   "Return the greatest integer less than or equal to the square root of N."
-  (declare (type unsigned-byte n))
+  (declare (type unsigned-byte n) (explicit-check))
   (macrolet
       ((isqrt-recursion (arg recurse fixnum-p)
          ;; Expands into code for the recursive step of the ISQRT
@@ -1438,7 +1464,9 @@ and the number of 0 bits if INTEGER is negative."
 
 (macrolet ((def (name doc)
              (declare (ignorable doc))
-             `(defun ,name (number) #!+sb-doc ,doc (,name number))))
+             `(defun ,name (number) #!+sb-doc ,doc
+                (declare (explicit-check))
+                (,name number))))
   (def zerop "Is this number zero?")
   (def plusp "Is this real number strictly positive?")
   (def minusp "Is this real number strictly negative?")

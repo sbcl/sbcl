@@ -538,6 +538,7 @@ distinct from the global value. Can also be SETF."
 ;;; ...in which case you frankly deserve to lose.
 (defun about-to-modify-symbol-value (symbol action &optional (new-value nil valuep) bind)
   (declare (symbol symbol))
+  (declare (explicit-check))
   (flet ((describe-action ()
            (ecase action
              (set "set SYMBOL-VALUE of ~S")

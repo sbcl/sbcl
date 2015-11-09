@@ -160,6 +160,7 @@ This particular SBCL version uses the popular MT19937 PRNG algorithm, and its
 internal state only effectively contains about 19937 bits of information.
 http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 "
+  (declare (explicit-check))
   (named-let seed-random-state ((state state))
    (etypecase state
     ;; Easy standard cases
@@ -406,6 +407,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 (defun random (arg &optional (state *random-state*))
   (declare (inline %random-fixnum %random-single-float %random-double-float
                    #!+long-float %random-long-float))
+  (declare (explicit-check))
   (cond
     ((and (fixnump arg) (> arg 0))
      (%random-fixnum arg state))

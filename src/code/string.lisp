@@ -18,6 +18,7 @@
    symbol, its name is returned. If X is a character then a one element
    string containing that character is returned. If X cannot be coerced
    into a string, an error occurs."
+  (declare (explicit-check))
   (cond ((stringp x) x)
         ((symbolp x) (symbol-name x))
         ((characterp x)
@@ -417,6 +418,7 @@
   "Given a character count and an optional fill character, makes and returns a
 new string COUNT long filled with the fill character."
   (declare (index count))
+  (declare (explicit-check))
   ;; FIXME: while this is a correct implementation relying on an IR1 transform,
   ;; it would be better if in the following example (assuming NOTINLINE):
   ;;  (MAKE-STRING 1000 :ELEMENT-TYPE 'BIT :INITIAL-element #\a)

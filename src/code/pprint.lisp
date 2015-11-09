@@ -842,6 +842,7 @@ line break."
   (declare (type (or null callable) function)
            (type real priority)
            (type pprint-dispatch-table table))
+  (declare (explicit-check))
   (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
   (/hexstr type)
   (assert-not-standard-pprint-dispatch-table table 'set-pprint-dispatch)

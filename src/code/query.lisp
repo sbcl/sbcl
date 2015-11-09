@@ -38,6 +38,7 @@
    *QUERY-IO* until the user enters y or Y as an affirmative, or either
    n or N as a negative answer. It asks again if you enter any other
    characters."
+  (declare (explicit-check))
   (flet ((print-query ()
            (apply #'maybe-print-query "(y or n)" format-string arguments)))
     (loop (print-query)
@@ -51,6 +52,7 @@
   "YES-OR-NO-P is similar to Y-OR-N-P, except that it clears the
    input buffer, beeps, and uses READ-LINE to get the strings
    YES or NO."
+  (declare (explicit-check))
   (flet ((print-query ()
            (apply #'maybe-print-query "(yes or no)" format-string arguments)))
     (beep *query-io*)

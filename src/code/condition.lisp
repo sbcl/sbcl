@@ -204,6 +204,7 @@
   ;; Note: While ANSI specifies no exceptional situations in this function,
   ;; ALLOCATE-CONDITION will signal a type error if TYPE does not designate
   ;; a condition class. This seems fair enough.
+  (declare (explicit-check))
   (multiple-value-bind (condition classoid)
       (apply #'allocate-condition type initargs)
 

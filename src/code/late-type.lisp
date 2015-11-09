@@ -828,6 +828,7 @@
   If values are NIL and T, type1 definitely is not a subtype of type2.
   If values are NIL and NIL, it couldn't be determined."
   (declare (type lexenv-designator environment) (ignore environment))
+  (declare (explicit-check))
   (csubtypep (specifier-type type1) (specifier-type type2)))
 
 ;;; If two types are definitely equivalent, return true. The second

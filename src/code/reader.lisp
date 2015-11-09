@@ -718,6 +718,7 @@ standard Lisp readtable when NIL."
   #!+sb-doc
   "Read from STREAM and return the value read, preserving any whitespace
    that followed the object."
+  (declare (explicit-check))
   (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
   (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
 
@@ -751,6 +752,7 @@ standard Lisp readtable when NIL."
                        (recursive-p nil))
   #!+sb-doc
   "Read the next Lisp value from STREAM, and return it."
+  (declare (explicit-check))
   (check-for-recursive-read stream recursive-p 'read)
   (let* ((local-eof-val (load-time-value (cons nil nil) t))
          (result (%read-preserving-whitespace
@@ -858,6 +860,7 @@ standard Lisp readtable when NIL."
   #!+sb-doc
   "Read Lisp values from INPUT-STREAM until the next character after a
    value's representation is ENDCHAR, and return the objects as a list."
+    (declare (explicit-check))
     (check-for-recursive-read input-stream recursive-p 'read-delimited-list)
     (flet ((%read-delimited-list ()
              (with-list-reader (input-stream endchar)

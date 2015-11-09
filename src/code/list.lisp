@@ -1365,6 +1365,7 @@
                      (declare (optimize speed (sb!c::verify-arg-count 0)))
                      ,@(when funs `((declare (function ,@funs))))
                      ,@(unless (member name '(member assoc adjoin rassoc)) `((declare (function x))))
+                     (declare (explicit-check))
                      ,body))))
          `(progn
             ,(%def 'adjoin)

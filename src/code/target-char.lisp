@@ -659,7 +659,7 @@ that digit stands, else returns NIL."
            (= (equal-char-code c1) (equal-char-code c2)))))))
 
 (defun char-equal-constant (x char reverse-case-char)
-  (declare (type character x))
+  (declare (type character x) (explicit-check))
   (or (eq char x)
       (eq reverse-case-char x)))
 
@@ -697,10 +697,11 @@ Case is ignored."))
 (defun two-arg-char-not-lessp (c1 c2)
   (>= (equal-char-code c1) (equal-char-code c2)))
 
-(macrolet ((def (op test doc)
+(macrolet ((def (op test doc &optional explicit-check)
              (declare (ignorable doc))
              `(defun ,op (character &rest more-characters)
                 #!+sb-doc ,doc
+                ,@(when explicit-check `((declare (explicit-check))))
                 (let ((c1 character))
                   (declare (character c1))
                   (do-rest-arg ((c2 i) more-characters 0 t)
@@ -723,19 +724,19 @@ Case is ignored."))
   ;; case-insensitive
   (def char-equal (two-arg-char-equal c1 c2)
     "Return T if all of the arguments are the same character.
-Case is ignored.")
+Case is ignored." t)
   (def char-lessp (two-arg-char-lessp c1 c2)
     "Return T if the arguments are in strictly increasing alphabetic order.
-Case is ignored.")
+Case is ignored." t)
   (def char-greaterp (two-arg-char-greaterp c1 c2)
     "Return T if the arguments are in strictly decreasing alphabetic order.
-Case is ignored.")
+Case is ignored." t)
   (def char-not-greaterp (two-arg-char-not-greaterp c1 c2)
     "Return T if the arguments are in strictly non-decreasing alphabetic order.
-Case is ignored.")
+Case is ignored." t)
   (def char-not-lessp (two-arg-char-not-lessp c1 c2)
     "Return T if the arguments are in strictly non-increasing alphabetic order.
-Case is ignored."))
+Case is ignored." t))
 
 
 ;;;; miscellaneous functions

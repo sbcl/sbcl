@@ -946,7 +946,8 @@
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
     (multiple-value-bind (forms decls doc) (parse-body (cddr form) t)
-      (binding* (((*lexenv* result-type post-binding-lexenv lambda-list)
+      (binding* (((*lexenv* result-type post-binding-lexenv
+                   lambda-list explicit-check)
                   (process-decls decls (append aux-vars vars) nil
                                  :binding-form-p t :allow-lambda-list t))
                  (debug-catch-p (and maybe-add-debug-catch
@@ -976,6 +977,8 @@
                                                       :source-name source-name
                                                       :debug-name debug-name
                                                       :system-lambda system-lambda)))))
+        (when explicit-check
+          (setf (getf (functional-plist res) 'explicit-check) explicit-check))
         (setf (functional-inline-expansion res) form)
         (setf (functional-arg-documentation res)
               (if (eq lambda-list :unspecified)
@@ -1185,10 +1188,15 @@
 ;;; EXPLICIT-CHECK attribute, which is specified on functions that
 ;;; check their argument types as a consequence of type dispatching.
 ;;; This avoids redundant checks such as NUMBERP on the args to +, etc.
+;;; FIXME: this seems to have nothing at all to do with adding "new"
+;;; definitions, as it is only called from IR1-CONVERT-INLINE-EXPANSION.
 (defun assert-new-definition (var fun)
-  (let ((type (leaf-type var))
-        (for-real (eq (leaf-where-from var) :declared))
-        (info (info :function :info (leaf-source-name var))))
+  (let* ((type (leaf-type var))
+         (for-real (eq (leaf-where-from var) :declared))
+         (name (leaf-source-name var))
+         (info (info :function :info name))
+         (explicit-check (getf (functional-plist fun) 'explicit-check)))
+    (verify-explicit-check-sanity explicit-check name)
     (assert-definition-type
      fun type
      ;; KLUDGE: Common Lisp is such a dynamic language that in general
@@ -1202,11 +1210,7 @@
      :unwinnage-fun (cond (info #'compiler-style-warn)
                           (for-real #'compiler-notify)
                           (t nil))
-     :really-assert
-     (and for-real
-          (not (and info
-                    (ir1-attributep (fun-info-attributes info)
-                                    explicit-check))))
+     :really-assert (and for-real (not explicit-check))
      :where (if for-real
                 "previous declaration"
                 "previous definition"))))

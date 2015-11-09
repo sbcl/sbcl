@@ -100,6 +100,7 @@
 (defun exp (number)
   #!+sb-doc
   "Return e raised to the power NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %exp number)
     ((complex)
@@ -142,6 +143,7 @@
 (defun expt (base power)
   #!+sb-doc
   "Return BASE raised to the POWER."
+  (declare (explicit-check))
   (if (zerop power)
     (if (and (zerop base) (floatp power))
         (error 'arguments-out-of-domain-error
@@ -341,6 +343,7 @@
 (defun log (number &optional (base nil base-p))
   #!+sb-doc
   "Return the logarithm of NUMBER in the base BASE, which defaults to e."
+  (declare (explicit-check))
   (if base-p
       (cond
         ((zerop base)
@@ -389,6 +392,7 @@
 (defun sqrt (number)
   #!+sb-doc
   "Return the square root of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (((foreach fixnum bignum ratio))
      (if (minusp number)
@@ -407,6 +411,7 @@
 (defun abs (number)
   #!+sb-doc
   "Return the absolute value of the number."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (((foreach single-float double-float fixnum rational))
      (abs number))
@@ -429,6 +434,7 @@
   For complex numbers, this is (atan (imagpart number) (realpart number)).
   For non-complex positive numbers, this is 0. For non-complex negative
   numbers this is PI."
+  (declare (explicit-check))
   (etypecase number
     (rational
      (if (minusp number)
@@ -448,6 +454,7 @@
 (defun sin (number)
   #!+sb-doc
   "Return the sine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %sin number)
     ((complex)
@@ -459,6 +466,7 @@
 (defun cos (number)
   #!+sb-doc
   "Return the cosine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %cos number)
     ((complex)
@@ -470,6 +478,7 @@
 (defun tan (number)
   #!+sb-doc
   "Return the tangent of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %tan number)
     ((complex)
@@ -478,12 +487,13 @@
 (defun cis (theta)
   #!+sb-doc
   "Return cos(Theta) + i sin(Theta), i.e. exp(i Theta)."
-  (declare (type real theta))
+  (declare (type real theta) (explicit-check))
   (complex (cos theta) (sin theta)))
 
 (defun asin (number)
   #!+sb-doc
   "Return the arc sine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     ((rational)
      (if (or (> number 1) (< number -1))
@@ -501,6 +511,7 @@
 (defun acos (number)
   #!+sb-doc
   "Return the arc cosine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     ((rational)
      (if (or (> number 1) (< number -1))
@@ -518,6 +529,7 @@
 (defun atan (y &optional (x nil xp))
   #!+sb-doc
   "Return the arc tangent of Y if X is omitted or Y/X if X is supplied."
+  (declare (explicit-check))
   (if xp
       (flet ((atan2 (y x)
                (declare (type double-float y x)
@@ -554,6 +566,7 @@
 (defun sinh (number)
   #!+sb-doc
   "Return the hyperbolic sine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %sinh number)
     ((complex)
@@ -565,6 +578,7 @@
 (defun cosh (number)
   #!+sb-doc
   "Return the hyperbolic cosine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %cosh number)
     ((complex)
@@ -576,6 +590,7 @@
 (defun tanh (number)
   #!+sb-doc
   "Return the hyperbolic tangent of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %tanh number)
     ((complex)
@@ -584,6 +599,7 @@
 (defun asinh (number)
   #!+sb-doc
   "Return the hyperbolic arc sine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %asinh number)
     ((complex)
@@ -592,6 +608,7 @@
 (defun acosh (number)
   #!+sb-doc
   "Return the hyperbolic arc cosine of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     ((rational)
      ;; acosh is complex if number < 1
@@ -609,6 +626,7 @@
 (defun atanh (number)
   #!+sb-doc
   "Return the hyperbolic arc tangent of NUMBER."
+  (declare (explicit-check))
   (number-dispatch ((number number))
     ((rational)
      ;; atanh is complex if |number| > 1

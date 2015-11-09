@@ -127,6 +127,7 @@
   "Return the element type that will actually be used to implement an array
    with the specifier :ELEMENT-TYPE Spec."
   (declare (type lexenv-designator environment) (ignore environment))
+  (declare (explicit-check))
   (handler-case
       ;; Can't rely on SPECIFIER-TYPE to signal PARSE-UNKNOWN-TYPE in
       ;; the case of (AND KNOWN UNKNOWN), since the result of the
@@ -144,6 +145,7 @@
   "Return the element type of the most specialized COMPLEX number type that
    can hold parts of type SPEC."
   (declare (type lexenv-designator environment) (ignore environment))
+  (declare (explicit-check))
   (let ((type (specifier-type spec)))
     (cond
       ((eq type *empty-type*) nil)

@@ -1652,6 +1652,8 @@
   (declare (list decls vars fvars))
   (let ((result-type *wild-type*)
         (allow-values-decl allow-lambda-list)
+        (explicit-check)
+        (allow-explicit-check allow-lambda-list)
         (lambda-list (if allow-lambda-list :unspecified nil))
         (optimize-qualities)
         (*post-binding-variable-lexenv* nil))
@@ -1674,6 +1676,18 @@
                               (if (singleton-p types)
                                   (car types)
                                   `(values ,@types)))))))
+                   ((and allow-explicit-check
+                         (typep spec '(cons (eql explicit-check))))
+                    ;; EXPLICIT-CHECK can specify that all arguments will be
+                    ;; checked by the function body, and/or all results.
+                    ;; Alternatively, a subset of arguments can be listed,
+                    ;; so that sequence operations can dispatch on the sequence
+                    ;; arguments, but benefit from automatic checks of others.
+                    ;; You can't actually specify anything yet, as the goal
+                    ;; is to be 100% compatible with the globaldb attribute.
+                    (aver (not (cdr spec)))
+                    (setq explicit-check t
+                          allow-explicit-check nil)) ; at most one of this decl
                    (t
                     (multiple-value-bind (new-env new-qualities)
                         (process-1-decl spec lexenv vars fvars
@@ -1691,7 +1705,8 @@
             ;; Kludge: EVAL calls this function to deal with LOCALLY.
               (process-it spec decl)))))
     (warn-repeated-optimize-qualities (lexenv-policy lexenv) optimize-qualities)
-    (values lexenv result-type *post-binding-variable-lexenv* lambda-list)))
+    (values lexenv result-type *post-binding-variable-lexenv*
+            lambda-list explicit-check)))
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
   (multiple-value-bind (*lexenv* result-type post-binding-lexenv)

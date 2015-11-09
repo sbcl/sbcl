@@ -88,7 +88,7 @@
                             (eof-error-p t)
                             eof-value
                             recursive-p)
-  (the (or character boolean) peek-type)
+  (declare (type (or character boolean) peek-type) (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-peek-char peek-type stream eof-error-p eof-value

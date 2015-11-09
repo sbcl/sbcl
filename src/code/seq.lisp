@@ -337,6 +337,7 @@
 
 (defun length (sequence)
   #!+sb-doc "Return an integer that is the length of SEQUENCE."
+  (declare (explicit-check))
   (seq-dispatch-checking sequence
                 (length sequence)
                 (length sequence)
@@ -346,7 +347,7 @@
   #!+sb-doc
   "Return a sequence of the given TYPE and LENGTH, with elements initialized
   to INITIAL-ELEMENT."
-  (declare (index length))
+  (declare (index length) (explicit-check))
   (let* ((expanded-type (typexpand type))
          (adjusted-type
           (typecase expanded-type
@@ -768,6 +769,7 @@ many elements are copied."
 (defun reverse (sequence)
   #!+sb-doc
   "Return a new sequence containing the same elements but in reverse order."
+  (declare (explicit-check))
   (seq-dispatch-checking sequence
     (list-reverse* sequence)
     (vector-reverse* sequence)
@@ -822,6 +824,7 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence of the same elements in reverse order; the argument
    is destroyed."
+  (declare (explicit-check))
   (seq-dispatch-checking sequence
     (list-nreverse* sequence)
     (vector-nreverse* sequence)
@@ -862,6 +865,7 @@ many elements are copied."
   "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
   specified OUTPUT-TYPE-SPEC."
+  (declare (explicit-check))
   (flet ((concat-to-list* (sequences)
            (let ((result (list nil)))
              (do ((sequences sequences (cdr sequences))
@@ -933,6 +937,7 @@ many elements are copied."
 (macrolet ((def (name element-type)
              `(defun ,name (&rest sequences)
                 (declare (dynamic-extent sequences)
+                         (explicit-check)
                          (optimize speed)
                          (optimize (sb!c::insert-array-bounds-checks 0)))
                 (let* ((lengths (mapcar #'length sequences))
@@ -957,6 +962,7 @@ many elements are copied."
 
 ;;; helper functions to handle arity-1 subcases of MAP
 (defun %map-to-list-arity-1 (fun sequence)
+  (declare (explicit-check))
   (let ((reversed-result nil)
         (really-fun (%coerce-callable-to-fun fun)))
     (sb!sequence:dosequence (element sequence)
@@ -964,6 +970,7 @@ many elements are copied."
             reversed-result))
     (nreverse reversed-result)))
 (defun %map-to-simple-vector-arity-1 (fun sequence)
+  (declare (explicit-check))
   (let ((result (make-array (length sequence)))
         (index 0)
         (really-fun (%coerce-callable-to-fun fun)))
@@ -974,6 +981,7 @@ many elements are copied."
       (incf index))
     result))
 (defun %map-for-effect-arity-1 (fun sequence)
+  (declare (explicit-check))
   (let ((really-fun (%coerce-callable-to-fun fun)))
     (sb!sequence:dosequence (element sequence)
       (funcall really-fun element)))
@@ -1062,6 +1070,7 @@ many elements are copied."
 ;;; length of the output sequence matches any length specified
 ;;; in RESULT-TYPE.
 (defun %map (result-type function &rest sequences)
+  (declare (explicit-check))
   (declare (dynamic-extent sequences))
   ;; Everything that we end up calling uses %COERCE-TO-CALLABLE
   ;; on FUNCTION so we don't need to declare it of type CALLABLE here.
@@ -1114,6 +1123,7 @@ many elements are copied."
                      (slower-map type))))))))))
 
 (defun map (result-type function first-sequence &rest more-sequences)
+  (declare (explicit-check))
   (let ((result
          (apply #'%map result-type function first-sequence more-sequences)))
     (if (or (eq result-type 'nil) (typep result result-type))
@@ -1140,6 +1150,7 @@ many elements are copied."
   (declare (type index start end)
            (type function fun)
            (type list sequences))
+  (declare (explicit-check))
   (let ((index start))
     (declare (type index index))
     (block mapping
@@ -2697,6 +2708,7 @@ many elements are copied."
 ;;; put it back there, and make DOSEQUENCE and SEQ-DISPATCH be in
 ;;; a new early-seq.lisp file.
 (defun fill-data-vector (vector dimensions initial-contents)
+  (declare (explicit-check))
   (let ((index 0))
     (labels ((frob (axis dims contents)
                (cond ((null dims)

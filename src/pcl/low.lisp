@@ -235,7 +235,7 @@ comparison.")
          (t (return-from %pcl-instance-p nil)))))
 
 ;;; This definition is for interpreted code.
-(defun pcl-instance-p (x) (%pcl-instance-p x))
+(defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
 ;;; CMU CL comment:
 ;;;   We define this as STANDARD-INSTANCE, since we're going to

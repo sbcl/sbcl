@@ -869,21 +869,35 @@ and no value was provided for it." name))))))))))
                             (derive-node-type ref s-type))))))
            t))))))
 
+(defun verify-explicit-check-sanity (explicit-check name)
+  ;; If globaldb said that NAME has the explicit-check attribute,
+  ;; then the function should also locally declare it for the time being,
+  ;; until the globaldb attribute is removed.
+  ;; The redundancy helps ensure that everything was declared as should be.
+  (let ((globaldb-value
+         (awhen (info :function :info name)
+           (ir1-attributep (fun-info-attributes it) explicit-check))))
+    (when (or (and globaldb-value (not explicit-check))
+              (and (not globaldb-value) explicit-check))
+      (warn "Explicit-check for ~S differs" name))))
+
 ;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.
 (defun assert-global-function-definition-type (name fun)
   (declare (type functional fun))
-  (let ((type (proclaimed-ftype name))
-        (where (info :function :where-from name)))
-    (when (eq where :declared)
-      (let ((type (massage-global-definition-type type fun)))
-        (setf (leaf-type fun) type)
-        (assert-definition-type
-         fun type
-         :unwinnage-fun #'compiler-notify
-         :where "proclamation"
-         :really-assert (not (awhen (info :function :info name)
-                               (ir1-attributep (fun-info-attributes it)
-                                               explicit-check))))))))
+  (let ((where (info :function :where-from name))
+        (explicit-check (getf (functional-plist fun) 'explicit-check)))
+    (if (eq where :declared)
+        (let ((type
+               (massage-global-definition-type (proclaimed-ftype name) fun)))
+          (verify-explicit-check-sanity explicit-check name)
+          (setf (leaf-type fun) type)
+          (assert-definition-type
+           fun type
+           :unwinnage-fun #'compiler-notify
+           :where "proclamation"
+           :really-assert (not explicit-check)))
+        (when explicit-check
+          (warn "Explicit-check without known FTYPE is meaningless")))))
 
 ;;; If the function has both &REST and &KEY, FIND-OPTIONAL-DISPATCH-TYPES
 ;;; doesn't complain about the type missing &REST -- which is good, because in

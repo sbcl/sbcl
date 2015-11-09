@@ -727,6 +727,7 @@
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
   "Returns the next byte of the Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -745,6 +746,7 @@
 (defun read-char (&optional (stream *standard-input*) (eof-error-p t)
                             eof-value recursive-p)
   "Inputs a character from Stream and returns it."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -764,6 +766,7 @@
 (defun read-char-no-hang (&optional (stream *standard-input*) (eof-error-p t)
                                     eof-value recursive-p)
   "Returns the next character from the Stream if one is availible, or nil."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -785,6 +788,7 @@
 
 (defun unread-char (character &optional (stream *standard-input*))
   "Puts the Character back on the front of the input Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -800,6 +804,7 @@
 (defun peek-char (&optional (peek-type nil) (stream *standard-input*)
                             (eof-error-p t) eof-value recursive-p)
   "Peeks at the next character in the input Stream.  See manual for details."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -843,6 +848,7 @@
   "Returns T if WIDTH octets are available on STREAM.  If WIDTH is
 given as 'CHARACTER, check for a character.  Note: the WIDTH argument
 is supported only on simple-streams."
+  (declare (sb-int:explicit-check))
   ;; WIDTH is number of octets which must be available; any value
   ;; other than 1 is treated as 'character.
   (let ((stream (sb-impl::in-synonym-of stream)))
@@ -859,6 +865,7 @@ is supported only on simple-streams."
                             eof-value recursive-p)
   "Returns a line of text read from the Stream as a string, discarding the
   newline character."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -892,6 +899,7 @@ is supported only on simple-streams."
 
 (defun clear-input (&optional (stream *standard-input*) buffer-only)
   "Clears any buffered input associated with the Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -904,6 +912,7 @@ is supported only on simple-streams."
 
 (defun write-byte (integer stream)
   "Outputs an octet to the Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -916,6 +925,7 @@ is supported only on simple-streams."
 
 (defun write-char (character &optional (stream *standard-output*))
   "Outputs the Character to the Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -929,6 +939,7 @@ is supported only on simple-streams."
 (defun write-string (string &optional (stream *standard-output*)
                             &key (start 0) (end nil))
   "Outputs the String to the given Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream))
         (end (sb-impl::%check-vector-sequence-bounds string start end)))
     (etypecase stream
@@ -943,6 +954,7 @@ is supported only on simple-streams."
 (defun write-line (string &optional (stream *standard-output*)
                           &key (start 0) end)
   (declare (type string string))
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream))
         (end (sb-impl::%check-vector-sequence-bounds string start end)))
     (etypecase stream
@@ -973,6 +985,7 @@ is supported only on simple-streams."
 
 (defun terpri (&optional (stream *standard-output*))
   "Outputs a new line to the Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -988,6 +1001,7 @@ is supported only on simple-streams."
 (defun fresh-line (&optional (stream *standard-output*))
   "Outputs a new line to the Stream if it is not positioned at the beginning of
    a line.  Returns T if it output a new line, nil otherwise."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -1000,6 +1014,7 @@ is supported only on simple-streams."
 (defun finish-output (&optional (stream *standard-output*))
   "Attempts to ensure that all output sent to the Stream has reached its
    destination, and only then returns."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -1012,6 +1027,7 @@ is supported only on simple-streams."
 
 (defun force-output (&optional (stream *standard-output*))
   "Attempts to force any buffered output to be sent."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream
@@ -1024,6 +1040,7 @@ is supported only on simple-streams."
 
 (defun clear-output (&optional (stream *standard-output*))
   "Clears the given output Stream."
+  (declare (sb-int:explicit-check))
   (let ((stream (sb-impl::out-synonym-of stream)))
     (etypecase stream
       (simple-stream

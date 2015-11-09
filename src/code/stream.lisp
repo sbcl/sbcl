@@ -312,6 +312,7 @@
 
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)
+  (declare (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-read-line stream eof-error-p eof-value recursive-p)
@@ -337,6 +338,7 @@
                             (eof-error-p t)
                             eof-value
                             recursive-p)
+  (declare (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
@@ -364,6 +366,7 @@
                     :unread character)))))
 
 (defun unread-char (character &optional (stream *standard-input*))
+  (declare (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-unread-char character stream)
@@ -382,6 +385,7 @@
             result))))
 
 (defun listen (&optional (stream *standard-input*))
+  (declare (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-listen stream)
@@ -399,6 +403,7 @@
                                     (eof-error-p t)
                                     eof-value
                                     recursive-p)
+  (declare (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-read-char-no-hang stream eof-error-p eof-value
@@ -415,6 +420,7 @@
   (funcall (ansi-stream-misc stream) stream :clear-input))
 
 (defun clear-input (&optional (stream *standard-input*))
+  (declare (explicit-check))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-clear-input stream)
@@ -432,6 +438,7 @@
     (fast-read-byte)))
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
+  (declare (explicit-check))
   (if (ansi-stream-p stream)
       (ansi-stream-read-byte stream eof-error-p eof-value nil)
       ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -603,11 +610,13 @@
 ;;; output functions
 
 (defun write-char (character &optional (stream *standard-output*))
+  (declare (explicit-check))
   (with-out-stream stream (ansi-stream-out character)
                    (stream-write-char character))
   character)
 
 (defun terpri (&optional (stream *standard-output*))
+  (declare (explicit-check))
   (with-out-stream stream (ansi-stream-out #\newline) (stream-terpri))
   nil)
 
@@ -618,6 +627,7 @@
     t))
 
 (defun fresh-line (&optional (stream *standard-output*))
+  (declare (explicit-check))
   (let ((stream (out-synonym-of stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-fresh-line stream)
@@ -644,12 +654,14 @@
                             &key (start 0) end)
   (declare (type string string))
   (declare (type stream-designator stream))
+  (declare (explicit-check))
   (%write-string string stream start end))
 
 (defun write-line (string &optional (stream *standard-output*)
                    &key (start 0) end)
   (declare (type string string))
   (declare (type stream-designator stream))
+  (declare (explicit-check))
   (let ((stream (out-synonym-of stream)))
     (cond ((ansi-stream-p stream)
            (ansi-stream-write-string string stream start end)
@@ -667,21 +679,25 @@
                    (stream-line-length)))
 
 (defun finish-output (&optional (stream *standard-output*))
+  (declare (explicit-check))
   (with-out-stream stream (ansi-stream-misc :finish-output)
                    (stream-finish-output))
   nil)
 
 (defun force-output (&optional (stream *standard-output*))
+  (declare (explicit-check))
   (with-out-stream stream (ansi-stream-misc :force-output)
                    (stream-force-output))
   nil)
 
 (defun clear-output (&optional (stream *standard-output*))
+  (declare (explicit-check))
   (with-out-stream stream (ansi-stream-misc :clear-output)
                    (stream-clear-output))
   nil)
 
 (defun write-byte (integer stream)
+  (declare (explicit-check))
   (with-out-stream/no-synonym stream (ansi-stream-bout integer)
                               (stream-write-byte integer))
   integer)
@@ -1308,6 +1324,7 @@
   #!+sb-doc
   "Return an output stream which will accumulate all output given it for the
 benefit of the function GET-OUTPUT-STREAM-STRING."
+  (declare (explicit-check))
   (if (csubtypep (specifier-type element-type) (specifier-type 'character))
       (%make-string-output-stream element-type)
       (error "~S is not a subtype of CHARACTER" element-type)))

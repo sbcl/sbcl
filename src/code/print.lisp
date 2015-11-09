@@ -161,6 +161,7 @@ variable: an unreadable object representing the error is printed instead.")
                      ((:suppress-errors *suppress-print-errors*)
                       *suppress-print-errors*))
                #!+sb-doc ,doc
+               (declare (explicit-check))
                ,@forms)))
   (def write
        "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*."
@@ -172,6 +173,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; Same as a call to (WRITE OBJECT :STREAM STREAM), but returning OBJECT.
 (defun %write (object stream)
+  (declare (explicit-check))
   (output-object object (out-synonym-of stream))
   object)
 
@@ -179,6 +181,7 @@ variable: an unreadable object representing the error is printed instead.")
   #!+sb-doc
   "Output a mostly READable printed representation of OBJECT on the specified
   STREAM."
+  (declare (explicit-check))
   (let ((*print-escape* t))
     (output-object object (out-synonym-of stream)))
   object)
@@ -187,6 +190,7 @@ variable: an unreadable object representing the error is printed instead.")
   #!+sb-doc
   "Output an aesthetic but not necessarily READable printed representation
   of OBJECT on the specified STREAM."
+  (declare (explicit-check))
   (let ((*print-escape* nil)
         (*print-readably* nil))
     (output-object object (out-synonym-of stream)))
@@ -196,6 +200,7 @@ variable: an unreadable object representing the error is printed instead.")
   #!+sb-doc
   "Output a newline, the mostly READable printed representation of OBJECT, and
   space to the specified STREAM."
+  (declare (explicit-check))
   (let ((stream (out-synonym-of stream)))
     (terpri stream)
     (prin1 object stream)
@@ -205,6 +210,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun pprint (object &optional stream)
   #!+sb-doc
   "Prettily output OBJECT preceded by a newline."
+  (declare (explicit-check))
   (let ((*print-pretty* t)
         (*print-escape* t)
         (stream (out-synonym-of stream)))
@@ -305,6 +311,7 @@ variable: an unreadable object representing the error is printed instead.")
   ;; to be T or NIL (a stream-designator), which is not really right
   ;; if eventually the call will be to a PRINT-OBJECT method,
   ;; since the generic function should always receive a stream.
+  (declare (explicit-check))
   (labels ((print-it (stream)
              (if *print-pretty*
                  (sb!pretty:output-pretty-object object stream)

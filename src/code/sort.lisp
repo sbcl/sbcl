@@ -163,6 +163,7 @@
   (declare (type list list)
            (type function test key)
            (dynamic-extent head))
+  (declare (explicit-check))
   (labels ((merge* (size list1 tail1 list2 tail2 rest)
              (declare (optimize speed)
                       (type (and fixnum unsigned-byte) size)
@@ -319,11 +320,13 @@
   (declare (type simple-vector vector)
            (type function pred)
            (type (or null function) key))
+  (declare (explicit-check))
   (vector-merge-sort vector pred key svref))
 
 (defun stable-sort-vector (vector pred key)
   (declare (type function pred)
            (type (or null function) key))
+  (declare (explicit-check))
   (vector-merge-sort vector pred key aref))
 
 ;;;; merging
@@ -378,6 +381,7 @@
   ;; ways. In decreasing order of estimated user astonishment, I note:
   ;; full calls to SPECIFIER-TYPE at runtime; copying input vectors
   ;; to lists before doing MERGE-LISTS -- WHN 2003-01-05
+  (declare (explicit-check))
   (let ((type (specifier-type result-type))
         (pred-fun (%coerce-callable-to-fun predicate))
         ;; Avoid coercing NIL to a function since 2 out of 3 branches of the

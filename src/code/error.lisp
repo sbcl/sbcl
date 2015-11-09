@@ -17,6 +17,7 @@
 ;;; INVOKE-DEBUGGER: Parse the hairy argument conventions into a
 ;;; single argument that's directly usable by all the other routines.
 (defun coerce-to-condition (datum arguments default-type fun-name)
+  (declare (explicit-check))
   (cond ((typep datum 'condition)
          (when (and arguments (not (eq fun-name 'cerror)))
            (cerror "Ignore the additional arguments."

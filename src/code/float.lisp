@@ -115,6 +115,7 @@
   #!+sb-doc
   "Return a non-negative number of significant digits in its float argument.
   Will be less than FLOAT-DIGITS if denormalized or zero."
+  (declare (explicit-check))
   (macrolet ((frob (digits bias decode)
                `(cond ((zerop f) 0)
                       ((float-denormalized-p f)
@@ -141,7 +142,7 @@
   "Return a floating-point number that has the same sign as
    FLOAT1 and, if FLOAT2 is given, has the same absolute value
    as FLOAT2."
-  (declare (float float1 float2))
+  (declare (float float1 float2) (explicit-check))
   (* (if (etypecase float1
            (single-float (minusp (single-float-bits float1)))
            (double-float (minusp (double-float-high-bits float1)))
@@ -161,6 +162,7 @@
 #!-sb-fluid (declaim (inline float-digits float-radix))
 
 (defun float-digits (f)
+  (declare (explicit-check))
   (number-dispatch ((f float))
     ((single-float) sb!vm:single-float-digits)
     ((double-float) sb!vm:double-float-digits)
@@ -335,6 +337,7 @@
       by FLOAT-DIGITS, since the significand has been scaled to have all its
       digits before the radix point.
    3) -1 or 1 (i.e. the sign of the argument.)"
+  (declare (explicit-check))
   (number-dispatch ((x float))
     ((single-float)
      (integer-decode-single-float x))
@@ -458,6 +461,7 @@
       between 0.5 (inclusive) and 1.0 (exclusive).
    2) an integer representing the exponent.
    3) -1.0 or 1.0 (i.e. the sign of the argument.)"
+  (declare (explicit-check))
   (number-dispatch ((f float))
     ((single-float)
      (decode-single-float f))
@@ -589,6 +593,7 @@
   #!+sb-doc
   "Return the value (* f (expt (float 2 f) ex)), but with no unnecessary loss
   of precision or overflow."
+  (declare (explicit-check))
   (number-dispatch ((f float))
     ((single-float)
      (scale-single-float f ex))
@@ -605,6 +610,7 @@
   "Converts any REAL to a float. If OTHER is not provided, it returns a
   SINGLE-FLOAT if NUMBER is not already a FLOAT. If OTHER is provided, the
   result is the same float format as OTHER."
+  (declare (explicit-check))
   (if otherp
       (number-dispatch ((number real) (other float))
         (((foreach rational single-float double-float #!+long-float long-float)
@@ -834,6 +840,7 @@
   "RATIONAL produces a rational number for any real numeric argument. This is
   more efficient than RATIONALIZE, but it assumes that floating-point is
   completely accurate, giving a result that isn't as pretty."
+  (declare (explicit-check))
   (number-dispatch ((x real))
     (((foreach single-float double-float #!+long-float long-float))
      (multiple-value-bind (bits exp) (integer-decode-float x)
@@ -915,6 +922,7 @@
   representation exploiting the assumption that floats are only accurate to
   their precision.  RATIONALIZE (and also RATIONAL) preserve the invariant:
       (= x (float (rationalize x) x))"
+  (declare (explicit-check))
   (number-dispatch ((x real))
     (((foreach single-float double-float #!+long-float long-float))
      ;; This is a fairly straigtforward implementation of the

@@ -122,6 +122,7 @@
 ;;   "foo does not designate a currently defined function"
 ;;    if a symbol does not satisfy FBOUNDP.
 (defun %coerce-callable-to-fun (callable)
+  (declare (explicit-check))
   (etypecase callable
     (function callable)
     (symbol (%coerce-name-to-fun callable symbol-fdefn))))
@@ -271,6 +272,7 @@
   "Return name's global function definition taking care to respect any
    encapsulations and to return the innermost encapsulated definition.
    This is SETF'able."
+  (declare (explicit-check))
   (let ((fun (%coerce-name-to-fun name)))
     (loop
      (let ((encap-info (encapsulation-info fun)))
@@ -310,6 +312,7 @@
   #!+sb-doc
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
+  (declare (explicit-check))
   (err-if-unacceptable-function new-value '(setf fdefinition))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
     (maybe-clobber-ftype name new-value)
@@ -357,12 +360,14 @@
 (defun fboundp (name)
   #!+sb-doc
   "Return true if name has a global function definition."
+  (declare (explicit-check))
   (let ((fdefn (find-fdefn name)))
     (and fdefn (fdefn-fun fdefn) t)))
 
 (defun fmakunbound (name)
   #!+sb-doc
   "Make NAME have no global function definition."
+  (declare (explicit-check))
   (with-single-package-locked-error
       (:symbol name "removing the function or macro definition of ~A")
     (let ((fdefn (find-fdefn name)))

@@ -150,6 +150,7 @@ means to wait indefinitely.")
   #!+sb-doc
   "This function causes execution to be suspended for SECONDS. SECONDS may be
 any non-negative real number."
+  (declare (explicit-check))
   (when (or (not (realp seconds))
             (minusp seconds))
     (error 'simple-type-error

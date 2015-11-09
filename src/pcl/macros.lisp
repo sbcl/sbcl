@@ -89,7 +89,7 @@
              (error "~S is not a legal class name." symbol)))))
 
 (defun find-class (symbol &optional (errorp t) environment)
-  (declare (ignore environment))
+  (declare (ignore environment) (explicit-check))
   (find-class-from-cell symbol
                         (find-classoid-cell symbol)
                         errorp))
