@@ -6,6 +6,45 @@
 ;;;; This software is in the public domain and is provided with absolutely no
 ;;;; warranty. See the COPYING and CREDITS files for more information.
 
+(in-package "SB-C") ; FIXME: not the best package for FDOCUMENTATION
+
+;;; FDOCUMENTATION refers to STRUCTURE-CLASS which has only a skeletal
+;;; representation during cross-compilation. Better to define this late.
+(defun fdocumentation (x doc-type)
+  (case doc-type
+    (variable
+     (typecase x
+       (symbol (values (info :variable :documentation x)))))
+    ;; FUNCTION is not used at the momemnt, just here for symmetry.
+    (function
+     (cond ((functionp x)
+            (%fun-doc x))
+           ((and (legal-fun-name-p x) (fboundp x))
+            (%fun-doc (or (and (symbolp x) (macro-function x))
+                          (fdefinition x))))))
+    (structure
+     (typecase x
+       (symbol (cond
+                 ((eq (info :type :kind x) :instance)
+                  (values (info :type :documentation x)))
+                 ((info :typed-structure :info x)
+                  (values (info :typed-structure :documentation x)))))))
+    (type
+     (typecase x
+       (structure-class (values (info :type :documentation (class-name x))))
+       (t (and (typep x 'symbol) (values (info :type :documentation x))))))
+    (setf (values (info :setf :documentation x)))
+    ((t)
+     (typecase x
+       (function (%fun-doc x))
+       (package (package-doc-string x))
+       (structure-class (values (info :type :documentation (class-name x))))
+       ((or symbol cons)
+        (random-documentation x doc-type))))
+    (t
+     (when (typep x '(or symbol cons))
+       (random-documentation x doc-type)))))
+
 (in-package "SB-PCL")
 
 (defun fun-doc (x)

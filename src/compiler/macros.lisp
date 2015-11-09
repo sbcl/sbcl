@@ -46,6 +46,7 @@
         (declare (lambda-list ,lambda-list))
         (,lambda-expr ,whole-var *lexenv*)
         (values))
+      #-sb-xc-host
       (install-guard-function ',name '(:special ,name) ,(or #!+sb-doc doc))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.

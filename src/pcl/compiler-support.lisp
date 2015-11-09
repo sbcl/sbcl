@@ -34,9 +34,6 @@
 ;;;; very low-level representation of instances with meta-class
 ;;;; STANDARD-CLASS
 
-(defknown sb-pcl::pcl-instance-p (t) boolean
-  (movable foldable flushable explicit-check))
-
 (deftransform sb-pcl::pcl-instance-p ((object))
   (let* ((otype (lvar-type object))
          (standard-object (specifier-type 'standard-object)))

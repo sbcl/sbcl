@@ -180,7 +180,6 @@ comparison.")
 ;;; In all cases, SET-FUN-NAME must return the new (or same)
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
-(declaim (ftype function class-of))
 ;; This is an absolutely terrible name for a function which both assigns
 ;; the name slot of a function, and _sometimes_ binds a name to a function.
 (defun set-fun-name (fun new-name)

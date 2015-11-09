@@ -41,16 +41,6 @@
 
 (in-package "SB-C")
 
-(defknown slot-value (t symbol) t (any))
-(defknown (slot-boundp slot-exists-p) (t symbol) boolean)
-(defknown sb-pcl::set-slot-value (t symbol t) t (any))
-
-(defknown find-class (symbol &optional t lexenv-designator)
-  (or class null))
-(defknown class-of (t) class (flushable))
-(defknown class-name (class) symbol (flushable))
-
-;; FIXME: shouldn't we remove the compiler-macro now?
 (deftransform slot-value ((object slot-name) (t (constant-arg symbol)) *
                           :node node)
   (let ((c-slot-name (lvar-value slot-name)))
@@ -68,7 +58,6 @@
                  `(sb-pcl::accessor-slot-value object ',c-slot-name))))
         (give-up-ir1-transform "slot name is not an interned symbol"))))
 
-;; FIXME: shouldn't we remove the compiler-macro now?
 (deftransform sb-pcl::set-slot-value ((object slot-name new-value)
                                       (t (constant-arg symbol) t)
                                       * :node node)

@@ -181,16 +181,15 @@ only."
     (clear-info :function :type symbol)
     (setf (info :function :kind symbol) :macro)
     (setf (info :function :macro-function symbol) function)
-    (install-guard-function symbol `(:macro ,symbol) nil))
+    #-sb-xc-host (install-guard-function symbol `(:macro ,symbol) nil))
   function)
 
 ;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
 ;; preventing funcall/apply of macros and special operators.
+#-sb-xc-host
 (defun install-guard-function (symbol fun-name docstring)
-  #+sb-xc-host (declare (ignore fun-name))
   (when docstring
     (setf (random-documentation symbol 'function) docstring))
-  #-sb-xc-host
   ;; (SETF SYMBOL-FUNCTION) goes out of its way to disallow this closure,
   ;; but we can trivially replicate its low-level effect.
   (setf (fdefn-fun (find-or-create-fdefn symbol))
@@ -256,45 +255,6 @@ return NIL. Can be set with SETF when ENV is NIL."
 ;;; DEF!STRUCT and DEF!MACRO and so forth. And consider simply saving
 ;;; all the BDOCUMENTATION entries in a *BDOCUMENTATION* hash table
 ;;; and slamming them into PCL once PCL gets going.
-(defun fdocumentation (x doc-type)
-  ;; In the cross-compiler, %FUN-DOC is just plain wrong, and while it
-  ;; might "work" to fetch strings using INFO, it really doesn't make sense.
-  #+sb-xc-host (declare (ignore x doc-type))
-  #-sb-xc-host
-  (case doc-type
-    (variable
-     (typecase x
-       (symbol (values (info :variable :documentation x)))))
-    ;; FUNCTION is not used at the momemnt, just here for symmetry.
-    (function
-     (cond ((functionp x)
-            (%fun-doc x))
-           ((and (legal-fun-name-p x) (fboundp x))
-            (%fun-doc (or (and (symbolp x) (macro-function x))
-                          (fdefinition x))))))
-    (structure
-     (typecase x
-       (symbol (cond
-                 ((eq (info :type :kind x) :instance)
-                  (values (info :type :documentation x)))
-                 ((info :typed-structure :info x)
-                  (values (info :typed-structure :documentation x)))))))
-    (type
-     (typecase x
-       (structure-class (values (info :type :documentation (class-name x))))
-       (t (and (typep x 'symbol) (values (info :type :documentation x))))))
-    (setf (values (info :setf :documentation x)))
-    ((t)
-     (typecase x
-       (function (%fun-doc x))
-       (package (package-doc-string x))
-       (structure-class (values (info :type :documentation (class-name x))))
-       ((or symbol cons)
-        (random-documentation x doc-type))))
-    (t
-     (when (typep x '(or symbol cons))
-       (random-documentation x doc-type)))))
-
 (defun (setf fdocumentation) (string name doc-type)
   (declare (type (or null string) string))
   #+sb-xc-host (declare (ignore name doc-type))
@@ -337,9 +297,11 @@ return NIL. Can be set with SETF when ENV is NIL."
            (setf (random-documentation name doc-type) string))))
   string)
 
+#-sb-xc-host
 (defun random-documentation (name type)
   (cdr (assoc type (info :random-documentation :stuff name))))
 
+#-sb-xc-host
 (defun (setf random-documentation) (new-value name type)
   (let ((pair (assoc type (info :random-documentation :stuff name))))
     (if pair

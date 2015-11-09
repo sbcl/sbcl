@@ -1841,3 +1841,18 @@
     (cons fixnum) fixnum)
 (defknown spin-loop-hint () (values)
     (always-translatable))
+
+;;;; PCL
+
+(defknown sb!pcl::pcl-instance-p (t) boolean
+  (movable foldable flushable explicit-check))
+
+;; FIXME: should T be be (OR INSTANCE FUNCALLABLE-INSTANCE) etc?
+(defknown slot-value (t symbol) t (any))
+(defknown (slot-boundp slot-exists-p) (t symbol) boolean)
+(defknown sb!pcl::set-slot-value (t symbol t) t (any))
+
+(defknown find-class (symbol &optional t lexenv-designator)
+  (or class null) (explicit-check))
+(defknown class-of (t) class (flushable explicit-check))
+(defknown class-name (class) symbol (flushable))
