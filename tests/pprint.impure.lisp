@@ -252,15 +252,21 @@
          (sb-int:standard-pprint-dispatch-table-modified-error ()
            :error)))))
 
+(defun pprint-to-string (form)
+  (let ((string (with-output-to-string (s) (pprint form s))))
+    (assert (eql #\newline (char string 0)))
+    (subseq string 1)))
 (with-test (:name :pprint-defmethod-lambda-list-function)
-  (flet ((to-string (form)
-           (let ((string (with-output-to-string (s) (pprint form s))))
-             (assert (eql #\newline (char string 0)))
-             (subseq string 1))))
-    (assert (equal "(DEFMETHOD FOO ((FUNCTION CONS)) FUNCTION)"
-                   (to-string `(defmethod foo ((function cons)) function))))
-    (assert (equal "(DEFMETHOD FOO :AFTER (FUNCTION CONS) FUNCTION)"
-                   (to-string `(defmethod foo :after (function cons) function))))))
+  (assert (equal "(DEFMETHOD FOO ((FUNCTION CONS)) FUNCTION)"
+                 (pprint-to-string `(defmethod foo ((function cons)) function))))
+  (assert (equal "(DEFMETHOD FOO :AFTER (FUNCTION CONS) FUNCTION)"
+                 (pprint-to-string `(defmethod foo :after (function cons) function))))
+  (assert (equal "(DEFMETHOD FOO :BEFORE ((FUNCTION (EQL #'FOO))) FUNCTION)"
+                 (pprint-to-string `(DEFMETHOD FOO :BEFORE ((FUNCTION (EQL #'FOO))) FUNCTION)))))
+
+(with-test (:name :pprint-lambda-list-quote)
+  (assert (equal "(LAMBDA (&KEY (BAR 'BAZ)))"
+                 (pprint-to-string '(lambda (&key (bar 'baz)))))))
 
 (defclass frob () ())
 

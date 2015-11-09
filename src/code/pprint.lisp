@@ -945,26 +945,31 @@ line break."
         (pprint-exit-if-list-exhausted)
         (unless first
           (write-char #\space stream))
-        (let ((arg (pprint-pop)))
-          (unless first
-            (case arg
-              (&optional
-               (setf state :optional)
-               (pprint-newline :linear stream))
-              ((&rest &body)
-               (setf state :required)
-               (pprint-newline :linear stream))
-              (&key
-               (setf state :key)
-               (pprint-newline :linear stream))
-              (&aux
-               (setf state :optional)
-               (pprint-newline :linear stream))
-              (t
-               (pprint-newline :fill stream))))
+       (let ((arg (pprint-pop)))
+          (case arg
+            ((&optional &aux)
+             (setf state :optional)
+             (pprint-newline :linear stream))
+            ((&rest &body)
+             (setf state :required)
+             (pprint-newline :linear stream))
+            (&key
+             (setf state :key)
+             (pprint-newline :linear stream))
+            (t
+             (pprint-newline :fill stream)))
           (ecase state
             (:required
-             (pprint-lambda-list stream arg))
+             ;; Make sure method specializers like
+             ;; (function (eql #'foo)) are printed right
+             (pprint-logical-block
+                 (stream arg :prefix "(" :suffix ")")
+               (pprint-exit-if-list-exhausted)
+               (loop
+                (output-object (pprint-pop) stream)
+                (pprint-exit-if-list-exhausted)
+                (write-char #\space stream)
+                (pprint-newline :linear stream))))
             ((:optional :key)
              (pprint-logical-block
                  (stream arg :prefix "(" :suffix ")")
@@ -977,13 +982,13 @@ line break."
                      (pprint-exit-if-list-exhausted)
                      (write-char #\space stream)
                      (pprint-newline :fill stream)
-                     (pprint-lambda-list stream (pprint-pop))
+                     (output-object (pprint-pop) stream)
                      (loop
                        (pprint-exit-if-list-exhausted)
                        (write-char #\space stream)
                        (pprint-newline :fill stream)
                        (output-object (pprint-pop) stream)))
-                   (pprint-lambda-list stream (pprint-pop)))
+                   (output-object (pprint-pop) stream))
                (loop
                  (pprint-exit-if-list-exhausted)
                  (write-char #\space stream)
