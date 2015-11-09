@@ -136,6 +136,7 @@
                 #+sb-fasteval "SRC;INTERPRETER;SEXPR"
                 #+sb-fasteval "SRC;INTERPRETER;SPECIAL-FORMS"
                 #+sb-fasteval "SRC;INTERPRETER;EVAL"
+                #+sb-fasteval "SRC;INTERPRETER;DEBUG"
 
                 "SRC;CODE;DESCRIBE-POLICY"
                 "SRC;CODE;INSPECT"

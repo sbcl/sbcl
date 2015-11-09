@@ -1251,15 +1251,18 @@ register."
 
 ;;; Return the name of the function represented by DEBUG-FUN. This may
 ;;; be a string or a cons; do not assume it is a symbol.
-(defun debug-fun-name (debug-fun)
-  (declare (type debug-fun debug-fun))
+(defun debug-fun-name (debug-fun &optional (pretty t))
+  (declare (type debug-fun debug-fun) (ignorable pretty))
   (etypecase debug-fun
     (compiled-debug-fun
      (let ((name (sb!c::compiled-debug-fun-name
                   (compiled-debug-fun-compiler-debug-fun debug-fun))))
-       ;; Frames named (.EVAL. special-operator) should show the operator name.
+       ;; Frames named (.EVAL. special-operator) should show the operator name
+       ;; in backtraces, but if the debugger needs to detect that the frame is
+       ;; interpreted for other purposes, it can specify PRETTY = NIL.
        (cond #!+sb-fasteval
-             ((typep name '(cons (eql sb!interpreter::.eval.)))
+             ((and (typep name '(cons (eql sb!interpreter::.eval.)))
+                   pretty)
               (if (singleton-p (cdr name)) (cadr name) (cdr name)))
              (t name))))
     (bogus-debug-fun

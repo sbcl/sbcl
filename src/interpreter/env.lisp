@@ -192,7 +192,7 @@
 (declaim (inline frame-size))
 (defun frame-size (frame) (length (frame-values frame)))
 
-;;; A LET* frame is just like a LET frame, but needs two policies.
+;;; A LET* frame is just like a LET frame.
 (defstruct (let*-frame
              (:include frame) (:predicate nil) (:copier nil)
              (:constructor make-let*-frame

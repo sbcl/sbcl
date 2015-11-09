@@ -1617,6 +1617,13 @@ forms that explicitly control this kind of evaluation.")
 
 (!def-debug-command "LIST-LOCALS" ()
   (let ((d-fun (sb!di:frame-debug-fun *current-frame*)))
+    #!+sb-fasteval
+    (when (typep (sb!di:debug-fun-name d-fun nil)
+                 '(cons (eql sb!interpreter::.eval.)))
+      (let ((env (arg 1)))
+        (when (typep env 'sb!interpreter:basic-env)
+          (return-from list-locals-debug-command
+            (sb!interpreter:list-locals env)))))
     (if (sb!di:debug-var-info-available d-fun)
         (let ((*standard-output* *debug-io*)
               (location (sb!di:frame-code-location *current-frame*))

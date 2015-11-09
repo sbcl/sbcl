@@ -3193,6 +3193,7 @@ structure representations"
                "FUN-SOURCE-LOCATION"
                "%FUN-TYPE" ; to avoid conflict with SB-KERNEL:FUN-TYPE
                "LEXENV-FROM-ENV"
+               "LIST-LOCALS"
                "PREPARE-FOR-COMPILE"
                "SET-FUN-DOCSTRING"
                "SET-FUN-NAME"
