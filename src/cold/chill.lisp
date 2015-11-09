@@ -63,7 +63,7 @@
 (export '(sb-int::def!method
           sb-int::!cold-init-forms
           sb-int::!coerce-to-specialized
-          sb-int::/show sb-int::/show0
+          sb-int::/show sb-int::/noshow sb-int::/show0 sb-int::/noshow0
           sb-int::!uncross-format-control)
         'sb-int)
 
@@ -83,4 +83,6 @@
 ;; Otherwise define them as no-ops.
 (unless (fboundp 'sb-int:/show)
   (defmacro sb-int:/show (&rest junk) (declare (ignore junk)))
-  (setf (macro-function 'sb-int:/show0) (macro-function 'sb-int:/show)))
+  (setf (macro-function 'sb-int:/noshow) (macro-function 'sb-int:/show)
+        (macro-function 'sb-int:/show0) (macro-function 'sb-int:/show)
+        (macro-function 'sb-int:/noshow0) (macro-function 'sb-int:/show)))
