@@ -1604,6 +1604,7 @@ or they must be declared locally notinline at each call site.~@:>")
                                (dd-slots dd))))
       (return-from structure-ctor-lambda-parts
         `((&key ,@lambda-list)
+          (declare (explicit-check))
           ,(funcall creator dd
                     (mapcar (lambda (dsd arg)
                               (let ((type (dsd-type dsd))
@@ -1655,6 +1656,7 @@ or they must be declared locally notinline at each call site.~@:>")
           ;; subsequent bindings refer to the deleted ones.
           ;; And worse, what if it's SETQd - is that even legal?
           (remove-if (lambda (x) (not (typep x '(cons t cons)))) aux))
+        (declare (explicit-check))
         ,(funcall
           creator dd
           (mapcar

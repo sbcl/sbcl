@@ -883,6 +883,9 @@ and no value was provided for it." name))))))))))
            :unwinnage-fun #'compiler-notify
            :where "proclamation"
            :really-assert (not explicit-check)))
+        ;; Can't actually test this. DEFSTRUCTs declare this, but non-toplevel
+        ;; ones won't have an FTYPE at compile-time.
+        #+nil
         (when explicit-check
           (warn "Explicit-check without known FTYPE is meaningless")))))
 
