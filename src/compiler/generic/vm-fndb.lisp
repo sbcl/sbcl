@@ -155,7 +155,7 @@
   (always-translatable))
 (defknown %layout-invalid-error (t layout) nil)
 
-#!+(or x86-64)
+#!+(or x86 x86-64)
 (defknown %raw-instance-cas/word (instance index sb!vm:word sb!vm:word)
   sb!vm:word ())
 (defknown %raw-instance-ref/word (instance index) sb!vm:word

@@ -453,8 +453,6 @@
   instance-slots-offset instance-pointer-lowtag
   (any-reg descriptor-reg) *
   %instance-cas)
-;; No good - need to implement interleaved raw slots first.
-#+nil
 (define-full-compare-and-swap %raw-instance-cas/word instance
   instance-slots-offset instance-pointer-lowtag
   (unsigned-reg) unsigned-num %raw-instance-cas/word)

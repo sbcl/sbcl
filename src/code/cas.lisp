@@ -122,7 +122,7 @@ EXPERIMENTAL: Interface subject to change."
          (casser
           (case (dsd-raw-type slotd)
             ((t) '%instance-cas)
-            #!+(or x86-64)
+            #!+(or x86 x86-64)
             ((word) '%raw-instance-cas/word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~

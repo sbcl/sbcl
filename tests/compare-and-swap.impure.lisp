@@ -152,7 +152,7 @@
     (assert (= (- (ash 1 sb-vm:n-word-bits) 2) (box-word box)))))
 
 (with-test (:name :cas-raw-instance-ref-word
-            :skipped-on '(not (or :x86-64)))
+            :skipped-on '(not (or :x86 :x86-64)))
   (let ((foo (make-box :word 42)))
     ;; basic smoke test - not checking for atomicity or anything
     (assert (eql (cas (box-word foo) 42 43) 42))
