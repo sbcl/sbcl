@@ -9,12 +9,12 @@ multiprocessing on machines that have more than one CPU, but it does
 not allow Lisp control of the scheduler.  This is found in the
 SB-THREAD package.
 
-Threads are part of the default build on x86[-64] Linux only.
+Threads are part of the default build on x86[-64] Linux and Windows.
 
-They are also experimentally supported on: x86[-64] Darwin (Mac OS X),
-x86[-64] FreeBSD, x86 SunOS (Solaris), and PPC Linux. On these platforms
-threads must be explicitly enabled at build-time, see @file{INSTALL} for
-directions.
+They are also supported on: x86[-64] Darwin (Mac OS X), x86[-64]
+FreeBSD, x86 SunOS (Solaris), PPC Linux, ARM64 Linux. On these
+platforms threads must be explicitly enabled at build-time, see
+@file{INSTALL} for directions.
 
 @menu
 * Threading basics::            
@@ -279,9 +279,9 @@ it.
 @section Barriers
 
 These are based on the Linux kernel barrier design, which is in turn
-based on the Alpha CPU memory model.  They are presently implemented for
-x86, x86-64, and PPC systems, and behave as compiler barriers on all
-other CPUs.
+based on the Alpha CPU memory model. They are presently implemented
+for x86, x86-64, PPC, and ARM64 systems, and behave as compiler
+barriers on all other CPUs.
 
 In addition to explicit use of the @code{sb-thread:barrier} macro, the
 following functions and macros also serve as @code{:memory} barriers:

@@ -26,7 +26,7 @@
    ENVIRONMENT-NAME is unused.
 
    This function is a no-op on platforms using the generational garbage
-   collector (x86, x86-64, ppc)."
+   collector (x86, x86-64, ppc, arm, arm64)."
   (declare (ignore environment-name))
   #!+gencgc
   (declare (ignore root-structures))
