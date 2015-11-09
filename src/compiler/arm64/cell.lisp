@@ -378,8 +378,8 @@
    (:temporary (:scs (any-reg)) bsp-temp)
    (:generator 0
      (load-symbol-value bsp-temp *binding-stack-pointer*)
-     (inst ldp value symbol (@ bsp (* (- binding-value-slot binding-size)
-                                     n-word-bytes)))
+     (inst ldp value symbol (@ bsp-temp (* (- binding-value-slot binding-size)
+                                           n-word-bytes)))
      (storew value symbol symbol-value-slot other-pointer-lowtag)
      ;; The order of stores here is reversed with respect to interrupt safety,
      ;; but STP cannot be interrupted in the middle.

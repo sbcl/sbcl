@@ -745,9 +745,14 @@ create_thread_struct(lispobj initial_function) {
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
-#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64) || defined(LISP_FEATURE_SB_THREAD)
+
+#ifdef LISP_FEATURE_SB_THREAD
     th->pseudo_atomic_bits=0;
+#else
+    clear_pseudo_atomic_atomic(th);
+    clear_pseudo_atomic_interrupted(th);
 #endif
+
 #ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
 # if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
@@ -777,11 +782,6 @@ create_thread_struct(lispobj initial_function) {
     SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
     SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
-    SetSymbolValue(PSEUDO_ATOMIC_BITS,(lispobj)th->pseudo_atomic_bits,th);
-#endif
-#ifdef PSEUDO_ATOMIC_INTERRUPTED
-    clear_pseudo_atomic_atomic(th);
-    clear_pseudo_atomic_interrupted(th);
 #endif
 #endif
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
