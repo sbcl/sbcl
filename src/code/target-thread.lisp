@@ -1530,10 +1530,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            ;; Allocate in the parent
            (thread-list (list thread thread)))
       (declare (dynamic-extent setup-sem))
-      ;; It could be just pinned instead, but implementing DX closures
-      ;; is much easier than implementing threading.
-      #!-(or stack-allocatable-closures stack-allocatable-fixed-objects)
-      #.(error "Stack allocatable closures required.")
       (dx-flet ((initial-thread-function ()
                   ;; Win32 doesn't inherit parent thread's FP modes,
                   ;; while it seems to happen everywhere else
