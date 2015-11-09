@@ -114,7 +114,7 @@
 ;; Coerce CALLABLE (a function-designator) to a FUNCTION.
 ;; The compiler emits this when someone tries to FUNCALL something.
 ;; Extended-function-designators are not accepted,
-;; This function is defknowned with 'explicit-check', and we avoid calling
+;; This function declares EXPLICIT-CHECK, and we avoid calling
 ;; SYMBOL-FUNCTION because that would do another check.
 ;; It would be great if this could change its error message
 ;; depending on the input to either:

@@ -82,10 +82,6 @@
   ;; definition for a known function, since it might be a botched
   ;; interpreter stub.)
   recursive
-  ;; The function does explicit argument type checking, so the
-  ;; declared type should not be asserted when a definition is
-  ;; compiled.
-  explicit-check
   ;; The function should always be translated by a VOP (i.e. it should
   ;; should never be converted into a full call).  This is used strictly
   ;; as a consistency checking mechanism inside the compiler during IR2

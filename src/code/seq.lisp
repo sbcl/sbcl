@@ -410,9 +410,8 @@
                 (awhen (find-class adjusted-type nil)
                   (let ((prototype (sb!mop:class-prototype
                                     (sb!pcl:ensure-class-finalized it))))
-                   ;; This function is DEFKNOWNed with EXPLICIT-CHECK,
-                   ;; so we must manually assert that user-written methods
-                   ;; return a subtype of SEQUENCE.
+                   ;; This function has the EXPLICIT-CHECK declaration,
+                   ;; so we manually assert that it returns a SEQUENCE.
                    (the sequence
                     (if iep
                         (sb!sequence:make-sequence-like
@@ -921,9 +920,8 @@ many elements are copied."
          (concat-to-simple* output-type-spec sequences))
         ((and (csubtypep type (specifier-type 'sequence))
               (awhen (find-class output-type-spec nil)
-               ;; This function is DEFKNOWNed with EXPLICIT-CHECK,
-               ;; so we must manually assert that user-written methods
-               ;; return a subtype of SEQUENCE.
+               ;; This function has the EXPLICIT-CHECK declaration,
+               ;; so we manually assert that it returns a SEQUENCE.
                (the sequence
                 (apply #'sb!sequence:concatenate
                        (sb!mop:class-prototype
@@ -1090,9 +1088,8 @@ many elements are copied."
                   (%map-to-vector result-type really-fun sequences))
                  ((and (csubtypep type (specifier-type 'sequence))
                        (awhen (find-class result-type nil)
-                         ;; This function is DEFKNOWNed with EXPLICIT-CHECK,
-                         ;; so we must manually assert that user-written methods
-                         ;; return a subtype of SEQUENCE.
+                         ;; This function has the EXPLICIT-CHECK declaration,
+                         ;; so we manually assert that it returns a SEQUENCE.
                          (the sequence
                               (apply #'sb!sequence:map
                                      (sb!mop:class-prototype

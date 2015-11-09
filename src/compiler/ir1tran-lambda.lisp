@@ -1196,7 +1196,6 @@
          (name (leaf-source-name var))
          (info (info :function :info name))
          (explicit-check (getf (functional-plist fun) 'explicit-check)))
-    (verify-explicit-check-sanity explicit-check name)
     (assert-definition-type
      fun type
      ;; KLUDGE: Common Lisp is such a dynamic language that in general
