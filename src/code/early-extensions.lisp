@@ -1429,7 +1429,7 @@
 (defun setup-type-in-final-deprecation
     (software version name replacement-spec)
   (declare (ignore software version replacement-spec))
-  (%compiler-deftype name (constant-type-expander t) nil))
+  (%compiler-deftype name (constant-type-expander name t) nil))
 
 (defmacro define-deprecated-function (state version name replacements lambda-list
                                       &body body)

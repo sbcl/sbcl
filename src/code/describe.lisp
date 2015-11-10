@@ -710,11 +710,8 @@
 
 (defun describe-type (name stream)
   (let* ((kind (info :type :kind name))
-         (fun (case kind
-                (:defined
-                 (or (info :type :expander name) t))
-                (:primitive
-                 (or (info :type :translator name) t)))))
+         (fun (and kind (info :type :expander name)))
+         (fun (if (listp fun) (car fun) fun)))
     (when fun
       (pprint-newline :mandatory stream)
       (pprint-logical-block (stream nil)
@@ -723,7 +720,7 @@
         (pprint-indent :block 2 stream)
         (describe-deprecation 'type name stream)
         (describe-documentation name 'type stream (eq t fun))
-        (unless (eq t fun)
+        (when (functionp fun)
           (describe-lambda-list (%fun-lambda-list fun) stream)
           (multiple-value-bind (expansion ok)
               (handler-case (typexpand-1 name)

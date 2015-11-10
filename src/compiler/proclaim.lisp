@@ -241,7 +241,7 @@
                ((listp id)
                 (let ((id (car id)))
                   (and (symbolp id)
-                       (or (info :type :translator id)
+                       (or (info :type :expander id)
                            (info :type :kind id)))))
                (t
                 ;; FIXME: should be (TYPEP id '(OR CLASS CLASSOID))

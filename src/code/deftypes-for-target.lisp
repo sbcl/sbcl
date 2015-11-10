@@ -121,6 +121,13 @@
 (sb!xc:deftype restart-designator ()
   '(or (and symbol (not null)) restart))
 
+;; FIXME: this fails to consider an EQL-SPECIALIZER a TYPE-SPECIFIER.
+;; SPECIFIER-TYPE has the explicit-check declaration, so that kinda works,
+;; because it doesn't check against this specifier.
+;; Somewhat miraculously, SB-C::CANONIZED-DECL-SPEC also works, so this works:
+;;  (lambda (x) (declare (#.(sb-mop::intern-eql-specializer 'serial) x)) x)
+;; But I suspect this must be reverted to (OR LIST SYMBOL INSTANCE)
+;; or we have to hack EQL-SPECIALIZER into 'condition-boot', sad as that is.
 (sb!xc:deftype type-specifier ()
   '(or list symbol classoid class))
 

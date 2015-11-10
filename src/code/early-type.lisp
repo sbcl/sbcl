@@ -825,12 +825,13 @@
                 (case (info :type :kind spec)
                   (:instance (return (find-classoid spec)))
                   (:forthcoming-defclass-type (go unknown))))
-              (awhen (info :type :translator head)
-                (return (or (funcall it context spec) (fail spec))))
               ;; Expansion brings up an interesting question - should the cache
               ;; contain entries for intermediary types? Say A -> B -> REAL.
               ;; As it stands, we cache the ctype corresponding to A but not B.
               (awhen (info :type :expander head)
+                (when (listp it) ; The function translates directly to a CTYPE.
+                  (return (or (funcall (car it) context spec) (fail spec))))
+                ;; The function produces a type expression.
                 (let ((expansion (funcall it (ensure-list spec))))
                   (return (if (typep expansion 'instance)
                               (instance-to-ctype expansion)
@@ -895,7 +896,7 @@ expansion happened."
                ;; a) From a user's point of view, CL types are opaque.
                ;;
                ;; b) so (EQUAL (TYPEXPAND 'STRING) (TYPEXPAND-ALL 'STRING))
-    (if (and expander (not (info :type :builtin atom)))
+    (if (and (functionp expander) (not (info :type :builtin atom)))
         (values (funcall expander (if (symbolp spec) (list spec) spec)) t)
         (values type-specifier nil))))
 

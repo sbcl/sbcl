@@ -571,39 +571,16 @@
 
 (define-info-type (:type :documentation) :type-spec (or string null))
 
-;;; A function that parses type specifiers into CTYPE structures.
-(define-info-type (:type :translator)
-  :type-spec (or function null)
-  ;; This error is never seen by a user. After meta-compile there is no
-  ;; means to define additional types with custom translators.
-  :validate-function (lambda (name new-value)
-                       ;; The compiler-macro signals an error
-                       ;; on forward-referenced info-types.
-                       #+sb-xc-host (declare (notinline info))
-                       (when (and new-value (info :type :expander name))
-                         (bug "Type has an expander"))))
+;;; The expander function for a defined type,
+;;; or a cons whose CAR is a function which is a builtin type translator.
+(define-info-type (:type :expander) :type-spec (or function list))
 
-;;; The expander function for a defined type.
-;;; It returns a type expression, not a CTYPE.
-(define-info-type (:type :expander)
-  :type-spec (or function null)
-  ;; This error is never seen by a user.
-  ;; The user sees "illegal to redefine standard type".
-  :validate-function (lambda (name new-value)
-                       (when (and new-value (info :type :translator name))
-                         (bug "Type has a translator"))))
-
-;;; If true, then the type coresponding to this name. Note that if
+;;; If non-nil, then the type coresponding to this name. Note that if
 ;;; this is a built-in class with a translation, then this is the
 ;;; translation, not the class object. This info type keeps track of
 ;;; various atomic types (NIL etc.) and also serves as a means to
 ;;; ensure that common standard types are only consed once.
-(define-info-type (:type :builtin)
-  :type-spec (or ctype null)
-  :validate-function (lambda (name new-value)
-                       (when (and (ctype-p new-value)
-                                  (ctype-p (info :type :translator name)))
-                         (bug ":BUILTIN and :TRANSLATOR are incompatible"))))
+(define-info-type (:type :builtin) :type-spec (or ctype null))
 
 ;;; The classoid-cell for this type
 (define-info-type (:type :classoid-cell) :type-spec t)

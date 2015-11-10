@@ -284,7 +284,7 @@ If an unsupported TYPE is requested, the function will return NIL.
           (if loc
               (translate-source-location loc)
               (let ((expander-fun (sb-int:info :type :expander name)))
-                (when expander-fun
+                (when (functionp expander-fun)
                   (find-definition-source expander-fun))))))
        ((:method)
         (when (fboundp name)
@@ -520,10 +520,9 @@ value, and a flag whether the arglist could be found as second
 value."
   (check-type typespec-operator symbol)
   ;; Don't return a lambda-list for combinators AND,OR,NOT.
-  (let ((f (and (sb-int:info :type :kind typespec-operator)
-                ;; globaldb prevents storing both of these
-                (or (sb-int:info :type :expander typespec-operator)
-                    (sb-int:info :type :translator typespec-operator)))))
+  (let* ((f (and (sb-int:info :type :kind typespec-operator)
+                 (sb-int:info :type :expander typespec-operator)))
+         (f (if (listp f) (car f) f)))
     (if (functionp f)
         (values (sb-kernel:%fun-lambda-list f) t)
         (values nil nil))))

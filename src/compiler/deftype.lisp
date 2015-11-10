@@ -35,7 +35,6 @@
   (unless (symbolp name)
     (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
               form))
-  ;; FIXME: why is SOURCE-LOCATION-FORM not always just '(SOURCE-LOCATION)?
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body t)
         ;; FIXME: CONSTANTP would need to understand backquote a little better
@@ -52,6 +51,8 @@
                (t
                 ;; FIXME: it seems non-ANSI-compliant to pretend every lexenv
                 ;; is nil. See also lp#309140.
+                ;; Source-location and docstring are associated with the lambda
+                ;; so we don't store them separately.
                 (make-macro-lambda `(type-expander ,name)
                                    lambda-list body 'deftype name
                                    :doc-string-allowed :external
