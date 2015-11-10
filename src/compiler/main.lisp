@@ -1069,6 +1069,17 @@ necessary, since type inference may take arbitrarily long to converge.")
              ;; FIXME: Ideally, something should be done so that DECLAIM
              ;; inside LOCALLY works OK. Failing that, at least we could
              ;; issue a warning instead of silently screwing up.
+             ;; Here's how to fix this: a POLICY object can in fact represent
+             ;; absence of qualitities. Whenever we rebind *POLICY* (here and
+             ;; elsewhere), it should be bound to a policy that expresses no
+             ;; qualities. Proclamations should update SYMBOL-GLOBAL-VALUE of
+             ;; *POLICY*, which can be seen irrespective of dynamic bindings,
+             ;; and declarations should update the lexical policy.
+             ;; The POLICY macro can be amended to merge the dynamic *POLICY*
+             ;; (or whatever it came from, like a LEXENV) with the global
+             ;; *POLICY*. COERCE-TO-POLICY can do the merge, employing a 1-line
+             ;; cache so that repeated calls for any two fixed policy objects
+             ;; return the identical value (since policies are immutable).
              (*policy* (lexenv-policy *lexenv*))
              ;; This is probably also a hack
              (*handled-conditions* (lexenv-handled-conditions *lexenv*))
