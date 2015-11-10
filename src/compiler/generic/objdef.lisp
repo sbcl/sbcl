@@ -450,7 +450,8 @@
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   ;; starting, running, suspended, dead
   (state :c-type "lispobj")
-  (tls-cookie)                          ;  on x86, the LDT index
+
+  #!+x86 (tls-cookie)                          ;  LDT index
   (interrupt-data :c-type "struct interrupt_data *"
                   :length #!+alpha 2 #!-alpha 1)
   ;; For various reasons related to pseudo-atomic and interrupt

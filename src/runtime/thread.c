@@ -439,7 +439,8 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
     gc_assert(lock_ret == 0);
 #endif
 
-    if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
+    arch_os_thread_cleanup(th);
+
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     os_sem_destroy(th->state_sem);
     os_sem_destroy(th->state_not_running_sem);
