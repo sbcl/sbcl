@@ -9,48 +9,53 @@
 
 (in-package "SB!IMPL")
 
-(defun constant-type-body-p (forms)
-  (destructuring-bind (&optional first . rest) forms
-    (and first (not rest)
-         (or (member first '(t nil))
-             (and (consp first) (eq (car first) 'quote))))))
-
-(defun constant-type-expander (expansion)
+(defun constant-type-expander (name expansion)
   (declare (optimize safety))
-  (lambda (whole)
-    (declare (sb!c::lambda-list ())) ; for introspection of DEFTYPE lambda-list
-    (if (cdr whole)
-        (error 'sb!kernel::arg-count-error
-               :kind 'deftype :name (car whole) :args (cdr whole)
-               :lambda-list '() :minimum 0 :maximum 0)
-        expansion)))
+  ;; Dummy implementation of SET-CLOSURE-NAME for the host.
+  (flet (#+sb-xc-host (set-closure-name (f name) (declare (ignore name)) f))
+    (set-closure-name
+     (lambda (whole)
+       ;; NB: It does not in general work to set the lambda-list of a closure,
+       ;; but all constant-type-expanders have NIL as the lambda-list
+       ;; because if they didn't, they wouldn't be constant.
+       (declare (sb!c::lambda-list ()))
+       (if (cdr whole)
+           (error 'sb!kernel::arg-count-error
+                  :kind 'deftype :name (car whole) :args (cdr whole)
+                  :lambda-list '() :minimum 0 :maximum 0)
+           expansion))
+     `(type-expander ,name))))
 
 (defvar !*xc-processed-deftypes* nil)
-(def!macro sb!xc:deftype (&whole form name lambda-list &body body)
+(def!macro sb!xc:deftype (&whole form name lambda-list &body body
+                          &environment env)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
+  (declare (ignore env))
   (unless (symbolp name)
     (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
               form))
+  ;; FIXME: why is SOURCE-LOCATION-FORM not always just '(SOURCE-LOCATION)?
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body t)
-        ;; FIXME: We could use CONSTANTP here to deal with slightly more
-        ;; complex deftypes using CONSTANT-TYPE-EXPANDER, but that XC:CONSTANTP
-        ;; is not availble early enough.
-        (if (and (not lambda-list) (not decls) (constant-type-body-p forms))
-            (progn
-              #-sb-xc-host (check-deprecated-type
-                            (typecase forms
-                              ((cons (cons (eql quote))) (cadar forms))
-                              ((cons symbol)             (car forms))))
-              (values `(constant-type-expander ,(car forms)) doc
-                      '(sb!c:source-location)))
-            ;; FIXME: it seems non-ANSI-compliant to pretend every lexenv
-            ;; is nil. See also lp#309140.
-            (make-macro-lambda `(type-expander ,name)
-                               lambda-list body 'deftype name
-                               :doc-string-allowed :external
-                               :environment :ignore)))
+        ;; FIXME: CONSTANTP would need to understand backquote a little better
+        ;; to be of any help in expressions such as `(integer 1 ,max-foo).
+        (acond ((and (not lambda-list) (not decls)
+                    (let ((expr `(progn ,@forms)))
+                      ;; While CONSTANTP works early, %MACROEXPAND does not,
+                      ;; so we can't pass ENV because it'd try to macroexpand.
+                      (if (sb!xc:constantp expr) expr)))
+                #-sb-xc-host
+                (check-deprecated-type (constant-form-value it))
+                (values `(constant-type-expander ',name ,it) doc
+                        '(sb!c:source-location)))
+               (t
+                ;; FIXME: it seems non-ANSI-compliant to pretend every lexenv
+                ;; is nil. See also lp#309140.
+                (make-macro-lambda `(type-expander ,name)
+                                   lambda-list body 'deftype name
+                                   :doc-string-allowed :external
+                                   :environment :ignore))))
     `(progn
        #+sb-xc-host
        (eval-when (:compile-toplevel)

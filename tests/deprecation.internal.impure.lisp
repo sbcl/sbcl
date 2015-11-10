@@ -149,3 +149,7 @@
    :replacements '("DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT1"
                    "DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT2"
                    "DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT3")))
+
+(with-test (:name :deftype-tricky-constant)
+  (assert-signal (eval '(deftype cows () (if nil 'foo 'sb-thread::spinlock)))
+                 warning))
