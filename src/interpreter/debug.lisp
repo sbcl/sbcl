@@ -20,3 +20,20 @@
               (format t "~S  =  ~S~%"
                       (car (svref symbols i))
                       (svref values i)))))))))
+
+(defun flush-macros () (atomic-incf *globaldb-cookie*))
+
+;; This is for SAVE-LISP-AND-DIE. It removes all accumulated stuff
+;; that can be recreated in the normal course of evaluation.
+(defun flush-everything ()
+  (sb-vm::map-allocated-objects
+   (lambda (obj type size)
+     (declare (ignore type size))
+     (when (typep obj 'interpreted-function)
+       (let ((proto-fn (interpreted-function-proto-fn obj)))
+         (setf (proto-fn-%frame proto-fn) nil
+               (proto-fn-cookie proto-fn) nil
+               (proto-fn-type proto-fn) nil
+               (interpreted-function-frame obj) nil
+               (interpreted-function-cookie obj) nil))))
+   :dynamic))

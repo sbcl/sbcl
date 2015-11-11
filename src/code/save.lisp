@@ -181,6 +181,7 @@ sufficiently motivated to do lengthy fixes."
         (return-from save-lisp-and-die))))
   (when (eql t compression)
     (setf compression -1))
+  #!+sb-fasteval (sb!interpreter::flush-everything)
   (tune-hashtable-sizes-of-all-packages)
   (deinit)
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this

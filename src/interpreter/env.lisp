@@ -534,8 +534,6 @@
 (declaim (fixnum *invalidation-count*))
 (defglobal *invalidation-count* 0)
 
-(defun flush-macros () (atomic-incf *globaldb-cookie*))
-
 ;; Return two values: FRAME and COOKIE, recomputing if cookie doesn't match
 ;; globaldb, otherwise return the previously computed information.
 (declaim (inline proto-fn-frame))
