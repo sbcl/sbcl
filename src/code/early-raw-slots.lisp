@@ -145,9 +145,9 @@
                      (,accessor-name y index)))))
     (let ((double-float-alignment
             ;; white list of architectures that can load unaligned doubles:
-            #!+(or x86 x86-64 ppc) 1
+            #!+(or x86 x86-64 ppc arm64) 1
             ;; at least sparc, mips and alpha can't:
-            #!-(or x86 x86-64 ppc) 2))
+            #!-(or x86 x86-64 ppc arm64) 2))
      (setq *raw-slot-data-list*
       (list
        (make-raw-slot-data :raw-type 'sb!vm:word

@@ -461,11 +461,20 @@
     ((define-raw-slot-vops (name value-primtype value-sc
                             &optional (move-macro 'move))
        (labels ((emit-generator (instruction move-result)
-                  `((inst lsl offset index (- word-shift n-fixnum-tag-bits))
-                    (inst add offset offset (- (* instance-slots-offset
-                                                  n-word-bytes)
-                                               instance-pointer-lowtag))
-                    (inst ,instruction value (@ object offset))
+                  `((sc-case index
+                      (immediate
+                       (inst ,instruction value
+                             (@ object
+                                (load-store-offset (- (* (+ instance-slots-offset
+                                                            (tn-value index))
+                                                         n-word-bytes)
+                                                      instance-pointer-lowtag)))))
+                      (t
+                       (inst lsl offset index (- word-shift n-fixnum-tag-bits))
+                       (inst add offset offset (- (* instance-slots-offset
+                                                     n-word-bytes)
+                                                  instance-pointer-lowtag))
+                       (inst ,instruction value (@ object offset))))
                     ,@(when move-result
                         `((,move-macro result value))))))
          (let ((ref-vop (symbolicate "RAW-INSTANCE-REF/" name))
@@ -475,7 +484,7 @@
                 (:translate ,(symbolicate "%" ref-vop))
                 (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
-                       (index :scs (any-reg)))
+                       (index :scs (any-reg immediate)))
                 (:arg-types * positive-fixnum)
                 (:results (value :scs (,value-sc)))
                 (:result-types ,value-primtype)
@@ -485,7 +494,7 @@
                 (:translate ,(symbolicate "%" set-vop))
                 (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
-                       (index :scs (any-reg))
+                       (index :scs (any-reg immediate))
                        (value :scs (,value-sc) :target result))
                 (:arg-types * positive-fixnum ,value-primtype)
                 (:results (result :scs (,value-sc)))
