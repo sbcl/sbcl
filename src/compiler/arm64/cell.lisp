@@ -459,14 +459,10 @@
 
 (macrolet
     ((define-raw-slot-vops (name value-primtype value-sc
-                                 &key (width 1) (move-macro 'move))
+                            &optional (move-macro 'move))
        (labels ((emit-generator (instruction move-result)
-                  `((loadw offset object 0 instance-pointer-lowtag)
-                    (inst lsr offset offset n-widetag-bits)
-                    (inst lsl offset offset word-shift)
-                    (inst sub offset offset (lsl index (- word-shift n-fixnum-tag-bits)))
-                    (inst sub offset offset (+ (* (- ,width
-                                                     instance-slots-offset)
+                  `((inst lsl offset index (- word-shift n-fixnum-tag-bits))
+                    (inst add offset offset (- (* instance-slots-offset
                                                   n-word-bytes)
                                                instance-pointer-lowtag))
                     (inst ,instruction value (@ object offset))
@@ -498,13 +494,13 @@
                 (:generator 5 ,@(emit-generator 'str t))))))))
   (define-raw-slot-vops word unsigned-num unsigned-reg)
   (define-raw-slot-vops single single-float single-reg
-     :move-macro move-float)
+    move-float)
   (define-raw-slot-vops double double-float double-reg
-     :move-macro move-float)
+    move-float)
   (define-raw-slot-vops complex-single complex-single-float complex-single-reg
-    :move-macro move-float)
+    move-float)
   (define-raw-slot-vops complex-double complex-double-float complex-double-reg
-    :width 2 :move-macro move-complex-double))
+    move-complex-double))
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
@@ -513,19 +509,15 @@
          (index :scs (any-reg))
          (diff :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
-  (:temporary (:sc unsigned-reg) offset)
   (:temporary (:sc non-descriptor-reg) sum)
   (:temporary (:sc interior-reg) lip)
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:generator 4
-    (loadw offset object 0 instance-pointer-lowtag)
-    (inst lsr offset offset n-widetag-bits)
-    (inst lsl offset offset word-shift)
-    (inst sub offset offset (lsl index (- word-shift n-fixnum-tag-bits)))
-    (inst sub offset offset (+ (* (1- instance-slots-offset) n-word-bytes)
-                               instance-pointer-lowtag))
-    (inst add lip object offset)
+    (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+    (inst add lip lip (- (* instance-slots-offset
+                            n-word-bytes)
+                         instance-pointer-lowtag))
 
     (inst dsb)
     LOOP
