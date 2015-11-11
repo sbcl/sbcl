@@ -53,7 +53,7 @@
                           (+ stack-frame-size nl0-offset))
         (my-make-wired-tn 'double-float
                           'double-stack
-                          (* 2 (- stack-frame-size 6))))))
+                          (* 2 (- stack-frame-size 4))))))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
@@ -65,7 +65,7 @@
                           (+ stack-frame-size nl0-offset))
         (my-make-wired-tn 'single-float
                           'single-stack
-                          (* 2 (- stack-frame-size 6))))))
+                          (* 2 (- stack-frame-size 4))))))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (declare (ignore state))
