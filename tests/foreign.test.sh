@@ -299,12 +299,16 @@ test_save small
 test_save fast
 
 test_start() {
-    echo testing start $1
-    run_sbcl_with_core $TEST_FILESTEM.$1.core \
-        --no-sysinit --no-userinit \
-        --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
-        --load $TEST_FILESTEM.test.lisp
-    check_status_maybe_lose "start $1" $?
+    if [ -f $TEST_FILESTEM.$1.core ] ; then
+        echo testing start $1
+        run_sbcl_with_core $TEST_FILESTEM.$1.core \
+            --no-sysinit --no-userinit \
+            --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+            --load $TEST_FILESTEM.test.lisp
+        check_status_maybe_lose "start $1" $?
+    else
+        echo "not testing start $1 (no core file, possibly due to linkage table above)"
+    fi
 }
 
 test_start fast
@@ -312,9 +316,10 @@ test_start small
 
 # missing object file
 rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
-run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
-    --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
-    <<EOF
+if [ -f $TEST_FILESTEM.fast.core ] ; then
+    run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
+        --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+        <<EOF
   (assert (= 22 (summish 10 11)))
   (multiple-value-bind (val err) (ignore-errors (eval 'foo))
     (assert (not val))
@@ -324,7 +329,10 @@ run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
     (assert (typep err 'undefined-alien-error)))
   (exit :code $EXIT_LISP_WIN)
 EOF
-check_status_maybe_lose "missing-so" $?
+    check_status_maybe_lose "missing-so" $?
+else
+    echo "skipping missing-so test (no core file, possibly due to linkage table above)"
+fi
 
 # ADDR of a heap-allocated object
 cat > $TEST_FILESTEM.addr.heap.c <<EOF
