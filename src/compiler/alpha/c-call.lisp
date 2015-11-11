@@ -101,7 +101,9 @@
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (my-make-wired-tn 'positive-fixnum 'any-reg nsp-offset)
-              (* (max (arg-state-stack-frame-size arg-state) 4) n-word-bytes)
+              (* (max (- (logandc2 (1+ (arg-state-stack-frame-size arg-state)) 1) 4) 2)
+                 n-word-bytes
+                 #.(floor n-machine-word-bits n-word-bits))
               (arg-tns)
               (invoke-alien-type-method :result-tn
                                         (alien-fun-type-result-type type)
