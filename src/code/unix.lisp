@@ -1222,11 +1222,15 @@ the UNIX epoch (January 1st 1970.)"
   (let ((ent (alien-funcall
               (extern-alien "sb_readdir"
                             (function system-area-pointer system-area-pointer))
-                            dir)))
+              dir))
+        errno)
     (if (zerop (sap-int ent))
-        (when errorp (simple-perror
-                      (format nil "Error reading directory entry~@[ from ~S~]"
-                              namestring)))
+        (when (and errorp
+                   (not (zerop (setf errno (get-errno)))))
+          (simple-perror
+           (format nil "Error reading directory entry~@[ from ~S~]"
+                   namestring)
+           :errno errno))
         ent)))
 
 (declaim (inline unix-closedir))

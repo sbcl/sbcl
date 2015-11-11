@@ -152,6 +152,11 @@ sb_opendir(char * name)
 extern struct dirent *
 sb_readdir(DIR * dirp)
 {
+    /* NULL returned from readdir() means it reached the end, NULL and
+       non-zero errno means an error occured.
+       When no error has occured, errno is not changed.
+       Set it to 0 beforehand. */
+    errno = 0;
     return readdir(dirp);
 }
 

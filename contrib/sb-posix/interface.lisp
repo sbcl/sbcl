@@ -145,21 +145,18 @@
 (define-call #-netbsd "opendir" #+netbsd "_opendir"
     (* t) null-alien (pathname filename))
 (define-call* "write" int minusp
-    (fd file-descriptor) (buf (* t)) (count int))
+  (fd file-descriptor) (buf (* t)) (count int))
+
+;;; FIXME: to detect errors in readdir errno needs to be set to 0 and
+;;; then checked, like it's done in sb-unix:readdir. 
 #+inode64
 (define-call ("readdir" :c-name "readdir$INODE64" :options :largefile)
   (* dirent)
-  ;; readdir() has the worst error convention in the world.  It's just
-  ;; too painful to support.  (return is NULL _and_ errno "unchanged"
-  ;; is not an error, it's EOF).
   not
   (dir (* t)))
 #-inode64
 (define-call (#-netbsd "readdir" #+netbsd "_readdir" :options :largefile)
   (* dirent)
-  ;; readdir() has the worst error convention in the world.  It's just
-  ;; too painful to support.  (return is NULL _and_ errno "unchanged"
-  ;; is not an error, it's EOF).
   not
   (dir (* t)))
 (define-call "closedir" int minusp (dir (* t)))
