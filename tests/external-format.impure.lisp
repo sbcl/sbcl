@@ -15,7 +15,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defmacro do-external-formats ((xf &optional result) &body body)
+(defmacro do-external-formats ((xf) &body body)
   (let ((nxf (gensym)))
     `(loop for ,nxf being the hash-values of sb-impl::*external-formats*
         do (let ((,xf (first (sb-impl::ef-names ,nxf))))
@@ -205,7 +205,9 @@
          (write-char (code-char 233) s)
          (terpri s)
          (close s)
-         (compile-file "external-format-test.lisp" :external-format :utf-8))
+         (let ((*error-output* (make-broadcast-stream)))
+           (compile-file "external-format-test.lisp"
+                         :external-format :utf-8 :verbose nil)))
     (delete-file s)
     (let ((p (probe-file (compile-file-pathname "external-format-test.lisp"))))
       (when p
@@ -239,6 +241,7 @@
 
        (string (octets-to-string koi8-r-codes :external-format :koi8-r))
        (uni-decoded (map 'vector #'char-code string)))
+  (declare (ignore uni-decoded))
   (assert (equalp (map 'vector #'char-code (octets-to-string koi8-r-codes :external-format :koi8-r))
                   uni-codes))
   (assert (equalp (string-to-octets (map 'string #'code-char uni-codes) :external-format :koi8-r)
@@ -294,9 +297,11 @@
       (read-char s)
       (let ((pos (file-position s))
             (char (read-char s)))
+        #+nil
         (format t "read character with code ~a successfully from file position ~a~%"
                 (char-code char) pos)
         (file-position s pos)
+        #+nil
         (format t "set file position back to ~a, trying to read-char again~%" pos)
         (let ((new-char (read-char s)))
           (assert (char= char new-char)))))
@@ -375,6 +380,7 @@
       (write-byte i s))
     (handler-bind ((sb-int:character-decoding-error
                     (lambda (c)
+                      (declare (ignore c))
                       (invoke-restart 'sb-impl::input-replacement #\?))))
       (with-open-file (s *test-path* :external-format :utf-8)
         (cond
@@ -389,7 +395,7 @@
     (with-open-file (s *test-path* :external-format :cp857)
       (handler-case (read-char s)
         (error () (assert (member i '(#xd5 #xe7 #xf2))))
-        (:no-error (char) (assert (not (member i '(#xd5 #xe7 #xf2)))))))))
+        (:no-error (char) char (assert (not (member i '(#xd5 #xe7 #xf2)))))))))
 (delete-file *test-path*)
 
 (with-test (:name (:unibyte-input-replacement :cp857))
