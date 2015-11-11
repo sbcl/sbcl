@@ -33,8 +33,9 @@
           (force-output))
         (if (zerop (mod *tons-o-method-count* 100000))
             (terpri)))
-      (blah object))
-    (remove-method #'blah (first (sb-mop:generic-function-methods #'blah)))))
+      (funcall 'blah object)) ; late bind to avoid style warning
+    (let ((gf (symbol-function 'blah)))
+      (remove-method gf (first (sb-mop:generic-function-methods gf))))))
 
 (format t "~&;; Be patient. This test is slow.~%")
 (test-util:with-test (:name :exhaust-heap-with-eql-specializers)
@@ -49,7 +50,6 @@
                          (incf n-junk))))
       (sb-vm::map-allocated-objects #'visit :dynamic)
       ;; This is probably not more than a few hundred.
-      ;; But how are there ** more ** EQL-specializers than junk objects?
       (format t "~&;; Post-test EQL-spec count: ~S, junk obj count: ~D~%"
               (hash-table-count sb-pcl::*eql-specializer-table*) n-junk)
       (sb-ext:gc :full t)
@@ -68,8 +68,8 @@
       ;; sense that your data went missing. But then you probably shouldn't
       ;; be relying on the existing interned specializer table.
       ;; Generic programming is not a panacea.
-      (assert (= (hash-table-count sb-pcl::*eql-specializer-table*)
-                 starting-eql-spec-count)))))
+      (assert (<= (hash-table-count sb-pcl::*eql-specializer-table*)
+		  (1+ starting-eql-spec-count))))))
 
 ;;; We make a generic function, add a bunch of method for it, and
 ;;; prepare another bunch of method objects for later addition.
