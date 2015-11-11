@@ -282,12 +282,14 @@
   (d 0.0d0 :type double-float))
 
 (defun-with-dx test-fp-struct-1.1 (s d)
+  d
   (let ((fp (make-fp-struct-1 :s s)))
     (declare (dynamic-extent fp))
     (assert (eql s (fp-struct-1-s fp)))
     (assert (eql 0.0d0 (fp-struct-1-d fp)))))
 
 (defun-with-dx test-fp-struct-1.2 (s d)
+  s
   (let ((fp (make-fp-struct-1 :d d)))
     (declare (dynamic-extent fp))
     (assert (eql 0.0 (fp-struct-1-s fp)))
@@ -320,12 +322,14 @@
   (s 0.0 :type single-float))
 
 (defun-with-dx test-fp-struct-2.1 (s d)
+  d
   (let ((fp (make-fp-struct-2 :s s)))
     (declare (dynamic-extent fp))
     (assert (eql s (fp-struct-2-s fp)))
     (assert (eql 0.0d0 (fp-struct-2-d fp)))))
 
 (defun-with-dx test-fp-struct-2.2 (s d)
+  s
   (let ((fp (make-fp-struct-2 :d d)))
     (declare (dynamic-extent fp))
     (assert (eql 0.0 (fp-struct-2-s fp)))
@@ -358,12 +362,14 @@
   (d (complex 0.0d0) :type (complex double-float)))
 
 (defun-with-dx test-cfp-struct-1.1 (s d)
+  d
   (let ((cfp (make-cfp-struct-1 :s s)))
     (declare (dynamic-extent cfp))
     (assert (eql s (cfp-struct-1-s cfp)))
     (assert (eql (complex 0.0d0) (cfp-struct-1-d cfp)))))
 
 (defun-with-dx test-cfp-struct-1.2 (s d)
+  s
   (let ((cfp (make-cfp-struct-1 :d d)))
     (declare (dynamic-extent cfp))
     (assert (eql (complex 0.0) (cfp-struct-1-s cfp)))
@@ -396,12 +402,14 @@
   (s (complex 0.0) :type (complex single-float)))
 
 (defun-with-dx test-cfp-struct-2.1 (s d)
+  d
   (let ((cfp (make-cfp-struct-2 :s s)))
     (declare (dynamic-extent cfp))
     (assert (eql s (cfp-struct-2-s cfp)))
     (assert (eql (complex 0.0d0) (cfp-struct-2-d cfp)))))
 
 (defun-with-dx test-cfp-struct-2.2 (s d)
+  s
   (let ((cfp (make-cfp-struct-2 :d d)))
     (declare (dynamic-extent cfp))
     (assert (eql (complex 0.0) (cfp-struct-2-s cfp)))
@@ -444,6 +452,7 @@
   c)
 
 (defun-with-dx make-foo2-on-stack (x y)
+  x
   (let ((foo (make-foo2 :y y :c 'c)))
     (declare (dynamic-extent foo))
     (assert (eql 0.0 (foo2-x foo)))
@@ -563,7 +572,8 @@
 (defun list-delete-some-stuff ()
   ;; opaque-identity hides the fact that we are calling a destructive function
   ;; on a constant, which is technically illegal. But no deletion occurs,
-  ;; so it's innocuous.
+  ;; so it's innocuous. Also these aren't tests of DX, but oh well...
+  (declare (muffle-conditions style-warning))
   (delete 'a (opaque-identity '(x y)))
   (delete 'a (opaque-identity '(x y)) :from-end t)
   (delete-duplicates (opaque-identity '(x y))))
@@ -677,6 +687,7 @@
                   (debug 1) (compilation-speed 3)))
         (let* ((v5 (cons b b)))
           (declare (dynamic-extent v5))
+          v5
           a)))
      'x 'y)
     'x)))
@@ -807,21 +818,23 @@
 
 (with-test (:name :regression-1.0.23.38)
   (compile nil '(lambda ()
+                 (declare (muffle-conditions compiler-note))
                  (flet ((make (x y)
                           (let ((res (cons x x)))
                             (setf (cdr res) y)
                             res)))
-                   (declaim (inline make))
+                   (declare (inline make))
                    (let ((z (make 1 2)))
                      (declare (dynamic-extent z))
                      (print z)
                      t))))
   (compile nil '(lambda ()
+                 (declare (muffle-conditions compiler-note))
                  (flet ((make (x y)
                           (let ((res (cons x x)))
                             (setf (cdr res) y)
                             (if x res y))))
-                   (declaim (inline make))
+                   (declare (inline make))
                    (let ((z (make 1 2)))
                      (declare (dynamic-extent z))
                      (print z)
@@ -847,6 +860,7 @@
     ;; failure note.
     (compile nil
              `(lambda (files fasl-dir load)
+                (declare (muffle-conditions style-warning))
                 (let ((needs-recompile nil))
                   (dolist (src files)
                     (let ((dest (binary-pathname src fasl-dir)))
@@ -878,7 +892,8 @@
              (handler-bind ((compiler-note (lambda (c)
                                              (declare (ignore c))
                                              (incf n))))
-               (compile nil lambda)
+               (let ((*error-output* (make-broadcast-stream)))
+                 (compile nil lambda))
                (unless (= j n)
                  (error "Wanted ~S notes, got ~S for~%   ~S"
                         j n lambda))))))
@@ -923,6 +938,7 @@
 ;;; Stack allocating a value cell in HANDLER-CASE would blow up stack
 ;;; in an unfortunate loop.
 (defun handler-case-eating-stack ()
+  (declare (muffle-conditions warning)) ; "dead code detected ... IR1-PHASES"
   (let ((sp nil))
     (do ((n 0 (logand most-positive-fixnum (1+ n))))
         ((>= n 1024))
@@ -964,7 +980,8 @@
                                          (unless (typep c type)
                                            (error "wanted ~S for~%  ~S~%got ~S"
                                                   type lambda (type-of c))))))
-               (compile nil lambda))
+               (let ((*error-output* (make-broadcast-stream)))
+                 (compile nil lambda)))
              (assert (= n 1)))))
     (test `(lambda () (declare (dynamic-extent #'bar)))
           'style-warning)
@@ -1057,8 +1074,11 @@
                                                 11
                                                 10
                                                 21)))))
-  (let ((f4 (compile nil `(lambda (f &optional x &rest args &key y &allow-other-keys)
-                            (apply f y x args)))))
+  (let ((f4
+          (let ((*error-output* (make-broadcast-stream)))
+            (compile nil `(lambda (f &optional x &rest args
+                                     &key y &allow-other-keys)
+                            (apply f y x args))))))
     (assert-no-consing (funcall f4 (lambda (y x yk y2 b c)
                                      (assert (eq y 'y))
                                      (assert (= x 2))
