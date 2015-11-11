@@ -86,7 +86,11 @@
                                :element-type '(unsigned-byte 8)
                                :fill-pointer 0
                                :adjustable t))))
-     (declare (type (vector (unsigned-byte 8) 16) ,var))
+     ;; Don't declare the length - if it gets adjusted and pushed back
+     ;; onto the freelist, it's anyone's guess whether it was expanded.
+     ;; This code was wrong for >12 years, so nobody must have needed
+     ;; more than 16 elements. Maybe we should make it nonadjustable?
+     (declare (type (vector (unsigned-byte 8)) ,var))
      (setf (fill-pointer ,var) 0)
      (unwind-protect
          (progn
