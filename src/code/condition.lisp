@@ -293,9 +293,8 @@
   (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
     (%compiler-define-condition name parent-types layout all-readers all-writers)
-    (sb!c:with-source-location (source-location)
-      (setf (layout-source-location layout)
-            source-location))
+    (when source-location
+      (setf (layout-source-location layout) source-location))
     (let ((class (find-classoid name))) ; FIXME: rename to 'classoid'
       (setf (condition-classoid-slots class) slots
             (condition-classoid-direct-default-initargs class) direct-default-initargs

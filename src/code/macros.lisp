@@ -158,7 +158,7 @@ invoked. In that case it will store into PLACE and start over."
   (let ((kind (info :variable :kind name)))
     (case kind
      ((:macro :unknown)
-      (sb!c:with-source-location (source-location)
+      (when source-location
         (setf (info :source-location :symbol-macro name) source-location))
       (setf (info :variable :kind name) :macro)
       (setf (info :variable :macro-expansion name) expansion))

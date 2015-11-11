@@ -47,7 +47,7 @@
     ((nil :forthcoming-defclass-type)
      (setf (info :type :kind name) :defined)))
   (setf (info :type :expander name) expander)
-  (sb!c:with-source-location (source-location)
+  (when source-location
     (setf (info :type :source-location name) source-location))
   (when doc
     (setf (fdocumentation name 'type) doc))

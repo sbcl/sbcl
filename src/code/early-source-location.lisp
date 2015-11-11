@@ -45,8 +45,3 @@
 ;;; important for multiple records for the same location to be
 ;;; coalesced. -- JES, 2008-01-02
 (defconstant +code-coverage-unmarked+ '%code-coverage-unmarked%)
-
-;; FIXME: remove this obfuscatory macro
-(defmacro with-source-location ((source-location) &body body)
-  `(when ,source-location
-     ,@body))

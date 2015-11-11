@@ -979,7 +979,7 @@ unless :NAMED is also specified.")))
            (setq layout (classoid-layout classoid))))
     (setf (find-classoid (dd-name dd)) classoid)
 
-    (sb!c:with-source-location (source-location)
+    (when source-location
       (setf (layout-source-location layout) source-location))))
 
 

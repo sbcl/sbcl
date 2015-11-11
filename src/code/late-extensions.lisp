@@ -312,7 +312,7 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
   (%compiler-defglobal name :always-bound value (not boundp))
   (when docp
     (setf (fdocumentation name 'variable) doc))
-  (sb!c:with-source-location (source-location)
+  (when source-location
     (setf (info :source-location :variable name) source-location))
   name)
 

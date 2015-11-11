@@ -249,7 +249,7 @@
                   exports)
           package)
   ;; Everything was created: update metadata
-  (sb!c:with-source-location (source-location)
+  (when source-location
     (setf (package-source-location package) source-location))
   (setf (package-doc-string package) doc-string)
   #!+sb-package-locks

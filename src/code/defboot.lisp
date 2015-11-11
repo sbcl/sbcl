@@ -330,7 +330,7 @@ evaluated as a PROGN."
     (set var val))
   (when docp
     (setf (fdocumentation var 'variable) doc))
-  (sb!c:with-source-location (source-location)
+  (when source-location
     (setf (info :source-location :variable var) source-location))
   var)
 
@@ -340,7 +340,7 @@ evaluated as a PROGN."
   (set var val)
   (when docp
     (setf (fdocumentation var 'variable) doc))
-  (sb!c:with-source-location (source-location)
+  (when source-location
     (setf (info :source-location :variable var) source-location))
   var)
 

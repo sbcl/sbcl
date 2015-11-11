@@ -53,7 +53,7 @@
      (style-warn 'asterisks-around-constant-variable-name
                  :format-control "Defining ~S as a constant"
                  :format-arguments (list name)))
-   (sb!c:with-source-location (source-location)
+   (when source-location
      (setf (info :source-location :constant name) source-location))
    (let ((kind (info :variable :kind name)))
      (case kind

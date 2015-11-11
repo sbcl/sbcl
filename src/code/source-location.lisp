@@ -43,6 +43,8 @@
                   form-number (source-path-form-number *current-path*)))
            ((and source-info (source-info-file-info source-info))
             (setf tlf-number (1- (fill-pointer (file-info-forms it))))))
+    ;; FIXME: Probably can never coalesce entries now that both a tlf number
+    ;; and subform number are stored. Maybe delete this.
     (if (and last
              (eql (definition-source-location-toplevel-form-number last) tlf-number)
              (eql (definition-source-location-form-number last) form-number)
