@@ -39,8 +39,8 @@
          (load-immediate-word tmp-tn x)
          tmp-tn)))
 
-(defun load-store-offset (offset &optional (temp tmp-tn))
-  (cond ((ldr-str-offset-encodable offset)
+(defun load-store-offset (offset &optional (temp tmp-tn) (size 64))
+  (cond ((ldr-str-offset-encodable offset size)
          offset)
         (t
          (load-immediate-word temp offset)

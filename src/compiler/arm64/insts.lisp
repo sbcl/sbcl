@@ -184,6 +184,7 @@
     (declare (ignore dstate))
     (princ "W" stream)
     (princ (aref *register-names* value) stream))
+
   (defun print-x-reg (value stream dstate)
     (declare (ignore dstate))
     (princ (aref *register-names* value) stream))
@@ -192,6 +193,12 @@
     (when (32-bit-register-p dstate)
       (princ "W" stream))
     (princ (aref *register-names* value) stream))
+
+  (defun print-x-reg-sp (value stream dstate)
+    (declare (ignore dstate))
+    (if (= value nsp-offset)
+        (princ "NSP" stream)
+        (princ (aref *register-names* value) stream)))
 
   (defun print-reg-sp (value stream dstate)
     (when (32-bit-register-p dstate)
@@ -361,6 +368,9 @@
 
   (sb!disassem:define-arg-type x-reg
     :printer #'print-x-reg)
+
+  (sb!disassem:define-arg-type x-reg-sp
+    :printer #'print-x-reg-sp)
 
   (sb!disassem:define-arg-type w-reg
     :printer #'print-w-reg)
@@ -1569,7 +1579,7 @@
     (v :field (byte 1 26))
     (op3 :field (byte 2 24) :value #b00)
     (op :field (byte 2 22))
-    (rn :field (byte 5 5) :type 'reg-sp)
+    (rn :field (byte 5 5) :type 'x-reg-sp)
     (rt :fields (list (byte 2 30) (byte 1 23) (byte 5 0)) :type 'reg-float-reg)
     (ldr-str-annotation :type 'ldr-str-annotation))
 
@@ -1654,10 +1664,11 @@
     (label :field (byte 19 5) :type 'label)
     (rt :fields (list (byte 2 30) (byte 5 0))))
 
-(defun ldr-str-offset-encodable (offset)
-  (or (and (typep offset '(unsigned-byte 15))
-           (not (ldb-test (byte 3 0) offset)))
-      (typep offset '(signed-byte 9))))
+(defun ldr-str-offset-encodable (offset &optional (size 64))
+  (or (typep offset '(signed-byte 9))
+      (multiple-value-bind (qout rem) (truncate offset (truncate size 8))
+        (and (zerop rem)
+             (typep qout '(unsigned-byte 12))))))
 
 (defun emit-load-store (size opc segment dst address)
   (process-null-sc dst)
@@ -1681,17 +1692,19 @@
                      ((sc-is dst 32-bit-reg)
                       #b10)
                      (t #b11)))
+         (scale (if fp
+                    (logior (ash (ldb (byte 1 1) opc) 2)
+                            size)
+                    size))
          (dst (tn-offset dst)))
-    (cond ((and (typep offset '(unsigned-byte 15))
-                (not (ldb-test (byte 3 0) offset))
+    (cond ((and (typep offset 'unsigned-byte)
+                (not (ldb-test (byte scale 0) offset))
+                (typep (ash offset (- scale)) '(unsigned-byte 12))
                 (register-p base)
                 (eq mode :offset))
            (emit-ldr-str-unsigned-imm segment size
                                       v opc
-                                      (if fp
-                                          (ash offset (- (logior (ash (ldb (byte 1 1) opc) 2)
-                                                                 size)))
-                                          (ash offset (- size)))
+                                      (ash offset (- scale))
                                       (tn-offset base)
                                       dst))
           ((and (eq mode :offset)
@@ -1882,7 +1895,7 @@
     (rs :field (byte 5 16) :type 'w-reg)
     (o0 :field (byte 1 15))
     (rt2 :field (byte 5 5) :type 'reg)
-    (rn :field (byte 5 5) :type 'reg-sp)
+    (rn :field (byte 5 5) :type 'x-reg-sp)
     (rt :field (byte 5 0) :type 'reg))
 
 (defmacro def-store-exclusive (name o0 o1 o2 rs &rest printers)
