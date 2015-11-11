@@ -11,7 +11,7 @@ changes relative to sbcl-1.3.0:
   * enhancement: x86[-64] platforms support SB-EXT:CAS on structure slots
     of type SB-EXT:WORD
   * enhancement: the interleaved structure slot optimization from
-    release 1.2.6 has been ported to 32-bit x86 and PowerPC.
+    release 1.2.6 has been ported to 32-bit x86, Sparc, and PowerPC.
   * bug fix: NTH-VALUE does not cause stack overflow. (lp#1511419)
   * bug fix: structure constructor type checking is better. (lp#1508735)
   * bug fix: supplied-p variables for unused optional or keyword variables no
