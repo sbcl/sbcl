@@ -536,6 +536,7 @@
 
 (defun fact (n) (if (zerop n) (error "nope") (* n (fact (1- n)))))
 
+#+sb-fasteval
 (with-test (:name (:backtrace :interpreted-factorial)
             :skipped-on '(not :interpreter))
   (assert-backtrace
