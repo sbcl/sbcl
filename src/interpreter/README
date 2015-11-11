@@ -150,15 +150,6 @@ that a subsequent invocation of M computes a new expansion.
 Known Bugs
 ==========
 
-* Regression tests of threading and foreign calls fail.
-
-* Self-building SBCL exhausts memory if the default evaluator-mode
-  is :interpret in the hosting SBCL and :sb-after-xc-core is set.
-
-* Structure constructors do not check their argument types.
-
-* Local type declarations on special variables are usually ignored.
-
 * Reading through a symbol-macro is not inherently type-correct,
   but the interpreter does not cast the type onto the expansion.
   It does cast for SETF.  This is a compromise, as the existing

@@ -69,7 +69,7 @@
       ;; be relying on the existing interned specializer table.
       ;; Generic programming is not a panacea.
       (assert (<= (hash-table-count sb-pcl::*eql-specializer-table*)
-		  (1+ starting-eql-spec-count))))))
+                  (1+ starting-eql-spec-count))))))
 
 ;;; We make a generic function, add a bunch of method for it, and
 ;;; prepare another bunch of method objects for later addition.
