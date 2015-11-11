@@ -522,11 +522,11 @@ invoked. In that case it will store into PLACE and start over."
   with object-type prefix and object-identity suffix, and executing the
   code in BODY to provide possible further output."
   ;; Note: possibly out-of-order keyword argument evaluation.
-  (if body
-      (let ((fun (make-symbol "THUNK")))
-        `(dx-flet ((,fun () ,@body))
-           (%print-unreadable-object ,object ,stream ,type ,identity #',fun)))
-      `(%print-unreadable-object ,object ,stream ,type ,identity)))
+  (let ((call `(%print-unreadable-object ,object ,stream ,type ,identity)))
+    (if body
+        (let ((fun (make-symbol "THUNK")))
+          `(dx-flet ((,fun () ,@body)) (,@call #',fun)))
+        call)))
 
 (defmacro-mundanely ignore-errors (&rest forms)
   #!+sb-doc
