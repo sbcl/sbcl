@@ -26,7 +26,8 @@
   ;; and C-STACK-IS-CONTROL-STACK (otherwise, the C stack is the
   ;; number stack, and we precisely-scavenge the control stack).
   #!-(and :gencgc :c-stack-is-control-stack)
-  (zerop (dd-raw-length (lvar-value defstruct-description)))
+  (every (lambda (x) (eq (dsd-raw-type x) t))
+         (dd-slots (lvar-value defstruct-description)))
   #!+(and :gencgc :c-stack-is-control-stack)
   t)
 

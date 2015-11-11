@@ -501,24 +501,23 @@
 
 ;;;; raw instance slot accessors
 
-(defun offset-for-raw-slot (instance-length index n-words)
-  (+ (* (- instance-length instance-slots-offset index (1- n-words))
-        n-word-bytes)
-     (- instance-pointer-lowtag)))
+(defun offset-for-raw-slot (index &optional (displacement 0))
+  (- (ash (+ index displacement instance-slots-offset) word-shift)
+     instance-pointer-lowtag))
 
 (define-vop (raw-instance-init/word)
   (:args (object :scs (descriptor-reg))
          (value :scs (unsigned-reg)))
   (:arg-types * unsigned-num)
-  (:info instance-length index)
+  (:info index)
   (:generator 4
-    (inst stw value object (offset-for-raw-slot instance-length index 1))))
+    (inst stw value object (offset-for-raw-slot index))))
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
+         (index :scs (any-reg)) ; FIXME: allow immediate
          (diff :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
   (:temporary (:sc unsigned-reg) offset)
@@ -526,15 +525,8 @@
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:generator 4
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (1- instance-slots-offset) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     ;; load the slot value, add DIFF, write the sum back, and return
     ;; the original slot value, atomically, and include a memory
     ;; barrier.
@@ -546,57 +538,30 @@
     (inst bne LOOP)
     (inst isync)))
 
-(define-vop (raw-instance-ref/word)
+(define-vop (raw-instance-ref/word word-index-ref)
+  (:policy :fast-safe)
   (:translate %raw-instance-ref/word)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types * positive-fixnum)
+  (:variant instance-slots-offset instance-pointer-lowtag)
+  (:arg-types instance positive-fixnum)
   (:results (value :scs (unsigned-reg)))
-  (:temporary (:scs (non-descriptor-reg)) offset)
-  (:result-types unsigned-num)
-  (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (1- instance-slots-offset) n-word-bytes)
-             instance-pointer-lowtag))
-    (inst lwzx value object offset)))
+  (:result-types unsigned-num))
 
-(define-vop (raw-instance-set/word)
-  (:translate %raw-instance-set/word)
+(define-vop (raw-instance-set/word word-index-set)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (unsigned-reg)))
-  (:arg-types * positive-fixnum unsigned-num)
+  (:translate %raw-instance-set/word)
+  (:variant instance-slots-offset instance-pointer-lowtag)
+  (:arg-types instance positive-fixnum unsigned-num)
+  (:args (object) (index) (value :scs (unsigned-reg)))
   (:results (result :scs (unsigned-reg)))
-  (:temporary (:scs (non-descriptor-reg)) offset)
-  (:result-types unsigned-num)
-  (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (1- instance-slots-offset) n-word-bytes)
-             instance-pointer-lowtag))
-    (inst stwx value object offset)
-    (move result value)))
+  (:result-types unsigned-num))
 
 (define-vop (raw-instance-init/single)
   (:args (object :scs (descriptor-reg))
          (value :scs (single-reg)))
   (:arg-types * single-float)
-  (:info instance-length index)
+  (:info index)
   (:generator 4
-    (inst stfs value object (offset-for-raw-slot instance-length index 1))))
+    (inst stfs value object (offset-for-raw-slot index))))
 
 (define-vop (raw-instance-ref/single)
   (:translate %raw-instance-ref/single)
@@ -608,15 +573,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types single-float)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (1- instance-slots-offset) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (inst lfsx value object offset)))
 
 (define-vop (raw-instance-set/single)
@@ -630,15 +588,8 @@
   (:result-types single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (1- instance-slots-offset) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (inst stfsx value object offset)
     (unless (location= result value)
       (inst frsp result value))))
@@ -647,9 +598,9 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (double-reg)))
   (:arg-types * double-float)
-  (:info instance-length index)
+  (:info index)
   (:generator 4
-    (inst stfd value object (offset-for-raw-slot instance-length index 2))))
+    (inst stfd value object (offset-for-raw-slot index))))
 
 (define-vop (raw-instance-ref/double)
   (:translate %raw-instance-ref/double)
@@ -661,15 +612,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types double-float)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (- instance-slots-offset 2) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (inst lfdx value object offset)))
 
 (define-vop (raw-instance-set/double)
@@ -683,15 +627,8 @@
   (:result-types double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (- instance-slots-offset 2) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (inst stfdx value object offset)
     (unless (location= result value)
       (inst fmr result value))))
@@ -700,12 +637,12 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-single-reg)))
   (:arg-types * complex-single-float)
-  (:info instance-length index)
+  (:info index)
   (:generator 4
     (inst stfs (complex-single-reg-real-tn value)
-          object (offset-for-raw-slot instance-length index 2))
+          object (offset-for-raw-slot index))
     (inst stfs (complex-single-reg-imag-tn value)
-          object (offset-for-raw-slot instance-length index 1))))
+          object (offset-for-raw-slot index 1))))
 
 (define-vop (raw-instance-ref/complex-single)
   (:translate %raw-instance-ref/complex-single)
@@ -717,15 +654,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types complex-single-float)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (- instance-slots-offset 2) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (inst lfsx (complex-single-reg-real-tn value) object offset)
     (inst addi offset offset n-word-bytes)
     (inst lfsx (complex-single-reg-imag-tn value) object offset)))
@@ -741,15 +671,8 @@
   (:result-types complex-single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (- instance-slots-offset 2) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (let ((value-real (complex-single-reg-real-tn value))
           (result-real (complex-single-reg-real-tn result)))
       (inst stfsx value-real object offset)
@@ -766,12 +689,12 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-double-reg)))
   (:arg-types * complex-double-float)
-  (:info instance-length index)
+  (:info index)
   (:generator 4
     (inst stfd (complex-single-reg-real-tn value)
-          object (offset-for-raw-slot instance-length index 4))
+          object (offset-for-raw-slot index))
     (inst stfd (complex-double-reg-imag-tn value)
-          object (offset-for-raw-slot instance-length index 2))))
+          object (offset-for-raw-slot index 2))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
@@ -783,15 +706,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types complex-double-float)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (- instance-slots-offset 4) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (inst lfdx (complex-double-reg-real-tn value) object offset)
     (inst addi offset offset (* 2 n-word-bytes))
     (inst lfdx (complex-double-reg-imag-tn value) object offset)))
@@ -807,15 +723,8 @@
   (:result-types complex-double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (loadw offset object 0 instance-pointer-lowtag)
-    ;; offset = (offset >> n-widetag-bits) << 2
-    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
-    (inst subf offset index offset)
-    (inst addi
-          offset
-          offset
-          (- (* (- instance-slots-offset 4) n-word-bytes)
-             instance-pointer-lowtag))
+    (inst addi offset index (- (ash instance-slots-offset word-shift)
+                               instance-pointer-lowtag))
     (let ((value-real (complex-double-reg-real-tn value))
           (result-real (complex-double-reg-real-tn result)))
       (inst stfdx value-real object offset)
