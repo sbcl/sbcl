@@ -109,10 +109,10 @@
 ;;;; frame hackery
 
 ;;; Return the number of bytes needed for the current non-descriptor
-;;; stack frame. Non-descriptor stack frames must be multiples of 8
-;;; bytes on the PMAX.
+;;; stack frame. Non-descriptor stack frames must be multiples of 16
+;;; bytes to preserve alien stack alignment.
 (defun bytes-needed-for-non-descriptor-stack-frame ()
-  (* (logandc2 (1+ (sb-allocated-size 'non-descriptor-stack)) 1)
+  (* (logandc2 (+ 3 (sb-allocated-size 'non-descriptor-stack)) 3)
      n-word-bytes))
 
 ;;; This is used for setting up the Old-FP in local call.
