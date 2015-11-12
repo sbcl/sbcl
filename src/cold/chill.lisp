@@ -60,7 +60,7 @@
     (def 'defparameter)
     (def 'defvar)))
 
-(export '(sb-int::def!method
+(export '(sb-int::def!method sb-int::defmacro-mundanely
           sb-int::!cold-init-forms
           sb-int::!coerce-to-specialized
           sb-int::/show sb-int::/noshow sb-int::/show0 sb-int::/noshow0
@@ -68,6 +68,8 @@
         'sb-int)
 
 (setf (macro-function 'sb-int:def!method) (macro-function 'defmethod))
+(defmacro sb-int:defmacro-mundanely (name lambda-list &body body)
+  `(let () (defmacro ,name ,lambda-list ,@body)))
 
 (defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms))
 
