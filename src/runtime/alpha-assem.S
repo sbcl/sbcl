@@ -277,6 +277,19 @@ undefined_tramp_offset:
 
 undefined_tramp= call_into_lisp_LRA_page+0x15c
         subl    reg_LIP, SIMPLE_FUN_CODE_OFFSET, reg_CODE
+
+	/* If we are called with stack arguments (or in a tail-call
+	   scenario), we end up with an allocated stack frame, but the
+	   frame link information is uninitialized.  Fix things by
+	   allocating and initializing our stack frame "properly". */
+	cmpule  reg_NARGS,24,reg_NL0
+	beq     reg_NL0,1f
+	addq    reg_CFP,24,reg_CSP
+	br      reg_ZERO,2f
+1:	addq    reg_CFP,reg_NARGS,reg_CSP
+2:	stl     reg_OCFP,0(reg_CFP)
+	stl     reg_LRA,4(reg_CFP)
+
 	call_pal PAL_bugchk
 	.long    trap_Error
         .byte    4                         /* what are these numbers? */
@@ -294,7 +307,7 @@ undefined_tramp= call_into_lisp_LRA_page+0x15c
         .globl  closure_tramp_offset
         .ent    closure_tramp_offset
 closure_tramp_offset:
-closure_tramp= call_into_lisp_LRA_page+0x170
+closure_tramp= call_into_lisp_LRA_page+0x18c
         ldl     reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
         ldl     reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
         addl    reg_L0, SIMPLE_FUN_CODE_OFFSET, reg_LIP

@@ -182,11 +182,11 @@
 
   (with-test (:name (:backtrace :undefined-function :bug-346)
                     :skipped-on :interpreter
-                    ;; Failures on ALPHA, SPARC, and probably HPPA are
-                    ;; due to not having a full and valid stack frame
-                    ;; for the undefined function frame.  See PPC
+                    ;; Failures on SPARC, and probably HPPA are due to
+                    ;; not having a full and valid stack frame for the
+                    ;; undefined function frame.  See PPC
                     ;; undefined_tramp for details.
-                    :fails-on '(or :alpha :sparc))
+                    :fails-on '(or :sparc))
     (assert-backtrace
      (lambda () (test #'optimized))
      (list *undefined-function-frame*
