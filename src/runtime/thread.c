@@ -749,7 +749,7 @@ create_thread_struct(lispobj initial_function) {
 
 #ifdef LISP_FEATURE_SB_THREAD
     th->pseudo_atomic_bits=0;
-#else
+#elif defined LISP_FEATURE_GENCGC
     clear_pseudo_atomic_atomic(th);
     clear_pseudo_atomic_interrupted(th);
 #endif
