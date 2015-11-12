@@ -459,3 +459,10 @@
                           (apply #'values (list 1))
                         (foo)))
                      '(1))))))
+
+;; Parse (ENUM COLOR)
+(sb-alien-internals:parse-alien-type '(enum color red blue black green) nil)
+;; Now reparse it as a different type
+(with-test (:name :change-enum-type)
+  (handler-bind ((error #'continue))
+    (sb-alien-internals:parse-alien-type '(enum color yellow ochre) nil)))

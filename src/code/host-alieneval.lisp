@@ -675,11 +675,11 @@
                  (unless (alien-type-= result old)
                    (cerror "Continue, clobbering the old definition"
                            "Incompatible alien enum type definition: ~S" name)
-                   (setf (alien-type-from old) (alien-type-from result)
-                         (alien-type-to old) (alien-type-to result)
-                         (alien-type-kind old) (alien-type-kind result)
-                         (alien-type-offset old) (alien-type-offset result)
-                         (alien-type-signed old) (alien-type-signed result)))
+                   (setf (alien-enum-type-from old) (alien-enum-type-from result)
+                         (alien-enum-type-to old) (alien-enum-type-to result)
+                         (alien-enum-type-kind old) (alien-enum-type-kind result)
+                         (alien-enum-type-offset old) (alien-enum-type-offset result)
+                         (alien-enum-type-signed old) (alien-enum-type-signed result)))
                  (setf result old))
                (unless old-p
                  (setf (auxiliary-alien-type :enum name env) result))))
