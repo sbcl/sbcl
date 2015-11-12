@@ -12,15 +12,6 @@
 
 (rem-all-tests)
 
-;; sb-eval fails 31 tests, sb-interpreter fails on only these:
-(unless (eq sb-ext:*evaluator-mode* :compile)
-  (setq sb-rt::*expected-failures*
-        (union sb-rt::*expected-failures*
-               '(function-info.notinline/local
-                 function-information.known-inline
-                 function-information.ftype
-                 define-declaration.function.mask))))
-
 (defmacro *x*-value ()
   (declare (special *x*))
   *x*)
@@ -57,6 +48,7 @@
 (deftest macroexpand-all.3
     (let ((*expansions* nil))
       (compile nil '(lambda ()
+                     (declare (muffle-conditions style-warning))
                      (macrolet ((foo (key &environment env)
                                   (macroexpand-all `(bar ,key) env)))
                        (foo
