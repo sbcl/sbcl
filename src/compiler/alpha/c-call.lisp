@@ -76,6 +76,13 @@
           (values 'unsigned-byte-64 'unsigned-reg))
     (my-make-wired-tn ptype reg-sc lip-offset)))
 
+(define-alien-type-method (integer :naturalize-gen) (type alien)
+  (if (<= (alien-type-bits type) 32)
+      (if (alien-integer-type-signed type)
+          `(sign-extend ,alien ,(alien-type-bits type))
+          `(logand ,alien ,(1- (ash 1 (alien-type-bits type)))))
+      alien))
+
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'system-area-pointer 'sap-reg lip-offset))
@@ -108,6 +115,45 @@
               (invoke-alien-type-method :result-tn
                                         (alien-fun-type-result-type type)
                                         nil)))))
+
+(defknown sign-extend ((signed-byte 64) t) fixnum
+    (foldable flushable movable))
+
+(define-vop (sign-extend)
+  (:translate sign-extend)
+  (:policy :fast-safe)
+  (:args (val :scs (signed-reg) :target res))
+  (:arg-types signed-num (:constant fixnum))
+  (:info size)
+  (:results (res :scs (signed-reg)))
+  (:result-types fixnum)
+  (:generator 1
+   (ecase size
+     (8
+      ;;(inst sextb val res) ;; Under what circumstances can we use this?
+      (inst sll val 56 res)
+      (inst sra res 56 res))
+     (16
+      ;;(inst sextw val res) ;; Under what circumstances can we use this?
+      (inst sll val 48 res)
+      (inst sra res 48 res))
+     (32
+      (inst sll val 32 res)
+      (inst sra res 32 res)))))
+
+#-sb-xc-host
+(defun sign-extend (x size)
+  (declare (type (signed-byte 64) x))
+  (ecase size
+    (8 (sign-extend x size))
+    (16 (sign-extend x size))
+    (32 (sign-extend x size))))
+
+#+sb-xc-host
+(defun sign-extend (x size)
+  (if (logbitp (1- size) x)
+      (dpb x (byte size 0) -1)
+      x))
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
