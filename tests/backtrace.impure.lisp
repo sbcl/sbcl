@@ -239,15 +239,13 @@
          (funcall fun)))
 
   (with-test (:name (:backtrace :divide-by-zero :bug-346)
-                    :skipped-on :interpreter
-                    :fails-on :alpha)  ; bug 346
+                    :skipped-on :interpreter)
     (assert-backtrace (lambda () (test #'optimized))
                       `((/ 42 &rest)
                         ((flet test :in ,*p*) ,#'optimized))))
 
   (with-test (:name (:backtrace :divide-by-zero :bug-356)
-                    :skipped-on :interpreter
-                    :fails-on :alpha)  ; bug 356
+                    :skipped-on :interpreter)
     (assert-backtrace (lambda () (test #'not-optimized))
                       `((/ 42 &rest)
                         ((flet not-optimized :in ,*p*))
@@ -256,7 +254,7 @@
 (defun throw-test ()
   (throw 'no-such-tag t))
 (with-test (:name (:backtrace :throw :no-such-tag)
-                  :fails-on '(or (and :sparc :linux) :alpha))
+                  :fails-on '(and :sparc :linux))
   (assert-backtrace #'throw-test '((throw-test))))
 
 (defun bug-308926 (x)
