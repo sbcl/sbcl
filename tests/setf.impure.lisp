@@ -458,4 +458,16 @@
    ;; All implementations agree that this is malformed.
    (macroexpand-1 '(defsetf baz (a . other-stuff) (v) ''who-cares))))
 
-;;; success
+
+(with-test (:name :shiftf-let*)
+  (define-setf-expander shiftf-let* ()
+    (let ((a (gensym "A"))
+          (b (gensym "B"))
+          (store (gensym "STORE")))
+      (values
+       (list a b)
+       `(10 (1+ ,a))
+       (list store)
+       (list 'list a b store)
+       b)))
+  (assert (eql (funcall (compile nil `(lambda () (shiftf (shiftf-let*) 21)))) 11)))

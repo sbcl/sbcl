@@ -148,7 +148,7 @@
   (fd file-descriptor) (buf (* t)) (count int))
 
 ;;; FIXME: to detect errors in readdir errno needs to be set to 0 and
-;;; then checked, like it's done in sb-unix:readdir. 
+;;; then checked, like it's done in sb-unix:readdir.
 #+inode64
 (define-call ("readdir" :c-name "readdir$INODE64" :options :largefile)
   (* dirent)
