@@ -444,6 +444,8 @@
   (:save-p :compute-only)
   (:generator 3
     (note-this-location vop :internal-error)
+    (inst cmptun x y temp)
+    (inst fbne temp (if not-p target fall-through))
     (if eq
         (inst cmpteq x y temp)
         (if complement
@@ -452,7 +454,8 @@
     (inst trapb)
     (if (if complement (not not-p) not-p)
         (inst fbeq temp target)
-        (inst fbne temp target))))
+        (inst fbne temp target))
+    FALL-THROUGH))
 
 (macrolet ((frob (name sc ptype)
              `(define-vop (,name float-compare)
