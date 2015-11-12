@@ -1210,8 +1210,13 @@
 (define-bitfield-emitter emit-word 16
   (byte 16 0))
 
+;; FIXME: a nice enhancement would be to save all sexprs of small functions
+;; within the same file, and drop them at the end.
+;; Expressly declaimed inline definitions would be saved as usual though.
+(declaim (inline emit-dword))
 (define-bitfield-emitter emit-dword 32
   (byte 32 0))
+(declaim (notinline emit-dword))
 
 ;;; Most uses of dwords are as displacements or as immediate values in
 ;;; 64-bit operations. In these cases they are sign-extended to 64 bits.

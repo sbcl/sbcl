@@ -75,12 +75,6 @@
               (t
                (,accessor uses))))))
 
-#!-sb-fluid (declaim (inline lvar-derived-type))
-(defun lvar-derived-type (lvar)
-  (declare (type lvar lvar))
-  (or (lvar-%derived-type lvar)
-      (setf (lvar-%derived-type lvar)
-            (%lvar-derived-type lvar))))
 (defun %lvar-derived-type (lvar)
   (lvar-type-using lvar node-derived-type))
 
@@ -235,20 +229,8 @@
                               (t (coerce-to-values type)))))
                dest)))))
   (or (lvar-%externally-checkable-type lvar) *wild-type*))
-#!-sb-fluid(declaim (inline flush-lvar-externally-checkable-type))
-(defun flush-lvar-externally-checkable-type (lvar)
-  (declare (type lvar lvar))
-  (setf (lvar-%externally-checkable-type lvar) nil))
 
 ;;;; interface routines used by optimizers
-
-(declaim (inline reoptimize-component))
-(defun reoptimize-component (component kind)
-  (declare (type component component)
-           (type (member nil :maybe t) kind))
-  (aver kind)
-  (unless (eq (component-reoptimize component) t)
-    (setf (component-reoptimize component) kind)))
 
 ;;; This function is called by optimizers to indicate that something
 ;;; interesting has happened to the value of LVAR. Optimizers must

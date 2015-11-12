@@ -461,11 +461,6 @@
   ;; are read and before results are written. This is only filled in
   ;; when VOP-INFO-SAVE-P is non-null.
   (save-set nil :type (or local-tn-bit-vector null)))
-(defprinter (vop)
-  (info :prin1 (vop-info-name info))
-  args
-  results
-  (codegen-info :test codegen-info))
 
 ;;; A TN-REF object contains information about a particular reference
 ;;; to a TN. The information in TN-REFs largely determines how TNs are
@@ -494,10 +489,6 @@
   (target nil :type (or null tn-ref))
   ;; the load TN allocated for this operand, if any
   (load-tn nil :type (or tn null)))
-(defprinter (tn-ref)
-  tn
-  write-p
-  (vop :test vop :prin1 (vop-info-name (vop-info vop))))
 
 ;;; A TEMPLATE object represents a particular IR2 coding strategy for
 ;;; a known function.
@@ -654,6 +645,20 @@
   ;; encodes the source ref (shifted 8, it is also encoded in
   ;; MAX-VOP-TN-REFS) and the dest ref index.
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1))))
+
+;; These printers follow the definition of VOP-INFO because they
+;; want to inline VOP-INFO-NAME, and it's less code to move them here
+;; than to move the defstructs of VOP-INFO and TEMPLATE.
+(defprinter (vop)
+  (info :prin1 (vop-info-name info))
+  args
+  results
+  (codegen-info :test codegen-info))
+(defprinter (tn-ref)
+  tn
+  write-p
+  (vop :test vop :prin1 (vop-info-name (vop-info vop))))
+
 
 ;;;; SBs and SCs
 

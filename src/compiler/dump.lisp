@@ -1246,6 +1246,7 @@
   (declare (type sb!c::source-info info))
   (let ((res (sb!c::debug-source-for-info info))
         (*dump-only-valid-structures* nil))
+    ;; Zero out the timestamps to get reproducible fasls.
     #+sb-xc-host (setf (sb!c::debug-source-created res) 0
                        (sb!c::debug-source-compiled res) 0)
     (dump-object res fasl-output)
@@ -1254,7 +1255,11 @@
         (dump-push res-handle fasl-output)
         (dump-fop 'fop-structset fasl-output)
         (dump-word info-handle fasl-output)
-        (dump-word sb!c::+debug-info-source-index+ fasl-output))
+        (macrolet ((debug-info-source-index ()
+                     (let ((dd (find-defstruct-description 'sb!c::debug-info)))
+                       (dsd-index (find 'source (dd-slots dd)
+                                        :key #'dsd-name :test 'string=)))))
+          (dump-word (debug-info-source-index) fasl-output)))
       #+sb-xc-host
       (progn
         (dump-push res-handle fasl-output)

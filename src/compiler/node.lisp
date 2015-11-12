@@ -98,6 +98,27 @@
   (print-unreadable-object (x stream :type t :identity t)
     (format stream "~D" (cont-num x))))
 
+#!-sb-fluid (declaim (inline lvar-has-single-use-p))
+(defun lvar-has-single-use-p (lvar)
+  (typep (lvar-uses lvar) '(not list)))
+
+;;; Return the unique node, delivering a value to LVAR.
+#!-sb-fluid (declaim (inline lvar-use))
+(defun lvar-use (lvar)
+  (the (not list) (lvar-uses lvar)))
+
+#!-sb-fluid (declaim (inline lvar-derived-type))
+(defun lvar-derived-type (lvar)
+  (declare (type lvar lvar))
+  (or (lvar-%derived-type lvar)
+      (setf (lvar-%derived-type lvar)
+            (%lvar-derived-type lvar))))
+
+#!-sb-fluid(declaim (inline flush-lvar-externally-checkable-type))
+(defun flush-lvar-externally-checkable-type (lvar)
+  (declare (type lvar lvar))
+  (setf (lvar-%externally-checkable-type lvar) nil))
+
 (def!struct (node (:constructor nil)
                   (:include sset-element (number (incf *compiler-sset-counter*)))
                   (:copier nil))
@@ -149,6 +170,11 @@
   ;; If the back-end breaks tail-recursion for some reason, then it
   ;; can null out this slot.
   (tail-p nil :type boolean))
+
+#!-sb-fluid (declaim (inline node-block))
+(defun node-block (node)
+  (ctran-block (node-prev node)))
+
 (defun %with-ir1-environment-from-node (node fun)
   (declare (type node node) (type function fun))
   (let ((*current-component* (node-component node))
@@ -166,6 +192,10 @@
   ;; Lvar, receiving the values, produced by this node. May be NIL if
   ;; the value is unused.
   (lvar nil :type (or lvar null)))
+
+#!-sb-fluid (declaim (inline node-dest))
+(defun node-dest (node)
+  (awhen (node-lvar node) (lvar-dest it)))
 
 ;;; Flags that are used to indicate various things about a block, such
 ;;; as what optimizations need to be done on it:
@@ -470,6 +500,14 @@
   name
   #!+sb-show id
   (reanalyze :test reanalyze))
+
+(declaim (inline reoptimize-component))
+(defun reoptimize-component (component kind)
+  (declare (type component component)
+           (type (member nil :maybe t) kind))
+  (aver kind)
+  (unless (eq (component-reoptimize component) t)
+    (setf (component-reoptimize component) kind)))
 
 ;;; Check that COMPONENT is suitable for roles which involve adding
 ;;; new code. (gotta love imperative programming with lotso in-place

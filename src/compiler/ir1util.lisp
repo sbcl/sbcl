@@ -440,18 +440,12 @@
     (when (eq (lambda-home fun) fun)
       (return fun))))
 
-#!-sb-fluid (declaim (inline node-block))
-(defun node-block (node)
-  (ctran-block (node-prev node)))
 (declaim (ftype (sfunction (node) component) node-component))
 (defun node-component (node)
   (block-component (node-block node)))
 (declaim (ftype (sfunction (node) physenv) node-physenv))
 (defun node-physenv (node)
   (lambda-physenv (node-home-lambda node)))
-#!-sb-fluid (declaim (inline node-dest))
-(defun node-dest (node)
-  (awhen (node-lvar node) (lvar-dest it)))
 
 #!-sb-fluid (declaim (inline node-stack-allocate-p))
 (defun node-stack-allocate-p (node)
@@ -824,15 +818,6 @@
             (setf path (common-suffix path
                                       (node-source-path use)))))
         (list (node-source-form use)))))
-
-;;; Return the unique node, delivering a value to LVAR.
-#!-sb-fluid (declaim (inline lvar-use))
-(defun lvar-use (lvar)
-  (the (not list) (lvar-uses lvar)))
-
-#!-sb-fluid (declaim (inline lvar-has-single-use-p))
-(defun lvar-has-single-use-p (lvar)
-  (typep (lvar-uses lvar) '(not list)))
 
 ;;; Return the LAMBDA that is CTRAN's home, or NIL if there is none.
 (declaim (ftype (sfunction (ctran) (or clambda null))

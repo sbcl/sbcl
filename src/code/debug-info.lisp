@@ -276,13 +276,6 @@
   ;; component came from, in the order that forms were read.
   (source nil))
 
-(defconstant +debug-info-source-index+
-  (let* ((dd (find-defstruct-description 'debug-info))
-         (slots (dd-slots dd))
-         (source (locally (declare (notinline find)) ; bug 117 bogowarning
-                   (find 'source slots :key #'dsd-name))))
-    (dsd-index source)))
-
 (def!struct (compiled-debug-info
              (:include debug-info)
              #-sb-xc-host (:pure t))

@@ -365,6 +365,8 @@
  ("src/pcl/pre-warm")
  ("src/pcl/low" :not-host)
 
+ ("src/code/debug-info")
+ ("src/code/source-location")
  ;; The type definition for INTERPRETED-FUNCTION
  #!+sb-fasteval ("src/interpreter/function")
  ("src/code/early-condition")
@@ -500,14 +502,12 @@
  ("src/compiler/disassem")
  ("src/compiler/assem")
 
- ("src/code/debug-info")
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ("src/compiler/dump")
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/xref")
- ("src/code/source-location")
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")

@@ -219,40 +219,6 @@
   (defparameter *sc-vop-slots*
     '((:move . sc-move-vops)
       (:move-arg . sc-move-arg-vops))))
-
-;;; Make NAME be the VOP used to move values in the specified FROM-SCs
-;;; to the representation of the TO-SCs of each SC pair in SCS.
-;;;
-;;; If KIND is :MOVE-ARG, then the VOP takes an extra argument,
-;;; which is the frame pointer of the frame to move into.
-;;;
-;;; We record the VOP and costs for all SCs that we can move between
-;;; (including implicit loading).
-(defmacro define-move-vop (name kind &rest scs)
-  (when (or (oddp (length scs)) (null scs))
-    (error "malformed SCs spec: ~S" scs))
-  (let ((accessor (or (cdr (assoc kind *sc-vop-slots*))
-                      (error "unknown kind ~S" kind))))
-    `(progn
-       ,@(when (eq kind :move)
-           `((eval-when (:compile-toplevel :load-toplevel :execute)
-               (do-sc-pairs (from-sc to-sc ',scs)
-                 (compute-move-costs from-sc to-sc
-                                     ,(vop-parse-cost
-                                       (vop-parse-or-lose name)))))))
-
-       (let ((vop (template-or-lose ',name)))
-         (do-sc-pairs (from-sc to-sc ',scs)
-           (dolist (dest-sc (cons to-sc (sc-alternate-scs to-sc)))
-             (let ((vec (,accessor dest-sc)))
-               (let ((scn (sc-number from-sc)))
-                 (setf (svref vec scn)
-                       (adjoin-template vop (svref vec scn))))
-               (dolist (sc (append (sc-alternate-scs from-sc)
-                                   (sc-constant-scs from-sc)))
-                 (let ((scn (sc-number sc)))
-                   (setf (svref vec scn)
-                         (adjoin-template vop (svref vec scn))))))))))))
 
 ;;;; primitive type definition
 
@@ -316,6 +282,42 @@
 ;;;; meta-compile time, both to hold the results of parsing the
 ;;;; elaborate syntax and to retain the information so that it can be
 ;;;; inherited by other VOPs.
+
+;;; An OPERAND-PARSE object contains stuff we need to know about an
+;;; operand or temporary at meta-compile time. Besides the obvious
+;;; stuff, we also store the names of per-operand temporaries here.
+(def!struct (operand-parse
+             (:make-load-form-fun just-dump-it-normally)
+             #-sb-xc-host (:pure t))
+  ;; name of the operand (which we bind to the TN)
+  (name nil :type symbol)
+  ;; the way this operand is used:
+  (kind (missing-arg)
+        :type (member :argument :result :temporary
+                      :more-argument :more-result))
+  ;; If true, the name of an operand that this operand is targeted to.
+  ;; This is only meaningful in :ARGUMENT and :TEMPORARY operands.
+  (target nil :type (or symbol null))
+  ;; TEMP is a temporary that holds the TN-REF for this operand.
+  (temp (make-operand-parse-temp) :type symbol)
+  ;; the time that this operand is first live and the time at which it
+  ;; becomes dead again. These are TIME-SPECs, as returned by
+  ;; PARSE-TIME-SPEC.
+  born
+  dies
+  ;; a list of the names of the SCs that this operand is allowed into.
+  ;; If false, there is no restriction.
+  (scs nil :type list)
+  ;; Variable that is bound to the load TN allocated for this operand, or to
+  ;; NIL if no load-TN was allocated.
+  (load-tn (make-operand-parse-load-tn) :type symbol)
+  ;; an expression that tests whether to do automatic operand loading
+  (load t)
+  ;; In a wired or restricted temporary this is the SC the TN is to be
+  ;; packed in. Null otherwise.
+  (sc nil :type (or symbol null))
+  ;; If non-null, we are a temp wired to this offset in SC.
+  (offset nil :type (or unsigned-byte null)))
 
 ;;; A VOP-PARSE object holds everything we need to know about a VOP at
 ;;; meta-compile time.
@@ -405,41 +407,6 @@
   (save-p :test save-p)
   (move-args :test move-args))
 
-;;; An OPERAND-PARSE object contains stuff we need to know about an
-;;; operand or temporary at meta-compile time. Besides the obvious
-;;; stuff, we also store the names of per-operand temporaries here.
-(def!struct (operand-parse
-             (:make-load-form-fun just-dump-it-normally)
-             #-sb-xc-host (:pure t))
-  ;; name of the operand (which we bind to the TN)
-  (name nil :type symbol)
-  ;; the way this operand is used:
-  (kind (missing-arg)
-        :type (member :argument :result :temporary
-                      :more-argument :more-result))
-  ;; If true, the name of an operand that this operand is targeted to.
-  ;; This is only meaningful in :ARGUMENT and :TEMPORARY operands.
-  (target nil :type (or symbol null))
-  ;; TEMP is a temporary that holds the TN-REF for this operand.
-  (temp (make-operand-parse-temp) :type symbol)
-  ;; the time that this operand is first live and the time at which it
-  ;; becomes dead again. These are TIME-SPECs, as returned by
-  ;; PARSE-TIME-SPEC.
-  born
-  dies
-  ;; a list of the names of the SCs that this operand is allowed into.
-  ;; If false, there is no restriction.
-  (scs nil :type list)
-  ;; Variable that is bound to the load TN allocated for this operand, or to
-  ;; NIL if no load-TN was allocated.
-  (load-tn (make-operand-parse-load-tn) :type symbol)
-  ;; an expression that tests whether to do automatic operand loading
-  (load t)
-  ;; In a wired or restricted temporary this is the SC the TN is to be
-  ;; packed in. Null otherwise.
-  (sc nil :type (or symbol null))
-  ;; If non-null, we are a temp wired to this offset in SC.
-  (offset nil :type (or unsigned-byte null)))
 (defprinter (operand-parse)
   name
   kind
@@ -450,6 +417,40 @@
   (load :test load)
   (sc :test sc)
   (offset :test offset))
+
+;;; Make NAME be the VOP used to move values in the specified FROM-SCs
+;;; to the representation of the TO-SCs of each SC pair in SCS.
+;;;
+;;; If KIND is :MOVE-ARG, then the VOP takes an extra argument,
+;;; which is the frame pointer of the frame to move into.
+;;;
+;;; We record the VOP and costs for all SCs that we can move between
+;;; (including implicit loading).
+(defmacro define-move-vop (name kind &rest scs)
+  (when (or (oddp (length scs)) (null scs))
+    (error "malformed SCs spec: ~S" scs))
+  (let ((accessor (or (cdr (assoc kind *sc-vop-slots*))
+                      (error "unknown kind ~S" kind))))
+    `(progn
+       ,@(when (eq kind :move)
+           `((eval-when (:compile-toplevel :load-toplevel :execute)
+               (do-sc-pairs (from-sc to-sc ',scs)
+                 (compute-move-costs from-sc to-sc
+                                     ,(vop-parse-cost
+                                       (vop-parse-or-lose name)))))))
+
+       (let ((vop (template-or-lose ',name)))
+         (do-sc-pairs (from-sc to-sc ',scs)
+           (dolist (dest-sc (cons to-sc (sc-alternate-scs to-sc)))
+             (let ((vec (,accessor dest-sc)))
+               (let ((scn (sc-number from-sc)))
+                 (setf (svref vec scn)
+                       (adjoin-template vop (svref vec scn))))
+               (dolist (sc (append (sc-alternate-scs from-sc)
+                                   (sc-constant-scs from-sc)))
+                 (let ((scn (sc-number sc)))
+                   (setf (svref vec scn)
+                         (adjoin-template vop (svref vec scn))))))))))))
 
 ;;;; miscellaneous utilities
 
