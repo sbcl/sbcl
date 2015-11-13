@@ -1209,7 +1209,7 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error nargs)))
       (cond ((zerop count)
              (inst bne nargs err-lab))
             (t
@@ -1227,7 +1227,7 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-            (generate-error-code vop invalid-arg-count-error nargs)))
+            (generate-error-code vop 'invalid-arg-count-error nargs)))
       (cond ((not min)
              (cond ((zerop max)
                     (inst bne nargs err-lab))
@@ -1259,7 +1259,7 @@ default-value-8
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop ,error ,@args)))))
+                  (error-call vop ',error ,@args)))))
   (frob arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs fname)
   (frob type-check-error object-not-type-error sb!c::%type-check-error

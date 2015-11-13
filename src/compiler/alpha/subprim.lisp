@@ -43,7 +43,7 @@
     (inst br zero-tn loop)
 
     NOT-LIST
-    (cerror-call vop done object-not-list-error ptr)
+    (cerror-call vop done 'object-not-list-error ptr)
 
     DONE
     (move count result)))

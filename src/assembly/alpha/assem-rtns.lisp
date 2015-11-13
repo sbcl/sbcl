@@ -175,7 +175,7 @@
   (declare (ignore start count))
 
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
-  (let ((error (generate-error-code nil invalid-unwind-error)))
+  (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst beq block error))
 
   (loadw target-uwp block unwind-block-current-uwp-slot)
@@ -213,7 +213,7 @@
 
   loop
 
-  (let ((error (generate-error-code nil unseen-throw-tag-error target)))
+  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst beq catch error))
 
   (loadw tag catch catch-block-tag-slot)

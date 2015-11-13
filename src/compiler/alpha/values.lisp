@@ -114,7 +114,7 @@
     (inst and list lowtag-mask ndescr)
     (inst xor ndescr list-pointer-lowtag ndescr)
     (inst beq ndescr loop)
-    (error-call vop bogus-arg-to-values-list-error list)
+    (error-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
     (inst subq csp-tn start count)))

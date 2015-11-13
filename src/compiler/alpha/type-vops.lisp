@@ -119,7 +119,7 @@
            `((define-vop (,check-name check-type)
                (:generator ,cost
                  (let ((err-lab
-                        (generate-error-code vop ,error-code value)))
+                        (generate-error-code vop ',error-code value)))
                    (test-type value err-lab t (,@type-codes) :temp temp)
                    (move value result))))))
        ,@(when ptype
@@ -160,7 +160,7 @@
 (define-vop (check-signed-byte-32 check-type)
   (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
-    (let ((loose (generate-error-code vop object-not-signed-byte-32-error
+    (let ((loose (generate-error-code vop 'object-not-signed-byte-32-error
                                       value)))
       (signed-byte-32-test value temp temp1 t loose okay))
     OKAY
@@ -224,7 +224,7 @@
 (define-vop (check-unsigned-byte-32 check-type)
   (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
-    (let ((loose (generate-error-code vop object-not-unsigned-byte-32-error
+    (let ((loose (generate-error-code vop 'object-not-unsigned-byte-32-error
                                       value)))
       (unsigned-byte-32-test value temp temp1 t loose okay))
     OKAY
@@ -251,7 +251,7 @@
   (:generator 12
     (inst cmpeq value null-tn temp)
     (inst bne temp drop-thru)
-    (let ((error (generate-error-code vop object-not-symbol-error value)))
+    (let ((error (generate-error-code vop 'object-not-symbol-error value)))
       (test-type value error t (symbol-header-widetag) :temp temp))
     DROP-THRU
     (move value result)))
@@ -268,7 +268,7 @@
 (define-vop (check-cons check-type)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 8
-    (let ((error (generate-error-code vop object-not-cons-error value)))
+    (let ((error (generate-error-code vop 'object-not-cons-error value)))
       (inst cmpeq value null-tn temp)
       (inst bne temp error)
       (test-type value error t (list-pointer-lowtag) :temp temp))

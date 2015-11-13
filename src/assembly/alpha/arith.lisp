@@ -225,7 +225,7 @@
                           (:temp rem-sign signed-reg nargs-offset)
                           (:temp temp1 non-descriptor-reg nl4-offset))
 
-  (let ((error (generate-error-code nil division-by-zero-error
+  (let ((error (generate-error-code nil 'division-by-zero-error
                                     dividend divisor)))
     (inst beq divisor error))
 

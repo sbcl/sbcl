@@ -25,8 +25,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!-(or alpha hppa) 'nil-array-accessed-error
-                #!+(or alpha hppa) nil-array-accessed-error
+                #!-(or hppa) 'nil-array-accessed-error
+                #!+(or hppa) nil-array-accessed-error
                 object)))
 
 ;;; It shouldn't be possible to fall through to here in normal user
@@ -53,8 +53,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!-(or alpha hppa) 'nil-array-accessed-error
-                #!+(or alpha hppa) nil-array-accessed-error
+                #!-(or hppa) 'nil-array-accessed-error
+                #!+(or hppa) nil-array-accessed-error
                 object)))
 
 (define-vop (data-vector-set/simple-array-nil)
@@ -73,8 +73,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!-(or alpha hppa) 'nil-array-accessed-error
-                #!+(or alpha hppa) nil-array-accessed-error
+                #!-(or hppa) 'nil-array-accessed-error
+                #!+(or hppa) nil-array-accessed-error
                 object)))
 
 ;; The only way to define this VOP on Alpha/HPPA would be with
