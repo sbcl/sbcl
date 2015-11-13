@@ -648,12 +648,7 @@
                   (error "no move function defined to ~:[save~;load~] SC ~S ~
                           ~:[to~;from~] from SC ~S"
                          load-p sc-name load-p (sc-name alt)))
-
                 (cond (found
-                       (unless (eq (cdr found) name)
-                         (error "can't tell whether to ~:[save~;load~]~@
-                                 with ~S or ~S when operand is in SC ~S"
-                                load-p name (cdr found) (sc-name alt)))
                        (pushnew alt (car found)))
                       (t
                        (funs (cons (list alt) name))))))))
@@ -1051,7 +1046,7 @@
   (let ((scs (operand-parse-scs op))
         (costs (make-array sc-number-limit :initial-element nil))
         (load-scs (make-array sc-number-limit :initial-element nil)))
-    (dolist (sc-name scs)
+    (dolist (sc-name (reverse scs))
       (let* ((load-sc (sc-or-lose sc-name))
              (load-scn (sc-number load-sc)))
         (setf (svref costs load-scn) 0)

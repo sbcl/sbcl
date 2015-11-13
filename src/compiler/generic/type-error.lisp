@@ -84,9 +84,10 @@
 (define-vop (type-check-error/c)
   (:policy :fast-safe)
   (:translate sb!c::%type-check-error/c)
-  (:args (object :scs (any-reg descriptor-reg)
-                 :load-if (not (sc-is object descriptor-reg any-reg
-                                      unsigned-reg signed-reg))))
+  (:args (object :scs (descriptor-reg any-reg unsigned-reg signed-reg)
+                 :load-if (not (sc-is object
+                                      descriptor-reg any-reg
+                                      unsigned-reg signed-reg constant))))
   (:arg-types * (:constant symbol))
   (:info errcode)
   (:vop-var vop)
@@ -104,9 +105,10 @@
                     `((:policy :fast-safe)
                       (:translate ,translate)))
                 (:args ,@(mapcar (lambda (arg)
-                                   `(,arg :scs (any-reg descriptor-reg)
+                                   `(,arg :scs (descriptor-reg any-reg
+                                                unsigned-reg signed-reg)
                                           :load-if (not (sc-is ,arg descriptor-reg any-reg
-                                                               unsigned-reg signed-reg))))
+                                                               unsigned-reg signed-reg constant))))
                                  args))
                 (:vop-var vop)
                 (:save-p :compute-only)
