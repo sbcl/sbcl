@@ -1466,34 +1466,7 @@
              (inst cmp nargs (fixnumize min))
              (inst jmp :b err-lab))))))
 
-;;; Various other error signallers.
-(macrolet ((def (name error translate &rest args)
-             `(define-vop (,name)
-                ,@(when translate
-                    `((:policy :fast-safe)
-                      (:translate ,translate)))
-                (:args ,@(mapcar (lambda (arg)
-                                   `(,arg :scs (any-reg descriptor-reg
-                                                control-stack constant)))
-                                 args))
-                (:vop-var vop)
-                (:save-p :compute-only)
-                (:generator 1000
-                  (error-call vop ',error ,@args)))))
-  (def arg-count-error invalid-arg-count-error
-    sb!c::%arg-count-error nargs fname)
-  (def type-check-error object-not-type-error sb!c::%type-check-error
-    object type)
-  (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
-    object layout)
-  (def odd-key-args-error odd-key-args-error
-    sb!c::%odd-key-args-error)
-  (def unknown-key-arg-error unknown-key-arg-error
-    sb!c::%unknown-key-arg-error key)
-  (def nil-fun-returned-error nil-fun-returned-error nil fun))
-
 ;;; Single-stepping
-
 (defun emit-single-step-test ()
   ;; We use different ways of representing whether stepping is on on
   ;; +SB-THREAD / -SB-THREAD: on +SB-THREAD, we use a slot in the

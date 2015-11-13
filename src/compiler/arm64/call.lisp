@@ -607,31 +607,6 @@
              ((plusp min)
               (inst cmp nargs (load-immediate min))
               (inst b :lo err-lab)))))))
-
-;;; Signal various errors.
-(macrolet ((frob (name error translate &rest args)
-             `(define-vop (,name)
-                ,@(when translate
-                    `((:policy :fast-safe)
-                      (:translate ,translate)))
-                (:args ,@(mapcar #'(lambda (arg)
-                                     `(,arg :load-if nil))
-                                 args))
-                (:vop-var vop)
-                (:save-p :compute-only)
-                (:generator 1000
-                  (error-call vop ',error ,@args)))))
-  (frob arg-count-error invalid-arg-count-error
-    sb!c::%arg-count-error nargs fname)
-  (frob type-check-error object-not-type-error sb!c::%type-check-error
-    object type)
-  (frob layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
-    object layout)
-  (frob odd-key-args-error odd-key-args-error
-        sb!c::%odd-key-args-error)
-  (frob unknown-key-arg-error unknown-key-arg-error
-        sb!c::%unknown-key-arg-error key)
-  (frob nil-fun-returned-error nil-fun-returned-error nil fun))
 
 ;;;; Local call with unknown values convention return:
 

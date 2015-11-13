@@ -1229,33 +1229,7 @@ default-value-8
               (inst cmp nargs (fixnumize min))
               (b :leu)))))))
 
-;;; Signal various errors.
-(macrolet ((frob (name error translate &rest args)
-             `(define-vop (,name)
-                ,@(when translate
-                    `((:policy :fast-safe)
-                      (:translate ,translate)))
-                (:args ,@(mapcar #'(lambda (arg)
-                                     `(,arg :scs (any-reg descriptor-reg)))
-                                 args))
-                (:vop-var vop)
-                (:save-p :compute-only)
-                (:generator 1000
-                  (error-call vop ',error ,@args)))))
-  (frob arg-count-error invalid-arg-count-error
-    sb!c::%arg-count-error nargs fname)
-  (frob type-check-error object-not-type-error sb!c::%type-check-error
-    object type)
-  (frob layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
-    object layout)
-  (frob odd-key-args-error odd-key-args-error
-    sb!c::%odd-key-args-error)
-  (frob unknown-key-arg-error unknown-key-arg-error
-    sb!c::%unknown-key-arg-error key)
-  (frob nil-fun-returned-error nil-fun-returned-error nil fun))
-
 ;;; Single-stepping
-
 (define-vop (step-instrument-before-vop)
   (:temporary (:scs (descriptor-reg)) stepping)
   (:policy :fast-safe)

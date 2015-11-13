@@ -26,8 +26,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!-(or hppa) 'nil-array-accessed-error
-                #!+(or hppa) nil-array-accessed-error
+                #!-hppa 'nil-array-accessed-error
+                #!+hppa nil-array-accessed-error
                 object)))
 
 ;;; It shouldn't be possible to fall through to here in normal user
@@ -80,7 +80,7 @@
 
 ;; The only way to define this VOP on HPPA would be with a big CASE
 ;; statement since the ERRCODE is not eval'ed by ERROR-CALL.
-#!-(or hppa)
+#!-hppa
 (define-vop (type-check-error/c)
   (:policy :fast-safe)
   (:translate sb!c::%type-check-error/c)
@@ -96,6 +96,28 @@
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
-;;; FIXME: There is probably plenty of other array stuff that looks
-;;; the same or similar enough to be genericized.  Do so, and move it
-;;; here so that a new port doesn't need to do as much work.
+(macrolet ((def (name error translate &rest args)
+             `(define-vop (,name)
+                ,@(when translate
+                    `((:policy :fast-safe)
+                      (:translate ,translate)))
+                (:args ,@(mapcar (lambda (arg)
+                                   `(,arg :load-if nil))
+                                 args))
+                (:vop-var vop)
+                (:save-p :compute-only)
+                (:generator 1000
+                  (error-call vop #!+hppa ,error
+                                  #!-hppa ',error
+                                  ,@args)))))
+  (def arg-count-error invalid-arg-count-error
+    sb!c::%arg-count-error nargs fname)
+  (def type-check-error object-not-type-error sb!c::%type-check-error
+    object type)
+  (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
+    object layout)
+  (def odd-key-args-error odd-key-args-error
+    sb!c::%odd-key-args-error)
+  (def unknown-key-arg-error unknown-key-arg-error
+    sb!c::%unknown-key-arg-error key)
+  (def nil-fun-returned-error nil-fun-returned-error nil fun))
