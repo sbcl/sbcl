@@ -52,7 +52,7 @@
   t)
 
 (deftest definition-source.1
-    (values (consp (find-definition-sources-by-name 'check-type :vop))
+    (values (consp (find-definition-sources-by-name 'vectorp :vop))
             (consp (find-definition-sources-by-name 'check-type :macro)))
   t t)
 

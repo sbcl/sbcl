@@ -155,67 +155,12 @@
                         (inst jmp less-or-equal target))))))))))))
       (emit-label drop-through))))
 
-;;;; type checking and testing
-
-(define-vop (check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)
-  (:ignore eax)
-  (:vop-var vop)
-  (:save-p :compute-only))
-
-(define-vop (type-predicate)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
-  (:ignore eax)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe))
-
 ;;; simpler VOP that don't need a temporary register
-(define-vop (simple-check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)
-                    :load-if (not (and (sc-is value any-reg descriptor-reg)
-                                       (sc-is result control-stack)))))
-  (:vop-var vop)
-  (:save-p :compute-only))
-
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe))
-
-(defun cost-to-test-types (type-codes)
-  (+ (* 2 (length type-codes))
-     (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
-
-(defmacro !define-type-vops (pred-name check-name ptype error-code
-                             (&rest type-codes)
-                             &key (variant nil variant-p) &allow-other-keys)
-  ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
-  ;; expansion?
-  (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
-         (prefix (if variant-p
-                     (concatenate 'string (string variant) "-")
-                     "")))
-    `(progn
-       ,@(when pred-name
-           `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
-               (:translate ,pred-name)
-               (:generator ,cost
-                 (test-type value target not-p (,@type-codes))))))
-       ,@(when check-name
-           `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
-               (:generator ,cost
-                 (let ((err-lab
-                        (generate-error-code vop ',error-code value)))
-                   (test-type value err-lab t (,@type-codes))
-                   (move result value))))))
-       ,@(when ptype
-           `((primitive-type-vop ,check-name (:check) ,ptype))))))
 
 ;;;; other integer ranges
 
@@ -268,23 +213,6 @@
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
-(define-vop (check-signed-byte-32 check-type)
-  (:generator 45
-    (let ((nope (generate-error-code vop
-                                     'object-not-signed-byte-32-error
-                                     value)))
-      (generate-fixnum-test value)
-      (inst jmp :e yep)
-      (inst lea eax-tn (make-ea :dword :base value
-                                :disp (- other-pointer-lowtag)))
-      (inst test al-tn lowtag-mask)
-      (inst jmp :ne nope)
-      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
-            (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst jmp :ne nope))
-    YEP
-    (move result value)))
-
 ;;; An (unsigned-byte 32) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
@@ -332,50 +260,6 @@
         (inst jmp (if not-p :s :ns) target)
 
         (emit-label not-target)))))
-
-(define-vop (check-unsigned-byte-32 check-type)
-  (:generator 45
-    (let ((nope
-           (generate-error-code vop 'object-not-unsigned-byte-32-error value))
-          (yep (gen-label))
-          (fixnum (gen-label))
-          (single-word (gen-label)))
-
-      ;; Is it a fixnum?
-      (generate-fixnum-test value)
-      (move eax-tn value)
-      (inst jmp :e fixnum)
-
-      ;; If not, is it an other pointer?
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
-      (inst jmp :ne nope)
-      ;; Get the header.
-      (loadw eax-tn value 0 other-pointer-lowtag)
-      ;; Is it one?
-      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst jmp :e single-word)
-      ;; If it's other than two, we can't be an (unsigned-byte 32)
-      (inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
-      (inst jmp :ne nope)
-      ;; Get the second digit.
-      (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
-      ;; All zeros, its an (unsigned-byte 32).
-      (inst test eax-tn eax-tn)
-      (inst jmp :z yep)
-      (inst jmp nope)
-
-      (emit-label single-word)
-      ;; Get the single digit.
-      (loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
-
-      ;; positive implies (unsigned-byte 32).
-      (emit-label fixnum)
-      (inst test eax-tn eax-tn)
-      (inst jmp :s nope)
-
-      (emit-label yep)
-      (move result value))))
 
 (defun power-of-two-limit-p (x)
   (and (fixnump x)
@@ -457,20 +341,6 @@
       (inst jmp (if not-p :ne :e) target))
     DROP-THRU))
 
-(define-vop (check-symbol check-type)
-  (:generator 12
-    (let ((error (generate-error-code vop 'object-not-symbol-error value))
-          (widetag-tn (make-ea :byte :base value :disp (- other-pointer-lowtag))))
-      (inst lea eax-tn widetag-tn)
-      (inst cmp eax-tn (- nil-value other-pointer-lowtag))
-      (inst jmp :e drop-thru)
-      (inst test al-tn other-pointer-lowtag)
-      (inst jmp :nz error)
-      (inst cmp widetag-tn symbol-header-widetag)
-      (inst jmp :ne error))
-    DROP-THRU
-    (move result value)))
-
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
@@ -484,16 +354,6 @@
        (inst test al-tn other-pointer-lowtag)
        (inst jmp (if not-p :nz :z) target))
     DROP-THRU))
-
-(define-vop (check-cons check-type)
-  (:generator 8
-    (let ((error (generate-error-code vop 'object-not-cons-error value)))
-      (inst lea eax-tn (make-ea :dword :base value :disp (- list-pointer-lowtag)))
-      (inst cmp eax-tn (- nil-value list-pointer-lowtag))
-      (inst jmp :e error)
-      (inst test al-tn other-pointer-lowtag)
-      (inst jmp :nz error)
-      (move result value))))
 
 ;; A vop that accepts a computed set of widetags.
 (define-vop (%other-pointer-subtype-p type-predicate)

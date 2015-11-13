@@ -247,34 +247,6 @@
      (push (cons ',name ,result) *backend-primitive-type-aliases*)
      ',name))
 
-(defparameter *primitive-type-slot-alist*
-  '((:check . primitive-type-check)))
-
-;;;  Primitive-Type-VOP Vop (Kind*) Type*
-;;;
-;;; Annotate all the specified primitive Types with the named VOP
-;;; under each of the specified kinds:
-;;;
-;;; :CHECK
-;;;    A one-argument one-result VOP that moves the argument to the
-;;;    result, checking that the value is of this type in the process.
-(defmacro primitive-type-vop (vop kinds &rest types)
-  (let ((n-vop (gensym))
-        (n-type (gensym)))
-    `(let ((,n-vop (template-or-lose ',vop)))
-       ,@(mapcar
-          (lambda (type)
-            `(let ((,n-type (primitive-type-or-lose ',type)))
-               ,@(mapcar
-                  (lambda (kind)
-                    (let ((slot (or (cdr (assoc kind
-                                                *primitive-type-slot-alist*))
-                                    (error "unknown kind: ~S" kind))))
-                      `(setf (,slot ,n-type) ,n-vop)))
-                  kinds)))
-          types)
-       nil)))
-
 
 ;;;; VOP definition structures
 ;;;;

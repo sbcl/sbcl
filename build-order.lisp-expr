@@ -585,6 +585,7 @@
   #!+(or ppc) :ignore-failure-p)
  ("src/code/cross-modular"  :not-target)
 
+ ("src/compiler/generic/late-type-vops") ;; KLUDGE: it's not so late anymore
  ("src/compiler/target/type-vops")
 
  ("src/compiler/target/subprim")
@@ -603,8 +604,6 @@
  ("src/compiler/target/array")
  ("src/compiler/generic/type-error")
  ("src/compiler/target/pred")
-
- ("src/compiler/generic/late-type-vops")
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as
  ;; normal lisp files, and once by sb-c:assemble-file.  We use a

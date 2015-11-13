@@ -97,11 +97,6 @@
   (any-reg descriptor-reg zero null)
   (any-reg descriptor-reg))
 
-;;; Make MOVE the check VOP for T so that type check generation
-;;; doesn't think it is a hairy type. This also allows checking of a
-;;; few of the values in a continuation to fall out.
-(primitive-type-vop move (:check) t)
-
 ;;; The MOVE-ARG VOP is used for moving descriptor values into
 ;;; another frame for argument or known value passing.
 (define-vop (move-arg)

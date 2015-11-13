@@ -10,66 +10,74 @@
 ;;;; files for more information.
 (in-package "SB!VM")
 
-(!define-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
+
+(define-vop (type-predicate)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:temporary #!+(or x86 x86-64)
+              (:sc unsigned-reg :offset eax-offset)
+              #!-(or x86 x86-64)
+              (:sc non-descriptor-reg)
+              temp)
+  #!+(or x86 x86-64)
+  (:ignore temp)
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe))
+
+#!+(or x86 x86-64)
+(define-vop (simple-type-predicate)
+  (:args (value :scs (any-reg descriptor-reg control-stack)))
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe))
+
+(defmacro !define-type-vop (pred-name type-codes
+                             &optional (inherit 'type-predicate))
+  (let ((cost (+ (* 2 (length type-codes))
+                 (if (> (reduce #'max type-codes :key #'eval) lowtag-limit)
+                     7
+                     2))))
+    `(define-vop (,pred-name ,inherit)
+       (:translate ,pred-name)
+       (:generator ,cost
+         (test-type value target not-p ,type-codes
+                    #!-(or x86-64 x86) :temp #!-(or x86-64 x86) temp)))))
+
+(!define-type-vop fixnump
   #.fixnum-lowtags
-  ;; we can save a register on the x86.
-  :variant simple
-  ;; we can save a couple of instructions and a branch on the ppc.
-  :mask fixnum-tag-mask)
+  #!+(or x86-64 x86) simple-type-predicate) ;; save a register
 
-(!define-type-vops functionp check-fun function object-not-function-error
-  (fun-pointer-lowtag)
-  :mask lowtag-mask)
+(!define-type-vop functionp (fun-pointer-lowtag))
 
-(!define-type-vops listp check-list list object-not-list-error
-  (list-pointer-lowtag)
-  :mask lowtag-mask)
+(!define-type-vop listp (list-pointer-lowtag))
 
-(!define-type-vops %instancep check-instance instance object-not-instance-error
-  (instance-pointer-lowtag)
-  :mask lowtag-mask)
+(!define-type-vop %instancep (instance-pointer-lowtag))
 
-(!define-type-vops %other-pointer-p nil nil nil
-  (other-pointer-lowtag)
-  :mask lowtag-mask)
+(!define-type-vop %other-pointer-p (other-pointer-lowtag))
 
-(!define-type-vops bignump check-bignum bignum object-not-bignum-error
-  (bignum-widetag))
+(!define-type-vop bignump (bignum-widetag))
 
-(!define-type-vops ratiop check-ratio ratio object-not-ratio-error
-  (ratio-widetag))
+(!define-type-vop ratiop (ratio-widetag))
 
-(!define-type-vops complexp check-complex complex object-not-complex-error
+(!define-type-vop complexp
   (complex-widetag complex-single-float-widetag complex-double-float-widetag
                    #!+long-float complex-long-float-widetag))
 
-(!define-type-vops complex-rational-p check-complex-rational nil
-    object-not-complex-rational-error
-  (complex-widetag))
+(!define-type-vop complex-rational-p (complex-widetag))
 
-(!define-type-vops complex-float-p check-complex-float nil
-    object-not-complex-float-error
+(!define-type-vop complex-float-p
   (complex-single-float-widetag complex-double-float-widetag
                                 #!+long-float complex-long-float-widetag))
 
-(!define-type-vops complex-single-float-p check-complex-single-float complex-single-float
-    object-not-complex-single-float-error
-  (complex-single-float-widetag))
+(!define-type-vop complex-single-float-p (complex-single-float-widetag))
 
-(!define-type-vops complex-double-float-p check-complex-double-float complex-double-float
-    object-not-complex-double-float-error
-  (complex-double-float-widetag))
+(!define-type-vop complex-double-float-p (complex-double-float-widetag))
 
-(!define-type-vops single-float-p check-single-float single-float
-    object-not-single-float-error
-  (single-float-widetag))
+(!define-type-vop single-float-p (single-float-widetag))
 
-(!define-type-vops double-float-p check-double-float double-float
-    object-not-double-float-error
-  (double-float-widetag))
+(!define-type-vop double-float-p (double-float-widetag))
 
-(!define-type-vops simple-string-p check-simple-string nil
-    object-not-simple-string-error
+(!define-type-vop simple-string-p
   (#!+sb-unicode simple-character-string-widetag
    simple-base-string-widetag simple-array-nil-widetag))
 
@@ -79,86 +87,63 @@
            ,@(map 'list
                   (lambda (saetp)
                     (let ((primtype (saetp-primitive-type-name saetp)))
-                    `(!define-type-vops
+                    `(!define-type-vop
                       ,(symbolicate primtype "-P")
-                      ,(symbolicate "CHECK-" primtype)
-                      ,primtype
-                      ,(symbolicate "OBJECT-NOT-" primtype "-ERROR")
                       (,(saetp-typecode saetp)))))
                   *specialized-array-element-type-properties*))))
   (define-simple-array-type-vops))
 
 (macrolet
     ((def ()
-       `(!define-type-vops simple-rank-1-array-*-p check-simple-rank-1-array-*
-         nil
-         ;; TODO: eliminate naming of errors. The error-emitting logic can find
-         ;; an error number from a type specifier. As impetus to remove them,
-         ;; I'm not adding a new exported symbol to sb-kernel.
-         sb!kernel::object-not-simple-rank-1-array-error
+       `(!define-type-vop simple-rank-1-array-*-p
          ,(map 'list #'saetp-typecode
                *specialized-array-element-type-properties*))))
   (def)) ; simple-rank-1-array-*-p
 
-(!define-type-vops characterp check-character character
-    object-not-character-error
-  (character-widetag))
+(!define-type-vop characterp (character-widetag))
 
-(!define-type-vops system-area-pointer-p check-system-area-pointer
-      system-area-pointer
-    object-not-sap-error
-  (sap-widetag))
+(!define-type-vop system-area-pointer-p (sap-widetag))
 
-(!define-type-vops weak-pointer-p check-weak-pointer weak-pointer
-    object-not-weak-pointer-error
-  (weak-pointer-widetag))
+(!define-type-vop weak-pointer-p (weak-pointer-widetag))
 
-(!define-type-vops code-component-p nil nil nil
-  (code-header-widetag))
+(!define-type-vop code-component-p (code-header-widetag))
 
-(!define-type-vops lra-p nil nil nil
-  (return-pc-header-widetag))
+(!define-type-vop lra-p (return-pc-header-widetag))
 
-(!define-type-vops fdefn-p nil nil nil
-  (fdefn-widetag))
+(!define-type-vop fdefn-p (fdefn-widetag))
 
-(!define-type-vops closurep nil nil nil (closure-header-widetag))
+(!define-type-vop closurep (closure-header-widetag))
 
-(!define-type-vops simple-fun-p nil nil nil
-  (simple-fun-header-widetag))
+(!define-type-vop simple-fun-p (simple-fun-header-widetag))
 
-(!define-type-vops funcallable-instance-p nil nil nil
-  (funcallable-instance-header-widetag))
+(!define-type-vop funcallable-instance-p (funcallable-instance-header-widetag))
 
-(!define-type-vops array-header-p nil nil nil
+(!define-type-vop array-header-p
   (simple-array-widetag
    #!+sb-unicode complex-character-string-widetag
    complex-base-string-widetag complex-bit-vector-widetag
    complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
-(!define-type-vops stringp check-string nil object-not-string-error
+(!define-type-vop stringp
   (#!+sb-unicode simple-character-string-widetag
    #!+sb-unicode complex-character-string-widetag
    simple-base-string-widetag complex-base-string-widetag
    simple-array-nil-widetag complex-vector-nil-widetag))
 
-(!define-type-vops base-string-p check-base-string nil object-not-base-string-error
+(!define-type-vop base-string-p
   (simple-base-string-widetag complex-base-string-widetag))
 
-(!define-type-vops bit-vector-p check-bit-vector nil
-    object-not-bit-vector-error
+(!define-type-vop bit-vector-p
   (simple-bit-vector-widetag complex-bit-vector-widetag))
 
-(!define-type-vops vector-nil-p check-vector-nil nil
-    object-not-vector-nil-error
+(!define-type-vop vector-nil-p
   (simple-array-nil-widetag complex-vector-nil-widetag))
 
 #!+sb-unicode
-(!define-type-vops character-string-p check-character-string nil
-    object-not-character-string-error
+(!define-type-vop character-string-p
   (simple-character-string-widetag complex-character-string-widetag))
 
-(!define-type-vops vectorp check-vector nil object-not-vector-error
+(!define-type-vop vectorp
   (complex-vector-widetag .
    #.(append
       (map 'list
@@ -179,18 +164,15 @@
 ;;; type.) Thus, there's no point in building up the full machinery of
 ;;; associated backend type predicates and so forth as we do for
 ;;; ordinary type VOPs.
-(!define-type-vops complex-vector-p check-complex-vector nil
-    object-not-complex-vector-error
-  (complex-vector-widetag))
+(!define-type-vop complex-vector-p (complex-vector-widetag))
 
-(!define-type-vops simple-array-p check-simple-array nil
-    object-not-simple-array-error
+(!define-type-vop simple-array-p
   (simple-array-widetag .
    #.(map 'list
           #'saetp-typecode
           *specialized-array-element-type-properties*)))
 
-(!define-type-vops arrayp check-array nil object-not-array-error
+(!define-type-vop arrayp
   (simple-array-widetag
    complex-array-widetag
    complex-vector-widetag .
@@ -203,7 +185,7 @@
                   (list (saetp-complex-typecode saetp))))
               (coerce *specialized-array-element-type-properties* 'list)))))
 
-(!define-type-vops numberp check-number nil object-not-number-error
+(!define-type-vop numberp
   (bignum-widetag
    ratio-widetag
    single-float-widetag
@@ -215,19 +197,22 @@
    #!+long-float complex-long-float-widetag
    . #.fixnum-lowtags))
 
-(!define-type-vops rationalp check-rational nil object-not-rational-error
+(!define-type-vop rationalp
   (ratio-widetag bignum-widetag . #.fixnum-lowtags))
 
-(!define-type-vops integerp check-integer nil object-not-integer-error
+(!define-type-vop integerp
   (bignum-widetag . #.fixnum-lowtags))
 
-(!define-type-vops floatp check-float nil object-not-float-error
+(!define-type-vop floatp
   (single-float-widetag double-float-widetag #!+long-float long-float-widetag))
 
-(!define-type-vops realp check-real nil object-not-real-error
+(!define-type-vop realp
   (ratio-widetag
    bignum-widetag
    single-float-widetag
    double-float-widetag
    #!+long-float long-float-widetag
    . #.fixnum-lowtags))
+
+#!+sb-simd-pack
+(!define-type-vop simd-pack-p (simd-pack-widetag))

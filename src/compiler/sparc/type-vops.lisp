@@ -123,56 +123,11 @@
                           (inst b :le when-true))))))))))
         (inst nop)
         (emit-label drop-through)))))
-
-;;;; Simple type checking and testing:
-;;;
-;;; These types are represented by a single type code, so are easily
-;;; open-coded as a mask and compare.
-(define-vop (check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:vop-var vop)
-  (:save-p :compute-only))
-
-(define-vop (type-predicate)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe)
-  (:temporary (:scs (non-descriptor-reg)) temp))
-
-(defun cost-to-test-types (type-codes)
-  (+ (* 2 (length type-codes))
-     (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
-
-(defmacro !define-type-vops (pred-name check-name ptype error-code
-                         (&rest type-codes)
-                         &key &allow-other-keys)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
-    `(progn
-      ,@(when pred-name
-           `((define-vop (,pred-name type-predicate)
-               (:translate ,pred-name)
-               (:generator ,cost
-                 (test-type value target not-p (,@type-codes)
-                            :temp temp)))))
-      ,@(when check-name
-           `((define-vop (,check-name check-type)
-               (:generator ,cost
-                 (let ((err-lab
-                        (generate-error-code vop ',error-code value)))
-                   (test-type value err-lab t (,@type-codes)
-                              :temp temp)
-                   (move result value))))))
-       ,@(when ptype
-           `((primitive-type-vop ,check-name (:check) ,ptype))))))
-
 
 ;;;; Other integer ranges.
 
-  ;; A (signed-byte 32) can be represented with either fixnum or a
-  ;; bignum with exactly one digit.
+;;; A (signed-byte 32) can be represented with either fixnum or a
+;;; bignum with exactly one digit.
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
@@ -193,25 +148,13 @@
                   (inst nop)
                   (emit-label not-target)))))
 
-(define-vop (check-signed-byte-32 check-type)
-  (:generator 45
-              (let ((nope (generate-error-code vop 'object-not-signed-byte-32-error value))
-                    (yep (gen-label)))
-                (inst andcc temp value fixnum-tag-mask)
-                (inst b :eq yep)
-                (test-type value nope t (other-pointer-lowtag) :temp temp)
-                (loadw temp value 0 other-pointer-lowtag)
-                (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-                (inst b :ne nope)
-                (inst nop)
-                (emit-label yep)
-                (move result value))))
 
 
-  ;; An (unsigned-byte 32) can be represented with either a
-  ;; positive fixnum, a bignum with exactly one positive digit, or
-  ;; a bignum with exactly two digits and the second digit all
-  ;; zeros.
+
+;;; An (unsigned-byte 32) can be represented with either a
+;;; positive fixnum, a bignum with exactly one positive digit, or
+;;; a bignum with exactly two digits and the second digit all
+;;; zeros.
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
@@ -261,53 +204,7 @@
                   (inst nop)
 
                   (emit-label not-target)))))
-
-(define-vop (check-unsigned-byte-32 check-type)
-  (:generator 45
-              (let ((nope
-                     (generate-error-code vop 'object-not-unsigned-byte-32-error value))
-                    (yep (gen-label))
-                    (fixnum (gen-label))
-                    (single-word (gen-label)))
-                ;; Is it a fixnum?
-                (inst andcc temp value fixnum-tag-mask)
-                (inst b :eq fixnum)
-                (inst cmp value)
-
-                ;; If not, is it an other pointer?
-                (test-type value nope t (other-pointer-lowtag) :temp temp)
-                ;; Get the number of digits.
-                (loadw temp value 0 other-pointer-lowtag)
-                ;; Is it one?
-                (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-                (inst b :eq single-word)
-                ;; If it's other than two, we can't be an (unsigned-byte 32)
-                (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
-                (inst b :ne nope)
-                ;; Get the second digit.
-                (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-                ;; All zeros, its an (unsigned-byte 32).
-                (inst cmp temp)
-                (inst b :eq yep)
-                ;; Otherwise, it isn't.
-                (inst b :ne nope)
-                (inst nop)
-
-                (emit-label single-word)
-                ;; Get the single digit.
-                (loadw temp value bignum-digits-offset other-pointer-lowtag)
-                ;; positive implies (unsigned-byte 32).
-                (inst cmp temp)
-
-                (emit-label fixnum)
-                (inst b :lt nope)
-                (inst nop)
-
-                (emit-label yep)
-                (move result value))))
-
-
-  
+
 ;;;; List/symbol types:
 
   ;; symbolp (or symbol (eq nil))
@@ -323,16 +220,6 @@
                 (test-type value target not-p (symbol-header-widetag) :temp temp)
                 (emit-label drop-thru))))
 
-(define-vop (check-symbol check-type)
-  (:generator 12
-              (let ((drop-thru (gen-label))
-                    (error (generate-error-code vop 'object-not-symbol-error value)))
-                (inst cmp value null-tn)
-                (inst b :eq drop-thru)
-                (test-type value error t (symbol-header-widetag) :temp temp)
-                (emit-label drop-thru)
-                (move result value))))
-
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
@@ -342,11 +229,3 @@
                 (inst b :eq is-not-cons-label)
                 (test-type value target not-p (list-pointer-lowtag) :temp temp)
                 (emit-label drop-thru))))
-
-(define-vop (check-cons check-type)
-  (:generator 8
-              (let ((error (generate-error-code vop 'object-not-cons-error value)))
-                (inst cmp value null-tn)
-                (inst b :eq error)
-                (test-type value error t (list-pointer-lowtag) :temp temp)
-                (move result value))))

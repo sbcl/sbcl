@@ -101,54 +101,6 @@
                           (inst b :le when-true))))))))))
         (emit-label drop-through)))))
 
-;;; Type checking and testing (see also the use of !DEFINE-TYPE-VOPS
-;;; in src/compiler/generic/late-type-vops.lisp):
-;;;
-;;; [FIXME: Like some of the other comments in this file, this one
-;;; really belongs somewhere else]
-(define-vop (check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)
-                    :to (:result 0)
-                    :offset ocfp-offset)
-              temp)
-  (:vop-var vop)
-  (:save-p :compute-only))
-
-(define-vop (type-predicate)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe))
-
-(defun cost-to-test-types (type-codes)
-  (+ (* 2 (length type-codes))
-     (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
-
-(defmacro !define-type-vops (pred-name check-name ptype error-code
-                             (&rest type-codes)
-                             &key &allow-other-keys)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
-    `(progn
-       ,@(when pred-name
-           `((define-vop (,pred-name type-predicate)
-               (:translate ,pred-name)
-               (:generator ,cost
-                 (test-type value target not-p (,@type-codes)
-                            :temp temp)))))
-       ,@(when check-name
-           `((define-vop (,check-name check-type)
-               (:generator ,cost
-                 (let ((err-lab
-                        (generate-error-code vop ',error-code value)))
-                   (test-type value err-lab t (,@type-codes)
-                              :temp temp)
-                   (move result value))))))
-       ,@(when ptype
-           `((primitive-type-vop ,check-name (:check) ,ptype))))))
-
 ;;;; Other integer ranges.
 
 ;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
@@ -176,14 +128,6 @@
    (let ((not-target (gen-label)))
      (signed-byte-32-test value temp not-p target not-target)
      (emit-label not-target))))
-
-(define-vop (check-signed-byte-32 check-type)
-  (:generator 45
-    (let ((nope (generate-error-code vop 'object-not-signed-byte-32-error value))
-          (yep (gen-label)))
-      (signed-byte-32-test value temp t nope yep)
-      (emit-label yep)
-      (move result value))))
 
 ;;; An (UNSIGNED-BYTE 32) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
@@ -239,13 +183,6 @@
      (unsigned-byte-32-test value temp not-p target not-target)
      (emit-label not-target))))
 
-(define-vop (check-unsigned-byte-32 check-type)
-  (:generator 45
-    (let ((lose (generate-error-code vop 'object-not-unsigned-byte-32-error value))
-          (okay (gen-label)))
-      (unsigned-byte-32-test value temp t lose okay)
-      (emit-label okay)
-      (move result value))))
 
 ;;; MOD type checks
 (defun power-of-two-limit-p (x)
@@ -393,16 +330,6 @@
       (test-type value target not-p (symbol-header-widetag) :temp temp)
       (emit-label drop-thru))))
 
-(define-vop (check-symbol check-type)
-  (:generator 12
-    (let ((drop-thru (gen-label))
-          (error (generate-error-code vop 'object-not-symbol-error value)))
-      (inst cmp value null-tn)
-      (inst b :eq drop-thru)
-      (test-type value error t (symbol-header-widetag) :temp temp)
-      (emit-label drop-thru)
-      (move result value))))
-
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
@@ -412,11 +339,3 @@
       (inst b :eq is-not-cons-label)
       (test-type value target not-p (list-pointer-lowtag) :temp temp)
       (emit-label drop-thru))))
-
-(define-vop (check-cons check-type)
-  (:generator 8
-    (let ((error (generate-error-code vop 'object-not-cons-error value)))
-      (inst cmp value null-tn)
-      (inst b :eq error)
-      (test-type value error t (list-pointer-lowtag) :temp temp)
-      (move result value))))

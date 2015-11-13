@@ -193,68 +193,6 @@
                   (inst cmp al-tn (- end start))
                   (inst jmp less-or-equal target))))))))
       (emit-label drop-through))))
-
-
-;;;; type checking and testing
-
-(define-vop (check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)
-  (:ignore eax)
-  (:vop-var vop)
-  (:save-p :compute-only))
-
-(define-vop (type-predicate)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
-  (:ignore eax)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe))
-
-;;; simpler VOP that don't need a temporary register
-(define-vop (simple-check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)
-                    :load-if (not (and (sc-is value any-reg descriptor-reg)
-                                       (sc-is result control-stack)))))
-  (:vop-var vop)
-  (:save-p :compute-only))
-
-(define-vop (simple-type-predicate)
-  (:args (value :scs (any-reg descriptor-reg control-stack)))
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe))
-
-(defmacro !define-type-vops (pred-name check-name ptype error-code
-                             (&rest type-codes)
-                             &key (variant nil variant-p) &allow-other-keys)
-  ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
-  ;; expansion?
-  (flet ((cost-to-test-types (type-codes)
-           (+ (* 2 (length type-codes))
-              (if (> (apply #'max type-codes) lowtag-limit) 7 2))))
-    (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
-           (prefix (if variant-p
-                       (concatenate 'string (string variant) "-")
-                       "")))
-      `(progn
-         ,@(when pred-name
-             `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
-                 (:translate ,pred-name)
-                 (:generator ,cost
-                   (test-type value target not-p (,@type-codes))))))
-         ,@(when check-name
-             `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
-                 (:generator ,cost
-                   (let ((err-lab
-                           (generate-error-code vop ',error-code value)))
-                     (test-type value err-lab t (,@type-codes))
-                     (move result value))))))
-         ,@(when ptype
-             `((primitive-type-vop ,check-name (:check) ,ptype)))))))
 
 ;;;; other integer ranges
 
@@ -327,30 +265,6 @@
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
-;; FIXME: this vop is never emitted. I suspect that is because whenever
-;; we have something which needs to be asserted as (SIGNED-BYTE 64) and
-;; then moved to a signed-reg, the signed-byte-64-p vop is used and then
-;; move-to-word. We apparently never want to both assert the type and
-;; keep it as a tagged object. Anyway if it ever were emitted before,
-;; GENERATE-ERROR-CODE would have failed since OBJECT-NOT-SIGNED-BYTE-64
-;; did not have an error number.
-(define-vop (check-signed-byte-64 check-type)
-  (:generator 45
-    (let ((nope (generate-error-code vop
-                                     'object-not-signed-byte-64-error
-                                     value)))
-      (generate-fixnum-test value)
-      (inst jmp :e yep)
-      (move-qword-to-eax value)
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
-      (inst jmp :ne nope)
-      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
-            (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst jmp :ne nope))
-    YEP
-    (move result value)))
-
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
@@ -398,50 +312,6 @@
         (inst jmp (if not-p :s :ns) target)
 
         (emit-label not-target)))))
-
-(define-vop (check-unsigned-byte-64 check-type)
-  (:generator 45
-    (let ((nope
-           (generate-error-code vop 'object-not-unsigned-byte-64-error value))
-          (yep (gen-label))
-          (fixnum (gen-label))
-          (single-word (gen-label)))
-
-      ;; Is it a fixnum?
-      (generate-fixnum-test value)
-      (move rax-tn value)
-      (inst jmp :e fixnum)
-
-      ;; If not, is it an other pointer?
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
-      (inst jmp :ne nope)
-      ;; Get the header.
-      (loadw rax-tn value 0 other-pointer-lowtag)
-      ;; Is it one?
-      (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst jmp :e single-word)
-      ;; If it's other than two, we can't be an (unsigned-byte 64)
-      (inst cmp rax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
-      (inst jmp :ne nope)
-      ;; Get the second digit.
-      (loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
-      ;; All zeros, its an (unsigned-byte 64).
-      (inst test rax-tn rax-tn)
-      (inst jmp :z yep)
-      (inst jmp nope)
-
-      (emit-label single-word)
-      ;; Get the single digit.
-      (loadw rax-tn value bignum-digits-offset other-pointer-lowtag)
-
-      ;; positive implies (unsigned-byte 64).
-      (emit-label fixnum)
-      (inst test rax-tn rax-tn)
-      (inst jmp :s nope)
-
-      (emit-label yep)
-      (move result value))))
 
 (defun power-of-two-limit-p (x)
   (and (fixnump x)
@@ -514,15 +384,6 @@
       (test-type value target not-p (symbol-header-widetag)))
     DROP-THRU))
 
-(define-vop (check-symbol check-type)
-  (:generator 12
-    (let ((error (generate-error-code vop 'object-not-symbol-error value)))
-      (inst cmp value nil-value)
-      (inst jmp :e DROP-THRU)
-      (test-type value error t (symbol-header-widetag)))
-    DROP-THRU
-    (move result value)))
-
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
@@ -531,14 +392,6 @@
       (inst jmp :e is-not-cons-label)
       (test-type value target not-p (list-pointer-lowtag)))
     DROP-THRU))
-
-(define-vop (check-cons check-type)
-  (:generator 8
-    (let ((error (generate-error-code vop 'object-not-cons-error value)))
-      (inst cmp value nil-value)
-      (inst jmp :e error)
-      (test-type value error t (list-pointer-lowtag))
-      (move result value))))
 
 ;; A vop that accepts a computed set of widetags.
 (define-vop (%other-pointer-subtype-p type-predicate)
@@ -550,66 +403,3 @@
         (canonicalize-headers-and-exceptions widetags)
       (%test-headers value target not-p nil headers
                      :except exceptions))))
-
-#!+sb-simd-pack
-(progn
-  (!define-type-vops simd-pack-p nil nil nil (simd-pack-widetag))
-
-  (define-vop (check-simd-pack check-type)
-    (:args (value :target result
-                  :scs (any-reg descriptor-reg
-                        int-sse-reg single-sse-reg double-sse-reg
-                        int-sse-stack single-sse-stack double-sse-stack)))
-    (:results (result :scs (any-reg descriptor-reg
-                           int-sse-reg single-sse-reg double-sse-reg)))
-    (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)
-    (:ignore eax)
-    (:vop-var vop)
-    (:node-var node)
-    (:save-p :compute-only)
-    (:generator 50
-      (sc-case value
-        ((int-sse-reg single-sse-reg double-sse-reg
-          int-sse-stack single-sse-stack double-sse-stack)
-         (sc-case result
-           ((int-sse-reg single-sse-reg double-sse-reg)
-            (move result value))
-           ((any-reg descriptor-reg)
-            (with-fixed-allocation (result
-                                    simd-pack-widetag
-                                    simd-pack-size
-                                    node)
-              ;; see *simd-pack-element-types*
-              (storew (fixnumize
-                       (sc-case value
-                         ((int-sse-reg int-sse-stack) 0)
-                         ((single-sse-reg single-sse-stack) 1)
-                         ((double-sse-reg double-sse-stack) 2)))
-                  result simd-pack-tag-slot other-pointer-lowtag)
-              (let ((ea (make-ea-for-object-slot
-                         result simd-pack-lo-value-slot other-pointer-lowtag)))
-                (if (float-simd-pack-p value)
-                    (inst movaps ea value)
-                    (inst movdqa ea value)))))))
-        ((any-reg descriptor-reg)
-         (let ((leaf (sb!c::tn-leaf value)))
-           (unless (and (sb!c::lvar-p leaf)
-                        (csubtypep (sb!c::lvar-type leaf)
-                                   (specifier-type 'simd-pack)))
-             (test-type
-                 value
-                 (generate-error-code vop 'object-not-simd-pack-error value)
-                 t (simd-pack-widetag))))
-         (sc-case result
-           ((int-sse-reg)
-            (let ((ea (make-ea-for-object-slot
-                       value simd-pack-lo-value-slot other-pointer-lowtag)))
-              (inst movdqa result ea)))
-           ((single-sse-reg double-sse-reg)
-            (let ((ea (make-ea-for-object-slot
-                       value simd-pack-lo-value-slot other-pointer-lowtag)))
-              (inst movaps result ea)))
-           ((any-reg descriptor-reg)
-            (move result value)))))))
-
-  (primitive-type-vop check-simd-pack (:check) simd-pack-int simd-pack-single simd-pack-double))

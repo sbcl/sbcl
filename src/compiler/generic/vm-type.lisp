@@ -176,40 +176,6 @@
     (when (csubtypep subtype (specifier-type type))
       (return type))))
 
-;;; If TYPE has a CHECK-xxx template, but doesn't have a corresponding
-;;; PRIMITIVE-TYPE, then return the template's name. Otherwise, return NIL.
-(defun hairy-type-check-template-name (type)
-  (declare (type ctype type))
-  (typecase type
-    (cons-type
-     (if (type= type (specifier-type 'cons))
-         'sb!c:check-cons
-         nil))
-    (built-in-classoid
-     (if (type= type (specifier-type 'symbol))
-         'sb!c:check-symbol
-         nil))
-    (numeric-type
-     (cond ((type= type (specifier-type 'fixnum))
-            'sb!c:check-fixnum)
-           #!-64-bit
-           ((type= type (specifier-type '(signed-byte 32)))
-            'sb!c:check-signed-byte-32)
-           #!-64-bit
-           ((type= type (specifier-type '(unsigned-byte 32)))
-            'sb!c:check-unsigned-byte-32)
-           #!+64-bit
-           ((type= type (specifier-type '(signed-byte 64)))
-            'sb!c:check-signed-byte-64)
-           #!+64-bit
-           ((type= type (specifier-type '(unsigned-byte 64)))
-            'sb!c:check-unsigned-byte-64)
-           (t nil)))
-    (fun-type
-     'sb!c:check-fun)
-    (t
-     nil)))
-
 ;; Given a union type INPUT, see if it fully covers an ARRAY-* type,
 ;; and unite into that when possible, taking care to handle more
 ;; than one dimensionality/complexity of array, and non-array types.

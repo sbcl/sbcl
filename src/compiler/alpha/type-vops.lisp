@@ -84,153 +84,84 @@
                           (inst ble temp target))
                       (inst ble temp when-true))))))))
         (emit-label drop-through)))))
-
-;;;; Type checking and testing:
 
-(define-vop (check-type)
-  (:args (value :target result :scs (any-reg descriptor-reg)))
-  (:results (result :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp)
-  (:vop-var vop)
-  (:save-p :compute-only))
-
-(define-vop (type-predicate)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe))
-
-(defun cost-to-test-types (type-codes)
-  (+ (* 2 (length type-codes))
-     (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
-
-(defmacro !define-type-vops (pred-name check-name ptype error-code
-                             (&rest type-codes)
-                             &key &allow-other-keys)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
-    `(progn
-       ,@(when pred-name
-           `((define-vop (,pred-name type-predicate)
-               (:translate ,pred-name)
-               (:generator ,cost
-                 (test-type value target not-p (,@type-codes) :temp temp)))))
-       ,@(when check-name
-           `((define-vop (,check-name check-type)
-               (:generator ,cost
-                 (let ((err-lab
-                        (generate-error-code vop ',error-code value)))
-                   (test-type value err-lab t (,@type-codes) :temp temp)
-                   (move value result))))))
-       ,@(when ptype
-           `((primitive-type-vop ,check-name (:check) ,ptype))))))
-
 ;;;; Other integer ranges.
 
 ;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
-
-(defun signed-byte-32-test (value temp temp1 not-p target not-target)
-  (multiple-value-bind
-      (yep nope)
-      (if not-p
-          (values not-target target)
-          (values target not-target))
-    (assemble ()
-      (inst and value fixnum-tag-mask temp)
-      (inst beq temp yep)
-      (inst and value lowtag-mask temp)
-      (inst xor temp other-pointer-lowtag temp)
-      (inst bne temp nope)
-      (loadw temp value 0 other-pointer-lowtag)
-      (inst li (+ (ash 1 n-widetag-bits) bignum-widetag) temp1)
-      (inst xor temp temp1 temp)
-      (if not-p
-          (inst bne temp target)
-          (inst beq temp target))))
-  (values))
-
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
   (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
-    (signed-byte-32-test value temp temp1 not-p target not-target)
+    (multiple-value-bind
+          (yep nope)
+        (if not-p
+            (values not-target target)
+            (values target not-target))
+      (assemble ()
+        (inst and value fixnum-tag-mask temp)
+        (inst beq temp yep)
+        (inst and value lowtag-mask temp)
+        (inst xor temp other-pointer-lowtag temp)
+        (inst bne temp nope)
+        (loadw temp value 0 other-pointer-lowtag)
+        (inst li (+ (ash 1 n-widetag-bits) bignum-widetag) temp1)
+        (inst xor temp temp1 temp)
+        (if not-p
+            (inst bne temp target)
+            (inst beq temp target))))
     NOT-TARGET))
-
-(define-vop (check-signed-byte-32 check-type)
-  (:temporary (:scs (non-descriptor-reg)) temp1)
-  (:generator 45
-    (let ((loose (generate-error-code vop 'object-not-signed-byte-32-error
-                                      value)))
-      (signed-byte-32-test value temp temp1 t loose okay))
-    OKAY
-    (move value result)))
 
 ;;; An (unsigned-byte 32) can be represented with either a positive fixnum, a
 ;;; bignum with exactly one positive digit, or a bignum with exactly two digits
 ;;; and the second digit all zeros.
 
-(defun unsigned-byte-32-test (value temp temp1 not-p target not-target)
-  (multiple-value-bind (yep nope)
-                       (if not-p
-                           (values not-target target)
-                           (values target not-target))
-    (assemble ()
-      ;; Is it a fixnum?
-      (inst and value fixnum-tag-mask temp1)
-      (inst move value temp)
-      (inst beq temp1 fixnum)
-
-      ;; If not, is it an other pointer?
-      (inst and value lowtag-mask temp)
-      (inst xor temp other-pointer-lowtag temp)
-      (inst bne temp nope)
-      ;; Get the header.
-      (loadw temp value 0 other-pointer-lowtag)
-      ;; Is it one?
-      (inst li  (+ (ash 1 n-widetag-bits) bignum-widetag) temp1)
-      (inst xor temp temp1 temp)
-      (inst beq temp single-word)
-      ;; If it's other than two, we can't be an (unsigned-byte 32)
-      (inst li (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
-                       (+ (ash 2 n-widetag-bits) bignum-widetag))
-            temp1)
-      (inst xor temp temp1 temp)
-      (inst bne temp nope)
-      ;; Get the second digit.
-      (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-      ;; All zeros, its an (unsigned-byte 32).
-      (inst beq temp yep)
-      (inst br zero-tn nope)
-
-      SINGLE-WORD
-      ;; Get the single digit.
-      (loadw temp value bignum-digits-offset other-pointer-lowtag)
-
-      ;; positive implies (unsigned-byte 32).
-      FIXNUM
-      (if not-p
-          (inst blt temp target)
-          (inst bge temp target))))
-  (values))
-
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
   (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
-    (unsigned-byte-32-test value temp temp1 not-p target not-target)
+    (multiple-value-bind (yep nope)
+        (if not-p
+            (values not-target target)
+            (values target not-target))
+      (assemble ()
+        ;; Is it a fixnum?
+        (inst and value fixnum-tag-mask temp1)
+        (inst move value temp)
+        (inst beq temp1 fixnum)
+
+        ;; If not, is it an other pointer?
+        (inst and value lowtag-mask temp)
+        (inst xor temp other-pointer-lowtag temp)
+        (inst bne temp nope)
+        ;; Get the header.
+        (loadw temp value 0 other-pointer-lowtag)
+        ;; Is it one?
+        (inst li  (+ (ash 1 n-widetag-bits) bignum-widetag) temp1)
+        (inst xor temp temp1 temp)
+        (inst beq temp single-word)
+        ;; If it's other than two, we can't be an (unsigned-byte 32)
+        (inst li (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
+                         (+ (ash 2 n-widetag-bits) bignum-widetag))
+              temp1)
+        (inst xor temp temp1 temp)
+        (inst bne temp nope)
+        ;; Get the second digit.
+        (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+        ;; All zeros, its an (unsigned-byte 32).
+        (inst beq temp yep)
+        (inst br zero-tn nope)
+
+        SINGLE-WORD
+        ;; Get the single digit.
+        (loadw temp value bignum-digits-offset other-pointer-lowtag)
+
+        ;; positive implies (unsigned-byte 32).
+        FIXNUM
+        (if not-p
+            (inst blt temp target)
+            (inst bge temp target))))
     NOT-TARGET))
-
-(define-vop (check-unsigned-byte-32 check-type)
-  (:temporary (:scs (non-descriptor-reg)) temp1)
-  (:generator 45
-    (let ((loose (generate-error-code vop 'object-not-unsigned-byte-32-error
-                                      value)))
-      (unsigned-byte-32-test value temp temp1 t loose okay))
-    OKAY
-    (move value result)))
-
-
 
 ;;;; List/symbol types:
 ;;;
@@ -246,16 +177,6 @@
     (test-type value target not-p (symbol-header-widetag) :temp temp)
     DROP-THRU))
 
-(define-vop (check-symbol check-type)
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 12
-    (inst cmpeq value null-tn temp)
-    (inst bne temp drop-thru)
-    (let ((error (generate-error-code vop 'object-not-symbol-error value)))
-      (test-type value error t (symbol-header-widetag) :temp temp))
-    DROP-THRU
-    (move value result)))
-
 (define-vop (consp type-predicate)
   (:translate consp)
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -264,13 +185,3 @@
     (inst bne temp (if not-p target drop-thru))
     (test-type value target not-p (list-pointer-lowtag) :temp temp)
     DROP-THRU))
-
-(define-vop (check-cons check-type)
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 8
-    (let ((error (generate-error-code vop 'object-not-cons-error value)))
-      (inst cmpeq value null-tn temp)
-      (inst bne temp error)
-      (test-type value error t (list-pointer-lowtag) :temp temp))
-    (move value result)))
-

@@ -29,18 +29,6 @@
       (combination-step-info node)
       nil))
 
-;;; If there is any CHECK-xxx template for TYPE, then return it,
-;;; otherwise return NIL.
-(defun type-check-template (type)
-  (declare (type ctype type))
-  (multiple-value-bind (check-ptype exact) (primitive-type type)
-    (if exact
-        (primitive-type-check check-ptype)
-        (let ((name (hairy-type-check-template-name type)))
-          (if name
-              (template-or-lose name)
-              nil)))))
-
 ;;; Emit code in BLOCK to check that VALUE is of the specified TYPE,
 ;;; yielding the checked result in RESULT. VALUE and result may be of
 ;;; any primitive type. There must be CHECK-xxx VOP for TYPE. Any
@@ -562,27 +550,6 @@
           dest))
   (values))
 
-;;; Move each SRC TN into the corresponding DEST TN, checking types
-;;; and defaulting any unsupplied source values to NIL
-(defun move-results-checked (node block src dest types)
-  (declare (type node node) (type ir2-block block) (list src dest types))
-  (let ((nsrc (length src))
-        (ndest (length dest))
-        (ntypes (length types)))
-    (mapc (lambda (from to type)
-            (if type
-                (emit-type-check node block from to type)
-                (emit-move node block from to)))
-          (if (> ndest nsrc)
-              (append src (make-list (- ndest nsrc)
-                                     :initial-element (emit-constant nil)))
-              src)
-          dest
-          (if (> ndest ntypes)
-              (append types (make-list (- ndest ntypes)))
-              types)))
-  (values))
-
 ;;; If necessary, emit coercion code needed to deliver the RESULTS to
 ;;; the specified lvar. NODE and BLOCK provide context for emitting
 ;;; code. Although usually obtained from STANDARD-RESULT-TNs or
@@ -621,27 +588,13 @@
              (2lvar (lvar-info lvar))
              (value (cast-value node))
              (2value (lvar-info value)))
-    (cond ((eq (ir2-lvar-kind 2lvar) :unused))
-          ((eq (ir2-lvar-kind 2lvar) :unknown)
-           (aver (eq (ir2-lvar-kind 2value) :unknown))
-           (aver (not (cast-type-check node)))
-           (move-results-coerced node block
-                                 (ir2-lvar-locs 2value)
-                                 (ir2-lvar-locs 2lvar)))
-          ((eq (ir2-lvar-kind 2lvar) :fixed)
-           (aver (eq (ir2-lvar-kind 2value) :fixed))
-           (if (cast-type-check node)
-               (move-results-checked node block
-                                     (ir2-lvar-locs 2value)
-                                     (ir2-lvar-locs 2lvar)
-                                     (multiple-value-bind (check types)
-                                         (cast-check-types node nil)
-                                       (aver (eq check :simple))
-                                       types))
-               (move-results-coerced node block
-                                     (ir2-lvar-locs 2value)
-                                     (ir2-lvar-locs 2lvar))))
-          (t (bug "CAST cannot be :DELAYED.")))))
+    (ecase (ir2-lvar-kind 2lvar)
+      (:unused)
+      ((:unknown :fixed)
+       (aver (not (cast-type-check node)))
+       (move-results-coerced node block
+                             (ir2-lvar-locs 2value)
+                             (ir2-lvar-locs 2lvar))))))
 
 ;;;; template conversion
 
