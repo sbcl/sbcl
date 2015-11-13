@@ -61,7 +61,7 @@
                 character-set-type unknown-type hairy-type
                 alien-type-type #+sb-simd-pack simd-pack-type)
             type)
-           (fun-type #'functionp)
+           (fun-type (specifier-type 'function))
            (compound-type
             (let* ((original (compound-type-types type))
                    (new (mapcar #'simplify original)))
@@ -109,7 +109,7 @@
            (negation-type
             (let* ((original (negation-type-type type))
                    (new (simplify original)))
-              (if (eq new original) type (make-negation-type new)))))))
+              (if (eq new original) type (make-negation-type :type new)))))))
     (or (get-unary-predicate type)
         ;; If we simplify, try again for a predicate.
         (let ((simplified (simplify type)))

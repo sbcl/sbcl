@@ -18,6 +18,14 @@
 
 (in-package sb-interpreter)
 
+(test-util:with-test (:name :type-checker-for-function)
+  ;; The test for (FUNCTION (HAIR) (MORE-HAIR)) is just FUNCTIONP.
+  ;; The test for not that is (NOT FUNCTION).
+  (assert (eq (type-checker (specifier-type '(function (cons) cons)))
+              #'functionp))
+  (assert (type-checker (specifier-type
+                         '(not (function (integer) integer))))))
+
 (defvar *invocation-count* 0)
 
 (defmacro what-cell (x)
