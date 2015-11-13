@@ -124,84 +124,93 @@
 
 ;;; A (signed-byte 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
-(defun signed-byte-64-test (value temp not-p target not-target)
-  (multiple-value-bind
-        (yep nope)
-      (if not-p
-          (values not-target target)
-          (values target not-target))
-    (assemble ()
-      (inst ands temp value fixnum-tag-mask)
-      (inst b :eq yep)
-      (test-type value nope t (other-pointer-lowtag) :temp temp)
-      (loadw temp value 0 other-pointer-lowtag)
-      (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst eor temp temp tmp-tn)
-      (inst tst temp temp)
-      (inst b (if not-p :ne :eq) target)))
-  (values))
-
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
   (:generator 45
-   (let ((not-target (gen-label)))
-     (signed-byte-64-test value temp not-p target not-target)
-     (emit-label not-target))))
-
-;;; An (UNSIGNED-BYTE 64) can be represented with either a positive
-;;; fixnum, a bignum with exactly one positive digit, or a bignum with
-;;; exactly two digits and the second digit all zeros.
-(defun unsigned-byte-64-test (value temp not-p target not-target)
-  (let ((single-word (gen-label))
-        (fixnum (gen-label)))
     (multiple-value-bind (yep nope)
         (if not-p
             (values not-target target)
             (values target not-target))
       (assemble ()
-        ;; Is it a fixnum?
-        (move temp value)
-        (%test-fixnum temp fixnum nil)
-
-        ;; If not, is it an other pointer?
+        (inst ands temp value fixnum-tag-mask)
+        (inst b :eq yep)
         (test-type value nope t (other-pointer-lowtag) :temp temp)
-        ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
-        ;; Is it one?
         (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
         (inst eor temp temp tmp-tn)
         (inst tst temp temp)
-        (inst b :eq single-word)
-        ;; If it's other than two, we can't be an (unsigned-byte 64)
-        (inst eor temp temp (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
-                                    (+ (ash 2 n-widetag-bits) bignum-widetag)))
-        (inst tst temp temp)
-        (inst b :ne nope)
-        ;; Get the second digit.
-        (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        ;; All zeros, its an (unsigned-byte 64).
-        (inst cbz temp yep)
-        (inst b nope)
+        (inst b (if not-p :ne :eq) target)))
+    not-target))
 
-        (emit-label single-word)
-        ;; Get the single digit.
-        (loadw temp value bignum-digits-offset other-pointer-lowtag)
-
-        ;; positive implies (unsigned-byte 64).
-        (emit-label fixnum)
-        (inst cmp temp 0)
-        (if not-p
-            (inst b :lt target)
-            (inst b :ge target))))
-    (values)))
-
+;;; An (UNSIGNED-BYTE 64) can be represented with either a positive
+;;; fixnum, a bignum with exactly one positive digit, or a bignum with
+;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
   (:generator 45
-   (let ((not-target (gen-label)))
-     (unsigned-byte-64-test value temp not-p target not-target)
-     (emit-label not-target))))
+   (let ((single-word (gen-label))
+         (fixnum (gen-label)))
+     (multiple-value-bind (yep nope)
+         (if not-p
+             (values not-target target)
+             (values target not-target))
+       (assemble ()
+         ;; Is it a fixnum?
+         (move temp value)
+         (%test-fixnum temp fixnum nil)
 
+         ;; If not, is it an other pointer?
+         (test-type value nope t (other-pointer-lowtag) :temp temp)
+         ;; Get the header.
+         (loadw temp value 0 other-pointer-lowtag)
+         ;; Is it one?
+         (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+         (inst eor temp temp tmp-tn)
+         (inst tst temp temp)
+         (inst b :eq single-word)
+         ;; If it's other than two, we can't be an (unsigned-byte 64)
+         (inst eor temp temp (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
+                                     (+ (ash 2 n-widetag-bits) bignum-widetag)))
+         (inst tst temp temp)
+         (inst b :ne nope)
+         ;; Get the second digit.
+         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+         ;; All zeros, its an (unsigned-byte 64).
+         (inst cbz temp yep)
+         (inst b nope)
+
+         (emit-label single-word)
+         ;; Get the single digit.
+         (loadw temp value bignum-digits-offset other-pointer-lowtag)
+
+         ;; positive implies (unsigned-byte 64).
+         (emit-label fixnum)
+         (inst cmp temp 0)
+         (if not-p
+             (inst b :lt target)
+             (inst b :ge target))))
+     (values))
+   NOT-TARGET))
+
+(define-vop (fixnump/unsigned-byte-64)
+  (:policy :fast-safe)
+  (:args (value :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:translate fixnump)
+  (:conditional :eq)
+  (:generator 5
+    (inst tst value (ash (1- (ash 1 (- n-word-bits
+                                   n-positive-fixnum-bits)))
+                     n-positive-fixnum-bits))))
+
+(define-vop (fixnump/signed-byte-64 type-predicate)
+  (:args (value :scs (signed-reg)))
+  (:conditional :vc)
+  (:info)
+  (:arg-types signed-num)
+  (:translate fixnump)
+  (:generator 5
+    (inst adds temp value value)))
 
 ;;; MOD type checks
 (defun power-of-two-limit-p (x)

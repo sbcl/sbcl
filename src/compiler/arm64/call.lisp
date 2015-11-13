@@ -615,7 +615,7 @@
                     `((:policy :fast-safe)
                       (:translate ,translate)))
                 (:args ,@(mapcar #'(lambda (arg)
-                                     `(,arg :scs (any-reg descriptor-reg)))
+                                     `(,arg :load-if nil))
                                  args))
                 (:vop-var vop)
                 (:save-p :compute-only)
