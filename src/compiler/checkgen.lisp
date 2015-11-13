@@ -439,7 +439,7 @@
                                   :initial-element nil)))
         ;; Older architectures don't have a VOP that can emit an arbitrary
         ;; primitive trap (see "compiler/generic/type-error" - and fix that)
-        #!-(or alpha hppa)
+        #!-(or hppa)
         (map nil
              (lambda (entry)
                (let* ((canon-type (car entry))
