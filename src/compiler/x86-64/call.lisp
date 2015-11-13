@@ -10,24 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-;;;; interfaces to IR2 conversion
-
-;;; Return a wired TN describing the N'th full call argument passing
-;;; location.
-(defun standard-arg-location (n)
-  (declare (type unsigned-byte n))
-  (if (< n register-arg-count)
-      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
-                     (nth n *register-arg-offsets*))
-      (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
-
-(defun standard-arg-location-sc (n)
-  (declare (type unsigned-byte n))
-  (if (< n register-arg-count)
-      (make-sc-offset descriptor-reg-sc-number
-                      (nth n *register-arg-offsets*))
-      (make-sc-offset control-stack-sc-number n)))
 
 (defconstant arg-count-sc (make-sc-offset any-reg-sc-number rcx-offset))
 (defconstant closure-sc (make-sc-offset any-reg-sc-number rax-offset))
@@ -81,34 +63,6 @@
 ;;; are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rcx-offset))
-
-;;; Make a TN to hold the number-stack frame pointer. This is allocated
-;;; once per component, and is component-live.
-(defun make-nfp-tn ()
-  (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
-
-(defun make-stack-pointer-tn ()
-  (make-normal-tn *fixnum-primitive-type*))
-
-(defun make-number-stack-pointer-tn ()
-  (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
-
-;;; Return a list of TNs that can be used to represent an unknown-values
-;;; continuation within a function.
-(defun make-unknown-values-locations ()
-  (list (make-stack-pointer-tn)
-        (make-normal-tn *fixnum-primitive-type*)))
-
-;;; This function is called by the ENTRY-ANALYZE phase, allowing
-;;; VM-dependent initialization of the IR2-COMPONENT structure. We
-;;; push placeholder entries in the CONSTANTS to leave room for
-;;; additional noise in the code object header.
-(defun select-component-format (component)
-  (declare (type component component))
-  (dotimes (i code-constants-offset)
-    (vector-push-extend nil
-                        (ir2-component-constants (component-info component))))
-  (values))
 
 ;;;; frame hackery
 

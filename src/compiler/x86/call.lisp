@@ -10,24 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-;;;; interfaces to IR2 conversion
-
-;;; Return a wired TN describing the N'th full call argument passing
-;;; location.
-(defun standard-arg-location (n)
-  (declare (type unsigned-byte n))
-  (if (< n register-arg-count)
-      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
-                     (nth n *register-arg-offsets*))
-      (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
-
-(defun standard-arg-location-sc (n)
-  (declare (type unsigned-byte n))
-  (if (< n register-arg-count)
-      (make-sc-offset descriptor-reg-sc-number
-                      (nth n *register-arg-offsets*))
-      (make-sc-offset control-stack-sc-number n)))
 
 (defconstant arg-count-sc (make-sc-offset any-reg-sc-number ecx-offset))
 (defconstant closure-sc (make-sc-offset descriptor-reg-sc-number eax-offset))
@@ -81,44 +63,6 @@
 ;;; are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ecx-offset))
-
-;;; Make a TN to hold the number-stack frame pointer. This is allocated
-;;; once per component, and is component-live.
-(defun make-nfp-tn ()
-  (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
-
-(defun make-stack-pointer-tn ()
-  (make-normal-tn *fixnum-primitive-type*))
-
-(defun make-number-stack-pointer-tn ()
-  (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
-
-;;; Return a list of TNs that can be used to represent an unknown-values
-;;; continuation within a function.
-(defun make-unknown-values-locations ()
-  (list (make-stack-pointer-tn)
-        (make-normal-tn *fixnum-primitive-type*)))
-
-;;; This function is called by the ENTRY-ANALYZE phase, allowing
-;;; VM-dependent initialization of the IR2-COMPONENT structure. We
-;;; push placeholder entries in the CONSTANTS to leave room for
-;;; additional noise in the code object header.
-(defun select-component-format (component)
-  (declare (type component component))
-  ;; The 1+ here is because for the x86 the first constant is a
-  ;; pointer to a list of fixups, or NIL if the code object has none.
-  ;; (If I understand correctly, the fixups are needed at GC copy
-  ;; time because the X86 code isn't relocatable.)
-  ;;
-  ;; KLUDGE: It'd be cleaner to have the fixups entry be a named
-  ;; element of the CODE (aka component) primitive object. However,
-  ;; it's currently a large, tricky, error-prone chore to change
-  ;; the layout of any primitive object, so for the foreseeable future
-  ;; we'll just live with this ugliness. -- WHN 2002-01-02
-  (dotimes (i (1+ code-constants-offset))
-    (vector-push-extend nil
-                        (ir2-component-constants (component-info component))))
-  (values))
 
 ;;;; frame hackery
 

@@ -1,11 +1,5 @@
 (in-package "SB!VM")
 
-;;; Make an environment-live stack TN for saving the SP for NLX entry.
-(defun make-nlx-sp-tn (env)
-  (physenv-live-tn
-   (make-representation-tn *fixnum-primitive-type* immediate-arg-scn)
-   env))
-
 ;;; Make a TN for the argument count passing location for a
 ;;; non-local entry.
 ;;;

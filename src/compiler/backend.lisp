@@ -99,29 +99,17 @@
 ;;; convert-conditional-move-p
 ;;; boxed-immediate-sc-p
 
-;;; from primtype.lisp
-;;; primitive-type-of
-;;; primitive-type
-
 ;;; from c-call.lisp
 ;;; make-call-out-tns
 
 ;;; from call.lisp
-;;; standard-arg-location
 ;;; make-return-pc-passing-location
 ;;; make-old-fp-passing-location
 ;;; make-old-fp-save-location
 ;;; make-return-pc-save-location
 ;;; make-arg-count-location
-;;; make-nfp-tn
-;;; make-stack-pointer-tn
-;;; make-number-stack-pointer-tn
-;;; make-unknown-values-locations
-;;; select-component-format
 
 ;;; from nlx.lisp
-;;; make-nlx-sp-tn
-;;; make-dynamic-state-tns
 ;;; make-nlx-entry-arg-start-location
 
 ;;; from pred.lisp

@@ -326,7 +326,6 @@
 ;;;; function call parameters
 
 ;;; the SC numbers for register and stack arguments/return values.
-(def!constant register-arg-scn (sc-number-or-lose 'descriptor-reg))
 (def!constant immediate-arg-scn (sc-number-or-lose 'any-reg))
 (def!constant control-stack-arg-scn (sc-number-or-lose 'control-stack))
 

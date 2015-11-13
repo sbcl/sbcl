@@ -96,3 +96,74 @@
          (progn
            ,@body)
        (push ,var *adjustable-vectors*))))
+
+;;;; interfaces to IR2 conversion
+
+;;; Return a wired TN describing the N'th full call argument passing
+;;; location.
+(defun standard-arg-location (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
+                     (nth n *register-arg-offsets*))
+      (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
+
+(defun standard-arg-location-sc (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-sc-offset descriptor-reg-sc-number
+                      (nth n *register-arg-offsets*))
+      (make-sc-offset control-stack-sc-number n)))
+
+;;; Make a TN to hold the number-stack frame pointer.  This is allocated
+;;; once per component, and is component-live.
+(defun make-nfp-tn ()
+  #!+c-stack-is-control-stack
+  (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number)
+  #!-c-stack-is-control-stack
+  (component-live-tn
+   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nfp-offset)))
+
+;;; Make an environment-live stack TN for saving the SP for NLX entry.
+(defun make-nlx-sp-tn (env)
+  (physenv-live-tn
+   (make-representation-tn *fixnum-primitive-type* any-reg-sc-number)
+   env))
+
+(defun make-stack-pointer-tn ()
+  (make-normal-tn *fixnum-primitive-type*))
+
+(defun make-number-stack-pointer-tn ()
+  #!+c-stack-is-control-stack
+  (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number)
+  #!-c-stack-is-control-stack
+  (make-normal-tn *fixnum-primitive-type*))
+
+;;; Return a list of TNs that can be used to represent an unknown-values
+;;; continuation within a function.
+(defun make-unknown-values-locations ()
+  (list (make-stack-pointer-tn)
+        (make-normal-tn *fixnum-primitive-type*)))
+
+;;; This function is called by the ENTRY-ANALYZE phase, allowing
+;;; VM-dependent initialization of the IR2-COMPONENT structure. We
+;;; push placeholder entries in the CONSTANTS to leave room for
+;;; additional noise in the code object header.
+(defun select-component-format (component)
+  (declare (type component component))
+  ;; The 1+ here is because for the x86 the first constant is a
+  ;; pointer to a list of fixups, or NIL if the code object has none.
+  ;; (The fixups are needed at GC copy time because the X86 code isn't
+  ;; relocatable.)
+  ;;
+  ;; KLUDGE: It'd be cleaner to have the fixups entry be a named
+  ;; element of the CODE (aka component) primitive object. However,
+  ;; it's currently a large, tricky, error-prone chore to change
+  ;; the layout of any primitive object, so for the foreseeable future
+  ;; we'll just live with this ugliness. -- WHN 2002-01-02
+  (dotimes (i (+ code-constants-offset #!+x86 1))
+    (vector-push-extend nil
+                        (ir2-component-constants (component-info component))))
+  (values))
+
+
