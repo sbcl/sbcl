@@ -295,7 +295,19 @@
        (let ((offset (+ nil-value offset)))
          (sb!disassem:maybe-note-assembler-routine offset nil dstate)
          (sb!disassem::maybe-note-static-symbol (logior offset other-pointer-lowtag)
-                                                dstate)))))
+                                                dstate)))
+      #!+sb-thread
+      (#.thread-offset
+       (let* ((thread-slots (primitive-object-slots
+                             (find 'thread *primitive-objects*
+                                   :key #'primitive-object-name)))
+              (slot (find (ash offset (- word-shift)) thread-slots
+                          :key #'slot-offset)))
+         (when slot
+           (sb!disassem:note
+            (lambda (stream)
+              (format stream "thread.~(~A~)" (slot-name slot)))
+            dstate))))))
 
   (defun find-value-from-previos-inst (register dstate)
     ;; Needs to be MOVZ REGISTER, imm, LSL #0
@@ -1595,7 +1607,8 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-unsigned-imm 32
-     :default-printer '(:name :tab rt  ", [" rn (:unless (just-imm :constant 0) ", " imm) "]")
+     :default-printer '(:name :tab rt  ", [" rn (:unless (just-imm :constant 0) ", " imm) "]"
+                        ldr-str-annotation)
      :include ldr-str)
     (op3 :value #b01)
     (just-imm :field (byte 12 10))
