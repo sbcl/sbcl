@@ -15,19 +15,19 @@
   (sb-ext:run-program "sleep" (list (format nil "~D" seconds))
                       :search t :wait t))
 
-(with-test (:name (:deadline :run-program :trivial) :fails-on :win32)
+(with-test (:name (:deadline sb-ext:run-program :trivial) :fails-on :win32)
   (assert-timeout (sb-sys:with-deadline (:seconds 1)
                     (run-sleep 3))))
 
-(with-test (:name (:deadline :defer-deadline-1) :fails-on :win32)
+(with-test (:name (:deadline sb-sys:defer-deadline 1) :fails-on :win32)
   (let ((n 0)
         (final nil))
     (handler-case
         (handler-bind ((sb-sys:deadline-timeout
-                        #'(lambda (c)
-                            (when (< n 2)
-                              (incf n)
-                              (sb-sys:defer-deadline 0.1 c)))))
+                        (lambda (c)
+                          (when (< n 2)
+                            (incf n)
+                            (sb-sys:defer-deadline 0.1 c)))))
           (sb-sys:with-deadline (:seconds 1)
             (run-sleep 2)))
       (sb-sys:deadline-timeout (c)
@@ -35,14 +35,14 @@
     (assert (= n 2))
     (assert final)))
 
-(with-test (:name (:deadline :defer-deadline-2) :fails-on :win32)
+(with-test (:name (:deadline sb-sys:defer-deadline 2) :fails-on :win32)
   (let ((n 0)
         (final nil))
     (handler-case
         (handler-bind ((sb-sys:deadline-timeout
-                        #'(lambda (c)
-                            (incf n)
-                            (sb-sys:defer-deadline 0.1 c))))
+                        (lambda (c)
+                          (incf n)
+                          (sb-sys:defer-deadline 0.1 c))))
           (sb-sys:with-deadline (:seconds 1)
             (run-sleep 2)))
       (sb-sys:deadline-timeout (c)
@@ -50,14 +50,14 @@
     (assert (plusp n))
     (assert (not final))))
 
-(with-test (:name (:deadline :cancel-deadline) :fails-on :win32)
+(with-test (:name (:deadline sb-sys:cancel-deadline) :fails-on :win32)
   (let ((n 0)
         (final nil))
     (handler-case
         (handler-bind ((sb-sys:deadline-timeout
-                        #'(lambda (c)
-                            (incf n)
-                            (sb-sys:cancel-deadline c))))
+                        (lambda (c)
+                          (incf n)
+                          (sb-sys:cancel-deadline c))))
           (sb-sys:with-deadline (:seconds 1)
             (run-sleep 2)))
       (sb-sys:deadline-timeout (c)
@@ -65,7 +65,8 @@
     (assert (= n 1))
     (assert (not final))))
 
-(with-test (:name (:deadline :grab-mutex) :skipped-on '(not :sb-thread))
+(with-test (:name (:deadline sb-thread:grab-mutex)
+                  :skipped-on '(not :sb-thread))
   (assert-timeout
    (let ((lock (sb-thread:make-mutex))
          (waitp t))
@@ -77,13 +78,15 @@
      (sb-sys:with-deadline (:seconds 1)
        (sb-thread:grab-mutex lock)))))
 
-(with-test (:name (:deadline :wait-on-semaphore) :skipped-on '(not :sb-thread))
+(with-test (:name (:deadline sb-thread:wait-on-semaphore)
+                  :skipped-on '(not :sb-thread))
   (assert-timeout
-   (let ((sem (sb-thread::make-semaphore :count 0)))
+   (let ((sem (sb-thread:make-semaphore :count 0)))
      (sb-sys:with-deadline (:seconds 1)
-       (sb-thread::wait-on-semaphore sem)))))
+       (sb-thread:wait-on-semaphore sem)))))
 
-(with-test (:name (:deadline :join-thread) :skipped-on '(not :sb-thread))
+(with-test (:name (:deadline sb-thread:join-thread)
+                  :skipped-on '(not :sb-thread))
   (assert-timeout
    (sb-sys:with-deadline (:seconds 1)
      (sb-thread:join-thread
@@ -112,5 +115,4 @@
       (sleep 0.3)
       (sb-thread:interrupt-thread thread (lambda () 42))
       (let ((seconds-passed (sb-thread:join-thread thread)))
-        (format t "Deadline in ~S~%" seconds-passed)
         (assert (< seconds-passed 1.2))))))
