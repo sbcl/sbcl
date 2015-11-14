@@ -248,9 +248,10 @@ been defined. (See SB-EXT:CAS for more information.)
   (def %compare-and-swap-car (cons) car)
   (def %compare-and-swap-cdr (cons) cdr)
   (def %instance-cas (instance index) %instance-ref %instance-set)
-  #!+x86-64 (def %raw-instance-cas/word (instance index)
-                 %raw-instance-ref/word
-                 %raw-instance-set/word)
+  #!+(or x86-64 x86)
+  (def %raw-instance-cas/word (instance index)
+       %raw-instance-ref/word
+       %raw-instance-set/word)
   (def %compare-and-swap-symbol-info (symbol) symbol-info)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
