@@ -1142,9 +1142,9 @@ the UNIX epoch (January 1st 1970.)"
         (c-sec 0)
         (c-msec 0)
         (now 0))
-    (declare (type unsigned-byte e-sec c-sec)
-             (type fixnum e-msec c-msec)
-             (type unsigned-byte now))
+    (declare (type sb!kernel:internal-seconds e-sec c-sec)
+             (type sb!kernel:internal-seconds e-msec c-msec)
+             (type sb!kernel:internal-time now))
     (defun reinit-internal-real-time ()
       (setf (values e-sec e-msec) (system-real-time-values)
             c-sec 0

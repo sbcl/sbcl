@@ -61,6 +61,8 @@
 ;;; one hundred forty-six million one hundred thirty-five thousand five hundred twenty years of runtime
 ;;; It's dangerous to run SBCL for that long without updating.
 ;;; And it'll be a fixnum on 64-bit targets.
+;;; The result from querying get-internal-run-time with multiple cores
+;;; running full tilt will exhaust this faster, but it's still plenty enough.
 (sb!xc:deftype internal-time () '(unsigned-byte 62))
 (sb!xc:deftype internal-seconds ()
   '(unsigned-byte

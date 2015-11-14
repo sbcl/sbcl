@@ -281,6 +281,8 @@
   (unencapsulate '%failed-aver '!bootstrap)
   (unencapsulate 'find-package '!bootstrap)
 
+  (show-and-call time-reinit)
+
   ;; Set sane values again, so that the user sees sane values instead
   ;; of whatever is left over from the last DECLAIM/PROCLAIM.
   (show-and-call !policy-cold-init-or-resanify)
