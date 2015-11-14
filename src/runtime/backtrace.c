@@ -522,67 +522,83 @@ describe_thread_state(void)
     printf("Pending handler = %p\n", data->pending_handler);
 }
 
+void print_backtrace_frame(void *pc, void *fp, int i) {
+    lispobj *p;
+    printf("%4d: ", i);
+
+    p = (lispobj *) component_ptr_from_pc((lispobj *) pc);
+
+    if (p) {
+        struct code *cp = (struct code *) p;
+        struct compiled_debug_fun *df = debug_function_from_pc(cp, pc);
+        if (df)
+            print_entry_name(df->name);
+        else
+            print_entry_points(cp);
+        printf(", pc = %p, fp = %p", pc, fp);
+    } else {
+#ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
+        Dl_info info;
+        if (dladdr(pc, &info)) {
+            printf("Foreign function %s, pc = %p, fp = %p", info.dli_sname, pc, fp);
+        } else
+#endif
+            printf("Foreign function, pc = %p, fp = %p", pc, fp);
+    }
+
+    putchar('\n');
+}
+
 /* This function has been split from lisp_backtrace() to enable Lisp
  * backtraces from gdb with call backtrace_from_fp(...). Useful for
  * example when debugging threading deadlocks.
  */
 void
-backtrace_from_fp(void *fp, int nframes)
+backtrace_from_fp(void *fp, int nframes, int start)
 {
-  int i;
+  int i = start;
 
-  for (i = 0; i < nframes; ++i) {
-    lispobj *p;
+  for (; i < nframes; ++i) {
     void *ra;
     void *next_fp;
 
     if (!x86_call_context(fp, &ra, &next_fp))
       break;
-
-    printf("%4d: ", i);
-
-    p = (lispobj *) component_ptr_from_pc((lispobj *) ra);
-    if (p) {
-      struct code *cp = (struct code *) p;
-      struct compiled_debug_fun *df = debug_function_from_pc(cp, ra);
-      if (df)
-        print_entry_name(df->name);
-      else
-        print_entry_points(cp);
-    } else {
-#ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
-        Dl_info info;
-        if (dladdr(ra, &info)) {
-            printf("Foreign function %s, fp = 0x%lx, ra = 0x%lx",
-                   info.dli_sname,
-                   (uword_t) next_fp,
-                   (uword_t) ra);
-        } else
-#endif
-        printf("Foreign fp = %p, ra = %p",
-               (void*) next_fp,
-               (void*) ra);
-    }
-
-    putchar('\n');
+    print_backtrace_frame(ra, next_fp, i);
     fp = next_fp;
   }
+}
+
+void backtrace_from_context(os_context_t *context, int nframes) {
+#ifdef LISP_FEATURE_X86
+    void *fp = (void *)*os_context_register_addr(context,reg_EBP);
+#elif defined (LISP_FEATURE_X86_64)
+    void *fp = (void *)*os_context_register_addr(context,reg_RBP);
+#endif
+    print_backtrace_frame((void *)*os_context_pc_addr(context), fp, 0);
+    backtrace_from_fp(fp, nframes - 1, 1);
 }
 
 void
 lisp_backtrace(int nframes)
 {
-  void *fp;
+    struct thread *thread=arch_os_get_current_thread();
+    int free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
-#if defined(LISP_FEATURE_X86)
-  asm("movl %%ebp,%0" : "=g" (fp));
+    if (free_ici) {
+        os_context_t *context = thread->interrupt_contexts[free_ici - 1];
+        backtrace_from_context(context, nframes);
+    } else {
+        void *fp;
+
+#ifdef LISP_FEATURE_X86
+        asm("movl %%ebp,%0" : "=g" (fp));
 #elif defined (LISP_FEATURE_X86_64)
-  asm("movq %%rbp,%0" : "=g" (fp));
-#else
-#error "How did we get here?"
+        asm("movq %%rbp,%0" : "=g" (fp));
 #endif
+        backtrace_from_fp(fp, nframes, 0);
+    }
 
-  backtrace_from_fp(fp, nframes);
 }
 
 #endif
