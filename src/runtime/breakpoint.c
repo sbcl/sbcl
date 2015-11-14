@@ -76,7 +76,7 @@ void breakpoint_do_displaced_inst(os_context_t* context,
     arch_do_displaced_inst(context, orig_inst);
 }
 
-static lispobj find_code(os_context_t *context)
+lispobj find_code(os_context_t *context)
 {
 #ifdef reg_CODE
     lispobj code = *os_context_register_addr(context, reg_CODE);

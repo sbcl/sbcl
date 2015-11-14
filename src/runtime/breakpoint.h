@@ -25,5 +25,6 @@ extern void handle_single_step_trap (os_context_t *context, int kind,
 
 extern void handle_single_step_trap(os_context_t *context, int kind,
                                     int register_offset);
+extern lispobj find_code(os_context_t *context);
 
 #endif
