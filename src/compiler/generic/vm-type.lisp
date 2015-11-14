@@ -56,8 +56,15 @@
 (sb!xc:deftype pathname-version ()
   '(or integer (member nil :newest :wild :unspecific)))
 
-;;; internal time format. (Note: not a FIXNUM, ouch..)
-(sb!xc:deftype internal-time () 'unsigned-byte)
+;;; Internal time format.
+;;; 62 bits should give
+;;; one hundred forty-six million one hundred thirty-five thousand five hundred twenty years of runtime
+;;; It's dangerous to run SBCL for that long without updating.
+;;; And it'll be a fixnum on 64-bit targets.
+(sb!xc:deftype internal-time () '(unsigned-byte 62))
+(sb!xc:deftype internal-seconds ()
+  '(unsigned-byte
+    #.(- 62 (floor (log sb!xc:internal-time-units-per-second 2)))))
 
 (sb!xc:deftype bignum-element-type () `(unsigned-byte ,sb!vm:n-word-bits))
 (sb!xc:deftype bignum-type () 'bignum)
