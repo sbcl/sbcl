@@ -150,6 +150,13 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
 ;;;
 ;;; If SECONDS is NIL and there is no *DEADLINE* all returned values
 ;;; are NIL.
+(declaim (ftype (function ((or null (real 0)))
+                          (values (or null sb!kernel:internal-seconds)
+                                  (or null (mod 1000000))
+                                  (or null sb!kernel:internal-seconds)
+                                  (or null (mod 1000000))
+                                  t))
+                decode-timeout))
 (defun decode-timeout (seconds)
   #!+sb-doc
   "Decodes a relative timeout in SECONDS into five values, taking any
@@ -192,9 +199,9 @@ it will signal a timeout condition."
                    (t
                     (values nil nil nil)))
            (if final-timeout
-               (multiple-value-bind (to-sec to-usec)
-                   (decode-internal-time final-timeout)
-                 (multiple-value-bind (stop-sec stop-usec)
-                     (decode-internal-time final-deadline)
-                   (values (max 0 to-sec) (max 0 to-usec) stop-sec stop-usec signalp)))
+               (binding* (((to-sec to-usec)
+                           (decode-internal-time final-timeout))
+                          ((stop-sec stop-usec)
+                           (decode-internal-time final-deadline)))
+                 (values to-sec to-usec stop-sec stop-usec signalp))
                (values nil nil nil nil nil)))))))
