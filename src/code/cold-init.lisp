@@ -304,8 +304,6 @@
   (show-and-call !foreign-cold-init)
   #!-(and win32 (not sb-thread))
   (show-and-call signal-cold-init-or-reinit)
-  (/show0 "enabling internal errors")
-  (setf (extern-alien "internal_errors_enabled" int) 1)
 
   (show-and-call float-cold-init-or-reinit)
 
@@ -332,6 +330,9 @@
 
   ;; Enable normal (post-cold-init) behavior of INFINITE-ERROR-PROTECT.
   (setf sb!kernel::*maximum-error-depth* 10)
+  (/show0 "enabling internal errors")
+  (setf (extern-alien "internal_errors_enabled" int) 1)
+
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
   #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)
