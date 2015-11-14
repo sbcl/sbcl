@@ -437,6 +437,16 @@ print_string (lispobj *object)
 #undef doit
 }
 
+static int string_equal (lispobj *object, char *string)
+{
+    int tag = widetag_of(*object);
+    struct vector *vector = (struct vector *) object;
+
+    if (tag != SIMPLE_BASE_STRING_WIDETAG)
+        return 0;
+    return !strcmp((char *) vector->data, string);
+}
+
 static void
 print_entry_name (lispobj name)
 {
@@ -458,8 +468,10 @@ print_entry_name (lispobj name)
         struct package *pkg
           = (struct package *) native_pointer(symbol->package);
         lispobj pkg_name = pkg->_name;
-        print_string(native_pointer(pkg_name));
-        fputs("::", stdout);
+        if (!string_equal(native_pointer(pkg_name), "COMMON-LISP")) {
+            print_string(native_pointer(pkg_name));
+            fputs("::", stdout);
+        }
       }
       print_string(native_pointer(symbol->name));
     } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG
@@ -598,7 +610,6 @@ lisp_backtrace(int nframes)
 #endif
         backtrace_from_fp(fp, nframes, 0);
     }
-
 }
 
 #endif
