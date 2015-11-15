@@ -836,13 +836,19 @@ IF-NOT-OWNER is :FORCE)."
     :slot token)
 
 (declaim (inline %condition-wait))
-(defun %condition-wait (queue mutex timeout to-sec to-usec stop-sec stop-usec deadlinep)
+(defun %condition-wait (queue mutex
+                        timeout to-sec to-usec stop-sec stop-usec deadlinep)
+  #!-sb-thread
+  (declare (ignore queue mutex to-sec to-usec stop-sec stop-usec deadlinep))
+  #!-sb-thread
+  (sb!ext:wait-for nil :timeout timeout) ; Yeah...
+  #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
     (assert (eq me (mutex-%owner mutex)))
     (let ((status :interrupted))
-      ;; Need to disable interrupts so that we don't miss grabbing the
-      ;; mutex on our way out.
+      ;; Need to disable interrupts so that we don't miss grabbing
+      ;; the mutex on our way out.
       (without-interrupts
         (unwind-protect
              (progn
@@ -977,12 +983,7 @@ around the call, checking the the associated data:
       (push data *data*)
       (condition-notify *queue*)))
 "
-  #!-sb-thread
-  (declare (ignore queue))
   (assert mutex)
-  #!-sb-thread
-  (sb!ext:wait-for nil :timeout timeout) ; Yeah...
-  #!+sb-thread
   (locally (declare (inline %condition-wait))
     (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
         (decode-timeout timeout)
