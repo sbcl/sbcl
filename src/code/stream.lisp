@@ -23,6 +23,33 @@
 (defvar *trace-output* () #!+sb-doc "trace output stream")
 (defvar *debug-io* () #!+sb-doc "interactive debugging stream")
 
+;;; Coarsely characterizes the element type of an FD-STREAM w.r.t.
+;;; its SUBTYPEP relations to the relevant CHARACTER and
+;;; ([UN]SIGNED-BYTE 8) types. This coarse characterization enables
+;;; dispatching on the element type as needed by {READ,WRITE}-SEQUENCE
+;;; without calling SUBTYPEP.
+(deftype stream-element-mode ()
+  '(member character unsigned-byte signed-byte :bivalent))
+
+(defun stream-element-type-stream-element-mode (element-type)
+  (let ((characterp (subtypep element-type 'character))
+        (unsigned-byte-p (subtypep element-type 'unsigned-byte))
+        ;; Every UNSIGNED-BYTE subtype is a SIGNED-BYTE
+        ;; subtype. Therefore explicitly check for intersection with
+        ;; the negative integers.
+        (signed-byte-p (and (subtypep element-type 'signed-byte)
+                            (not (subtypep `(and ,element-type (integer * -1))
+                                           nil)))))
+    (cond
+      ((and characterp (not unsigned-byte-p) (not signed-byte-p))
+       'character)
+      ((and (not characterp) unsigned-byte-p (not signed-byte-p))
+       'unsigned-byte)
+      ((and (not characterp) (not unsigned-byte-p) signed-byte-p)
+       'signed-byte)
+      (t
+       :bivalent))))
+
 (defun ill-in (stream &rest ignore)
   (declare (ignore ignore))
   (error 'simple-type-error
@@ -1951,6 +1978,26 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
         (funcall (ansi-stream-sout target) target str 0 len)
         (stream-write-string target str 0 len))))
 
+;;;; Shared {READ,WRITE}-SEQUENCE support functions
+
+(declaim (inline ansi-stream-element-mode
+                 compatible-vector-and-stream-element-types-p))
+
+(defun ansi-stream-element-mode (stream)
+  (declare (type ansi-stream stream))
+  (if (fd-stream-p stream)
+      (fd-stream-element-mode stream)
+      (stream-element-type-stream-element-mode
+       (ansi-stream-element-type stream))))
+
+(defun compatible-vector-and-stream-element-types-p (vector stream)
+  (declare (type vector vector)
+           (type ansi-stream stream))
+  (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
+           (eq (ansi-stream-element-mode stream) 'unsigned-byte))
+      (and (typep vector '(simple-array (signed-byte 8) (*)))
+           (eq (ansi-stream-element-mode stream) 'signed-byte))))
+
 ;;;; READ-SEQUENCE
 
 (defun read-sequence (seq stream &key (start 0) end)
@@ -1971,15 +2018,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       ;; must be Gray streams FUNDAMENTAL-STREAM
       (stream-read-sequence stream seq start end)))
 
-(declaim (inline compatible-vector-and-stream-element-types-p))
-(defun compatible-vector-and-stream-element-types-p (vector stream)
-  (declare (type vector vector)
-           (type ansi-stream stream))
-  (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
-           (subtypep (ansi-stream-element-type stream) '(unsigned-byte 8)))
-      (and (typep vector '(simple-array (signed-byte 8) (*)))
-           (subtypep (ansi-stream-element-type stream) '(signed-byte 8)))))
-
 (defun ansi-stream-read-sequence (seq stream start %end)
   (declare (type sequence seq)
            (type ansi-stream stream)
@@ -1991,7 +2029,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (etypecase seq
       (list
        (let ((read-function
-              (if (subtypep (ansi-stream-element-type stream) 'character)
+              (if (eq (ansi-stream-element-mode stream) 'character)
                   #'ansi-stream-read-char
                   #'ansi-stream-read-byte)))
          (do ((rem (nthcdr start seq) (rest rem))
@@ -2019,7 +2057,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                                                          start %end))
                (t
                 (let ((read-function
-                       (if (subtypep (ansi-stream-element-type stream) 'character)
+                       (if (ansi-stream-element-mode stream)
                            ;; If the stream-element-type is CHARACTER,
                            ;; this might be a bivalent stream. If the
                            ;; sequence is a specialized unsigned-byte
@@ -2109,7 +2147,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (etypecase seq
       (list
        (let ((write-function
-              (if (subtypep (ansi-stream-element-type stream) 'character)
+              (if (eq (ansi-stream-element-mode stream) 'character)
                   (ansi-stream-out stream)
                   (ansi-stream-bout stream))))
          (do ((rem (nthcdr start seq) (rest rem))
@@ -2126,7 +2164,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (labels
              ((output-seq-in-loop ()
                 (let ((write-function
-                       (if (subtypep (ansi-stream-element-type stream) 'character)
+                       (if (eq (ansi-stream-element-mode stream) 'character)
                            (lambda (stream object)
                              ;; This might be a bivalent stream, so we need
                              ;; to dispatch on a per-element basis, rather

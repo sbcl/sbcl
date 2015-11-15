@@ -124,6 +124,9 @@
   (element-size 1 :type index)
   ;; the type of element being transfered
   (element-type 'base-char)
+  ;; coarse characterization of the element type. see description of
+  ;; STREAM-ELEMENT-MODE type.
+  (element-mode :bivalent :type stream-element-mode)
   ;; the Unix file descriptor
   (fd -1 :type #!-win32 fixnum #!+win32 sb!vm:signed-word)
   ;; What do we know about the FD?
@@ -162,10 +165,11 @@
   (external-format :latin-1)
   ;; fixed width, or function to call with a character
   (char-size 1 :type (or fixnum function))
-  (output-bytes #'ill-out :type function)
-  ;; a boolean indicating whether the stream is bivalent.  For
-  ;; internal use only.
-  (bivalent-p nil :type boolean))
+  (output-bytes #'ill-out :type function))
+
+(defun fd-stream-bivalent-p (stream)
+  (eq (fd-stream-element-mode stream) :bivalent))
+
 (def!method print-object ((fd-stream fd-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
@@ -2231,29 +2235,31 @@
          (setf input t))
         ((not (or input output))
          (error "File descriptor must be opened either for input or output.")))
-  (let ((stream (funcall (ecase class
-                           (fd-stream '%make-fd-stream)
-                           (form-tracking-stream '%make-form-tracking-stream))
-                                 :fd fd
-                                 :fd-type
-                                 #!-win32 (sb!unix:fd-type fd)
-                                 ;; KLUDGE.
-                                 #!+win32 (if serve-events
-                                              :unknown
-                                              :regular)
-                                 :name name
-                                 :file file
-                                 :original original
-                                 :delete-original delete-original
-                                 :pathname pathname
-                                 :buffering buffering
-                                 :dual-channel-p dual-channel-p
-                                 :bivalent-p (eq element-type :default)
-                                 :serve-events serve-events
-                                 :timeout
-                                 (if timeout
-                                     (coerce timeout 'single-float)
-                                     nil))))
+  (let* ((constructor (ecase class
+                        (fd-stream '%make-fd-stream)
+                        (form-tracking-stream '%make-form-tracking-stream)))
+         (element-mode (stream-element-type-stream-element-mode element-type))
+         (stream (funcall constructor
+                          :fd fd
+                          :fd-type
+                          #!-win32 (sb!unix:fd-type fd)
+                          ;; KLUDGE.
+                          #!+win32 (if serve-events
+                                       :unknown
+                                       :regular)
+                          :name name
+                          :file file
+                          :original original
+                          :delete-original delete-original
+                          :pathname pathname
+                          :buffering buffering
+                          :dual-channel-p dual-channel-p
+                          :element-mode element-mode
+                          :serve-events serve-events
+                          :timeout
+                          (if timeout
+                              (coerce timeout 'single-float)
+                              nil))))
     (set-fd-stream-routines stream element-type external-format
                             input output input-buffer-p)
     (when auto-close

@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
+changes relative to sbcl-1.3.1
+  * enhancement: {READ,WRITE}-SEQUENCE are much faster for some combinations
+    of short sequences and stream types
+
 changes in sbcl-1.3.1 relative to sbcl-1.3.0:
   * enhancement: SB-THREAD support for ARM64.
   * enhancement: compiling an out-of-line DEFSTRUCT constructor call
