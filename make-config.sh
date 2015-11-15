@@ -417,7 +417,7 @@ if $fancy
 then
     # If --fancy, enable threads on platforms where they can be built.
     case $sbcl_arch in
-        x86|x86-64|ppc)
+        x86|x86-64|ppc|arm64)
 	    if ([ "$sbcl_os" = "sunos" ] && [ "$sbcl_arch" = "x86-64" ]) || \
                 [ "$sbcl_os" = "dragonfly" ]
 	    then
@@ -433,7 +433,7 @@ then
     esac
 else
     case $sbcl_arch in
-        x86|x86-64)
+        x86|x86-64|arm64)
             case $sbcl_os in
                 linux)
                     WITH_FEATURES="$WITH_FEATURES :sb-thread"
