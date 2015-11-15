@@ -302,7 +302,7 @@
       (inst add bsp bsp (* binding-size n-word-bytes))
       (store-binding-stack-pointer bsp)
       (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
-      (inst mov alloc-tls-symbol symbol)
+      (move alloc-tls-symbol symbol)
       (load-inline-constant value-temp '(:fixup alloc-tls-index :assembly-routine) lip)
       (inst blr value-temp)
       TLS-INDEX-VALID
