@@ -24,14 +24,11 @@
 #include "os.h"
 #include "interrupt.h"
 #include "lispregs.h"
-#ifdef LISP_FEATURE_GENCGC
 #include <wchar.h>
 #include "arch.h"
-#include "gencgc-alloc-region.h"
 #include "genesis/compiled-debug-fun.h"
 #include "genesis/compiled-debug-info.h"
 #include "genesis/package.h"
-#endif
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "thread.h"
