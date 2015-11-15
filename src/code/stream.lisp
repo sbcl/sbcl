@@ -1976,9 +1976,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type vector vector)
            (type ansi-stream stream))
   (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
-           (subtypep (stream-element-type stream) '(unsigned-byte 8)))
+           (subtypep (ansi-stream-element-type stream) '(unsigned-byte 8)))
       (and (typep vector '(simple-array (signed-byte 8) (*)))
-           (subtypep (stream-element-type stream) '(signed-byte 8)))))
+           (subtypep (ansi-stream-element-type stream) '(signed-byte 8)))))
 
 (defun ansi-stream-read-sequence (seq stream start %end)
   (declare (type sequence seq)
@@ -1991,7 +1991,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (etypecase seq
       (list
        (let ((read-function
-              (if (subtypep (stream-element-type stream) 'character)
+              (if (subtypep (ansi-stream-element-type stream) 'character)
                   #'ansi-stream-read-char
                   #'ansi-stream-read-byte)))
          (do ((rem (nthcdr start seq) (rest rem))
@@ -2019,7 +2019,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                                                          start %end))
                (t
                 (let ((read-function
-                       (if (subtypep (stream-element-type stream) 'character)
+                       (if (subtypep (ansi-stream-element-type stream) 'character)
                            ;; If the stream-element-type is CHARACTER,
                            ;; this might be a bivalent stream. If the
                            ;; sequence is a specialized unsigned-byte
@@ -2109,7 +2109,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (etypecase seq
       (list
        (let ((write-function
-              (if (subtypep (stream-element-type stream) 'character)
+              (if (subtypep (ansi-stream-element-type stream) 'character)
                   (ansi-stream-out stream)
                   (ansi-stream-bout stream))))
          (do ((rem (nthcdr start seq) (rest rem))
@@ -2119,14 +2119,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                     (type index i))
            (funcall write-function stream (first rem)))))
       (string
-       (%write-string seq stream start end))
+       (ansi-stream-write-string seq stream start end))
       (vector
        (with-array-data ((data seq) (offset-start start) (offset-end end)
                          :check-fill-pointer t)
          (labels
              ((output-seq-in-loop ()
                 (let ((write-function
-                       (if (subtypep (stream-element-type stream) 'character)
+                       (if (subtypep (ansi-stream-element-type stream) 'character)
                            (lambda (stream object)
                              ;; This might be a bivalent stream, so we need
                              ;; to dispatch on a per-element basis, rather
