@@ -80,6 +80,7 @@
 (defstruct (negation-type (:include ctype
                                     (class-info (type-class-or-lose 'negation)))
                           (:copier nil)
+                          (:constructor make-negation-type (type))
                           #!+cmu (:pure nil))
   (type (missing-arg) :type ctype :read-only t))
 
@@ -455,7 +456,7 @@
     (setq *base-char-type* (range 0 127)
           *extended-char-type* (range 128 (1- sb!xc:char-code-limit)))))
 
-(defun make-character-set-type (&key pairs)
+(defun make-character-set-type (pairs)
   ; (aver (equal (mapcar #'car pairs)
   ;              (sort (mapcar #'car pairs) #'<)))
   ;; aver that the cars of the list elements are sorted into increasing order

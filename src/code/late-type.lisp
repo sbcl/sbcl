@@ -214,8 +214,7 @@
 ;;; (NOT x). TYPE-SPECIFIER usually allows it to preserve information.
 (!defvar *unparse-allow-negation* t)
 
-(!define-type-method (function :negate) (type)
-  (make-negation-type :type type))
+(!define-type-method (function :negate) (type) (make-negation-type type))
 
 (!define-type-method (function :unparse) (type)
   (if *unparse-fun-type-simplify*
@@ -1469,7 +1468,7 @@
     ((or (eq x *instance-type*)
          (eq x *funcallable-instance-type*)
          (eq x *extended-sequence-type*))
-     (make-negation-type :type x))
+     (make-negation-type x))
     (t (bug "NAMED type unexpected: ~S" x))))
 
 (!define-type-method (named :unparse) (x)
@@ -1478,8 +1477,7 @@
 ;;;; hairy and unknown types
 ;;;; DEFINE-TYPE-CLASS HAIRY is in 'early-type'
 
-(!define-type-method (hairy :negate) (x)
-  (make-negation-type :type x))
+(!define-type-method (hairy :negate) (x) (make-negation-type x))
 
 (!define-type-method (hairy :unparse) (x)
   (hairy-type-specifier x))
@@ -1768,10 +1766,9 @@
 
 (!define-type-method (number :negate) (type)
   (if (and (null (numeric-type-low type)) (null (numeric-type-high type)))
-      (make-negation-type :type type)
+      (make-negation-type type)
       (type-union
-       (make-negation-type
-        :type (modified-numeric-type type :low nil :high nil))
+       (make-negation-type (modified-numeric-type type :low nil :high nil))
        (cond
          ((null (numeric-type-low type))
           (modified-numeric-type
@@ -2551,8 +2548,8 @@ used for a COMPLEX component.~:@>"
       (type-union (make-array-type '* :complexp nil
                                    :element-type *wild-type*)
                   (make-negation-type
-                   :type (make-array-type '* :element-type *wild-type*)))
-      (make-negation-type :type type)))
+                         (make-array-type '* :element-type *wild-type*)))
+      (make-negation-type type)))
 
 (!define-type-method (array :unparse) (type)
   (let* ((dims (array-type-dimensions type))
@@ -2902,20 +2899,20 @@ used for a COMPLEX component.~:@>"
         (apply #'type-intersection
                (if (xset-empty-p xset)
                    *universal-type*
-                   (make-negation-type :type (make-member-type xset nil)))
+                   (make-negation-type (make-member-type xset nil)))
                (mapcar
                 (lambda (x)
                   (let* ((opposite (neg-fp-zero x))
                          (type (ctype-of opposite)))
                     (type-union
                      (make-negation-type
-                      :type (modified-numeric-type type :low nil :high nil))
+                      (modified-numeric-type type :low nil :high nil))
                      (modified-numeric-type type :low nil :high (list opposite))
                      (make-eql-type opposite)
                      (modified-numeric-type type :low (list opposite) :high nil))))
                 fp-zeroes))
         ;; Easy case
-        (make-negation-type :type type))))
+        (make-negation-type type))))
 
 (!define-type-method (member :unparse) (type)
   (let ((members (member-type-members type)))
@@ -3020,9 +3017,8 @@ used for a COMPLEX component.~:@>"
             (t (push m ms))))
         (apply #'type-union
                (member-type-from-list ms)
-               (make-character-set-type
-                :pairs (mapcar (lambda (x) (cons x x))
-                               (sort char-codes #'<)))
+               (make-character-set-type (mapcar (lambda (x) (cons x x))
+                                                (sort char-codes #'<)))
                (nreverse numbers)))
       *empty-type*))
 
@@ -3365,9 +3361,9 @@ used for a COMPLEX component.~:@>"
 (!define-type-method (cons :negate) (type)
   (if (and (eq (cons-type-car-type type) *universal-type*)
            (eq (cons-type-cdr-type type) *universal-type*))
-      (make-negation-type :type type)
+      (make-negation-type type)
       (type-union
-       (make-negation-type :type (specifier-type 'cons))
+       (make-negation-type (specifier-type 'cons))
        (cond
          ((and (not (eq (cons-type-car-type type) *universal-type*))
                (not (eq (cons-type-cdr-type type) *universal-type*)))
@@ -3513,22 +3509,22 @@ used for a COMPLEX component.~:@>"
 
 (!def-type-translator character-set
     (&optional (pairs '((0 . #.(1- sb!xc:char-code-limit)))))
-  (make-character-set-type :pairs pairs))
+  (make-character-set-type pairs))
 
 (!define-type-method (character-set :negate) (type)
   (let ((pairs (character-set-type-pairs type)))
     (if (and (= (length pairs) 1)
              (= (caar pairs) 0)
              (= (cdar pairs) (1- sb!xc:char-code-limit)))
-        (make-negation-type :type type)
+        (make-negation-type type)
         (let ((not-character
                (make-negation-type
-                :type (make-character-set-type
-                       :pairs '((0 . #.(1- sb!xc:char-code-limit)))))))
+                (make-character-set-type
+                 '((0 . #.(1- sb!xc:char-code-limit)))))))
           (type-union
            not-character
            (make-character-set-type
-            :pairs (let (not-pairs)
+                   (let (not-pairs)
                      (when (> (caar pairs) 0)
                        (push (cons 0 (1- (caar pairs))) not-pairs))
                      (do* ((tail pairs (cdr tail))
@@ -3591,7 +3587,7 @@ used for a COMPLEX component.~:@>"
   ;; actually does the union for us.  It might be a little fragile to
   ;; rely on it.
   (make-character-set-type
-   :pairs (merge 'list
+          (merge 'list
                 (copy-alist (character-set-type-pairs type1))
                 (copy-alist (character-set-type-pairs type2))
                 #'< :key #'car)))
@@ -3602,7 +3598,7 @@ used for a COMPLEX component.~:@>"
   (let (pairs)
     (dolist (pair1 (character-set-type-pairs type1)
             (make-character-set-type
-             :pairs (sort pairs #'< :key #'car)))
+                    (sort pairs #'< :key #'car)))
       (dolist (pair2 (character-set-type-pairs type2))
        (cond
          ((<= (car pair1) (car pair2) (cdr pair1))
@@ -3611,7 +3607,7 @@ used for a COMPLEX component.~:@>"
           (push (cons (car pair1) (min (cdr pair1) (cdr pair2))) pairs))))))
 |#
   (make-character-set-type
-   :pairs (intersect-type-pairs
+          (intersect-type-pairs
            (character-set-type-pairs type1)
            (character-set-type-pairs type2))))
 
@@ -3755,7 +3751,7 @@ used for a COMPLEX component.~:@>"
   (!define-type-method (simd-pack :negate) (type)
      (let ((remaining (set-difference *simd-pack-element-types*
                                       (simd-pack-type-element-type type)))
-           (not-simd-pack (make-negation-type :type (specifier-type 'simd-pack))))
+           (not-simd-pack (make-negation-type (specifier-type 'simd-pack))))
        (if remaining
            (type-union not-simd-pack (%make-simd-pack-type remaining))
            not-simd-pack)))

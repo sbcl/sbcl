@@ -19,8 +19,7 @@
 
 (!define-type-class alien :enumerable nil :might-contain-other-types nil)
 
-(!define-type-method (alien :negate) (type)
-  (make-negation-type :type type))
+(!define-type-method (alien :negate) (type) (make-negation-type type))
 
 (!define-type-method (alien :unparse) (type)
   `(alien ,(unparse-alien-type (alien-type-type-alien-type type))))

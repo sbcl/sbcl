@@ -812,8 +812,7 @@ between the ~A definition and the ~A definition"
       (values nil nil)
       (invoke-complex-subtypep-arg1-method type1 class2 nil t)))
 
-(!define-type-method (classoid :negate) (type)
-  (make-negation-type :type type))
+(!define-type-method (classoid :negate) (type) (make-negation-type type))
 
 (!define-type-method (classoid :unparse) (type)
   (classoid-proper-name type))
