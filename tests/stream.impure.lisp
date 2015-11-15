@@ -302,7 +302,7 @@
                       (read-sequence sequence stream)
                       (error "READ-SEQUENCE didn't signal an error"))
         (type-error (condition)
-          (assert (eql (type-error-datum condition) (code-char 255)))
+          (assert (eql (type-error-datum condition) 255))
           (assert (subtypep (type-error-expected-type condition)
                             '(signed-byte 8)))))))
   (delete-file pathname))
