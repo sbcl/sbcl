@@ -29,17 +29,6 @@
       (combination-step-info node)
       nil))
 
-;;; Emit code in BLOCK to check that VALUE is of the specified TYPE,
-;;; yielding the checked result in RESULT. VALUE and result may be of
-;;; any primitive type. There must be CHECK-xxx VOP for TYPE. Any
-;;; other type checks should have been converted to an explicit type
-;;; test.
-(defun emit-type-check (node block value result type)
-  (declare (type tn value result) (type node node) (type ir2-block block)
-           (type ctype type))
-  (emit-move-template node block (type-check-template type) value result)
-  (values))
-
 ;;; Allocate an indirect value cell.
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
 (defun emit-make-value-cell (node block value res)

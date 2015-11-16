@@ -79,38 +79,32 @@
             (slot (cdr init)))
         (case kind
           (:slot
+           ;; FIXME: with #!+interleaved-raw-slots the only reason INIT-SLOT
+           ;; and its raw variants exist is to avoid an extra MOVE -
+           ;; setters are expected to return something, but INITers don't.
+           ;; It would probably produce better code by not assuming that
+           ;; setters return a value, because as things are, if you call
+           ;; 8 setters in a row, then you probably produce 7 extraneous moves,
+           ;; because not all of them can deliver a value to the final result.
            (let* ((raw-type (pop slot))
                   (arg (pop args))
                   (arg-tn (lvar-tn node block arg)))
              (macrolet
-                 ((make-case ()
+                 ((make-case (&optional rsd-list)
                     `(ecase raw-type
                        ((t)
                         (vop init-slot node block object arg-tn
                              name (+ sb!vm:instance-slots-offset slot) lowtag))
                        ,@(mapcar
                           (lambda (rsd)
-                            (let ((specifier (sb!kernel::raw-slot-data-raw-type
-                                              rsd)))
-                              `(,specifier
-                                (let ((type (specifier-type ',specifier))
-                                      (arg-tn arg-tn))
-                                  (unless (csubtypep (lvar-type arg) type)
-                                    (let ((tmp (make-normal-tn
-                                                (primitive-type type))))
-                                      (emit-type-check node block arg-tn
-                                                       tmp type)
-                                      (setf arg-tn tmp)))
-                                  (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
-                                       node block
-                                       object arg-tn
-                                       #!-interleaved-raw-slots instance-length
-                                       slot)))))
-                          #!+raw-instance-init-vops
-                          sb!kernel::*raw-slot-data-list*
-                          #!-raw-instance-init-vops
-                          nil))))
-               (make-case))))
+                            `(,(sb!kernel::raw-slot-data-raw-type rsd)
+                              (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
+                                   node block object arg-tn
+                                   #!-interleaved-raw-slots instance-length
+                                   slot)))
+                          (symbol-value rsd-list)))))
+               (make-case #!+raw-instance-init-vops
+                          sb!kernel::*raw-slot-data-list*))))
           (:dd
            (vop init-slot node block object
                 (emit-constant (sb!kernel::dd-layout-or-lose slot))
