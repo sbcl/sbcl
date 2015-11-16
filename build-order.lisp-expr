@@ -549,6 +549,10 @@
  ;; the host lisp have setf expanders rather than setf functions).
  ("src/compiler/late-vmdef")
 
+ ;; Target-insts defines things that are needed by the :printer and
+ ;; :labeller option in define-instruction, so it's needed first
+ ;; due to compile-time evaluation of #'some-printer.
+ ("src/compiler/target/target-insts" :not-host)
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
  ("src/compiler/generic/early-type-vops")
@@ -698,7 +702,6 @@
 
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
- ("src/compiler/target/target-insts" :not-host)
 
  ("src/code/debug" :not-host)
 

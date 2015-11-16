@@ -445,25 +445,27 @@
     (:prefilter . (value dstate))))
 
 (defun munge-fun-refs (params evalp &optional wrap-defs-p (prefix ""))
-  (let ((params (copy-list params)))
-    (do ((tail params (cdr tail))
-         (wrapper-defs nil))
-        ((null tail)
-         (values params (nreverse wrapper-defs)))
-      (let ((fun-arg (assoc (car tail) *arg-fun-params*)))
-        (when fun-arg
-          (let* ((fun-form (cadr tail))
-                 (quoted-fun-form `',fun-form))
-            (when (and wrap-defs-p (not (doesnt-need-wrapping-p fun-form)))
-              (multiple-value-bind (access-form wrapper-def-form)
-                  (make-wrapper fun-form (car fun-arg) (cdr fun-arg) prefix)
-                (setf quoted-fun-form `',access-form)
-                (push wrapper-def-form wrapper-defs)))
-            (if evalp
-                (setf (cadr tail)
-                      `(make-valsrc ,fun-form ,quoted-fun-form))
-                (setf (cadr tail)
-                      fun-form))))))))
+  (collect ((new-params) (wrapper-defs))
+    (loop
+     (when (endp params)
+       (return (values (new-params) (wrapper-defs))))
+     (let* ((indicator (pop params))
+            (value (pop params))
+            (fun-arg (assoc indicator *arg-fun-params*)))
+       (if (not fun-arg)
+           (new-params indicator value)
+           #-sb-xc-host
+           (let* ((fun-form value)
+                  (quoted-fun-form `',fun-form))
+             (when (and wrap-defs-p (not (doesnt-need-wrapping-p fun-form)))
+               (multiple-value-bind (access-form wrapper-def-form)
+                   (make-wrapper fun-form (car fun-arg) (cdr fun-arg) prefix)
+                 (setf quoted-fun-form `',access-form)
+                 (wrapper-defs wrapper-def-form)))
+             (new-params indicator
+                         (if evalp
+                             `(make-valsrc ,fun-form ,quoted-fun-form)
+                             fun-form))))))))
 
 (defun gen-args-def-form (overrides format-form &optional (evalp t))
   (let ((args-var (gensym)))
@@ -1528,6 +1530,10 @@
 (defun princ16 (value stream)
   (write value :stream stream :radix t :base 16 :escape nil))
 
+;; What the heck is this function doing here?
+;; In addition to the disassembler not working on the host,
+;; stuff common to x86oids should be somewhere specific to that.
+#!+(and (or x86 x86-64) (host-feature sb-xc))
 (defun read-signed-suffix (length dstate)
   (declare (type (member 8 16 32 64) length)
            (type disassem-state dstate)
