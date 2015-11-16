@@ -278,7 +278,6 @@
                   `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
        ,@body)))
 
-#!+(or hppa sparc ppc mips) ; KLUDGE - SB!C:LOCATION-NUMBER is platform-specific
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number read)
@@ -316,7 +315,6 @@
         (push inst (svref (segment-readers segment) index)))))
   (values))
 
-#!+(or hppa sparc ppc mips) ; KLUDGE - SB!C:LOCATION-NUMBER is platform-specific
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number write)
@@ -383,10 +381,6 @@
       (when (zerop countdown)
         (schedule-pending-instructions segment))))
   (values))
-
-;; KLUDGE: except for three backends, EMIT-NOP is never defined.
-#!-(or mips ppc sparc)
-(defun sb!c:emit-nop (seg) (bug "EMIT-NOP called on ~S" seg))
 
 ;;; Emit all the pending instructions, and reset any state. This is
 ;;; called whenever we hit a label (i.e. an entry point of some kind)

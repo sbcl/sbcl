@@ -18,6 +18,16 @@
 ;;; Note: In CMU CL, this used to be a call to SET-DISASSEM-PARAMS.
 (setf sb!disassem:*disassem-inst-alignment-bytes* 1)
 
+;;; This type is used mostly in disassembly and represents legacy
+;;; registers only. R8-R15 are handled separately.
+(deftype reg () '(unsigned-byte 3))
+
+;;; This includes legacy registers and R8-R15.
+(deftype full-reg () '(unsigned-byte 4))
+
+;;; The XMM registers XMM0 - XMM15.
+(deftype xmmreg () '(unsigned-byte 4))
+
 ;;; Default word size for the chip: if the operand size /= :dword
 ;;; we need to output #x66 (or REX) prefix
 (def!constant +default-operand-size+ :dword)
@@ -27,10 +37,23 @@
 ;;; and thus not supported by this assembler/disassembler.
 (def!constant +default-address-size+ :qword)
 
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+
 (defun offset-next (value dstate)
   (declare (type integer value)
            (type sb!disassem:disassem-state dstate))
   (+ (sb!disassem:dstate-next-addr dstate) value))
+
+(defparameter *byte-reg-names*
+  #(al cl dl bl spl bpl sil dil r8b r9b r10b r11b r12b r13b r14b r15b))
+(defparameter *high-byte-reg-names*
+  #(ah ch dh bh))
+(defparameter *word-reg-names*
+  #(ax cx dx bx sp bp si di r8w r9w r10w r11w r12w r13w r14w r15w))
+(defparameter *dword-reg-names*
+  #(eax ecx edx ebx esp ebp esi edi r8d r9d r10d r11d r12d r13d r14d r15d))
+(defparameter *qword-reg-names*
+  #(rax rcx rdx rbx rsp rbp rsi rdi r8 r9 r10 r11 r12 r13 r14 r15))
 
 ;;; The printers for registers, memory references and immediates need to
 ;;; take into account the width bit in the instruction, whether a #x66
@@ -70,6 +93,255 @@
       :word
       :qword))
 
+;;; Print to STREAM the name of the general-purpose register encoded by
+;;; VALUE and of size WIDTH. For robustness, the high byte registers
+;;; (AH, BH, CH, DH) are correctly detected, too, although the compiler
+;;; does not use them.
+(defun print-reg-with-width (value width stream dstate)
+  (declare (type full-reg value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (princ (if (and (eq width :byte)
+                  (<= 4 value 7)
+                  (not (sb!disassem:dstate-get-inst-prop dstate 'rex)))
+             (aref *high-byte-reg-names* (- value 4))
+             (aref (ecase width
+                     (:byte *byte-reg-names*)
+                     (:word *word-reg-names*)
+                     (:dword *dword-reg-names*)
+                     (:qword *qword-reg-names*))
+                   value))
+         stream)
+  ;; XXX plus should do some source-var notes
+  )
+
+(defun print-reg (value stream dstate)
+  (declare (type full-reg value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg-with-width value
+                        (inst-operand-size dstate)
+                        stream
+                        dstate))
+
+(defun print-reg-default-qword (value stream dstate)
+  (declare (type full-reg value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg-with-width value
+                        (inst-operand-size-default-qword dstate)
+                        stream
+                        dstate))
+
+(defun print-byte-reg (value stream dstate)
+  (declare (type full-reg value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg-with-width value :byte stream dstate))
+
+(defun print-addr-reg (value stream dstate)
+  (declare (type full-reg value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg-with-width value +default-address-size+ stream dstate))
+
+;;; Print a register or a memory reference of the given WIDTH.
+;;; If SIZED-P is true, add an explicit size indicator for memory
+;;; references.
+(defun print-reg/mem-with-width (value width sized-p stream dstate)
+  (declare (type (or list full-reg) value)
+           (type (member :byte :word :dword :qword) width)
+           (type boolean sized-p)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (if (typep value 'full-reg)
+      (print-reg-with-width value width stream dstate)
+      (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)))
+
+;;; Print a register or a memory reference. The width is determined by
+;;; calling INST-OPERAND-SIZE.
+(defun print-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width
+   value (inst-operand-size dstate) nil stream dstate))
+
+;; Same as print-reg/mem, but prints an explicit size indicator for
+;; memory references.
+(defun print-sized-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width
+   value (inst-operand-size dstate) t stream dstate))
+
+;;; Same as print-sized-reg/mem, but with a default operand size of
+;;; :qword.
+(defun print-sized-reg/mem-default-qword (value stream dstate)
+  (declare (type (or list full-reg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width
+   value (inst-operand-size-default-qword dstate) t stream dstate))
+
+(defun print-sized-byte-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width value :byte t stream dstate))
+
+(defun print-sized-word-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width value :word t stream dstate))
+
+(defun print-sized-dword-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width value :dword t stream dstate))
+
+(defun print-label (value stream dstate)
+  (declare (ignore dstate))
+  (sb!disassem:princ16 value stream))
+
+(defun print-xmmreg (value stream dstate)
+  (declare (type xmmreg value)
+           (type stream stream)
+           (ignore dstate))
+  (format stream "XMM~d" value))
+
+(defun print-xmmreg/mem (value stream dstate)
+  (declare (type (or list xmmreg) value)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
+  (if (typep value 'xmmreg)
+      (print-xmmreg value stream dstate)
+      (print-mem-ref :ref value nil stream dstate)))
+
+;;; This prefilter is used solely for its side effects, namely to put
+;;; the bits found in the REX prefix into the DSTATE for use by other
+;;; prefilters and by printers.
+(defun prefilter-wrxb (value dstate)
+  (declare (type (unsigned-byte 4) value)
+           (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop dstate 'rex)
+  (when (plusp (logand value #b1000))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-w))
+  (when (plusp (logand value #b0100))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-r))
+  (when (plusp (logand value #b0010))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-x))
+  (when (plusp (logand value #b0001))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-b))
+  value)
+
+;;; The two following prefilters are used instead of prefilter-wrxb when
+;;; the bits of the REX prefix need to be treated individually. They are
+;;; always used together, so only the first one sets the REX property.
+(defun prefilter-rex-w (value dstate)
+  (declare (type bit value)
+           (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop dstate 'rex)
+  (when (plusp value)
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-w)))
+(defun prefilter-rex-b (value dstate)
+  (declare (type bit value)
+           (type sb!disassem:disassem-state dstate))
+  (when (plusp value)
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-b)))
+
+;;; This prefilter is used solely for its side effect, namely to put
+;;; the property OPERAND-SIZE-8 into the DSTATE if VALUE is 0.
+(defun prefilter-width (value dstate)
+  (declare (type bit value)
+           (type sb!disassem:disassem-state dstate))
+  (when (zerop value)
+    (sb!disassem:dstate-put-inst-prop dstate 'operand-size-8))
+  value)
+
+;;; This prefilter is used solely for its side effect, namely to put
+;;; the property OPERAND-SIZE-16 into the DSTATE.
+(defun prefilter-x66 (value dstate)
+  (declare (type (eql #x66) value)
+           (ignore value)
+           (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop dstate 'operand-size-16))
+
+;;; A register field that can be extended by REX.R.
+(defun prefilter-reg-r (value dstate)
+  (declare (type reg value)
+           (type sb!disassem:disassem-state dstate))
+  (if (sb!disassem::dstate-get-inst-prop dstate 'rex-r)
+      (+ value 8)
+      value))
+
+;;; A register field that can be extended by REX.B.
+(defun prefilter-reg-b (value dstate)
+  (declare (type reg value)
+           (type sb!disassem:disassem-state dstate))
+  (if (sb!disassem::dstate-get-inst-prop dstate 'rex-b)
+      (+ value 8)
+      value))
+
+;;; Returns either an integer, meaning a register, or a list of
+;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
+;;; may be missing or nil to indicate that it's not used or has the
+;;; obvious default value (e.g., 1 for the index-scale). VALUE is a list
+;;; of the mod and r/m field of the ModRM byte of the instruction.
+;;; Depending on VALUE a SIB byte and/or an offset may be read. The
+;;; REX.B bit from DSTATE is used to extend the sole register or the
+;;; BASE-REG to a full register, the REX.X bit does the same for the
+;;; INDEX-REG.
+(defun prefilter-reg/mem (value dstate)
+  (declare (type list value)
+           (type sb!disassem:disassem-state dstate))
+  (flet ((extend (bit-name reg)
+           (logior (if (sb!disassem:dstate-get-inst-prop dstate bit-name) 8 0)
+                   reg)))
+    (declare (inline extend))
+    (let* ((mod (the (unsigned-byte 2) (first value)))
+           (r/m (the (unsigned-byte 3) (second value)))
+           (full-reg (extend 'rex-b r/m)))
+      (cond ((= mod #b11)
+             ;; registers
+             full-reg)
+            ((= r/m #b100) ; SIB byte - rex.b is "don't care"
+             (let* ((sib (the (unsigned-byte 8)
+                              (sb!disassem:read-suffix 8 dstate)))
+                    (base-reg (ldb (byte 3 0) sib))
+                    (index-reg (extend 'rex-x (ldb (byte 3 3) sib)))
+                    (offset
+                         (case mod
+                               (#b00
+                                (if (= base-reg #b101)
+                                    (sb!disassem:read-signed-suffix 32 dstate)
+                                  nil))
+                               (#b01
+                                (sb!disassem:read-signed-suffix 8 dstate))
+                               (#b10
+                                (sb!disassem:read-signed-suffix 32 dstate)))))
+               (list (unless (and (= mod #b00) (= base-reg #b101))
+                       (extend 'rex-b base-reg))
+                     offset
+                     (unless (= index-reg #b100) index-reg) ; index can't be RSP
+                     (ash 1 (ldb (byte 2 6) sib)))))
+            ;; rex.b is not decoded in determining RIP-relative mode
+            ((and (= mod #b00) (= r/m #b101))
+             (list 'rip (sb!disassem:read-signed-suffix 32 dstate)))
+            ((= mod #b00)
+             (list full-reg))
+            ((= mod #b01)
+             (list full-reg (sb!disassem:read-signed-suffix 8 dstate)))
+            (t                            ; (= mod #b10)
+             (list full-reg (sb!disassem:read-signed-suffix 32 dstate)))))))
+
+(defun read-address (value dstate)
+  (declare (ignore value))              ; always nil anyway
+  (sb!disassem:read-suffix (width-bits (inst-operand-size dstate)) dstate))
+
 (defun width-bits (width)
   (ecase width
     (:byte 8)
@@ -77,6 +349,11 @@
     (:dword 32)
     (:qword 64)))
 
+(defun print-imm/asm-routine (value stream dstate)
+  (sb!disassem:maybe-note-assembler-routine value nil dstate)
+  (sb!disassem:maybe-note-static-symbol value dstate)
+  (princ value stream))
+) ; EVAL-WHEN
 
 ;;;; disassembler argument types
 
@@ -192,7 +469,6 @@
 (sb!disassem:define-arg-type reg/mem
   :prefilter #'prefilter-reg/mem
   :printer #'print-reg/mem)
-
 (sb!disassem:define-arg-type sized-reg/mem
   ;; Same as reg/mem, but prints an explicit size indicator for
   ;; memory references.
@@ -1750,6 +2026,57 @@
              (t
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
+;; It's an error to compile instructions without their labeler and printer defined
+;; in the compiler, even though they aren't called.
+;; This stems from compile-time use of (MAKE-VALSRC #'f '#'f)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+
+;; If the filtered VALUE (R/M field of LEA) should be treated as a label,
+;; return the virtual address, otherwise the value unchanged.
+(defun lea-compute-label (value dstate)
+  (if (and (listp value) (eq (first value) 'rip))
+      (+ (sb!disassem:dstate-next-addr dstate) (second value))
+      value))
+
+;; Figure out whether LEA should print its EA with just the stuff in brackets,
+;; or additionally show the EA as either a label or a hex literal.
+(defun lea-print-ea (value stream dstate)
+  (let ((width (inst-operand-size dstate)))
+    (etypecase value
+      (list
+       ;; Indicate to PRINT-MEM-REF that this is not a memory access.
+       (print-mem-ref :compute value width stream dstate)
+       (when (eq (first value) 'rip)
+         (let ((addr (+ (sb!disassem:dstate-next-addr dstate) (second value))))
+           (sb!disassem:note (lambda (s) (format s "= #x~x" addr))
+                             dstate))))
+
+      ;; We're robust in allowing VALUE to be an integer (a register),
+      ;; though LEA Rx,Ry is an illegal instruction.
+      ;; A label should never have memory address of 0 to 15 so this case is
+      ;; unambiguous for the most part, except maybe in a compiler trace file
+      ;; which starts disassembling as if the origin were zero.
+      (full-reg (print-reg-with-width value width stream dstate))
+
+      ;; Unfortunately the "label" case sees either an integer or string,
+      ;; because MAP-SEGMENT-INSTRUCTIONS happens twice (really thrice).
+      ;;  - DETERMINE-OPCODE-BOUNDS in target-insts. Label = integer from prefilter.
+      ;;  - ADD-SEGMENT-LABELS. Never calls instruction printers.
+      ;;  - DISASSEMBLE-SEGMENT. Label = string
+      ;; and we need a different 'arg-form-kind' than the one in VALUE,
+      ;; because :USE-LABEL forces the printing pass to see only a label string.
+      ;; Unlike for JMP and CALL, this isn't reasonable, as no one instruction
+      ;; corresponds to, say, "LEA RAX,L1". We want [RIP+disp] or [mem_absolute]
+      ;; so extract the filtered not-labelized value for PRINT-MEM-REF.
+      ((or string integer)
+       (print-mem-ref :compute
+                      (reg-r/m-inst-r/m-arg sb!disassem::dchunk-zero dstate)
+                      width stream dstate)
+       (when (stringp value) ; Don't note anything during -OPCODE-BOUNDS pass
+         (sb!disassem:note (lambda (s) (format s "= ~A" value)) dstate))))))
+
+) ; EVAL-WHEN
+
 (define-instruction lea (segment dst src)
   (:printer
    reg-reg/mem
@@ -2555,6 +2882,33 @@
 
 ;;;; interrupt instructions
 
+(defun snarf-error-junk (sap offset &optional length-only)
+  (let* ((length (sap-ref-8 sap offset))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type system-area-pointer sap)
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
+    (cond (length-only
+           (values 0 (1+ length) nil nil))
+          (t
+           (copy-ub8-from-system-area sap (1+ offset) vector 0 length)
+           (collect ((sc-offsets)
+                     (lengths))
+             (lengths 1)                ; the length byte
+             (let* ((index 0)
+                    (error-number (read-var-integer vector index)))
+               (lengths index)
+               (loop
+                 (when (>= index length)
+                   (return))
+                 (let ((old-index index))
+                   (sc-offsets (read-var-integer vector index))
+                   (lengths (- index old-index))))
+               (values error-number
+                       (1+ length)
+                       (sc-offsets)
+                       (lengths))))))))
+
 #|
 (defmacro break-cases (breaknum &body cases)
   (let ((bn-temp (gensym)))
@@ -2564,6 +2918,32 @@
       `(let ((,bn-temp ,breaknum))
          (cond ,@(clauses))))))
 |#
+
+(defun break-control (chunk inst stream dstate)
+  (declare (ignore inst))
+  (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+    (case #!-ud2-breakpoints (byte-imm-code chunk dstate)
+          #!+ud2-breakpoints (word-imm-code chunk dstate)
+      (#.error-trap
+       (nt "error trap")
+       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+      (#.cerror-trap
+       (nt "cerror trap")
+       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+      (#.breakpoint-trap
+       (nt "breakpoint trap"))
+      (#.pending-interrupt-trap
+       (nt "pending interrupt trap"))
+      (#.halt-trap
+       (nt "halt trap"))
+      (#.fun-end-breakpoint-trap
+       (nt "function end breakpoint trap"))
+      (#.single-step-around-trap
+       (nt "single-step trap (around)"))
+      (#.single-step-before-trap
+       (nt "single-step trap (before)"))
+      (#.invalid-arg-count-trap
+       (nt "Invalid argument count trap")))))
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
@@ -3507,7 +3887,7 @@
          (aver (integerp value))
          (cons type value))
       ((:base-char)
-         #!+sb-unicode (aver (typep value 'base-char))
+         #!+sb-unicode (aver (base-char-p value))
          (cons :byte (char-code value)))
       ((:character)
          (aver (characterp value))
