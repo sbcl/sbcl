@@ -16,7 +16,11 @@
 ;;; The HOST structure holds the functions that both parse the
 ;;; pathname information into structure slot entries, and after
 ;;; translation the inverse (unparse) functions.
-(def!struct (host (:constructor nil))
+(sb!xc:defstruct (host (:constructor nil)
+                       (:print-object
+                        (lambda (host stream)
+                          (print-unreadable-object
+                           (host stream :type t :identity t)))))
   (parse (missing-arg) :type function)
   (parse-native (missing-arg) :type function)
   (unparse (missing-arg) :type function)
@@ -29,11 +33,12 @@
   (simplify-namestring (missing-arg) :type function)
   (customary-case (missing-arg) :type (member :upper :lower)))
 
-(def!method print-object ((host host) stream)
-  (print-unreadable-object (host stream :type t :identity t)))
-
-(def!struct (logical-host
-             (:make-load-form-fun make-logical-host-load-form-fun)
+(sb!xc:defstruct
+            (logical-host
+             (:print-object
+              (lambda (logical-host stream)
+                (print-unreadable-object (logical-host stream :type t)
+                  (prin1 (logical-host-name logical-host) stream))))
              (:include host
                        (parse #'parse-logical-namestring)
                        (parse-native
@@ -58,11 +63,9 @@
   (translations nil :type list)
   (canon-transls nil :type list))
 
-(def!method print-object ((logical-host logical-host) stream)
-  (print-unreadable-object (logical-host stream :type t)
-    (prin1 (logical-host-name logical-host) stream)))
-
-(defun make-logical-host-load-form-fun (logical-host)
+#-sb-xc-host
+(def!method make-load-form ((logical-host logical-host) &optional env)
+  (declare (ignore env))
   (values `(find-logical-host ',(logical-host-name logical-host))
           nil))
 
@@ -133,10 +136,12 @@
 ;;; \ and / as directory separators on Windows, we print our
 ;;; own always with /, which is much less confusing what with
 ;;; being \ needing to be escaped.
+#-sb-xc-host ; %PATHNAME-DIRECTORY is target-only
 (defun unparse-physical-directory (pathname escape-char)
   (declare (pathname pathname))
   (unparse-physical-directory-list (%pathname-directory pathname) escape-char))
 
+#-sb-xc-host
 (defun unparse-physical-directory-list (directory escape-char)
   (declare (list directory))
   (collect ((pieces))

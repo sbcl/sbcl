@@ -11,8 +11,7 @@
 
 (in-package "SB!IMPL")
 
-(def!struct (unix-host
-             (:make-load-form-fun make-host-load-form)
+(defstruct (unix-host
              (:include host
                        (parse #'parse-unix-namestring)
                        (parse-native #'parse-native-unix-namestring)

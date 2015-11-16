@@ -16,8 +16,10 @@
 ;;; To be initialized in unix/win32-pathname.lisp
 (defvar *physical-host*)
 
-(defun make-host-load-form (host)
-  (declare (ignore host))
+;; Though it looks like *PHYSICAL-HOST* is unbound here, this form is evaluated
+;; much later, by which time the variable has a value.
+(def!method make-load-form ((host (eql *physical-host*)) &optional env)
+  (declare (ignore env))
   '*physical-host*)
 
 ;;; Return a value suitable, e.g., for preinitializing

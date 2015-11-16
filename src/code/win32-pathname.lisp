@@ -11,7 +11,7 @@
 
 (in-package "SB!IMPL")
 
-(def!struct (win32-host
+(defstruct (win32-host
              (:make-load-form-fun make-host-load-form)
              (:include host
                        (parse #'parse-win32-namestring)
