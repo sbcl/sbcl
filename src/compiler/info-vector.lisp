@@ -515,7 +515,7 @@
 
 ;; Compute the number of elements needed to hold unpacked VECTOR after packing.
 ;; This is not "compute-packed-info-size" since that could be misconstrued
-;; and wanting the vector to be already packed.
+;; as expecting the vector to be already packed.
 ;;
 (defun compute-packified-info-size (vector &optional (end (length vector)))
   (declare (simple-vector vector)) ; unpacked format
