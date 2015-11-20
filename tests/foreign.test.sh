@@ -191,17 +191,6 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   ;; that the location will be the same.
   (assert (= (sb-sys:sap-int (alien-sap *environ*))
              (sb-sys:sap-int (alien-sap environ))))
-
-  ;; automagic restarts
-  (setf *invoke-debugger-hook*
-        (lambda (condition hook)
-          (declare (ignore hook))
-          (princ condition)
-          (let ((cont (find-restart 'continue condition)))
-            (when cont
-              (invoke-restart cont)))
-          (print :fell-through)
-          (invoke-debugger condition)))
 EOF
 
 echo "(declaim (optimize speed))" > $TEST_FILESTEM.fast.lisp
@@ -326,7 +315,6 @@ test_save() {
     x="$1"
     run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
 #+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$x.core")
-#-linkage-table nil
 (sb-ext:exit :code 22) ; catch this
 EOF
     check_status_maybe_lose "save $1" $? \
@@ -353,9 +341,26 @@ test_start fast
 test_start small
 
 # missing object file
-rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
-if [ -f $TEST_FILESTEM.fast.core ] ; then
     run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
+        --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
+        <<EOF
+  (setf *invoke-debugger-hook*
+        (lambda (condition hook)
+          (declare (ignore hook))
+          (let ((cont (find-restart 'continue condition)))
+            (when cont
+              (invoke-restart cont)))
+          (print :fell-through)
+          (invoke-debugger condition)))
+   #+linkage-table (save-lisp-and-die "$TEST_FILESTEM.missing.core")
+   (sb-ext:exit :code 22) ; catch this
+EOF
+    check_status_maybe_lose "saving-missing-so-core" $? \
+	0 "(successful save)" 22 "(linkage table not available)"
+
+rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
+if [ -f $TEST_FILESTEM.missing.core ] ; then
+    run_sbcl_with_core $TEST_FILESTEM.missing.core --no-sysinit --no-userinit \
         --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
         <<EOF
   (assert (= 22 (summish 10 11)))
