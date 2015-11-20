@@ -530,15 +530,6 @@
 (define-condition simple-style-warning (simple-condition style-warning) ())
 (define-condition simple-type-error (simple-condition type-error) ())
 
-;; Can't have a function called SIMPLE-TYPE-ERROR or TYPE-ERROR...
-(declaim (ftype (sfunction (t t t &rest t) nil) bad-type))
-(defun bad-type (datum type control &rest arguments)
-  (error 'simple-type-error
-         :datum datum
-         :expected-type type
-         :format-control control
-         :format-arguments arguments))
-
 (define-condition program-error (error) ())
 (define-condition parse-error   (error) ())
 (define-condition control-error (error) ())
@@ -1522,10 +1513,6 @@ the usual naming convention (names like *FOO*) for special variables"
                                                       type-proclamation-mismatch)
   ())
 
-(defun type-proclamation-mismatch-warn (name old new &optional description)
-  (warn 'type-proclamation-mismatch-warning
-        :name name :old old :new new :description description))
-
 (define-condition ftype-proclamation-mismatch (proclamation-mismatch)
   ()
   (:default-initargs :kind 'ftype))
@@ -1533,10 +1520,6 @@ the usual naming convention (names like *FOO*) for special variables"
 (define-condition ftype-proclamation-mismatch-warning (style-warning
                                                        ftype-proclamation-mismatch)
   ())
-
-(defun ftype-proclamation-mismatch-warn (name old new &optional description)
-  (warn 'ftype-proclamation-mismatch-warning
-        :name name :old old :new new :description description))
 
 (define-condition ftype-proclamation-mismatch-error (error
                                                      ftype-proclamation-mismatch)

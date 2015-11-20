@@ -109,6 +109,10 @@
         (setf (info :variable :always-bound name) info-value)
         (setf (info :variable :kind name) info-value))))
 
+(defun type-proclamation-mismatch-warn (name old new &optional description)
+  (warn 'type-proclamation-mismatch-warning
+        :name name :old old :new new :description description))
+
 (defun proclaim-type (name type type-specifier where-from)
   (unless (symbolp name)
     (error "Cannot proclaim TYPE of a non-symbol: ~S" name))
@@ -122,6 +126,10 @@
            name (type-specifier old-type) type-specifier))))
     (setf (info :variable :type name) type
           (info :variable :where-from name) where-from)))
+
+(defun ftype-proclamation-mismatch-warn (name old new &optional description)
+  (warn 'ftype-proclamation-mismatch-warning
+        :name name :old old :new new :description description))
 
 (defun proclaim-ftype (name type-oid type-specifier where-from)
   (declare (type (or ctype defstruct-description) type-oid))

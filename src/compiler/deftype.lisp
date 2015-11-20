@@ -26,6 +26,15 @@
            expansion))
      `(type-expander ,name))))
 
+;; Can't have a function called SIMPLE-TYPE-ERROR or TYPE-ERROR...
+(declaim (ftype (sfunction (t t t &rest t) nil) bad-type))
+(defun bad-type (datum type control &rest arguments)
+  (error 'simple-type-error
+         :datum datum
+         :expected-type type
+         :format-control control
+         :format-arguments arguments))
+
 (defvar !*xc-processed-deftypes* nil)
 (def!macro sb!xc:deftype (&whole form name lambda-list &body body
                           &environment env)
