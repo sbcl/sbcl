@@ -29,7 +29,8 @@
 (defun c-string-external-format (type)
   (let ((external-format (alien-c-string-type-external-format type)))
     (if (eq external-format :default)
-        (default-c-string-external-format)
+        #+sb-xc-host (bug "No default c-string-external-format")
+        #-sb-xc-host (default-c-string-external-format)
         external-format)))
 
 (define-alien-type-method (c-string :unparse) (type)

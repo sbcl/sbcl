@@ -398,6 +398,7 @@
   `(foreign-symbol-sap ,(heap-alien-info-alien-name info)
                        ,(heap-alien-info-datap info)))
 
+#-sb-xc-host ; No FOREIGN-SYMBOL-SAP
 (defun heap-alien-info-sap (info)
   (foreign-symbol-sap (heap-alien-info-alien-name info)
                       (heap-alien-info-datap info)))

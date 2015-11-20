@@ -37,6 +37,7 @@
      (or (gethash extern table)
          (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
 
+#-sb-xc-host
 (defun find-foreign-symbol-address (name)
   #!+sb-doc
   "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
@@ -45,6 +46,7 @@ symbol in the linkage table, and never returns an address in the linkage-table."
       (find-foreign-symbol-in-table name *static-foreign-symbols*)
       (find-dynamic-foreign-symbol-address name)))
 
+#-sb-xc-host
 (defun foreign-symbol-address (name &optional datap)
   #!+sb-doc
   "Returns the address of the foreign symbol NAME. DATAP must be true if the
@@ -77,6 +79,7 @@ On non-linkage-table ports signals an error if the symbol isn't found."
         #!-os-provides-dlopen
         (error 'undefined-alien-error :name name))))
 
+#-sb-xc-host ; SAPs don't exist
 (defun foreign-symbol-sap (symbol &optional datap)
   #!+sb-doc
   "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the

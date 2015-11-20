@@ -800,6 +800,7 @@
                      ;; would cause a compiler error as it tries to decide
                      ;; whether any clause of this COND subsumes another.
                      ;; Moreover, we don't require the host to support MOP.
+                     #-sb-xc-host
                      ((sb!pcl::classp x) (translate (sb!pcl::class-classoid x)))
                      #-sb-xc-host
                      ((sb!pcl::eql-specializer-p type-specifier)

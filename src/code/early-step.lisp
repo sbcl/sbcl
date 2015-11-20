@@ -30,6 +30,11 @@
 ;; OUT debugger command will actually have a wrapper to step out to.
 (defvar *step-out* nil)
 
+;; These functions make no sense on the host, but putting them in
+;; 'step.lisp' is too late, because 'step' is compiled in warm load,
+;; but the REPL calls DISABLE-STEPPING right way.
+;; Adding a file of target-only code for these isn't worth the trouble.
+#-sb-xc-host
 (symbol-macrolet ((place
                    #!+sb-thread (sb!thread::thread-stepping)
                    #!-sb-thread *stepping*))
@@ -38,8 +43,10 @@
   (defun stepping-enabled-p ()
     (= place 1)))
 
+#-sb-xc-host
 (defun enable-stepping ()
   (setf (stepping) 1))
+#-sb-xc-host
 (defun disable-stepping ()
   (setf (stepping) 0))
 

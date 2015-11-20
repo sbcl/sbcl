@@ -318,6 +318,7 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
 
 ;;;; WAIT-FOR -- waiting on arbitrary conditions
 
+#-sb-xc-host
 (defun %%wait-for (test stop-sec stop-usec)
   (declare (function test))
   (labels ((try ()
@@ -375,6 +376,7 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
                        (t
                         (return-from %%wait-for nil))))))))
 
+#-sb-xc-host
 (defun %wait-for (test timeout)
   (declare (function test))
   (tagbody
