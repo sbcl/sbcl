@@ -99,7 +99,7 @@ long long return_long_long() {
     return powish(2,33);
 }
 
-char return_char_test(char *p) {
+signed char return_schar_test(signed char *p) {
     return *p;
 }
 
@@ -172,7 +172,7 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   (define-alien-routine long-sap-test1 int (ptr1 int :copy) (long1 (integer 64)))
   (define-alien-routine long-sap-test2 int (ptr1 int :copy) (int1 int) (long1 (integer 64)))
   (define-alien-routine return-long-long (integer 64))
-  (define-alien-routine return-char-test char (p char :copy))
+  (define-alien-routine return-schar-test char (p char :copy))
   (define-alien-routine return-uchar-test unsigned-char (p unsigned-char :copy))
   (define-alien-routine return-short-test short (p short :copy))
   (define-alien-routine return-ushort-test unsigned-short (p unsigned-short :copy))
@@ -233,8 +233,8 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
   (assert (= 1 (long-sap-test1 38 (+ 3 (ash 1 38)))))
   (assert (= 1 (long-sap-test2 38 1 (+ 3 (ash 1 38)))))
   (assert (= (ash 1 33) (return-long-long)))
-  (assert (= -1 (return-char-test -1)))
-  (assert (= 1 (return-char-test 1)))
+  (assert (= -1 (return-schar-test -1)))
+  (assert (= 1 (return-schar-test 1)))
   (assert (= 255 (return-uchar-test 255)))
   (assert (= 1 (return-uchar-test 1)))
   (assert (= -1 (return-short-test -1)))
