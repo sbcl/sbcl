@@ -93,29 +93,37 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
 
+#if defined(LISP_FEATURE_HPUX)
       // FIX-lav: use accessor macro instead
       return (!foreign_function_call_active) &&
              *(&((ucontext_t *) context)->uc_mcontext.ss_wide.ss_64.ss_gr7) & 4;
+#else
+      return (!foreign_function_call_active) &&
+          ((*os_context_register_addr(context,reg_ALLOC)) & 4);
+#endif
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-
+#if defined(LISP_FEATURE_HPUX)
     *(&((ucontext_t *) context)->uc_mcontext.ss_wide.ss_64.ss_gr7) |= 1;
 /* on hpux do we need to watch out for the barbarian ? */
-#ifdef LISP_FEATURE_HPUX
     *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
      |= SS_MODIFIEDWIDE;
+#else
+    *os_context_register_addr(context,reg_ALLOC) |= 1;
 #endif
 }
 
 /* FIXME: untested */
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
+#if defined(LISP_FEATURE_HPUX)
     *(&((ucontext_t *) context)->uc_mcontext.ss_wide.ss_64.ss_gr7) &= ~1;
-#ifdef LISP_FEATURE_HPUX
     *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
      |= SS_MODIFIEDWIDE;
+#else
+    *os_context_register_addr(context,reg_ALLOC) &= ~1;
 #endif
 }
 
@@ -235,8 +243,10 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
         handle_fun_end_breakpoint(context);
     *os_context_pc_addr(context) = pc;
     *os_context_npc_addr(context) = pc + 4;
+#ifdef LISP_FEATURE_HPUX
     *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
      |= SS_MODIFIEDWIDE;
+#endif
 }
 
 
@@ -284,7 +294,11 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo,
 {
     unsigned badinst = *(unsigned *)(*os_context_pc_addr(context) & ~3);
 
+#ifdef LISP_FEATURE_LINUX
+    if (!siginfo->si_code && /* Linux 3.14 seems to set si_code to 0 for this case */
+#else
     if (siginfo->si_code == FPE_COND &&
+#endif
         (badinst&0xfffff800) == (0xb000e000|reg_ALLOC<<21|reg_ALLOC<<16)) {
         /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped.
          * That means that it is the end of a pseudo-atomic.  So do the
@@ -337,10 +351,12 @@ static void sigbus_handler(int signal, siginfo_t *siginfo,
     }
 }
 
+#ifdef LISP_FEATURE_HPUX
 static void
 ignore_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
 }
+#endif
 
 /* this routine installs interrupt handlers that will
  * bypass the lisp interrupt handlers */
