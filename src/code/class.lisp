@@ -675,8 +675,12 @@ between the ~A definition and the ~A definition"
 ;;; class comparison, we must ensure that both are valid before
 ;;; proceeding.
 (defun %ensure-classoid-valid (classoid layout error-context)
+  (declare (ignorable error-context)) ; not used on host
   (aver (eq classoid (layout-classoid layout)))
   (or (not (layout-invalid layout))
+      ;; Avoid accidentally reaching code that can't work.
+      #+sb-xc-host (bug "(TYPEP x 'STANDARD-CLASSOID) can't be tested")
+      #-sb-xc-host
       (if (typep classoid 'standard-classoid)
           (let ((class (classoid-pcl-class classoid)))
             (cond
@@ -709,6 +713,7 @@ between the ~A definition and the ~A definition"
                  (%ensure-classoid-valid class2 layout2 errorp))
       (return-from %ensure-both-classoids-valid nil))))
 
+#-sb-xc-host ; No such thing as LAYOUT-OF, never mind the rest
 (defun update-object-layout-or-invalid (object layout)
   ;; FIXME: explain why this isn't (LAYOUT-FOR-STD-CLASS-P LAYOUT).
   (if (layout-for-std-class-p (layout-of object))
@@ -1308,6 +1313,9 @@ between the ~A definition and the ~A definition"
 ;;;; class definition/redefinition
 
 ;;; This is to be called whenever we are altering a class.
+#+sb-xc-host
+(defun %modify-classoid (classoid) (bug "MODIFY-CLASSOID ~S" classoid))
+#-sb-xc-host
 (defun %modify-classoid (classoid)
   (clear-type-caches)
   (when (member (classoid-state classoid) '(:read-only :frozen))
