@@ -651,6 +651,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                                     code-length
                                     fixup-notes
                                     *compile-object*))
+              #-sb-xc-host ; no compiling to core
               (core-object
                (maybe-mumble "core")
                (make-core-component component

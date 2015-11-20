@@ -19,7 +19,7 @@
   (etypecase x
     (null (make-null-lexenv))
     (lexenv x)
-    #!+sb-fasteval
+    #!+(and sb-fasteval (host-feature sb-xc))
     (sb!interpreter:basic-env (sb!interpreter:lexenv-from-env x))))
 
 ;;; Take the lexenv surrounding an inlined function and extract things
@@ -123,7 +123,7 @@
              (let ((env (reconstruct-lexenv lexenv)))
                (and env
                     `(lambda-with-lexenv ,env ,@(cdr lambda))))))))
-   #!+sb-fasteval
+   #!+(and sb-fasteval (host-feature sb-xc))
    (sb!interpreter:basic-env
     (awhen (sb!interpreter::reconstruct-syntactic-closure-env lexenv)
       `(lambda-with-lexenv ,it ,@(cdr lambda))))

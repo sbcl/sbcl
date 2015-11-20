@@ -14,6 +14,11 @@
 
 ;;; Forward declarations
 
+#!+sb-fasteval
+(declaim (ftype function
+                sb!interpreter::interpreted-function-proto-fn
+                sb!interpreter::interpreted-function-env))
+
 (declaim (ftype (function (t &rest t) nil) sb!c::compiler-error)
          (ftype (function (t &rest t) (values &optional))
                 sb!c::compiler-warn sb!c::compiler-style-warn)

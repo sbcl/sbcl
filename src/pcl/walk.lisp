@@ -223,6 +223,9 @@
          ,@body))))
 
 (defun convert-macro-to-lambda (llist body env &optional (name "dummy macro"))
+  (declare (ignorable llist body env name))
+  #+sb-xc-host (error "CONVERT-MACRO-TO-LAMBDA called") ; no EVAL-IN-LEXENV
+  #-sb-xc-host
   (let ((gensym (make-symbol name)))
     (eval-in-lexenv `(defmacro ,gensym ,llist ,@body)
                     (sb!c::make-restricted-lexenv env))
@@ -468,7 +471,7 @@
                              (lambda (subform context env)
                                (declare (ignore context env))
                                subform)))
-  #!+sb-fasteval
+  #!+(and sb-fasteval (host-feature sb-xc))
   (when (typep environment 'sb!interpreter:basic-env)
     (setq environment (sb!interpreter:lexenv-from-env environment)))
   (walker-environment-bind (new-env environment :walk-function walk-function)

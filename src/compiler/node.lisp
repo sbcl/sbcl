@@ -768,7 +768,7 @@
 (defun fun-locally-defined-p (name env)
   (typecase env
     (null nil)
-    #!+sb-fasteval
+    #!+(and sb-fasteval (host-feature sb-xc))
     (sb!interpreter:basic-env
      (values (sb!interpreter:find-lexical-fun env name)))
     (t
@@ -1522,7 +1522,7 @@
 (defun %coerce-to-policy (thing)
   (typecase thing
     (policy thing)
-    #!+sb-fasteval
+    #!+(and sb-fasteval (host-feature sb-xc))
     (sb!interpreter:basic-env (sb!interpreter:env-policy thing))
     (null **baseline-policy**)
     (t (lexenv-policy (etypecase thing

@@ -152,7 +152,7 @@ else returns NIL. If ENV is unspecified or NIL, use the global environment
 only."
   ;; local function definitions (ordinary) can shadow a global macro
   (typecase env
-    #!+sb-fasteval
+    #!+(and sb-fasteval (host-feature sb-xc))
     (sb!interpreter:basic-env
      (multiple-value-bind (kind def)
          (sb!interpreter:find-lexical-fun env symbol)

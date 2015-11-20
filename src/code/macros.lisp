@@ -66,7 +66,7 @@
                              (sb!kernel:lexenv
                               (let ((f (cdr (assoc name (sb!c::lexenv-funs env)))))
                                 (if (not f) global-fun-p (sb!c::functional-p f))))
-                             #!+sb-fasteval
+                             #!+(and sb-fasteval (host-feature sb-xc))
                              (sb!interpreter:basic-env
                               (let ((kind
                                      (sb!interpreter::find-lexical-fun env name)))
