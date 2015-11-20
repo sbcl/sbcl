@@ -197,18 +197,28 @@
         nl0 lip)
   (inst bv lip :nullify t))
 
+#+sb-assembling ;; No VOP for this one
 (define-assembly-routine
-  (funcallable-instance-tramp (:return-style :none))
+    (funcallable-instance-tramp-header
+     (:return-style :none)
+     (:align n-lowtag-bits)
+     (:export (funcallable-instance-tramp
+               (+ funcallable-instance-tramp-header
+                  fun-pointer-lowtag))))
   nil
-  (inst nop)
-  (inst nop)
-  (inst nop)
-  (inst nop)
-  (inst nop)
-  (inst ldw 3 lexenv-tn lexenv-tn)
-  (inst ldw (- (* closure-fun-slot n-word-bytes)
-                  fun-pointer-lowtag)
-            lexenv-tn code-tn)
+  (inst word simple-fun-header-widetag) ;;header
+  (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine)) ;; self
+  (inst word nil-value) ;; next
+  (inst word nil-value) ;; name
+  (inst word nil-value) ;; arglist
+  (inst word nil-value) ;; type
+  (inst word nil-value) ;; info
+  (loadw lexenv-tn lexenv-tn
+         funcallable-instance-function-slot
+         fun-pointer-lowtag)
+  (loadw code-tn lexenv-tn
+         closure-fun-slot
+         fun-pointer-lowtag)
   (inst addi (- (* simple-fun-code-offset n-word-bytes)
                 fun-pointer-lowtag) code-tn lip-tn)
   (inst bv lip-tn :nullify t))
