@@ -2890,7 +2890,8 @@
 (declaim (type (sfunction (integer) rational) reciprocate))
 (defun reciprocate (x)
   (declare (optimize (safety 0)))
-  (%make-ratio 1 x))
+  #+sb-xc-host (error "Can't call reciprocate ~D" x)
+  #-sb-xc-host (%make-ratio 1 x))
 
 (deftransform expt ((base power) ((constant-arg unsigned-byte) integer))
   (let ((base (lvar-value base)))

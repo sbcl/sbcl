@@ -30,6 +30,18 @@
                   (the ,type (read-byte ,f-stream ,f-eof-error-p ,f-eof-value))))
          ,@body))))
 
+;; FORM-TRACKING-STREAM is one our ANSI-STREAM subtypes,
+;; and can't really have an (easy) implementation in the host.
 (defun form-tracking-stream-p (x)
   (declare (ignore x))
   nil)
+(macrolet ((def-stub (name)
+             `(defun ,name (&rest args)
+                (declare (ignore args))
+                (error "stub called"))))
+  (def-stub sb!c::make-form-tracking-stream-observer)
+  (def-stub form-tracking-stream-form-start-char-pos)
+  (def-stub form-tracking-stream-form-start-byte-pos)
+  (def-stub line/col-from-charpos)
+  (def-stub (setf form-tracking-stream-form-start-char-pos))
+  (def-stub (setf form-tracking-stream-observer)))

@@ -142,6 +142,17 @@
 (defun signed-byte-32-p (number)
   (typep number '(signed-byte 32)))
 
+;; This has an obvious portable implementation
+;; as (typep number 'ratio), but apparently we
+;; expect never to need it.
+(defun ratiop (number)
+  (declare (ignore number))
+  (error "Should not call RATIOP"))
+
+(defun make-value-cell (value)
+  (declare (ignore value))
+  (error "cross-compiler can not make value cells"))
+
 ;;; package locking nops for the cross-compiler
 
 (defmacro without-package-locks (&body body)
@@ -185,3 +196,7 @@
   (let ((position (position item seq :from-end from-end
                             :start start :end end :key key :test test)))
     (values (if position (elt seq position) nil) position)))
+
+(defun sb!impl::split-seconds-for-sleep (&rest args)
+  (declare (ignore args))
+  (error "Can't call SPLIT-SECONDS-FOR-SLEEP"))

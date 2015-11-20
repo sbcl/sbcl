@@ -248,3 +248,9 @@
                        (expt 0.5d0 52))))
          (* sign (kludge-opaque-expt 2.0d0 expt) mant)))))
 
+(defun float-infinity-p (x)
+  (declare (ignore x))
+  (error "Can't call FLOAT-INFINITY-P"))
+(defun float-nan-p (x)
+  (declare (ignore x))
+  (error "Can't call FLOAT-NAN-P"))

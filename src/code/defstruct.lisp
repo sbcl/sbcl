@@ -1998,6 +1998,11 @@ or they must be declared locally notinline at each call site.~@:>")
             ;; The target Lisp never assumes that.
             (aver (and (eql (dsd-index dsd) index) (eq (dsd-raw-type dsd) t)))
             (funcall accessor-name instance)))))
+
+  (defun %raw-instance-ref/word (instance index)
+    (declare (ignore instance index))
+    (error "No such thing as raw structure access on the host"))
+
   ;; Setting with (FUNCALL `(SETF ,accessor) ...) is unportable because
   ;;  "The mechanism by which defstruct arranges for slot accessors to be
   ;;   usable with setf is implementation-dependent; for example, it may
