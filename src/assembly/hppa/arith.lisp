@@ -47,7 +47,7 @@
 
   DONE
   (inst xor res sign res)
-  (inst add res sign res))
+  (inst sub res sign res))
 
 (define-assembly-routine
     (truncate)
