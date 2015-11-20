@@ -447,6 +447,9 @@
     ;(move q-pass q)
     (move r-pass r)))
 
+#+(or) ;; This contains two largely-inexplicable hacks, and there's no
+       ;; equivalent VOP for either Alpha or ARM.  Why is this even
+       ;; here?  -- AB, 2015-11-19
 (define-vop (fast-truncate/unsigned fast-unsigned-binop)
   (:translate truncate)
   (:args (x :scs (unsigned-reg) :target x-pass)
