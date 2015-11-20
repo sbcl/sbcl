@@ -190,6 +190,7 @@ by ALLOW-WITH-INTERRUPTS."
 ;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is
 ;;; false, *ALLOW-WITH-INTERRUPTS* is true and deferrable signals are
 ;;; unblocked.
+#-sb-xc-host
 (defun %check-interrupts ()
   ;; Here we check for pending interrupts first, because reading a
   ;; special is faster then binding it!

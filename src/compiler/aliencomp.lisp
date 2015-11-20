@@ -618,7 +618,8 @@
 
 #!+c-stack-is-control-stack
 (declaim (inline invoke-with-saved-fp-and-pc))
-#!+c-stack-is-control-stack
+;; Makes no sense when compiling for the host.
+#!+(and c-stack-is-control-stack (host-feature sb-xc))
 (defun invoke-with-saved-fp-and-pc (fn)
   (declare #-sb-xc-host (muffle-conditions compiler-note)
            (optimize (speed 3)))

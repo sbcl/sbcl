@@ -31,6 +31,7 @@
   (debug-info () :type list))
 
 ;;; Note the existence of FUNCTION.
+#-sb-xc-host ; There is no (SETF CODE-HEADER-REF) so this can't work.
 (defun note-fun (info function object)
   (declare (type function function)
            (type core-object object))
@@ -42,6 +43,9 @@
   (values))
 
 ;;; Do "load-time" fixups on the code vector.
+;;; But the host never compiles to core, and there is no GET-LISP-OBJ-ADDRESS,
+;;; FIXUP-CODE-OBJECT, or ENSURE-SYMBOL-TLS-INDEX.
+#-sb-xc-host
 (defun do-core-fixups (code fixup-notes)
   (declare (list fixup-notes))
   (dolist (note fixup-notes)
@@ -75,6 +79,7 @@
 
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
 ;;; function hasn't been compiled yet, make a note in the patch table.
+#-sb-xc-host ; no (SETF CODE-HEADER-REF)
 (defun reference-core-fun (code-obj i fun object)
   (declare (type core-object object) (type functional fun)
            (type index i))

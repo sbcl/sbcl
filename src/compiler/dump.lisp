@@ -297,6 +297,8 @@
       ;; Before the actual FASL header, write a shebang line using the current
       ;; runtime path, so our fasls can be executed directly from the shell.
       (when *runtime-pathname*
+        #+sb-xc-host (bug "Can't write shebang line") ; no #'NATIVE-PATHNAME
+        #-sb-xc-host
         (fasl-write-string
          (format nil "#!~A --script~%"
                  (native-namestring *runtime-pathname* :as-file t))
@@ -761,7 +763,8 @@
 (defun dump-array (x file)
   (if (vectorp x)
       (dump-vector x file)
-      (dump-multi-dim-array x file)))
+      #-sb-xc-host (dump-multi-dim-array x file)
+      #+sb-xc-host (bug "Can't dump multi-dim array")))
 
 ;;; Dump the vector object. If it's not simple, then actually dump a
 ;;; simple version of it. But we enter the original in the EQ or EQUAL

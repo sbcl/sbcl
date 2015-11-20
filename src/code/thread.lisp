@@ -11,6 +11,7 @@
 
 (in-package "SB!THREAD")
 
+;;; FIXME: most of this file looks like it's supposed to be :not-host.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (sb!xc:proclaim '(sb!ext:always-bound *current-thread*)))
 
@@ -67,12 +68,15 @@ stale value, use MUTEX-OWNER instead."
 (define-deprecated-function :early "1.0.53.11" (setf spinlock-name) (setf mutex-name) (name lock)
   (setf (mutex-name lock) name))
 
+#-sb-xc-host ; Mutex is not a type on the host.
 (define-deprecated-function :early "1.0.53.11" spinlock-value mutex-owner (lock)
   (mutex-owner lock))
 
+#-sb-xc-host ; Mutex is not a type on the host.
 (define-deprecated-function :early "1.0.53.11" get-spinlock grab-mutex (lock)
   (grab-mutex lock))
 
+#-sb-xc-host ; Mutex is not a type on the host.
 (define-deprecated-function :early "1.0.53.11" release-spinlock release-mutex (lock)
   (release-mutex lock))
 
@@ -193,6 +197,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
       #'with-recursive-system-lock-thunk
        ,lock)))
 
+#-sb-xc-host ; Mutex is not a type on the host.
 (macrolet ((def (name &optional variant)
              `(defun ,(if variant (symbolicate name "/" variant) name)
                   (function mutex)
@@ -217,7 +222,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   (def call-with-system-mutex :without-gcing)
   (def call-with-system-mutex :allow-with-interrupts))
 
-#!-sb-thread
+#!+(and (host-feature sb-xc) (not sb-thread))
 (progn
   (defun call-with-mutex (function mutex value waitp timeout)
     (declare (ignore mutex waitp timeout)
@@ -242,7 +247,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
     (without-gcing
       (funcall function))))
 
-#!+sb-thread
+#!+(and (host-feature sb-xc) sb-thread)
 ;;; KLUDGE: These need to use DX-LET, because the cleanup form that
 ;;; closes over GOT-IT causes a value-cell to be allocated for it --
 ;;; and we prefer that to go on the stack since it can.
