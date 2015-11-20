@@ -5,15 +5,15 @@
 ;;; things.)
 (setf *print-level* 5 *print-length* 5)
 
-(load "src/cold/shared.lisp")
-(load "tools-for-build/ldso-stubs.lisp")
+(progn (load "src/cold/shared.lisp")
+       (load "tools-for-build/ldso-stubs.lisp"))
 (in-package "SB-COLD")
 (setf *host-obj-prefix* "obj/from-host/")
-(load "src/cold/set-up-cold-packages.lisp")
-(load "src/cold/defun-load-or-cload-xcompiler.lisp")
+(progn (load "src/cold/set-up-cold-packages.lisp")
+       (load "src/cold/defun-load-or-cload-xcompiler.lisp"))
 
-(set-dispatch-macro-character #\# #\+ #'she-reader)
-(set-dispatch-macro-character #\# #\- #'she-reader)
+(progn (set-dispatch-macro-character #\# #\+ #'she-reader)
+       (set-dispatch-macro-character #\# #\- #'she-reader))
 
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp
@@ -28,28 +28,30 @@
   `(with-compilation-unit () ,@forms))
 
 (maybe-with-compilation-unit
- (load-or-cload-xcompiler #'host-cload-stem))
+ (load-or-cload-xcompiler #'host-cload-stem)
 
 ;;; Let's check that the type system, and various other things, are
 ;;; reasonably sane. (It's easy to spend a long time wandering around
 ;;; confused trying to debug cross-compilation if it isn't.)
-(when (find :sb-test *shebang-features*)
-  (load "tests/type.before-xc.lisp")
-  (load "tests/info.before-xc.lisp")
-  (load "tests/vm.before-xc.lisp"))
+ (when (find :sb-test *shebang-features*)
+   (load "tests/type.before-xc.lisp")
+   (load "tests/info.before-xc.lisp")
+   (load "tests/vm.before-xc.lisp"))
 ;; When building on a slow host using a slow Lisp,
 ;; the wait time in slurp-ucd seems interminable - over a minute.
 ;; Compiling seems to help a bit, but maybe it's my imagination.
-(load (compile-file "tools-for-build/ucd.lisp"))
+ (load (compile-file "tools-for-build/ucd.lisp"))
 
 ;;; Generate character database tables.
-(sb-cold::slurp-ucd)
-(sb-cold::slurp-proplist)
-(sb-cold::output)
+ (sb-cold::slurp-ucd)
+ (sb-cold::slurp-proplist)
+ (sb-cold::output)
 
 ;;; propagate structure offset and other information to the C runtime
 ;;; support code.
-(host-cload-stem "src/compiler/generic/genesis" nil)
+ (host-cload-stem "src/compiler/generic/genesis" nil)
+) ; END with-compilation-unit
+
 (sb!vm:genesis :c-header-dir-name "src/runtime/genesis")
 #+cmu (ext:quit)
 #+clisp (ext:quit)
