@@ -67,7 +67,7 @@
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
 
-#elif ALIEN_STACK_GROWS_UPWARD
+#elif defined(ALIEN_STACK_GROWS_UPWARD)
 
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)                            \
     (((os_vm_address_t)th->alien_stack_start) + ALIEN_STACK_SIZE - \
