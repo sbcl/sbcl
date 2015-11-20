@@ -18,6 +18,8 @@
           (inst (sap-ref-32 sap offset)))
      (setf (sap-ref-32 sap offset)
            (ecase kind
+             (:absolute
+              value)
              (:load
               (logior (mask-field (byte 18 14) value)
                       (if (< value 0)

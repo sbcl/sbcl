@@ -1659,9 +1659,13 @@
                 (:delay 0)
                 :pinned
                 (:emitter
-                 (,(symbolicate "EMIT-" size) segment ,size)))))
+                 (etypecase ,size
+                   ,@(when (eq size 'word)
+                       '((fixup
+                          (note-fixup segment :absolute word)
+                          (emit-word segment 0))))
+                   (integer
+                    (,(symbolicate "EMIT-" size) segment ,size)))))))
   (data byte  (or (unsigned-byte 8)  (signed-byte 8)))
   (data short (or (unsigned-byte 16) (signed-byte 16)))
-  (data word  (or (unsigned-byte 23) (signed-byte 23))))
-
-
+  (data word  (or (unsigned-byte 32) (signed-byte 32) fixup)))

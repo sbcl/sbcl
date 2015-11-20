@@ -2029,6 +2029,8 @@ core and return a descriptor to it."
                      -2)))))
       (:hppa
        (ecase kind
+         (:absolute
+          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))
          (:load
           (setf (bvref-32 gspace-bytes gspace-byte-offset)
                 (logior (mask-field (byte 18 14)
