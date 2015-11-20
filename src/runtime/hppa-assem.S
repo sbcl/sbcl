@@ -115,8 +115,8 @@ call_into_lisp:
   addil   L%return_from_lisp_stub-$global$,%dp
   ldw     R%return_from_lisp_stub-$global$(0,%r1),reg_NL0
   be,n  0(%sr5,reg_NL0)
-#else                 
-  be,n  0(%sr5,reg_NL0)
+#else
+  be,n  0(%sr5,reg_LIP)
 #endif
 
 	break	0,0
