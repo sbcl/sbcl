@@ -21,6 +21,21 @@
 (defun int-sse-p (tn)
   (sc-is tn int-sse-reg int-sse-stack int-sse-immediate))
 
+;; On the target we want stubs for the interpreter.
+;; On the host we want not to call these.
+#-sb-xc-host
+(progn
+  (defun %simd-pack-low (x)
+    (declare (type simd-pack x))
+    (%simd-pack-low x))
+  (defun %simd-pack-high (x)
+    (declare (type simd-pack x))
+    (%simd-pack-high x)))
+#+sb-xc-host
+(progn
+  (defun %simd-pack-low (x) (error "Called %SIMD-PACK-LOW ~S" x))
+  (defun %simd-pack-high (x) (error "Called %SIMD-PACK-HIGH ~S" x)))
+
 (define-move-fun (load-int-sse-immediate 1) (vop x y)
   ((int-sse-immediate) (int-sse-reg))
   (let* ((x  (tn-value x))
@@ -153,11 +168,6 @@
   (:generator 3
     (inst movd dst x)))
 
-#-sb-xc-host
-(defun %simd-pack-low (x)
-  (declare (type simd-pack x))
-  (%simd-pack-low x))
-
 (define-vop (%simd-pack-high)
   (:translate %simd-pack-high)
   (:args (x :scs (int-sse-reg double-sse-reg single-sse-reg)
@@ -171,11 +181,6 @@
     (move tmp x)
     (inst psrldq tmp 8)
     (inst movd dst tmp)))
-
-#-sb-xc-host
-(defun %simd-pack-high (x)
-  (declare (type simd-pack x))
-  (%simd-pack-high x))
 
 (define-vop (%make-simd-pack)
   (:translate %make-simd-pack)
