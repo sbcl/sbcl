@@ -12,7 +12,6 @@
 (in-package "SB!IMPL")
 
 (defstruct (win32-host
-             (:make-load-form-fun make-host-load-form)
              (:include host
                        (parse #'parse-win32-namestring)
                        (parse-native #'parse-native-win32-namestring)
