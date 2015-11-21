@@ -85,8 +85,7 @@
              (recurse)))))
     (assert (= exhaust-count recurse-count *count*))))
 
-(with-test (:name (:exhaust :binding-stack)
-            :broken-on :mips)
+(with-test (:name (:exhaust :binding-stack))
   (let ((ok nil)
         (symbols (loop repeat 1024 collect (gensym)))
         (values (loop repeat 1024 collect nil)))
