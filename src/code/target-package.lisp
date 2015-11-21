@@ -832,9 +832,9 @@ implementation it is ~S." *default-package-use-list*)
          (unless (and (string= name (package-name package))
                       (null (set-difference nicks (package-nicknames package)
                                             :test #'string=)))
-           (assert-package-unlocked package "rename as ~A~@[ with nickname~P ~
-                                             ~{~A~^, ~}~]"
-                                    name (length nicks) nicks))
+           (assert-package-unlocked
+            package "renaming as ~A~@[ with nickname~*~P ~1@*~{~A~^, ~}~]"
+            name nicks (length nicks)))
          (with-package-names (names)
            ;; Check for race conditions now that we have the lock.
            (unless (eq package (find-package package-designator))
