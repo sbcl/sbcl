@@ -76,15 +76,15 @@
   (let ((stack-frame-size (logandc2 (1+ (arg-state-stack-frame-size state)) 1))
         (float-args (arg-state-float-args state)))
     (setf (arg-state-stack-frame-size state) (+ stack-frame-size 2))
-    (setf (arg-state-float-args state) (1+ float-args))
+    (setf (arg-state-float-args state) (+ 2 float-args))
     (cond ((>= stack-frame-size 4)
            (my-make-wired-tn 'double-float
                              'double-stack
                              stack-frame-size state))
           (t
             (my-make-wired-tn 'double-float
-                              'double-int-carg-reg
-                              (1+ (* float-args 2)) state)))))
+                              'double-reg
+                              (1+ float-args) state)))))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
@@ -97,9 +97,9 @@
                              'single-stack
                              stack-frame-size state))
           (t
-            (my-make-wired-tn 'double-float
-                              'single-int-carg-reg
-                              (* float-args 2) state)))))
+            (my-make-wired-tn 'single-float
+                              'single-reg
+                              float-args state)))))
 
 (defstruct result-state
   (num-results 0))
