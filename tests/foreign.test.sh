@@ -340,6 +340,7 @@ test_start() {
 test_start fast
 test_start small
 
+if [ -f $TEST_FILESTEM.fast.core ] ; then
 # missing object file
     run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
         --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
@@ -357,6 +358,7 @@ test_start small
 EOF
     check_status_maybe_lose "saving-missing-so-core" $? \
 	0 "(successful save)" 22 "(linkage table not available)"
+fi
 
 rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
 if [ -f $TEST_FILESTEM.missing.core ] ; then
