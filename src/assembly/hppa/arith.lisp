@@ -73,7 +73,7 @@
     (inst addc quo quo quo))
   ;; If the remainder is negative, we need to add the absolute value of the
   ;; divisor.
-  (inst comb :>= rem zero-tn remainder-positive)
+  (inst comb :>= rem zero-tn remainder-positive :nullify t)
   (inst comclr divisor zero-tn zero-tn :<)
   (inst add rem divisor rem :tr)
   (inst sub rem divisor rem)
