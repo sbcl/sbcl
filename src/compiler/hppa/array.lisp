@@ -71,7 +71,7 @@
   (:generator 5
     (let ((error (generate-error-code vop invalid-array-index-error
                                       array bound index)))
-      (inst bc :>= nil index bound error))
+      (inst bc :>>= nil index bound error))
     (move index result)))
 
 
