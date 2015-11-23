@@ -1931,14 +1931,16 @@
 
 ;;; reported by Lutz Euler: we shouldn't signal a compiler note for
 ;;; simple-bit-vector functions.
-(handler-bind ((sb-ext:compiler-note #'error))
-  (compile nil '(lambda (x)
-                 (declare (type simple-bit-vector x))
-                 (count 1 x))))
-(handler-bind ((sb-ext:compiler-note #'error))
-  (compile nil '(lambda (x y)
-                 (declare (type simple-bit-vector x y))
-                 (equal x y))))
+(with-test (:name (:simple-bit-vector :count :should-not-compiler-note))
+  (handler-bind ((sb-ext:compiler-note (lambda (c) (error "~A" c))))
+    (compile nil '(lambda (x)
+                   (declare (type simple-bit-vector x))
+                   (count 1 x)))))
+(with-test (:name (:simple-bit-vector :equal :should-not-compiler-note))
+  (handler-bind ((sb-ext:compiler-note (lambda (c) (error "~A" c))))
+    (compile nil '(lambda (x y)
+                   (declare (type simple-bit-vector x y))
+                   (equal x y)))))
 
 ;;; MISC.550: CAST merging in IR1 finalization caused unexpected
 ;;; code transformations.
