@@ -767,13 +767,12 @@
             float-modes)
 
 (define-vop (floating-point-modes)
-            (:results (res :scs (unsigned-reg)
-                           :load-if (not (sc-is res unsigned-stack))))
+            (:results (res :scs (unsigned-reg)))
             (:result-types unsigned-num)
             (:translate floating-point-modes)
             (:policy :fast-safe)
-            (:temporary (:scs (unsigned-stack) :to (:result 0)) temp)
-            (:temporary (:scs (any-reg) :from (:argument 0) :to (:result 0)) index)
+            (:temporary (:scs (double-stack)) temp)
+            (:temporary (:scs (any-reg) :to (:result 0)) index)
             (:vop-var vop)
   (:generator 3
               (let* ((nfp (current-nfp-tn vop))
@@ -782,26 +781,28 @@
                                         (unsigned-reg temp)))
                      (offset (* (tn-offset stack-tn) n-word-bytes)))
                 (cond ((< offset (ash 1 4))
-                       (inst fsts fp-single-zero-tn offset nfp))
+                       (inst fsts fp-double-zero-tn offset nfp))
                       ((and (< offset (ash 1 13))
                             (> offset 0))
                        (inst ldo offset zero-tn index)
-                       (inst fstx fp-single-zero-tn index nfp))
+                       (inst fstx fp-double-zero-tn index nfp))
                       (t
                        (error "floating-point-modes error, ldo offset too large")))
-                (unless (eq stack-tn res)
-                  (inst ldw offset nfp res)))))
+                (ecase *backend-byte-order*
+                  (:big-endian
+                   (inst ldw offset nfp res))
+                  (:little-endian
+                   (inst ldw (+ offset 4) nfp res))))))
 
 (define-vop (set-floating-point-modes)
-            (:args (new :scs (unsigned-reg)
-                        :load-if (not (sc-is new unsigned-stack))))
+            (:args (new :scs (unsigned-reg) :target res))
             (:results (res :scs (unsigned-reg)))
             (:arg-types unsigned-num)
             (:result-types unsigned-num)
             (:translate (setf floating-point-modes))
             (:policy :fast-safe)
-            (:temporary (:scs (unsigned-stack) :from (:argument 0) :to (:result 0)) temp)
-            (:temporary (:scs (any-reg) :from (:argument 0) :to (:result 0)) index)
+            (:temporary (:scs (unsigned-stack)) temp)
+            (:temporary (:scs (any-reg)) index)
             (:vop-var vop)
   (:generator 3
               (let* ((nfp (current-nfp-tn vop))
@@ -809,17 +810,22 @@
                                         (unsigned-stack new)
                                         (unsigned-reg temp)))
                      (offset (* (tn-offset stack-tn) n-word-bytes)))
-                (unless (eq new stack-tn)
-                  (inst stw new offset nfp))
+                (ecase *backend-byte-order*
+                  (:big-endian
+                   (inst stw new offset nfp)
+                   (inst stw zero-tn (+ offset 4) nfp))
+                  (:little-endian
+                   (inst stw zero-tn offset nfp)
+                   (inst stw new (+ offset 4) nfp)))
                 (cond ((< offset (ash 1 4))
-                       (inst flds offset nfp fp-single-zero-tn))
+                       (inst flds offset nfp fp-double-zero-tn))
                       ((and (< offset (ash 1 13))
                             (> offset 0))
-                        (inst ldo offset zero-tn index)
-                        (inst fldx index nfp fp-single-zero-tn))
+                       (inst ldo offset zero-tn index)
+                       (inst fldx index nfp fp-double-zero-tn))
                       (t
                        (error "set-floating-point-modes error, ldo offset too large")))
-                (inst ldw offset nfp res))))
+                (move new res))))
 
 ;;;; Complex float VOPs
 
