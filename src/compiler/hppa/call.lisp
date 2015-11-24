@@ -81,7 +81,7 @@
   (:generator 1
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-        (inst addi (- (bytes-needed-for-non-descriptor-stack-frame))
+        (inst ldo (- (bytes-needed-for-non-descriptor-stack-frame))
               nfp val)))))
 
 ;;; Accessing a slot from an earlier stack frame is definite hackery.
@@ -126,12 +126,12 @@
 (define-vop (xep-setup-sp)
   (:vop-var vop)
   (:generator 1
-    (inst addi (* n-word-bytes (sb-allocated-size 'control-stack))
+    (inst ldo (* n-word-bytes (sb-allocated-size 'control-stack))
           cfp-tn csp-tn)
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
         (move nsp-tn nfp)
-        (inst addi (bytes-needed-for-non-descriptor-stack-frame)
+        (inst ldo (bytes-needed-for-non-descriptor-stack-frame)
                    nsp-tn nsp-tn)))))
 
 (define-vop (allocate-frame)
@@ -140,11 +140,11 @@
   (:info callee)
   (:generator 2
     (move csp-tn res)
-    (inst addi (* n-word-bytes (sb-allocated-size 'control-stack))
+    (inst ldo (* n-word-bytes (sb-allocated-size 'control-stack))
           csp-tn csp-tn)
     (when (ir2-physenv-number-stack-p callee)
       (move nsp-tn nfp)
-      (inst addi (bytes-needed-for-non-descriptor-stack-frame)
+      (inst ldo (bytes-needed-for-non-descriptor-stack-frame)
                  nsp-tn nsp-tn))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
@@ -157,7 +157,7 @@
   (:generator 2
     (when (> nargs register-arg-count)
       (move csp-tn res)
-      (inst addi (* nargs n-word-bytes) csp-tn csp-tn))))
+      (inst ldo (* nargs n-word-bytes) csp-tn csp-tn))))
 
 
 ;;; Fix: boil down below notes into something nicer
@@ -722,7 +722,7 @@ default-value-8
                                                  word-shift)
                                             cfp-tn return-pc-pass))))
                               (:frob-nfp
-                               (inst addi (- (bytes-needed-for-non-descriptor-stack-frame))
+                               (inst ldo (- (bytes-needed-for-non-descriptor-stack-frame))
                                           nsp-tn nsp-tn)))
                             `((:comp-lra
                                (inst compute-lra-from-code code-tn lra-label
@@ -938,7 +938,7 @@ default-value-8
         ;; restore the frame pointer and clear as much of the control
         ;; stack as possible.
         (move ocfp cfp-tn)
-        (inst addi (* nvals n-word-bytes) val-ptr csp-tn)
+        (inst ldo (* nvals n-word-bytes) val-ptr csp-tn)
         (aver (= (* nvals n-word-bytes) (fixnumize nvals)))
         ;; pre-default any argument register that need it.
         (when (< nvals register-arg-count)
