@@ -61,7 +61,6 @@
     ;; Wait, but not with sleep because that will be interrupted and
     ;; we get EINTR.
     (loop until returning)
-    (loop repeat 1000000000)
     (assert (= saved-errno (sb-unix::get-errno)))))
 
 (with-test (:name :handle-interactive-interrupt
