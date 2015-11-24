@@ -601,10 +601,13 @@
   (assert-no-consing (list-delete-some-stuff))
   (assert-no-consing (multiple-dx-uses)))
 
-(with-test (:name (:no-consing :dx-value-cell))
+(with-test (:name (:no-consing :dx-value-cell)
+                  :skipped-on '(not :stack-allocatable-closures))
   (assert-no-consing (dx-value-cell 13)))
 
-(with-test (:name (:no-consing :dx-fixed-objects) :skipped-on '(not :stack-allocatable-fixed-objects))
+(with-test (:name (:no-consing :dx-fixed-objects)
+                  :skipped-on '(not (and :stack-allocatable-fixed-objects
+                                         :stack-allocatable-closures)))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-foo1-on-stack 123))
   (assert-no-consing (nested-good 42))
@@ -855,7 +858,8 @@
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 
 (with-test (:name :handler-case-bogus-compiler-note
-            :skipped-on '(not :stack-allocatable-fixed-objects))
+            :skipped-on '(not (and :stack-allocatable-fixed-objects
+                                   :stack-allocatable-closures)))
   (handler-bind
       ((compiler-note (lambda (note)
                         (error "compiler issued note ~S during test" note))))
@@ -890,7 +894,8 @@
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
 (with-test (:name :dx-compiler-notes
-            :skipped-on '(not :stack-allocatable-vectors))
+            :skipped-on '(not (and :stack-allocatable-vectors
+                                   :stack-allocatable-closures)))
   (flet ((assert-notes (j lambda)
            (let ((n 0))
              (handler-bind ((compiler-note (lambda (c)
@@ -952,7 +957,8 @@
           (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
 (with-test (:name :handler-case-eating-stack
-            :skipped-on '(not :stack-allocatable-fixed-objects))
+            :skipped-on '(not (and :stack-allocatable-fixed-objects
+                                   :stack-allocatable-closures)))
   (assert-no-consing (handler-case-eating-stack)))
 
 ;;; A nasty bug where RECHECK-DYNAMIC-EXTENT-LVARS thought something was going

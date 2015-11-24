@@ -281,14 +281,15 @@
                        (*print-pretty* t))
                    (format nil "~@<~S~:>" (make-instance 'frob))))))
 
-(with-test (:name :pprint-logical-block-code-deletion-node)
+(with-test (:name :pprint-logical-block-code-deletion-node
+                  :skipped-on '(not :stack-allocatable-closures))
   (handler-case
       (compile nil
                `(lambda (words &key a b c)
                   (pprint-logical-block (nil words :per-line-prefix (or a b c))
                     (pprint-fill *standard-output* (sort (copy-seq words) #'string<) nil))))
     ((or sb-ext:compiler-note warning) (c)
-      (error c))))
+      (error "~A" c))))
 
 (with-test (:name :pprint-logical-block-multiple-per-line-prefix-eval)
   (funcall (compile nil

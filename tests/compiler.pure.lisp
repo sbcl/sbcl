@@ -4982,7 +4982,9 @@
     (assert failure-p)))
 
 ;; quantifiers shouldn't cons themselves.
-(with-test (:name :quantifiers-no-consing :skipped-on :interpreter)
+(with-test (:name :quantifiers-no-consing
+            :skipped-on '(or :interpreter
+                             (not :stack-allocatable-closures)))
   (let ((constantly-t (lambda (x) x t))
         (constantly-nil (lambda (x) x nil))
         (list (make-list 1000 :initial-element nil))
