@@ -149,7 +149,7 @@
               `((let ((real-tn (,(symbolicate type "-REG-REAL-TN") y)))
                   (ld-float offset nfp real-tn))
                 (let ((imag-tn (,(symbolicate type "-REG-IMAG-TN") y)))
-                  (ld-float (+ offset n-word-bytes) nfp imag-tn)))
+                  (ld-float (+ offset (* ,(/ size 2) n-word-bytes)) nfp imag-tn)))
               `((let ((real-tn (,(symbolicate type "-REG-REAL-TN") x)))
                   (str-float real-tn offset nfp))
                 (let ((imag-tn (,(symbolicate type "-REG-IMAG-TN") x)))
