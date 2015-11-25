@@ -125,7 +125,7 @@
       ((eql (length s) length)
        (if icp (replace s initial-contents) s))
       (t (apply #'adjust-array s length args))))
-  (:method (new-value (s sequence) &rest args)
+  (:method ((s sequence) length &rest args)
     (declare (ignore args))
     (sequence::protocol-unimplemented s))
   #+sb-doc
