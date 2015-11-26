@@ -319,11 +319,11 @@
          (sc-number-or-lose 'immediate)
          nil))
     (single-float
-     (if (zerop value)
+     (if (eql value 0f0)
          (sc-number-or-lose 'fp-single-zero)
          nil))
     (double-float
-     (if (zerop value)
+     (if (eql value 0d0)
          (sc-number-or-lose 'fp-double-zero)
          nil))))
 
