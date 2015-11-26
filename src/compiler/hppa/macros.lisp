@@ -265,7 +265,15 @@ initializes the object."
     `(let ((,n-extra ,extra))
        (inst addi 4 alloc-tn alloc-tn)
        ,@forms
-       (inst addit (- ,n-extra 4) alloc-tn alloc-tn :od))))
+       (cond
+         ((typep ,n-extra '(signed-byte 11))
+          (inst addit (- ,n-extra 4) alloc-tn alloc-tn :od))
+         ((typep ,n-extra '(signed-byte 14))
+          (inst ldo ,n-extra alloc-tn alloc-tn)
+          (inst addit -4 alloc-tn alloc-tn :od))
+         (t
+          ;; FIXME: Make this case work, somehow
+          (error "EXTRA out-of-range in PSEUDO-ATOMIC"))))))
 
 ;;;; indexed references
 
