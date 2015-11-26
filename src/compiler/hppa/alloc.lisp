@@ -45,7 +45,12 @@
                    (align-csp res))
                  (set-lowtag list-pointer-lowtag (if dx-p csp-tn alloc-tn) res)
                  (when dx-p
-                   (inst addi alloc csp-tn csp-tn))
+                   (if (typep alloc '(signed-byte 14))
+                       (inst ldo alloc csp-tn csp-tn)
+                       ;; FIXME: We have TEMP available, so can do an
+                       ;; LIDL / LDO / ADD sequence here instead of
+                       ;; punting.
+                       (error "VOP LIST-OR-LIST* can't stack-allocate more than 511 CONSes at once")))
                  (move res ptr)
                  (dotimes (i (1- cons-cells))
                    (store-car (tn-ref-tn things) ptr)
