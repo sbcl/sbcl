@@ -458,12 +458,63 @@
   (frob abs/single-float abs single-reg single-float
     (inst funop :abs x y))
   (frob abs/double-float abs double-reg double-float
-    (inst funop :abs x y))
-  (frob %negate/single-float %negate single-reg single-float
-    (inst fbinop :sub fp-single-zero-tn x y))
-  (frob %negate/double-float %negate double-reg double-float
-    (inst fbinop :sub fp-double-zero-tn x y)))
+    (inst funop :abs x y)))
 
+(macrolet ((frob (name translate sc type zero-tn)
+             `(define-vop (,name)
+                (:args (x :scs (,sc)))
+                (:results (y :scs (,sc)))
+                (:temporary (:scs (,sc)) float-temp)
+                (:temporary (:scs (signed-reg)) reg-temp)
+                (:temporary (:scs (signed-stack)) stack-temp)
+                (:translate ,translate)
+                (:policy :fast-safe)
+                (:arg-types ,type)
+                (:result-types ,type)
+                (:note "inline float arithmetic")
+                (:vop-var vop)
+                (:save-p :compute-only)
+                (:generator 1
+                  (note-this-location vop :internal-error)
+                  ;; KLUDGE: Subtracting the input from zero fails to
+                  ;; produce negative zero from positive zero.
+                  ;; Multiplying by -1 causes overflow conditions on
+                  ;; some inputs.  The FNEG instruction is available
+                  ;; in PA-RISC 2.0 only, and we're supposed to be
+                  ;; PA-RISC 1.1 compatible.  To do the negation as an
+                  ;; integer operation requires writing out the value
+                  ;; (or its high bits) to memory, reading them up
+                  ;; into a non-descriptor-reg, flipping the sign bit
+                  ;; (most likely requiring another unsigned-reg to
+                  ;; hold a constant to XOR with), then getting the
+                  ;; result back to the FPU via memory again.  So
+                  ;; instead we test for zeroness explicitly and
+                  ;; decide which of the two FPU-based strategies to
+                  ;; use.  I feel unclean for having implemented this,
+                  ;; but it seems to be the least dreadful option.
+                  ;; Help?  -- AB, 2015-11-26
+                  (inst fcmp #b00111 x ,zero-tn)
+                  (inst ftest)
+                  (inst b SUBTRACT-FROM-ZERO :nullify t)
+
+                  MULTIPLY-BY-NEGATIVE-ONE
+                  (let ((nfp (current-nfp-tn vop))
+                        (short-float-temp (make-random-tn :kind :normal
+                                                          :sc (sc-or-lose 'single-reg)
+                                                          :offset (tn-offset reg-temp))))
+                    (inst li -1 reg-temp)
+                    (storew reg-temp nfp (tn-offset stack-temp))
+                    (ld-float (tn-offset stack-temp) nfp short-float-temp)
+                    (inst fcnvxf short-float-temp float-temp)
+                    (inst fbinop :mpy x float-temp y))
+                  (inst b DONE :nullify t)
+
+                  SUBTRACT-FROM-ZERO
+                  (inst fbinop :sub ,zero-tn x y)
+
+                  DONE))))
+  (frob %negate/single-float %negate single-reg single-float fp-single-zero-tn)
+  (frob %negate/double-float %negate double-reg double-float fp-double-zero-tn))
 
 ;;;; Comparison:
 
