@@ -1710,7 +1710,9 @@ generic function lambda list ~S~:>"
 (defun generic-clobbers-function (fun-name)
   (cerror "Replace the function binding"
           'simple-program-error
-          :format-control "~S already names an ordinary function or a macro."
+          :format-control "~@<~/sb-impl:print-symbol-with-prefix/ ~
+                           already names an ordinary function or a ~
+                           macro.~@:>"
           :format-arguments (list fun-name)))
 
 (defvar *sgf-wrapper*
