@@ -1719,45 +1719,28 @@
 ;;; This is based on the rules of method lambda list congruency
 ;;; defined in the spec. The lambda list it constructs is the pretty
 ;;; union of the lambda lists of the generic function and of all its
-;;; methods.  It doesn't take method applicability into account at all
-;;; yet.
-
-;;; (Notice that we ignore &AUX variables as they're not part of the
-;;; "public interface" of a function.)
-
-(defmethod generic-function-pretty-arglist
-           ((generic-function standard-generic-function))
-  (let ((gf-lambda-list (generic-function-lambda-list generic-function))
-        (methods (generic-function-methods generic-function)))
-    (if (null methods)
-        gf-lambda-list
-        (multiple-value-bind (gf.llks gf.required gf.optional gf.rest gf.keys)
-            (parse-lambda-list gf-lambda-list :silent t)
-          ;; Possibly extend the keyword parameters of the gf by
-          ;; additional key parameters of its methods:
-          (let ((methods.keys nil) (methods.allowp nil))
-            (dolist (m methods)
-              (multiple-value-bind (m.keyparams m.allow-other-keys)
-                  (function-keyword-parameters m)
-                (setq methods.keys (union methods.keys m.keyparams :key #'maybe-car))
-                (setq methods.allowp (or methods.allowp m.allow-other-keys))))
-            (let ((arglist '()))
-              (when (or (ll-kwds-allowp gf.llks) methods.allowp)
-                (push '&allow-other-keys arglist))
-              (when (or gf.keys methods.keys)
-                ;; We make sure that the keys of the gf appear before
-                ;; those of its methods, since they're probably more
-                ;; generally appliable.
-                (setq arglist (nconc (list '&key) gf.keys
-                                     (nset-difference methods.keys gf.keys)
-                                     arglist)))
-              (when gf.rest
-                (setq arglist (nconc (cons '&rest gf.rest) arglist)))
-              (when gf.optional
-                (setq arglist (nconc (list '&optional) gf.optional arglist)))
-              (nconc gf.required arglist)))))))
-
-(defun maybe-car (thing)
-  (if (listp thing)
-      (car thing)
-      thing))
+;;; methods.  It doesn't take method applicability into account; we
+;;; also ignore non-public parts of the interface (e.g. &AUX, default
+;;; and supplied-p parameters)
+(defmethod generic-function-pretty-arglist ((gf standard-generic-function))
+  (let ((gf-lambda-list (generic-function-lambda-list gf))
+        (methods (generic-function-methods gf)))
+    (flet ((canonize (k)
+             (multiple-value-bind (kw var)
+                 (parse-key-arg-spec k)
+               (if (and (eql (symbol-package kw) *keyword-package*)
+                        (string= kw var))
+                   var
+                   (list (list kw var))))))
+      (multiple-value-bind (llks required optional rest keys)
+          (parse-lambda-list gf-lambda-list :silent t)
+        (setq keys (mapcar #'canonize keys))
+        ;; Possibly extend the keyword parameters of the gf by
+        ;; additional key parameters of its methods:
+        (dolist (m methods (make-lambda-list llks nil required optional rest keys))
+          (binding* (((m.llks nil nil nil m.keys)
+                      (parse-lambda-list (method-lambda-list m) :silent t)))
+            (setq llks (logior llks m.llks))
+            (dolist (k m.keys)
+              (unless (member (parse-key-arg-spec k) keys :key #'parse-key-arg-spec :test #'eq)
+                (setq keys (nconc keys (list (canonize k))))))))))))
