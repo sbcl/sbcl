@@ -207,8 +207,6 @@
 
 (defgeneric function-keywords (method))
 
-(defgeneric function-keyword-parameters (method))
-
 (defgeneric generic-function-argument-precedence-order (gf))
 
 (defgeneric generic-function-lambda-list (gf))

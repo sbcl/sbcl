@@ -632,8 +632,8 @@
                                      :key #'method-lambda-list)))
                    (ftype
                     (specifier-type
-                     ;; SERIOUSLY? Do we not already have like at least
-                     ;; two other variations on this code?
+                     ;; SERIOUSLY? Do we not already have like at least N
+                     ;; other variations on this code?
                      `(function
                        (,@(mapcar tfun gf.required)
                           ,@(if gf.optional
@@ -1697,24 +1697,6 @@
                                (method-lambda-list method)))
     (declare (ignore nreq nopt))
     (values keywords (ll-kwds-allowp llks))))
-
-(defmethod function-keyword-parameters ((method standard-method))
-  (multiple-value-bind (llks nreq nopt keywords keyword-parameters)
-      (analyze-lambda-list (if (consp method)
-                               (early-method-lambda-list method)
-                               (method-lambda-list method)))
-    (declare (ignore nreq nopt keywords))
-    (values keyword-parameters (ll-kwds-allowp llks))))
-
-;; FIXME: this is just: "parse, set keys to nil, unparse" (I think).
-(defun method-ll->generic-function-ll (ll)
-  (multiple-value-bind (llks nreq nopt keywords keyword-parameters)
-      (analyze-lambda-list ll)
-    (declare (ignore llks nreq nopt keywords))
-    (remove-if (lambda (s)
-                 (or (memq s keyword-parameters)
-                     (eq s '&allow-other-keys)))
-               ll)))
 
 ;;; This is based on the rules of method lambda list congruency
 ;;; defined in the spec. The lambda list it constructs is the pretty
