@@ -116,7 +116,7 @@
               #!+compare-and-swap-vops
               (%array-atomic-incf/word
                ,array
-               (%check-bound ,array (array-dimension ,array 0) ,(cadr args))
+               (check-bound ,array (array-dimension ,array 0) ,(cadr args))
                ,(compute-delta))
               #!-compare-and-swap-vops
               ,(with-unique-names (index old-value)

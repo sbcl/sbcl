@@ -964,18 +964,26 @@
               "The array type is ambiguous; must call ~
                ARRAY-HAS-FILL-POINTER-P at runtime.")))))))
 
-;;; Primitive used to verify indices into arrays. If we can tell at
-;;; compile-time or we are generating unsafe code, don't bother with
-;;; the VOP.
-(deftransform %check-bound ((array dimension index) * * :node node)
+(defoptimizer (%check-bound optimizer) ((array bound index) node)
+  (when (constant-lvar-p bound)
+    (let* ((bound-type (specifier-type `(integer 0 (,(lvar-value bound)))))
+           (index-type (lvar-type index)))
+      (when (eq (type-intersection bound-type index-type)
+                *empty-type*)
+        (let ((*compiler-error-context* node))
+          (compiler-warn "Derived type ~s is not a suitable index for ~s."
+                         (type-specifier index-type)
+                         (type-specifier (lvar-type array))))))))
+
+(deftransform check-bound ((array dimension index) * * :node node)
   (cond ((policy node (= insert-array-bounds-checks 0))
          'index)
         ((not (constant-lvar-p dimension))
-         (give-up-ir1-transform))
+         `(%check-bound array dimension index))
         (t
-         (let ((dim (lvar-value dimension)))
-           ;; FIXME: Can SPEED > SAFETY weaken this check to INTEGER?
-           `(the (integer 0 (,dim)) index)))))
+         `(progn
+            (%check-bound array dimension index)
+            (truly-the (integer 0 ,(lvar-value dimension)) index)))))
 
 ;;;; WITH-ARRAY-DATA
 
@@ -1165,7 +1173,7 @@
       `(let ((,n-vector ,vector))
          (the ,elt-type (data-vector-ref
                          (the simple-vector ,n-vector)
-                         (%check-bound ,n-vector (length ,n-vector) ,index)))))))
+                         (check-bound ,n-vector (length ,n-vector) ,index)))))))
 
 (define-source-transform %svset (vector index value)
   (let ((elt-type (or (when (symbolp vector)
@@ -1178,12 +1186,12 @@
       `(let ((,n-vector ,vector))
          (truly-the ,elt-type (data-vector-set
                                (the simple-vector ,n-vector)
-                               (%check-bound ,n-vector (length ,n-vector) ,index)
+                               (check-bound ,n-vector (length ,n-vector) ,index)
                                (the ,elt-type ,value)))))))
 
 (macrolet (;; This is a handy macro for computing the row-major index
            ;; given a set of indices. We wrap each index with a call
-           ;; to %CHECK-BOUND to ensure that everything works out
+           ;; to CHECK-BOUND to ensure that everything works out
            ;; correctly. We can wrap all the interior arithmetic with
            ;; TRULY-THE INDEX because we know the resultant
            ;; row-major index must be an index.
@@ -1210,15 +1218,15 @@
                                 (do* ((dims dims (cdr dims))
                                       (indices n-indices (cdr indices))
                                       (last-dim nil (car dims))
-                                      (form `(%check-bound ,',array
-                                                           ,(car dims)
-                                                           ,(car indices))
+                                      (form `(check-bound ,',array
+                                                          ,(car dims)
+                                                          ,(car indices))
                                             `(truly-the
                                               index
                                               (+ (truly-the index
                                                             (* ,form
                                                                ,last-dim))
-                                                 (%check-bound
+                                                 (check-bound
                                                   ,',array
                                                   ,(car dims)
                                                   ,(car indices))))))
@@ -1258,7 +1266,7 @@
        (let* ((declared-element-ctype (array-type-declared-element-type type))
               (bare-form
                 `(data-vector-ref array
-                                  (%check-bound array (array-dimension array 0) index))))
+                                  (check-bound array (array-dimension array 0) index))))
          (if (type= declared-element-ctype element-ctype)
              bare-form
              `(the ,(type-specifier declared-element-ctype) ,bare-form))))
@@ -1299,15 +1307,15 @@
                   ,(if extra
                        ``(truly-the ,declared-type
                                     (,',transform-to array
-                                                     (%check-bound array
-                                                                   (array-dimension array 0)
-                                                                   index)
+                                                     (check-bound array
+                                                                  (array-dimension array 0)
+                                                                  index)
                                                      (the ,declared-type ,@',extra)))
                        ``(the ,declared-type
                            (,',transform-to array
-                                            (%check-bound array
-                                                          (array-dimension array 0)
-                                                          index))))))))
+                                            (check-bound array
+                                                         (array-dimension array 0)
+                                                         index))))))))
   (define hairy-data-vector-ref/check-bounds
       hairy-data-vector-ref nil nil)
   (define hairy-data-vector-set/check-bounds
@@ -1318,10 +1326,10 @@
 ;;; array total size.
 (deftransform row-major-aref ((array index))
   `(hairy-data-vector-ref array
-                          (%check-bound array (array-total-size array) index)))
+                          (check-bound array (array-total-size array) index)))
 (deftransform %set-row-major-aref ((array index new-value))
   `(hairy-data-vector-set array
-                          (%check-bound array (array-total-size array) index)
+                          (check-bound array (array-total-size array) index)
                           new-value))
 
 ;;;; bit-vector array operation canonicalization

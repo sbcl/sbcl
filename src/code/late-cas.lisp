@@ -37,5 +37,5 @@
             old
             new
             `(locally (declare (simple-vector ,v))
-               (%compare-and-swap-svref ,v (%check-bound ,v (length ,v) ,i) ,old ,new))
+               (%compare-and-swap-svref ,v (check-bound ,v (length ,v) ,i) ,old ,new))
             `(svref ,v ,i))))

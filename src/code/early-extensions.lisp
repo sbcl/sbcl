@@ -985,7 +985,7 @@
      (%failed-aver ',expr)))
 
 (defun %failed-aver (expr)
-  (bug "~@<failed AVER: ~2I~_~A~:>" expr))
+  (bug "~@<failed AVER: ~2I~_~S~:>" expr))
 
 (defun bug (format-control &rest format-arguments)
   (error 'bug

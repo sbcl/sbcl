@@ -711,12 +711,12 @@
                   `(let* ((len (length seq))
                           (end (or end len))
                           (bound (1+ end)))
-                     ;; Minor abuse %CHECK-BOUND for bounds checking.
+                     ;; Minor abuse CHECK-BOUND for bounds checking.
                      ;; (- END START) may still end up negative, but
                      ;; the basher handle that.
                      (,basher ,bash-value seq
-                              (%check-bound seq bound start)
-                              (- (if end (%check-bound seq bound end) len)
+                              (check-bound seq bound start)
+                              (- (if end (check-bound seq bound end) len)
                                  start)))
                `(with-array-data ((data seq)
                                   (start start)
