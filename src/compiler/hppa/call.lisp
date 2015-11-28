@@ -1161,7 +1161,7 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error nargs)))
       (cond ((zerop count)
              (inst bc :<> nil nargs zero-tn err-lab))
             (t
@@ -1177,7 +1177,7 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error nargs)))
       (cond ((not min)
              (if (zerop max)
                  (inst bc :<> nil nargs zero-tn err-lab)

@@ -131,7 +131,7 @@
   (declare (ignore start count))
 
 
-  (let ((error (generate-error-code nil invalid-unwind-error)))
+  (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst bc := nil block zero-tn error))
 
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
@@ -165,7 +165,7 @@
   (load-symbol-value catch *current-catch-block*)
 
   LOOP
-  (let ((error (generate-error-code nil unseen-throw-tag-error target)))
+  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst bc := nil catch zero-tn error))
   (loadw tag catch catch-block-tag-slot)
   (inst comb := tag target EXIT :nullify t)

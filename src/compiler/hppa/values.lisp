@@ -118,7 +118,7 @@
     (inst extru list 31 n-lowtag-bits ndescr)
     (inst comib := list-pointer-lowtag ndescr loop)
     (inst nop)
-    (error-call vop bogus-arg-to-values-list-error list)
+    (error-call vop 'bogus-arg-to-values-list-error list)
     DONE
     (inst sub csp-tn start count)))
 

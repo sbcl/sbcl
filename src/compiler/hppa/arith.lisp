@@ -443,7 +443,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 30
-    (let ((zero (generate-error-code vop division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst bc := nil y zero-tn zero))
     (move x x-pass)
     (move y y-pass)
@@ -476,7 +476,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 35
-    (let ((zero (generate-error-code vop division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst bc := nil y zero-tn zero))
     (move x x-pass)
     (move y y-pass)
@@ -520,7 +520,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 35
-    (let ((zero (generate-error-code vop division-by-zero-error x y)))
+    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst bc := nil y zero-tn zero))
     (move x x-pass)
     (move y y-pass)

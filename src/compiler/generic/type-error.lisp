@@ -25,10 +25,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop
-                #!-hppa 'nil-array-accessed-error
-                #!+hppa nil-array-accessed-error
-                object)))
+    (error-call vop 'nil-array-accessed-error object)))
 
 ;;; It shouldn't be possible to fall through to here in normal user
 ;;; code, as the system is smart enough to deduce that there must be
@@ -53,10 +50,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop
-                #!-(or hppa) 'nil-array-accessed-error
-                #!+(or hppa) nil-array-accessed-error
-                object)))
+    (error-call vop 'nil-array-accessed-error object)))
 
 (define-vop (data-vector-set/simple-array-nil)
   (:translate data-vector-set)
@@ -73,10 +67,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop
-                #!-(or hppa) 'nil-array-accessed-error
-                #!+(or hppa) nil-array-accessed-error
-                object)))
+    (error-call vop 'nil-array-accessed-error object)))
 
 ;; The only way to define this VOP on HPPA would be with a big CASE
 ;; statement since the ERRCODE is not eval'ed by ERROR-CALL.
@@ -113,9 +104,7 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop #!+hppa ,error
-                                  #!-hppa ',error
-                                  ,@args)))))
+                  (error-call vop ',error ,@args)))))
   (def arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs fname)
   (def type-check-error object-not-type-error sb!c::%type-check-error
