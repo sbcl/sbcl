@@ -633,9 +633,10 @@ thread, NIL otherwise."
 
 (defun frame-call (frame &key (method-frame-style *method-frame-style*)
                               replace-dynamic-extent-objects)
-  "Returns as multiple values a descriptive name for the function responsible
-for FRAME, arguments that that function, and a list providing additional
-information about the frame.
+  "Returns as multiple values the following:
+  - a descriptive name for the function responsible for FRAME
+  - the arguments that function was called with
+  - a printable list providing additional information about the frame.
 
 Unavailable arguments are represented using dummy-objects printing as
 #<unavailable argument>.
@@ -660,14 +661,18 @@ the current thread are replaced with dummy objects which can safely escape."
                       args)))
         (values name args info)))))
 
-(defun ensure-printable-object (object)
+(defun ensure-printable-object (object &key brief)
   (handler-case
       (with-open-stream (out (make-broadcast-stream))
         (prin1 object out)
         object)
-    (error (cond)
-      (declare (ignore cond))
-      (make-unprintable-object "error printing object"))))
+    (serious-condition (e)
+      (make-unprintable-object
+       (if brief
+           "error printing"
+           (format nil "error ~/sb-impl::print-symbol-with-prefix/ while ~
+                        printing a ~/sb-impl::print-symbol-with-prefix/"
+                   (type-of e) (type-of object)))))))
 
 (defun frame-call-arg (var location frame)
   (lambda-var-dispatch var location
@@ -691,37 +696,37 @@ the current thread are replaced with dummy objects which can safely escape."
                                 (sb!di:frame-number frame))))
   (multiple-value-bind (name args info)
       (frame-call frame :method-frame-style method-frame-style)
-    (pprint-logical-block (stream nil :prefix "(" :suffix ")")
-      (let ((*print-pretty* nil)
-            (*print-circle* t))
-        ;; Since we go to some trouble to make nice informative
-        ;; function names like (PRINT-OBJECT :AROUND (CLOWN T)), let's
-        ;; make sure that they aren't truncated by *PRINT-LENGTH* and
-        ;; *PRINT-LEVEL*.
-        (let ((*print-length* nil)
-              (*print-level* nil)
-              (name (if emergency-best-effort
-                        (ensure-printable-object name)
-                        name)))
-          (write name :stream stream :escape t :pretty (equal '(lambda ()) name)))
+    (flet ((maybe-ensure-printable-object (o)
+             (if emergency-best-effort
+                 (ensure-printable-object o)
+                 o)))
+      (pprint-logical-block (stream nil :prefix "(" :suffix ")")
+        (let ((*print-pretty* nil)
+              (*print-circle* t))
+          ;; Since we go to some trouble to make nice informative
+          ;; function names like (PRINT-OBJECT :AROUND (CLOWN T)), let's
+          ;; make sure that they aren't truncated by *PRINT-LENGTH* and
+          ;; *PRINT-LEVEL*.
+          (let ((*print-length* nil)
+                (*print-level* nil))
+            (write (maybe-ensure-printable-object name)
+                   :stream stream :escape t :pretty (equal '(lambda ()) name)))
 
-        ;; For the function arguments, we can just print normally.  If
-        ;; we hit a &REST arg, then print as many of the values as
-        ;; possible, punting the loop over lambda-list variables since
-        ;; any other arguments will be in the &REST arg's list of
-        ;; values.
-        (let ((args (if emergency-best-effort
-                        (ensure-printable-object args)
-                        args)))
-          (cond ((not (listp args))
-                 (format stream " ~S" args))
-                (t
-                 (dolist (arg args)
-                   (write-char #\space stream)
-                   (pprint-newline :linear stream)
-                   (write arg :stream stream :escape t)))))))
-    (when info
-      (format stream " [~{~(~A~)~^,~}]" info)))
+          ;; For the function arguments, we can just print normally.  If
+          ;; we hit a &REST arg, then print as many of the values as
+          ;; possible, punting the loop over lambda-list variables since
+          ;; any other arguments will be in the &REST arg's list of
+          ;; values.
+          (let ((args (maybe-ensure-printable-object args)))
+            (cond ((not (listp args))
+                   (format stream " ~S" args))
+                  (t
+                   (dolist (arg args)
+                     (write-char #\space stream)
+                     (pprint-newline :linear stream)
+                     (write arg :stream stream :escape t)))))))
+      (when info
+        (format stream " [~{~(~A~)~^,~}]" (maybe-ensure-printable-object info)))))
   (when print-frame-source
     (let* ((loc (sb!di:frame-code-location frame))
            (path (and (sb!di::compiled-debug-fun-p
