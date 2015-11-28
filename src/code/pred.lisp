@@ -276,7 +276,8 @@
 ;;; IR1 might potentially transform EQL into %EQL/INTEGER.
 #!+integer-eql-vop
 (defun %eql/integer (obj1 obj2)
-  (eql (the integer obj1) (the integer obj2)))
+  ;; This is just for constand folding, no need to transform into the %EQL/INTEGER VOP
+  (eql obj1 obj2))
 
 (declaim (inline %eql))
 (defun %eql (obj1 obj2)

@@ -5372,10 +5372,10 @@
 
 ;; lp# 310267
 (with-test (:name :optimize-quality-multiply-specified)
-  (let ((*error-output* (make-broadcast-stream)))
-    (let ((sb-c::*policy* sb-c::*policy*)) ; to keep this test pure
-      (assert-signal (proclaim '(optimize space debug (space 0)))
-                     style-warning))
+  (let ((*error-output* (make-broadcast-stream))
+        (sb-c::*policy* sb-c::*policy*)) ; to keep this test pure
+    (assert-signal (proclaim '(optimize space debug (space 0)))
+                   style-warning)
     (assert-signal
      (compile nil '(lambda () (declare (optimize speed (speed 0))) 5))
      style-warning)
@@ -5384,20 +5384,20 @@
      style-warning)
     (assert-signal
      (compile nil '(lambda ()
-                     (declare (optimize speed)) (declare (optimize (speed 0)))
-                     5))
-     style-warning))
+                    (declare (optimize speed)) (declare (optimize (speed 0)))
+                    5))
+     style-warning)
 
-  ;; these are OK
-  (assert-no-signal (proclaim '(optimize (space 3) space)))
-  (assert-no-signal
-   (compile nil '(lambda () (declare (optimize speed (speed 3))) 5)))
-  (assert-no-signal
-   (compile nil '(lambda () (declare (optimize speed) (optimize (speed 3))) 5)))
-  (assert-no-signal
-   (compile nil '(lambda ()
-                   (declare (optimize speed)) (declare (optimize (speed 3)))
-                   5))))
+    ;; these are OK
+    (assert-no-signal (proclaim '(optimize (space 3) space)))
+    (assert-no-signal
+     (compile nil '(lambda () (declare (optimize speed (speed 3))) 5)))
+    (assert-no-signal
+     (compile nil '(lambda () (declare (optimize speed) (optimize (speed 3))) 5)))
+    (assert-no-signal
+     (compile nil '(lambda ()
+                    (declare (optimize speed)) (declare (optimize (speed 3)))
+                    5)))))
 
 (with-test (:name :truncate-type-derivation)
   (assert (=
@@ -5630,3 +5630,14 @@
                                    (foo))))))))))
     (eq (funcall (car (funcall f)))
         (funcall (car (funcall f))))))
+
+(with-test (:name :constant-fold-%eql/integer)
+  (assert (null
+           (funcall
+            (compile nil
+                     `(lambda (x)
+                        (declare (type (complex single-float) x)
+                                 (optimize (debug 2)))
+                        (member (the (eql #c(0.0 0.0)) x)
+                                '(1 2 3 9912477572127105188))))
+            #C(0.0 0.0)))))
