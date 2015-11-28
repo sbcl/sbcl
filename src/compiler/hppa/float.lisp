@@ -852,14 +852,11 @@
             (:result-types unsigned-num)
             (:translate (setf floating-point-modes))
             (:policy :fast-safe)
-            (:temporary (:scs (unsigned-stack)) temp)
+            (:temporary (:scs (double-stack)) stack-tn)
             (:temporary (:scs (any-reg)) index)
             (:vop-var vop)
   (:generator 3
               (let* ((nfp (current-nfp-tn vop))
-                     (stack-tn (sc-case new
-                                        (unsigned-stack new)
-                                        (unsigned-reg temp)))
                      (offset (* (tn-offset stack-tn) n-word-bytes)))
                 (ecase *backend-byte-order*
                   (:big-endian
