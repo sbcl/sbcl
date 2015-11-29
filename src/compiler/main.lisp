@@ -357,23 +357,32 @@ Examples:
       (terpri *error-output*)
       (force-output *error-output*))))
 
+;; Bidrectional map between IR1/IR2/assembler abstractions
+;; and a corresponding small integer identifier. One direction could be done
+;; by adding the integer ID as an object slot, but we want both directions.
+(defstruct (compiler-ir-obj-map (:conc-name objmap-)
+                                (:constructor make-compiler-ir-obj-map ())
+                                (:copier nil)
+                                (:predicate nil))
+  (obj-to-id   (make-hash-table :test 'eq) :read-only t)
+  (id-to-cont  (make-array 10) :type simple-vector) ; number -> CTRAN or LVAR
+  (id-to-tn    (make-array 10) :type simple-vector) ; number -> TN
+  (id-to-label (make-array 10) :type simple-vector) ; number -> LABEL
+  (cont-num    0 :type fixnum)
+  (tn-id       0 :type fixnum)
+  (label-id    0 :type fixnum))
+
+(declaim (type compiler-ir-obj-map *compiler-ir-obj-map*))
+(defvar *compiler-ir-obj-map*)
+
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and
 ;;; WARNINGS-P and FAILURE-P are as in CL:COMPILE or CL:COMPILE-FILE.
-;;; This also wraps up WITH-IR1-NAMESPACE functionality.
 (defmacro with-compilation-values (&body body)
-  ;; These bindings could just as well be in WITH-IR1-NAMESPACE, but
-  ;; since they're primarily debugging tools, it's nicer to have
+  ;; This binding could just as well be in WITH-IR1-NAMESPACE, but
+  ;; since it's primarily a debugging tool, it's nicer to have
   ;; a wider unique scope by ID.
-  `(let ((*continuation-number* 0)
-         (*continuation-numbers* (make-hash-table :test 'eq))
-         (*number-continuations* (make-hash-table :test 'eql))
-         (*tn-id* 0)
-         (*tn-ids* (make-hash-table :test 'eq))
-         (*id-tns* (make-hash-table :test 'eql))
-         (*label-id* 0)
-         (*label-ids* (make-hash-table :test 'eq))
-         (*id-labels* (make-hash-table :test 'eql)))
+  `(let ((*compiler-ir-obj-map* (make-compiler-ir-obj-map)))
        (unwind-protect
             (let ((*warnings-p* nil)
                   (*failure-p* nil))
@@ -383,12 +392,11 @@ Examples:
                   (values (progn ,@body)
                        *warnings-p*
                        *failure-p*)))
-         (clrhash *tn-ids*)
-         (clrhash *id-tns*)
-         (clrhash *continuation-numbers*)
-         (clrhash *number-continuations*)
-         (clrhash *label-ids*)
-         (clrhash *id-labels*))))
+         (let ((map *compiler-ir-obj-map*))
+           (clrhash (objmap-obj-to-id map))
+           (fill (objmap-id-to-cont map) nil)
+           (fill (objmap-id-to-tn map) nil)
+           (fill (objmap-id-to-label map) nil)))))
 
 ;;; THING is a kind of thing about which we'd like to issue a warning,
 ;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.

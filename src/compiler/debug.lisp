@@ -874,29 +874,27 @@ One of :WARN, :ERROR or :NONE.")
 ;;; When we print CONTINUATIONs and TNs, we assign them small numeric
 ;;; IDs so that we can get a handle on anonymous objects given a
 ;;; printout.
-;;;
-;;; FIXME:
-;;;   * Perhaps this machinery should be #!+SB-SHOW.
-(macrolet ((def (counter vto vfrom fto ffrom)
+(macrolet ((def (array-getter fto ffrom) ; "to" = to number/id, resp. "from"
              `(progn
-                (declaim (type hash-table ,vto ,vfrom))
-                (defvar ,vto)
-                (defvar ,vfrom)
-                (declaim (type fixnum ,counter))
-                (defvar ,counter 0)
-
                 (defun ,fto (x)
-                  (or (gethash x ,vto)
-                      (let ((num (incf ,counter)))
-                        (setf (gethash num ,vfrom) x)
-                        (setf (gethash x ,vto) num))))
+                  (let* ((map *compiler-ir-obj-map*)
+                         (ht (objmap-obj-to-id map)))
+                    (or (values (gethash x ht))
+                        (let ((array (,array-getter map))
+                              (num (incf (,(symbolicate "OBJMAP-" fto) map))))
+                          (when (>= num (length array))
+                            (let ((new (adjust-array array (* (length array) 2))))
+                              (fill array nil)
+                              (setf array new (,array-getter map) array)))
+                          (setf (svref array num) x)
+                          (setf (gethash x ht) num)))))
 
                 (defun ,ffrom (num)
-                  (values (gethash num ,vfrom))))))
-  (def *continuation-number* *continuation-numbers* *number-continuations*
-       cont-num num-cont)
-  (def *tn-id* *tn-ids* *id-tns* tn-id id-tn)
-  (def *label-id* *label-ids* *id-labels* label-id id-label))
+                  (let ((array (,array-getter *compiler-ir-obj-map*)))
+                    (and (< num (length array)) (svref array num)))))))
+  (def objmap-id-to-cont cont-num num-cont)
+  (def objmap-id-to-tn tn-id id-tn)
+  (def objmap-id-to-label label-id id-label))
 
 ;;; Print a terse one-line description of LEAF.
 (defun print-leaf (leaf &optional (stream *standard-output*))
