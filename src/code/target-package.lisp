@@ -1729,3 +1729,7 @@ PACKAGE."
                       (:eval
                        (eval-error condition))))))
     (with-single-package-locked-error (:symbol symbol control))))
+
+;; This is to assert that genesis can manipulate shadowing symbols.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (shadow "!UNINTERN-ME" "SB!IMPL"))

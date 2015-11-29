@@ -23,6 +23,10 @@
 
 ;;;; package hacking
 
+;;; Assert that compile-time shadowing symbols are still shadowing.
+(let ((symbols (package-shadowing-symbols "SB-IMPL")))
+  (assert (= (length symbols) 1)))
+
 ;;; FIXME: This nickname is a deprecated hack for backwards
 ;;; compatibility with code which assumed the CMU-CL-style
 ;;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated

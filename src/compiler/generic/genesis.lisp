@@ -762,9 +762,15 @@ core and return a descriptor to it."
     (write-wordindexed dest sb!vm:cons-cdr-slot cdr)
     dest))
 (defun cold-list (&rest args)
-  (if args
-      (cold-cons (car args) (apply 'cold-list (cdr args)))
-      *nil-descriptor*))
+  (let ((head *nil-descriptor*)
+        (tail nil))
+    ;; A recursive algorithm would have the first cons at the highest
+    ;; address. This way looks nicer when viewed in ldb.
+    (loop
+     (unless args (return head))
+     (let ((cons (cold-cons (pop args) *nil-descriptor*)))
+       (if tail (cold-rplacd tail cons) (setq head cons))
+       (setq tail cons)))))
 (defun cold-list-length (list) ; but no circularity detection
   ;; a recursive implementation uses too much stack for some Lisps
   (let ((n 0))
@@ -1184,10 +1190,7 @@ core and return a descriptor to it."
              (find-package-cell (name)
                (or (assoc (if (string= name "CL") "COMMON-LISP" name)
                           target-pkg-list :test #'string=)
-                   (error "No cold package named ~S" name)))
-             (list-to-core (list)
-               (let ((res *nil-descriptor*))
-                 (dolist (x list res) (cold-push x res)))))
+                   (error "No cold package named ~S" name))))
       ;; pass 1: make all proto-packages
       (dolist (pd package-data-list)
         (init-cold-package (sb-cold:package-data-name pd)
@@ -1201,11 +1204,11 @@ core and return a descriptor to it."
               (push (cadr cell) use)
               (push this (cddr cell))))
           (write-slots this package-layout
-                       :%use-list (list-to-core (nreverse use)))))
+                       :%use-list (apply 'cold-list (nreverse use)))))
       ;; pass 3: set the 'used-by' lists
       (dolist (cell target-pkg-list)
         (write-slots (cadr cell) package-layout
-                     :%used-by-list (list-to-core (cddr cell)))))))
+                     :%used-by-list (apply 'cold-list (cddr cell)))))))
 
 ;;; sanity check for a symbol we're about to create on the target
 ;;;
@@ -1385,10 +1388,6 @@ core and return a descriptor to it."
   (when set-home-p
     (write-wordindexed symbol-descriptor sb!vm:symbol-package-slot
                        (car target-pkg-info)))
-  (when (member host-symbol (package-shadowing-symbols host-package))
-    ;; Fail in an obvious way if target shadowing symbols exist.
-    ;; (This is simply not an important use-case during system bootstrap.)
-    (error "Genesis doesn't like shadowing symbol ~S, sorry." host-symbol))
   (let ((access-lists (cdr target-pkg-info)))
     (case accessibility
       (:external (push symbol-descriptor (car access-lists)))
@@ -1548,18 +1547,31 @@ core and return a descriptor to it."
           (sort cold-package-symbols-list #'string< :key #'car))
     (dolist (pkgcons cold-package-symbols-list)
       (destructuring-bind (pkg-name . pkg-info) pkgcons
+        (let ((shadow
+               ;; Record shadowing symbols (except from SB-XC) in SB! packages.
+               (when (eql (mismatch pkg-name "SB!") 3)
+                 ;; Be insensitive to the host's ordering.
+                 (sort (remove (find-package "SB-XC")
+                               (package-shadowing-symbols (find-package pkg-name))
+                               :key #'symbol-package) #'string<))))
+          (write-slots (car (gethash pkg-name *cold-package-symbols*)) ; package
+                       (find-layout 'package)
+                       :%shadowing-symbols
+                       (apply 'cold-list (mapcar 'cold-intern shadow))))
         (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
           (let ((host-pkg (find-package pkg-name))
                 (sb-xc-pkg (find-package "SB-XC"))
                 syms)
+            ;; Now for each symbol directly present in this host-pkg,
+            ;; i.e. accessible but not :INHERITED, figure out if the symbol
+            ;; came from a different package, and if so, make a note of it.
             (with-package-iterator (iter host-pkg :internal :external)
               (loop (multiple-value-bind (foundp sym accessibility) (iter)
                       (unless foundp (return))
                       (unless (or (eq (symbol-package sym) host-pkg)
                                   (eq (symbol-package sym) sb-xc-pkg))
                         (push (cons sym accessibility) syms)))))
-            (setq syms (sort syms #'string< :key #'car))
-            (dolist (symcons syms)
+            (dolist (symcons (sort syms #'string< :key #'car))
               (destructuring-bind (sym . accessibility) symcons
                 (record-accessibility accessibility (cold-intern sym)
                                       pkg-info sym host-pkg)))))
@@ -1617,6 +1629,10 @@ core and return a descriptor to it."
 (defun cold-cdr (des)
   (aver (= (descriptor-lowtag des) sb!vm:list-pointer-lowtag))
   (read-wordindexed des sb!vm:cons-cdr-slot))
+(defun cold-rplacd (des newval)
+  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-lowtag))
+  (write-wordindexed des sb!vm:cons-cdr-slot newval)
+  des)
 (defun cold-null (des)
   (= (descriptor-bits des)
      (descriptor-bits *nil-descriptor*)))
@@ -3627,7 +3643,7 @@ initially undefined function references:~2%")
            (*cold-fdefn-objects* (make-hash-table :test 'equal))
            (*cold-symbols* (make-hash-table :test 'eql)) ; integer keys
            (*cold-package-symbols* (make-hash-table :test 'equal)) ; string keys
-           (pkg-metadata (sb-cold:read-from-file "package-data-list.lisp-expr"))
+           (pkg-metadata (sb-cold::package-list-for-genesis))
            (*read-only* (make-gspace :read-only
                                      read-only-core-space-id
                                      sb!vm:read-only-space-start))

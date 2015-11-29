@@ -129,3 +129,6 @@
         (dolist (x package-data-list)
           (reexport x))
         (assert (= (length done) (length package-data-list)))))))
+
+(defun package-list-for-genesis ()
+  (sb-cold:read-from-file "package-data-list.lisp-expr"))
