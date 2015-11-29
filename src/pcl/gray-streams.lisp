@@ -265,53 +265,31 @@
   (:documentation
    "This is like CL:READ-SEQUENCE, but for Gray streams."))
 
-;;; Destructively modify SEQ by reading elements from STREAM. That
-;;; part of SEQ bounded by START and END is destructively modified by
-;;; copying successive elements into it from STREAM. If the end of
-;;; file for STREAM is reached before copying all elements of the
-;;; subsequence, then the extra elements near the end of sequence are
-;;; not updated, and the index of the next element is returned.
-(defun basic-io-type-stream-read-sequence (stream seq start end read-fun)
-  (declare (type sequence seq)
-           (type stream stream)
-           (type index start)
-           (type sequence-end end)
-           (type function read-fun)
-           (values index))
-  (let ((end (or end (length seq))))
-    (declare (type index end))
-    (etypecase seq
-      (list
-        (do ((rem (nthcdr start seq) (rest rem))
-             (i start (1+ i)))
-            ((or (endp rem) (>= i end)) i)
-          (declare (type list rem)
-                   (type index i))
-          (let ((el (funcall read-fun stream)))
-            (when (eq el :eof)
-              (return i))
-            (setf (first rem) el))))
-      (vector
-        (with-array-data ((data seq) (offset-start start) (offset-end end))
-          (do ((i offset-start (1+ i)))
-              ((>= i offset-end) end)
-            (declare (type index i))
-            (let ((el (funcall read-fun stream)))
-              (when (eq el :eof)
-                (return (+ start (- i offset-start))))
-              (setf (aref data i) el))))))))
-
 (defmethod stream-read-sequence ((stream fundamental-character-input-stream)
                                  (seq sequence)
                                  &optional (start 0) (end nil))
-  (basic-io-type-stream-read-sequence stream seq start end
-                                      #'stream-read-char))
+  (sb-impl::read-sequence/read-function
+   seq stream start end 'character
+   (lambda (stream eof-error-p eof-value recursive-p)
+     (aver (null eof-error-p))
+     (aver (eq :eof eof-value))
+     (aver (not recursive-p))
+     (stream-read-char stream))
+   #'ill-bin))
 
 (defmethod stream-read-sequence ((stream fundamental-binary-input-stream)
                                  (seq sequence)
                                  &optional (start 0) (end nil))
-  (basic-io-type-stream-read-sequence stream seq start end
-                                      #'stream-read-byte))
+  (let ((stream-element-mode (sb-impl::stream-element-type-stream-element-mode
+                              (stream-element-type stream))))
+    (sb-impl::read-sequence/read-function
+     seq stream start end stream-element-mode
+     #'ill-in
+     (lambda (stream eof-error-p eof-value recursive-p)
+       (aver (null eof-error-p))
+       (aver (eq :eof eof-value))
+       (aver (not recursive-p))
+       (stream-read-byte stream)))))
 
 
 ;;; character output streams
@@ -382,14 +360,10 @@
 
 (defmethod stream-write-string ((stream fundamental-character-output-stream)
                                 string &optional (start 0) end)
-  (declare (string string)
-           (fixnum start))
-  (let ((end (or end (length string))))
-    (declare (fixnum end))
-    (do ((pos start (1+ pos)))
-        ((>= pos end))
-      (declare (type index pos))
-      (stream-write-char stream (aref string pos))))
+  (with-array-data ((data string) (offset-start start) (offset-end end)
+                    :check-fill-pointer t)
+    (sb-impl::write-sequence/vector
+     (data simple-string) stream offset-start offset-end #'stream-write-char))
   string)
 
 (defgeneric stream-terpri (stream)
@@ -478,39 +452,23 @@
   (:documentation
    "This is like CL:WRITE-SEQUENCE, but for Gray streams."))
 
-;;; Write the elements of SEQ bounded by START and END to STREAM.
-(defun basic-io-type-stream-write-sequence (stream seq start end write-fun)
-  (declare (type sequence seq)
-           (type stream stream)
-           (type index start)
-           (type sequence-end end)
-           (type function write-fun)
-           (values sequence))
-  (let ((end (or end (length seq))))
-    (declare (type index start end))
-    (etypecase seq
-      (list
-        (do ((rem (nthcdr start seq) (rest rem))
-             (i start (1+ i)))
-            ((or (endp rem) (>= i end)) seq)
-          (declare (type list rem)
-                   (type index i))
-          (funcall write-fun stream (first rem))))
-      (vector
-        (do ((i start (1+ i)))
-            ((>= i end) seq)
-          (declare (type index i))
-          (funcall write-fun stream (aref seq i)))))))
-
 (defmethod stream-write-sequence ((stream fundamental-character-output-stream)
                                   (seq sequence)
                                   &optional (start 0) (end nil))
-  (typecase seq
-    (string
-      (stream-write-string stream seq start end))
-    (t
-      (basic-io-type-stream-write-sequence stream seq start end
-                                           #'stream-write-char))))
+  (sb-impl::write-sequence/write-function
+   seq stream start end 'character #'stream-write-char #'ill-bout))
+
+;; Provide a reasonable default for binary Gray streams.  We might be
+;; able to do better by specializing on the sequence type, but at
+;; least the behaviour is reasonable. --tony 2003/05/08.
+(defmethod stream-write-sequence ((stream fundamental-binary-output-stream)
+                                  (seq sequence)
+                                  &optional (start 0) (end nil))
+  (let ((stream-element-mode (sb-impl::stream-element-type-stream-element-mode
+                              (stream-element-type stream))))
+    (sb-impl::write-sequence/write-function
+     seq stream start end stream-element-mode
+     #'ill-out #'stream-write-byte)))
 
 
 ;;; binary streams
@@ -542,15 +500,6 @@
   (bug-or-error stream 'stream-write-byte))
 (defmethod stream-write-byte ((non-stream t) integer)
   (error 'type-error :datum non-stream :expected-type 'stream))
-
-;; Provide a reasonable default for binary Gray streams.  We might be
-;; able to do better by specializing on the sequence type, but at
-;; least the behaviour is reasonable. --tony 2003/05/08.
-(defmethod stream-write-sequence ((stream fundamental-binary-output-stream)
-                                  (seq sequence)
-                                  &optional (start 0) (end nil))
-  (basic-io-type-stream-write-sequence stream seq start end
-                                       #'stream-write-byte))
 
 (defgeneric stream-file-position (stream &optional position-spec)
   #+sb-doc

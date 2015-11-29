@@ -1982,21 +1982,21 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 ;;;; Shared {READ,WRITE}-SEQUENCE support functions
 
-(declaim (inline ansi-stream-element-mode
-                 ansi-stream-compute-io-function
+(declaim (inline stream-element-mode
+                 stream-compute-io-function
                  compatible-vector-and-stream-element-types-p))
 
-(defun ansi-stream-element-mode (stream)
-  (declare (type ansi-stream stream))
+(defun stream-element-mode (stream)
+  (declare (type stream stream))
   (if (fd-stream-p stream)
       (fd-stream-element-mode stream)
       (stream-element-type-stream-element-mode
-       (ansi-stream-element-type stream))))
+       (stream-element-type stream))))
 
-(defun ansi-stream-compute-io-function (stream sequence-element-type
-                                        character-io binary-io bivalent-io)
-  (declare (type ansi-stream stream))
-  (ecase (ansi-stream-element-mode stream)
+(defun stream-compute-io-function (stream
+                                   stream-element-mode sequence-element-type
+                                   character-io binary-io bivalent-io)
+  (ecase stream-element-mode
     (character
      character-io)
     ((unsigned-byte signed-byte)
@@ -2025,9 +2025,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type vector vector)
            (type ansi-stream stream))
   (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
-           (eq (ansi-stream-element-mode stream) 'unsigned-byte))
+           (eq (stream-element-mode stream) 'unsigned-byte))
       (and (typep vector '(simple-array (signed-byte 8) (*)))
-           (eq (ansi-stream-element-mode stream) 'signed-byte))))
+           (eq (stream-element-mode stream) 'signed-byte))))
 
 ;;;; READ-SEQUENCE
 
@@ -2049,19 +2049,25 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       ;; must be Gray streams FUNDAMENTAL-STREAM
       (stream-read-sequence stream seq start end)))
 
-(defun ansi-stream-read-sequence (seq stream start %end)
+(declaim (inline read-sequence/read-function))
+(defun read-sequence/read-function (seq stream start %end
+                                    stream-element-mode
+                                    character-read-function binary-read-function)
   (declare (type sequence seq)
-           (type ansi-stream stream)
+           (type stream stream)
            (type index start)
            (type sequence-end %end)
-           (values index))
-  (let ((end (or %end (length seq)))
-        (in #'ansi-stream-read-char)
-        (bin #'ansi-stream-read-byte))
+           (type stream-element-mode stream-element-mode)
+           (type function character-read-function binary-read-function)
+           (values index &optional))
+  (let ((end (or %end (length seq))))
     (declare (type index end))
     (labels ((compute-read-function (sequence-element-type)
-               (ansi-stream-compute-io-function
-                stream sequence-element-type in bin in))
+               (stream-compute-io-function
+                stream
+                stream-element-mode sequence-element-type
+                character-read-function binary-read-function
+                character-read-function))
              (read-list (read-function)
                (do ((rem (nthcdr start seq) (rest rem))
                     (i start (1+ i)))
@@ -2097,18 +2103,32 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       (cond
         ((typep seq 'list)
          (read-list (compute-read-function nil)))
-        ((and (ansi-stream-cin-buffer stream)
+        ((and (ansi-stream-p stream)
+              (ansi-stream-cin-buffer stream)
               (typep seq 'simple-string))
          (ansi-stream-read-string-from-frc-buffer seq stream start %end))
         ((typep seq 'vector)
          (with-array-data ((data seq) (offset-start start) (offset-end end)
                            :check-fill-pointer t)
-           (if (compatible-vector-and-stream-element-types-p data stream)
+           (if (and (ansi-stream-p stream)
+                    (compatible-vector-and-stream-element-types-p data stream))
                (read-vector/fast data offset-start)
                (read-vector (compute-read-function (array-element-type data))
                             data offset-start offset-end))))
         (t
          (read-generic-sequence (compute-read-function nil)))))))
+(declaim (notinline read-sequence/read-function))
+
+(defun ansi-stream-read-sequence (seq stream start %end)
+  (declare (type sequence seq)
+           (type ansi-stream stream)
+           (type index start)
+           (type sequence-end %end)
+           (values index &optional))
+  (locally (declare (inline read-sequence/read-function))
+    (read-sequence/read-function
+     seq stream start %end (stream-element-mode stream)
+     #'ansi-stream-read-char #'ansi-stream-read-byte)))
 
 (defun ansi-stream-read-string-from-frc-buffer (seq stream start %end)
   (declare (type simple-string seq)
@@ -2169,24 +2189,43 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       ;; must be Gray-streams FUNDAMENTAL-STREAM
       (stream-write-sequence stream seq start end)))
 
-(defun ansi-stream-write-sequence (seq stream start %end)
+;;; This macro allows sharing code between
+;;; WRITE-SEQUENCE/WRITE-FUNCTION and SB-GRAY:STREAM-WRITE-STRING.
+(defmacro write-sequence/vector ((seq type) stream start end write-function)
+  (once-only ((seq seq) (stream stream) (start start) (end end)
+              (write-function write-function))
+    `(locally
+         (declare (type ,type ,seq)
+                  (type index ,start ,end)
+                  (type function ,write-function))
+       (do ((i ,start (1+ i)))
+           ((>= i ,end))
+         (declare (type index i))
+         (funcall ,write-function ,stream (aref ,seq i))))))
+
+(declaim (inline write-sequence/write-function))
+(defun write-sequence/write-function (seq stream start %end
+                                      stream-element-mode
+                                      character-write-function
+                                      binary-write-function)
   (declare (type sequence seq)
-           (type ansi-stream stream)
+           (type stream stream)
            (type index start)
            (type sequence-end %end)
-           (values sequence))
-  (let ((end (or %end (length seq)))
-        (out (ansi-stream-out stream))
-        (bout (ansi-stream-bout stream)))
+           (type stream-element-mode stream-element-mode)
+           (type function character-write-function binary-write-function))
+  (let ((end (or %end (length seq))))
     (declare (type index end))
     (labels ((compute-write-function (sequence-element-type)
-               (ansi-stream-compute-io-function
-                stream sequence-element-type
-                out bout #'write-element/bivalent))
+               (stream-compute-io-function
+                stream
+                stream-element-mode sequence-element-type
+                character-write-function binary-write-function
+                #'write-element/bivalent))
              (write-element/bivalent (stream object)
                (if (characterp object)
-                   (funcall out stream object)
-                   (funcall bout stream object)))
+                   (funcall character-write-function stream object)
+                   (funcall binary-write-function stream object)))
              (write-list (write-function)
                (do ((rem (nthcdr start seq) (rest rem))
                     (i start (1+ i)))
@@ -2195,12 +2234,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                           (type index i))
                  (funcall write-function stream (first rem))))
              (write-vector (data start end write-function)
-               (declare (type (simple-array * (*)) data)
-                        (type index start end))
-               (do ((i start (1+ i)))
-                   ((>= i end))
-                 (declare (type index i))
-                 (funcall write-function stream (aref data i))))
+               (write-sequence/vector
+                (data (simple-array * (*))) stream start end write-function))
              (write-generic-sequence (write-function)
                (declare (ignore write-function))
                (error "~@<~A does not yet support generic sequences.~@:>"
@@ -2212,7 +2247,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
         (list
          (write-list (compute-write-function nil)))
         (string
-         (ansi-stream-write-string seq stream start end))
+         (if (ansi-stream-p stream)
+             (ansi-stream-write-string seq stream start end)
+             (stream-write-string stream seq start end)))
         (vector
          (with-array-data ((data seq) (offset-start start) (offset-end end)
                            :check-fill-pointer t)
@@ -2223,7 +2260,19 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                              (compute-write-function
                               (array-element-type seq))))))
         (sequence
-         (write-generic-sequence (compute-write-function nil))))))
+         (write-generic-sequence (compute-write-function nil)))))))
+(declaim (notinline write-sequence/write-function))
+
+(defun ansi-stream-write-sequence (seq stream start %end)
+  (declare (type sequence seq)
+           (type ansi-stream stream)
+           (type index start)
+           (type sequence-end %end)
+           (values sequence))
+  (locally (declare (inline write-sequence/write-function))
+    (write-sequence/write-function
+     seq stream start %end (stream-element-mode stream)
+     (ansi-stream-out stream) (ansi-stream-bout stream)))
   seq)
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
