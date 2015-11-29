@@ -278,6 +278,7 @@
                   `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
        ,@body)))
 
+#!+(or hppa sparc ppc mips) ; only for platforms with scheduling assembler.
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number read)
@@ -315,6 +316,7 @@
         (push inst (svref (segment-readers segment) index)))))
   (values))
 
+#!+(or hppa sparc ppc mips) ; only for platforms with scheduling assembler.
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number write)
@@ -381,6 +383,9 @@
       (when (zerop countdown)
         (schedule-pending-instructions segment))))
   (values))
+
+#!-(or mips ppc sparc) ; not defined for platforms other than these
+(defun sb!c:emit-nop (seg) seg (bug "EMIT-NOP"))
 
 ;;; Emit all the pending instructions, and reset any state. This is
 ;;; called whenever we hit a label (i.e. an entry point of some kind)
