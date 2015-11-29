@@ -380,23 +380,31 @@
 (declaim (ftype (sfunction (t) ctype)
                 specifier-type ctype-of sb!kernel::ctype-of-array))
 
-;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION.
-;;; If a DD, it must contain a constructor whose name is
-;;; the one being sought in globaldb.
-;;; The DD can be used to derive the constructor's type signature.
-(define-info-type (:function :type)
-  :type-spec (or ctype defstruct-description)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+(defun ftype-from-fdefn (name)
+  (declare (ignorable name))
   ;; Again [as in (DEFINE-INFO-TYPE (:FUNCTION :TYPE) ...)] it's
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990330
-  :default
-  ;; Delay evaluation of (SPECIFIER-TYPE) since it can't work yet
-  #+sb-xc-host (lambda (x) (declare (ignore x)) (specifier-type 'function))
-  #-sb-xc-host (lambda (name)
-                 (if (fboundp name)
-                     (handler-bind ((style-warning #'muffle-warning))
-                       (specifier-type (sb!impl::%fun-type (fdefinition name))))
-                     (specifier-type 'function))))
+  #+sb-xc-host
+  (specifier-type 'function)
+  #-sb-xc-host
+  (let* ((fdefn (sb!kernel::find-fdefn name))
+         (fun (and fdefn (fdefn-fun fdefn))))
+    (if fun
+        (handler-bind ((style-warning #'muffle-warning))
+          (specifier-type (sb!impl::%fun-type fun)))
+        (specifier-type 'function)))))
+
+;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION
+;;; or the symbol :GENERIC-FUNTION.
+;;; If a DD, it must contain a constructor whose name is
+;;; the one being sought in globaldb, which is used to derive the type.
+;;; If :GENERIC-FUNCTION, the info is recomputed from existing methods
+;;; and stored back into globaldb.
+(define-info-type (:function :type)
+  :type-spec (or ctype defstruct-description (member :generic-function))
+  :default #'ftype-from-fdefn)
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition

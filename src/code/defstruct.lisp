@@ -1584,9 +1584,10 @@ or they must be declared locally notinline at each call site.~@:>")
 
 (defun proclaimed-ftype (name)
   (multiple-value-bind (info foundp) (info :function :type name)
-    (values (if (defstruct-description-p info)
-                (specifier-type (struct-ctor-ftype info name))
-                info)
+    (values (cond ((defstruct-description-p info)
+                   (specifier-type (struct-ctor-ftype info name)))
+                  ((eq info :generic-function) (sb!pcl::compute-gf-ftype name))
+                  (t info))
             foundp)))
 
 ;;; Given a DD and a constructor spec (a cons of name and pre-parsed

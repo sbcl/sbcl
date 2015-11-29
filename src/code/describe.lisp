@@ -602,10 +602,6 @@
                           (from (and legal-name-p
                                      (info :function :where-from name)))
                           declared-type)
-                     ;; Ensure lazy pickup of information
-                     ;; from methods.
-                     (when legal-name-p
-                       (sb-c::maybe-update-info-for-gf name))
                      (cond ((not type))
                            ((eq from :declared)
                             (setf declared-type type))

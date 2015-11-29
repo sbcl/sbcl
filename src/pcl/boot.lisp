@@ -313,6 +313,11 @@ generic function lambda list ~S~:>"
   ;; It's there mainly so that DEFSTRUCT's printer options can expand
   ;; to DEFMETHOD instead of a DEF!METHOD.
   (fmakunbound 'defmethod))
+;;; As per CLHS -
+;;; "defmethod is not required to perform any compile-time side effects."
+;;; and we don't do much other than to make the function be defined,
+;;; which means that checking of callers' arglists can only occur after called
+;;; methods are actually loaded.
 (defmacro defmethod (name &rest args)
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)

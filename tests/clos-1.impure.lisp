@@ -109,6 +109,7 @@
   (setq *method-with-no-next-method* (defmethod nnm-tester ((y (eql x))) (call-next-method))))
 (make-nnm-tester 1)
 (defmethod no-next-method ((gf (eql #'nnm-tester)) method &rest args)
+  (declare (ignore args))
   (assert (eql method *method-with-no-next-method*))
   (incf *nnm-count*))
 (with-test (:name (no-next-method :unknown-specializer))
@@ -164,6 +165,14 @@
 (with-test (:name :gf-allow-other-keys)
   (defgeneric foo (x &key &allow-other-keys))
   (defmethod foo ((i integer) &key y z) (list i y z))
+  ;; Correctness of a GF's ftype was previously ensured by the compiler,
+  ;; and only if a lambda was compiled that referenced the GF, in a way
+  ;; that was just barely non-broken enough to make the compiler happy.
+  ;; Now the FTYPE is computed the instant anyone asks for it.
+  (assert (equal (mapcar 'sb-kernel:key-info-name
+                         (sb-kernel:fun-type-keywords
+                          (sb-int:proclaimed-ftype 'foo)))
+                 '(:y :z)))
   (assert
    (null (nth-value 1 (compile nil '(lambda () (foo 5 :z 10 :y 15))))))
   (assert

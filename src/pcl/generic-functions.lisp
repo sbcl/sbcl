@@ -205,8 +205,6 @@
 
 (defgeneric finalize-inheritance (class))
 
-(defgeneric function-keywords (method))
-
 (defgeneric generic-function-argument-precedence-order (gf))
 
 (defgeneric generic-function-lambda-list (gf))

@@ -1138,9 +1138,11 @@
 ;;; Given a lambda-list, return a FUN-TYPE object representing the signature:
 ;;; return type is *, and each individual arguments type is T -- but we get
 ;;; the argument counts and keywords.
+;;; TODO: enhance this to optionally accept an alist of (var . type)
+;;; and use that lieu of SB-INTERPRETER:APPROXIMATE-PROTO-FN-TYPE.
 (defun ftype-from-lambda-list (lambda-list)
   (multiple-value-bind (llks req opt rest key-list)
-      (parse-lambda-list lambda-list)
+      (parse-lambda-list lambda-list :silent t)
     (flet ((list-of-t (list) (mapcar (constantly t) list)))
       (let ((reqs (list-of-t req))
             (opts (when opt (cons '&optional (list-of-t opt))))

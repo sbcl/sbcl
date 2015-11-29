@@ -118,12 +118,6 @@
     (eq (or answer (info :function :inlinep name))
         :notinline)))
 
-;; This will get redefined in PCL boot.
-(declaim (notinline maybe-update-info-for-gf))
-(defun maybe-update-info-for-gf (name)
-  (declare (ignore name))
-  nil)
-
 (defun maybe-defined-here (name where)
   (if (and (eq :defined where)
            (member name *fun-names-in-this-file* :test #'equal))
@@ -162,7 +156,7 @@
                  ftype
                  (specifier-type 'function))
        :defined-type (if (and (not latep) (not notinline))
-                         (or (maybe-update-info-for-gf name) ftype)
+                         ftype
                          (specifier-type 'function))
        :where-from (if notinline
                        where
