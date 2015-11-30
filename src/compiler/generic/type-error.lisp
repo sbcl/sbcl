@@ -69,9 +69,6 @@
   (:generator 1
     (error-call vop 'nil-array-accessed-error object)))
 
-;; The only way to define this VOP on HPPA would be with a big CASE
-;; statement since the ERRCODE is not eval'ed by ERROR-CALL.
-#!-hppa
 (define-vop (type-check-error/c)
   (:policy :fast-safe)
   (:translate sb!c::%type-check-error/c)

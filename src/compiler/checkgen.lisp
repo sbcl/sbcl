@@ -343,9 +343,6 @@
            ;; This is effectively a compact read-only binned hashtable.
            (hashtable (make-array (logior (length entries) 1)
                                   :initial-element nil)))
-        ;; Older architectures don't have a VOP that can emit an arbitrary
-        ;; primitive trap (see "compiler/generic/type-error" - and fix that)
-        #!-(or hppa)
         (map nil
              (lambda (entry)
                (let* ((canon-type (car entry))
