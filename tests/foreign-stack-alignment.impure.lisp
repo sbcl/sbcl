@@ -39,7 +39,8 @@
   #+(and x86 darwin) 16
   #+sparc 8
   #+alpha 16
-  #-(or arm arm64 x86 x86-64 mips ppc sparc alpha)
+  #+hppa 64
+  #-(or arm arm64 x86 x86-64 mips ppc sparc alpha hppa)
   (error "Unknown platform"))
 
 ;;;; Build the offset-tool as regular excutable, and run it with
