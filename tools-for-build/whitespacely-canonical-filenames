@@ -24,8 +24,8 @@ fi
 
 # SunOS find does not support -path.  Try to find a binary which does.
 if   [ -n "$GNUFIND" ];        then :
-elif which gfind >/dev/null;   then GNUFIND=gfind
-elif which gnufind >/dev/null; then GNUFIND=gnufind
+elif command -v gfind >/dev/null;   then GNUFIND=gfind
+elif command -v gnufind >/dev/null; then GNUFIND=gnufind
 else                                GNUFIND=find; fi
 if ! "$GNUFIND" /dev/null -path dummy 2>/dev/null; then
     echo "Warning: $GNUFIND might not be GNU: use of -path fails." 1>&2
