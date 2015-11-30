@@ -5647,3 +5647,12 @@
    (= (funcall (compile nil
                         `(lambda () (svref #(1 2 3) 1))))
       2)))
+
+(with-test (:name :char-equal-type-intersection)
+  (assert
+   (eq (funcall (compile nil
+                         `(lambda (x y)
+                            (char-equal (the (member #\a #\B) x)
+                                        (the (eql #\A) y))))
+                #\a #\A)
+       t)))

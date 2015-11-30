@@ -3859,8 +3859,13 @@
 (macrolet ((def (x)
              `(%deftransform ',x '(function * *) #'simple-equality-transform)))
   (def eq)
-  (def char=)
-  (def two-arg-char-equal))
+  (def char=))
+
+;;; Can't use the above thing, since TYPES-EQUAL-OR-INTERSECT is case sensitive.
+(deftransform two-arg-char-equal ((x y) * *)
+  (cond
+    ((same-leaf-ref-p x y) t)
+    (t (give-up-ir1-transform))))
 
 ;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:
