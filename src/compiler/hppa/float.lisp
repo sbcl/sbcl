@@ -504,7 +504,7 @@
                                                           :offset (tn-offset reg-temp))))
                     (inst li -1 reg-temp)
                     (storew reg-temp nfp (tn-offset stack-temp))
-                    (ld-float (tn-offset stack-temp) nfp short-float-temp)
+                    (ld-float (* (tn-offset stack-temp) n-word-bytes) nfp short-float-temp)
                     (inst fcnvxf short-float-temp float-temp)
                     (inst fbinop :mpy x float-temp y))
                   (inst b DONE :nullify t)
