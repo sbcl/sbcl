@@ -181,8 +181,8 @@
                (cond ((typep offset '(signed-byte 14))
                       (inst ldw offset object result))
                      (t
-                      (inst ldil offset temp)
-                      (inst ldw (ldb (byte 11 0) offset) temp result))))
+                      (inst li offset temp)
+                      (inst ldwx object temp result))))
              (inst extru result (+ (* extra ,bits) ,(1- bits)) ,bits result))))
        (define-vop (,(symbolicate 'data-vector-set/ type))
          (:note "inline array store")
