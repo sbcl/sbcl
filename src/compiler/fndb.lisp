@@ -1597,7 +1597,7 @@
   (movable foldable flushable))
 (defknown %negate (number) number (movable foldable flushable))
 (defknown (%check-bound check-bound) (array index fixnum) index
-  (movable foldable flushable dx-safe))
+  (dx-safe))
 (defknown data-vector-ref (simple-array index) t
   (foldable unsafely-flushable always-translatable))
 (defknown data-vector-ref-with-offset (simple-array fixnum fixnum) t

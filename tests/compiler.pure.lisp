@@ -5641,3 +5641,9 @@
                         (member (the (eql #c(0.0 0.0)) x)
                                 '(1 2 3 9912477572127105188))))
             #C(0.0 0.0)))))
+
+(with-test (:name :constant-svref)
+  (assert
+   (= (funcall (compile nil
+                        `(lambda () (svref #(1 2 3) 1))))
+      2)))
