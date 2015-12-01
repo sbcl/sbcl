@@ -48,12 +48,7 @@
   ;; the Lisp type equivalent to this type. If this type could never be
   ;; returned by PRIMITIVE-TYPE, then this is the NIL (or empty) type.
   ;; TYPE-SPECIFIER is too general - this doesn't allow CLASS/CLASSOID.
-  (specifier (missing-arg) :type (or symbol list) :read-only t)
-  ;; the template used to check that an object is of this type. This is a
-  ;; template of one argument and one result, both of primitive-type T. If
-  ;; the argument is of the correct type, then it is delivered into the
-  ;; result. If the type is incorrect, then an error is signalled.
-  (check nil :type (or template null) :read-only nil))
+  (specifier (missing-arg) :type (or symbol list) :read-only t))
 
 (defprinter (primitive-type)
   name)
