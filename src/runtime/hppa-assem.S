@@ -278,12 +278,7 @@ call_into_c_return:
 
 /*
  * Stuff to sanctify a block of memory for execution.
- * FIX why does this code work: parisc2.0 guide tells
- * us that we should add an sync after fdc and fic and
- * then let seven nops be executed before executing the
- * sanctified code.
  */
-
 
 	.EXPORT sanctify_for_execution
 sanctify_for_execution:
@@ -292,16 +287,24 @@ sanctify_for_execution:
 	.entry
 	/* %arg0=start addr, %arg1=length in bytes */
 	add	%arg0,%arg1,%arg1
+        copy	%arg0,%arg2
 	ldo	-1(%arg1),%arg1
 	depi	0,31,5,%arg0
 	depi	0,31,5,%arg1
 	ldsid	(%arg0),%r1
 	mtsp	%r1,%sr1
 	ldi	32,%r1			; bytes per cache line
+        /* parisc 1.1 and 2.0 manuals say to flush the dcache, SYNC,
+	 * flush the icache, SYNC again, and burn seven instructions
+	 * before executing modified code. */
 sanctify_loop:
-	fdc	0(%sr1,%arg0)
 	comb,<	%arg0,%arg1,sanctify_loop
-	fic,m	%r1(%sr1,%arg0)
+	fdc,m	%r1(%sr1,%arg0)
+        sync
+sanctify_loop_2:
+	comb,<	%arg2,%arg1,sanctify_loop_2
+	fic,m	%r1(%sr1,%arg2)
+        sync
 
 	bv	%r0(%rp)
 	nop
