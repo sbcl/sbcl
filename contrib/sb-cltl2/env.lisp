@@ -295,10 +295,9 @@ appear."
                    (list-cons-when (and ftype (neq *universal-fun-type* ftype))
                      'ftype (type-specifier ftype))
                    (list-cons-when dx 'dynamic-extent t)
-                   ;; FIXME: a local name shadowing a deprecated global
-                   ;; wrongly returns deprecation info.
-                   (maybe-deprecation-entry
-                    (info :function :deprecated name))
+                   (unless localp
+                     (maybe-deprecation-entry
+                      (info :function :deprecated name)))
                    (extra-pairs :function name fun *lexenv*)))))
 
 (declaim (ftype (sfunction

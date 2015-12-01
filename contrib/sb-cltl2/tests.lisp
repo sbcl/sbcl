@@ -383,6 +383,11 @@
                                         :since        (nil "1.2.3")
                                         :replacements (foo))))))
 
+(deftest function-info.global.deprecation.lexically-shadowed
+    (flet ((function-info.global.deprecation ()))
+      (fun-info function-info.global.deprecation))
+  (:function t nil))
+
 (defmacro my-macro (x) x)
 
 (deftest function-info.macro
