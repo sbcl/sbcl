@@ -294,6 +294,17 @@
 (sb!disassem:define-arg-type space
   :printer #("" |1,| |2,| |3,|))
 
+(sb!disassem:define-arg-type memory-address-annotation
+  :printer (lambda (value stream dstate)
+             (declare (ignore stream))
+             (destructuring-bind (reg raw-offset) value
+               (let ((offset (low-sign-extend raw-offset 14)))
+                 (cond
+                   ((= reg code-offset)
+                    (sb!disassem:note-code-constant offset dstate))
+                   ((= reg null-offset)
+                    (sb!disassem:maybe-note-nil-indexed-object offset dstate)))))))
+
 
 ;;;; Define-instruction-formats for disassembler.
 
@@ -303,7 +314,9 @@
   (b    :field (byte 5 21) :type 'reg)
   (t/r  :field (byte 5 16) :type 'reg)
   (s    :field (byte 2 14) :type 'space)
-  (im14 :field (byte 14 0) :type 'im14))
+  (im14 :field (byte 14 0) :type 'im14)
+  (memory-address-annotation :fields (list (byte 5 21) (byte 14 0))
+                             :type 'memory-address-annotation))
 
 (defconstant-eqx cmplt-index-print '((:cond ((u :constant 1) '\,S))
                                  (:cond ((m :constant 1) '\,M)))
@@ -581,7 +594,7 @@
                           (type (or fixup (signed-byte 14)) disp))
                 (:delay 0)
                 (:printer load/store ((op ,opcode) (s 0))
-                          '(:name :tab im14 "(" s b ")," t/r))
+                          '(:name :tab im14 "(" s b ")," t/r memory-address-annotation))
                 (:dependencies (reads base) (reads :memory) (writes reg))
                 (:emitter
                   (emit-load/store segment ,opcode
@@ -595,7 +608,7 @@
                           (type (or fixup (signed-byte 14)) disp))
                 (:delay 0)
                 (:printer load/store ((op ,opcode) (s 0))
-                  '(:name :tab t/r "," im14 "(" s b ")"))
+                  '(:name :tab t/r "," im14 "(" s b ")" memory-address-annotation))
                 (:dependencies (reads base) (reads reg) (writes :memory))
                 (:emitter
                   (emit-load/store segment ,opcode
