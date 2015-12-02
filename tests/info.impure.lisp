@@ -48,6 +48,12 @@
    "#<FUN-TYPE (FUNCTION (T T) LIST)>"))
 ||#
 
+(with-test (:name :fboundp-type-error)
+  (assert-error (funcall (compile nil `(lambda (x) (fboundp x))) 0)
+                 type-error)
+  (assert-error (funcall (compile nil `(lambda (x) (fdefinition x))) 0)
+                 type-error))
+
 (in-package "SB-C")
 
 (test-util:with-test (:name :globaldb-sxhashoid-discrimination)
