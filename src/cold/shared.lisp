@@ -125,7 +125,7 @@
 (let ((*print-length* nil)
       (*print-level* nil))
   (format t
-          "target features *SHEBANG-FEATURES*=~@<~S~:>~%"
+          "target features *SHEBANG-FEATURES*=~%~@<~S~:>~%"
           *shebang-features*))
 
 (defvar *shebang-backend-subfeatures*

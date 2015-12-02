@@ -43,9 +43,8 @@
  (load (compile-file "tools-for-build/ucd.lisp"))
 
 ;;; Generate character database tables.
- (sb-cold::slurp-ucd)
- (sb-cold::slurp-proplist)
- (sb-cold::output)
+ (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
+   (funcall s))
 
 ;;; propagate structure offset and other information to the C runtime
 ;;; support code.
