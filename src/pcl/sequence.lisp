@@ -25,7 +25,7 @@
                        ~/sb-impl:print-symbol-with-prefix/ is not ~
                        implemented for ~A which is an instance of the ~
                        ~/sb-impl:print-symbol-with-prefix/ subclass ~
-                       ~/sb-impl:print-symbol-with-prefix/.~@:>"
+                       ~S.~@:>"
                operation datum 'sequence (class-of datum)))))
   #+sb-doc
   (:documentation
