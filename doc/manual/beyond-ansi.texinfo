@@ -445,7 +445,7 @@ From this perspective, no distinction between builtin and user-defined
 Providers of the extension, that is of user-defined @code{sequence}
 subclasses, have to adhere to a ``sequence protocol'' which consists of
 a set of generic functions in the @code{sequence} package.
-@c
+
 A minimal @code{sequence} subclass has to specify @code{standard-object} and
 @code{sequence} as its superclasses and has to be the specializer of the
 @code{sequence} parameter of methods on at least the following generic
@@ -473,6 +473,12 @@ performance penalty @xref{Iterator Protocol}.
 @findex @cl{subseq}
 @findex @cl{copy-seq}
 @findex @sequence{adjust-sequence}
+
+When the sequence protocol is only partially implemented for a given
+@code{sequence} subclass, an attempt to apply one of the missing
+operations to instances of that class signals the following condition:
+
+@include condition-sb-sequence-protocol-unimplemented.texinfo
 
 In addition to the mandatory functions above, methods on the sequence
 functions listed below can be defined.

@@ -2554,7 +2554,10 @@ package is deprecated in favour of SB-MOP."
       :doc "semi-public: implements something which might eventually
 be submitted as a CDR"
       :use ()
-      :export ("DOSEQUENCE"
+      :export ("PROTOCOL-UNIMPLEMENTED"
+               "PROTOCOL-UNIMPLEMENTED-OPERATION"
+
+               "DOSEQUENCE"
 
                "MAKE-SEQUENCE-ITERATOR" "MAKE-SIMPLE-SEQUENCE-ITERATOR"
 

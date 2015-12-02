@@ -10,15 +10,34 @@
 (in-package "SB-IMPL")
 
 ;;;; basic protocol
-(define-condition sequence::protocol-unimplemented (type-error
-                                                    reference-condition)
-  ()
+(define-condition sequence:protocol-unimplemented (type-error
+                                                   reference-condition)
+  ((operation :initarg :operation
+              :reader sequence:protocol-unimplemented-operation))
   (:default-initargs
-   :references '((:sbcl :node "Extensible Sequences"))))
+   :operation (missing-arg)
+   :references '((:sbcl :node "Extensible Sequences")))
+  (:report
+   (lambda (condition stream)
+     (let ((operation (sequence::protocol-unimplemented-operation condition))
+           (datum (type-error-datum condition)))
+       (format stream "~@<The operation ~
+                       ~/sb-impl:print-symbol-with-prefix/ is not ~
+                       implemented for ~A which is an instance of the ~
+                       ~/sb-impl:print-symbol-with-prefix/ subclass ~
+                       ~/sb-impl:print-symbol-with-prefix/.~@:>"
+               operation datum 'sequence (class-of datum)))))
+  #+sb-doc
+  (:documentation
+   "This error is signaled if a sequence operation is applied to an
+   instance of a sequence class that does not support the
+   operation."))
 
-(defun sequence::protocol-unimplemented (sequence)
-  (error 'sequence::protocol-unimplemented
-         :datum sequence :expected-type '(or list vector)))
+(defun sequence:protocol-unimplemented (operation sequence)
+  (error 'sequence:protocol-unimplemented
+         :datum sequence
+         :expected-type '(or list vector)
+         :operation operation))
 
 (defgeneric sequence:emptyp (sequence)
   (:method ((s list)) (null s))
@@ -32,7 +51,8 @@
 (defgeneric sequence:length (sequence)
   (:method ((s list)) (length s))
   (:method ((s vector)) (length s))
-  (:method ((s sequence)) (sequence::protocol-unimplemented s))
+  (:method ((s sequence))
+    (sequence:protocol-unimplemented 'sequence:length s))
   #+sb-doc
   (:documentation
    "Returns the length of SEQUENCE or signals a PROTOCOL-UNIMPLEMENTED
@@ -42,7 +62,8 @@
 (defgeneric sequence:elt (sequence index)
   (:method ((s list) index) (elt s index))
   (:method ((s vector) index) (elt s index))
-  (:method ((s sequence) index) (sequence::protocol-unimplemented s))
+  (:method ((s sequence) index)
+    (sequence:protocol-unimplemented 'sequence:elt s))
   #+sb-doc
   (:documentation
    "Returns the element at position INDEX of SEQUENCE or signals a
@@ -54,7 +75,7 @@
   (:method (new-value (s list) index) (setf (elt s index) new-value))
   (:method (new-value (s vector) index) (setf (elt s index) new-value))
   (:method (new-value (s sequence) index)
-    (sequence::protocol-unimplemented s))
+    (sequence:protocol-unimplemented '(setf sequence:elt) s))
   #+sb-doc
   (:documentation
    "Replaces the element at position INDEX of SEQUENCE with NEW-VALUE
@@ -86,7 +107,7 @@
       (t (make-array length :element-type (array-element-type s)))))
   (:method ((s sequence) length &key initial-element initial-contents)
     (declare (ignore initial-element initial-contents))
-    (sequence::protocol-unimplemented s))
+    (sequence:protocol-unimplemented 'sequence:make-sequence-like s))
   #+sb-doc
   (:documentation
    "Returns a freshly allocated sequence of length LENGTH and of the
@@ -127,7 +148,7 @@
       (t (apply #'adjust-array s length args))))
   (:method ((s sequence) length &rest args)
     (declare (ignore args))
-    (sequence::protocol-unimplemented s))
+    (sequence:protocol-unimplemented 'sequence:adjust-sequence s))
   #+sb-doc
   (:documentation
    "Return destructively modified SEQUENCE or a freshly allocated
