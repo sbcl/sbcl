@@ -144,7 +144,17 @@
 ;; packed info vector tests
 
 (test-util:with-test (:name :globaldb-info-iterate)
-  (show-info '*))
+  (let ((s (with-output-to-string (*standard-output*) (show-info '*))))
+    (dolist (x '((:function :definition) (:function :type)
+                 (:function :where-from) (:function :kind)
+                 (:function :info) (:function :source-transform)
+                 (:type :kind) (:type :builtin)
+                 (:source-location :declaration)
+                 (:variable :kind) (:variable :documentation)
+                 (:variable :type) (:variable :where-from)
+                 (:source-location :variable)
+                 (:alien-type :kind) (:alien-type :translator)))
+      (assert (search (format nil "~S ~S" (car x) (cadr x)) s)))))
 
 (test-util:with-test (:name :find-fdefn-agreement)
   ;; Shows that GET-INFO-VALUE agrees with FIND-FDEFN on all symbols,
@@ -251,16 +261,19 @@
       (logior (ash key 10) (random (ash 1 10) random-state))
       key)) ; not randomizing
 
-(defun show-tally (table tally verb)
-  (format t "Hashtable has ~D entries~%" (info-env-count table))
+(defun show-tally (table tally verb print)
+  (when print
+    (format t "Hashtable has ~D entries~%" (info-env-count table)))
   (let ((tot 0))
     (dotimes (thread-id (length tally) tot)
       (let ((n (aref tally thread-id)))
-        (format t "Thread ~2d ~A ~7d time~:P~%" thread-id verb n)
+        (when print
+          (format t "Thread ~2d ~A ~7d time~:P~%" thread-id verb n))
         (incf tot n)))))
 
 (defun test-concurrent-incf (&key (table (make-info-hashtable))
-                                  (n-threads 40) (n-inserts 50000))
+                                  (n-threads 40) (n-inserts 50000)
+                                  (print nil))
   (declare (optimize safety))
   (let ((threads)
         (worklists (make-array n-threads))
@@ -287,11 +300,11 @@
              :name (format nil "Worker ~D" i)
              :arguments (list (aref worklists i) i))
             threads))
-    (format t "Started ~D threads doing INCF~%" n-threads)
+    (when print (format t "Started ~D threads doing INCF~%" n-threads))
     (dolist (thread threads)
       (sb-thread:join-thread thread))
     (assert (= (info-env-count table) n-inserts))
-    (show-tally table tries "updated")
+    (show-tally table tries "updated" print)
     ;; expect val[key] = 2*n-threads for all keys
     (info-maphash (lambda (k v)
                     (unless (= v (* 2 n-threads))
@@ -304,7 +317,7 @@
 
 (defun test-concurrent-consing (&key (table (make-info-hashtable))
                                 (n-threads 40) (n-inserts 100000)
-                                (randomize t))
+                                (randomize t) (print nil))
   (declare (optimize safety))
   (assert (evenp n-threads))
   (let ((threads)
@@ -326,7 +339,7 @@
              :name (format nil "Worker ~D" i)
              :arguments (list i (if randomize (make-random-state rs))))
             threads))
-    (format t "Started ~D threads doing CONS~%" n-threads)
+    (when print (format t "Started ~D threads doing CONS~%" n-threads))
     (dolist (thread threads)
       (sb-thread:join-thread thread))
     (assert (= (info-env-count table) n-inserts))
@@ -349,7 +362,7 @@
        table)
       ;; There should be half as many puthash operations that succeeded
       ;; as the product of n-threads and n-inserts.
-      (assert (= (show-tally table tally "inserted")
+      (assert (= (show-tally table tally "inserted" print)
                  (* 1/2 n-threads n-inserts)))))
   table)
 
