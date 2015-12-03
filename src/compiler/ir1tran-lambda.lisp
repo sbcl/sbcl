@@ -1088,11 +1088,16 @@
                         (recurse body
                                  (process-decls `((declare ,@bindings)) nil nil)))
                        (:macro
-                        #+sb-xc-host (bug "inline-lexenv?") ; no EVAL-IN-LEXENV
-                        #-sb-xc-host
-                        (let ((macros (loop for (name . function) in bindings
-                                            collect (list* name 'macro
-                                                           (eval-in-lexenv function lexenv)))))
+                        (let ((macros
+                               (mapcar (lambda (binding)
+                                         (list* (car binding) 'macro
+                                                #-sb-xc-host
+                                                (eval-in-lexenv (cdr binding) lexenv)
+                                                #+sb-xc-host ; no EVAL-IN-LEXENV
+                                                (if (null-lexenv-p lexenv)
+                                                    (eval (cdr binding))
+                                                    (bug "inline-lexenv?"))))
+                                       bindings)))
                           (recurse body
                                    (make-lexenv :default lexenv
                                                 :funs macros))))

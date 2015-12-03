@@ -115,14 +115,15 @@
    (lexenv
     (let ((vars (lexenv-vars lexenv))
           (funs (lexenv-funs lexenv)))
-      (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
-            ((and (null vars) (null funs)) lambda)
-            ;; too complicated for cross-compilation
-            #-sb-xc-host
-            (t
-             (let ((env (reconstruct-lexenv lexenv)))
-               (and env
-                    `(lambda-with-lexenv ,env ,@(cdr lambda))))))))
+      (acond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
+             ((and (null vars) (null funs)) lambda)
+             ;; If the lexenv is too hairy for cross-compilation,
+             ;; you'll find out later, when trying to perform inlining.
+             ;; This is fine, because if the inline expansion is only
+             ;; for the target, it's totally OK to cross-compile this
+             ;; defining form. The syntactic env is correctly captured.
+             ((reconstruct-lexenv lexenv)
+              `(lambda-with-lexenv ,it ,@(cdr lambda))))))
    #!+(and sb-fasteval (host-feature sb-xc))
    (sb!interpreter:basic-env
     (awhen (sb!interpreter::reconstruct-syntactic-closure-env lexenv)

@@ -109,6 +109,15 @@
 ;;; This is a little ugly.  Fixing bug 188 would bring the ability to
 ;;; wrap a MACROLET or something similar around this whole thing would
 ;;; make things significantly less ugly.  --njf, 2005-02-23
+;;;
+;;; Well, it turns out that we *could* wrap a MACROLET around this,
+;;; but it's quite ugly in a different way: when you write
+;;;  (MACROLET ((GENERATOR () `(DEFUN F (X) ,@(INSANITY ...))) (GENERATOR)))
+;;; and then view the inline expansion of F, you'll see it has actually
+;;; captured the entirety of the MACROLET that surrounded it.
+;;; With respect to building SBCL, this means, among other things, that
+;;; it'd hang onto all the "!" symbols that would otherwise disappear,
+;;; as well as kilobytes of completely useless s-expressions.
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;;; Align the SAP to a word boundary, and update the offset accordingly.
