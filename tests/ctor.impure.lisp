@@ -25,6 +25,15 @@
   (make-instance 'no-slots))
 (compile 'make-no-slots)
 
+(with-test (:name :instance-hash-starts-as-0)
+  ;; These first two tests look the same but they aren't:
+  ;; the second one uses a CTOR function.
+  (assert (zerop (sb-kernel:%instance-ref (make-instance 'no-slots)
+                                          sb-pcl::std-instance-hash-slot-index)))
+  (assert (zerop (sb-kernel:%instance-ref (make-no-slots)
+                                          sb-pcl::std-instance-hash-slot-index)))
+  (assert (not (zerop (sxhash (make-no-slots))))))
+
 (defmethod update-instance-for-redefined-class
     ((object no-slots) added discarded plist &rest initargs)
   (declare (ignore initargs))

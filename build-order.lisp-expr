@@ -210,6 +210,7 @@
  ("src/code/weak"          :not-host)
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/early-float"   :not-host)
+ ("src/pcl/early-low" :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host)
@@ -320,7 +321,6 @@
  ;; needed by "compiler/vop"
  ("src/compiler/sset")
  ("src/code/xset") ; for representation of MEMBER type
- ("src/pcl/early-low" :not-host)
  ("src/code/early-type")
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"

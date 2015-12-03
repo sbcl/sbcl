@@ -69,27 +69,6 @@
            (setf ,drops (random-fixnum)
                  ,drop-pos sb!vm:n-positive-fixnum-bits))))))
 
-;;;; PCL's view of funcallable instances
-
-(!defstruct-with-alternate-metaclass standard-funcallable-instance
-  ;; KLUDGE: Note that neither of these slots is ever accessed by its
-  ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
-  ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
-  :slot-names (clos-slots hash-code)
-  :boa-constructor %make-standard-funcallable-instance
-  :superclass-name function
-  :metaclass-name standard-classoid
-  :metaclass-constructor make-standard-classoid
-  :dd-type funcallable-structure
-  ;; Only internal implementation code will access these, and these
-  ;; accesses (slot readers in particular) could easily be a
-  ;; bottleneck, so it seems reasonable to suppress runtime type
-  ;; checks.
-  ;;
-  ;; (Except note KLUDGE above that these accessors aren't used at all
-  ;; (!) as of sbcl-0.pre7.63, so for now it's academic.)
-  :runtime-type-checks-p nil)
-
 (import 'sb!kernel:funcallable-instance-p) ; why?
 
 (defun set-funcallable-instance-function (fin new-value)
@@ -115,8 +94,6 @@
   `(%funcallable-instance-layout ,fin))
 (defmacro fsc-instance-slots (fin)
   `(%funcallable-instance-info ,fin 1))
-(defmacro fsc-instance-hash (fin)
-  `(%funcallable-instance-info ,fin 2))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))
@@ -237,36 +214,12 @@ comparison.")
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
-;;; CMU CL comment:
-;;;   We define this as STANDARD-INSTANCE, since we're going to
-;;;   clobber the layout with some standard-instance layout as soon as
-;;;   we make it, and we want the accessor to still be type-correct.
-#|
-(defstruct (standard-instance
-            (:predicate nil)
-            (:constructor %%allocate-instance--class ())
-            (:copier nil)
-            (:alternate-metaclass instance
-                                  cl:standard-class
-                                  make-standard-class))
-  (slots nil))
-|#
-(!defstruct-with-alternate-metaclass standard-instance
-  :slot-names (slots hash-code)
-  :boa-constructor %make-standard-instance
-  :superclass-name t
-  :metaclass-name standard-classoid
-  :metaclass-constructor make-standard-classoid
-  :dd-type structure
-  :runtime-type-checks-p nil)
-
 ;;; Both of these operations "work" on structures, which allows the above
 ;;; weakening of STD-INSTANCE-P.
+;;; FIXME: what does the preceding comment mean? You can't use instance-slots
+;;; on a structure. (Consider especially a structure of 0 slots.)
 (defmacro std-instance-slots (x) `(%instance-ref ,x 1))
 (defmacro std-instance-wrapper (x) `(%instance-layout ,x))
-;;; KLUDGE: This one doesn't "work" on structures.  However, we
-;;; ensure, in SXHASH and friends, never to call it on structures.
-(defmacro std-instance-hash (x) `(%instance-ref ,x 2))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
@@ -297,6 +250,9 @@ comparison.")
 
 ;;;; support for useful hashing of PCL instances
 
+;; FIXME: do something address-based, so not to depend on the ordinary PRNG.
+;; Probably mix the object address with the output of a fast and simple LCG,
+;; as is done for CTYPEs.
 (defvar *instance-hash-code-random-state* (make-random-state))
 (defun get-instance-hash-code ()
   ;; ANSI SXHASH wants us to make a good-faith effort to produce
@@ -309,12 +265,6 @@ comparison.")
   ;; that I am insufficiently insightful to insee. -- WHN 2004-10-28
   (random most-positive-fixnum
           *instance-hash-code-random-state*))
-
-(defun sb!impl::sxhash-instance (x)
-  (cond
-    ((std-instance-p x) (std-instance-hash x))
-    ((fsc-instance-p x) (fsc-instance-hash x))
-    (t (bug "SXHASH-INSTANCE called on some weird thing: ~S" x))))
 
 ;;;; structure-instance stuff
 ;;;;

@@ -33,7 +33,7 @@
 
 (defun allocate-standard-instance (wrapper
                                    &optional (slots-init nil slots-init-p))
-  (let ((instance (%make-standard-instance nil (get-instance-hash-code)))
+  (let ((instance (%make-standard-instance nil 0))
         (no-of-slots (wrapper-no-of-instance-slots wrapper)))
     (setf (std-instance-wrapper instance) wrapper)
     (setf (std-instance-slots instance)

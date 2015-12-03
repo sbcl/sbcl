@@ -172,7 +172,23 @@
 
 ;; simple cases
 (declaim (ftype (sfunction (integer) hash) sxhash-bignum))
-(declaim (ftype (sfunction (t) hash) sxhash-instance))
+
+(declaim (inline std-instance-hash))
+(defun std-instance-hash (instance)
+  (let ((hash (%instance-ref instance sb!pcl::std-instance-hash-slot-index)))
+    (if (not (eql hash 0))
+        hash
+        (let ((new (sb!pcl::get-instance-hash-code)))
+          ;; At most one thread will compute a random hash.
+          ;; %INSTANCE-CAS is a full call if there is no vop for it.
+          (let ((old (%instance-cas instance sb!pcl::std-instance-hash-slot-index
+                                    0 new)))
+            (if (eql old 0) new old))))))
+
+;; These are also random numbers, but not lazily computed.
+(declaim (inline fsc-instance-hash))
+(defun fsc-instance-hash (fin)
+  (%funcallable-instance-info fin sb!pcl::fsc-instance-hash-slot-index))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
@@ -238,10 +254,11 @@
                    (layout-clos-hash x))
                   ((or structure-object condition)
                    (logxor 422371266
+                           ;; FIXME: why not (LAYOUT-CLOS-HASH ...) ?
                            (sxhash      ; through DEFTRANSFORM
                             (classoid-name
                              (layout-classoid (%instance-layout x))))))
-                  (t (sxhash-instance x))))
+                  (t (std-instance-hash x))))
                (symbol (sxhash x))      ; through DEFTRANSFORM
                (array
                 (typecase x
@@ -262,7 +279,7 @@
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
                ;; general, inefficient case of NUMBER
                (number (sxhash-number x))
-               (generic-function (sxhash-instance x))
+               (generic-function (fsc-instance-hash x))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 

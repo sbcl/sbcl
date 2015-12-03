@@ -133,5 +133,38 @@
                   *the-wrapper-of-float* *the-wrapper-of-cons*
                   *the-wrapper-of-complex* *the-wrapper-of-character*
                   *the-wrapper-of-bit-vector* *the-wrapper-of-array*))
+
+;;;; PCL instances
+
+(sb!kernel::!defstruct-with-alternate-metaclass standard-instance
+  :slot-names (slots hash-code)
+  :boa-constructor %make-standard-instance
+  :superclass-name t
+  :metaclass-name standard-classoid
+  :metaclass-constructor make-standard-classoid
+  :dd-type structure
+  :runtime-type-checks-p nil)
+
+(sb!kernel::!defstruct-with-alternate-metaclass standard-funcallable-instance
+  ;; KLUDGE: Note that neither of these slots is ever accessed by its
+  ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
+  ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
+  :slot-names (clos-slots hash-code)
+  :boa-constructor %make-standard-funcallable-instance
+  :superclass-name function
+  :metaclass-name standard-classoid
+  :metaclass-constructor make-standard-classoid
+  :dd-type funcallable-structure
+  ;; Only internal implementation code will access these, and these
+  ;; accesses (slot readers in particular) could easily be a
+  ;; bottleneck, so it seems reasonable to suppress runtime type
+  ;; checks.
+  ;;
+  ;; (Except note KLUDGE above that these accessors aren't used at all
+  ;; (!) as of sbcl-0.pre7.63, so for now it's academic.)
+  :runtime-type-checks-p nil)
+
+(defconstant std-instance-hash-slot-index 2)
+(defconstant fsc-instance-hash-slot-index 2)
 
 (/show0 "finished with early-low.lisp")

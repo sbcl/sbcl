@@ -218,8 +218,8 @@
 (declaim (inline sxhash-symbol-or-class))
 (defun sxhash-symbol-or-class (x)
   (cond ((symbolp x) (sxhash x))
-        ((std-instance-p x) (std-instance-hash x))
-        ((fsc-instance-p x) (fsc-instance-hash x))
+        ((std-instance-p x) (sb-impl::std-instance-hash x))
+        ((fsc-instance-p x) (sb-impl::fsc-instance-hash x))
         (t
          (bug "Something strange where symbol or class expected."))))
 
@@ -663,8 +663,7 @@
          (allocation-function (raw-instance-allocator class))
          (slots-fetcher (slots-fetcher class)))
     (if (eq allocation-function 'allocate-standard-instance)
-        `(let ((.instance. (%make-standard-instance nil
-                                                    (get-instance-hash-code)))
+        `(let ((.instance. (%make-standard-instance nil 0))
                (.slots. (make-array
                          ,(layout-length wrapper)
                          ,@(when early-unbound-markers-p
