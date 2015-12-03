@@ -778,12 +778,19 @@
                (union-type
                 (let* ((types (remove nil (mapcar #'maybe-array-type-dimensions
                                                   (union-type-types type))))
-                       (result (car types)))
-                  (dolist (other (cdr types) result)
-                    (unless (equal result other)
+                       (result (car types))
+                       (length (length result))
+                       (complete-match t))
+                  (dolist (other (cdr types))
+                    (when (/= length (length other))
                       (give-up-ir1-transform
                        "~@<dimensions of arrays in union type ~S do not match~:@>"
-                       (type-specifier type))))))
+                       (type-specifier type)))
+                    (unless (equal result other)
+                      (setf complete-match nil)))
+                  (if complete-match
+                      result
+                      (make-list length :initial-element '*))))
                (intersection-type
                 (let* ((types (remove nil (mapcar #'maybe-array-type-dimensions
                                                   (intersection-type-types type))))
