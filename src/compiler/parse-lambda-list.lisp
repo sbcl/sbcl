@@ -909,6 +909,10 @@
     (multiple-value-bind (kind name) (get-ds-bind-context pattern)
       #-sb-xc-host
       (declare (optimize sb!c::allow-non-returning-tail-call))
+      ;; KLUDGE: Compiling (COERCE x 'list) transforms to COERCE-TO-LIST,
+      ;; but COERCE-TO-LIST is an inline function not yet defined, and
+      ;; its subsequent definition would signal an inlining failure warning.
+      (declare (notinline coerce))
       (error 'sb!kernel::defmacro-lambda-list-broken-key-list-error
              :kind kind :name name
              :problem problem
