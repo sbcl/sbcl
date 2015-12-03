@@ -53,6 +53,7 @@
 ;;
 (declaim (ftype (sfunction ((or symbol list)) (or fdefn null)) find-fdefn))
 (defun find-fdefn (name)
+  (declare (explicit-check))
   (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
     (return-from find-fdefn (symbol-fdefn name)))
   ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
