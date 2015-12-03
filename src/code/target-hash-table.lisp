@@ -998,45 +998,6 @@ table itself."
           ;; VAL is discarded if KEY is found this time.
           (or (gethash key table) (setf (gethash key table) val))))))
 
-;;;; MAPHASH
-
-;;; FIXME: This should be made into a compiler transform for two reasons:
-;;;   1. It would then be available for compiling the entire system,
-;;;      not only parts of the system which are defined after DEFUN MAPHASH.
-;;;   2. It could be conditional on compilation policy, so that
-;;;      it could be compiled as a full call instead of an inline
-;;;      expansion when SPACE>SPEED.
-(declaim (inline maphash))
-(defun maphash (function-designator hash-table)
-  #!+sb-doc
-  "For each entry in HASH-TABLE, call the designated two-argument function on
-the key and value of the entry. Return NIL.
-
-Consequences are undefined if HASH-TABLE is mutated during the call to
-MAPHASH, except for changing or removing elements corresponding to the
-current key. The applies to all threads, not just the current one --
-even for synchronized hash-tables. If the table may be mutated by
-another thread during iteration, use eg. SB-EXT:WITH-LOCKED-HASH-TABLE
-to protect the MAPHASH call."
-  ;; This essentially duplicates WITH-HASH-TABLE-ITERATOR, so
-  ;; any changes here should be reflected there as well.
-  (let ((fun (%coerce-callable-to-fun function-designator))
-        (size (length (hash-table-next-vector hash-table))))
-    (declare (type function fun))
-    (do ((i 1 (1+ i)))
-        ((>= i size))
-      (declare (type index/2 i))
-      (let* ((kv-vector (hash-table-table hash-table))
-             (key (aref kv-vector (* 2 i)))
-             (value (aref kv-vector (1+ (* 2 i)))))
-        ;; We are running without locking or WITHOUT-GCING. For a weak
-        ;; :VALUE hash table it's possible that the GC hit after KEY
-        ;; was read and now the entry is gone. So check if either the
-        ;; key or the value is empty.
-        (unless (or (eq key +empty-ht-slot+)
-                    (eq value +empty-ht-slot+))
-          (funcall fun key value))))))
-
 ;;;; methods on HASH-TABLE
 
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE

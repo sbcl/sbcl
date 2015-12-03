@@ -196,6 +196,7 @@
  ("src/compiler/info-vector")
  ("src/code/fdefinition" :not-host)
 
+ ("src/code/maphash" :not-host)
  ("src/code/pred" :not-host)
 
  ("src/code/target-alieneval" :not-host)

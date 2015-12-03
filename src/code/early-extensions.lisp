@@ -444,20 +444,16 @@
 
 ;;; Iterate over the entries in a HASH-TABLE, first obtaining the lock
 ;;; if the table is a synchronized table.
+;;; An implicit block named NIL exists around the iteration, as is the custom.
 (defmacro dohash (((key-var value-var) table &key result locked) &body body)
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (with-unique-names (gen n-more n-table)
-      (let ((iter-form `(with-hash-table-iterator (,gen ,n-table)
-                         (loop
-                           (multiple-value-bind (,n-more ,key-var ,value-var) (,gen)
-                             ,@decls
-                             (unless ,n-more (return ,result))
-                             ,@forms)))))
-        `(let ((,n-table ,table))
-           ,(if locked
-                `(with-locked-system-table (,n-table)
-                   ,iter-form)
-                iter-form))))))
+  (let* ((n-table (make-symbol "HT"))
+         (iter-form `(block nil
+                       (maphash (lambda (,key-var ,value-var) ,@body) ,n-table)
+                       ,result)))
+    `(let ((,n-table ,table))
+       ,(if locked
+            `(with-locked-system-table (,n-table) ,iter-form)
+            iter-form))))
 
 ;;; Executes BODY for all entries of PLIST with KEY and VALUE bound to
 ;;; the respective keys and values.
