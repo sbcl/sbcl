@@ -1190,13 +1190,20 @@ and the number of 0 bits if INTEGER is negative."
   #!+sb-doc
   "Extract SIZE lower bits from INTEGER, considering them as a
 2-complement SIZE-bits representation of a signed integer."
-  (cond ((zerop size)
-         0)
-        ((logbitp (1- size) integer)
-         (dpb integer (byte size 0) -1))
-        (t
-         (ldb (byte size 0) integer))))
-
+  (typecase size
+    ((eql 0) 0)
+    ((integer 0 #.sb!vm:n-fixnum-bits)
+     (number-dispatch ((integer integer))
+       ;; FIXME: a case here to reduce BIGNUM arguments to FIXNUM for
+       ;; (INTEGER 1 #.SB!VM:N-FIXNUM-BITS) SIZE would be excellent.
+       (((foreach fixnum bignum))
+        (if (logbitp (1- size) integer)
+            (dpb integer (byte (1- size) 0) -1)
+            (ldb (byte (1- size) 0) integer)))))
+    ((unsigned-byte)
+     (if (logbitp (1- size) integer)
+         (dpb integer (byte (1- size) 0) -1)
+         (ldb (byte (1- size) 0) integer)))))
 
 ;;;; BOOLE
 
