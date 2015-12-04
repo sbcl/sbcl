@@ -5684,3 +5684,10 @@
         (unless (= ool-answer constant-answer declared-answer)
           (push (list size arg ool-answer constant-answer declared-answer) result))))
     (assert (null result))))
+
+(with-test (:name :array-dimensions-*)
+  (= (funcall (compile nil `(lambda  (array)
+                              (declare ((or (vector t) (array character)) array))
+                              (array-dimension array 0)))
+              #(1 2 3))
+     3))

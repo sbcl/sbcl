@@ -776,8 +776,13 @@
                (array-type
                 (array-type-dimensions type))
                (union-type
-                (let* ((types (remove nil (mapcar #'maybe-array-type-dimensions
-                                                  (union-type-types type))))
+                (let* ((types (loop for type in (union-type-types type)
+                                    for dimensions = (maybe-array-type-dimensions type)
+                                    when (eq dimensions '*)
+                                    do
+                                    (return-from maybe-array-type-dimensions '*)
+                                    when dimensions
+                                    collect it))
                        (result (car types))
                        (length (length result))
                        (complete-match t))
