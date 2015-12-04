@@ -1190,20 +1190,27 @@ and the number of 0 bits if INTEGER is negative."
   #!+sb-doc
   "Extract SIZE lower bits from INTEGER, considering them as a
 2-complement SIZE-bits representation of a signed integer."
-  (typecase size
-    ((eql 0) 0)
-    ((integer 0 #.sb!vm:n-fixnum-bits)
-     (number-dispatch ((integer integer))
-       ;; FIXME: a case here to reduce BIGNUM arguments to FIXNUM for
-       ;; (INTEGER 1 #.SB!VM:N-FIXNUM-BITS) SIZE would be excellent.
-       (((foreach fixnum bignum))
-        (if (logbitp (1- size) integer)
-            (dpb integer (byte (1- size) 0) -1)
-            (ldb (byte (1- size) 0) integer)))))
-    ((unsigned-byte)
-     (if (logbitp (1- size) integer)
-         (dpb integer (byte (1- size) 0) -1)
-         (ldb (byte (1- size) 0) integer)))))
+  (macrolet ((msf (size integer)
+               `(if (logbitp (1- ,size) ,integer)
+                    (dpb ,integer (byte (1- ,size) 0) -1)
+                    (ldb (byte (1- ,size) 0) ,integer))))
+    (typecase size
+      ((eql 0) 0)
+      ((integer 1 #.sb!vm:n-fixnum-bits)
+       (number-dispatch ((integer integer))
+         ((fixnum) (msf size integer))
+         ((bignum) (let ((fix (sb!c::mask-signed-field #.sb!vm:n-fixnum-bits (%bignum-ref integer 0))))
+                     (if (= size #.sb!vm:n-fixnum-bits)
+                         fix
+                         (msf size fix))))))
+      ((integer (#.sb!vm:n-fixnum-bits) #.sb!vm:n-word-bits)
+       (number-dispatch ((integer integer))
+         ((fixnum) integer)
+         ((bignum) (let ((word (sb!c::mask-signed-field #.sb!vm:n-word-bits (%bignum-ref integer 0))))
+                     (if (= size #.sb!vm:n-word-bits)
+                         word
+                         (msf size word))))))
+      ((unsigned-byte) (msf size integer)))))
 
 ;;;; BOOLE
 
