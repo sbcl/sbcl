@@ -129,15 +129,15 @@
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (aref (make-array 0) 0)))
-  (declare (ignore warn fail))
-  #+nil (assert fail) ; doesn't work, (maybe because ASSERTED-TYPE is NIL?)
-  (assert-error (funcall fun) type-error))
+  (declare (ignore warn))
+  (assert fail)
+  (assert-error (funcall fun) sb-int:invalid-array-index-error))
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (aref (make-array 1) 1)))
   (declare (ignore warn))
   (assert fail)
-  (assert-error (funcall fun) type-error))
+  (assert-error (funcall fun) sb-int:invalid-array-index-error))
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (make-array 5 :element-type 'undefined-type)))

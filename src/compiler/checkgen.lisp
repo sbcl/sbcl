@@ -512,16 +512,17 @@
                    (casts node)))))
         (setf (block-type-check block) nil)))
     (dolist (cast (casts))
-      (multiple-value-bind (check types) (cast-check-types cast)
-        (ecase check
-          (:simple
-           (convert-type-check cast types))
-          (:too-hairy
-           (let ((*compiler-error-context* cast))
-             (when (policy cast (>= safety inhibit-warnings))
-               (compiler-notify
-                "type assertion too complex to check:~% ~S."
-                (type-specifier (coerce-to-values (cast-asserted-type cast))))))
-           (setf (cast-type-to-check cast) *wild-type*)
-           (setf (cast-%type-check cast) nil))))))
+      (unless (bound-cast-p cast)
+        (multiple-value-bind (check types) (cast-check-types cast)
+          (ecase check
+            (:simple
+             (convert-type-check cast types))
+            (:too-hairy
+             (let ((*compiler-error-context* cast))
+               (when (policy cast (>= safety inhibit-warnings))
+                 (compiler-notify
+                  "type assertion too complex to check:~% ~S."
+                  (type-specifier (coerce-to-values (cast-asserted-type cast))))))
+             (setf (cast-type-to-check cast) *wild-type*)
+             (setf (cast-%type-check cast) nil)))))))
   (values))

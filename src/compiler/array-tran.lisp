@@ -971,26 +971,10 @@
               "The array type is ambiguous; must call ~
                ARRAY-HAS-FILL-POINTER-P at runtime.")))))))
 
-(defoptimizer (%check-bound optimizer) ((array bound index) node)
-  (when (constant-lvar-p bound)
-    (let* ((bound-type (specifier-type `(integer 0 (,(lvar-value bound)))))
-           (index-type (lvar-type index)))
-      (when (eq (type-intersection bound-type index-type)
-                *empty-type*)
-        (let ((*compiler-error-context* node))
-          (compiler-warn "Derived type ~s is not a suitable index for ~s."
-                         (type-specifier index-type)
-                         (type-specifier (lvar-type array))))))))
-
 (deftransform check-bound ((array dimension index) * * :node node)
-  (cond ((policy node (= insert-array-bounds-checks 0))
-         'index)
-        ((not (constant-lvar-p dimension))
-         `(%check-bound array dimension index))
-        (t
-         `(progn
-            (%check-bound array dimension index)
-            (truly-the (integer 0 ,(lvar-value dimension)) index)))))
+  ;; This is simply to avoid multiple evaluation of INDEX by the
+  ;; translator, it's easier to wrap it in a lambda from DEFTRANSFORM
+  `(bound-cast array dimension index))
 
 ;;;; WITH-ARRAY-DATA
 

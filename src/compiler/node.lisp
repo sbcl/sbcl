@@ -1465,6 +1465,22 @@
   type-to-check
   vestigial-exit-lexenv
   vestigial-exit-entry-lexenv)
+
+;;; A cast that always follows %check-bound and they are deleted together.
+;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.
+;;; IR1-OPTIMIZE-CAST handles propagation from BOUND to CAST-ASSERTED-TYPE
+;;; DELETE-CAST deletes BOUND-CAST-CHECK
+;;; GENERATE-TYPE-CHECKS ignores it, it never translates to a type check,
+;;; %CHECK-BOUND does all the checking.
+(def!struct (bound-cast (:include cast (%type-check nil)))
+  ;; %check-bound combination before the cast
+  (check (missing-arg) :type combination)
+  ;; Tells whether the type information is in a state where it can be
+  ;; optimized away, i.e. when BOUND is a constant.
+  (derived nil :type boolean)
+  (array (missing-arg) :type lvar)
+  (bound (missing-arg) :type lvar))
+
 
 ;;;; non-local exit support
 ;;;;

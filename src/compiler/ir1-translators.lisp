@@ -952,6 +952,31 @@ Consequences are undefined if any result is not of the declared type
 care."
   (the-in-policy value-type form **zero-typecheck-policy** start next result))
 
+(def-ir1-translator bound-cast ((array bound index) start next result)
+  (let ((check-bound-tran (make-ctran))
+        (index-ctran (make-ctran))
+        (index-lvar (make-lvar)))
+    ;; CHECK-BOUND transform ensure that INDEX won't be evaluated twice
+    (ir1-convert start check-bound-tran nil `(%check-bound ,array ,bound ,index))
+    (ir1-convert check-bound-tran index-ctran index-lvar index)
+    (let* ((check-bound-combination (ctran-use check-bound-tran))
+           (array (first (combination-args check-bound-combination)))
+           (bound (second (combination-args check-bound-combination)))
+           (derived (constant-lvar-p bound))
+           (type (specifier-type (if derived
+                                     `(integer 0 (,(lvar-value bound)))
+                                     '(and unsigned-byte fixnum))))
+           (cast (make-bound-cast :value index-lvar
+                                  :asserted-type type
+                                  :type-to-check type
+                                  :derived-type (coerce-to-values type)
+                                  :check check-bound-combination
+                                  :derived derived
+                                  :array array
+                                  :bound bound)))
+      (link-node-to-previous-ctran cast index-ctran)
+      (setf (lvar-dest index-lvar) cast)
+      (use-continuation cast next result))))
 #-sb-xc-host
 (setf (info :function :macro-function 'truly-the)
       (lambda (whole env)
