@@ -73,17 +73,16 @@
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (bound :scs (any-reg descriptor-reg))
-         (index :scs (any-reg descriptor-reg) :target result))
-  (:results (result :scs (any-reg descriptor-reg)))
+         (index :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index)))
+      (%test-fixnum index error t :temp temp)
       (inst cmplw index bound)
-      (inst bge error)
-      (move result index))))
-
+      (inst bge error))))
 
 
 ;;;; Accessors/Setters

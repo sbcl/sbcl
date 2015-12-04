@@ -1596,7 +1596,7 @@
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer
   (movable foldable flushable))
 (defknown %negate (number) number (movable foldable flushable))
-(defknown (%check-bound check-bound) (array index fixnum) index
+(defknown (%check-bound check-bound) (array index t) index
   (dx-safe))
 (defknown data-vector-ref (simple-array index) t
   (foldable unsafely-flushable always-translatable))

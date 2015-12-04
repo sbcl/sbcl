@@ -124,25 +124,23 @@
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (bound :scs (any-reg))
-         (index :scs (any-reg #+nil immediate) :target result))
-  (:arg-types * positive-fixnum tagged-num)
-  (:results (result :scs (any-reg)))
-  (:result-types positive-fixnum)
+         (index :scs (any-reg descriptor-reg #+nil immediate)))
+  (:arg-types * positive-fixnum *)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index))
           (index (if (sc-is index immediate)
-                   (fixnumize (tn-value index))
-                   index)))
+                     (fixnumize (tn-value index))
+                     index)))
+      (unless (integerp index)
+        (%test-fixnum index error t))
       (inst cmp bound index)
       ;; We use below-or-equal even though it's an unsigned test,
       ;; because negative indexes appear as large unsigned numbers.
       ;; Therefore, we get the <0 and >=bound test all rolled into one.
-      (inst jmp :be error)
-      (unless (and (tn-p index) (location= result index))
-        (inst mov result index)))))
+      (inst jmp :be error))))
 
 ;;;; accessors/setters
 

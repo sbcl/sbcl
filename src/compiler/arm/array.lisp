@@ -83,21 +83,21 @@
     (inst mov temp (asr temp n-widetag-bits))
     (inst sub temp temp (1- array-dimensions-offset))
     (inst mov res (lsl temp n-fixnum-tag-bits))))
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (bound :scs (any-reg descriptor-reg))
-         (index :scs (any-reg descriptor-reg) :target result))
-  (:results (result :scs (any-reg descriptor-reg)))
+         (index :scs (any-reg descriptor-reg)))
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error array bound index)))
+      (%test-fixnum index error t)
       (inst cmp index bound)
-      (inst b :hs error)
-      (move result index))))
+      (inst b :hs error))))
 
 ;;;; Accessors/Setters
 

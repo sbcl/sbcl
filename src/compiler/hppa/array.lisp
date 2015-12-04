@@ -64,15 +64,14 @@
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (bound :scs (any-reg descriptor-reg))
-         (index :scs (any-reg descriptor-reg) :target result))
-  (:results (result :scs (any-reg descriptor-reg)))
+         (index :scs (any-reg descriptor-reg)))
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index)))
-      (inst bc :>>= nil index bound error))
-    (move index result)))
+      (%test-fixnum index error t)
+      (inst bc :>>= nil index bound error))))
 
 
 ;;;; Accessors/Setters

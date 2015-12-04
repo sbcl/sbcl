@@ -773,7 +773,7 @@ of specialized arrays is supported."
                `(array ,et ,dims)
                `(vector ,et ,@dims)))))
 
-(declaim (ftype (function (array integer integer &optional t) nil)
+(declaim (ftype (function (array t integer &optional t) nil)
                 invalid-array-index-error))
 (defun invalid-array-index-error (array index bound &optional axis)
   (if (invalid-array-p array)

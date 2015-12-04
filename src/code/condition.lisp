@@ -999,8 +999,8 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (:report
    (lambda (condition stream)
      (let ((array (invalid-array-index-error-array condition)))
-       (format stream "Index ~W out of bounds for ~@[axis ~W of ~]~S, ~
-                       should be nonnegative and <~W."
+       (format stream "Invalid index ~W for ~@[axis ~W of ~]~S, ~
+                       should be a non-negative integer below ~W."
                (type-error-datum condition)
                (when (> (array-rank array) 1)
                  (invalid-array-index-error-axis condition))
