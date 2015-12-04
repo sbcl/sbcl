@@ -5,6 +5,8 @@ changes relative to sbcl-1.3.1
     of short sequences and stream types
   * bug fix: WRITE-SEQUENCE no longer fails to write lists containing integers
     to bivalent streams
+  * bug fix: LOGTEST (and hence ODDP) no longer conses when given fixnum
+    arguments and small bit positions.  (lp#1277690)
 
 changes in sbcl-1.3.1 relative to sbcl-1.3.0:
   * enhancement: SB-THREAD support for ARM64.

@@ -3534,6 +3534,7 @@
 (deftransform mask-signed-field ((size x) ((constant-arg t) *) *)
   "fold identity operation"
   (let ((size (lvar-value size)))
+    (when (= size 0) (give-up-ir1-transform))
     (unless (csubtypep (lvar-type x) (specifier-type `(signed-byte ,size)))
       (give-up-ir1-transform))
     'x))
