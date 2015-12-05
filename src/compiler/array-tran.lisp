@@ -979,7 +979,10 @@
 (deftransform check-bound ((array dimension index) * * :node node)
   ;; This is simply to avoid multiple evaluation of INDEX by the
   ;; translator, it's easier to wrap it in a lambda from DEFTRANSFORM
-  `(bound-cast array dimension index))
+  `(bound-cast array ,(if (constant-lvar-p dimension)
+                          (lvar-value dimension)
+                          'dimension)
+               index))
 
 ;;;; WITH-ARRAY-DATA
 

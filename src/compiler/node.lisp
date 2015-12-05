@@ -1474,7 +1474,7 @@
 ;;; %CHECK-BOUND does all the checking.
 (def!struct (bound-cast (:include cast (%type-check nil)))
   ;; %check-bound combination before the cast
-  (check (missing-arg) :type combination)
+  (check (missing-arg) :type (or null combination))
   ;; Tells whether the type information is in a state where it can be
   ;; optimized away, i.e. when BOUND is a constant.
   (derived nil :type boolean)

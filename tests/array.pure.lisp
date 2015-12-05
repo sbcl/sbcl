@@ -351,3 +351,15 @@
     (setf (aref a 0 0) 11)
     (assert (zerop (aref b 0 0)))
     (assert (not (eq a b)))))
+
+(with-test (:name :check-bound-elision)
+  (assert-error (funcall (compile nil `(lambda (x)
+                                         (char "abcd" x)))
+                         4)
+                sb-int:invalid-array-index-error)
+  (assert (eql (funcall (compile nil `(lambda (x)
+                                        (declare (optimize (safety 0)))
+                                        ;; Strins are null-terminated for C interoperability
+                                        (char "abcd" x)))
+                        4)
+               #\Nul)))

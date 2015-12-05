@@ -2193,8 +2193,10 @@
   (declare (type cast cast))
   (let ((value (cast-value cast))
         (lvar (cast-lvar cast)))
-    (when (bound-cast-p cast)
-      (flush-combination (bound-cast-check cast)))
+    (when (and (bound-cast-p cast)
+               (bound-cast-check cast))
+      (flush-combination (bound-cast-check cast))
+      (setf (bound-cast-check cast) nil))
     (delete-filter cast lvar value)
     (when lvar
       (reoptimize-lvar lvar)
@@ -2237,6 +2239,7 @@
     (unless (or do-not-optimize
                 (not (may-delete-vestigial-exit cast)))
       (when (and (bound-cast-p cast)
+                 (bound-cast-check cast)
                  (constant-lvar-p (bound-cast-bound cast)))
         (setf atype
               (specifier-type `(integer 0 (,(lvar-value (bound-cast-bound cast)))))
@@ -2275,7 +2278,13 @@
                              (eq (basic-combination-kind use) :local))
                     (merges use))))
               (dolist (use (merges))
-                (merge-tail-sets use)))))))
+                (merge-tail-sets use))))))
+
+      (when (and (bound-cast-p cast)
+                 (bound-cast-check cast)
+                 (policy cast (= insert-array-bounds-checks 0)))
+        (flush-combination (bound-cast-check cast))
+        (setf (bound-cast-check cast) nil)))
 
     (let* ((value-type (lvar-derived-type value))
            (int (values-type-intersection value-type atype)))
