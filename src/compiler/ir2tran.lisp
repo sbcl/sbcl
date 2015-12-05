@@ -1124,6 +1124,19 @@
          (fname (lvar-fun-name lvar t)))
     (declare (type (or symbol cons) fname))
 
+    ;; Warn about cross-compiling certain full-calls,
+    ;; as it is indicative of dependency order problems.
+    #+sb-xc-host
+    (let ((compname (component-name (node-component node))))
+      ;; Don't care too much about macro performance.
+      (unless (and (stringp compname) (string/= compname "DEF!MACRO"))
+        ;; Catch FOO and (SETF FOO) both.
+        (let ((stem (if (atom fname) fname (second fname))))
+          (when (member stem
+                        sb-cold::*full-calls-to-warn-about*
+                        :test #'string=)
+            (warn "Full call to ~S" fname)))))
+
     (let* ((inlineable-p (not (let ((*lexenv* (node-lexenv node)))
                                 (fun-lexically-notinline-p fname))))
            (inlineable-bit (if inlineable-p 1 0))

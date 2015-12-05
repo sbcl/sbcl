@@ -116,8 +116,10 @@
                  (push (cons name cell) likely-suspicious)
                  (push (cons name cell) possibly-suspicious))))))
     (flet ((show (label list)
-             (format t "~%~A suspicious calls:~:{~%~*~4d ~0@*~S~*~@{~%     ~S~}~}~%"
-                     label (sort list #'> :key #'cadr))))
+             (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
+                     label
+                     (mapcar (lambda (x) (list* (ash (cadr x) -2) (car x) (cddr x)))
+                             (sort list #'> :key #'cadr)))))
       ;; Called inlines not in the presence of a declaration to the contrary
       ;; indicate that perhaps the function definition appeared too late.
       (show "Likely" likely-suspicious)

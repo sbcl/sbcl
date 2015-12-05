@@ -9,6 +9,10 @@
 
 (in-package "SB-COLD")
 
+(defparameter *full-calls-to-warn-about*
+  '(;mask-signed-field ;; Too many to fix
+    ))
+
 (export '*symbol-values-for-genesis*)
 (let ((pathname "output/init-symbol-values.lisp-expr"))
   (defvar *symbol-values-for-genesis*
