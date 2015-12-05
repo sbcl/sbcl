@@ -14,14 +14,6 @@
 ;;;; DYNAMIC-USAGE and friends
 
 #!-sb-fluid
-(declaim (inline current-dynamic-space-start))
-#!+gencgc
-(defun current-dynamic-space-start () sb!vm:dynamic-space-start)
-#!-gencgc
-(defun current-dynamic-space-start ()
-  (extern-alien "current_dynamic_space" unsigned-long))
-
-#!-sb-fluid
 (declaim (inline dynamic-usage))
 #!+gencgc
 (defun dynamic-usage ()

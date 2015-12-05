@@ -22,3 +22,5 @@
     pathname random-state ratio rational real readtable sequence
     short-float simple-array simple-bit-vector simple-string simple-vector
     single-float standard-char stream string base-char symbol t vector))
+
+(defvar sb!sys::*software-version* nil)

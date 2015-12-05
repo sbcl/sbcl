@@ -143,6 +143,14 @@
                *static-space-free-pointer*
                *read-only-space-free-pointer*))
 
+#!-sb-fluid
+(declaim (inline current-dynamic-space-start))
+#!+gencgc
+(defun current-dynamic-space-start () sb!vm:dynamic-space-start)
+#!-gencgc
+(defun current-dynamic-space-start ()
+  (extern-alien "current_dynamic_space" unsigned-long))
+
 (defun space-bounds (space)
   (declare (type spaces space))
   (ecase space

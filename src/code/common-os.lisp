@@ -11,8 +11,6 @@
 
 (in-package "SB!SYS")
 
-(defvar *software-version* nil)
-
 (sb!alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
 (sb!alien:define-alien-variable ("core_string" *native-core-string*) (* char))
 (sb!alien:define-alien-routine
