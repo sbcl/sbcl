@@ -16,16 +16,18 @@
 (use-package "ASSERTOID")
 (use-package "TEST-UTIL")
 
+(defmacro silently (&rest things)
+  `(let ((*standard-output* (make-broadcast-stream))) ,@things))
 
 ;; Interpreted closure is a problem for COMPILE
 (with-test (:name :disassemble :skipped-on :interpreter)
 ;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
   (defun disassemble-fun (x) x)
-  (disassemble 'disassemble-fun))
+  (silently (disassemble 'disassemble-fun)))
 
 (with-test (:name :disassemble-closure :skipped-on :interpreter)
   (let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
-  (disassemble 'disassemble-closure))
+  (silently (disassemble 'disassemble-closure)))
 
 #+sb-eval
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -39,20 +41,20 @@
     ;; Nor should it fail on interpreted functions
     (let ((sb-ext:*evaluator-mode* :interpret))
       (eval `(defun disassemble-eval (x) x))
-      (disassemble 'disassemble-eval))
+      (silently (disassemble 'disassemble-eval)))
 
     ;; disassemble-eval should still be an interpreted function.
     ;; clhs disassemble: "(If that function is an interpreted function,
     ;; it is first compiled but the result of this implicit compilation
     ;; is not installed.)"
-    (assert (interpreted-function-p #'disassemble-eval)))
+    (assert (interpreted-function-p (symbol-function 'disassemble-eval))))
 
 (with-test (:name :disassemble-generic)
   ;; nor should it fail on generic functions or other funcallable instances
   (defgeneric disassemble-generic (x))
-  (disassemble 'disassemble-generic)
+  (silently (disassemble 'disassemble-generic))
   (let ((fin (make-instance 'sb-mop:funcallable-standard-object)))
-    (disassemble fin)))
+    (silently (disassemble fin))))
 
 ;;; while we're at it, much the same applies to
 ;;; FUNCTION-LAMBDA-EXPRESSION:
@@ -76,10 +78,10 @@
     (progn
       (let ((sb-ext:*evaluator-mode* :interpret))
         (eval `(defun fle-eval (x) x))
-        (assert (eql (fle-name #'fle-eval) 'fle-eval)))
+        (assert (eql (fle-name (symbol-function 'fle-eval)) 'fle-eval)))
 
       ;; fle-eval should still be an interpreted function.
-      (assert (interpreted-function-p #'fle-eval)))))
+      (assert (interpreted-function-p (symbol-function 'fle-eval))))))
 
 
 ;;; support for DESCRIBE tests
@@ -89,11 +91,12 @@
   (eval `(let (x) (defun closure-to-describe () (incf x)))))
 
 (with-test (:name :describe-empty-gf)
-  (describe (make-instance 'generic-function))
-  (describe (make-instance 'standard-generic-function)))
+  (silently (describe (make-instance 'generic-function)))
+  (silently (describe (make-instance 'standard-generic-function))))
 
 ;;; DESCRIBE should run without signalling an error.
 (with-test (:name (describe :no-error))
+ (silently
   (describe (make-to-be-described))
   (describe 12)
   (describe "a string")
@@ -102,7 +105,7 @@
   (describe '(a list))
   (describe #(a vector))
 ;; bug 824974
-  (describe 'closure-to-describe))
+  (describe 'closure-to-describe)))
 
 ;;; The DESCRIBE-OBJECT methods for built-in CL stuff should do
 ;;; FRESH-LINE and TERPRI neatly.
@@ -357,7 +360,7 @@
   ;; Signalled an error at one point
   (flet ((zoo () (gogo)))
     (defmethod gogo () nil)
-    (describe 'gogo)))
+    (silently (describe 'gogo))))
 
 (defmacro bug-643958-test ()
   "foo"
