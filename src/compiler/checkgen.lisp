@@ -497,7 +497,8 @@
 (defun generate-type-checks (component)
   (collect ((casts))
     (do-blocks (block component)
-      (when (block-type-check block)
+      (when (and (block-type-check block)
+                 (not (block-delete-p block)))
         ;; CAST-EXTERNALLY-CHECKABLE-P wants the backward pass
         (do-nodes-backwards (node nil block)
           (when (and (cast-p node)

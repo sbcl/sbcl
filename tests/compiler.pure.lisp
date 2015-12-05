@@ -5691,3 +5691,11 @@
                               (array-dimension array 0)))
               #(1 2 3))
      3))
+
+(with-test (:name :generate-type-checks-on-dead-blocks)
+  (assert (equalp (funcall (compile nil `(lambda (a b)
+                                          (declare (optimize (safety 3))
+                                                   (type (member vector 42) a))
+                                          (map a 'list (the vector b) #*)))
+                          'vector #())
+                 #())))
