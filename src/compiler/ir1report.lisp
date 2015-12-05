@@ -544,6 +544,7 @@ has written, having proved that it is unreachable."))
 ;;; WITH-COMPILATION-UNIT, which can potentially be invoked outside
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
+  (setq name (uncross name))
   (unless (and
            ;; Check for boundness so we don't blow up if we're called
            ;; when IR1 conversion isn't going on.
