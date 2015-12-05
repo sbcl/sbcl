@@ -92,9 +92,7 @@
       (sb!int:info :function :macro-function 'sb!int:quasiquote)
       (cl:macro-function 'sb!int:quasiquote))
 (setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
-(progn ; Should be: sb-xc:with-compilation-unit () ... but
-  ;; leaving aside the question of building in any host - which shouldn't
-  ;; matter - building SBCL in SBCL can hang in a way I haven't tracked down.
+(sb-xc:with-compilation-unit ()
   (load "src/cold/compile-cold-sbcl.lisp"))
 
 (when sb!c::*track-full-called-fnames*
