@@ -608,12 +608,6 @@
 
 ) ; #+x86 PROGN
 
-;;; Convert the descriptor into a SAP. The bits all stay the same, we just
-;;; change our notion of what we think they are.
-#!-sb-fluid (declaim (inline descriptor-sap))
-(defun descriptor-sap (x)
-  (int-sap (get-lisp-obj-address x)))
-
 ;;; Return the top frame of the control stack as it was before calling
 ;;; this function.
 (defun top-frame ()

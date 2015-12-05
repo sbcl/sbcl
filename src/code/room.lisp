@@ -709,6 +709,15 @@
        space)
       res)))
 
+;;; Convert the descriptor into a SAP. The bits all stay the same, we just
+;;; change our notion of what we think they are.
+;;;
+;;; Defining this here (as opposed to in 'debug-int' where it belongs)
+;;; is the path of least resistance to avoiding an inlining failure warning.
+#!-sb-fluid (declaim (inline sb!di::descriptor-sap))
+(defun sb!di::descriptor-sap (x)
+  (int-sap (get-lisp-obj-address x)))
+
 ;;; Calls FUNCTION with all object that have (possibly conservative)
 ;;; references to them on current stack.
 (defun map-stack-references (function)
