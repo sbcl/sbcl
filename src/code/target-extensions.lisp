@@ -79,15 +79,6 @@ exit(3) directly will circumvent these hooks.")
     (recurse 0 (truncate (length vector) 2))))
 
 
-;;; like LISTEN, but any whitespace in the input stream will be flushed
-(defun listen-skip-whitespace (&optional (stream *standard-input*))
-  (do ((char (read-char-no-hang stream nil nil nil)
-             (read-char-no-hang stream nil nil nil)))
-      ((null char) nil)
-    (cond ((not (whitespace[1]p char))
-           (unread-char char stream)
-           (return t)))))
-
 ;;;; helpers for C library calls
 
 ;;; Signal a SIMPLE-CONDITION/ERROR condition associated with an ANSI C

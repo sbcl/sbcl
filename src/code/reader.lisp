@@ -1945,3 +1945,12 @@ extended <package-name>::<form-in-package> syntax."
   (unless (null new-alist)
     (error "Assignment to virtual DISPATCH-TABLES slot not allowed"))
   new-alist)
+
+;;; like LISTEN, but any whitespace in the input stream will be flushed
+(defun listen-skip-whitespace (&optional (stream *standard-input*))
+  (do ((char (read-char-no-hang stream nil nil nil)
+             (read-char-no-hang stream nil nil nil)))
+      ((null char) nil)
+    (cond ((not (whitespace[1]p char))
+           (unread-char char stream)
+           (return t)))))
