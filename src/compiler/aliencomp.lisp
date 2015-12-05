@@ -611,6 +611,7 @@
     `(lambda (function ,@names)
        (alien-funcall (deref function) ,@names))))
 
+#-sb-xc-host
 (defun find-saved-fp-and-pc (fp)
   (dolist (x *saved-fp-and-pcs*)
     (declare (type (simple-array word (2)) x))
