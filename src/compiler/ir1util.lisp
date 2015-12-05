@@ -850,20 +850,19 @@
 
 #!-sb-fluid (declaim (inline lvar-single-value-p))
 (defun lvar-single-value-p (lvar)
-  (or (not lvar)
-      (let ((dest (lvar-dest lvar)))
-        (typecase dest
-          ((or creturn exit)
-           nil)
-          (mv-combination
-           (eq (basic-combination-fun dest) lvar))
-          (cast
-           (locally
-               (declare (notinline lvar-single-value-p))
-             (and (cast-single-value-p dest)
-                  (lvar-single-value-p (node-lvar dest)))))
-          (t
-           t)))))
+  (or (not lvar) (%lvar-single-value-p lvar)))
+(defun %lvar-single-value-p (lvar)
+  (let ((dest (lvar-dest lvar)))
+    (typecase dest
+      ((or creturn exit)
+       nil)
+      (mv-combination
+       (eq (basic-combination-fun dest) lvar))
+      (cast
+       (and (cast-single-value-p dest)
+            (acond ((node-lvar dest) (%lvar-single-value-p it))
+                   (t t))))
+      (t t))))
 
 (defun principal-lvar-end (lvar)
   (loop for prev = lvar then (node-lvar dest)
