@@ -199,6 +199,11 @@
  ("src/code/maphash" :not-host)
  ("src/code/pred" :not-host)
 
+ ("src/compiler/generic/vm-array")
+ ("src/code/weak"          :not-host)
+ ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
+ ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
+
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)
  ("src/code/target-allocate"  :not-host)
@@ -206,9 +211,6 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
- ("src/compiler/generic/vm-array")
- ("src/code/weak"          :not-host)
- ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/early-float"   :not-host)
  ("src/pcl/early-low" :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
