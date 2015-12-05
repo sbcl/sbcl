@@ -464,7 +464,7 @@ variable: an unreadable object representing the error is printed instead.")
      (output-fdefn object stream))
     #!+sb-simd-pack
     (simd-pack
-     (output-simd-pack object stream))
+     (print-object object stream))
     (t
      (output-random object stream))))
 
@@ -1733,31 +1733,29 @@ variable: an unreadable object representing the error is printed instead.")
           ;; (You'd get crashes in INTERNAL-NAME-P and other places)
           (format stream "(~{~S~^ ~})" name)))))
 
+;;; Making this a DEFMETHOD defers its compilation until after the inline
+;;; functions %SIMD-PACK-{SINGLES,DOUBLES,UB64S} get defined.
 #!+sb-simd-pack
-(defun output-simd-pack (pack stream)
-  (declare (type simd-pack pack))
+(defmethod print-object ((pack simd-pack) stream)
   (cond ((and *print-readably* *read-eval*)
-         (etypecase pack
-           ((simd-pack double-float)
-            (multiple-value-call #'format stream
-              "#.(~S ~S ~S)"
-              '%make-simd-pack-double
-              (%simd-pack-doubles pack)))
-           ((simd-pack single-float)
-            (multiple-value-call #'format stream
-              "#.(~S ~S ~S ~S ~S)"
-              '%make-simd-pack-single
-              (%simd-pack-singles pack)))
-           (t
-            (multiple-value-call #'format stream
-              "#.(~S #X~16,'0X #X~16,'0X)"
-              '%make-simd-pack-ub64
-              (%simd-pack-ub64s pack)))))
+         (multiple-value-bind (format maker extractor)
+             (etypecase pack
+               ((simd-pack double-float)
+                (values "#.(~S ~S ~S)"
+                        '%make-simd-pack-double #'%simd-pack-doubles))
+               ((simd-pack single-float)
+                (values "#.(~S ~S ~S ~S ~S)"
+                        '%make-simd-pack-single #'%simd-pack-singles))
+               (t
+                (values "#.(~S #X~16,'0X #X~16,'0X)"
+                        '%make-simd-pack-ub64 #'%simd-pack-ub64s)))
+           (multiple-value-call
+            #'format stream format maker (funcall extractor pack))))
         (t
          (print-unreadable-object (pack stream)
            (flet ((all-ones-p (value start end &aux (mask (- (ash 1 end) (ash 1 start))))
                       (= (logand value mask) mask))
-                    (split-num (value start)
+                  (split-num (value start)
                       (loop
                          for i from 0 to 3
                          and v = (ash value (- start)) then (ash v -8)
