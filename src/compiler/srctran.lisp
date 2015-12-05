@@ -417,12 +417,6 @@
     (%make-interval :low (normalize-bound low)
                     :high (normalize-bound high))))
 
-;;; Given a number X, create a form suitable as a bound for an
-;;; interval. Make the bound open if OPEN-P is T. NIL remains NIL.
-#!-sb-fluid (declaim (inline set-bound))
-(defun set-bound (x open-p)
-  (if (and x open-p) (list x) x))
-
 ;;; Apply the function F to a bound X. If X is an open bound and the
 ;;; function is declared strictly monotonic, then the result will be
 ;;; open. IF X is NIL, the result is NIL.
