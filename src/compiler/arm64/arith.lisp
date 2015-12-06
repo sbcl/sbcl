@@ -431,20 +431,24 @@
                 (:note "inline ASH")
                 (:translate ash)
                 (:args (number :scs (,sc-type))
-                       (amount :scs (signed-reg unsigned-reg)
-                               :target temp))
-                (:temporary (:sc non-descriptor-reg) temp)
+                       (amount :scs (signed-reg unsigned-reg)))
+                ;; For modular variants
+                (:variant-vars cut)
                 (:arg-types ,type positive-fixnum)
                 (:results (result :scs (,result-type)))
                 (:result-types ,type)
                 (:policy :fast-safe)
                 (:generator ,cost
-                  (move temp amount)
-                  (inst cmp temp sb!vm:n-word-bits)
-                  (inst b :lt do)
-                  (inst mov temp (1- sb!vm:n-word-bits))
-                  do
-                  (inst lsl result number temp)))))
+                  (let ((amount (cond (cut
+                                       (inst cmp amount sb!vm:n-word-bits)
+                                       ;; Only the first 6 bits count for shifts.
+                                       ;; This sets all bits to 1 if AMOUNT is larger than 63,
+                                       ;; cutting the amount to 63.
+                                       (inst csinv tmp-tn amount zr-tn :lt)
+                                       tmp-tn)
+                                      (t
+                                       amount))))  
+                    (inst lsl result number amount))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
@@ -491,6 +495,7 @@
 
 (define-vop (fast-ash-left-modfx/fixnum=>fixnum
              fast-ash-left/fixnum=>fixnum)
+  (:variant t)
   (:translate ash-left-modfx))
 
 (define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
@@ -503,10 +508,12 @@
 
 (define-vop (fast-ash-left-mod64/fixnum=>fixnum
              fast-ash-left/fixnum=>fixnum)
+  (:variant t)
   (:translate ash-left-mod64))
 
 (define-vop (fast-ash-left-mod64/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned)
+  (:variant t)
   (:translate ash-left-mod64))
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
