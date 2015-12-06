@@ -432,8 +432,8 @@ returns NIL each time."
 designated by UPDATE-FN with ARGUMENTS and the previous value of PLACE.
 
 PLACE may be read and UPDATE-FN evaluated and called multiple times before the
-update succeeds: atomicity in this context means that value of place did not
-change between the time it was read, and the time it was replaced with the
+update succeeds: atomicity in this context means that the value of PLACE did
+not change between the time it was read, and the time it was replaced with the
 computed value.
 
 PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP.

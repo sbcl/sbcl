@@ -122,7 +122,7 @@ places via e.g. @code{defcas}.
 
 At the same time, new atomic operations can be built on top of CAS
 using @code{get-cas-expansion}. See @code{atomic-update},
-@code{atomic-push}, and €@code{atomic-pop} for example of how to do
+@code{atomic-push}, and @code{atomic-pop} for examples of how to do
 this.
 
 @include macro-sb-ext-cas.texinfo
