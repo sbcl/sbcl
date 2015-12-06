@@ -337,6 +337,10 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
         addr=under_2gb_free_pointer;
     }
 #endif
+
+    if (addr)
+        flags |= MAP_FIXED;
+
     actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
     if (actual == MAP_FAILED) {
         perror("mmap");
