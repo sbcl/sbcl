@@ -824,7 +824,7 @@ constant shift greater than word length")))
           (t
            (move result number)
            (cond ((< -64 amount 64) ;; XXXX
-                  ;; this code is used both in ASH and ASH-MOD32, so
+                  ;; this code is used both in ASH and ASH-MOD64, so
                   ;; be careful
                   (if (plusp amount)
                       (inst shl result amount)
@@ -1406,7 +1406,7 @@ constant shift greater than word length")))
   (:arg-types * (:constant fixnum))
   (:variant-cost 6))
 
-;;;; 32-bit logical operations
+;;;; 64-bit logical operations
 
 ;;; Only the lower 6 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)

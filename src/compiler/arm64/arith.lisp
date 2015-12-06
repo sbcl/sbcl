@@ -345,14 +345,6 @@
     (inst asr temp number (min (- amount) 63))
     (inst and result temp (bic-mask fixnum-tag-mask))))
 
-(define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
-             fast-ash-left-c/fixnum=>fixnum)
-  (:translate ash-left-modfx))
-
-(define-vop (fast-ash-left-mod64-c/fixnum=>fixnum
-             fast-ash-left-c/fixnum=>fixnum)
-  (:translate ash-left-mod64))
-
 (define-vop (fast-ash-c/unsigned=>unsigned)
   (:translate ash)
   (:policy :fast-safe)
@@ -386,14 +378,6 @@
                (inst asr result number (- amount))))
           (t
            (inst mov result 0)))))
-
-(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
-             fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-mod64))
-
-(define-vop (fast-ash-left-mod64-c/signed=>signed
-             fast-ash-c/signed=>signed)
-  (:translate ash-left-mod64))
 
 (define-vop (fast-ash/signed/unsigned)
   (:note "inline ASH")
@@ -467,10 +451,6 @@
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
-(define-vop (fast-ash-left-mod64/unsigned=>unsigned
-             fast-ash-left/unsigned=>unsigned)
-  (:translate ash-left-mod64))
-
 #!+ash-right-vops
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
@@ -508,6 +488,30 @@
   (:generator 3
     (inst asr temp number amount)
     (inst and result temp (bic-mask fixnum-tag-mask))))
+
+(define-vop (fast-ash-left-modfx/fixnum=>fixnum
+             fast-ash-left/fixnum=>fixnum)
+  (:translate ash-left-modfx))
+
+(define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
+             fast-ash-left-c/fixnum=>fixnum)
+  (:translate ash-left-modfx))
+
+(define-vop (fast-ash-left-mod64-c/fixnum=>fixnum
+             fast-ash-left-c/fixnum=>fixnum)
+  (:translate ash-left-mod64))
+
+(define-vop (fast-ash-left-mod64/fixnum=>fixnum
+             fast-ash-left/fixnum=>fixnum)
+  (:translate ash-left-mod64))
+
+(define-vop (fast-ash-left-mod64/unsigned=>unsigned
+             fast-ash-left/unsigned=>unsigned)
+  (:translate ash-left-mod64))
+
+(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
+             fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-mod64))
 
 ;;; Only the lower 6 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)
@@ -674,31 +678,50 @@
   (:generator 1
     (inst mvn res x)))
 
-(macrolet
-    ((define-modular-backend (fun &optional constantp)
-       (let ((mfun-name (symbolicate fun '-mod64))
-             (modvop (symbolicate 'fast- fun '-mod64/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun 'mod64-c/unsigned=>unsigned))
-             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
-             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
-         `(progn
-            (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 64)
-            (define-vop (,modvop ,vop)
-              (:translate ,mfun-name))
-            ,@(when constantp
-                `((define-vop (,modcvop ,cvop)
-                    (:translate ,mfun-name))))))))
-  (define-modular-backend +)
-  (define-modular-backend -)
-  (define-modular-backend *)
-  ;; (define-modular-backend logeqv)
-  ;; (define-modular-backend lognand)
-  ;; (define-modular-backend lognor)
-  (define-modular-backend logandc1)
-  (define-modular-backend logandc2)
-  ;; (define-modular-backend logorc1)
-  ;; (define-modular-backend logorc2)
-  )
+(defmacro define-mod-binop ((name prototype) function)
+  `(define-vop (,name ,prototype)
+     (:args (x :target r :scs (unsigned-reg signed-reg))
+            (y :scs (unsigned-reg signed-reg)))
+     (:arg-types untagged-num untagged-num)
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+
+(defmacro define-mod-binop-c ((name prototype) function)
+  `(define-vop (,name ,prototype)
+     (:args (x :target r :scs (unsigned-reg signed-reg)))
+     (:info y)
+     (:arg-types untagged-num (:constant (or word
+                                             signed-word)))
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+
+(macrolet ((def (name -c-p)
+             (let ((fun64 (intern (format nil "~S-MOD64" name)))
+                   (vopu (intern (format nil "FAST-~S/UNSIGNED=>UNSIGNED" name)))
+                   (vopcu (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
+                   (vopf (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
+                   (vopcf (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name)))
+                   (vop64u (intern (format nil "FAST-~S-MOD64/WORD=>UNSIGNED" name)))
+                   (vop64f (intern (format nil "FAST-~S-MOD64/FIXNUM=>FIXNUM" name)))
+                   (vop64cu (intern (format nil "FAST-~S-MOD64-C/WORD=>UNSIGNED" name)))
+                   (funfx (intern (format nil "~S-MODFX" name)))
+                   (vopfxf (intern (format nil "FAST-~S-MODFX/FIXNUM=>FIXNUM" name)))
+                   (vopfxcf (intern (format nil "FAST-~S-MODFX-C/FIXNUM=>FIXNUM" name))))
+               `(progn
+                  (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
+                  (define-modular-fun ,funfx (x y) ,name :tagged t
+                                      #.(- n-word-bits n-fixnum-tag-bits))
+                  (define-mod-binop (,vop64u ,vopu) ,fun64)
+                  (define-vop (,vop64f ,vopf) (:translate ,fun64))
+                  (define-vop (,vopfxf ,vopf) (:translate ,funfx))
+                  ,@(when -c-p
+                      `((define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
+                        (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
+  (def + t)
+  (def - t)
+  (def * nil))
 
 ;;;; Binary conditional VOPs:
 
