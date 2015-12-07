@@ -2497,13 +2497,18 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
 {
     while (words > 0) {
         size_t count = 1;
-        lispobj thing = *start;
+        lispobj *forwarded_start;
 
+        if (forwarding_pointer_p(start))
+            forwarded_start = native_pointer(forwarding_pointer_value(start));
+        else
+            forwarded_start = start;
+        lispobj thing = *forwarded_start;
         /* If thing is an immediate then this is a cons. */
         if (is_lisp_pointer(thing) || is_lisp_immediate(thing))
             count = 2;
         else
-            count = (sizetab[widetag_of(thing)])(start);
+            count = (sizetab[widetag_of(thing)])(forwarded_start);
 
         /* Check whether the pointer is within this object. */
         if ((pointer >= start) && (pointer < (start+count))) {
