@@ -447,7 +447,7 @@
                                        (inst csinv tmp-tn amount zr-tn :lt)
                                        tmp-tn)
                                       (t
-                                       amount))))  
+                                       amount))))
                     (inst lsl result number amount))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
