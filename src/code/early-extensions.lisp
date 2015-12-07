@@ -1009,10 +1009,12 @@
       (destructuring-bind (result) x result)
       x))
 
-;;; some commonly-occuring CONSTANTLY forms
+;;; some commonly-occurring CONSTANTLY forms
 (macrolet ((def-constantly-fun (name constant-expr)
-             `(setf (symbol-function ',name)
-                    (constantly ,constant-expr))))
+             `(progn
+                (declaim (ftype (sfunction * (eql ,constant-expr)) ,name))
+                (setf (symbol-function ',name)
+                      (constantly ,constant-expr)))))
   (def-constantly-fun constantly-t t)
   (def-constantly-fun constantly-nil nil)
   (def-constantly-fun constantly-0 0))
