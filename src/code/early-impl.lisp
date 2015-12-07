@@ -16,6 +16,7 @@
 ;;; listed here and then listed separately (and by now, 2001-06-06,
 ;;; slightly differently) elsewhere.
 (declaim (special *posix-argv*
+                  *full-posix-argv*
                   *core-string*
                   *stdin*
                   *stdout*

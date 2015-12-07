@@ -12,6 +12,8 @@
 (in-package "SB!SYS")
 
 (sb!alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
+(sb!alien:define-alien-variable ("full_posix_argv" *native-full-posix-argv*)
+    (* (* char)))
 (sb!alien:define-alien-variable ("core_string" *native-core-string*) (* char))
 (sb!alien:define-alien-routine
  os-get-runtime-executable-path sb!alien:c-string (external-path boolean))
@@ -45,7 +47,8 @@
         *software-version* nil
         *runtime-pathname* nil
         *core-pathname* nil
-        *posix-argv* nil)
+        *posix-argv* nil
+        *full-posix-argv* nil)
   (sb!impl::%makunbound '*machine-version*))
 
 (defun os-cold-init-or-reinit ()
@@ -60,6 +63,13 @@
    *posix-argv*
    (loop for i from 0
          for arg = (sb!alien:deref *native-posix-argv* i)
+         until (sb!alien:null-alien arg)
+         collect (sb!alien:cast arg sb!alien:c-string)))
+  (/show0 "setting *FULL-POSIX-ARGV*")
+  (init-var-ignoring-errors
+   *full-posix-argv*
+   (loop for i from 0
+         for arg = (sb!alien:deref *native-full-posix-argv* i)
          until (sb!alien:null-alien arg)
          collect (sb!alien:cast arg sb!alien:c-string)))
   (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")

@@ -358,6 +358,7 @@ parse_size_arg(char *arg, char *arg_name)
 }
 
 char **posix_argv;
+char **full_posix_argv;
 char *core_string;
 
 struct runtime_options *runtime_options;
@@ -488,11 +489,12 @@ main(int argc, char *argv[], char *envp[])
     if (runtime_options != NULL) {
         dynamic_space_size = runtime_options->dynamic_space_size;
         thread_control_stack_size = runtime_options->thread_control_stack_size;
-        sbcl_argv = argv;
+        full_posix_argv = sbcl_argv = argv;
     } else {
         int argi = 1;
 
         runtime_options = successful_malloc(sizeof(struct runtime_options));
+        full_posix_argv = argv;
 
         while (argi < argc) {
             char *arg = argv[argi];

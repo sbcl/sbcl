@@ -108,6 +108,16 @@ if [ $status != 42 ]; then
     echo "saving runtime options from executable failed"
     exit 1
 fi
+./"$tmpcore" --no-userinit --version --eval '(exit)' <<EOF
+  (when (equal *full-posix-argv* '("./$tmpcore" "--no-userinit"
+                                   "--version" "--eval" "(exit)"))
+    (exit :code 42))
+EOF
+status=$?
+if [ $status != 42 ]; then
+    echo "saving all runtime options from executable failed"
+    exit 1
+fi
 
 rm "$tmpcore"
 run_sbcl <<EOF

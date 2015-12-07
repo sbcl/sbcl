@@ -132,7 +132,7 @@
   '(t
 
     ;; filled in by the C code to propagate to Lisp
-    *posix-argv* *core-string*
+    *posix-argv* *full-posix-argv* *core-string*
 
     ;; free pointers.  Note that these are FIXNUM word counts, not (as
     ;; one might expect) byte counts or SAPs. The reason seems to be
