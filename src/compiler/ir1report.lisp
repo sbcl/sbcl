@@ -544,6 +544,12 @@ has written, having proved that it is unreachable."))
 ;;; WITH-COMPILATION-UNIT, which can potentially be invoked outside
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
+  #+sb-xc-host
+  ;; Whitelist functions are looked up prior to UNCROSS,
+  ;; so that we can distinguish CL:SOMEFUN from SB-XC:SOMEFUN.
+  (when (and (eq kind :function)
+             (gethash name sb-cold::*undefined-fun-whitelist*))
+    (return-from note-undefined-reference (values)))
   (setq name (uncross name))
   (unless (and
            ;; Check for boundness so we don't blow up if we're called

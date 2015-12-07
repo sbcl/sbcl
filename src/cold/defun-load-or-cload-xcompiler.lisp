@@ -13,6 +13,11 @@
   '(;mask-signed-field ;; Too many to fix
     ))
 
+;;; Set of function names whose definition will never be seen in make-host-2,
+;;; as they are deferred until warm load.
+;;; The table is populated later in this file.
+(defparameter *undefined-fun-whitelist* (make-hash-table :test 'equal))
+
 (export '*symbol-values-for-genesis*)
 (let ((pathname "output/init-symbol-values.lisp-expr"))
   (defvar *symbol-values-for-genesis*
@@ -148,6 +153,10 @@
                     "UPGRADED-COMPLEX-PART-TYPE"
                     "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
+  ;; Symbols that can't be entered into the whitelist
+  ;; until this function executes.
+  (setf (gethash (intern "MAKE-LOAD-FORM" "SB-XC")
+                 *undefined-fun-whitelist*) t)
   ;; don't watch:
   (dolist (package (list-all-packages))
     (when (= (mismatch (package-name package) "SB!") 3)
@@ -192,3 +201,96 @@
   (sb-ext:purify)
 
   (values))
+
+;; Keep these in order by package, then symbol.
+(dolist (sym
+         (append
+          ;; CL and KERNEL
+          '(allocate-instance
+            compute-applicable-methods
+            slot-makunbound
+            sb!kernel:profile-deinit)
+          ;; CLOS implementation
+          '(sb!mop:class-finalized-p
+            sb!mop:class-prototype
+            sb!mop:eql-specializer-object
+            sb!mop:finalize-inheritance
+            sb!pcl::%force-cache-flushes
+            sb!pcl::class-has-a-forward-referenced-superclass-p
+            sb!pcl::class-wrapper
+            sb!pcl::compute-gf-ftype
+            sb!pcl::definition-source
+            sb!pcl:ensure-class-finalized
+            sb!pcl::get-instance-hash-code)
+          ;; CLOS-based packages
+          '(sb!gray:stream-file-position
+            sb!gray:stream-read-sequence
+            sb!gray:stream-write-sequence
+            sb!sequence:concatenate
+            sb!sequence:copy-seq
+            sb!sequence:count
+            sb!sequence:count-if
+            sb!sequence:count-if-not
+            sb!sequence:delete
+            sb!sequence:delete-duplicates
+            sb!sequence:delete-if
+            sb!sequence:delete-if-not
+            (setf sb!sequence:elt)
+            sb!sequence:elt
+            sb!sequence:emptyp
+            sb!sequence:fill
+            sb!sequence:find
+            sb!sequence:find-if
+            sb!sequence:find-if-not
+            (setf sb!sequence:iterator-element)
+            sb!sequence:iterator-endp
+            sb!sequence:iterator-step
+            sb!sequence:length
+            sb!sequence:make-sequence-iterator
+            sb!sequence:make-sequence-like
+            sb!sequence:map
+            sb!sequence:merge
+            sb!sequence:mismatch
+            sb!sequence:nreverse
+            sb!sequence:nsubstitute
+            sb!sequence:nsubstitute-if
+            sb!sequence:nsubstitute-if-not
+            sb!sequence:position
+            sb!sequence:position-if
+            sb!sequence:position-if-not
+            sb!sequence:reduce
+            sb!sequence:remove
+            sb!sequence:remove-duplicates
+            sb!sequence:remove-if
+            sb!sequence:remove-if-not
+            sb!sequence:replace
+            sb!sequence:reverse
+            sb!sequence:search
+            sb!sequence:sort
+            sb!sequence:stable-sort
+            sb!sequence:subseq
+            sb!sequence:substitute
+            sb!sequence:substitute-if
+            sb!sequence:substitute-if-not)
+          ;; Fast interpreter
+          #!+sb-fasteval
+          '(sb!interpreter:%fun-type
+            sb!interpreter:env-policy
+            sb!interpreter:eval-in-environment
+            sb!interpreter:find-lexical-fun
+            sb!interpreter:find-lexical-var
+            sb!interpreter::flush-everything
+            sb!interpreter::fun-lexically-notinline-p
+            sb!interpreter:lexenv-from-env
+            sb!interpreter:list-locals
+            sb!interpreter:prepare-for-compile
+            sb!interpreter::reconstruct-syntactic-closure-env)
+          ;; Other
+          '(sb!debug::find-interrupted-name-and-frame
+            sb!impl::encapsulate-generic-function
+            sb!impl::encapsulated-generic-function-p
+            sb!impl::get-processes-status-changes
+            sb!impl::step-form
+            sb!impl::step-values
+            sb!impl::unencapsulate-generic-function)))
+  (setf (gethash sym *undefined-fun-whitelist*) t))
