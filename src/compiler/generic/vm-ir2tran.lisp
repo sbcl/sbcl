@@ -278,17 +278,22 @@
 
   (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
     (declare (ignore type length words))
+    (vectorish-ltn-annotate-helper call ltn-policy
+                                   'sb!vm::allocate-vector-on-stack
+                                   'sb!vm::allocate-vector-on-heap))
+
+  (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
     (let ((args (basic-combination-args call))
           (template (template-or-lose (if (awhen (node-lvar call)
                                             (lvar-dynamic-extent it))
-                                          'sb!vm::allocate-vector-on-stack
-                                          'sb!vm::allocate-vector-on-heap))))
+                                          dx-template
+                                          not-dx-template))))
       (dolist (arg args)
         (setf (lvar-info arg)
               (make-ir2-lvar (primitive-type (lvar-type arg)))))
       (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
         (ltn-default-call call)
-        (return-from allocate-vector-ltn-annotate-optimizer (values)))
+        (return-from vectorish-ltn-annotate-helper (values)))
       (setf (basic-combination-info call) template)
       (setf (node-tail-p call) nil)
 
@@ -317,3 +322,26 @@
   (defoptimizer (%make-complex stack-allocate-result) ((&rest args) node dx)
     (declare (ignore args dx))
     t))
+
+;;; MAKE-LIST optimizations
+#!+x86-64
+(progn
+  (defoptimizer (%make-list stack-allocate-result) ((length element) node dx)
+    (declare (ignore element))
+    (or (eq dx :always-dynamic)
+        (zerop (policy node safety))
+        ;; At most one page (this is more paranoid than %listify-rest-args).
+        ;; Really what you want to do is decrement the stack pointer by one page
+        ;; at a time, filling in CDR pointers downward. Then this restriction
+        ;; could be removed, because allocation would never miss the guard page
+        ;; if it tries to consume too much stack space.
+        (values-subtypep (lvar-derived-type length)
+                         (load-time-value
+                          (specifier-type `(integer 0 ,(/ sb!vm::*backend-page-bytes*
+                                                          sb!vm:n-word-bytes 2)))))))
+  (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
+    (declare (ignore length element))
+    (vectorish-ltn-annotate-helper call ltn-policy
+                                   'sb!vm::allocate-list-on-stack
+                                   'sb!vm::allocate-list-on-heap)))
+

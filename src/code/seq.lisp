@@ -1000,6 +1000,7 @@ many elements are copied."
     ;; this is almost efficient (except in the general case where we
     ;; trampoline to MAKE-SEQUENCE-ITERATOR; if we had DX allocation
     ;; of MAKE-LIST, the whole of %MAP would be cons-free.
+    ;; TODO: on x86-64, we do have. Now see if the above remark is true.
     (declare (type list %sequences %iters %apply-args))
     (loop
      (do ((in-sequences  %sequences  (cdr in-sequences))

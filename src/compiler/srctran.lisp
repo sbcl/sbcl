@@ -151,7 +151,19 @@
       (specifier-type 'cons)
       (lvar-type arg)))
 
-;;;
+(define-source-transform make-list (length &rest rest)
+  (if (or (null rest)
+          ;; Use of &KEY in source xforms doesn't have all the usual semantics.
+          ;; It's better to hand-roll it - cf. transforms for WRITE[-TO-STRING].
+          (typep rest '(cons (eql :initial-element) (cons t null))))
+      ;; Something fishy here- If THE is removed, OPERAND-RESTRICTION-OK
+      ;; returns NIL because type inference on MAKE-LIST never happens.
+      ;; But the fndb entry for %MAKE-LIST is right, so I'm slightly bewildered.
+      `(%make-list (the (integer 0 (,(1- sb!xc:array-dimension-limit))) ,length)
+                   ,(second rest))
+      (values nil t))) ; give up
+
+(deftransform %make-list ((length item) ((constant-arg (eql 0)) t)) nil)
 
 (define-source-transform nconc (&rest args)
   (case (length args)

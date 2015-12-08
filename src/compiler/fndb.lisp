@@ -779,6 +779,7 @@
 (defknown list* (t &rest t) t (movable flushable))
 (defknown make-list (index &key (:initial-element t)) list
   (movable flushable))
+(defknown %make-list (index t) list (movable flushable))
 
 (defknown sb!impl::|List| (&rest t) list (movable flushable foldable))
 (defknown sb!impl::|List*| (t &rest t) t (movable flushable foldable))

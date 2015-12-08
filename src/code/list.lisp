@@ -334,6 +334,10 @@
 (defun make-list (size &key initial-element)
   #!+sb-doc
   "Constructs a list with size elements each set to value"
+  (%make-list size initial-element))
+;;; This entry point is to be preferred, irrespective of
+;;; whether or not the backend has vops for %MAKE-LIST.
+(defun %make-list (size initial-element)
   (declare (type index size))
   (do ((count size (1- count))
        (result '() (cons initial-element result)))

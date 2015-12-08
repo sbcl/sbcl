@@ -147,6 +147,82 @@
             (inst rep)
             (inst stos rax)))))))
 
+;;; ALLOCATE-LIST
+(macrolet ((calc-size-in-bytes (length answer)
+             `(cond ((sc-is ,length immediate)
+                     (aver (/= (tn-value ,length) 0))
+                     (* (tn-value ,length) n-word-bytes 2))
+                    (t
+                     (inst mov result nil-value)
+                     (inst test ,length ,length)
+                     (inst jmp :z done)
+                     (inst lea ,answer
+                           (make-ea :byte :base nil :index ,length
+                                    :scale (ash 1 (1+ (- word-shift
+                                                         n-fixnum-tag-bits)))))
+                     ,answer)))
+           (compute-end ()
+             `(inst lea limit
+                    (make-ea :qword :base result
+                                    :index (if (fixnump size) nil size)
+                                    :disp (if (fixnump size) size 0)))))
+
+  (define-vop (allocate-list-on-stack)
+    (:args (length :scs (any-reg immediate))
+           (element :scs (any-reg descriptor-reg)))
+    (:results (result :scs (descriptor-reg) :from :load))
+    (:arg-types positive-fixnum *)
+    (:policy :fast-safe)
+    (:node-var node)
+    (:temporary (:sc descriptor-reg) tail next limit)
+    (:node-var node)
+    (:generator 20
+      (let ((size (calc-size-in-bytes length next))
+            (loop (gen-label)))
+        (allocation result size node t list-pointer-lowtag)
+        (compute-end)
+        (inst mov next result)
+        (emit-label LOOP)
+        (inst mov tail next)
+        (inst add next (* 2 n-word-bytes))
+        (storew element tail cons-car-slot list-pointer-lowtag)
+        ;; Store the CDR even if it will be smashed to nil.
+        (storew next tail cons-cdr-slot list-pointer-lowtag)
+        (inst cmp next limit)
+        (inst jmp :ne loop)
+        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
+      done))
+
+  (define-vop (allocate-list-on-heap)
+    (:args (length :scs (any-reg immediate))
+           (element :scs (any-reg descriptor-reg)))
+    (:results (result :scs (descriptor-reg) :from :load))
+    (:arg-types positive-fixnum *)
+    (:policy :fast-safe)
+    (:node-var node)
+    (:temporary (:sc descriptor-reg) tail next limit)
+    (:generator 20
+      (let ((size (calc-size-in-bytes length next))
+            (entry (gen-label))
+            (loop (gen-label))
+            (no-init
+             (and (sc-is element immediate) (= (tn-value element) 0))))
+        (pseudo-atomic
+         (allocation result size node nil list-pointer-lowtag)
+         (compute-end)
+         (inst mov next result)
+         (inst jmp entry)
+         (emit-label LOOP)
+         (storew next tail cons-cdr-slot list-pointer-lowtag)
+         (emit-label ENTRY)
+         (inst mov tail next)
+         (inst add next (* 2 n-word-bytes))
+         (unless no-init ; don't bother writing zeros in the CARs
+           (storew element tail cons-car-slot list-pointer-lowtag))
+         (inst cmp next limit)
+         (inst jmp :ne loop))
+        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
+      done)))
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)

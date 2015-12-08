@@ -274,6 +274,19 @@
     (true v)
     nil))
 
+;;; MAKE-LIST
+
+(declaim (inline make-list-container))
+(defstruct list-container listy-slot)
+(defun make-var-length-dx-list (n thunk)
+  (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
+    (funcall thunk s)))
+;; :stack-allocatable-lists is necessary but not sufficient
+(with-test (:name (:dx-list :make-list) :skipped-on '(not :x86-64))
+  (assert (null (ctu:find-named-callees #'make-var-length-dx-list)))
+  (assert-no-consing (make-var-length-dx-list
+                      50 (lambda (x) (declare (ignore x))))))
+
 ;;; MAKE-STRUCTURE
 
 (declaim (inline make-fp-struct-1))

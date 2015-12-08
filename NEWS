@@ -3,6 +3,7 @@
 changes relative to sbcl-1.3.1
   * enhancement: {READ,WRITE}-SEQUENCE are much faster for some combinations
     of short sequences and stream types
+  * enhancement: MAKE-LIST's result can be stack-allocated on x86-64
   * bug fix: WRITE-SEQUENCE no longer fails to write lists containing integers
     to bivalent streams
   * bug fix: LOGTEST (and hence ODDP) no longer conses when given fixnum
