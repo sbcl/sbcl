@@ -195,7 +195,9 @@
 
   (define-vop (allocate-list-on-heap)
     (:args (length :scs (any-reg immediate))
-           (element :scs (any-reg descriptor-reg)))
+           (element :scs (any-reg descriptor-reg)
+                    :load-if (not (and (sc-is element immediate)
+                                       (eql (tn-value element) 0)))))
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
     (:policy :fast-safe)
@@ -206,7 +208,7 @@
             (entry (gen-label))
             (loop (gen-label))
             (no-init
-             (and (sc-is element immediate) (= (tn-value element) 0))))
+             (and (sc-is element immediate) (eql (tn-value element) 0))))
         (pseudo-atomic
          (allocation result size node nil list-pointer-lowtag)
          (compute-end)
