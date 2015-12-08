@@ -162,10 +162,16 @@
                                                          n-fixnum-tag-bits)))))
                      ,answer)))
            (compute-end ()
-             `(inst lea limit
-                    (make-ea :qword :base result
-                                    :index (if (fixnump size) nil size)
-                                    :disp (if (fixnump size) size 0)))))
+             `(let ((size (cond ((or (not (fixnump size))
+                                     (immediate32-p size))
+                                 size)
+                                (t
+                                 (inst mov limit size)
+                                 limit))))
+                (inst lea limit
+                      (make-ea :qword :base result
+                                      :index (if (fixnump size) nil size)
+                                      :disp (if (fixnump size) size 0))))))
 
   (define-vop (allocate-list-on-stack)
     (:args (length :scs (any-reg immediate))

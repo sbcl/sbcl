@@ -5698,4 +5698,10 @@
                                                    (type (member vector 42) a))
                                           (map a 'list (the vector b) #*)))
                           'vector #())
-                 #())))
+                  #())))
+
+(with-test (:name :large-make-list)
+  (compile nil `(lambda ()
+                  (make-list (expt 2 28) :initial-element 0)))
+  (compile nil `(lambda ()
+                  (make-list (expt 2 30) :initial-element 0))))
