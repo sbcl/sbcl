@@ -282,16 +282,19 @@
                                    'sb!vm::allocate-vector-on-stack
                                    'sb!vm::allocate-vector-on-heap))
 
-  (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
-    (let ((args (basic-combination-args call))
-          (template (template-or-lose (if (awhen (node-lvar call)
-                                            (lvar-dynamic-extent it))
-                                          dx-template
-                                          not-dx-template))))
+  (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template &optional not-dx-template)
+    (let* ((args (basic-combination-args call))
+           (template-name (if (awhen (node-lvar call)
+                                (lvar-dynamic-extent it))
+                              dx-template
+                              not-dx-template))
+           (template (and template-name
+                          (template-or-lose template-name))))
       (dolist (arg args)
         (setf (lvar-info arg)
               (make-ir2-lvar (primitive-type (lvar-type arg)))))
-      (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
+      (unless (and template
+                   (is-ok-template-use template call (ltn-policy-safe-p ltn-policy)))
         (ltn-default-call call)
         (return-from vectorish-ltn-annotate-helper (values)))
       (setf (basic-combination-info call) template)
@@ -342,6 +345,5 @@
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
     (declare (ignore length element))
     (vectorish-ltn-annotate-helper call ltn-policy
-                                   'sb!vm::allocate-list-on-stack
-                                   'sb!vm::allocate-list-on-heap)))
+                                   'sb!vm::allocate-list-on-stack)))
 
