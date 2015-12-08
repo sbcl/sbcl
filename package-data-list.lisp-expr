@@ -2998,7 +2998,9 @@ structure representations"
                "INSTANCE-HEADER-WIDETAG" "INSTANCE-POINTER-LOWTAG"
                "INSTANCE-SLOTS-OFFSET" "INSTANCE-USAGE"
                "INTERIOR-REG-SC-NUMBER" "INTERNAL-ERROR-ARGS"
-               "INTERRUPTED-FLAG" "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
+               "INTERRUPTED-FLAG"
+               #!+gencgc "LARGE-OBJECT-SIZE"
+               "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
                ;; FIXME: Possibly these other parameters (see
                ;; compiler/{x86,sparc}/parms.lisp) should be defined
                ;; conditionally on #!+LONG-FLOAT)

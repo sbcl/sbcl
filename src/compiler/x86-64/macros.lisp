@@ -219,11 +219,7 @@
                #!+gencgc
                ;; large objects will never be made in a per-thread region
                (and (integerp size)
-                    ;; Kludge: this is supposed to be
-                    ;;  (>= size (extern-alien "large_object_size" long))
-                    ;; but that won't cross-compile. So, a little OAOOM...
-                    (>= size (* 4 (max *backend-page-bytes* gencgc-card-bytes
-                                       gencgc-alloc-granularity)))))
+                    (>= size large-object-size)))
            (allocation-tramp alloc-tn size lowtag))
           (t
            (inst mov temp-reg-tn free-pointer)

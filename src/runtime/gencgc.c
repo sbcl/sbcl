@@ -83,16 +83,6 @@ enum {
  * that don't have pointers to younger generations? */
 boolean enable_page_protection = 1;
 
-/* the minimum size (in bytes) for a large object*/
-/* NB this logic is unfortunately copied in 'compiler/x86-64/macros.lisp' */
-#if (GENCGC_ALLOC_GRANULARITY >= PAGE_BYTES) && (GENCGC_ALLOC_GRANULARITY >= GENCGC_CARD_BYTES)
-os_vm_size_t large_object_size = 4 * GENCGC_ALLOC_GRANULARITY;
-#elif (GENCGC_CARD_BYTES >= PAGE_BYTES) && (GENCGC_CARD_BYTES >= GENCGC_ALLOC_GRANULARITY)
-os_vm_size_t large_object_size = 4 * GENCGC_CARD_BYTES;
-#else
-os_vm_size_t large_object_size = 4 * PAGE_BYTES;
-#endif
-
 /* Largest allocation seen since last GC. */
 os_vm_size_t large_allocation = 0;
 
@@ -1440,7 +1430,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
 {
     void *new_free_pointer;
 
-    if ((size_t)nbytes>=large_object_size)
+    if (nbytes>=LARGE_OBJECT_SIZE)
         return gc_alloc_large(nbytes, page_type_flag, my_region);
 
     /* Check whether there is room in the current alloc region. */

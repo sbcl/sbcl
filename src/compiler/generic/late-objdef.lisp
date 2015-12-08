@@ -21,3 +21,8 @@
   (when (slot-special slot)
     (setf (info :variable :wired-tls (slot-special slot))
           (ash (slot-offset slot) word-shift))))
+
+#!+gencgc
+(defconstant large-object-size
+  (* 4 (max *backend-page-bytes* gencgc-card-bytes
+            gencgc-alloc-granularity)))
