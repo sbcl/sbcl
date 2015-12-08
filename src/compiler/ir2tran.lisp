@@ -1864,23 +1864,32 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (macrolet ((def (name)
              `(defoptimizer (,name ir2-convert) ((&rest args) node block)
-                (let* ((refs (reference-tn-list
-                              (loop for arg in args
-                                    for tn = (make-normal-tn *backend-t-primitive-type*)
-                                    do
-                                    (emit-move node block (lvar-tn node block arg) tn)
-                                    collect tn)
-                              nil))
-                       (lvar (node-lvar node))
-                       (res (lvar-result-tns
-                             lvar
-                             (list (primitive-type (specifier-type 'list))))))
-                  (when (and lvar (lvar-dynamic-extent lvar))
-                    (vop current-stack-pointer node block
-                         (ir2-lvar-stack-pointer (lvar-info lvar))))
-                  (vop* ,name node block (refs) ((first res) nil)
-                        (length args))
-                  (move-lvar-result node block res lvar)))))
+                (cond #!+gencgc
+                      ((>= (length args)
+                           (/ sb!vm:large-object-size
+                              (* sb!vm:n-word-bytes 2)))
+                       ;; The VOPs will try to allocate all space at once
+                       ;; And it'll end up in large objects, and no conses
+                       ;; are welcome there.
+                       (ir2-convert-full-call node block))
+                      (t
+                       (let* ((refs (reference-tn-list
+                                     (loop for arg in args
+                                           for tn = (make-normal-tn *backend-t-primitive-type*)
+                                           do
+                                           (emit-move node block (lvar-tn node block arg) tn)
+                                           collect tn)
+                                     nil))
+                              (lvar (node-lvar node))
+                              (res (lvar-result-tns
+                                    lvar
+                                    (list (primitive-type (specifier-type 'list))))))
+                         (when (and lvar (lvar-dynamic-extent lvar))
+                           (vop current-stack-pointer node block
+                                (ir2-lvar-stack-pointer (lvar-info lvar))))
+                         (vop* ,name node block (refs) ((first res) nil)
+                               (length args))
+                         (move-lvar-result node block res lvar)))))))
   (def list)
   (def list*))
 
