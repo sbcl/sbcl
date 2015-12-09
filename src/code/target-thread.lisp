@@ -748,9 +748,6 @@ IF-NOT-OWNER is :FORCE)."
 
 ;;;; Waitqueues/condition variables
 
-;; For possible DX-allocating, see the notinline counterpart after the
-;; PROGN below
-(declaim (inline make-waitqueue))
 #!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:constructor make-waitqueue (&key name)))
   #!+sb-doc
@@ -818,7 +815,6 @@ IF-NOT-OWNER is :FORCE)."
                               (thread-waiting-for next) queue nil))
                (decf n)))
     nil))
-(declaim (notinline make-waitqueue))
 
 (def!method print-object ((waitqueue waitqueue) stream)
   (print-unreadable-object (waitqueue stream :type t :identity t)
@@ -1037,7 +1033,6 @@ must be held by this thread during this call."
 
 ;;;; Semaphores
 
-(declaim (inline make-semaphore)) ;; for possible DX-allocating
 (defstruct (semaphore (:constructor make-semaphore
                           (&key name ((:count %count) 0))))
   #!+sb-doc
@@ -1049,7 +1044,6 @@ future."
   (waitcount 0 :type sb!vm:word)
   (mutex (make-mutex))
   (queue (make-waitqueue)))
-(declaim (notinline make-semaphore))
 
 #!+sb-doc
 (setf (fdocumentation 'semaphore-name 'function)

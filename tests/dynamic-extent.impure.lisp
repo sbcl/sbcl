@@ -449,10 +449,24 @@
 (with-test (:name (:test-cfp-struct-2.4))
   (test-cfp-struct-2.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
 
-(declaim (inline make-foo1 make-foo2 make-foo3))
+;; It works to declare a structure constructor INLINE after the DEFSTRUCT
+;; was processed, as long as it was in the null lexical environment.
+;; In a perfect world, we'd figure out that a variable declared DX which
+;; receives the value of a structure constructor defined in the same file
+;; and neither expressly INLINE nor NOTINLINE should be locally inlined.
+;; But at least this shows that a declaration at the intended use point
+;; is sufficient, without also a bracketing INLINE/NOTINLINE at the DEFSTRUCT.
+
+;; Verify the precondition for the assertions that claim that DXifying works
+;; even though the MAKE- function was not expressly INLINE when its DEFSTRUCT
+;; was compiled.
+(dolist (s '(make-foo1 make-foo2 make-foo3))
+  (assert (null (sb-int:info :function :inline-expansion-designator s))))
+
 (defstruct foo1 x)
 
 (defun-with-dx make-foo1-on-stack (x)
+  (declare (inline make-foo1))
   (let ((foo (make-foo1 :x x)))
     (declare (dynamic-extent foo))
     (assert (eql x (foo1-x foo)))))
@@ -465,6 +479,7 @@
   c)
 
 (defun-with-dx make-foo2-on-stack (x y)
+  (declare (inline make-foo2))
   x
   (let ((foo (make-foo2 :y y :c 'c)))
     (declare (dynamic-extent foo))
@@ -483,6 +498,7 @@
   (e 4.0d0 :type double-float))
 
 (defun-with-dx make-foo3-on-stack ()
+  (declare (inline make-foo3))
   (let ((foo (make-foo3)))
     (declare (dynamic-extent foo))
     (assert (eql 0 (foo3-a foo)))

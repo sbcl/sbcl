@@ -12,7 +12,6 @@
 ;;;; This defstruct should appear before any use of WITH-CONDITION-RESTARTS
 ;;;; so that the slot accessors are transformed.
 
-(declaim (inline make-restart)) ;; for DX allocation
 (defstruct (restart (:constructor make-restart
                         ;; Having TEST-FUNCTION at the end allows
                         ;; to not replicate its default value in RESTART-BIND.
@@ -32,6 +31,5 @@
   ;; however, since safe uses of restarts have to assume dynamic
   ;; extent.
   (associated-conditions '() :type list))
-(declaim (notinline make-restart))
 
 #!-sb-fluid (declaim (freeze-type restart))

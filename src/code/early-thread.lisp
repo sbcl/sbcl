@@ -34,10 +34,6 @@ in future versions."
    :type mutex)
   waiting-for)
 
-;; We don't actually want to inline this within MAKE-THREAD.
-;; If we did want to, we'd need DEF!STRUCT to reconstruct the inline
-;; constructor from the DD, which we could do, but have never needed.
-(declaim (sb!ext:maybe-inline make-mutex)) ;; for possible DX-allocating
 (def!struct (mutex (:constructor make-mutex (&key name)))
   #!+sb-doc
   "Mutex type."
@@ -45,4 +41,3 @@ in future versions."
   (%owner nil :type (or null thread))
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))
-(declaim (notinline make-mutex))
