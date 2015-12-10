@@ -4542,7 +4542,7 @@ general_alloc(sword_t nbytes, int page_type_flag)
 }
 
 lispobj AMD64_SYSV_ABI *
-alloc(long nbytes)
+alloc(sword_t nbytes)
 {
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     struct thread *self = arch_os_get_current_thread();
