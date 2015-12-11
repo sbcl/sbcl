@@ -205,10 +205,11 @@
 ;; Keep these in order by package, then symbol.
 (dolist (sym
          (append
-          ;; CL and KERNEL
+          ;; CL, EXT, KERNEL
           '(allocate-instance
             compute-applicable-methods
             slot-makunbound
+            sb!ext:run-program
             sb!kernel:profile-deinit)
           ;; CLOS implementation
           '(sb!mop:class-finalized-p
