@@ -397,13 +397,6 @@
   (def signed-zero-< <)
   (def signed-zero-<= <=))
 
-;;; The basic interval type. It can handle open and closed intervals.
-;;; A bound is open if it is a list containing a number, just like
-;;; Lisp says. NIL means unbounded.
-(defstruct (interval (:constructor %make-interval)
-                     (:copier nil))
-  low high)
-
 (defun make-interval (&key low high)
   (labels ((normalize-bound (val)
              (cond #-sb-xc-host
@@ -426,8 +419,8 @@
                         (list new-val))))
                    (t
                     (error "unknown bound type in MAKE-INTERVAL")))))
-    (%make-interval :low (normalize-bound low)
-                    :high (normalize-bound high))))
+    (%make-interval (normalize-bound low)
+                    (normalize-bound high))))
 
 ;;; Apply the function F to a bound X. If X is an open bound and the
 ;;; function is declared strictly monotonic, then the result will be
