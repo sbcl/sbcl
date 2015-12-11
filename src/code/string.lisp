@@ -462,42 +462,6 @@ new string COUNT long filled with the fill character."
   (%downcase string start end))
 ) ; FLET
 
-;; Moved from 'target-char' because of inline-ness
-(declaim (inline alphanumericp))
-(defun alphanumericp (char)
-  #!+sb-doc
-  "Given a character-object argument, ALPHANUMERICP returns T if the argument
-is either numeric or alphabetic."
-  (let ((gc (ucd-general-category char)))
-    (or (< gc 5)
-        (= gc 13))))
-
-(flet ((%capitalize (string start end)
-         (declare (string string) (index start) (type sequence-end end))
-         (let ((saved-header string))
-           (with-one-string (string start end)
-             (do ((index start (1+ index))
-                  (new-word? t)
-                  (char nil))
-                 ((= index (the fixnum end)))
-               (declare (fixnum index))
-               (setq char (schar string index))
-               (cond ((not (alphanumericp char))
-                      (setq new-word? t))
-                     (new-word?
-                      ;; CHAR is the first case-modifiable character after
-                      ;; a sequence of non-case-modifiable characters.
-                      (setf (schar string index) (char-upcase char))
-                      (setq new-word? nil))
-                     (t
-                      (setf (schar string index) (char-downcase char))))))
-           saved-header)))
-(defun string-capitalize (string &key (start 0) end)
-  (%capitalize (copy-seq (string string)) start end))
-(defun nstring-capitalize (string &key (start 0) end)
-  (%capitalize string start end))
-) ; FLET
-
 (defun generic-string-trim (char-bag string left-p right-p)
   (let ((header (%string string)))
     (with-array-data ((string header)

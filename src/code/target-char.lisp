@@ -14,7 +14,7 @@
 ;;; We compile some trivial character operations via inline expansion.
 #!-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
-                 upper-case-p lower-case-p both-case-p
+                 upper-case-p lower-case-p both-case-p alphanumericp
                  char-int))
 (declaim (maybe-inline digit-char-p))
 
@@ -139,6 +139,11 @@
                                               (dotimes (i len)
                                                 (push (read-codepoint) ret))
                                               (nreverse ret))))))
+                            ;; Dependency cycle: BOTH-CASE-INDEX-P is defined later
+                            ;; because it uses **CHARACTER-MISC-DATABASE** which is
+                            ;; defined by the DEFGLOBAL above. This declaration
+                            ;; suppresses the warning that it can't be inlined.
+                            (declare (notinline both-case-index-p))
                             (loop until (>= index length)
                                   for key = (read-codepoint)
                                   for upper = (read-length-tagged)
@@ -601,6 +606,14 @@ that digit stands, else returns NIL."
         (when (and number (< (truly-the fixnum number) radix))
           number))))
 
+(defun alphanumericp (char)
+  #!+sb-doc
+  "Given a character-object argument, ALPHANUMERICP returns T if the argument
+is either numeric or alphabetic."
+  (let ((gc (ucd-general-category char)))
+    (or (< gc 5)
+        (= gc 13))))
+
 ;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.
 
@@ -787,3 +800,32 @@ character exists."
   (and (typep weight 'fixnum)
        (>= weight 0) (< weight radix) (< weight 36)
        (code-char (if (< weight 10) (+ 48 weight) (+ 55 weight)))))
+
+;;; Moved from 'string' because ALPHANUMERICP wants to be inlined,
+;;; and moving ALPHANUMERICP earlier causes a snowball effect of
+;;; other inlining failures.
+(flet ((%capitalize (string start end)
+         (declare (string string) (index start) (type sequence-end end))
+         (let ((saved-header string))
+           (with-one-string (string start end)
+             (do ((index start (1+ index))
+                  (new-word? t)
+                  (char nil))
+                 ((= index (the fixnum end)))
+               (declare (fixnum index))
+               (setq char (schar string index))
+               (cond ((not (alphanumericp char))
+                      (setq new-word? t))
+                     (new-word?
+                      ;; CHAR is the first case-modifiable character after
+                      ;; a sequence of non-case-modifiable characters.
+                      (setf (schar string index) (char-upcase char))
+                      (setq new-word? nil))
+                     (t
+                      (setf (schar string index) (char-downcase char))))))
+           saved-header)))
+(defun string-capitalize (string &key (start 0) end)
+  (%capitalize (copy-seq (string string)) start end))
+(defun nstring-capitalize (string &key (start 0) end)
+  (%capitalize string start end))
+) ; FLET
