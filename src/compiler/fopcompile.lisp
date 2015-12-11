@@ -488,23 +488,16 @@
             (bug "looks unFOPCOMPILEable: ~S" form))))))
 
 (defun fopcompile-function (form path for-value-p)
-  (flet ((dump-fdefinition (name)
-           (fopcompile `(fdefinition ',name) path for-value-p)))
-    (if (consp form)
-        (cond
+  (cond ((lambda-form-p form)
           ;; Lambda forms are compiled with the real compiler
-          ((lambda-form-p form)
-           (let* ((handle (%compile form
-                                    *compile-object*
-                                    :path path)))
-             (when for-value-p
-               (sb!fasl::dump-push handle *compile-object*))))
+         (let ((handle (%compile form *compile-object* :path path)))
+           (when for-value-p
+             (sb!fasl::dump-push handle *compile-object*))))
           ;; While function names are translated to a call to FDEFINITION.
-          ((legal-fun-name-p form)
-           (dump-fdefinition form))
-          (t
-           (compiler-error "~S is not a legal function name." form)))
-        (dump-fdefinition form))))
+        ((legal-fun-name-p form)
+         (fopcompile `(fdefinition ',form) path for-value-p))
+        (t
+         (compiler-error "~S is not a legal function name." form))))
 
 (defun fopcompile-if (args path for-value-p)
   (destructuring-bind (condition then &optional else)
