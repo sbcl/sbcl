@@ -595,9 +595,7 @@
                       (eql slot-makunbound)
                       (cons instance
                             (cons (cons (eql quote) (cons symbol null)) null))))
-             ;; FIXME: could define SB-PCL:+SLOT-UNBOUND+ much earlier,
-             ;; and put the symbol in the kernel package or something.
-             (values (cdr form) 'sb!pcl::..slot-unbound..)))
+             (values (cdr form) sb!pcl:+slot-unbound+)))
     (if args
         (values (car args) (cadadr args) const)
         (values nil nil nil))))
