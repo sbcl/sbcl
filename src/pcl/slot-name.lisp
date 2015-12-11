@@ -41,3 +41,23 @@
 (defun slot-boundp-name (slot-name)
   (list 'slot-accessor :global slot-name 'boundp))
 
+;;; This is the value that we stick into a slot to tell us that it is
+;;; unbound. It may seem gross, but for performance reasons, we make
+;;; this an interned symbol. That means that the fast check to see
+;;; whether a slot is unbound is to say (EQ <val> '..SLOT-UNBOUND..).
+;;; That is considerably faster than looking at the value of a special
+;;; variable.
+;;;
+;;; It seems only reasonable to also export this for users, since
+;;; otherwise dealing with STANDARD-INSTANCE-ACCESS becomes harder
+;;; -- and slower -- than it needs to be.
+(defconstant +slot-unbound+ '..slot-unbound..
+  #!+sb-doc
+  "SBCL specific extensions to MOP: if this value is read from an
+instance using STANDARD-INSTANCE-ACCESS, the slot is unbound.
+Similarly, an :INSTANCE allocated slot can be made unbound by
+assigning this to it using (SETF STANDARD-INSTANCE-ACCESS).
+
+Value of +SLOT-UNBOUND+ is unspecified, and should not be relied to be
+of any particular type, but it is guaranteed to be suitable for EQ
+comparison.")
