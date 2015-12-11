@@ -104,6 +104,14 @@
 
 ;;;; the FD-STREAM structure
 
+;;; Coarsely characterizes the element type of an FD-STREAM w.r.t.
+;;; its SUBTYPEP relations to the relevant CHARACTER and
+;;; ([UN]SIGNED-BYTE 8) types. This coarse characterization enables
+;;; dispatching on the element type as needed by {READ,WRITE}-SEQUENCE
+;;; without calling SUBTYPEP.
+(deftype stream-element-mode ()
+  '(member character unsigned-byte signed-byte :bivalent))
+
 (defstruct (fd-stream
             (:constructor %make-fd-stream)
             (:conc-name fd-stream-)
@@ -2636,21 +2644,6 @@
              t)
             (t
              (fd-stream-pathname stream)))))
-
-;; Placing this definition (formerly in "toplevel") after the important
-;; stream types are known produces smaller+faster code than it did before.
-(defun stream-output-stream (stream)
-  (typecase stream
-    (fd-stream
-     stream)
-    (synonym-stream
-     (stream-output-stream
-      (symbol-value (synonym-stream-symbol stream))))
-    (two-way-stream
-     (stream-output-stream
-      (two-way-stream-output-stream stream)))
-    (t
-     stream)))
 
 ;; Fix the INPUT-CHAR-POS slot of STREAM after having consumed characters
 ;; from the CIN-BUFFER. This operation is done upon exit from a FAST-READ-CHAR

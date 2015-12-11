@@ -23,14 +23,6 @@
 (defvar *trace-output* () #!+sb-doc "trace output stream")
 (defvar *debug-io* () #!+sb-doc "interactive debugging stream")
 
-;;; Coarsely characterizes the element type of an FD-STREAM w.r.t.
-;;; its SUBTYPEP relations to the relevant CHARACTER and
-;;; ([UN]SIGNED-BYTE 8) types. This coarse characterization enables
-;;; dispatching on the element type as needed by {READ,WRITE}-SEQUENCE
-;;; without calling SUBTYPEP.
-(deftype stream-element-mode ()
-  '(member character unsigned-byte signed-byte :bivalent))
-
 (defun stream-element-type-stream-element-mode (element-type)
   (let ((characterp (subtypep element-type 'character))
         (unsigned-byte-p (subtypep element-type 'unsigned-byte))
@@ -2229,5 +2221,20 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (unless (typep stream 'broadcast-stream)
     (stream-must-be-associated-with-file stream))
   (funcall (ansi-stream-misc stream) stream :file-length))
+
+;; Placing this definition (formerly in "toplevel") after the important
+;; stream types are known produces smaller+faster code than it did before.
+(defun stream-output-stream (stream)
+  (typecase stream
+    (fd-stream
+     stream)
+    (synonym-stream
+     (stream-output-stream
+      (symbol-value (synonym-stream-symbol stream))))
+    (two-way-stream
+     (stream-output-stream
+      (two-way-stream-output-stream stream)))
+    (t
+     stream)))
 
 ;;;; etc.
