@@ -2500,7 +2500,8 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
         lispobj *forwarded_start;
 
         if (forwarding_pointer_p(start))
-            forwarded_start = native_pointer(forwarding_pointer_value(start));
+            forwarded_start =
+                native_pointer((lispobj)forwarding_pointer_value(start));
         else
             forwarded_start = start;
         lispobj thing = *forwarded_start;
