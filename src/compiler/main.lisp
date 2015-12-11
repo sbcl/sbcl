@@ -2040,9 +2040,10 @@ SPEED and COMPILATION-SPEED optimization values, and the
 (defvar *constants-being-created* nil)
 (defvar *constants-created-since-last-init* nil)
 ;;; FIXME: Shouldn't these^ variables be unbound outside LET forms?
-(defun emit-make-load-form (constant &optional (name nil namep))
+(defun emit-make-load-form (constant &optional (name nil namep)
+                                     &aux (fasl *compile-object*))
   (aver (fasl-output-p *compile-object*))
-  (unless (or (fasl-constant-already-dumped-p constant *compile-object*)
+  (unless (or (fasl-constant-already-dumped-p constant fasl)
               ;; KLUDGE: This special hack is because I was too lazy
               ;; to rework DEF!STRUCT so that the MAKE-LOAD-FORM
               ;; function of LAYOUT returns nontrivial forms when
@@ -2073,7 +2074,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (setq creation-form :sb-just-dump-it-normally))
       (case creation-form
         (:sb-just-dump-it-normally
-         (fasl-validate-structure constant *compile-object*)
+         (fasl-validate-structure constant fasl)
          t)
         (:ignore-it
          nil)
@@ -2090,9 +2091,9 @@ SPEED and COMPILATION-SPEED optimization values, and the
                  (catch constant
                    (fasl-note-handle-for-constant
                     constant
-                    (or (fopcompile-allocate-instance creation-form)
+                    (or (fopcompile-allocate-instance fasl creation-form)
                         (compile-load-time-value creation-form))
-                    *compile-object*)
+                    fasl)
                    nil)
                (compiler-error "circular references in creation form for ~S"
                                constant)))
@@ -2103,7 +2104,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
                        (loop for (name form) on (cdr info) by #'cddr
                          collect name into names
                          collect form into forms
-                         finally (or (fopcompile-constant-init-forms forms)
+                         finally (or (fopcompile-constant-init-forms fasl forms)
                                      (compile-make-load-form-init-forms forms)))
                        nil)))
                (when circular-ref
