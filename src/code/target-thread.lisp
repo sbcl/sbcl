@@ -480,6 +480,28 @@ HOLDING-MUTEX-P."
 
 (sb!ext:defglobal **deadlock-lock** nil)
 
+#!+(or (not sb-thread) sb-futex)
+(defstruct (waitqueue (:constructor make-waitqueue (&key name)))
+  #!+sb-doc
+  "Waitqueue type."
+  (name nil :type (or null thread-name))
+  #!+(and sb-thread sb-futex)
+  (token nil))
+
+#!+(and sb-thread (not sb-futex))
+(defstruct (waitqueue (:constructor make-waitqueue (&key name)))
+  #!+sb-doc
+  "Waitqueue type."
+  (name nil :type (or null thread-name))
+  ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
+  ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
+  ;; lock. In most cases this should be uncontested thanks to the mutex --
+  ;; the only case where that might not be true is when CONDITION-WAIT
+  ;; unwinds and %WAITQUEUE-DROP is called.
+  %owner
+  %head
+  %tail)
+
 ;;; Signals an error if owner of LOCK is waiting on a lock whose release
 ;;; depends on the current thread. Does not detect deadlocks from sempahores.
 (defun check-deadlock ()
@@ -748,29 +770,8 @@ IF-NOT-OWNER is :FORCE)."
 
 ;;;; Waitqueues/condition variables
 
-#!+(or (not sb-thread) sb-futex)
-(defstruct (waitqueue (:constructor make-waitqueue (&key name)))
-  #!+sb-doc
-  "Waitqueue type."
-  (name nil :type (or null thread-name))
-  #!+(and sb-thread sb-futex)
-  (token nil))
-
 #!+(and sb-thread (not sb-futex))
 (progn
-  (defstruct (waitqueue (:constructor make-waitqueue (&key name)))
-    #!+sb-doc
-    "Waitqueue type."
-    (name nil :type (or null thread-name))
-    ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
-    ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
-    ;; lock. In most cases this should be uncontested thanks to the mutex --
-    ;; the only case where that might not be true is when CONDITION-WAIT
-    ;; unwinds and %WAITQUEUE-DROP is called.
-    %owner
-    %head
-    %tail)
-
   (defun %waitqueue-enqueue (thread queue)
     (setf (thread-waiting-for thread) queue)
     (let ((head (waitqueue-%head queue))
