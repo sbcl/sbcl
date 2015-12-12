@@ -420,3 +420,10 @@
 
 (with-test (:name :impossible-number-error)
   (princ (nth-value 1 (ignore-errors (READ-FROM-STRING "1/0")))))
+
+(with-test (:name :read-from-string-compiler-macro)
+  ;; evaluation order should be the customary one. In particular,
+  ;; do not assume that EOF-ERROR-P and EOF-VALUE are constants.
+  (sb-int:collect ((l))
+    (read-from-string "a" (l 'first) (l 'second) :start (progn (l 'third) 0))
+    (assert (equal (l) '(first second third)))))
