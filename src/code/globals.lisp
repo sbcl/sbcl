@@ -24,18 +24,3 @@
                   #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
                   *load-verbose*
                   *posix-argv*))
-
-(declaim (ftype (function * *)
-                assert-error assert-prompt check-type-error
-                case-body-error print-object
-                describe-object sb!pcl::check-wrapper-validity))
-
-;;; Gray streams functions not defined until after PCL is loaded
-(declaim (ftype (function * *)
-                stream-advance-to-column stream-clear-input
-                stream-clear-output stream-finish-output stream-force-output
-                stream-fresh-line stream-line-column stream-line-length
-                stream-listen stream-peek-char stream-read-byte
-                stream-read-char stream-read-char-no-hang stream-read-line
-                stream-start-line-p stream-terpri stream-unread-char
-                stream-write-byte stream-write-char stream-write-string))
