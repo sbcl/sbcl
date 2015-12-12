@@ -942,6 +942,7 @@
   (physenv nil :type (or physenv null))
   ;; The depth of the deepest loop that this TN is used in.
   (loop-depth 0 :type fixnum))
+(declaim (freeze-type tn))
 (def!method print-object ((tn tn) stream)
   (print-unreadable-object (tn stream :type t)
     ;; KLUDGE: The distinction between PRINT-TN and PRINT-OBJECT on TN is
