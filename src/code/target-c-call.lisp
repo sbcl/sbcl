@@ -71,17 +71,3 @@
       (let ((result (make-string length :element-type 'base-char)))
         (sb!kernel:copy-ub8-from-system-area sap 0 result 0 length)
         result))))
-
-(defun string-to-c-string (string external-format)
-  (declare (type simple-string string))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let ((external-format (sb!impl::get-external-format-or-lose external-format)))
-      (funcall (sb!impl::ef-write-c-string-fun external-format) string))))
-
-(defun c-string-to-string (sap external-format element-type)
-  (declare (type system-area-pointer sap))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let ((external-format (sb!impl::get-external-format-or-lose external-format)))
-      (funcall (sb!impl::ef-read-c-string-fun external-format) sap element-type))))

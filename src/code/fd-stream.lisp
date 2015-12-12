@@ -832,6 +832,20 @@
       (bytes-for-char-fun ef-entry)
       (funcall (bytes-for-char-fun ef-entry) #\x)))
 
+(defun sb!alien::string-to-c-string (string external-format)
+  (declare (type simple-string string))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (let ((external-format (get-external-format-or-lose external-format)))
+      (funcall (ef-write-c-string-fun external-format) string))))
+
+(defun sb!alien::c-string-to-string (sap external-format element-type)
+  (declare (type system-area-pointer sap))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (let ((external-format (get-external-format-or-lose external-format)))
+      (funcall (ef-read-c-string-fun external-format) sap element-type))))
+
 (defun wrap-external-format-functions (external-format fun)
   (let ((result (%copy-external-format external-format)))
     (macrolet ((frob (accessor)
