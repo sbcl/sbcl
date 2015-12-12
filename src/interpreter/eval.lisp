@@ -27,7 +27,7 @@
 ;;; That is, policy-related decisions need to be made here, not in the caller.
 (defun expand-or-eval-symbol (env symbol)
   (declare (symbol symbol))
-  (binding* (((binding kind frame-ptr value) (find-lexical-var env symbol))
+  (binding* (((binding kind nil value) (find-lexical-var env symbol))
              (type (var-type-assertion env symbol binding :read))
              ((macro-p value)
               (if kind
