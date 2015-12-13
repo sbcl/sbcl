@@ -23,6 +23,10 @@
 
 (in-package "SB-COLD")
 
+;;; If TRUE, then COMPILE-FILE is being invoked only to process
+;;; :COMPILE-TOPLEVEL forms, not to produce an output file.
+(defvar *compile-for-effect-only* nil)
+
 ;;; prefixes for filename stems when cross-compiling. These are quite arbitrary
 ;;; (although of course they shouldn't collide with anything we don't want to
 ;;; write over). In particular, they can be either relative path names (e.g.
@@ -428,7 +432,11 @@
 
     ;; If we get to here, compilation succeeded, so it's OK to rename
     ;; the temporary output file to the permanent object file.
-    (rename-file-a-la-unix tmp-obj obj)
+    ;; ASSEMBLE-FILE produces no output in the preload pass.
+    ;; (The compiler produces an empty file.)
+    (if (and *compile-for-effect-only* (search "/assembly/" obj))
+        nil
+        (rename-file-a-la-unix tmp-obj obj))
 
     ;; nice friendly traditional return value
     (pathname obj)))

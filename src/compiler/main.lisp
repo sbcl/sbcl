@@ -1013,6 +1013,9 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; *TOPLEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path &optional (expand t))
   (declare (list path))
+  #+sb-xc-host
+  (when sb-cold::*compile-for-effect-only*
+    (return-from convert-and-maybe-compile))
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
@@ -1790,7 +1793,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun print-compile-start-note (source-info)
   (declare (type source-info source-info))
   (let ((file-info (source-info-file-info source-info)))
-    (compiler-mumble #+sb-xc-host "~&; cross-compiling file ~S (written ~A):~%"
+    (compiler-mumble #+sb-xc-host "~&; ~A file ~S (written ~A):~%"
+                     #+sb-xc-host (if sb-cold::*compile-for-effect-only*
+                                      "preloading"
+                                      "cross-compiling")
                      #-sb-xc-host "~&; compiling file ~S (written ~A):~%"
                      (namestring (file-info-name file-info))
                      (sb!int:format-universal-time nil
