@@ -255,9 +255,6 @@
  #!+arm   ("src/code/arm-vm" :not-host)
  #!+arm64 ("src/code/arm64-vm" :not-host)
 
- ;; FIXME: do we really want to keep this? -- CSR, 2002-08-31
- #!+rt    ("src/code/rt-vm"    :not-host)
-
  #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
  #!+win32 ("src/code/target-exception" :not-host)
 
