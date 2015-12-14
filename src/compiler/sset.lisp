@@ -94,18 +94,16 @@
                (sset-adjoin element set)))))
 
 ;;; Rehash the sset when the proportion of free cells in the set is
-;;; lower than this.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +sset-rehash-threshold+ 1/4))
+;;; lower than this, the value is a reciprocal.
+(defconstant +sset-rehash-threshold+ 4)
 
 ;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
-  (declare (optimize (speed 2)))
   (when (<= (sset-free set)
             (max 1 (truncate (length (sset-vector set))
-                             #.(round (/ +sset-rehash-threshold+)))))
+                       +sset-rehash-threshold+)))
     (sset-grow set))
   (loop with vector = (sset-vector set)
         with mask of-type fixnum = (1- (length vector))
