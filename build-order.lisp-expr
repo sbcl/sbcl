@@ -546,7 +546,7 @@
  ("src/compiler/generic/utils")
  ("src/compiler/fopcompile")
 
- ("src/assembly/assemfile")
+ ("src/assembly/assemfile" :not-target)
 
  ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
  ;; SB!ASSEM:EMIT-POST-IT, defined in assem.lisp, and also possibly

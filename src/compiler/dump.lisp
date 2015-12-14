@@ -1147,6 +1147,8 @@
                          (fasl-output-patch-table fasl-output))))
         handle))))
 
+;;; This is only called from assemfile, which doesn't exist in the target.
+#+sb-xc-host
 (defun dump-assembler-routines (code-segment length fixups routines file)
   (dump-fop 'fop-assembler-code file)
   (dump-word length file)

@@ -290,3 +290,7 @@ the stack without triggering overflow protection.")
           (bug "~S is a legal function name, and cannot be used as a ~
                 debug name." name))
         name))))
+
+;;; Set this to NIL to inhibit assembly-level optimization. (For
+;;; compiler debugging, rather than policy control.)
+(defvar *assembly-optimize* t)

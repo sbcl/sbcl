@@ -18,10 +18,6 @@
 ;;; a list of (NAME LABEL OFFSET) for every entry point
 (defvar *entry-points* nil)
 
-;;; Set this to NIL to inhibit assembly-level optimization. (For
-;;; compiler debugging, rather than policy control.)
-(defvar *assembly-optimize* t)
-
 ;;; Note: You might think from the name that this would act like
 ;;; COMPILE-FILE, but in fact it's arguably more like LOAD, even down
 ;;; to the return convention. It LOADs a file, then writes out any
