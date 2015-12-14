@@ -35,7 +35,8 @@
                                              :element-type :default :external-format :utf-8)
                       ,@body)))
               ,@body)
-         (delete-file ,file-var)))))
+         (when (probe-file ,file-var)
+           (delete-file ,file-var))))))
 
 (defun assert-roundtrip (write-call read-call result expected)
   (unless (equalp result expected)
@@ -134,3 +135,9 @@
                  (assert-roundtrip `(write-sequence ,source ,@source-args)
                                    `(read-sequence ,into/old ,@into-args)
                                    into expected-sequence)))))))
+
+(with-test (:name (stream :bivalent :no-unknown-type-condition))
+  (assert-no-signal
+   (with-bivalent-io-setup ("bivalent-stream-test.txt")
+     (with-stream (stream :direction :output :if-exists :supersede)))
+   sb-kernel:parse-unknown-type))

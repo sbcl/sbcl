@@ -24,14 +24,20 @@
 (defvar *debug-io* () #!+sb-doc "interactive debugging stream")
 
 (defun stream-element-type-stream-element-mode (element-type)
-  (let ((characterp (subtypep element-type 'character))
-        (unsigned-byte-p (subtypep element-type 'unsigned-byte))
-        ;; Every UNSIGNED-BYTE subtype is a SIGNED-BYTE
-        ;; subtype. Therefore explicitly check for intersection with
-        ;; the negative integers.
-        (signed-byte-p (and (subtypep element-type 'signed-byte)
-                            (not (subtypep `(and ,element-type (integer * -1))
-                                           nil)))))
+  (when (eq element-type :default)
+    (return-from stream-element-type-stream-element-mode :bivalent))
+
+  (unless (valid-type-specifier-p element-type)
+    (return-from stream-element-type-stream-element-mode :bivalent))
+
+  (let* ((characterp (subtypep element-type 'character))
+         (unsigned-byte-p (subtypep element-type 'unsigned-byte))
+         ;; Every UNSIGNED-BYTE subtype is a SIGNED-BYTE
+         ;; subtype. Therefore explicitly check for intersection with
+         ;; the negative integers.
+         (signed-byte-p (and (subtypep element-type 'signed-byte)
+                             (not (subtypep `(and ,element-type (integer * -1))
+                                            nil)))))
     (cond
       ((and characterp (not unsigned-byte-p) (not signed-byte-p))
        'character)
