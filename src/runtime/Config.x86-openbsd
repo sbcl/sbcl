@@ -14,8 +14,6 @@ include Config.generic-openbsd
 
 ASSEM_SRC += ldso-stubs.S
 
-CC = egcc
-
 # The -Z linker flag conflicts with the default address space
 # locations used. If you wish to link the runtime using -Z option then
 # please see the comments in src/compiler/x86/parms.lisp
