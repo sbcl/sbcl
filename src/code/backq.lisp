@@ -344,4 +344,14 @@
 (defun simple-reader-error (stream format-string &rest format-args)
   (error "READER-ERROR on stream ~S: ~?" stream format-string format-args))
 
+;;; So that we never fail to use the compiler-macro for code generated
+;;; from backquote, define the macro as early as possible.
+#+sb-xc
+(define-compiler-macro append (&whole form &rest lists)
+  (case (length lists)
+    (0 nil)
+    (1 (car lists))
+    (2 `(append2 ,@lists))
+    (t form)))
+
 (/show0 "done with backq.lisp")

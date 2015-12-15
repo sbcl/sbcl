@@ -18,19 +18,23 @@
 ;;;; be feasible to get rid of source-transforms.
 ;;;; A problem is namespace clobbering: these must not affect the host Lisp.
 
-(define-compiler-macro append (&whole form &rest lists)
-  (case (length lists)
-    (0 nil)
-    (1 (car lists))
-    (2 `(append2 ,@lists))
-    (t form)))
-
 ;;; A sanity-checker for an extremely common programmer error.
 (define-compiler-macro format (&whole form destination control &rest args)
   (declare (ignore control args))
   (when (stringp destination)
     (warn "Literal string as destination in FORMAT:~%  ~S" form))
   form)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun maybe-note-read-from-string-signature-issue (eof-error-p)
+  ;; The interface is so unintuitive that we explicitly check for the common
+  ;; error.
+  (when (member eof-error-p '(:start :end :preserve-whitespace))
+    (style-warn "~@<~S as EOF-ERROR-P argument to ~S: probable error. ~
+               Two optional arguments must be provided before the ~
+               first keyword argument.~:@>"
+                eof-error-p 'read-from-string)
+    t)))
 
 (define-compiler-macro read-from-string (&whole form string &rest args)
   ;; Check this at compile-time, and rewrite it so we're silent at runtime.
@@ -66,14 +70,3 @@
                           (setf seen (logior (ash 1 index) seen)
                                 (nth index list) (copy-symbol key)))))
             (push (list var (pop keys)) bind))))))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-(defun maybe-note-read-from-string-signature-issue (eof-error-p)
-  ;; The interface is so unintuitive that we explicitly check for the common
-  ;; error.
-  (when (member eof-error-p '(:start :end :preserve-whitespace))
-    (style-warn "~@<~S as EOF-ERROR-P argument to ~S: probable error. ~
-               Two optional arguments must be provided before the ~
-               first keyword argument.~:@>"
-                eof-error-p 'read-from-string)
-    t)))
