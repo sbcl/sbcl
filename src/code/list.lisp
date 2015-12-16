@@ -18,7 +18,7 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-          tree-equal nth %setnth nthcdr make-list
+          tree-equal %setnth nthcdr
           tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons

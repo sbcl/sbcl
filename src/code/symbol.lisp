@@ -15,7 +15,7 @@
 
 (in-package "SB!IMPL")
 
-(declaim (maybe-inline get get3 %put getf remprop %putf get-properties keywordp))
+(declaim (maybe-inline get3 %put getf remprop %putf get-properties keywordp))
 
 ;;; Used by [GLOBAL-]SYMBOL-VALUE compiler-macros:
 ;;;
