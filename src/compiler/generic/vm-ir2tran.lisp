@@ -95,7 +95,7 @@
                        ((t)
                         (vop init-slot node block object arg-tn
                              name (+ sb!vm:instance-slots-offset slot) lowtag))
-                       ,@(mapcar
+                       ,@(map 'list
                           (lambda (rsd)
                             `(,(sb!kernel::raw-slot-data-raw-type rsd)
                               (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
@@ -104,7 +104,7 @@
                                    slot)))
                           (symbol-value rsd-list)))))
                (make-case #!+raw-instance-init-vops
-                          sb!kernel::*raw-slot-data-list*))))
+                          sb!kernel::*raw-slot-data*))))
           (:dd
            (vop init-slot node block object
                 (emit-constant (sb!kernel::dd-layout-or-lose slot))

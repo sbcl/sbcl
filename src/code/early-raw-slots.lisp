@@ -119,7 +119,7 @@
 
 ;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
 ;; but not eval'd in the compiler.
-(defglobal *raw-slot-data-list* nil)
+(defglobal *raw-slot-data* nil)
 ;; By making this a cold-init function, it is possible to use raw slots
 ;; in cold toplevel forms.
 (defun !raw-slot-data-init ()
@@ -140,8 +140,8 @@
             #!+(or x86 x86-64 ppc arm64) 1
             ;; at least sparc, mips and alpha can't:
             #!-(or x86 x86-64 ppc arm64) 2))
-     (setq *raw-slot-data-list*
-      (list
+     (setq *raw-slot-data*
+      (vector
        (make-raw-slot-data :raw-type 'sb!vm:word
                            :accessor-name '%raw-instance-ref/word
                            :init-vop 'sb!vm::raw-instance-init/word
@@ -193,14 +193,8 @@
                            :comparer (make-comparer %raw-instance-ref/complex-long)))))))
 
 #+sb-xc-host (!raw-slot-data-init)
-
-(declaim (ftype (sfunction (symbol) raw-slot-data) raw-slot-data-or-lose))
-(defun raw-slot-data-or-lose (type)
-  (or (car (member type *raw-slot-data-list* :key #'raw-slot-data-raw-type))
-      (error "Invalid raw slot type: ~S" type)))
-
-(defun raw-slot-words (type)
-  (raw-slot-data-n-words (raw-slot-data-or-lose type)))
+#+sb-xc
+(declaim (type (simple-vector #.(length *raw-slot-data*)) *raw-slot-data*))
 
 ;; DO-INSTANCE-TAGGED-SLOT iterates over the manifest slots of THING
 ;; that contain tagged objects. (The LAYOUT does not count as a manifest slot).

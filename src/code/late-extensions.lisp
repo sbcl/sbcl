@@ -57,7 +57,7 @@
          (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
                     (error "Slot ~S not found in ~S." slot structure)))
          (index (dsd-index slotd))
-         #!-interleaved-raw-slots (raw-type (dsd-raw-type slotd)))
+         #!-interleaved-raw-slots (rsd (dsd-raw-slot-data slotd)))
     `(progn
        (declaim (inline ,name))
        (defun ,name (instance)
@@ -69,11 +69,11 @@
                  #!+interleaved-raw-slots
                  (* (+ sb!vm:instance-slots-offset index) sb!vm:n-word-bytes)
                  #!-interleaved-raw-slots
-                 (* (if (eq t raw-type)
+                 (* (if (not rsd)
                         (+ sb!vm:instance-slots-offset index)
                         (- (1+ (sb!kernel::dd-instance-length dd))
                            sb!vm:instance-slots-offset index
-                           (1- (sb!kernel::raw-slot-words raw-type))))
+                           (1- (sb!kernel::raw-slot-data-n-words rsd))))
                     sb!vm:n-word-bytes))))))))
 
 ;;;; ATOMIC-INCF and ATOMIC-DECF

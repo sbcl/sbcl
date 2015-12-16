@@ -43,13 +43,13 @@
                            `(ecase raw-type
                               ((t)
                                (setf (%instance-ref instance index) value))
-                              ,@(mapcar
+                              ,@(map 'list
                                  (lambda (rsd)
                                    `(,(raw-slot-data-raw-type rsd)
                                       (setf (,(raw-slot-data-accessor-name rsd)
                                               instance index)
                                             value)))
-                                 *raw-slot-data-list*))))
+                                 *raw-slot-data*))))
                 (make-case))))
           slot-specs slot-values)
     instance))
@@ -171,11 +171,10 @@
                   ;; -1 because LAYOUT (slot index 0) has no comparator stored.
                   (setf (aref comparators
                               (- (dsd-index slot) sb!vm:instance-data-start))
-                        (let ((raw-type (dsd-raw-type slot)))
-                          (if (eq raw-type t)
+                        (let ((rsd (dsd-raw-slot-data slot)))
+                          (if (not rsd)
                               0 ; means recurse using EQUALP
-                              (raw-slot-data-comparer
-                               (raw-slot-data-or-lose raw-type)))))))))
+                              (raw-slot-data-comparer rsd))))))))
 
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))
@@ -244,15 +243,23 @@
   ;; that'll fail in some cases. For example -0.0 and 0.0 are EQUALP
   ;; but have different bit patterns. -- JES, 2007-08-21
   (loop for dsd in (dd-slots (layout-info layout))
-        for raw-type = (dsd-raw-type dsd)
-        for rsd = (unless (eql raw-type t)
-                    (find raw-type
-                          *raw-slot-data-list*
-                          :key 'raw-slot-data-raw-type))
-        always (or (not rsd)
-                   (funcall (raw-slot-data-comparer rsd) (dsd-index dsd) x y))))
+        for raw-type-index = (dsd-%raw-type dsd)
+        always (or (eql raw-type-index -1)
+                   (funcall (raw-slot-data-comparer
+                             (svref *raw-slot-data* raw-type-index))
+                            (dsd-index dsd) x y))))
 
 ;;; default PRINT-OBJECT method
+
+;;; Printing formerly called the auto-generated accessor functions,
+;;; but reading the slots more primitively confers several advantages:
+;;; - it works even if the user clobbered an accessor
+;;; - it works if the slot fails a type-check and the reader was SAFE-P,
+;;    i.e. was required to perform a check. This is a feature, not a bug.
+(macrolet ((access-fn (dsd)
+             `(acond ((dsd-raw-slot-data ,dsd)
+                      (symbol-function (raw-slot-data-accessor-name it)))
+                     (t #'%instance-ref))))
 
 (defun %default-structure-pretty-print (structure stream name dd)
   (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
@@ -269,7 +276,7 @@
                 (output-symbol-name (symbol-name (dsd-name slot)) stream)
                 (write-char #\space stream)
                 (pprint-newline :miser stream)
-                (output-object (funcall (dsd-accessor-name slot) structure)
+                (output-object (funcall (access-fn slot) structure (dsd-index slot))
                                stream)
                 (when (null remaining-slots)
                   (return))
@@ -291,8 +298,9 @@
       (let ((slot (first remaining-slots)))
         (output-symbol-name (symbol-name (dsd-name slot)) stream)
         (write-char #\space stream)
-        (output-object (funcall (dsd-accessor-name slot) structure)
+        (output-object (funcall (access-fn slot) structure (dsd-index slot))
                        stream)))))
+) ; end MACROLET
 
 (defun default-structure-print (structure stream depth)
   (declare (ignore depth))
@@ -340,16 +348,15 @@
     (mapcan (lambda (dsd)
               (when (or (not slot-names-p) (memq (dsd-name dsd) slot-names))
                 (let ((index (dsd-index dsd))
-                      (raw-type (dsd-raw-type dsd)))
-                  (if (eq raw-type t)
+                      (rsd (dsd-raw-slot-data dsd)))
+                  (if (not rsd)
                       `((%instance-ref ,struct ,index)
                         ,(let ((val (%instance-ref struct index)))
                            (if (and (or (listp val) (symbolp val))
                                     (not (member val '(nil t))))
                                (list 'quote val)
                                val)))
-                      (let ((accessor (raw-slot-data-accessor-name
-                                       (raw-slot-data-or-lose raw-type))))
+                      (let ((accessor (raw-slot-data-accessor-name rsd)))
                         `((,accessor ,struct ,index)
                           ,(funcall accessor struct index)))))))
             (dd-slots dd))))

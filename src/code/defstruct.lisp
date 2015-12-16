@@ -147,25 +147,21 @@
   (type t)                      ; declared type specifier
   (safe-p t :type boolean)      ; whether the slot is known to be
                                 ; always of the specified type
-  ;; If this object does not describe a raw slot, this value is T.
-  ;;
-  ;; If this object describes a raw slot, this value is the type of the
-  ;; value that the raw slot holds.
-  ;; Note: if there were more than about 5 raw types - and there aren't -
-  ;; this could be made more efficient by storing either a raw-type-id
-  ;; as an integer index to a vector of the raw types (presently a list,
-  ;; but easily a vector), or actually just the RSD object (raw-slot-data).
-  ;; Doing so would avoid some frequent re-scanning of the RSD list.
-  (raw-type t :type (member t single-float double-float
-                            #!+long-float long-float
-                            complex-single-float complex-double-float
-                            #!+long-float complex-long-float
-                            sb!vm:word))
+  ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
+  ;; The index is -1 if this slot is not raw.
+  (%raw-type -1 :type (integer -1 (#.(length *raw-slot-data*))))
   (read-only nil :type (member t nil)))
 #!-sb-fluid (declaim (freeze-type defstruct-slot-description))
 (def!method print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))
+(defun dsd-raw-slot-data (dsd)
+  (let ((type-index (dsd-%raw-type dsd)))
+    (and (>= type-index 0)
+         (svref *raw-slot-data* type-index))))
+(defun dsd-raw-type (dsd)
+  (acond ((dsd-raw-slot-data dsd) (raw-slot-data-raw-type it))
+         (t)))
 
 ;;;; typed (non-class) structures
 
@@ -788,9 +784,9 @@ unless :NAMED is also specified.")))
     slot))
 
 ;;; When a value of type TYPE is stored in a structure, should it be
-;;; stored in a raw slot?  Return the matching RAW-SLOT-DATA structure
-;; if TYPE should be stored in a raw slot, or NIL if not.
-(defun structure-raw-slot-data (type)
+;;; stored in a raw slot?  Return the index of the matching RAW-SLOT-DATA
+;;; if TYPE should be stored in a raw slot, or NIL if not.
+(defun structure-raw-slot-data-index (type)
   (multiple-value-bind (fixnum? fixnum-certain?)
       (sb!xc:subtypep type 'fixnum)
     ;; (The extra test for FIXNUM-CERTAIN? here is intended for
@@ -800,23 +796,25 @@ unless :NAMED is also specified.")))
     ;; FIXNUM-CERTAIN?.)
     (if (or fixnum? (not fixnum-certain?))
         nil
-        (dolist (data *raw-slot-data-list*)
-          (when (sb!xc:subtypep type (raw-slot-data-raw-type data))
-            (return data))))))
+        (dotimes (i (length *raw-slot-data*))
+          (let ((data (svref *raw-slot-data* i)))
+            (when (sb!xc:subtypep type (raw-slot-data-raw-type data))
+              (return i)))))))
 
 ;;; Allocate storage for a DSD in DD. This is where we decide whether
 ;;; a slot is raw or not. Raw objects are aligned on the unit of their size.
 (defun allocate-1-slot (dd dsd)
-  (let ((rsd (if (eq (dd-type dd) 'structure)
-                 (structure-raw-slot-data (dsd-type dsd))
-                 nil)))
-    (cond ((null rsd)
+  (let ((rsd-index (if (eq (dd-type dd) 'structure)
+                       (structure-raw-slot-data-index (dsd-type dsd))
+                       nil)))
+    (cond ((null rsd-index)
            (setf (dsd-index dsd) (dd-length dd))
            (incf (dd-length dd)))
           (t
-           (setf (dsd-raw-type dsd) (raw-slot-data-raw-type rsd))
-           (let ((words (raw-slot-data-n-words rsd))
-                 (alignment (raw-slot-data-alignment rsd)))
+           (setf (dsd-%raw-type dsd) rsd-index)
+           (let* ((rsd (svref *raw-slot-data* rsd-index))
+                  (words (raw-slot-data-n-words rsd))
+                  (alignment (raw-slot-data-alignment rsd)))
              #!-interleaved-raw-slots
              (let ((off (rem (dd-raw-length dd) alignment)))
                (unless (zerop off)
@@ -992,12 +990,11 @@ unless :NAMED is also specified.")))
                (list 'nth)
                (vector 'aref)))
         (index (dsd-index dsd))
-        (raw-type (dsd-raw-type dsd)))
-    (if (eq raw-type t) ; if not raw slot
+        (rsd (dsd-raw-slot-data dsd)))
+    (if (not rsd) ; if not raw slot
         (multiple-value-call 'list ref
          (if (eq ref 'nth) (values index instance) (values instance index)))
-        `(,(raw-slot-data-accessor-name
-            (raw-slot-data-or-lose raw-type)) ,instance ,index))))
+        `(,(raw-slot-data-accessor-name rsd) ,instance ,index))))
 
 ;;; Return the transform of conceptual FUNCTION one of {:READ,:WRITE,:SETF}
 ;;; as applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.

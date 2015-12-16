@@ -988,9 +988,9 @@ core and return a descriptor to it."
                   (let* ((dsd (cold-car slots))
                          (slot-name (read-slot dsd dsd-layout :name)))
                     (when (eq (keywordicate (warm-symbol slot-name)) initarg)
-                      (let ((raw-type (read-slot dsd dsd-layout :raw-type)))
-                        ;; Untagged slots are not accessible during cold-load.
-                        (aver (eq (warm-symbol raw-type) t)))
+                      ;; Untagged slots are not accessible during cold-load
+                      (aver (eql (descriptor-fixnum
+                                  (read-slot dsd dsd-layout :%raw-type)) -1))
                       (return (descriptor-fixnum
                                (read-slot dsd dsd-layout :index))))))
                 (let ((dsd (find initarg slots

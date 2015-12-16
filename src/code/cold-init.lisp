@@ -156,7 +156,7 @@
   (progn (prin1 `(package = ,(package-name *package*)))
          (terpri))
 
-  ;; *RAW-SLOT-DATA-LIST* is essentially a compile-time constant
+  ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
   (show-and-call sb!kernel::!raw-slot-data-init)
 

@@ -1315,3 +1315,9 @@ redefinition."
 (with-test (:name :defstruct-ftype-correctness)
   (assert (make-foo-not-too-strong -3)) ; should be allowed
   (assert-error (make-foo-not-too-weak))) ; should not set X slot to NIL
+
+(defstruct fruitbat a (b #xbadf00d :type sb-ext:word) (c 'hi))
+(mapc 'fmakunbound '(fruitbat-a fruitbat-b fruitbat-c))
+(with-test (:name :defstruct-printer-robust)
+  (assert (string= (princ-to-string (make-fruitbat :a "test"))
+                   "#S(FRUITBAT :A test :B 195948557 :C HI)")))
