@@ -2484,4 +2484,9 @@
    (defclass class-with-eventual-self-as-metaclass () ()
      (:metaclass class-with-eventual-self-as-metaclass))))
 
-;;;; success
+(with-test (:name :function-keywords)
+  (defgeneric function-keywords-test (&key))
+  (assert (equal (function-keywords
+                  (defmethod function-keywords-test (&key a b)
+                    (declare (ignore a b))))
+                 '(:a :b))))

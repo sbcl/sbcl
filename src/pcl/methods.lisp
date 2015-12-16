@@ -1669,6 +1669,14 @@
   (reinitialize-instance generic-function :name new-value)
   new-value)
 
+(defmethod function-keywords ((method standard-method))
+  (multiple-value-bind (llks nreq nopt keywords)
+      (analyze-lambda-list (if (consp method)
+                               (early-method-lambda-list method)
+                               (method-lambda-list method)))
+    (declare (ignore nreq nopt))
+    (values keywords (ll-kwds-allowp llks))))
+
 ;;; This is based on the rules of method lambda list congruency
 ;;; defined in the spec. The lambda list it constructs is the pretty
 ;;; union of the lambda lists of the generic function and of all its
