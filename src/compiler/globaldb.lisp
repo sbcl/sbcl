@@ -458,6 +458,13 @@
 ;;; expansion is inhibited.
 ;;; As an exception, a cons of two atoms represents structure metadata
 ;;; which is recognized and transformed in a stylized way.
+;;;
+;;; This item is almost mutually exclusive with an inline expansion,
+;;; but both are possible in the rare case of a system-defined transform
+;;; that may decline to expand. If it does, an inline expansion could win.
+;;; We don't actually have anything like that any more though.
+;;; For user-defined functions, the invariant is maintained that at most
+;;; one of :source-transform and an inline-expansion exist.
 (define-info-type (:function :source-transform)
   :type-spec (or function null (cons atom atom)))
 

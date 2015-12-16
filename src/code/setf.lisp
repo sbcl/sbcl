@@ -31,7 +31,7 @@
         (dx-let ((setter `(setf ,fun)))
           (when (and (not (sb!c::fun-locally-defined-p setter env))
                      (not (sb!c::fun-lexically-notinline-p setter env)))
-            slot-info)))))) ; caller needs the (DD . DSD) pair pack
+            slot-info)))))) ; caller needs the (DD . DSD) pair
 
 ;;; The inverse for a generalized-variable reference function is stored in
 ;;; one of two ways:

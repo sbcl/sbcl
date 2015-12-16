@@ -235,10 +235,9 @@
 (declaim (optimize (debug 2)))
 
 (defmacro test-variant (defstructname &key colontype boa-constructor-p)
-  `(progn
-
-     (format t "~&/beginning PROGN for COLONTYPE=~S~%" ',colontype)
-
+  `(locally
+     (declare (muffle-conditions style-warning)) ; &OPTIONAL and &KEY
+     #+nil(format t "~&/beginning PROGN for COLONTYPE=~S~%" ',colontype)
      (defstruct (,defstructname
                   ,@(when colontype `((:type ,colontype)))
                   ,@(when boa-constructor-p
@@ -264,7 +263,7 @@
        ;; more ordinary tagged slots
        (refcount 0 :type (and unsigned-byte fixnum)))
 
-     (format t "~&/done with DEFSTRUCT~%")
+     #+nil(format t "~&/done with DEFSTRUCT~%")
 
      (let* ((cn (string+ ',defstructname "-")) ; conc-name
             (ctor (symbol-function ',(symbol+ (if boa-constructor-p
@@ -282,7 +281,7 @@
                                            `(:refcount 1)))))
 
        ;; Check that ctor set up slot values correctly.
-       (format t "~&/checking constructed structure~%")
+       #+nil(format t "~&/checking constructed structure~%")
        (assert (string= "some id" (read-slot cn "ID" *instance*)))
        (assert (eql (find-package :cl) (read-slot cn "HOME" *instance*)))
        (assert (string= "" (read-slot cn "COMMENT" *instance*)))
@@ -292,13 +291,13 @@
        (assert (= 1 (read-slot cn "REFCOUNT" *instance*)))
 
        ;; There should be no writers for read-only slots.
-       (format t "~&/checking no read-only writers~%")
+       #+nil(format t "~&/checking no read-only writers~%")
        (assert (not (fboundp `(setf ,(symbol+ cn "HOME")))))
        (assert (not (fboundp `(setf ,(symbol+ cn "HASH")))))
        ;; (Read-only slot values are checked in the loop below.)
 
        (dolist (inlinep '(t nil))
-         (format t "~&/doing INLINEP=~S~%" inlinep)
+         #+nil(format t "~&/doing INLINEP=~S~%" inlinep)
          ;; Fiddle with writable slot values.
          (let ((new-id (format nil "~S" (random 100)))
                (new-comment (format nil "~X" (random 5555)))
@@ -312,7 +311,7 @@
            ;;  (error "WEIGHT mismatch: ~S vs. ~S"
            ;;         new-weight (read-slot cn "WEIGHT" *instance*)))
            (assert (eql new-weight (read-slot cn "WEIGHT" *instance*)))))
-       (format t "~&/done with INLINEP loop~%")
+       #+nil(format t "~&/done with INLINEP loop~%")
 
        ;; :TYPE FOO objects don't go in the Lisp type system, so we
        ;; can't test TYPEP stuff for them.
@@ -322,19 +321,19 @@
        ,@(unless colontype
            `(;; Fiddle with predicate function.
              (let ((pred-name (symbol+ ',defstructname "-P")))
-               (format t "~&/doing tests on PRED-NAME=~S~%" pred-name)
+               #+nil(format t "~&/doing tests on PRED-NAME=~S~%" pred-name)
                (assert (funcall pred-name *instance*))
                (assert (not (funcall pred-name 14)))
                (assert (not (funcall pred-name "test")))
                (assert (not (funcall pred-name (make-hash-table))))
                (let ((compiled-pred
                       (compile nil `(lambda (x) (,pred-name x)))))
-                 (format t "~&/doing COMPILED-PRED tests~%")
+                 #+nil(format t "~&/doing COMPILED-PRED tests~%")
                  (assert (funcall compiled-pred *instance*))
                  (assert (not (funcall compiled-pred 14)))
                  (assert (not (funcall compiled-pred #()))))
                ;; Fiddle with TYPEP.
-               (format t "~&/doing TYPEP tests, COLONTYPE=~S~%" ',colontype)
+               #+nil(format t "~&/doing TYPEP tests, COLONTYPE=~S~%" ',colontype)
                (assert (typep *instance* ',defstructname))
                (assert (not (typep 0 ',defstructname)))
                (assert (funcall (symbol+ "TYPEP") *instance* ',defstructname))
@@ -345,7 +344,7 @@
                  (assert (funcall compiled-typep *instance*))
                  (assert (not (funcall compiled-typep nil))))))))
 
-     (format t "~&/done with PROGN for COLONTYPE=~S~%" ',colontype)))
+     #+nil(format t "~&/done with PROGN for COLONTYPE=~S~%" ',colontype)))
 
 (test-variant vanilla-struct)
 (test-variant vector-struct :colontype vector)
@@ -470,7 +469,7 @@
                      :d d
                      :e e)
             *manyraw*)))
-  (room)
+  (let ((*standard-output* (make-broadcast-stream))) (room))
   (sb-ext:gc))
 (with-test (:name :defstruct-raw-slot-gc)
   (check-manyraws *manyraw*))
@@ -1321,3 +1320,32 @@ redefinition."
 (with-test (:name :defstruct-printer-robust)
   (assert (string= (princ-to-string (make-fruitbat :a "test"))
                    "#S(FRUITBAT :A test :B 195948557 :C HI)")))
+
+;; lp#540063
+(defstruct x y)
+(with-test (:name :redefine-accessor-as-random-defun)
+  (flet ((assert-that (expect form)
+           ;; test by STRING= since there's no condition class,
+           ;; being a little more thorough than merely ASSERT-SIGNAL.
+           (let (win)
+             (handler-bind ((simple-warning
+                             (lambda (c)
+                               (when (string= (princ-to-string c) expect)
+                                 (setq win t)
+                                 (muffle-warning)))))
+               (eval form)
+               (assert win)))))
+    (assert-that "redefinition of X-Y clobbers structure accessor"
+                 '(defun x-y (z) (list :x-y z)))
+    (assert-that "redefinition of X-P clobbers structure predicate"
+                 '(defun x-p (z) (list 'bork z))))
+  (assert (equalp
+           (funcall (compile nil '(lambda (z) (x-y z)))
+                    (make-x :y t))
+           '(:X-Y #S(X :Y T))))
+  (assert (equalp
+           (funcall (compile nil '(lambda (z)
+                                    (declare (notinline x-y))
+                                    (x-y z)))
+                    (make-x :y t))
+           '(:X-Y #S(X :Y T)))))

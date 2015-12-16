@@ -1270,7 +1270,26 @@
       (substitute-leaf fun var))
     fun))
 
+;;; Store INLINE-LAMBDA as the inline expansion of NAME.
 (defun %set-inline-expansion (name defined-fun inline-lambda)
+  (cond ((member inline-lambda '(:accessor :predicate))
+         ;; Special-case that implies a structure-related source-transform.
+         (when (info :function :inline-expansion-designator name)
+           ;; Any inline expansion that existed can't be useful.
+           (warn "structure ~(~A~) ~S clobbers inline function"
+                 inline-lambda name))
+         (setq inline-lambda nil)) ; will be cleared below
+        (t
+         ;; Warn if stomping on a structure predicate or accessor
+         ;; whether or not we are about to install an inline-lambda.
+         (let ((info (info :function :source-transform name)))
+           (when (consp info)
+             (clear-info :function :source-transform name)
+             ;; This is serious enough that you can get two warnings:
+             ;; - one because you redefined a function at all,
+             ;; - and one because the source-transform is erased.
+             (warn "redefinition of ~S clobbers structure ~:[accessor~;predicate~]"
+                   name (eq (cdr info) :predicate))))))
   (cond (inline-lambda
          (setf (info :function :inline-expansion-designator name)
                inline-lambda)
@@ -1282,15 +1301,18 @@
 
 ;;; the even-at-compile-time part of DEFUN
 ;;;
-;;; The INLINE-LAMBDA is a LAMBDA-WITH-LEXENV, or NIL if there is no
-;;; inline expansion.
+;;; The INLINE-LAMBDA is either the symbol :ACCESSOR, meaning that
+;;; the function is a structure accessor, or a LAMBDA-WITH-LEXENV,
+;;; or NIL if there is no inline expansion.
 (defun %compiler-defun (name inline-lambda compile-toplevel)
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
     (when compile-toplevel
       (with-single-package-locked-error
           (:symbol name "defining ~S as a function")
         (setf defined-fun
-              (if inline-lambda
+              (if (consp inline-lambda)
+                  ;; FIFTH as an accessor - how informative!
+                  ;; Obfuscation aside, I doubt this is even right.
                   (get-defined-fun name (fifth inline-lambda))
                   (get-defined-fun name))))
       (when (boundp '*lexenv*)

@@ -179,7 +179,7 @@ evaluated as a PROGN."
    ;; the only unsurprising choice.
    (info :function :inline-expansion-designator name)))
 
-(defmacro-mundanely defun (&environment env name args &body body)
+(defmacro-mundanely defun (&environment env name lambda-list &body body)
   #!+sb-doc
   "Define a function at top level."
   #+sb-xc-host
@@ -187,28 +187,30 @@ evaluated as a PROGN."
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body t)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
-           (lambda-guts `(,args
+           (lambda-guts `(,lambda-list
                           ,@(when doc (list doc))
                           ,@decls
                           (block ,(fun-name-block-name name)
                             ,@forms)))
            (lambda `(lambda ,@lambda-guts))
            (named-lambda `(named-lambda ,name ,@lambda-guts))
-           (inline-lambda
-            (when (inline-fun-name-p name)
-              ;; we want to attempt to inline, so complain if we can't
-              (or (sb!c:maybe-inline-syntactic-closure lambda env)
-                  (progn
-                    (#+sb-xc-host warn
-                     #-sb-xc-host sb!c:maybe-compiler-notify
-                     "lexical environment too hairy, can't inline DEFUN ~S"
-                     name)
-                    nil)))))
+           (inline-thing
+            (or (sb!kernel::defstruct-generated-defn-p name lambda-list body)
+                (when (inline-fun-name-p name)
+                  ;; we want to attempt to inline, so complain if we can't
+                  (acond ((sb!c:maybe-inline-syntactic-closure lambda env)
+                          (list 'quote it))
+                         (t
+                          (#+sb-xc-host warn
+                           #-sb-xc-host sb!c:maybe-compiler-notify
+                           "lexical environment too hairy, can't inline DEFUN ~S"
+                           name)
+                          nil))))))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb!c:%compiler-defun ',name ',inline-lambda t))
+           (sb!c:%compiler-defun ',name ,inline-thing t))
          (%defun ',name ,named-lambda (sb!c:source-location)
-                 ,@(and inline-lambda `(',inline-lambda)))
+                 ,@(and inline-thing (list inline-thing)))
          ;; This warning, if produced, comes after the DEFUN happens.
          ;; When compiling, there's no real difference, but when interpreting,
          ;; if there is a handler for style-warning that nonlocally exits,
@@ -228,28 +230,6 @@ evaluated as a PROGN."
     (when (fboundp name)
       (warn 'redefinition-with-defun
             :name name :new-function def :new-location source-location))
-    ;; If NAME has an existing structure slot source-transform and DEF does not
-    ;; coincide with the transform, then blow away the transform.
-    ;; It's important for the interpreter to do this because we prefer to
-    ;; use the transform when it exists - which is presently achieved by calling
-    ;; COMPILE on NAME. But we need to ensure that it is correct to call COMPILE
-    ;; on NAME in a null environment even if it appeared inside a toplevel LET.
-    ;; The indication of whether this will work is that DEF matches the
-    ;; expected source-transform for NAME. Users should not care that NAME
-    ;; ever got temporarily defined as an interpreted function.
-    ;; Arguably (SETF FDEFINITION) and FMAKUNBOUND should do this check too,
-    ;; but one would hope that those operations on compiler-defined functions
-    ;; are uncommon enough that this makes no difference.
-    ;; *** See also https://bugs.launchpad.net/sbcl/+bug/540063
-    #!+sb-fasteval
-    (awhen (and (sb!interpreter:interpreted-function-p def)
-                (structure-instance-accessor-p name))
-      (unless (structure-accessor-form-p
-               (if (consp name) :setf :read) it
-               (sb!interpreter:fun-lambda-list def)
-               (sb!interpreter::fun-forms def))
-        (clear-info :function :source-transform name)
-        (warn "structure slot accessor ~S incompatibly redefined" name)))
     (setf (sb!xc:fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF
@@ -264,28 +244,6 @@ evaluated as a PROGN."
     (sb!c::%set-inline-expansion name nil inline-lambda)
     ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.
     ))
-
-;; Return T if LAMBDA-LIST and FORMS make up to the lambda expression
-;; that corresponds to the structure slot accessor for SLOT-INFO so
-;; that we can decide that an interpreted lambda is consistent with
-;; its source-transform.  I think there's actually a better way than
-;; this heuristic: *always* remove a source-transform whenever an
-;; fdefn-fun is set, with a blanket exception for boostrap code. Then
-;; %TARGET-DEFSTRUCT, which is the last step to occur from DEFSTRUCT,
-;; can re-establish the source-transforms.
-(defun structure-accessor-form-p (kind slot-info lambda-list forms)
-  (let ((expected-lambda-list
-         (ecase kind
-           (:read '(instance))
-           (:setf '(sb!kernel::value instance)))))
-    (when (and (equal lambda-list expected-lambda-list)
-               (singleton-p forms))
-      (let ((form (car forms)))
-        ;; FORM must match (BLOCK x subform)
-        (and (typep form '(cons (eql block) (cons t (cons t null))))
-             (equal (third form)
-                    (slot-access-transform
-                     kind (reverse expected-lambda-list) slot-info)))))))
 
 ;;;; DEFVAR and DEFPARAMETER
 

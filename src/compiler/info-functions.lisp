@@ -108,8 +108,8 @@
       ;; symbol and its #<fdefn> object, it could lead to creation of
       ;; a non-unique #<fdefn> for a name.
       (frob :info
-            :type
-            :where-from
+            :type ; Hmm. What if it was proclaimed- shouldn't it stay?
+            :where-from ; Ditto.
             :inlinep
             :kind
             :macro-function
