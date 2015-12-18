@@ -55,6 +55,13 @@
 os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
+#ifndef LISP_FEATURE_GENCGC
+inline static boolean
+in_gc_p(void) {
+    return current_dynamic_space == from_space;
+}
+#endif
+
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
     lispobj first_word=*pointer;
@@ -62,6 +69,7 @@ forwarding_pointer_p(lispobj *pointer) {
     return (first_word == 0x01);
 #else
     return (is_lisp_pointer(first_word)
+            && in_gc_p() /* cheneygc new_space_p() is broken when not in gc */
             && new_space_p(first_word));
 #endif
 }
