@@ -13,7 +13,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB!X86-64-ASM")
 
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
@@ -37,7 +37,7 @@
            (type list value)
            (type (member nil :byte :word :dword :qword) width)
            (type stream stream)
-           (type sb!disassem:disassem-state dstate))
+           (type disassem-state dstate))
   (when (and width (eq mode :sized-ref))
     (princ width stream)
     (princ '| PTR | stream))
@@ -47,6 +47,9 @@
                  ;; Print an element of the address, maybe with
                  ;; a leading separator.
                  `(let ((,var ,val))
+                    ;; Compiler knows that FIRSTP is T in first call to PEL.
+                    #-sb-xc-host
+                    (declare (muffle-conditions code-deletion-note))
                     (when ,var
                       (unless firstp
                         (write-char #\+ stream))
@@ -72,46 +75,40 @@
             (rip-p
              (princ offset stream)
              (unless (eq mode :compute)
-               (let ((addr (+ offset (sb!disassem:dstate-next-addr dstate))))
+               (let ((addr (+ offset (dstate-next-addr dstate))))
                  (when (plusp addr) ; FIXME: what does this test achieve?
-                    (let ((hook (sb!disassem:dstate-get-prop
+                    (let ((hook (dstate-get-prop
                                  dstate :rip-relative-mem-ref-hook)))
                       (when hook
                         (funcall hook offset width)))
                     (or (nth-value
-                         1 (sb!disassem::note-code-constant-absolute
-                            addr dstate width))
-                        (sb!disassem:maybe-note-assembler-routine
-                         addr nil dstate)
+                         1 (note-code-constant-absolute addr dstate width))
+                        (maybe-note-assembler-routine addr nil dstate)
                         ;; Show the absolute address and maybe the contents.
-                        (sb!disassem:note
+                        (note
                          (format nil "[#x~x]~@[ = ~x~]"
                                  addr
                                  (case width
                                   (:qword (unboxed-constant-ref
                                            dstate
-                                           (+ (sb!disassem:dstate-next-offs
-                                               dstate) offset)))))
+                                           (+ (dstate-next-offs dstate) offset)))))
                          dstate))))))
             (firstp
-               (sb!disassem:princ16 offset stream)
+               (princ16 offset stream)
                (or (minusp offset)
-                   (nth-value 1
-                              (sb!disassem::note-code-constant-absolute offset dstate))
-                   (sb!disassem:maybe-note-assembler-routine offset
-                                                             nil
-                                                             dstate)))
+                   (nth-value 1 (note-code-constant-absolute offset dstate))
+                   (maybe-note-assembler-routine offset nil dstate)))
             (t
              (princ offset stream)))))))
   (write-char #\] stream)
   #!+sb-thread
   (let ((disp (second value)))
-    (when (and (eql (first value) #.(ash (tn-offset thread-base-tn) -1))
+    (when (and (eql (first value) #.(ash (tn-offset sb!vm::thread-base-tn) -1))
                (not (third value)) ; no index
                (typep disp '(integer 0 *)) ; positive displacement
-               (sb!disassem::seg-code (sb!disassem:dstate-segment dstate)))
+               (seg-code (dstate-segment dstate)))
       ;; Try to reverse-engineer which thread-local binding this is
-      (let* ((code (sb!disassem::seg-code (sb!disassem:dstate-segment dstate)))
+      (let* ((code (seg-code (dstate-segment dstate)))
              (header-n-words
               (ash (sap-ref-word (int-sap (get-lisp-obj-address code))
                                  (- other-pointer-lowtag)) -8))
@@ -120,35 +117,30 @@
               for obj = (code-header-ref code word-num)
               when (and (symbolp obj) (= (symbol-tls-index obj) tls-index))
               do (return-from print-mem-ref
-                   (sb!disassem:note
-                    (lambda (stream) (format stream "tls: ~S" obj))
-                    dstate))))
+                   (note (lambda (stream) (format stream "tls: ~S" obj))
+                         dstate))))
       ;; Or maybe we're looking at the 'struct thread' itself
       (when (< disp max-interrupts)
         (let* ((thread-slots
                 (load-time-value
                  (primitive-object-slots
-                  (find 'thread *primitive-objects*
+                  (find 'sb!vm::thread *primitive-objects*
                         :key #'primitive-object-name)) t))
                (slot (find (ash disp (- word-shift)) thread-slots
                            :key #'slot-offset)))
           (when slot
             (return-from print-mem-ref
-              (sb!disassem:note
-               (lambda (stream)
-                 (format stream "thread.~(~A~)" (slot-name slot)))
-               dstate))))))))
+              (note (lambda (stream)
+                      (format stream "thread.~(~A~)" (slot-name slot)))
+                    dstate))))))))
 
 (defun unboxed-constant-ref (dstate segment-offset)
-  (let* ((seg (sb!disassem:dstate-segment dstate))
+  (let* ((seg (dstate-segment dstate))
          (code-offset
           (sb!disassem::segment-offs-to-code-offs segment-offset seg))
          (unboxed-range (sb!disassem::seg-unboxed-data-range seg)))
     (and unboxed-range
          (<= (car unboxed-range) code-offset (cdr unboxed-range))
-         (sb!disassem::sap-ref-int
-          (sb!disassem:dstate-segment-sap dstate)
-          segment-offset
-          n-word-bytes
-          (sb!disassem::dstate-byte-order dstate)))))
-
+         (sap-ref-int (dstate-segment-sap dstate)
+                      segment-offset n-word-bytes
+                      (dstate-byte-order dstate)))))
