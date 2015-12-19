@@ -142,8 +142,6 @@ extern uword_t install_handler(int signal,
                                interrupt_handler_t handler,
                                int synchronous);
 
-extern union interrupt_handler interrupt_handlers[NSIG];
-
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:
  * SA_SIGACTION handlers have one signature, and the default old-style
