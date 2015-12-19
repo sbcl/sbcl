@@ -229,7 +229,7 @@
   (%make-simd-pack-ub64 low high))
 
 #-sb-xc-host
-(declaim (inline %make-simd-pack-ub64))
+(declaim (inline %make-simd-pack-ub32))
 #-sb-xc-host
 (defun %make-simd-pack-ub32 (w x y z)
   (declare (type (unsigned-byte 32) w x y z))
