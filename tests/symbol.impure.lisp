@@ -195,7 +195,7 @@
         for current = (classify-symbol symbol)
         do
         (when (/= expected current)
-          (error "Symbol ~s is ~s, expcted to be ~s"
+          (error "Symbol ~s is ~s; expected to be ~s"
                  symbol
                  (describe-symbol-classification current)
                  (describe-symbol-classification expected)))))
