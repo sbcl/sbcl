@@ -28,6 +28,11 @@
 
 (in-package "SB!FASL")
 
+;; This is to assert that genesis can manipulate shadowing symbols.
+;; Cross-compiling this form would test the wrong thing,
+;; as evidenced by an assertion that was passing, but should have failed.
+(shadow "!UNINTERN-ME" "SB!IMPL")
+
 ;;; a magic number used to identify our core files
 (defconstant core-magic
   (logior (ash (sb!xc:char-code #\S) 24)

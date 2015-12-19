@@ -1603,8 +1603,7 @@ PACKAGE."
                      (add-symbol table symbol)))))
           (setf (package-external-symbols pkg) (!make-table (car symbols))
                 (package-internal-symbols pkg) (!make-table (cdr symbols))))
-        (setf (package-%shadowing-symbols pkg) nil
-              (package-%local-nicknames pkg) nil
+        (setf (package-%local-nicknames pkg) nil
               (package-%locally-nicknamed-by pkg) nil
               (package-source-location pkg) nil
               (gethash (package-%name pkg) names) pkg)
@@ -1729,7 +1728,3 @@ PACKAGE."
                       (:eval
                        (eval-error condition))))))
     (with-single-package-locked-error (:symbol symbol control))))
-
-;; This is to assert that genesis can manipulate shadowing symbols.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (shadow "!UNINTERN-ME" "SB!IMPL"))
