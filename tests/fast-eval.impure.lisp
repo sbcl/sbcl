@@ -238,3 +238,11 @@
               (go :b)
               :c
               (princ :c))))))
+
+(macrolet ((foo= (x y) `(= (the fixnum ,x) (the fixnum ,y))))
+  (declare (optimize speed))
+  (declaim (inline foo-compare))
+  (defun foo-compare (a b) (foo= a b)))
+
+(test-util:with-test (:name :inline-lexenv-not-too-hairy)
+  (assert (sb-c::fun-name-inline-expansion 'foo-compare)))

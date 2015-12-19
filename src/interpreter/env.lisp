@@ -1228,33 +1228,34 @@
     lexenv))
 
 ;;; Produce the source representation expected by :INLINE-EXPANSION-DESIGNATOR.
-;;; This is less capable than the correspoding logic in RECONSTRUCT-LEXENV
-;;; but should not be too difficult to enhance to match.
 (defun reconstruct-syntactic-closure-env (env)
-  (flet ((externalize (env nest)
-           (typecase env
-             (symbol-macro-env
-              (let ((symbols (env-symbols env))
-                    (expansions (env-payload env)))
-                (when (and (null (env-declarations env))
-                           ;; More symbols than expansions = free specials.
-                           (= (length symbols) (length expansions)))
-                  (list* :symbol-macro
-                         (map 'list (lambda (x y) (list (car x) y))
-                              symbols expansions)
-                         nest))))
-             (macro-env
-              (when (and (null (env-declarations env))
-                         (null (env-symbols env)))
-                (list*
-                 :macro
-                 (map 'list
-                      (lambda (f)
-                        ;; The name of each macro is (MACROLET symbol).
-                        (cons (second (fun-name f))
-                              (fun-lambda-expression f)))
-                      (env-payload env))
-                 nest))))))
+  (flet ((externalize (env forms)
+           (multiple-value-bind (kind data)
+               (let ((symbols (env-symbols env))
+                     (expansions (env-payload env)))
+                 (typecase env
+                   (symbol-macro-env
+                    (values :symbol-macro
+                            (map 'list (lambda (x y) (list (car x) y))
+                                 symbols expansions)))
+                   (macro-env
+                    (values
+                     :macro
+                     (map 'list
+                          (lambda (f)
+                            ;; The name of each macro is (MACROLET symbol).
+                            (cons (second (fun-name f))
+                                  (fun-lambda-expression f)))
+                          expansions)))
+                   ;; Insert all declarations, and hope for the best.
+                   ;; OPTIMIZE won't do anything. SPECIAL may or may not.
+                   (basic-env (values :declare nil))))
+             (when kind
+               (let ((decl (awhen (env-declarations env)
+                             (list* :declare it forms))))
+                 (if data
+                     (list* kind data (if decl (list decl) forms))
+                     decl))))))
     (let ((nest nil))
       (loop
        (let ((sexpr (externalize env nest)))
