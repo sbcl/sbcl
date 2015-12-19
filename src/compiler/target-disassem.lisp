@@ -654,15 +654,15 @@
       (setf (dstate-labels dstate) labels))))
 
 ;;; Get the instruction-space, creating it if necessary.
-(defun get-inst-space (&key force)
+(defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)
+                            force)
   (let ((ispace *disassem-inst-space*))
     (when (or force (null ispace))
       (let ((insts nil))
-        (maphash (lambda (name inst-flavs)
-                   (declare (ignore name))
-                   (dolist (flav inst-flavs)
-                     (push flav insts)))
-                 *disassem-insts*)
+        (do-symbols (name package)
+          (let ((inst-flavors (get name :disassembler)))
+            (dolist (flav inst-flavors)
+              (push flav insts))))
         (setf ispace (build-inst-space insts)))
       (setf *disassem-inst-space* ispace))
     ispace))

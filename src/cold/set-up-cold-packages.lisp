@@ -130,5 +130,18 @@
           (reexport x))
         (assert (= (length done) (length package-data-list)))))))
 
+(defun backend-asm-package-name ()
+  (concatenate 'string "SB!" (string-upcase (target-platform-name)) "-ASM"))
+
+;; Each backend should have a different package for its instruction set
+;; so that they can co-exist.
+(make-assembler-package (backend-asm-package-name))
+
 (defun package-list-for-genesis ()
-  (sb-cold:read-from-file "package-data-list.lisp-expr"))
+  (append (sb-cold:read-from-file "package-data-list.lisp-expr")
+          (let ((asm-package (backend-asm-package-name)))
+            (list (make-package-data
+                   :name asm-package
+                   :use (mapcar 'package-name
+                                (package-use-list asm-package))
+                   :doc nil)))))

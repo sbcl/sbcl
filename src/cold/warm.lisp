@@ -23,9 +23,11 @@
 
 ;;;; package hacking
 
-;;; Assert that compile-time shadowing symbols are still shadowing.
-(let ((symbols (package-shadowing-symbols "SB-IMPL")))
-  (assert (= (length symbols) 1)))
+;;; Assert that genesis preserves shadowing symbols.
+(let ((p sb-assem::*backend-instruction-set-package*))
+  (unless (eq p (find-package "SB-VM"))
+    (dolist (expect '("SEGMENT" "MAKE-SEGMENT"))
+      (assert (find expect (package-shadowing-symbols p) :test 'string=)))))
 
 ;;; FIXME: This nickname is a deprecated hack for backwards
 ;;; compatibility with code which assumed the CMU-CL-style

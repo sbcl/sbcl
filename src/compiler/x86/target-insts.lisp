@@ -13,13 +13,13 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB!X86-ASM")
 
 (defun print-mem-access (value stream print-size-p dstate)
   (declare (type list value)
            (type stream stream)
            (type (member t nil) print-size-p)
-           (type sb!disassem:disassem-state dstate))
+           (type disassem-state dstate))
   (when print-size-p
     (princ (inst-operand-size dstate) stream)
     (princ '| PTR | stream))
@@ -49,12 +49,9 @@
             (write-char #\+ stream))
           (if firstp
             (progn
-              (sb!disassem:princ16 offset stream)
+              (princ16 offset stream)
               (or (minusp offset)
-                  (nth-value 1
-                    (sb!disassem::note-code-constant-absolute offset dstate))
-                  (sb!disassem:maybe-note-assembler-routine offset
-                                                            nil
-                                                            dstate)))
+                  (nth-value 1 (note-code-constant-absolute offset dstate))
+                  (maybe-note-assembler-routine offset nil dstate)))
             (princ offset stream))))))
   (write-char #\] stream))

@@ -1245,16 +1245,18 @@
   #+sb-xc-host
   (def sb!xc:defmacro %macroexpand))
 
+(defun inst-emitter-symbol (symbol &optional create)
+  (values (funcall (if create 'intern 'find-symbol)
+                   (string-downcase symbol)
+                   *backend-instruction-set-package*)))
+
 (defmacro inst (&whole whole instruction &rest args &environment env)
   #!+sb-doc
   "Emit the specified instruction to the current segment."
-  (let ((inst (gethash (symbol-name instruction) *assem-instructions*)))
-    (cond ((null inst)
-           (error "unknown instruction: ~S" instruction))
-          ((functionp inst)
-           (funcall inst (cdr whole) env))
-          (t
-           `(,inst (%%current-segment%%) (%%current-vop%%) ,@args)))))
+  (let ((sym (inst-emitter-symbol instruction)))
+    (cond ((not (fboundp sym)) (error "unknown instruction: ~S" instruction))
+          ((get sym :macro) (funcall sym (cdr whole) env))
+          (t `(,sym (%%current-segment%%) (%%current-vop%%) ,@args)))))
 
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
 ;;; and %%CURRENT-VOP%% prevents this from being an ordinary function.
@@ -1517,7 +1519,7 @@
 
 (defmacro define-instruction (name lambda-list &rest options)
   (let* ((sym-name (symbol-name name))
-         (defun-name (sb!int:symbolicate sym-name "-INST-EMITTER"))
+         (defun-name (inst-emitter-symbol sym-name t))
          (vop-var nil)
          (postits (gensym "POSTITS-"))
          (emitter nil)
@@ -1654,21 +1656,19 @@
                (declare (enable-package-locks %%current-segment%%))
                ,@emitter))
            (values))
-         (eval-when (:compile-toplevel :load-toplevel :execute)
-           (%define-instruction ,sym-name ',defun-name))
+         (eval-when (:compile-toplevel)
+           ;; Emitters are valid only if fboundp at compile-time.
+           (unless (fboundp ',defun-name) ; Don't clobber if reloading.
+             (setf (symbol-function ',defun-name) #'error)))
          ,@(extract-nths 1 'progn pdefs)
          ,@(when pdefs
-             `((sb!disassem:install-inst-flavors
-                ',name
+             `((setf (get ',defun-name :disassembler)
                 (append ,@(extract-nths 0 'list pdefs)))))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
-  (let ((namestring (symbol-name name)))
+  (let* ((namestring (symbol-name name))
+         (defun-name (inst-emitter-symbol namestring t)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%define-instruction ,namestring
-                            ,(make-macro-lambda
-                              namestring lambda-list body 'inst name)))))
-
-(defun %define-instruction (name defun)
-  (setf (gethash name *assem-instructions*) defun)
-  name)
+       (setf (get ',defun-name :macro) t
+             (symbol-function ',defun-name)
+             ,(make-macro-lambda namestring lambda-list body 'inst name)))))

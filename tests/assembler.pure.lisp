@@ -19,7 +19,7 @@
 ;; this is architecture-agnostic
 (defun test-assemble (inst expect)
   (let ((segment (sb-assem:make-segment :type :regular)))
-    (apply (symbolicate (car inst) "-INST-EMITTER") segment nil (cdr inst))
+    (apply (sb-assem::inst-emitter-symbol (car inst)) segment nil (cdr inst))
     (let* ((buf (sb-assem::segment-buffer segment))
            (string
             (with-output-to-string (stream)

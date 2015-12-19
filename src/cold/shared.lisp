@@ -253,6 +253,18 @@
          ,@body
          (clrhash *array-to-specialization*)))))
 
+(defun target-platform-name ()
+  (or #!+x86 "x86"
+      #!+x86-64 "x86-64"
+      #!+sparc "sparc"
+      #!+ppc "ppc"
+      #!+mips "mips"
+      #!+alpha "alpha"
+      #!+hppa "hppa"
+      #!+arm "arm"
+      #!+arm64 "arm64"
+      (error "What- no target-platform?")))
+
 ;;; Given a STEM, remap the path component "/target/" to a suitable
 ;;; target directory.
 (defun stem-remap-target (stem)
@@ -260,15 +272,7 @@
     (if position
       (concatenate 'string
                    (subseq stem 0 (1+ position))
-                   #!+x86 "x86"
-                   #!+x86-64 "x86-64"
-                   #!+sparc "sparc"
-                   #!+ppc "ppc"
-                   #!+mips "mips"
-                   #!+alpha "alpha"
-                   #!+hppa "hppa"
-                   #!+arm "arm"
-                   #!+arm64 "arm64"
+                   (target-platform-name)
                    (subseq stem (+ position 7)))
       stem)))
 (compile 'stem-remap-target)
@@ -491,3 +495,21 @@
            (lambda ()
              (funcall *target-compile-file* filename))))
 (compile 'target-compile-file)
+
+(defun make-assembler-package (pkg-name)
+  (when (find-package pkg-name)
+    (delete-package pkg-name))
+  (let ((pkg (make-package pkg-name
+                           :use '("CL" "SB!INT" "SB!EXT" "SB!KERNEL" "SB!VM"
+                                  "SB!SYS" ; for SAP accessors
+                                  ;; Dependence of the assembler on the compiler
+                                  ;; feels a bit backwards, but assembly needs
+                                  ;; TN-SC, TN-OFFSET, etc. because the compiler
+                                  ;; doesn't speak the assembler's language.
+                                  ;; Rather vice-versa.
+                                  "SB!C"))))
+    ;; Both SB-ASSEM and SB-DISASSEM export these two symbols.
+    ;; Neither is shadowing-imported. If you need one, package-qualify it.
+    (shadow '("SEGMENT" "MAKE-SEGMENT") pkg)
+    (use-package '("SB!ASSEM" "SB!DISASSEM") pkg)
+    pkg))

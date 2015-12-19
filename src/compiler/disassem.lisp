@@ -30,9 +30,13 @@
 
 ;;;; disassembly parameters
 
-;;; instructions
-(defvar *disassem-insts* (make-hash-table :test 'eq))
-(declaim (type hash-table *disassem-insts*))
+;; With a few tweaks, you can use a running SBCL as a cross-assembler
+;; and disassembler for other supported backends,
+;; if that backend has been converted to use a distinct ASM package.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter sb!assem::*backend-instruction-set-package*
+    (or #!+x86 (find-package #.(sb-cold::backend-asm-package-name))
+        (find-package "SB!VM")))) ; temporary
 
 (defvar *disassem-inst-space* nil)
 
@@ -1479,10 +1483,6 @@
                           (arg-name arg)))
               (dchunk-insertf id (car fields) (car values))
               (dchunk-orf mask field-mask))))))))
-
-(defun install-inst-flavors (name flavors)
-  (setf (gethash name *disassem-insts*)
-        flavors))
 
 #!-sb-fluid (declaim (inline bytes-to-bits))
 (declaim (maybe-inline sign-extend aligned-p align tab tab0))
