@@ -204,8 +204,7 @@
 (define-arg-type relative-label
   :sign-extend t
   :use-label #'(lambda (value dstate)
-                 (declare (type (signed-byte 14) value)
-                          (type disassem-state dstate))
+                 (declare (type (signed-byte 24) value))
                  (+ (ash value 2) (dstate-cur-addr dstate))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
