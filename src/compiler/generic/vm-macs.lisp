@@ -54,6 +54,7 @@
   (size 0 :type fixnum :read-only t)
   (variable-length-p nil :type (member t nil) :read-only t))
 
+(declaim (freeze-type prim-object-slot primitive-object))
 (defvar *primitive-objects* nil)
 
 (defun !%define-primitive-object (primobj)

@@ -125,9 +125,11 @@
                     dstate))))
       ;; Or maybe we're looking at the 'struct thread' itself
       (when (< disp max-interrupts)
-        (let* ((thread-slots (primitive-object-slots
-                              (find 'thread *primitive-objects*
-                                    :key #'primitive-object-name)))
+        (let* ((thread-slots
+                (load-time-value
+                 (primitive-object-slots
+                  (find 'thread *primitive-objects*
+                        :key #'primitive-object-name)) t))
                (slot (find (ash disp (- word-shift)) thread-slots
                            :key #'slot-offset)))
           (when slot
