@@ -9,7 +9,18 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB!PPC-ASM")
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Imports from this package into SB-VM
+  (import '(reg-tn-encoding) 'sb!vm)
+  ;; Imports from SB-VM into this package
+  (import '(;; SBs and SCs
+            sb!vm::zero sb!vm::null sb!vm::immediate-constant
+            sb!vm::registers sb!vm::float-registers
+            ;; TNs and offsets
+            sb!vm::zero-tn sb!vm::lip-tn
+            sb!vm::zero-offset sb!vm::null-offset)))
 
 ;;; needs a little more work in the assembler, to realise that the
 ;;; delays requested here are not mandatory, so that the assembler
@@ -70,14 +81,13 @@
        #'(lambda (name)
            (cond ((null name) nil)
                  (t (make-symbol (concatenate 'string "$" name)))))
-       *register-names*))
+       sb!vm::*register-names*))
 
 (defun maybe-add-notes (regno dstate)
-  (let* ((inst (sb!disassem::sap-ref-int
-                (sb!disassem::dstate-segment-sap dstate)
-                (sb!disassem::dstate-cur-offs dstate)
+  (let* ((inst (sap-ref-int (dstate-segment-sap dstate)
+                            (dstate-cur-offs dstate)
                 n-word-bytes
-                (sb!disassem::dstate-byte-order dstate)))
+                (dstate-byte-order dstate)))
          (op (ldb (byte 6 26) inst)))
     (case op
       ;; lwz
@@ -86,21 +96,19 @@
          (case (ldb (byte 5 16) inst)
            ;; reg_CODE
            (19
-            (sb!disassem:note-code-constant (ldb (byte 16 0) inst) dstate)))))
+            (note-code-constant (ldb (byte 16 0) inst) dstate)))))
       ;; addi
       (14
        (when (= regno null-offset)
-         (sb!disassem:maybe-note-nil-indexed-object
-          (ldb (byte 16 0) inst) dstate))))))
+         (maybe-note-nil-indexed-object (ldb (byte 16 0) inst) dstate))))))
 
-(sb!disassem:define-arg-type reg
+(define-arg-type reg
   :printer
   (lambda (value stream dstate)
     (declare (type stream stream) (fixnum value))
     (let ((regname (aref reg-symbols value)))
       (princ regname stream)
-      (sb!disassem:maybe-note-associated-storage-ref
-       value 'registers regname dstate)
+      (maybe-note-associated-storage-ref value 'registers regname dstate)
       (maybe-add-notes value dstate))))
 
 (defparameter float-reg-symbols
@@ -108,12 +116,12 @@
      (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
      'vector))
 
-(sb!disassem:define-arg-type fp-reg
+(define-arg-type fp-reg
   :printer #'(lambda (value stream dstate)
                (declare (type stream stream) (fixnum value))
                (let ((regname (aref float-reg-symbols value)))
                  (princ regname stream)
-                 (sb!disassem:maybe-note-associated-storage-ref
+                 (maybe-note-associated-storage-ref
                   value
                   'float-registers
                   regname
@@ -126,7 +134,7 @@
       :bo-dnz :bo-dnzp :bo-dz :bo-dzp :bo-u nil nil nil
       nil nil nil nil nil nil nil nil)))
 
-(sb!disassem:define-arg-type bo-field
+(define-arg-type bo-field
   :printer #'(lambda (value stream dstate)
                (declare (ignore dstate)
                         (type stream stream)
@@ -174,7 +182,7 @@
         (valid-cr-bit-encoding (cadr enc))))
    (error "Invalid BI field spec : ~s" enc)))
 
-(sb!disassem:define-arg-type bi-field
+(define-arg-type bi-field
   :printer #'(lambda (value stream dstate)
                (declare (ignore dstate)
                         (type stream stream)
@@ -186,19 +194,19 @@
                    (princ bitname stream)
                    (princ (list (svref cr-field-names crfield) bitname) stream)))))
 
-(sb!disassem:define-arg-type crf
+(define-arg-type crf
   :printer #'(lambda (value stream dstate)
                (declare (ignore dstate)
                         (type stream stream)
                         (type (unsigned-byte 3) value))
                (princ (svref cr-field-names value) stream)))
 
-(sb!disassem:define-arg-type relative-label
+(define-arg-type relative-label
   :sign-extend t
   :use-label #'(lambda (value dstate)
                  (declare (type (signed-byte 14) value)
-                          (type sb!disassem:disassem-state dstate))
-                 (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+                          (type disassem-state dstate))
+                 (+ (ash value 2) (dstate-cur-addr dstate))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter trap-values-alist '((:t . 31) (:lt . 16) (:le . 20) (:eq . 4) (:lng . 6)
@@ -211,7 +219,7 @@
       (cdr (assoc enc trap-values-alist))
       (error "Unknown trap condition: ~s" enc)))
 
-(sb!disassem:define-arg-type to-field
+(define-arg-type to-field
   :sign-extend nil
   :printer #'(lambda (value stream dstate)
                (declare (ignore dstate)
@@ -309,7 +317,7 @@
 (eval-when (:compile-toplevel :execute :load-toplevel)
 (defparameter *spr-numbers-alist* '((:xer 1) (:lr 8) (:ctr 9))))
 
-(sb!disassem:define-arg-type spr
+(define-arg-type spr
   :printer #'(lambda (value stream dstate)
                (declare (ignore dstate)
                         (type (unsigned-byte 10) value))
@@ -322,7 +330,7 @@
   (defparameter jump-printer
     #'(lambda (value stream dstate)
         (let ((addr (ash value 2)))
-          (sb!disassem:maybe-note-assembler-routine addr t dstate)
+          (maybe-note-assembler-routine addr t dstate)
           (write addr :base 16 :radix t :stream stream)))))
 
 
@@ -380,11 +388,11 @@
 
 
 
-(sb!disassem:define-instruction-format (instr 32)
+(define-instruction-format (instr 32)
   (op :field (byte 6 26))
   (other :field (byte 26 0)))
 
-(sb!disassem:define-instruction-format (sc 32 :default-printer '(:name :tab rest))
+(define-instruction-format (sc 32 :default-printer '(:name :tab rest))
   (op :field (byte 6 26))
   (rest :field (byte 26 0) :value 2))
 
@@ -402,7 +410,7 @@
                    (collect ((field (list '(op :field (byte 6 26)))))
                             (dolist (spec specs)
                               (field (spec-field spec)))
-                            `(sb!disassem:define-instruction-format (,name 32 ,@(if default-printer `(:default-printer ,default-printer)))
+                            `(define-instruction-format (,name 32 ,@(if default-printer `(:default-printer ,default-printer)))
                               ,@(field)))))))
 
 (def-ppc-iformat (i '(:name :tab li))
@@ -568,7 +576,7 @@
 (def-ppc-iformat (m-sh '(:name :tab ra "," rs "," sh "," mb "," me))
   rs ra sh mb me rc)))
 
-(sb!disassem:define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
+(define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
   (op-to-a :field (byte 16 16))
   (data :field (byte 16 0) :reader xinstr-data))
 
@@ -617,14 +625,14 @@
 
 (defun unimp-control (chunk inst stream dstate)
   (declare (ignore inst))
-  (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+  (flet ((nt (x) (if stream (note x dstate))))
     (case (xinstr-data chunk dstate)
       (#.error-trap
        (nt "Error trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+       (handle-break-args #'snarf-error-junk stream dstate))
       (#.cerror-trap
        (nt "Cerror trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+       (handle-break-args #'snarf-error-junk stream dstate))
       (#.object-not-list-trap
        (nt "Object not list trap"))
       (#.breakpoint-trap
@@ -1543,7 +1551,7 @@
     (:delay 1)
     :pinned
     (:cost 8)
-    (:emitter (emit-x-form-inst sb!assem:segment 31 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) 533 0)))
+    (:emitter (emit-x-form-inst segment 31 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) 533 0)))
   (define-x-instruction lwbrx 31 534)
   (define-x-20-instruction lfsx 31 535)
   (define-2-x-5-instructions srw 31 536)
@@ -1554,7 +1562,7 @@
     :pinned
     (:delay 8)
     (:cost 8)
-    (:emitter (emit-x-form-inst sb!assem:segment 31 (reg-tn-encoding rt) (reg-tn-encoding ra) rb 597 0)))
+    (:emitter (emit-x-form-inst segment 31 (reg-tn-encoding rt) (reg-tn-encoding ra) rb 597 0)))
 
   (define-instruction sync (segment)
     (:printer x-27 ((op 31) (xo 598)))
@@ -1568,7 +1576,7 @@
     :pinned
     (:cost 8)
     (:delay 1)
-    (:emitter (emit-x-form-inst sb!assem:segment 31
+    (:emitter (emit-x-form-inst segment 31
                                 (reg-tn-encoding rs)
                                 (reg-tn-encoding ra)
                                 (reg-tn-encoding rb)
