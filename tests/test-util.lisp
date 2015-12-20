@@ -39,10 +39,12 @@
     thread))
 
 (defun log-msg (&rest args)
-  (format *trace-output* "~&::: ")
-  (apply #'format *trace-output* args)
-  (terpri *trace-output*)
+  (apply #'format *trace-output* "~&::: ~@?~%" args)
   (force-output *trace-output*))
+
+(defun log-msg/non-pretty (&rest args)
+  (let ((*print-pretty* nil))
+    (apply #'log-msg args)))
 
 (defmacro with-test ((&key fails-on broken-on skipped-on name)
                      &body body)
@@ -77,7 +79,8 @@
                                           (fail-test :unexpected-failure ',name error))
                                       (return-from ,block-name))))
                 (progn
-                  (log-msg "Running ~S" ',name)
+                  ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+                  (log-msg/non-pretty "Running ~S" ',name)
                   ,@body
                   #+sb-thread
                   (let ((any-leftover nil))
@@ -105,7 +108,8 @@
                       (return-from ,block-name)))
                   (if (expected-failure-p ,fails-on)
                       (fail-test :unexpected-success ',name nil)
-                      (log-msg "Success ~S" ',name)))))))))))
+                      ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+                      (log-msg/non-pretty "Success ~S" ',name)))))))))))
 
 (defun report-test-status ()
   (with-standard-io-syntax
