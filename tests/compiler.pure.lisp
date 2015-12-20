@@ -3724,11 +3724,11 @@
                   :warning)))))
 
 (with-test (:name :bug-646796)
-  (assert 42
-          (funcall
-           (compile nil
-                    `(lambda ()
-                       (load-time-value (the (values fixnum) 42)))))))
+  (assert (= 42
+             (funcall
+              (compile nil
+                       `(lambda ()
+                          (load-time-value (the (values fixnum) 42))))))))
 
 (with-test (:name :bug-654289)
   ;; Test that compile-times don't explode when quoted constants
