@@ -923,39 +923,27 @@ of specialized arrays is supported."
 (defun array-element-type (array)
   #!+sb-doc
   "Return the type of the elements of the array"
-  (let ((widetag (%other-pointer-widetag array)))
-    (macrolet ((pick-element-type (&rest stuff)
-                 `(cond ,@(mapcar (lambda (stuff)
-                                    (cons
-                                     (let ((item (car stuff)))
-                                       (cond ((eq item t)
-                                              t)
-                                             ((listp item)
-                                              (cons 'or
-                                                    (mapcar (lambda (x)
-                                                              `(= widetag ,x))
-                                                            item)))
-                                             (t
-                                              `(= widetag ,item))))
-                                     (cdr stuff)))
-                                  stuff))))
-      #.`(pick-element-type
-          ,@(map 'list
-                 (lambda (saetp)
-                   `(,(if (sb!vm:saetp-complex-typecode saetp)
-                          (list (sb!vm:saetp-typecode saetp)
-                                (sb!vm:saetp-complex-typecode saetp))
-                          (sb!vm:saetp-typecode saetp))
-                     ',(sb!vm:saetp-specifier saetp)))
-                 sb!vm:*specialized-array-element-type-properties*)
-          ((sb!vm:simple-array-widetag
-            sb!vm:complex-vector-widetag
-            sb!vm:complex-array-widetag)
-           (with-array-data ((array array) (start) (end))
-             (declare (ignore start end))
-             (array-element-type array)))
-          (t
-           (error 'type-error :datum array :expected-type 'array))))))
+  (let ((widetag (%other-pointer-widetag array))
+        (table (load-time-value
+                (let ((table (make-array 256 :initial-element nil)))
+                  (dotimes (i (length sb!vm:*specialized-array-element-type-properties*) table)
+                    (let* ((saetp (aref sb!vm:*specialized-array-element-type-properties* i))
+                           (typecode (sb!vm:saetp-typecode saetp))
+                           (complex-typecode (sb!vm:saetp-complex-typecode saetp))
+                           (specifier (sb!vm:saetp-specifier saetp)))
+                      (aver (typep specifier '(or list symbol)))
+                      (setf (aref table typecode) specifier)
+                      (when complex-typecode
+                        (setf (aref table complex-typecode) specifier)))))
+                t)))
+    (let ((result (aref table widetag)))
+      (if result
+          (truly-the (or list symbol) result)
+          ;; (MAKE-ARRAY :ELEMENT-TYPE NIL) goes to this branch, but
+          ;; gets the right answer in the end
+          (with-array-data ((array array) (start) (end))
+            (declare (ignore start end))
+            (truly-the (or list symbol) (aref table (%other-pointer-widetag array))))))))
 
 (defun array-rank (array)
   #!+sb-doc
