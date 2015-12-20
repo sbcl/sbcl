@@ -34,46 +34,59 @@
 
 ;;; Nathan Froyd reported that sbcl-0.6.11.34 screwed up output of
 ;;; floating point infinities.
-(dolist (x (list short-float-positive-infinity short-float-negative-infinity
-                 single-float-positive-infinity single-float-negative-infinity
-                 double-float-positive-infinity double-float-negative-infinity
-                 long-float-positive-infinity long-float-negative-infinity))
-  (assert-output x))
+(with-test (:name (write float :infinities))
+  (dolist (x (list short-float-positive-infinity short-float-negative-infinity
+                   single-float-positive-infinity single-float-negative-infinity
+                   double-float-positive-infinity double-float-negative-infinity
+                   long-float-positive-infinity long-float-negative-infinity))
+    (assert-output x)))
 
 ;;; Eric Marsden reported that this would blow up in CMU CL (even
 ;;; though ANSI says that the mismatch between ~F expected type and
 ;;; provided string type is supposed to be handled without signalling
 ;;; an error) and provided a fix which was ported to sbcl-0.6.12.35.
-(assert (null (format t "~F" "foo")))
+(with-test (:name (format :fixed-format-floating-point-directive :type-mismatch))
+  (let ((*standard-output* (make-broadcast-stream)))
+    (assert (null (format t "~F" "foo")))))
 
 ;;; This was a bug in SBCL until 0.6.12.40 (originally reported as a
 ;;; CMU CL bug by Erik Naggum on comp.lang.lisp).
-(loop for base from 2 to 36
-      with *print-radix* = t
-      do (let ((*print-base* base))
-           (assert (string= "#*101" (format nil "~S" #*101)))))
+(with-test (:name (format bit-vector *print-base* *print-radix*))
+  (loop for base from 2 to 36
+     with *print-radix* = t
+     do (let ((*print-base* base))
+          (assert (string= "#*101" (format nil "~S" #*101))))))
 
 ;;; bug in sbcl-0.7.1.25, reported by DB sbcl-devel 2002-02-25
-(assert (string= "0.5" (format nil "~2D" 0.5)))
+(with-test (:name (:format :decimal-directive :type-mismatch))
+  (assert (string= "0.5" (format nil "~2D" 0.5))))
 
 ;;; we want malformed format strings to cause errors rather than have
 ;;; some DWIM "functionality".
-(assert-error (format nil "~:2T"))
+(with-test (:name (format :tabulate-directive :malformed))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile `(lambda () (format nil "~:2T"))
+                       :allow-failure t :allow-warnings t)
+    (assert failure-p)
+    (assert (= 1 (length warnings)))
+    (assert-error (funcall fun))))
 
 ;;; bug reported, with fix, by Robert Strandh, sbcl-devel 2002-03-09,
 ;;; fixed in sbcl-0.7.1.36:
-(assert (string= (format nil "~2,3,8,'0$" 1234567.3d0) "1234567.30"))
+(with-test (:name (format :monetary-floating-point-directive 1))
+  (assert (string= (format nil "~2,3,8,'0$" 1234567.3d0) "1234567.30")))
 
 ;;; checks that other FORMAT-DOLLAR output remains sane after the
 ;;; 0.7.1.36 change
-(assert (string= (format nil "~$" 0) "0.00"))
-(assert (string= (format nil "~$" 4) "4.00"))
-(assert (string= (format nil "~$" -4.0) "-4.00"))
-(assert (string= (format nil "~2,7,11$" -4.0) "-0000004.00"))
-(assert (string= (format nil "~2,7,11,' $" 1.1) " 0000001.10"))
-(assert (string= (format nil "~1,7,11,' $" 1.1) "  0000001.1"))
-(assert (string= (format nil "~1,3,8,' $" 7.3) "   007.3"))
-(assert (string= (format nil "~2,3,8,'0$" 7.3) "00007.30"))
+(with-test (:name (format :monetary-floating-point-directive 2))
+  (assert (string= (format nil "~$" 0) "0.00"))
+  (assert (string= (format nil "~$" 4) "4.00"))
+  (assert (string= (format nil "~$" -4.0) "-4.00"))
+  (assert (string= (format nil "~2,7,11$" -4.0) "-0000004.00"))
+  (assert (string= (format nil "~2,7,11,' $" 1.1) " 0000001.10"))
+  (assert (string= (format nil "~1,7,11,' $" 1.1) "  0000001.1"))
+  (assert (string= (format nil "~1,3,8,' $" 7.3) "   007.3"))
+  (assert (string= (format nil "~2,3,8,'0$" 7.3) "00007.30")))
 
 ;;; Check for symbol lookup in ~/ / directive -- double-colon was
 ;;; broken in 0.7.1.36 and earlier
@@ -81,69 +94,97 @@
   (declare (ignore colonp atsignp params))
   (format stream "~d" arg))
 
-(assert (string= (format nil "~/print-foo/" 2) "2"))
-(assert (string= (format nil "~/cl-user:print-foo/" 2) "2"))
-(assert (string= (format nil "~/cl-user::print-foo/" 2) "2"))
-(assert-error (format nil "~/cl-user:::print-foo/" 2))
-(assert-error (format nil "~/cl-user:a:print-foo/" 2))
-(assert-error (format nil "~/a:cl-user:print-foo/" 2))
-(assert-error (format nil "~/cl-user:print-foo:print-foo/" 2))
+(with-test (:name (format :call-function-directive :smoke))
+  (assert (string= (format nil "~/print-foo/" 2) "2"))
+  (assert (string= (format nil "~/cl-user:print-foo/" 2) "2"))
+  (assert (string= (format nil "~/cl-user::print-foo/" 2) "2")))
+
+(with-test (:name (format :call-function-directive :syntax-errors))
+  (flet ((test (args)
+           (multiple-value-bind (fun failure-p)
+               (checked-compile `(lambda (format nil ,@args))
+                                :allow-failure t)
+             (assert failure-p)
+             (assert-error (funcall fun)))))
+    (test '("~/cl-user:::print-foo/" 2))
+    (test '("~/cl-user:a:print-foo/" 2))
+    (test '("~/a:cl-user:print-foo/" 2))
+    (test '("~/cl-user:print-foo:print-foo/" 2))))
 
 ;;; better make sure that we get this one right, too
 (defun print-foo\:print-foo (stream arg colonp atsignp &rest params)
   (declare (ignore colonp atsignp params))
   (format stream "~d" arg))
 
-(assert (string= (format nil "~/cl-user:print-foo:print-foo/" 2) "2"))
-(assert (string= (format nil "~/cl-user::print-foo:print-foo/" 2) "2"))
+(with-test (:name (format :call-function-directive :colon-in-function-name))
+  (assert (string= (format nil "~/cl-user:print-foo:print-foo/" 2) "2"))
+  (assert (string= (format nil "~/cl-user::print-foo:print-foo/" 2) "2")))
 
 ;;; Check for error detection of illegal directives in a~<..~> justify
 ;;; block (see ANSI section 22.3.5.2)
-(assert-error (format nil "~<~W~>" 'foo))
-(assert-error (format nil "~<~<~A~:>~>" '(foo)))
-(assert (string= (format nil "~<~<~A~>~>" 'foo) "FOO"))
+(with-test (:name (format :justification-directive :illegal-directives))
+  (flet ((test (args)
+           (multiple-value-bind (fun failure-p)
+               (checked-compile `(lambda () (format nil ,@args))
+                                :allow-failure t)
+             (assert failure-p)
+             (assert-error (funcall fun)))))
+    (test '("~<~W~>" 'foo))
+    (test '("~<~<~A~:>~>" '(foo))))
+  (assert (string= (format nil "~<~<~A~>~>" 'foo) "FOO")))
 
-(with-test (:name (:format :justification-atsign-check))
-  (assert-error (format nil "~<~@>"))
+(with-test (:name (format :justification-directive :atsign-check))
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda () (format nil "~<~@>"))
+                       :allow-failure t)
+    (assert failure-p)
+    (assert-error (funcall fun)))
   (assert-error (eval '(format nil "~<~@>"))))
 
 ;;; Check that arrays that we print while *PRINT-READABLY* is true are
 ;;; in fact generating similar objects.
-(assert (equal (array-dimensions
-                (read-from-string
-                 (with-output-to-string (s)
-                   (let ((*print-readably* t))
-                     (print (make-array '(1 2 0)) s)))))
-               '(1 2 0)))
+(with-test (:name (print array *print-readably* :dimensions))
+  (assert (equal (array-dimensions
+                  (read-from-string
+                   (with-output-to-string (s)
+                     (let ((*print-readably* t))
+                       (print (make-array '(1 2 0)) s)))))
+                 '(1 2 0))))
 
-(dolist (array (list (make-array '(1 0 1))
-                     (make-array 0 :element-type nil)
-                     (make-array 1 :element-type 'base-char)
-                     (make-array 1 :element-type 'character)))
-  (assert (multiple-value-bind (result error)
-              (ignore-errors (read-from-string
-                              (with-output-to-string (s)
-                                (let ((*print-readably* t))
-                                  (print array s)))))
-            ;; it might not be readably-printable
-            (or (typep error 'print-not-readable)
-                (and
-                 ;; or else it had better have the same dimensions
-                 (equal (array-dimensions result) (array-dimensions array))
-                 ;; and the same element-type
-                 (equal (array-element-type result) (array-element-type array)))))))
+(with-test (:name (print array *print-readably* :element-type))
+  (dolist (array (list (make-array '(1 0 1))
+                       (make-array 0 :element-type nil)
+                       (make-array 1 :element-type 'base-char)
+                       (make-array 1 :element-type 'character)))
+    (assert (multiple-value-bind (result error)
+                (ignore-errors (read-from-string
+                                (with-output-to-string (s)
+                                  (let ((*print-readably* t))
+                                    (print array s)))))
+              ;; it might not be readably-printable
+              (or (typep error 'print-not-readable)
+                  (and
+                   ;; or else it had better have the same dimensions
+                   (equal (array-dimensions result) (array-dimensions array))
+                   ;; and the same element-type
+                   (equal (array-element-type result) (array-element-type array))))))))
 
 ;;; before 0.8.0.66 it signalled UNBOUND-VARIABLE
-(write #(1 2 3) :pretty nil :readably t)
+(with-test (:name (write vector :smoke))
+  (let ((*standard-output* (make-broadcast-stream)))
+    (write #(1 2 3) :pretty nil :readably t)))
 
 ;;; another UNBOUND-VARIABLE, this time due to a bug in FORMATTER
 ;;; expanders.
-(funcall (formatter "~@<~A~:*~A~:>") nil 3)
+(with-test (:name (formatter :smoke))
+  (funcall (formatter "~@<~A~:*~A~:>") (make-broadcast-stream) 3))
 
 ;;; the PPC floating point backend was at one point sufficiently
 ;;; broken that this looped infinitely or caused segmentation
 ;;; violations through stack corruption.
-(print 0.0001)
+(with-test (:name (print float :smoke))
+  (let ((*standard-output* (make-broadcast-stream)))
+    (print 0.0001)))
 
 ;;; In sbcl-0.8.7, the ~W format directive interpreter implemented the
 ;;; sense of the colon and at-sign modifiers exactly backwards.
@@ -164,10 +205,12 @@
 (defmethod print-object :before ((wexerciser-0-8-7 wexerciser-0-8-7) stream)
   (unless (and *print-level* *print-length*)
     (error "gotcha coming")))
-(let ((*print-level* 11)
-      (*print-length* 12))
-  (wexercise-0-8-7-interpreted "~W")
-  (wexercise-0-8-7-compiled-without-atsign))
+(with-test (:name (format :write-directive :colon :at-sign 1))
+  (let ((*print-level* 11)
+        (*print-length* 12)
+        (*standard-output* (make-broadcast-stream)))
+    (wexercise-0-8-7-interpreted "~W")
+    (wexercise-0-8-7-compiled-without-atsign)))
 (remove-method #'print-object
                (find-method #'print-object
                             '(:before)
@@ -175,19 +218,23 @@
 (defmethod print-object :before ((wexerciser-0-8-7 wexerciser-0-8-7) stream)
   (when (or *print-level* *print-length*)
     (error "gotcha going")))
-(let ((*print-level* 11)
-      (*print-length* 12))
-  (wexercise-0-8-7-interpreted "~@W")
-  (wexercise-0-8-7-compiled-with-atsign))
+(with-test (:name (format :write-directive :colon :at-sign 2))
+  (let ((*print-level* 11)
+        (*print-length* 12)
+        (*standard-output* (make-broadcast-stream)))
+    (wexercise-0-8-7-interpreted "~@W")
+    (wexercise-0-8-7-compiled-with-atsign)))
 
 ;;; WRITE-TO-STRING was erroneously DEFKNOWNed as FOLDABLE
-;;;
+
 ;;; This bug from PFD
 (defpackage "SCRATCH-WRITE-TO-STRING" (:use))
-(with-standard-io-syntax
-  (let* ((*package* (find-package "SCRATCH-WRITE-TO-STRING"))
-         (answer (write-to-string 'scratch-write-to-string::x :readably nil)))
-    (assert (string= answer "X"))))
+(with-test (:name (write symbol *package*))
+  (with-standard-io-syntax
+    (let* ((*package* (find-package "SCRATCH-WRITE-TO-STRING"))
+           (answer (write-to-string 'scratch-write-to-string::x :readably nil)))
+      (assert (string= answer "X")))))
+
 ;;; and a couple from Bruno Haible
 (defun my-pprint-reverse (out list)
   (write-char #\( out)
@@ -197,11 +244,13 @@
      (when (endp list) (return))
      (write-char #\Space out)))
   (write-char #\) out))
-(with-standard-io-syntax
-  (let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
-    (set-pprint-dispatch '(cons (member foo)) 'my-pprint-reverse 0)
-    (let ((answer (write-to-string '(foo bar :boo 1) :pretty t :escape t)))
-      (assert (string= answer "(1 :BOO BAR FOO)")))))
+(with-test (:name (write *print-pprint-dispatch* 1))
+  (with-standard-io-syntax
+    (let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+      (set-pprint-dispatch '(cons (member foo)) 'my-pprint-reverse 0)
+      (let ((answer (write-to-string '(foo bar :boo 1) :pretty t :escape t)))
+        (assert (string= answer "(1 :BOO BAR FOO)"))))))
+
 (defun my-pprint-logical (out list)
   (pprint-logical-block (out list :prefix "(" :suffix ")")
     (when list
@@ -211,64 +260,75 @@
        (write-char #\? out)
        (pprint-exit-if-list-exhausted)
        (write-char #\Space out)))))
-(with-standard-io-syntax
-  (let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
-    (set-pprint-dispatch '(cons (member bar)) 'my-pprint-logical 0)
-    (let ((answer (write-to-string '(bar foo :boo 1) :pretty t :escape t)))
-      (assert (string= answer "(?BAR? ?FOO? ?:BOO? ?1?)")))))
+(with-test (:name (write *print-pprint-dispatch* 2))
+  (with-standard-io-syntax
+    (let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+      (set-pprint-dispatch '(cons (member bar)) 'my-pprint-logical 0)
+      (let ((answer (write-to-string '(bar foo :boo 1) :pretty t :escape t)))
+        (assert (string= answer "(?BAR? ?FOO? ?:BOO? ?1?)"))))))
 
 ;;; FORMAT string compile-time checker failure, reported by Thomas
 ;;; F. Burdick
-(multiple-value-bind (f w-p f-p)
-    (compile nil '(lambda () (format nil "~{")))
-  (assert (and w-p f-p))
-  (assert (nth-value 1 (ignore-errors (funcall f)))))
+(with-test (:name (format :compile-time-check))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile '(lambda () (format nil "~{"))
+                       :allow-failure t :allow-warnings t)
+    (assert failure-p)
+    (assert (= (length warnings) 1))
+    (assert-error (funcall fun))))
 
 ;;; floating point print/read consistency
-(let ((x (/ -9.349640046247849d-21 -9.381494249123696d-11)))
-  (let ((y (read-from-string (write-to-string x :readably t))))
-    (assert (eql x y))))
+(with-test (:name (read print float :consistency))
+  (let* ((x (/ -9.349640046247849d-21 -9.381494249123696d-11))
+         (y (read-from-string (write-to-string x :readably t))))
+    (assert (eql x y)))
 
-(let ((x1 (float -5496527/100000000000000000))
-      (x2 (float -54965272/1000000000000000000)))
-  (assert (or (equal (multiple-value-list (integer-decode-float x1))
-                     (multiple-value-list (integer-decode-float x2)))
-              (string/= (prin1-to-string x1) (prin1-to-string x2)))))
+  (let ((x1 (float -5496527/100000000000000000))
+        (x2 (float -54965272/1000000000000000000)))
+    (assert (or (equal (multiple-value-list (integer-decode-float x1))
+                       (multiple-value-list (integer-decode-float x2)))
+                (string/= (prin1-to-string x1) (prin1-to-string x2))))))
 
 ;;; readable printing of arrays with *print-radix* t
-(let ((*print-radix* t)
-      (*print-readably* t)
-      (*print-pretty* nil))
-  (let ((output (with-output-to-string (s)
-                  (write #2a((t t) (nil nil)) :stream s))))
-    (assert (equalp (read-from-string output) #2a((t t) (nil nil))))))
+(with-test (:name (write read array *print-radix*))
+  (let ((*print-radix* t)
+        (*print-readably* t)
+        (*print-pretty* nil))
+    (let ((output (with-output-to-string (s)
+                    (write #2a((t t) (nil nil)) :stream s))))
+      (assert (equalp (read-from-string output) #2a((t t) (nil nil)))))))
 
 ;;; NIL parameters to "interpreted" FORMAT directives
-(assert (string= (format nil "~v%" nil) (string #\Newline)))
+(with-test (:name (format :v-directive-arg nil))
+ (assert (string= (format nil "~v%" nil) (string #\Newline))))
 
 ;;; PRINC-TO-STRING should bind print-readably
-(let ((*print-readably* t))
-  (assert (string= (princ-to-string #\7)
-                   (write-to-string #\7 :escape nil :readably nil))))
+(with-test (:name (princ-to-string *print-readably*))
+  (let ((*print-readably* t))
+    (assert (string= (princ-to-string #\7)
+                     (write-to-string #\7 :escape nil :readably nil)))))
 
 ;;; in FORMAT, ~^ inside ~:{ should go to the next case, not break
 ;;; iteration, even if one argument is just a one-element list.
-(assert (string= (format nil "~:{~A~^~}" '((A) (C D))) "AC"))
+(with-test (:name (format :escape-upward-directive :in :iteration-directive))
+  (assert (string= (format nil "~:{~A~^~}" '((A) (C D))) "AC")))
 
-;;; errors should be raised if pprint and justification are mixed
+;;; errors should be signaled if pprint and justification are mixed
 ;;; injudiciously...
-(dolist (x (list "~<~:;~>~_" "~<~:;~>~I" "~<~:;~>~W"
-                 "~<~:;~>~:T" "~<~:;~>~<~:>" "~_~<~:;~>"
-                 "~I~<~:;~>" "~W~<~:;~>" "~:T~<~:;~>" "~<~:>~<~:;~>"))
-  (assert-error (format nil x nil))
-  (assert-error (format nil (eval `(formatter ,x)) nil)))
+(with-test (:name (format :mixing :justification-directive :pprint-directives :illegal))
+  (dolist (x (list "~<~:;~>~_" "~<~:;~>~I" "~<~:;~>~W"
+                   "~<~:;~>~:T" "~<~:;~>~<~:>" "~_~<~:;~>"
+                   "~I~<~:;~>" "~W~<~:;~>" "~:T~<~:;~>" "~<~:>~<~:;~>"))
+    (assert-error (format nil x nil))
+    (assert-error (format nil (eval `(formatter ,x)) nil))))
 ;;; ...but not in judicious cases.
-(dolist (x (list "~<~;~>~_" "~<~;~>~I" "~<~;~>~W"
-                 "~<~;~>~:T" "~<~;~>~<~>" "~_~<~;~>"
-                 "~I~<~;~>" "~W~<~;~>" "~:T~<~;~>" "~<~>~<~;~>"
-                 "~<~:;~>~T" "~T~<~:;~>"))
-  (assert (format nil x nil))
-  (assert (format nil (eval `(formatter ,x)) nil)))
+(with-test (:name (format :mixing :justification-directive :pprint-directives :legal))
+  (dolist (x (list "~<~;~>~_" "~<~;~>~I" "~<~;~>~W"
+                   "~<~;~>~:T" "~<~;~>~<~>" "~_~<~;~>"
+                   "~I~<~;~>" "~W~<~;~>" "~:T~<~;~>" "~<~>~<~;~>"
+                   "~<~:;~>~T" "~T~<~:;~>"))
+    (assert (format nil x nil))
+    (assert (format nil (eval `(formatter ,x)) nil))))
 
 ;;; bug 350: bignum printing so memory-hungry that heap runs out
 ;;; -- just don't stall here forever on a slow box
@@ -281,113 +341,123 @@
 
 ;;; bug 371: bignum print/read inconsistency
 (defvar *bug-371* -7043009959286724629649270926654940933664689003233793014518979272497911394287216967075767325693021717277238746020477538876750544587281879084559996466844417586093291189295867052594478662802691926547232838591510540917276694295393715934079679531035912244103731582711556740654671309980075069010778644542022/670550434139267031632063192770201289106737062379324644110801846820471752716238484923370056920388400273070254958650831435834503195629325418985020030706879602898158806736813101434594805676212779217311897830937606064579213895527844045511878668289820732425014254579493444623868748969110751636786165152601)
-(let ((*print-base* 5)
-      (*read-base* 5)
-      (*print-radix* nil))
-  (assert (= *bug-371* (read-from-string (prin1-to-string *bug-371*)))))
+(with-test (:name (read print bignum :consistency :bug-371))
+  (let ((*print-base* 5)
+        (*read-base* 5)
+        (*print-radix* nil))
+    (assert (= *bug-371* (read-from-string (prin1-to-string *bug-371*))))))
 
 ;;; a spot of random-testing for rational printing
 (defvar *seed-state* (make-random-state))
 (with-open-file (f "last-random-state.lisp-expr"
                    :direction :output :if-exists :supersede)
- ;; I don't want to see this every time
- (write *seed-state* :pretty nil :stream f)) ; so that we can reproduce errors
-(let ((seed (make-random-state *seed-state*)))
-  (loop repeat 42
-     do (let ((n (random (ash 1 1000) seed))
-              (d (random (ash 1 1000) seed)))
-          (when (zerop (random 2 seed))
-            (setf n (- n)))
-          (let ((r (/ n d)))
-            (loop for base from 2 to 36
-               do (let ((*print-base* base)
-                        (*read-base* base)
-                        (*print-radix* nil))
-                    (assert (= r (read-from-string (prin1-to-string r))))
-                    (if (= 36 base)
-                        (decf *read-base*)
-                        (incf *read-base*))
-                    (assert (not (eql r (read-from-string (prin1-to-string r)))))
-                    (let ((*print-radix* t))
-                      (assert (= r (read-from-string
-                                    (princ-to-string r)))))))))
-       (write-char #\.)
-       (finish-output)))
+  ;; I don't want to see this every time
+  (write *seed-state* :pretty nil :stream f)) ; so that we can reproduce errors
+(with-test (:name (read print rational :consistency ))
+  (let ((seed (make-random-state *seed-state*)))
+    (loop repeat 42
+       do (let ((n (random (ash 1 1000) seed))
+                (d (random (ash 1 1000) seed)))
+            (when (zerop (random 2 seed))
+              (setf n (- n)))
+            (let ((r (/ n d)))
+              (loop for base from 2 to 36
+                 do (let ((*print-base* base)
+                          (*read-base* base)
+                          (*print-radix* nil))
+                      (assert (= r (read-from-string (prin1-to-string r))))
+                      (if (= 36 base)
+                          (decf *read-base*)
+                          (incf *read-base*))
+                      (assert (not (eql r (read-from-string (prin1-to-string r)))))
+                      (let ((*print-radix* t))
+                        (assert (= r (read-from-string
+                                      (princ-to-string r)))))))))
+         (write-char #\.)
+         (finish-output))))
 
 ;;;; Bugs, found by PFD
 ;;; NIL parameter for ~^ means `not supplied'
-(loop for (format arg result) in
-      '(("~:{~D~v^~D~}" ((3 1 4) (1 0 2) (7 nil) (5 nil 6)) "341756")
-        ("~:{~1,2,v^~A~}" ((nil 0) (3 1) (0 2)) "02"))
-      do (assert (string= (funcall #'format nil format arg) result))
-      do (assert (string= (with-output-to-string (s)
-                            (funcall (eval `(formatter ,format)) s arg))
-                          result)))
+(with-test (:name (format :escape-upward-directive :v-directive-arg nil))
+  (loop for (format arg result) in
+       '(("~:{~D~v^~D~}" ((3 1 4) (1 0 2) (7 nil) (5 nil 6)) "341756")
+         ("~:{~1,2,v^~A~}" ((nil 0) (3 1) (0 2)) "02"))
+     do (assert (string= (funcall #'format nil format arg) result))
+     do (assert (string= (with-output-to-string (s)
+                           (funcall (eval `(formatter ,format)) s arg))
+                         result))))
 
 ;;; NIL first parameter for ~R is equivalent to no parameter.
-(assert (string= (format nil "~VR" nil 5) "five"))
-(assert (string= (format nil (formatter "~VR") nil 6) "six"))
+(with-test (:name (format :radix-directive nil :argument))
+  (assert (string= (format nil "~VR" nil 5) "five"))
+  (assert (string= (format nil (formatter "~VR") nil 6) "six")))
 
 ;;; CSR inserted a bug into Burger & Dybvig's float printer.  Caught
 ;;; by Raymond Toy
-(assert (string= (format nil "~E" 1d23) "1.d+23"))
+(with-test (:name (format :exponential-floating-point-directive :smoke))
+  (assert (string= (format nil "~E" 1d23) "1.d+23")))
 
 ;;; Fixed-format bugs from CLISP's test suite (reported by Bruno
 ;;; Haible, bug 317)
-(assert (string= (format nil "~1F" 10) "10."))
-(assert (string= (format nil "~0F" 10) "10."))
-(assert (string= (format nil "~2F" 1234567.1) "1234567."))
+(with-test (:name (format :fixed-format-floating-point-directive :bug-317))
+ (assert (string= (format nil "~1F" 10) "10."))
+ (assert (string= (format nil "~0F" 10) "10."))
+ (assert (string= (format nil "~2F" 1234567.1) "1234567.")))
 
 ;;; here's one that seems to fail most places.  I think this is right,
 ;;; and most of the other answers I've seen are definitely wrong.
-(assert (string= (format nil "~G" 1d23) "100000000000000000000000.    "))
+(with-test (:name (format :general-floating-point-directive :smoke))
+  (assert (string= (format nil "~G" 1d23) "100000000000000000000000.    ")))
 
 ;;; Adam Warner's test case
-(assert (string= (format nil "~@F" 1.23) "+1.23"))
+(with-test (:name (format :fixed-format-floating-point-directive :at-sign))
+  (assert (string= (format nil "~@F" 1.23) "+1.23")))
 
 
 ;;; New (2005-11-08, also known as CSR House day) float format test
 ;;; cases.  Simon Alexander, Raymond Toy, and others
-(assert (string= (format nil "~9,4,,-7E" pi) ".00000003d+8"))
-(assert (string= (format nil "~9,4,,-5E" pi) ".000003d+6"))
-(assert (string= (format nil "~5,4,,7E" pi) "3141600.d-6"))
-(assert (string= (format nil "~11,4,,3E" pi) "  314.16d-2"))
-(assert (string= (format nil "~11,4,,5E" pi) "  31416.d-4"))
-(assert (string= (format nil "~11,4,,0E" pi) "  0.3142d+1"))
-(assert (string= (format nil "~9,,,-1E" pi) ".03142d+2"))
-(assert (string= (format nil "~,,,-2E" pi) "0.003141592653589793d+3"))
-(assert (string= (format nil "~,,,2E" pi) "31.41592653589793d-1"))
-(assert (string= (format nil "~E" pi) "3.141592653589793d+0"))
-(assert (string= (format nil "~9,5,,-1E" pi) ".03142d+2"))
-(assert (string= (format nil "~11,5,,-1E" pi) " 0.03142d+2"))
-(assert (string= (format nil "~G" pi) "3.141592653589793    "))
-(assert (string= (format nil "~9,5G" pi) "3.1416    "))
-(assert (string= (format nil "|~13,6,2,7E|" pi) "| 3141593.d-06|"))
-(assert (string= (format nil "~9,3,2,0,'%E" pi) "0.314d+01"))
-(assert (string= (format nil "~9,0,6f" pi) " 3141593."))
-(assert (string= (format nil "~6,2,1,'*F" pi) " 31.42"))
-(assert (string= (format nil "~6,2,1,'*F" (* 100 pi)) "******"))
-(assert (string= (format nil "~9,3,2,-2,'%@E" pi) "+.003d+03"))
-(assert (string= (format nil "~10,3,2,-2,'%@E" pi) "+0.003d+03"))
-(assert (string= (format nil "~15,3,2,-2,'%,'=@E" pi) "=====+0.003d+03"))
-(assert (string= (format nil "~9,3,2,-2,'%E" pi) "0.003d+03"))
-(assert (string= (format nil "~8,3,2,-2,'%@E" pi) "%%%%%%%%"))
+(with-test (:name (format :floating-point-directives :misc))
+  (assert (string= (format nil "~9,4,,-7E" pi) ".00000003d+8"))
+  (assert (string= (format nil "~9,4,,-5E" pi) ".000003d+6"))
+  (assert (string= (format nil "~5,4,,7E" pi) "3141600.d-6"))
+  (assert (string= (format nil "~11,4,,3E" pi) "  314.16d-2"))
+  (assert (string= (format nil "~11,4,,5E" pi) "  31416.d-4"))
+  (assert (string= (format nil "~11,4,,0E" pi) "  0.3142d+1"))
+  (assert (string= (format nil "~9,,,-1E" pi) ".03142d+2"))
+  (assert (string= (format nil "~,,,-2E" pi) "0.003141592653589793d+3"))
+  (assert (string= (format nil "~,,,2E" pi) "31.41592653589793d-1"))
+  (assert (string= (format nil "~E" pi) "3.141592653589793d+0"))
+  (assert (string= (format nil "~9,5,,-1E" pi) ".03142d+2"))
+  (assert (string= (format nil "~11,5,,-1E" pi) " 0.03142d+2"))
+  (assert (string= (format nil "~G" pi) "3.141592653589793    "))
+  (assert (string= (format nil "~9,5G" pi) "3.1416    "))
+  (assert (string= (format nil "|~13,6,2,7E|" pi) "| 3141593.d-06|"))
+  (assert (string= (format nil "~9,3,2,0,'%E" pi) "0.314d+01"))
+  (assert (string= (format nil "~9,0,6f" pi) " 3141593."))
+  (assert (string= (format nil "~6,2,1,'*F" pi) " 31.42"))
+  (assert (string= (format nil "~6,2,1,'*F" (* 100 pi)) "******"))
+  (assert (string= (format nil "~9,3,2,-2,'%@E" pi) "+.003d+03"))
+  (assert (string= (format nil "~10,3,2,-2,'%@E" pi) "+0.003d+03"))
+  (assert (string= (format nil "~15,3,2,-2,'%,'=@E" pi) "=====+0.003d+03"))
+  (assert (string= (format nil "~9,3,2,-2,'%E" pi) "0.003d+03"))
+  (assert (string= (format nil "~8,3,2,-2,'%@E" pi) "%%%%%%%%"))
 
-(assert (string= (format nil "~g" 1e0) "1.    "))
-(assert (string= (format nil "~g" 1.2d40) "12000000000000000000000000000000000000000.    "))
+  (assert (string= (format nil "~g" 1e0) "1.    "))
+  (assert (string= (format nil "~g" 1.2d40) "12000000000000000000000000000000000000000.    "))
 
-(assert (string= (format nil "~e" 0) "0.0e+0"))
-(assert (string= (format nil "~e" 0d0) "0.0d+0"))
-(assert (string= (format nil "~9,,4e" 0d0) "0.0d+0000"))
+  (assert (string= (format nil "~e" 0) "0.0e+0"))
+  (assert (string= (format nil "~e" 0d0) "0.0d+0"))
+  (assert (string= (format nil "~9,,4e" 0d0) "0.0d+0000")))
 
-(let ((table (make-hash-table)))
-  (setf (gethash 1 table) t)
-  (assert-error (with-standard-io-syntax
-                  (let ((*read-eval* nil)
-                        (*print-readably* t))
-                    (with-output-to-string (*standard-output*)
-                      (prin1 table))))
-                print-not-readable))
+(with-test (:name (print hash-table print-not-readable))
+  (let ((table (make-hash-table)))
+    (setf (gethash 1 table) t)
+    (assert-error (with-standard-io-syntax
+                    (let ((*read-eval* nil)
+                          (*print-readably* t))
+                      (with-output-to-string (*standard-output*)
+                        (prin1 table))))
+                  print-not-readable)))
 
 ;; Test that we can print characters readably regardless of the external format
 ;; of the stream.
@@ -415,42 +485,47 @@
 (with-test (:name (:print-readable :character :iso-8859-1) :skipped-on '(not :sb-unicode))
   (test-readable-character (code-char #xfffe) :iso-8859-1))
 
-(assert (string= (eval '(format nil "~:C" #\a)) "a"))
-(assert (string= (format nil (formatter "~:C") #\a) "a"))
+(with-test (:name (format :character-directive :colon))
+  (assert (string= (eval '(format nil "~:C" #\a)) "a"))
+  (assert (string= (format nil (formatter "~:C") #\a) "a")))
 
 ;;; This used to trigger an AVER instead.
-(assert-error (eval '(formatter "~>")) sb-format:format-error)
-(assert-error (eval '(format t "~>")) sb-format:format-error)
+(with-test (:name (format :end-of-justification-directive :mismatch))
+  (assert-error (eval '(formatter "~>")) sb-format:format-error)
+  (assert-error (eval '(format t "~>")) sb-format:format-error))
 
 ;;; readably printing hash-tables, check for circularity
-(let ((x (cons 1 2))
-      (h (make-hash-table))
-      (*print-readably* t)
-      (*print-circle* t)
-      (*read-eval* t))
-  (setf (gethash x h) h)
-  (destructuring-bind (x2 . h2) (read-from-string (write-to-string (cons x h)))
-    (assert (equal x x2))
-    (assert (eq h2 (gethash x2 h2)))))
+(with-test (:name (print read hash-table *print-circle*))
+  (let ((x (cons 1 2))
+        (h (make-hash-table))
+        (*print-readably* t)
+        (*print-circle* t)
+        (*read-eval* t))
+    (setf (gethash x h) h)
+    (destructuring-bind (x2 . h2) (read-from-string (write-to-string (cons x h)))
+      (assert (equal x x2))
+      (assert (eq h2 (gethash x2 h2))))))
 
 ;;; an off-by-one error in the ~R format directive until 1.0.15.20
 ;;; prevented printing cardinals and ordinals between (expt 10 63) and
 ;;; (1- (expt 10 66))
-(assert (string= (format nil "~R" (expt 10 63)) "one vigintillion"))
-(assert (string= (format nil "~:R" (expt 10 63)) "one vigintillionth"))
+(with-test (:name (format :radix-directive :large-values))
+  (assert (string= (format nil "~R" (expt 10 63)) "one vigintillion"))
+  (assert (string= (format nil "~:R" (expt 10 63)) "one vigintillionth")))
 
 ;;; too-clever cacheing for PRINT-OBJECT resulted in a bogus method
 ;;; for printing RESTART objects.  Check also CONTROL-STACK-EXHAUSTED
 ;;; and HEAP-EXHAUSTED-ERROR.
-(let ((result (with-output-to-string (*standard-output*)
-                (princ (find-restart 'abort)))))
-  (assert (string/= result "#<" :end1 2)))
-(let ((result (with-output-to-string (*standard-output*)
-                (princ (make-condition 'sb-kernel::control-stack-exhausted)))))
-  (assert (string/= result "#<" :end1 2)))
-(let ((result (with-output-to-string (*standard-output*)
-                (princ (make-condition 'sb-kernel::heap-exhausted-error)))))
-  (assert (string/= result "#<" :end1 2)))
+(with-test (:name (print-object restart condition))
+  (let ((result (with-output-to-string (*standard-output*)
+                  (princ (find-restart 'abort)))))
+    (assert (string/= result "#<" :end1 2)))
+  (let ((result (with-output-to-string (*standard-output*)
+                  (princ (make-condition 'sb-kernel::control-stack-exhausted)))))
+    (assert (string/= result "#<" :end1 2)))
+  (let ((result (with-output-to-string (*standard-output*)
+                  (princ (make-condition 'sb-kernel::heap-exhausted-error)))))
+    (assert (string/= result "#<" :end1 2))))
 
 (with-test (:name (:with-standard-io-syntax :bind-print-pprint-dispatch))
   (let ((*print-pprint-dispatch* (copy-pprint-dispatch nil)))
@@ -488,14 +563,13 @@
 (with-test (:name :write-return-value)
   ;; COMPILE is called explicitly because there was a bug in the
   ;; compiler-macro for WRITE, which isn't expanded by the evaluator.
-  (assert (= 123 (funcall (compile nil '(lambda (s) (write 123 :stream s)))
+  (assert (= 123 (funcall (checked-compile '(lambda (s) (write 123 :stream s)))
                           (make-broadcast-stream)))))
 
 (with-test (:name :write/write-to-string-compiler-macro-lp/598374+581564)
-  (let ((test (compile nil
-                       `(lambda (object &optional output-stream)
-                          (write object
-                                 :stream output-stream)))))
+  (let ((test (checked-compile
+               `(lambda (object &optional output-stream)
+                  (write object :stream output-stream)))))
     (assert (equal "(HELLO WORLD)"
                    (with-output-to-string (*standard-output*)
                      (let ((list '(hello world)))
@@ -503,19 +577,19 @@
     (assert (equal "12"
                    (with-output-to-string (*standard-output*)
                      (assert (eql 12 (funcall test 12)))))))
-  (let ((test (compile nil
-                       `(lambda ()
-                          (let ((*print-length* 42))
-                            (write-to-string *print-length* :length nil))))))
+  (let ((test (checked-compile
+               `(lambda ()
+                  (let ((*print-length* 42))
+                    (write-to-string *print-length* :length nil))))))
     (assert (equal "42" (funcall test)))))
 
-(with-test (:name (:format :compile-literal-dest-string))
-  (assert (eq :warned
-              (handler-case
-                  (compile nil
-                           `(lambda (x) (format "~A" x)))
-                ((and warning (not style-warning)) ()
-                  :warned)))))
+(with-test (:name (format :compile-literal-dest-string))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile `(lambda (x) (format "~A" x))
+                       :allow-warnings t)
+    (declare (ignore fun))
+    (assert failure-p)
+    (assert (= (length warnings) 1))))
 
 (with-test (:name :bug-308961)
   (assert (string= (format nil "~4,1F" 0.001) " 0.0"))
@@ -641,11 +715,11 @@
                     (assert (equal (row-major-aref a i) (row-major-aref copy i)))))))))
         :next))))
 
-(with-test (:name (:format :negative-colinc-and-mincol))
+(with-test (:name (format :negative-colinc-and-mincol))
   (assert-error (format nil "~-2a" 1))
   (assert-error (format nil "~,0a" 1)))
 
-(with-test (:name :bug-905817)
+(with-test (:name (format :bug-905817))
   ;; The bug manifests itself in an endless loop in FORMAT.
   ;; Correct behaviour is to signal an error.
   (handler-case
@@ -694,7 +768,7 @@
       (assert (format nil "~b" #'format))
       (assert (format nil "~3r" #'format)))))
 
-(with-test (:name :format-print-base)
+(with-test (:name (format *print-base*))
   (let ((*print-base* 3))
     (assert (equal (format nil "~g" '(123)) "(123)"))
     (assert (equal (format nil "~f" '(123)) "(123)"))
@@ -707,17 +781,17 @@
       (assert (equal (format nil "~e" '(123)) "(123)"))
       (assert (equal (format nil "~$" '(123)) "(123)")))))
 
-(with-test (:name :format-concatenate)
+(with-test (:name (format :concatenate))
   (assert (equal
-           (funcall (compile nil `(lambda (x) (format nil "~s" (the string x))))
+           (funcall (checked-compile `(lambda (x) (format nil "~s" (the string x))))
                     "\\")
            (prin1-to-string "\\"))))
 
-(with-test (:name :write-stream-nil)
+(with-test (:name (write :stream nil))
   (assert
    (equal
     (with-output-to-string (*standard-output*)
-      (funcall (compile nil `(lambda () (write "xx" :stream nil)))))
+      (funcall (checked-compile `(lambda () (write "xx" :stream nil)))))
     "\"xx\"")))
 
 (define-condition foo () (a))
@@ -726,7 +800,5 @@
 (with-test (:name :write-obsolete-condition)
   (assert (search "UNPRINTABLE" (write-to-string *ccc*))))
 
-(with-test (:name :no-overeager-compile-time-format-processing)
-  (multiple-value-bind (f warn err)
-      (compile nil '(lambda (x) (format t "~/nopackage:nofun/" x)))
-    (assert (and f (not warn) (not err)))))
+(with-test (:name (format :no-overeager-compile-time-processing))
+  (checked-compile '(lambda (x) (format t "~/nopackage:nofun/" x))))
