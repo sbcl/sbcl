@@ -154,9 +154,9 @@
   (sb-impl::featurep skipped-on))
 
 ;;; Compile FORM capturing and muffling all [style-]warnings and notes
-;;; and return five values: 1) the compiled function 2) a generalized
-;;; Boolean indicating whether compilation failed 3) a list of
-;;; warnings 4) a list of style-warnigns 5) a list of notes.
+;;; and return five values: 1) the compiled function 2) a Boolean
+;;; indicating whether compilation failed 3) a list of warnings 4) a
+;;; list of style-warnigns 5) a list of notes.
 ;;;
 ;;; An error can be signaled when COMPILE indicates failure as well as
 ;;; in case [style-]warning or note conditions are signaled. The
@@ -168,13 +168,14 @@
 ;;; allowed conditions of the respective kind.
 (defun checked-compile (form
                         &key
-                        allow-failure
-                        allow-warnings
-                        allow-style-warnings
-                        (allow-notes t))
+                          allow-failure
+                          allow-warnings
+                          allow-style-warnings
+                          (allow-notes t))
   (let ((warnings '())
         (style-warnings '())
-        (notes '()))
+        (notes '())
+        (error-output (make-string-output-stream)))
     (handler-bind ((sb-ext:compiler-note
                     (lambda (condition)
                       (push condition notes)
@@ -187,7 +188,9 @@
                     (lambda (condition)
                       (push condition warnings)
                       (muffle-warning condition))))
-      (multiple-value-bind (function warnings-p failure-p) (compile nil form)
+      (multiple-value-bind (function warnings-p failure-p)
+          (let ((*error-output* error-output))
+            (compile nil form))
         (declare (ignore warnings-p))
         (labels ((fail (kind conditions &optional allowed-type)
                    (error "~@<Compilation of ~S signaled ~A~P:~
@@ -210,7 +213,10 @@
                       (fail kind conditions)))))
 
           (when (and (not allow-failure) failure-p)
-            (error "~@<Compilation of ~S failed.~@:>" form))
+            (let ((output (get-output-stream-string error-output)))
+              (error "~@<Compilation of ~S failed~@[ with ~
+                      output~@:_~@:_~A~@:_~@:_~].~@:>"
+                     form (when (plusp (length output)) output))))
 
           (check-conditions "warning"       warnings       allow-warnings)
           (check-conditions "style-warning" style-warnings allow-style-warnings)
@@ -219,7 +225,7 @@
           ;; Since we may have prevented warnings from being taken
           ;; into account for FAILURE-P by muffling them, adjust the
           ;; second return value accordingly.
-          (values function (or failure-p warnings)
+          (values function (when (or failure-p warnings) t)
                   warnings style-warnings notes))))))
 
 ;;; Repeat calling THUNK until its cumulated runtime, measured using
