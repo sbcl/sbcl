@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(defun lowest-set-bit-index (integer-value)
-  (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
-
 (defun repeating-pattern-p (val)
   (declare (type (unsigned-byte 32) val))
   (and (= (ldb (byte 16 0) val)

@@ -35,7 +35,7 @@
 ;; if that backend has been converted to use a distinct ASM package.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter sb!assem::*backend-instruction-set-package*
-    (or #!+(or mips ppc sparc x86 x86-64)
+    (or #!+(or arm mips ppc sparc x86 x86-64)
         (find-package #.(sb-cold::backend-asm-package-name))
         (find-package "SB!VM")))) ; temporary
 
