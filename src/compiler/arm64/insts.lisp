@@ -741,34 +741,34 @@
 
 (sb!disassem:define-instruction-format
     (add-sub 32)
-    (op :field (byte 2 29))
-    (rn :field (byte 5 5) :type 'reg-sp)
-    (rd :field (byte 5 0) :type 'reg-sp))
+  (op :field (byte 2 29))
+  (rn :field (byte 5 5) :type 'reg-sp)
+  (rd :field (byte 5 0) :type 'reg-sp))
 
 (sb!disassem:define-instruction-format
     (add-sub-imm 32
      :default-printer '(:name :tab rd ", " rn ", " imm shift)
      :include add-sub)
-    (op2 :field (byte 5 24) :value #b10001)
-    (shift :field (byte 2 22) :type '2-bit-shift)
-    (imm :field (byte 12 10) :type 'unsigned-immediate))
+  (op2 :field (byte 5 24) :value #b10001)
+  (shift :field (byte 2 22) :type '2-bit-shift)
+  (imm :field (byte 12 10) :type 'unsigned-immediate))
 
 (sb!disassem:define-instruction-format
     (adds-subs-imm 32
      :include add-sub-imm
      :default-printer '(:name :tab rd ", " rn ", " imm shift))
-    (rd :type 'reg))
+  (rd :type 'reg))
 
 (sb!disassem:define-instruction-format
     (add-sub-shift-reg 32
      :default-printer '(:name :tab rd ", " rn ", " rm shift)
      :include add-sub)
-    (op2 :field (byte 5 24) :value #b01011)
-    (op3 :field (byte 1 21) :value #b0)
-    (shift :fields (list (byte 2 22) (byte 6 10)) :type 'shift)
-    (rm :field (byte 5 16) :type 'reg)
-    (rn :type 'reg)
-    (rd :type 'reg))
+  (op2 :field (byte 5 24) :value #b01011)
+  (op3 :field (byte 1 21) :value #b0)
+  (shift :fields (list (byte 2 22) (byte 6 10)) :type 'shift)
+  (rm :field (byte 5 16) :type 'reg)
+  (rn :type 'reg)
+  (rd :type 'reg))
 
 (def-emitter add-sub-shift-reg
   (size 1 31)
@@ -785,10 +785,10 @@
     (add-sub-ext-reg 32
      :default-printer '(:name :tab rd ", " rn ", " extend)
      :include add-sub)
-    (op2 :field (byte 8 21) :value #b01011001)
-    (extend :fields (list (byte 3 13) (byte 3 10)) :type 'extend)
-    (rm :field (byte 5 16) :type 'reg)
-    (rd :type 'reg))
+  (op2 :field (byte 8 21) :value #b01011001)
+  (extend :fields (list (byte 3 13) (byte 3 10)) :type 'extend)
+  (rm :field (byte 5 16) :type 'reg)
+  (rd :type 'reg))
 
 (def-emitter add-sub-ext-reg
   (size 1 31)
@@ -952,11 +952,11 @@
 (sb!disassem:define-instruction-format
     (add-sub-carry 32 :include add-sub
                       :default-printer '(:name :tab rd ", " rn ", " rm))
-    (op2 :field (byte 8 21) :value #b11010000)
-    (rm :field (byte 5 16) :type 'reg)
-    (op :field (byte 6 10) :value 0)
-    (rn :type 'reg)
-    (rd :type 'reg))
+  (op2 :field (byte 8 21) :value #b11010000)
+  (rm :field (byte 5 16) :type 'reg)
+  (op :field (byte 6 10) :value 0)
+  (rn :type 'reg)
+  (rd :type 'reg))
 
 (defmacro def-add-sub-carry (name opc)
   `(define-instruction ,name (segment rd rn rm)
@@ -974,9 +974,9 @@
 
 (sb!disassem:define-instruction-format
     (logical 32)
-    (op :field (byte 2 29))
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+  (op :field (byte 2 29))
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg))
 
 (def-emitter logical-reg
   (size 1 31)
@@ -993,10 +993,10 @@
     (logical-reg 32
      :include logical
      :default-printer '(:name :tab rd ", " rn ", " rm shift))
-    (op2 :field (byte 5 24) :value #b01010)
-    (shift :fields (list (byte 2 22) (byte 6 10)) :type 'shift)
-    (n :field (byte 1 21) :value 0)
-    (rm :field (byte 5 16) :type 'reg))
+  (op2 :field (byte 5 24) :value #b01010)
+  (shift :fields (list (byte 2 22) (byte 6 10)) :type 'shift)
+  (n :field (byte 1 21) :value 0)
+  (rm :field (byte 5 16) :type 'reg))
 
 (def-emitter logical-imm
   (size 1 31)
@@ -1012,10 +1012,10 @@
     (logical-imm 32
      :include logical
      :default-printer '(:name :tab rd  ", " rn ", " imm))
-    (op2 :field (byte 6 23) :value #b100100)
-    (imm :fields (list (byte 1 22) (byte 6 16) (byte 6 10))
-         :type 'logical-immediate)
-    (rd :type 'reg-sp))
+  (op2 :field (byte 6 23) :value #b100100)
+  (imm :fields (list (byte 1 22) (byte 6 16) (byte 6 10))
+       :type 'logical-immediate)
+  (rd :type 'reg-sp))
 
 (defun sequence-of-ones-p (integer)
   (declare (type (unsigned-byte 64) integer))
@@ -1191,14 +1191,14 @@
 (sb!disassem:define-instruction-format
     (bitfield 32
      :default-printer '(:name :tab rd  ", " rn ", " immr ", " imms))
-    (op :field (byte 2 29))
-    (op2 :field (byte 6 23) :value #b100110)
-    (n :field (byte 1 22) :value +64-bit-size+)
-    (immr :field (byte 6 16) :type 'unsigned-immediate)
-    (imms :field (byte 6 10) :type 'unsigned-immediate)
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg)
-    (lsl-alias :fields (list (byte 6 16) (byte 6 10))))
+  (op :field (byte 2 29))
+  (op2 :field (byte 6 23) :value #b100110)
+  (n :field (byte 1 22) :value +64-bit-size+)
+  (immr :field (byte 6 16) :type 'unsigned-immediate)
+  (imms :field (byte 6 10) :type 'unsigned-immediate)
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg)
+  (lsl-alias :fields (list (byte 6 16) (byte 6 10))))
 
 
 (define-instruction sbfm (segment rd rn immr imms)
@@ -1296,12 +1296,12 @@
 
 (sb!disassem:define-instruction-format
     (extract 32)
-    (op2 :field (byte 8 23) :value #b00100111)
-    (op3 :field (byte 1 21) :value #b0)
-    (rm :field (byte 5 16) :type 'reg)
-    (imm :field (byte 6 10) :type 'unsigned-immediate)
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+  (op2 :field (byte 8 23) :value #b00100111)
+  (op3 :field (byte 1 21) :value #b0)
+  (rm :field (byte 5 16) :type 'reg)
+  (imm :field (byte 6 10) :type 'unsigned-immediate)
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg))
 
 (define-instruction extr (segment rd rn rm lsb)
   (:printer extract ()
@@ -1331,11 +1331,11 @@
 (sb!disassem:define-instruction-format
     (move-wide 32
      :default-printer '(:name :tab rd  ", " imm shift))
-    (op :field (byte 2 29))
-    (op2 :field (byte 6 23) :value #b100101)
-    (shift :field (byte 2 21) :type 'wide-shift)
-    (imm :field (byte 16 5) :type 'unsigned-immediate)
-    (rd :field (byte 5 0) :type 'reg))
+  (op :field (byte 2 29))
+  (op2 :field (byte 6 23) :value #b100101)
+  (shift :field (byte 2 21) :type 'wide-shift)
+  (imm :field (byte 16 5) :type 'unsigned-immediate)
+  (rd :field (byte 5 0) :type 'reg))
 
 (defmacro process-null-sc (reg)
   `(setf ,reg (if (and (tn-p ,reg)
@@ -1387,13 +1387,13 @@
 (sb!disassem:define-instruction-format
     (cond-select 32
      :default-printer '(:name :tab rd  ", " rn ", " rm ", " cond))
-    (op :field (byte 1 30))
-    (op3 :field (byte 9 21) :value #b011010100)
-    (rm :field (byte 5 16) :type 'reg)
-    (cond :field (byte 4 12) :type 'cond)
-    (op2 :field (byte 2 10))
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+  (op :field (byte 1 30))
+  (op3 :field (byte 9 21) :value #b011010100)
+  (rm :field (byte 5 16) :type 'reg)
+  (cond :field (byte 4 12) :type 'cond)
+  (op2 :field (byte 2 10))
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg))
 
 (defmacro def-cond-select (name op op2 &rest printers)
   `(define-instruction ,name (segment rd rn rm cond)
@@ -1460,10 +1460,10 @@
 (sb!disassem:define-instruction-format
     (data-processing-1 32
      :default-printer '(:name :tab rd  ", " rn))
-    (op2 :field (byte 18 13) :value #b101101011000000000)
-    (op :field (byte 3 10))
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+  (op2 :field (byte 18 13) :value #b101101011000000000)
+  (op :field (byte 3 10))
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg))
 
 (defmacro def-data-processing-1 (name opc)
   `(define-instruction ,name (segment rd rn)
@@ -1492,11 +1492,11 @@
 (sb!disassem:define-instruction-format
     (data-processing-2 32
      :default-printer '(:name :tab rd  ", " rn ", " rm))
-    (op2 :field (byte 10 21) :value #b0011010110)
-    (rm :field (byte 5 16) :type 'reg)
-    (op :field (byte 6 10))
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+  (op2 :field (byte 10 21) :value #b0011010110)
+  (rm :field (byte 5 16) :type 'reg)
+  (op :field (byte 6 10))
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg))
 
 
 (defmacro def-data-processing-2 (name opc &optional alias)
@@ -1534,13 +1534,13 @@
 (sb!disassem:define-instruction-format
     (data-processing-3 32
      :default-printer '(:name :tab rd  ", " rn ", " rm ", " ra))
-    (op2 :field (byte 7 24) :value #b0011011)
-    (op31 :field (byte 3 21))
-    (rm :field (byte 5 16) :type 'reg)
-    (o0 :field (byte 1 15))
-    (ra :field (byte 5 10) :type 'reg)
-    (rn :field (byte 5 5) :type 'reg)
-    (rd :field (byte 5 0) :type 'reg))
+  (op2 :field (byte 7 24) :value #b0011011)
+  (op31 :field (byte 3 21))
+  (rm :field (byte 5 16) :type 'reg)
+  (o0 :field (byte 1 15))
+  (ra :field (byte 5 10) :type 'reg)
+  (rn :field (byte 5 5) :type 'reg)
+  (rd :field (byte 5 0) :type 'reg))
 
 (defmacro def-data-processing-3 (name op31 o0 &rest printers)
   `(define-instruction ,name (segment rd rn rm ra)
@@ -1586,14 +1586,14 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str 32)
-    (size :field (byte 2 30))
-    (op2 :field (byte 3 27) :value #b111)
-    (v :field (byte 1 26))
-    (op3 :field (byte 2 24) :value #b00)
-    (op :field (byte 2 22))
-    (rn :field (byte 5 5) :type 'x-reg-sp)
-    (rt :fields (list (byte 2 30) (byte 1 23) (byte 5 0)) :type 'reg-float-reg)
-    (ldr-str-annotation :type 'ldr-str-annotation))
+  (size :field (byte 2 30))
+  (op2 :field (byte 3 27) :value #b111)
+  (v :field (byte 1 26))
+  (op3 :field (byte 2 24) :value #b00)
+  (op :field (byte 2 22))
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :fields (list (byte 2 30) (byte 1 23) (byte 5 0)) :type 'reg-float-reg)
+  (ldr-str-annotation :type 'ldr-str-annotation))
 
 (def-emitter ldr-str-unsigned-imm
   (size 2 30)
@@ -1632,10 +1632,10 @@
     (ldr-str-unscaled-imm 32
      :default-printer '(:name :tab rt  ", [" rn imm-writeback ldr-str-annotation)
      :include ldr-str)
-    (op4 :field (byte 1 21) :value #b0)
-    (imm-writeback :fields (list (byte 9 12) (byte 2 10)) :type 'imm-writeback)
-    (op5 :field (byte 2 10) :value #b00)
-    (ldr-str-annotation :field (byte 9 12)))
+  (op4 :field (byte 1 21) :value #b0)
+  (imm-writeback :fields (list (byte 9 12) (byte 2 10)) :type 'imm-writeback)
+  (op5 :field (byte 2 10) :value #b00)
+  (ldr-str-annotation :field (byte 9 12)))
 
 
 (def-emitter ldr-str-reg
@@ -1656,10 +1656,10 @@
     (ldr-str-reg 32
      :default-printer '(:name :tab rt  ", [" rn ", " rm option "]" ldr-str-annotation)
      :include ldr-str)
-    (op4 :field (byte 1 21) :value 1)
-    (rm :field (byte 5 16) :type 'reg)
-    (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
-    (ldr-str-annotation :field (byte 5 16) :type 'ldr-str-reg-annotation))
+  (op4 :field (byte 1 21) :value 1)
+  (rm :field (byte 5 16) :type 'reg)
+  (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
+  (ldr-str-annotation :field (byte 5 16) :type 'ldr-str-reg-annotation))
 
 (def-emitter ldr-literal
   (opc 2 30)
@@ -1673,9 +1673,9 @@
     (ldr-literal 32
      :default-printer '(:name :tab rt ", " label)
      :include ldr-str)
-    (op2 :value #b011)
-    (label :field (byte 19 5) :type 'label)
-    (rt :fields (list (byte 2 30) (byte 5 0))))
+  (op2 :value #b011)
+  (label :field (byte 19 5) :type 'label)
+  (rt :fields (list (byte 2 30) (byte 5 0))))
 
 (defun ldr-str-offset-encodable (offset &optional (size 64))
   (or (typep offset '(signed-byte 9))
@@ -1820,15 +1820,15 @@
     (ldr-str-pair 32
      :default-printer '(:name :tab rt ", " rt2 ", [" rn pair-imm-writeback)
      :include ldr-str)
-    (size :field (byte 2 30))
-    (op2 :value #b101)
-    (v :field (byte 1 26))
-    (op3 :field (byte 1 25) :value #b00)
-    (l :field (byte 1 22))
-    (pair-imm-writeback :fields (list (byte 2 23) (byte 2 30) (byte 7 15) (byte 1 26))
-                        :type 'pair-imm-writeback)
-    (rt2 :fields (list (byte 2 30) (byte 5 10)) :type 'reg-float-reg)
-    (rt :fields (list (byte 2 30) (byte 5 0))))
+  (size :field (byte 2 30))
+  (op2 :value #b101)
+  (v :field (byte 1 26))
+  (op3 :field (byte 1 25) :value #b00)
+  (l :field (byte 1 22))
+  (pair-imm-writeback :fields (list (byte 2 23) (byte 2 30) (byte 7 15) (byte 1 26))
+                      :type 'pair-imm-writeback)
+  (rt2 :fields (list (byte 2 30) (byte 5 10)) :type 'reg-float-reg)
+  (rt :fields (list (byte 2 30) (byte 5 0))))
 
 (defun ldp-stp-offset-p (offset size)
   (multiple-value-bind (quot rem) (truncate offset (ecase size
@@ -1900,16 +1900,16 @@
 
 (sb!disassem:define-instruction-format
     (ldr-str-exclusive 32)
-    (size :field (byte 2 30))
-    (op2 :field (byte 6 24) :value #b001000)
-    (o2 :field (byte 1 23))
-    (l :field (byte 1 22))
-    (o1 :field (byte 1 21))
-    (rs :field (byte 5 16) :type 'w-reg)
-    (o0 :field (byte 1 15))
-    (rt2 :field (byte 5 5) :type 'reg)
-    (rn :field (byte 5 5) :type 'x-reg-sp)
-    (rt :field (byte 5 0) :type 'reg))
+  (size :field (byte 2 30))
+  (op2 :field (byte 6 24) :value #b001000)
+  (o2 :field (byte 1 23))
+  (l :field (byte 1 22))
+  (o1 :field (byte 1 21))
+  (rs :field (byte 5 16) :type 'w-reg)
+  (o0 :field (byte 1 15))
+  (rt2 :field (byte 5 5) :type 'reg)
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :field (byte 5 0) :type 'reg))
 
 (defmacro def-store-exclusive (name o0 o1 o2 rs &rest printers)
   `(define-instruction ,name (segment ,@(and rs '(rs)) rt rn)
@@ -1959,10 +1959,10 @@
 
 (sb!disassem:define-instruction-format
     (cond-branch 32 :default-printer '(:name cond :tab target))
-    (op1 :field (byte 8 24) :value #b01010100)
-    (target :field (byte 19 5) :type 'label)
-    (op2 :field (byte 1 4) :value #b0)
-    (cond :field (byte 4 0) :type 'cond))
+  (op1 :field (byte 8 24) :value #b01010100)
+  (target :field (byte 19 5) :type 'label)
+  (op2 :field (byte 1 4) :value #b0)
+  (cond :field (byte 4 0) :type 'cond))
 
 (def-emitter uncond-branch
   (op 1 31)
@@ -1971,9 +1971,9 @@
 
 (sb!disassem:define-instruction-format
     (uncond-branch 32 :default-printer '(:name :tab target))
-    (op :field (byte 1 31))
-    (op2 :field (byte 5 26) :value #b00101)
-    (target :field (byte 26 0) :type 'label))
+  (op :field (byte 1 31))
+  (op2 :field (byte 5 26) :value #b00101)
+  (target :field (byte 26 0) :type 'label))
 
 (define-instruction b (segment cond-or-label &optional label)
   (:printer cond-branch ())
@@ -2025,11 +2025,11 @@
 (sb!disassem:define-instruction-format
     (uncond-branch-reg 32
      :default-printer '(:name :tab rn))
-    (op2 :field (byte 7 25) :value #b1101011)
-    (op :field (byte 4 21))
-    (op3 :field (byte 11 10) :value #b11111000000)
-    (rn :field (byte 5 5) :type 'reg-sp)
-    (op4 :field (byte 5 0) :value #b00000))
+  (op2 :field (byte 7 25) :value #b1101011)
+  (op :field (byte 4 21))
+  (op3 :field (byte 11 10) :value #b11111000000)
+  (rn :field (byte 5 5) :type 'reg-sp)
+  (op4 :field (byte 5 0) :value #b00000))
 
 (define-instruction br (segment register)
   (:printer uncond-branch-reg ((op 0)))
@@ -2059,11 +2059,11 @@
 
 (sb!disassem:define-instruction-format
     (compare-branch-imm 32 :default-printer '(:name :tab rt ", " label))
-    (size :field (byte 1 31))
-    (op1 :field (byte 6 25) :value #b011010)
-    (op  :field (byte 1 24))
-    (label :field (byte 19 5) :type 'label)
-    (rt :field (byte 5 0) :type 'reg))
+  (size :field (byte 1 31))
+  (op1 :field (byte 6 25) :value #b011010)
+  (op  :field (byte 1 24))
+  (label :field (byte 19 5) :type 'label)
+  (rt :field (byte 5 0) :type 'reg))
 
 (define-instruction cbz (segment rt label)
   (:printer compare-branch-imm ((op 0)))
@@ -2132,10 +2132,10 @@
 
 (sb!disassem:define-instruction-format
     (exception 32 :default-printer '(:name :tab imm))
-    (op2 :field (byte 8 24) :value #b11010100)
-    (op  :field (byte 3 21))
-    (imm :field (byte 16 5) :type 'unsigned-immediate)
-    (ll :field (byte 2 0)))
+  (op2 :field (byte 8 24) :value #b11010100)
+  (op  :field (byte 3 21))
+  (imm :field (byte 16 5) :type 'unsigned-immediate)
+  (ll :field (byte 2 0)))
 
 (defmacro def-exception (name opc ll &rest printer-options)
   `(define-instruction ,name (segment imm)
@@ -2160,10 +2160,10 @@
 
 (sb!disassem:define-instruction-format
     (pc-relative 32 :default-printer '(:name :tab rd ", " label))
-    (op :field (byte 1 31))
-    (op2 :field (byte 5 24) :value #b10000)
-    (label :fields (list (byte 2 29) (byte 19 5)) :type 'label)
-    (rd :field (byte 5 0) :type 'x-reg))
+  (op :field (byte 1 31))
+  (op2 :field (byte 5 24) :value #b10000)
+  (label :fields (list (byte 2 29) (byte 19 5)) :type 'label)
+  (rd :field (byte 5 0) :type 'x-reg))
 
 (defun emit-pc-relative-inst (op segment rd label)
   (assert (label-p label))
@@ -2197,10 +2197,10 @@
 
 (sb!disassem:define-instruction-format
     (sys-reg 32)
-    (op :field (byte 10 22) :value #b1101010100)
-    (l :field (byte 1 21))
-    (sys-reg :field (byte 16 5) :type 'sys-reg)
-    (rt :field (byte 5 0) :type 'x-reg))
+  (op :field (byte 10 22) :value #b1101010100)
+  (l :field (byte 1 21))
+  (sys-reg :field (byte 16 5) :type 'sys-reg)
+  (rt :field (byte 5 0) :type 'x-reg))
 
 (defun decode-sys-reg (reg)
   (ecase reg
@@ -2236,10 +2236,10 @@
 
 (sb!disassem:define-instruction-format
     (system 32)
-    (op1 :field (byte 20 12) :value #b11010101000000110011)
-    (crm :field (byte 4 8))
-    (op :field (byte 3 5))
-    (op2 :field (byte 5 0) :value #b11111))
+  (op1 :field (byte 20 12) :value #b11010101000000110011)
+  (crm :field (byte 4 8))
+  (op :field (byte 3 5))
+  (op2 :field (byte 5 0) :value #b11111))
 
 
 (define-instruction clrex (segment &optional (imm 15))
@@ -2295,9 +2295,9 @@
 
 (sb!disassem:define-instruction-format
     (hint 32 :default-printer '(:name))
-    (op1 :field (byte 24 8) :value #b110101010000001100100000)
-    (imm :field (byte 3 5))
-    (op2 :field (byte 5 0) :value #b11111))
+  (op1 :field (byte 24 8) :value #b110101010000001100100000)
+  (imm :field (byte 3 5))
+  (op2 :field (byte 5 0) :value #b11111))
 
 (define-instruction nop (segment)
   (:printer hint ((imm 0)))
@@ -2330,14 +2330,14 @@
 
 (sb!disassem:define-instruction-format
     (fp-compare 32 :default-printer '(:name :tab rn ", " rm))
-    (op1 :field (byte 9 23) :value #b000111100)
-    (type :field (byte 1 22))
-    (rm :field (byte 5 16) :type 'float-reg)
-    (op2 :field (byte 6 10) :value #b001000)
-    (rn :field (byte 5 5) :type 'float-reg)
-    (op :field (byte 1 4))
-    (z :field (byte 1 3))
-    (op3 :field (byte 3 0) :value #b0))
+  (op1 :field (byte 9 23) :value #b000111100)
+  (type :field (byte 1 22))
+  (rm :field (byte 5 16) :type 'float-reg)
+  (op2 :field (byte 6 10) :value #b001000)
+  (rn :field (byte 5 5) :type 'float-reg)
+  (op :field (byte 1 4))
+  (z :field (byte 1 3))
+  (op3 :field (byte 3 0) :value #b0))
 
 (defmacro def-fp-compare (name op)
   `(define-instruction ,name (segment rn rm)
@@ -2368,8 +2368,8 @@
 
 (sb!disassem:define-instruction-format
     (fp-data-processing 32)
-    (rn :field (byte 5 5) :type 'float-reg)
-    (rd :field (byte 5 0) :type 'float-reg))
+  (rn :field (byte 5 5) :type 'float-reg)
+  (rd :field (byte 5 0) :type 'float-reg))
 
 (def-emitter fp-data-processing-1
   (#b000111100 9 23)
@@ -2384,10 +2384,10 @@
     (fp-data-processing-1 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn))
-    (op2 :field (byte 9 23) :value #b000111100)
-    (op3 :field (byte 3 19) :value #b100)
-    (op :field (byte 4 15))
-    (:op4 :field (byte 5 10) :value #b10000))
+  (op2 :field (byte 9 23) :value #b000111100)
+  (op3 :field (byte 3 19) :value #b100)
+  (op :field (byte 4 15))
+  (:op4 :field (byte 5 10) :value #b10000))
 
 (def-emitter fp-data-processing-2
   (#b000111100 9 23)
@@ -2403,11 +2403,11 @@
     (fp-data-processing-2 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn ", " rm))
-    (op2 :field (byte 9 23) :value #b000111100)
-    (op3 :field (byte 1 21) :value #b1)
-    (rm :field (byte 5 16) :type 'float-reg)
-    (op :field (byte 4 12))
-    (:op4 :field (byte 2 10) :value #b10))
+  (op2 :field (byte 9 23) :value #b000111100)
+  (op3 :field (byte 1 21) :value #b1)
+  (rm :field (byte 5 16) :type 'float-reg)
+  (op :field (byte 4 12))
+  (:op4 :field (byte 2 10) :value #b10))
 
 (def-emitter fp-data-processing-3
   (#b000111110 9 23)
@@ -2423,11 +2423,11 @@
     (fp-data-processing-3 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn ", " rm ", " ra))
-    (op4 :field (byte 9 23) :value #b000011110)
-    (op1 :field (byte 1 21))
-    (op2 :field (byte 1 15))
-    (rm :field (byte 5 16) :type 'float-reg)
-    (ra :field (byte 5 10) :type 'float-reg))
+  (op4 :field (byte 9 23) :value #b000011110)
+  (op1 :field (byte 1 21))
+  (op2 :field (byte 1 15))
+  (rm :field (byte 5 16) :type 'float-reg)
+  (ra :field (byte 5 10) :type 'float-reg))
 
 (def-emitter fp-conversion
   (size 1 31)
@@ -2443,11 +2443,11 @@
     (fp-conversion 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn))
-    (op2 :field (byte 8 23) :value #b00111100)
-    (type :field (byte 1 22))
-    (op1 :field (byte 1 21) :value #b1)
-    (op :field (byte 5 16))
-    (op3 :field (byte 6 10) :value #b0))
+  (op2 :field (byte 8 23) :value #b00111100)
+  (type :field (byte 1 22))
+  (op1 :field (byte 1 21) :value #b1)
+  (op :field (byte 5 16))
+  (op3 :field (byte 6 10) :value #b0))
 
 (defmacro def-fp-data-processing-1 (name op)
   `(define-instruction ,name (segment rd rn)
@@ -2478,9 +2478,9 @@
     (fcvt 32
      :include fp-data-processing-1
      :default-printer '(:name :tab rd ", " rn))
-    (op :field (byte 2 17) :value #b01)
-    (rn :fields (list (byte 1 22) (byte 5 5)))
-    (rd :fields (list (byte 2 15) (byte 5 0))))
+  (op :field (byte 2 17) :value #b01)
+  (rn :fields (list (byte 1 22) (byte 5 5)))
+  (rd :fields (list (byte 2 15) (byte 5 0))))
 
 (define-instruction fcvt (segment rd rn)
   (:printer fcvt ())
@@ -2762,16 +2762,16 @@
 (sb!disassem:define-instruction-format
     (simd-three-same 32
      :default-printer '(:name :tab rd ", " rn ", " rm))
-    (op3 :field (byte 1 31) :value #b0)
-    (u :field (byte 1 29))
-    (op4 :field (byte 5 24) :value #b01110)
-    (size :field (byte 2 22))
-    (op5 :field (byte 1 21) :value #b1)
-    (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
-    (op :field (byte 5 11))
-    (op6 :field (byte 1 10) :value #b1)
-    (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
-    (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+  (op3 :field (byte 1 31) :value #b0)
+  (u :field (byte 1 29))
+  (op4 :field (byte 5 24) :value #b01110)
+  (size :field (byte 2 22))
+  (op5 :field (byte 1 21) :value #b1)
+  (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
+  (op :field (byte 5 11))
+  (op6 :field (byte 1 10) :value #b1)
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
 
 (defun decode-vector-size (size)
   (ecase size
@@ -2839,14 +2839,14 @@
 (sb!disassem:define-instruction-format
     (simd-copy 32
      :default-printer '(:name :tab rd ", " rn))
-    (op3 :field (byte 1 31) :value #b0)
-    (q :field (byte 1 30))
-    (op :field (byte 1 29))
-    (op4 :field (byte 8 21) :value #b01110000)
-    (op5 :field (byte 1 15) :value #b0)
-    (op6 :field (byte 1 10) :value #b1)
-    (rn :fields (list (byte 5 5) (byte 5 16) (byte 4 11)) :type 'simd-copy-reg)
-    (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-copy-reg))
+  (op3 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (op :field (byte 1 29))
+  (op4 :field (byte 8 21) :value #b01110000)
+  (op5 :field (byte 1 15) :value #b0)
+  (op6 :field (byte 1 10) :value #b1)
+  (rn :fields (list (byte 5 5) (byte 5 16) (byte 4 11)) :type 'simd-copy-reg)
+  (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-copy-reg))
 
 (define-instruction s-ins (segment rd index1 rn index2 size)
   (:printer simd-copy ((q 1) (op 1))

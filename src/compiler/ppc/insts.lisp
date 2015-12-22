@@ -16,7 +16,7 @@
   (import '(reg-tn-encoding) 'sb!vm)
   ;; Imports from SB-VM into this package
   (import '(;; SBs and SCs
-            sb!vm::zero sb!vm::null sb!vm::immediate-constant
+            sb!vm::zero sb!vm::immediate-constant
             sb!vm::registers sb!vm::float-registers
             ;; TNs and offsets
             sb!vm::zero-tn sb!vm::lip-tn

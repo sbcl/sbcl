@@ -234,7 +234,7 @@
   '(:name :tab rd (:unless (:same-as rd) ", " rs) ", " rt)
   #'equalp)
 
-(define-instruction-format(register 32 :default-printer reg-printer)
+(define-instruction-format (register 32 :default-printer reg-printer)
   (op :field (byte 6 26))
   (rs :field (byte 5 21) :type 'reg)
   (rt :field (byte 5 16) :type 'reg)
@@ -250,8 +250,8 @@
   (subcode :field (byte 10 6) :reader break-subcode)
   (funct :field (byte 6 0) :value #b001101))
 
-(define-instruction-format
-    (coproc-branch 32 :default-printer '(:name :tab offset))
+(define-instruction-format (coproc-branch 32
+                            :default-printer '(:name :tab offset))
   (op :field (byte 6 26))
   (funct :field (byte 10 16))
   (offset :field (byte 16 0)))

@@ -418,7 +418,6 @@
   (opc-2 :field (byte 2 20) :value #b11)
   (opc :field (byte 4 16))
   (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
-
   (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
   (opc-3 :field (byte 3 9) :value #b101)
   (size :field (byte 1 8))
