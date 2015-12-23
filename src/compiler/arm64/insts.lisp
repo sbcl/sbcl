@@ -10,12 +10,24 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
-;;; FIXME: SB!DISASSEM: prefixes are used so widely in this file that
-;;; I wonder whether the separation of the disassembler from the
-;;; virtual machine is valid or adds value.
+(in-package "SB!ARM64-ASM")
 
-(setf sb!disassem:*disassem-inst-alignment-bytes* 4)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Imports from this package into SB-VM
+  (import '(*condition-name-vec* conditional-opcode
+            add-sub-immediate-p fixnum-add-sub-immediate-p
+            negative-add-sub-immediate-p
+            encode-logical-immediate fixnum-encode-logical-immediate
+            ldr-str-offset-encodable ldp-stp-offset-p
+            bic-mask extend lsl lsr asr ror @) 'sb!vm)
+  ;; Imports from SB-VM into this package
+  (import '(sb!vm::*register-names*
+            sb!vm::add-sub-immediate
+            sb!vm::32-bit-reg sb!vm::single-reg sb!vm::double-reg
+            sb!vm::complex-single-reg sb!vm::complex-double-reg
+            sb!vm::tmp-tn sb!vm::zr-tn sb!vm::nsp-offset)))
+
+(setf *disassem-inst-alignment-bytes* 4)
 
 
 (defparameter *conditions*
@@ -45,7 +57,7 @@
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf sb!assem:*assem-scheduler-p* nil))
+  (setf *assem-scheduler-p* nil))
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition *conditions* :test #'eq)))
@@ -57,11 +69,10 @@
 ;;;; disassembler field definitions
 
 (defun current-instruction (dstate &optional (offset 0))
-  (sb!disassem::sap-ref-int
-   (sb!disassem:dstate-segment-sap dstate)
-   (+ (sb!disassem:dstate-cur-offs dstate) offset)
-   n-word-bytes
-   (sb!disassem::dstate-byte-order dstate)))
+  (sap-ref-int (dstate-segment-sap dstate)
+               (+ (dstate-cur-offs dstate) offset)
+               n-word-bytes
+               (dstate-byte-order dstate)))
 
 (defun 32-bit-register-p (dstate)
   (not (logbitp 31 (current-instruction dstate))))
@@ -151,7 +162,7 @@
   (defun print-imm-writeback (value stream dstate)
     (declare (ignore dstate))
     (destructuring-bind (imm mode) value
-      (let ((imm (sb!disassem:sign-extend imm 9)))
+      (let ((imm (sign-extend imm 9)))
         (if (zerop imm)
             (princ "]" stream)
             (ecase mode
@@ -163,7 +174,7 @@
                (format stream ", #~D]!" imm)))))))
 
   (defun decode-pair-scaled-immediate (opc value simd)
-    (ash (sb!disassem:sign-extend value 7)
+    (ash (sign-extend value 7)
          (+ 2 (ash opc (- (logxor 1 simd))))))
 
   (defun print-pair-imm-writeback (value stream dstate)
@@ -261,6 +272,9 @@
                   "8B"
                   "16B"))))
 
+  (defun lowest-set-bit-index (integer-value)
+    (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
+
   (defun print-simd-copy-reg (value stream dstate)
     (declare (ignore dstate))
     (destructuring-bind (offset imm5 &optional imm4) value
@@ -284,30 +298,31 @@
                      (logior (ldb (byte 2 0) (car value))
                              (ash (cadr value) 2))
                      (ash value 2))))
-      (+ value (sb!disassem:dstate-cur-addr dstate))))
+      (+ value (dstate-cur-addr dstate))))
 
 
   (defun annotate-ldr-str (register offset dstate)
     (case register
-      (#.code-offset
-       (sb!disassem:note-code-constant offset dstate))
-      (#.null-offset
-       (let ((offset (+ nil-value offset)))
-         (sb!disassem:maybe-note-assembler-routine offset nil dstate)
-         (sb!disassem::maybe-note-static-symbol (logior offset other-pointer-lowtag)
+      (#.sb!vm::code-offset
+       (note-code-constant offset dstate))
+      (#.sb!vm::null-offset
+       (let ((offset (+ sb!vm::nil-value offset)))
+         (maybe-note-assembler-routine offset nil dstate)
+         (maybe-note-static-symbol (logior offset other-pointer-lowtag)
                                                 dstate)))
       #!+sb-thread
-      (#.thread-offset
-       (let* ((thread-slots (primitive-object-slots
-                             (find 'thread *primitive-objects*
-                                   :key #'primitive-object-name)))
+      (#.sb!vm::thread-offset
+       (let* ((thread-slots
+               (load-time-value
+                (primitive-object-slots
+                 (find 'sb!vm::thread *primitive-objects*
+                       :key #'primitive-object-name)) t))
               (slot (find (ash offset (- word-shift)) thread-slots
                           :key #'slot-offset)))
          (when slot
-           (sb!disassem:note
-            (lambda (stream)
-              (format stream "thread.~(~A~)" (slot-name slot)))
-            dstate))))))
+           (note (lambda (stream)
+                   (format stream "thread.~(~A~)" (slot-name slot)))
+                 dstate))))))
 
   (defun find-value-from-previos-inst (register dstate)
     ;; Needs to be MOVZ REGISTER, imm, LSL #0
@@ -341,92 +356,65 @@
 
 (progn
 
+  (define-arg-type shift :printer #'print-shift)
 
-  (sb!disassem:define-arg-type shift
-    :printer #'print-shift)
+  (define-arg-type 2-bit-shift :printer #'print-2-bit-shift)
 
-  (sb!disassem:define-arg-type 2-bit-shift
-    :printer #'print-2-bit-shift)
+  (define-arg-type wide-shift :printer #'print-wide-shift)
 
-  (sb!disassem:define-arg-type wide-shift
-    :printer #'print-wide-shift)
+  (define-arg-type extend :printer #'print-extend)
 
-  (sb!disassem:define-arg-type extend
-    :printer #'print-extend)
+  (define-arg-type ldr-str-extend :printer #'print-ldr-str-extend)
 
-  (sb!disassem:define-arg-type ldr-str-extend
-    :printer #'print-ldr-str-extend)
+  (define-arg-type scaled-immediate :printer #'print-scaled-immediate)
 
-  (sb!disassem:define-arg-type scaled-immediate
-    :printer #'print-scaled-immediate)
+  (define-arg-type immediate :sign-extend t :printer #'print-immediate)
 
-  (sb!disassem:define-arg-type immediate
-    :sign-extend t
-    :printer #'print-immediate)
+  (define-arg-type unsigned-immediate :printer #'print-immediate)
 
-  (sb!disassem:define-arg-type unsigned-immediate
-    :printer #'print-immediate)
+  (define-arg-type logical-immediate :printer #'print-logical-immediate)
 
-  (sb!disassem:define-arg-type logical-immediate
-    :printer #'print-logical-immediate)
+  (define-arg-type imm-writeback :printer #'print-imm-writeback)
 
-  (sb!disassem:define-arg-type imm-writeback
-    :printer #'print-imm-writeback)
-  (sb!disassem:define-arg-type pair-imm-writeback
-    :printer #'print-pair-imm-writeback)
+  (define-arg-type pair-imm-writeback :printer #'print-pair-imm-writeback)
 
-  (sb!disassem:define-arg-type reg
-    :printer #'print-reg)
+  (define-arg-type reg :printer #'print-reg)
 
-  (sb!disassem:define-arg-type x-reg
-    :printer #'print-x-reg)
+  (define-arg-type x-reg :printer #'print-x-reg)
 
-  (sb!disassem:define-arg-type x-reg-sp
-    :printer #'print-x-reg-sp)
+  (define-arg-type x-reg-sp :printer #'print-x-reg-sp)
 
-  (sb!disassem:define-arg-type w-reg
-    :printer #'print-w-reg)
+  (define-arg-type w-reg :printer #'print-w-reg)
 
-  (sb!disassem:define-arg-type reg-sp
-    :printer #'print-reg-sp)
+  (define-arg-type reg-sp :printer #'print-reg-sp)
 
-  (sb!disassem:define-arg-type reg-float-reg
-    :printer #'print-reg-float-reg)
+  (define-arg-type reg-float-reg :printer #'print-reg-float-reg)
 
-  (sb!disassem:define-arg-type float-reg
-    :printer #'print-float-reg)
+  (define-arg-type float-reg :printer #'print-float-reg)
 
-  (sb!disassem:define-arg-type simd-reg
-    :printer #'print-simd-reg)
+  (define-arg-type simd-reg :printer #'print-simd-reg)
 
-  (sb!disassem:define-arg-type simd-copy-reg
-    :printer #'print-simd-copy-reg)
+  (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
 
-  (sb!disassem:define-arg-type sys-reg
-    :printer #'print-sys-reg)
+  (define-arg-type sys-reg :printer #'print-sys-reg)
 
-  (sb!disassem:define-arg-type cond
-    :printer #'print-cond)
+  (define-arg-type cond :printer #'print-cond)
 
-  (sb!disassem:define-arg-type ldr-str-annotation
-    :printer #'annotate-ldr-str-imm)
+  (define-arg-type ldr-str-annotation :printer #'annotate-ldr-str-imm)
 
-  (sb!disassem:define-arg-type ldr-str-reg-annotation
-    :printer #'annotate-ldr-str-reg)
+  (define-arg-type ldr-str-reg-annotation :printer #'annotate-ldr-str-reg)
 
-  (sb!disassem:define-arg-type label
-    :sign-extend t
-    :use-label #'use-label))
+  (define-arg-type label :sign-extend t :use-label #'use-label))
 
 ;;;; special magic to support decoding internal-error and related traps
 (defun snarf-error-junk (sap offset &optional length-only)
-  (let ((length (sb!sys:sap-ref-8 sap offset)))
-    (declare (type sb!sys:system-area-pointer sap)
+  (let ((length (sap-ref-8 sap offset)))
+    (declare (type system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
            (values 0 (1+ length) nil nil))
           (t
-           (let* ((inst (sb!sys:sap-ref-32 sap (- offset 4)))
+           (let* ((inst (sap-ref-32 sap (- offset 4)))
                   (vector (make-array length :element-type '(unsigned-byte 8)))
                   (index 0)
                   (error-number (ldb (byte 8 13) inst)))
@@ -440,7 +428,7 @@
                 (when (>= index length)
                   (return))
                 (let ((old-index index))
-                  (sc-offsets (sb!c:read-var-integer vector index))
+                  (sc-offsets (read-var-integer vector index))
                   (lengths (- index old-index))))
                (values error-number
                        (1+ length)
@@ -450,7 +438,7 @@
 (defun brk-control (chunk inst stream dstate)
   (declare (ignore inst chunk))
   (let ((code (ldb (byte 8 5) (current-instruction dstate))))
-    (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+    (flet ((nt (x) (if stream (note x dstate))))
       (case code
         (#.halt-trap
          (nt "Halt trap"))
@@ -458,10 +446,10 @@
          (nt "Pending interrupt trap"))
         (#.error-trap
          (nt "Error trap")
-         (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+         (handle-break-args #'snarf-error-junk stream dstate))
         (#.cerror-trap
          (nt "Cerror trap")
-         (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+         (handle-break-args #'snarf-error-junk stream dstate))
         (#.breakpoint-trap
          (nt "Breakpoint trap"))
         (#.fun-end-breakpoint-trap
@@ -485,11 +473,11 @@
 
 (defun register-p (thing)
   (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'registers)))
+       (eq (sb-name (sc-sb (tn-sc thing))) 'sb!vm::registers)))
 
 (defun fp-register-p (thing)
   (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
+       (eq (sb-name (sc-sb (tn-sc thing))) 'sb!vm::float-registers)))
 
 (defun reg-size (tn)
   (if (sc-is tn 32-bit-reg)
@@ -651,10 +639,10 @@
 
 
 (defmacro def-emitter (name &rest specs)
-  (sb!int:collect ((arg-names) (arg-types))
+  (collect ((arg-names) (arg-types))
     (let* ((total-bits 32)
            (overall-mask (ash -1 total-bits))
-           (num-bytes (truncate total-bits sb!assem::assembly-unit-bits))
+           (num-bytes (truncate total-bits assembly-unit-bits))
            (bytes (make-array num-bytes :initial-element nil)))
       (dolist (spec-expr specs)
         (destructuring-bind (arg size pos) spec-expr
@@ -669,9 +657,9 @@
                                        ,(1- (ash 1 size)))
                               ,arg)))
           (multiple-value-bind (start-byte offset)
-              (floor pos sb!assem::assembly-unit-bits)
+              (floor pos assembly-unit-bits)
             (let ((end-byte (floor (1- (+ pos size))
-                                   sb!assem::assembly-unit-bits)))
+                                   assembly-unit-bits)))
               (flet ((maybe-ash (expr offset)
                        (if (zerop offset)
                            expr
@@ -684,26 +672,26 @@
                              (svref bytes start-byte)))
                       (t
                        (push (maybe-ash
-                              `(ldb (byte ,(- sb!assem::assembly-unit-bits offset) 0)
+                              `(ldb (byte ,(- assembly-unit-bits offset) 0)
                                     ,arg)
                               offset)
                              (svref bytes start-byte))
                        (do ((index (1+ start-byte) (1+ index)))
                            ((>= index end-byte))
                          (push
-                          `(ldb (byte ,sb!assem::assembly-unit-bits
-                                      ,(- (* sb!assem::assembly-unit-bits
+                          `(ldb (byte ,assembly-unit-bits
+                                      ,(- (* assembly-unit-bits
                                              (- index start-byte))
                                           offset))
                                 ,arg)
                           (svref bytes index)))
                        (let ((len (rem (+ size offset)
-                                       sb!assem::assembly-unit-bits)))
+                                       assembly-unit-bits)))
                          (push
                           `(ldb (byte ,(if (zerop len)
-                                           sb!assem::assembly-unit-bits
+                                           assembly-unit-bits
                                            len)
-                                      ,(- (* sb!assem::assembly-unit-bits
+                                      ,(- (* assembly-unit-bits
                                              (- end-byte start-byte))
                                           offset))
                                 ,arg)
@@ -722,8 +710,8 @@
                                    (car pieces)))
                   forms)))
         `(defun ,(symbolicate "EMIT-" name) (segment ,@(arg-names))
-           (declare (type segment segment) ,@(arg-types))
-           ,@(ecase sb!c:*backend-byte-order*
+           (declare (type sb!assem:segment segment) ,@(arg-types))
+           ,@(ecase *backend-byte-order*
                (:little-endian (nreverse forms))
                (:big-endian forms))
            nil)))))
@@ -739,13 +727,12 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (add-sub 32)
+(define-instruction-format (add-sub 32)
   (op :field (byte 2 29))
   (rn :field (byte 5 5) :type 'reg-sp)
   (rd :field (byte 5 0) :type 'reg-sp))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (add-sub-imm 32
      :default-printer '(:name :tab rd ", " rn ", " imm shift)
      :include add-sub)
@@ -753,13 +740,13 @@
   (shift :field (byte 2 22) :type '2-bit-shift)
   (imm :field (byte 12 10) :type 'unsigned-immediate))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (adds-subs-imm 32
      :include add-sub-imm
      :default-printer '(:name :tab rd ", " rn ", " imm shift))
   (rd :type 'reg))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (add-sub-shift-reg 32
      :default-printer '(:name :tab rd ", " rn ", " rm shift)
      :include add-sub)
@@ -781,7 +768,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (add-sub-ext-reg 32
      :default-printer '(:name :tab rd ", " rn ", " extend)
      :include add-sub)
@@ -949,7 +936,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (add-sub-carry 32 :include add-sub
                       :default-printer '(:name :tab rd ", " rn ", " rm))
   (op2 :field (byte 8 21) :value #b11010000)
@@ -972,8 +959,7 @@
 
 ;;;
 
-(sb!disassem:define-instruction-format
-    (logical 32)
+(define-instruction-format (logical 32)
   (op :field (byte 2 29))
   (rn :field (byte 5 5) :type 'reg)
   (rd :field (byte 5 0) :type 'reg))
@@ -989,7 +975,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (logical-reg 32
      :include logical
      :default-printer '(:name :tab rd ", " rn ", " rm shift))
@@ -1008,7 +994,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (logical-imm 32
      :include logical
      :default-printer '(:name :tab rd  ", " rn ", " imm))
@@ -1188,9 +1174,9 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (bitfield 32
-     :default-printer '(:name :tab rd  ", " rn ", " immr ", " imms))
+(define-instruction-format (bitfield 32
+                            :default-printer
+                            '(:name :tab rd  ", " rn ", " immr ", " imms))
   (op :field (byte 2 29))
   (op2 :field (byte 6 23) :value #b100110)
   (n :field (byte 1 22) :value +64-bit-size+)
@@ -1294,8 +1280,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (extract 32)
+(define-instruction-format (extract 32)
   (op2 :field (byte 8 23) :value #b00100111)
   (op3 :field (byte 1 21) :value #b0)
   (rm :field (byte 5 16) :type 'reg)
@@ -1328,9 +1313,8 @@
   (imm 16 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (move-wide 32
-     :default-printer '(:name :tab rd  ", " imm shift))
+(define-instruction-format (move-wide 32
+                            :default-printer '(:name :tab rd  ", " imm shift))
   (op :field (byte 2 29))
   (op2 :field (byte 6 23) :value #b100101)
   (shift :field (byte 2 21) :type 'wide-shift)
@@ -1340,7 +1324,7 @@
 (defmacro process-null-sc (reg)
   `(setf ,reg (if (and (tn-p ,reg)
                        (eq 'null (sc-name (tn-sc ,reg))))
-                  null-tn
+                  sb!vm::null-tn
                   ,reg)))
 
 (define-instruction-macro mov-sp (rd rm)
@@ -1351,7 +1335,7 @@
          (rm ,rm))
      (process-null-sc rm)
      (if (integerp rm)
-         (load-immediate-word rd rm)
+         (sb!vm::load-immediate-word rd rm)
          (inst orr rd zr-tn rm))))
 
 (define-instruction movn (segment rd imm &optional (shift 0))
@@ -1384,7 +1368,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (cond-select 32
      :default-printer '(:name :tab rd  ", " rn ", " rm ", " cond))
   (op :field (byte 1 30))
@@ -1457,9 +1441,8 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (data-processing-1 32
-     :default-printer '(:name :tab rd  ", " rn))
+(define-instruction-format (data-processing-1 32
+                            :default-printer '(:name :tab rd  ", " rn))
   (op2 :field (byte 18 13) :value #b101101011000000000)
   (op :field (byte 3 10))
   (rn :field (byte 5 5) :type 'reg)
@@ -1489,9 +1472,8 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (data-processing-2 32
-     :default-printer '(:name :tab rd  ", " rn ", " rm))
+(define-instruction-format (data-processing-2 32
+                            :default-printer '(:name :tab rd  ", " rn ", " rm))
   (op2 :field (byte 10 21) :value #b0011010110)
   (rm :field (byte 5 16) :type 'reg)
   (op :field (byte 6 10))
@@ -1531,9 +1513,9 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (data-processing-3 32
-     :default-printer '(:name :tab rd  ", " rn ", " rm ", " ra))
+(define-instruction-format (data-processing-3 32
+                            :default-printer
+                            '(:name :tab rd  ", " rn ", " rm ", " ra))
   (op2 :field (byte 7 24) :value #b0011011)
   (op31 :field (byte 3 21))
   (rm :field (byte 5 16) :type 'reg)
@@ -1584,8 +1566,7 @@
                            0 31 (tn-offset rn) (tn-offset rd))))
 ;;;
 
-(sb!disassem:define-instruction-format
-    (ldr-str 32)
+(define-instruction-format (ldr-str 32)
   (size :field (byte 2 30))
   (op2 :field (byte 3 27) :value #b111)
   (v :field (byte 1 26))
@@ -1605,7 +1586,7 @@
   (rn 5 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (ldr-str-unsigned-imm 32
      :default-printer '(:name :tab rt  ", [" rn (:unless (just-imm :constant 0) ", " imm) "]"
                         ldr-str-annotation)
@@ -1628,7 +1609,7 @@
   (rn 5 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (ldr-str-unscaled-imm 32
      :default-printer '(:name :tab rt  ", [" rn imm-writeback ldr-str-annotation)
      :include ldr-str)
@@ -1652,7 +1633,7 @@
   (rn 5 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (ldr-str-reg 32
      :default-printer '(:name :tab rt  ", [" rn ", " rm option "]" ldr-str-annotation)
      :include ldr-str)
@@ -1669,10 +1650,9 @@
   (imm 19 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
-    (ldr-literal 32
-     :default-printer '(:name :tab rt ", " label)
-     :include ldr-str)
+(define-instruction-format (ldr-literal 32
+                            :default-printer '(:name :tab rt ", " label)
+                            :include ldr-str)
   (op2 :value #b011)
   (label :field (byte 19 5) :type 'label)
   (rt :fields (list (byte 2 30) (byte 5 0))))
@@ -1816,7 +1796,7 @@
   (rn 5 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (ldr-str-pair 32
      :default-printer '(:name :tab rt ", " rt2 ", [" rn pair-imm-writeback)
      :include ldr-str)
@@ -1898,8 +1878,7 @@
   (rn 5 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
-    (ldr-str-exclusive 32)
+(define-instruction-format (ldr-str-exclusive 32)
   (size :field (byte 2 30))
   (op2 :field (byte 6 24) :value #b001000)
   (o2 :field (byte 1 23))
@@ -1957,8 +1936,8 @@
   (#b0 1 4)
   (cond 4 0))
 
-(sb!disassem:define-instruction-format
-    (cond-branch 32 :default-printer '(:name cond :tab target))
+(define-instruction-format (cond-branch 32
+                            :default-printer '(:name cond :tab target))
   (op1 :field (byte 8 24) :value #b01010100)
   (target :field (byte 19 5) :type 'label)
   (op2 :field (byte 1 4) :value #b0)
@@ -1969,8 +1948,8 @@
   (#b00101 5 26)
   (imm 26 0))
 
-(sb!disassem:define-instruction-format
-    (uncond-branch 32 :default-printer '(:name :tab target))
+(define-instruction-format (uncond-branch 32
+                            :default-printer '(:name :tab target))
   (op :field (byte 1 31))
   (op2 :field (byte 5 26) :value #b00101)
   (target :field (byte 26 0) :type 'label))
@@ -2022,9 +2001,8 @@
   (rn 5 5)
   (#b00000 5 0))
 
-(sb!disassem:define-instruction-format
-    (uncond-branch-reg 32
-     :default-printer '(:name :tab rn))
+(define-instruction-format (uncond-branch-reg 32
+                            :default-printer '(:name :tab rn))
   (op2 :field (byte 7 25) :value #b1101011)
   (op :field (byte 4 21))
   (op3 :field (byte 11 10) :value #b11111000000)
@@ -2041,9 +2019,9 @@
   (:emitter
    (emit-uncond-branch-reg segment 1 (tn-offset register))))
 
-(define-instruction ret (segment &optional (register lr-tn))
+(define-instruction ret (segment &optional (register sb!vm::lr-tn))
   (:printer uncond-branch-reg ((op #b10)))
-  (:printer uncond-branch-reg ((op #b10) (rn lr-offset))
+  (:printer uncond-branch-reg ((op #b10) (rn sb!vm::lr-offset))
             '(:name))
   (:emitter
    (emit-uncond-branch-reg segment #b10 (tn-offset register))))
@@ -2057,8 +2035,8 @@
   (imm 19 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
-    (compare-branch-imm 32 :default-printer '(:name :tab rt ", " label))
+(define-instruction-format (compare-branch-imm 32
+                            :default-printer '(:name :tab rt ", " label))
   (size :field (byte 1 31))
   (op1 :field (byte 6 25) :value #b011010)
   (op  :field (byte 1 24))
@@ -2130,8 +2108,7 @@
   (#b000 3 2)
   (ll 2 0))
 
-(sb!disassem:define-instruction-format
-    (exception 32 :default-printer '(:name :tab imm))
+(define-instruction-format (exception 32 :default-printer '(:name :tab imm))
   (op2 :field (byte 8 24) :value #b11010100)
   (op  :field (byte 3 21))
   (imm :field (byte 16 5) :type 'unsigned-immediate)
@@ -2158,8 +2135,8 @@
   (immhi 19 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (pc-relative 32 :default-printer '(:name :tab rd ", " label))
+(define-instruction-format (pc-relative 32
+                            :default-printer '(:name :tab rd ", " label))
   (op :field (byte 1 31))
   (op2 :field (byte 5 24) :value #b10000)
   (label :fields (list (byte 2 29) (byte 19 5)) :type 'label)
@@ -2195,8 +2172,7 @@
   (sys-reg 16 5)
   (rt 5 0))
 
-(sb!disassem:define-instruction-format
-    (sys-reg 32)
+(define-instruction-format (sys-reg 32)
   (op :field (byte 10 22) :value #b1101010100)
   (l :field (byte 1 21))
   (sys-reg :field (byte 16 5) :type 'sys-reg)
@@ -2234,8 +2210,7 @@
   (op 3 5)
   (#b11111 5 0))
 
-(sb!disassem:define-instruction-format
-    (system 32)
+(define-instruction-format (system 32)
   (op1 :field (byte 20 12) :value #b11010101000000110011)
   (crm :field (byte 4 8))
   (op :field (byte 3 5))
@@ -2293,8 +2268,7 @@
   (imm 3 5)
   (#b11111 5 0))
 
-(sb!disassem:define-instruction-format
-    (hint 32 :default-printer '(:name))
+(define-instruction-format (hint 32 :default-printer '(:name))
   (op1 :field (byte 24 8) :value #b110101010000001100100000)
   (imm :field (byte 3 5))
   (op2 :field (byte 5 0) :value #b11111))
@@ -2328,8 +2302,8 @@
   (z 1 3)
   (#b000 3 0))
 
-(sb!disassem:define-instruction-format
-    (fp-compare 32 :default-printer '(:name :tab rn ", " rm))
+(define-instruction-format (fp-compare 32
+                            :default-printer '(:name :tab rn ", " rm))
   (op1 :field (byte 9 23) :value #b000111100)
   (type :field (byte 1 22))
   (rm :field (byte 5 16) :type 'float-reg)
@@ -2366,8 +2340,7 @@
 (def-fp-compare fcmp #b0)
 (def-fp-compare fcmpe #b1)
 
-(sb!disassem:define-instruction-format
-    (fp-data-processing 32)
+(define-instruction-format (fp-data-processing 32)
   (rn :field (byte 5 5) :type 'float-reg)
   (rd :field (byte 5 0) :type 'float-reg))
 
@@ -2380,7 +2353,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (fp-data-processing-1 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn))
@@ -2399,7 +2372,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (fp-data-processing-2 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn ", " rm))
@@ -2419,7 +2392,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
+(define-instruction-format
     (fp-data-processing-3 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn ", " rm ", " ra))
@@ -2439,10 +2412,9 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (fp-conversion 32
-     :include fp-data-processing
-     :default-printer '(:name :tab rd ", " rn))
+(define-instruction-format (fp-conversion 32
+                            :include fp-data-processing
+                            :default-printer '(:name :tab rd ", " rn))
   (op2 :field (byte 8 23) :value #b00111100)
   (type :field (byte 1 22))
   (op1 :field (byte 1 21) :value #b1)
@@ -2474,10 +2446,9 @@
 (def-fp-data-processing-1 frintx #b1110)
 (def-fp-data-processing-1 frinti #b1111)
 
-(sb!disassem:define-instruction-format
-    (fcvt 32
-     :include fp-data-processing-1
-     :default-printer '(:name :tab rd ", " rn))
+(define-instruction-format (fcvt 32
+                            :include fp-data-processing-1
+                            :default-printer '(:name :tab rd ", " rn))
   (op :field (byte 2 17) :value #b01)
   (rn :fields (list (byte 1 22) (byte 5 5)))
   (rd :fields (list (byte 2 15) (byte 5 0))))
@@ -2759,9 +2730,8 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (simd-three-same 32
-     :default-printer '(:name :tab rd ", " rn ", " rm))
+(define-instruction-format (simd-three-same 32
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
   (op3 :field (byte 1 31) :value #b0)
   (u :field (byte 1 29))
   (op4 :field (byte 5 24) :value #b01110)
@@ -2836,9 +2806,8 @@
   (rn 5 5)
   (rd 5 0))
 
-(sb!disassem:define-instruction-format
-    (simd-copy 32
-     :default-printer '(:name :tab rd ", " rn))
+(define-instruction-format (simd-copy 32
+                            :default-printer '(:name :tab rd ", " rn))
   (op3 :field (byte 1 31) :value #b0)
   (q :field (byte 1 30))
   (op :field (byte 1 29))

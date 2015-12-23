@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(defun lowest-set-bit-index (integer-value)
-  (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
-
 (defun load-immediate-word (y val)
   (cond ((typep val '(unsigned-byte 16))
          (inst movz y val))
