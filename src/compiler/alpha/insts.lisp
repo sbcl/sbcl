@@ -9,9 +9,18 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB!ALPHA-ASM")
 
-(setf sb!disassem:*disassem-inst-alignment-bytes* 4)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Imports from this package into SB-VM
+  (import '(reg-tn-encoding) 'sb!vm)
+  ;; Imports from SB-VM into this package
+  (import '(sb!vm::zero sb!vm::fp-single-zero sb!vm::fp-double-zero
+            sb!vm::registers sb!vm::float-registers
+            sb!vm::zero-tn sb!vm::fp-single-zero-tn sb!vm::fp-double-zero-tn
+            sb!vm::zero-offset sb!vm::null-offset sb!vm::code-offset)))
+
+(setf *disassem-inst-alignment-bytes* 4)
 
 
 ;;;; utility functions
@@ -45,64 +54,65 @@
        (lambda (name)
          (cond ((null name) nil)
                (t (make-symbol (concatenate 'string "$" name)))))
-       *register-names*))
+       sb!vm::*register-names*))
 
-(sb!disassem:define-arg-type reg
+(define-arg-type reg
   :printer (lambda (value stream dstate)
              (declare (stream stream) (fixnum value))
              (let ((regname (aref reg-symbols value)))
                (princ regname stream)
-               (sb!disassem:maybe-note-associated-storage-ref
+               (maybe-note-associated-storage-ref
                 value
                 'registers
                 regname
                 dstate))))
 
-(sb!disassem:define-arg-type memory-address-annotation
+(define-arg-type memory-address-annotation
   :printer (lambda (value stream dstate)
              (declare (ignore stream))
              (destructuring-bind (reg offset) value
                (cond
                  ((= reg code-offset)
-                  (sb!disassem:note-code-constant offset dstate))
+                  (note-code-constant offset dstate))
                  ((= reg null-offset)
-                  (sb!disassem:maybe-note-nil-indexed-object offset dstate))))))
+                  (maybe-note-nil-indexed-object offset dstate))))))
 
 (defparameter float-reg-symbols
   #.(coerce
      (loop for n from 0 to 31 collect (make-symbol (format nil "~D" n)))
      'vector))
 
-(sb!disassem:define-arg-type fp-reg
+(define-arg-type fp-reg
   :printer (lambda (value stream dstate)
              (declare (stream stream) (fixnum value))
              (let ((regname (aref float-reg-symbols value)))
                (princ regname stream)
-               (sb!disassem:maybe-note-associated-storage-ref
+               (maybe-note-associated-storage-ref
                 value
                 'float-registers
                 regname
                 dstate))))
 
-(sb!disassem:define-arg-type relative-label
+(define-arg-type relative-label
   :sign-extend t
   :use-label (lambda (value dstate)
                (declare (type (signed-byte 21) value)
-                        (type sb!disassem:disassem-state dstate))
-               (+ 4 (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+                        (type disassem-state dstate))
+               (+ 4 (ash value 2) (dstate-cur-addr dstate))))
 
 ;; We use CALL-PAL BUGCHK as part of our trap logic.  It is invariably
 ;; followed by a trap-code word, which we pick out with the
 ;; semi-traditional prefilter approach.
-(sb!disassem:define-arg-type bugchk-trap-code
+(define-arg-type bugchk-trap-code
     :prefilter (lambda (value dstate)
                  (declare (ignore value))
-                 (sb!disassem:read-suffix 32 dstate)))
+                 (read-suffix 32 dstate)))
 
 ;;;; DEFINE-INSTRUCTION-FORMATs for the disassembler
 
-(sb!disassem:define-instruction-format
-    (memory 32 :default-printer '(:name :tab ra "," disp "(" rb ")" memory-address-annotation))
+(define-instruction-format (memory 32
+                            :default-printer '(:name :tab ra "," disp "(" rb ")"
+                                               memory-address-annotation))
   (op   :field (byte 6 26))
   (ra   :field (byte 5 21) :type 'reg)
   (rb   :field (byte 5 16) :type 'reg)
@@ -110,22 +120,22 @@
   (memory-address-annotation :fields (list (byte 5 16) (byte 16 0))
                              :type 'memory-address-annotation))
 
-(sb!disassem:define-instruction-format
-    (jump 32 :default-printer '(:name :tab ra ",(" rb ")," hint))
+(define-instruction-format (jump 32
+                            :default-printer '(:name :tab ra ",(" rb ")," hint))
   (op    :field (byte 6 26))
   (ra    :field (byte 5 21) :type 'reg)
   (rb    :field (byte 5 16) :type 'reg)
   (subop :field (byte 2 14))
   (hint  :field (byte 14 0)))
 
-(sb!disassem:define-instruction-format
-    (branch 32 :default-printer '(:name :tab ra "," disp))
+(define-instruction-format (branch 32
+                            :default-printer '(:name :tab ra "," disp))
   (op   :field (byte 6 26))
   (ra   :field (byte 5 21) :type 'reg)
   (disp :field (byte 21 0) :type 'relative-label))
 
-(sb!disassem:define-instruction-format
-    (reg-operate 32 :default-printer '(:name :tab ra "," rb "," rc))
+(define-instruction-format (reg-operate 32
+                            :default-printer '(:name :tab ra "," rb "," rc))
   (op  :field (byte 6 26))
   (ra  :field (byte 5 21) :type 'reg)
   (rb  :field (byte 5 16) :type 'reg)
@@ -134,8 +144,8 @@
   (fn  :field (byte 7 5))
   (rc  :field (byte 5 0) :type 'reg))
 
-(sb!disassem:define-instruction-format
-    (lit-operate 32 :default-printer '(:name :tab ra "," lit "," rc))
+(define-instruction-format (lit-operate 32
+                            :default-printer '(:name :tab ra "," lit "," rc))
   (op  :field (byte 6 26))
   (ra  :field (byte 5 21) :type 'reg)
   (lit :field (byte 8 13))
@@ -143,21 +153,21 @@
   (fn  :field (byte 7 5))
   (rc  :field (byte 5 0) :type 'reg))
 
-(sb!disassem:define-instruction-format
-    (fp-operate 32 :default-printer '(:name :tab fa "," fb "," fc))
+(define-instruction-format (fp-operate 32
+                            :default-printer '(:name :tab fa "," fb "," fc))
   (op :field (byte 6 26))
   (fa :field (byte 5 21) :type 'fp-reg)
   (fb :field (byte 5 16) :type 'fp-reg)
   (fn :field (byte 11 5))
   (fc :field (byte 5 0) :type 'fp-reg))
 
-(sb!disassem:define-instruction-format
-    (call-pal 32 :default-printer '('call_pal :tab 'pal_ :name))
+(define-instruction-format (call-pal 32
+                            :default-printer '('call_pal :tab 'pal_ :name))
   (op      :field (byte 6 26) :value 0)
   (palcode :field (byte 26 0)))
 
-(sb!disassem:define-instruction-format
-    (bugchk 32 :default-printer '('call_pal :tab 'pal_bugchk "," code))
+(define-instruction-format (bugchk 32
+                            :default-printer '('call_pal :tab 'pal_bugchk "," code))
   (op      :field (byte 6 26) :value 0)
   (palcode :field (byte 26 0) :value #x81)
   (code :type 'bugchk-trap-code :reader bugchk-trap-code))
@@ -503,7 +513,7 @@
 
 (defun bugchk-trap-control (chunk inst stream dstate)
   (declare (ignore inst))
-  (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+  (flet ((nt (x) (if stream (note x dstate))))
     (case (bugchk-trap-code chunk dstate)
       (#.halt-trap
        (nt "Halt trap"))
@@ -511,10 +521,10 @@
        (nt "Pending interrupt trap"))
       (#.error-trap
        (nt "Error trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+       (handle-break-args #'snarf-error-junk stream dstate))
       (#.cerror-trap
        (nt "Cerror trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+       (handle-break-args #'snarf-error-junk stream dstate))
       (#.breakpoint-trap
        (nt "Breakpoint trap"))
       (#.fun-end-breakpoint-trap
