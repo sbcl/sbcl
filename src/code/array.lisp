@@ -31,7 +31,7 @@
   (def %array-data-vector)
   (def %array-displacement)
   (def %array-displaced-p)
-  (def %array-diplaced-from))
+  (def %array-displaced-from))
 
 (defun %array-rank (array)
   (%array-rank array))
