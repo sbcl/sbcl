@@ -92,9 +92,18 @@ include the pathname of the file and the position of the definition."
 (defun debug-info-source (debug-info)
   (sb-c::debug-info-source debug-info))
 
-(declaim (ftype (function (debug-info) debug-function) debug-info-debug-function))
-(defun debug-info-debug-function (debug-info)
-  (elt (sb-c::compiled-debug-info-fun-map debug-info) 0))
+(declaim (ftype (function (t debug-info) debug-function) debug-info-debug-function))
+(defun debug-info-debug-function (function debug-info)
+  (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
+        (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
+    (or
+     (find-if
+      (lambda (x)
+        (and
+         (sb-c::compiled-debug-fun-p x)
+         (eq (sb-c::compiled-debug-fun-name x) name)))
+      map)
+     (elt map 0))))
 
 (defun valid-function-name-p (name)
   "True if NAME denotes a valid function name, ie. one that can be passed to
@@ -464,7 +473,7 @@ If an unsupported TYPE is requested, the function will return NIL.
 (defun find-function-definition-source (function)
   (let* ((debug-info (function-debug-info function))
          (debug-source (debug-info-source debug-info))
-         (debug-fun (debug-info-debug-function debug-info))
+         (debug-fun (debug-info-debug-function function debug-info))
          (tlf (if debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
     (make-definition-source
      :pathname
