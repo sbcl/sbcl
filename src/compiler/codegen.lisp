@@ -70,7 +70,8 @@
 (defvar *prev-segment*)
 (defvar *prev-vop*)
 
-(defun trace-instruction (segment vop inst args)
+(defun trace-instruction (segment vop inst &rest args)
+  (declare (dynamic-extent args))
   (let ((*standard-output* *compiler-trace-output*))
     (unless (eq *prev-segment* segment)
       (format t "in the ~A segment:~%" (sb!assem:segment-type segment))
@@ -85,9 +86,9 @@
       (setf *prev-vop* vop))
     (case inst
       (:label
-       (format t "~A:~%" args))
+       (format t "~A:~%" (car args)))
       (:align
-       (format t "~0,8T.align~0,8T~A~%" args))
+       (format t "~0,8T.align~0,8T~A~%" (car args)))
       (t
        (format t "~0,8T~A~@[~0,8T~{~A~^, ~}~]~%" inst args))))
   (values))

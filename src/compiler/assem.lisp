@@ -1454,63 +1454,41 @@
                (:big-endian forms))
            ',name)))))
 
-(defun grovel-lambda-list (lambda-list vop-var)
-  (let ((segment-name (car lambda-list))
-        (vop-var (or vop-var (make-symbol "VOP"))))
-    (sb!int:collect ((new-lambda-list))
-      (new-lambda-list segment-name)
-      (new-lambda-list vop-var)
-      (labels
-          ((grovel (state lambda-list)
-             (when lambda-list
-               (let ((param (car lambda-list)))
-                 (cond
-                  ((member param sb!xc:lambda-list-keywords)
-                   (new-lambda-list param)
-                   (grovel param (cdr lambda-list)))
-                  (t
-                   (ecase state
-                     ((nil)
-                      (new-lambda-list param)
-                      `(cons ,param ,(grovel state (cdr lambda-list))))
-                     (&optional
-                      (multiple-value-bind (name default supplied-p)
-                          (if (consp param)
-                              (values (first param)
-                                      (second param)
-                                      (or (third param)
-                                          (sb!xc:gensym "SUPPLIED-P-")))
-                              (values param nil (sb!xc:gensym "SUPPLIED-P-")))
-                        (new-lambda-list (list name default supplied-p))
-                        `(and ,supplied-p
-                              (cons ,(if (consp name)
-                                         (second name)
-                                         name)
-                                    ,(grovel state (cdr lambda-list))))))
-                     (&key
-                      (multiple-value-bind (name default supplied-p)
-                          (if (consp param)
-                              (values (first param)
-                                      (second param)
-                                      (or (third param)
-                                          (sb!xc:gensym "SUPPLIED-P-")))
-                              (values param nil (sb!xc:gensym "SUPPLIED-P-")))
-                        (new-lambda-list (list name default supplied-p))
-                        (multiple-value-bind (key var)
-                            (if (consp name)
-                                (values (first name) (second name))
-                                (values (keywordicate name) name))
-                          `(append (and ,supplied-p (list ',key ,var))
-                                   ,(grovel state (cdr lambda-list))))))
-                     (&rest
-                      (new-lambda-list param)
-                      (grovel state (cdr lambda-list))
-                      param))))))))
-        (let ((reconstructor (grovel nil (cdr lambda-list))))
-          (values (new-lambda-list)
-                  segment-name
-                  vop-var
-                  reconstructor))))))
+;;; Return a list of forms involving VALUES that will pass the arguments from
+;;; LAMBA-LIST by way of MULTIPLE-VALUE-CALL. Secondary value is the augmented
+;;; lambda-list which has a supplied-p var for every &OPTIONAL and &KEY arg.
+(defun make-arglist-forwarder (lambda-list)
+  (multiple-value-bind (llks required optional rest keys aux)
+      (parse-lambda-list lambda-list)
+    (collect ((reconstruction))
+      (flet ((augment (spec var def sup-p var-maker arg-passing-form)
+               (multiple-value-bind (sup-p new-spec)
+                   (if sup-p
+                       (values (car sup-p) spec)
+                       (let ((sup-p (copy-symbol var)))
+                         (values sup-p `(,(funcall var-maker) ,def ,sup-p))))
+                 (reconstruction `(if ,sup-p ,arg-passing-form (values)))
+                 new-spec)))
+        (setq optional ; Ensure that each &OPTIONAL arg has a supplied-p var.
+              (mapcar (lambda (spec)
+                        (multiple-value-bind (var def sup)
+                            (parse-optional-arg-spec spec)
+                          (augment spec var def sup (lambda () var) var)))
+                      optional))
+        (unless (ll-kwds-restp llks)
+          (setq keys ; Do the same for &KEY, unless &REST is present.
+                (mapcar (lambda (spec)
+                          (multiple-value-bind (key var def sup)
+                              (parse-key-arg-spec spec)
+                            (augment spec var def sup
+                                     (lambda ()
+                                       (if (eq (keywordicate var) key)
+                                           var
+                                           `(,key ,var)))
+                                     `(values ',key ,var))))
+                        keys))))
+      (values `(,@required ,@(reconstruction) ,@(if rest `((values-list ,@rest))))
+              (make-lambda-list llks nil required optional rest keys aux)))))
 
 (defun extract-nths (index glue list-of-lists-of-lists)
   (mapcar (lambda (list-of-lists)
@@ -1523,7 +1501,8 @@
 (defmacro define-instruction (name lambda-list &rest options)
   (let* ((sym-name (symbol-name name))
          (defun-name (inst-emitter-symbol sym-name t))
-         (vop-var nil)
+         (segment-name (car lambda-list))
+         (vop-name nil)
          (postits (gensym "POSTITS-"))
          (emitter nil)
          (decls nil)
@@ -1561,9 +1540,9 @@
           (:pinned
            (setf pinned t))
           (:vop-var
-           (if vop-var
+           (if vop-name
                (error "You can only specify :VOP-VAR once per instruction.")
-               (setf vop-var (car args))))
+               (setf vop-name (car args))))
           (:printer
            (sb!int:/noshow "uniquifying :PRINTER with" args)
            #-sb-xc-host
@@ -1589,14 +1568,14 @@
            (error "unknown option: ~S" option)))))
     (sb!int:/noshow "done processing options")
     (setf pdefs (nreverse pdefs))
-    (multiple-value-bind
-        (new-lambda-list segment-name vop-name arg-reconstructor)
-        (grovel-lambda-list lambda-list vop-var)
-      (sb!int:/noshow new-lambda-list segment-name vop-name arg-reconstructor)
+    (unless vop-name
+      (setq vop-name (make-symbol "VOP")))
+    (multiple-value-bind (arg-reconstructor new-lambda-list)
+        (make-arglist-forwarder (cdr lambda-list))
       (push `(let ((hook (segment-inst-hook ,segment-name)))
                (when hook
-                 (funcall hook ,segment-name ,vop-name ,sym-name
-                          ,arg-reconstructor)))
+                 (multiple-value-call hook ,segment-name ,vop-name ,sym-name
+                                      ,@arg-reconstructor)))
             emitter)
       (push `(dolist (postit ,postits)
                (emit-back-patch ,segment-name 0 postit))
@@ -1640,7 +1619,7 @@
                                       (queue-inst ,segment-name ,inst-name))
                                     (,flet-name ,segment-name))))))))
       `(progn
-         (defun ,defun-name ,new-lambda-list
+         (defun ,defun-name (,segment-name ,vop-name ,@new-lambda-list)
            ,@(when decls
                `((declare ,@decls)))
            (let ((,postits (segment-postits ,segment-name)))
