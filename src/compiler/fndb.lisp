@@ -946,7 +946,7 @@
 (defknown row-major-aref (array index) t (foldable))
 
 (defknown array-element-type (array) (or list symbol)
-  (foldable flushable recursive))
+  (foldable flushable))
 (defknown array-rank (array) array-rank (foldable flushable))
 ;; FIXME: there's a fencepost bug, but for all practical purposes our
 ;; ARRAY-RANK-LIMIT is infinite, thus masking the bug. e.g. if the

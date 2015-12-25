@@ -524,11 +524,11 @@ of specialized arrays is supported."
   ;;
   ;; Allocate and possibly initialize the vector.
   (multiple-value-bind (type n-bits)
-      (sb!impl::%vector-widetag-and-n-bits element-type)
+      (%vector-widetag-and-n-bits element-type)
     (let ((vector
-           (allocate-static-vector type length
-                                   (ceiling (* length n-bits)
-                                            sb!vm:n-word-bits))))
+            (allocate-static-vector type length
+                                    (ceiling (* length n-bits)
+                                             sb!vm:n-word-bits))))
       (cond (initial-element-p
              (fill vector initial-element))
             (initial-contents-p
