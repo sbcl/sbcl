@@ -2033,29 +2033,17 @@
          (let ((addr (+ (dstate-next-addr dstate) (second value))))
            (note (lambda (s) (format s "= #x~x" addr)) dstate))))
 
+      (string
+       ;; A label for the EA should not print as itself, but as the decomposed
+       ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
+       (print-mem-ref :compute (reg-r/m-inst-r/m-arg dchunk-zero dstate)
+                      width stream dstate)
+       (note (lambda (s) (format s "= ~A" value)) dstate))
+
       ;; We're robust in allowing VALUE to be an integer (a register),
       ;; though LEA Rx,Ry is an illegal instruction.
-      ;; A label should never have memory address of 0 to 15 so this case is
-      ;; unambiguous for the most part, except maybe in a compiler trace file
-      ;; which starts disassembling as if the origin were zero.
-      (full-reg (print-reg-with-width value width stream dstate))
-
-      ;; Unfortunately the "label" case sees either an integer or string,
-      ;; because MAP-SEGMENT-INSTRUCTIONS happens twice (really thrice).
-      ;;  - DETERMINE-OPCODE-BOUNDS in target-insts. Label = integer from prefilter.
-      ;;  - ADD-SEGMENT-LABELS. Never calls instruction printers.
-      ;;  - DISASSEMBLE-SEGMENT. Label = string
-      ;; and we need a different 'arg-form-kind' than the one in VALUE,
-      ;; because :USE-LABEL forces the printing pass to see only a label string.
-      ;; Unlike for JMP and CALL, this isn't reasonable, as no one instruction
-      ;; corresponds to, say, "LEA RAX,L1". We want [RIP+disp] or [mem_absolute]
-      ;; so extract the filtered not-labelized value for PRINT-MEM-REF.
-      ((or string integer)
-       (print-mem-ref :compute
-                      (reg-r/m-inst-r/m-arg dchunk-zero dstate)
-                      width stream dstate)
-       (when (stringp value) ; Don't note anything during -OPCODE-BOUNDS pass
-         (note (lambda (s) (format s "= ~A" value)) dstate))))))
+      (full-reg
+       (print-reg-with-width value width stream dstate)))))
 
 ) ; EVAL-WHEN
 

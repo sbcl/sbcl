@@ -76,23 +76,18 @@
              (princ offset stream)
              (unless (eq mode :compute)
                (let ((addr (+ offset (dstate-next-addr dstate))))
-                 (when (plusp addr) ; FIXME: what does this test achieve?
-                    (let ((hook (dstate-get-prop
-                                 dstate :rip-relative-mem-ref-hook)))
-                      (when hook
-                        (funcall hook offset width)))
-                    (or (nth-value
-                         1 (note-code-constant-absolute addr dstate width))
-                        (maybe-note-assembler-routine addr nil dstate)
-                        ;; Show the absolute address and maybe the contents.
-                        (note
-                         (format nil "[#x~x]~@[ = ~x~]"
-                                 addr
-                                 (case width
-                                  (:qword (unboxed-constant-ref
-                                           dstate
-                                           (+ (dstate-next-offs dstate) offset)))))
-                         dstate))))))
+                 (or (nth-value
+                      1 (note-code-constant-absolute addr dstate width))
+                     (maybe-note-assembler-routine addr nil dstate)
+                     ;; Show the absolute address and maybe the contents.
+                     (note (format nil "[#x~x]~@[ = ~x~]"
+                                   addr
+                                   (case width
+                                     (:qword
+                                      (unboxed-constant-ref
+                                       dstate
+                                       (+ (dstate-next-offs dstate) offset)))))
+                           dstate)))))
             (firstp
                (princ16 offset stream)
                (or (minusp offset)
