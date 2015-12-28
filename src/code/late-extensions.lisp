@@ -57,7 +57,7 @@
          (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
                     (error "Slot ~S not found in ~S." slot structure)))
          (index (dsd-index slotd))
-         #!-interleaved-raw-slots (rsd (dsd-raw-slot-data slotd)))
+         #!-interleaved-raw-slots (rsd (sb!kernel::dsd-raw-slot-data slotd)))
     `(progn
        (declaim (inline ,name))
        (defun ,name (instance)
