@@ -2292,13 +2292,13 @@
       (cond ((or
               (neq int *empty-type*)
               (eq value-type *empty-type*)))
-            ((bound-cast-p cast)
-             (let ((*compiler-error-context* cast))
-               (compiler-warn "Derived type ~s is not a suitable index for ~s."
-                              (type-specifier (single-value-type value-type))
-                              (type-specifier (lvar-type (bound-cast-array cast))))))
+            ;; No need to transform into an analog of
+            ;; %COMPILE-TIME-TYPE-ERROR, %CHECK-BOUND will signal at
+            ;; run-time and %CHECK-BOUND ir2-converter will signal at
+            ;; compile-time if it survives further stages of ir1
+            ;; optimization.
+            ((bound-cast-p cast))
             (t
-
              ;; FIXME: Do it in one step.
              (let ((context (node-source-form cast))
                    (detail (lvar-all-sources (cast-value cast))))

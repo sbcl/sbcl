@@ -584,6 +584,20 @@
        (move-results-coerced node block
                              (ir2-lvar-locs 2value)
                              (ir2-lvar-locs 2lvar))))))
+
+(defoptimizer (%check-bound ir2-convert)
+    ((array bound index) node block)
+  (when (constant-lvar-p bound)
+    (let* ((bound-type (specifier-type `(integer 0 (,(lvar-value bound)))))
+           (index-type (lvar-type index))
+           (*compiler-error-context* node))
+      (when (eq (type-intersection bound-type index-type)
+                *empty-type*)
+        (let ((*compiler-error-context* node))
+          (compiler-warn "Derived type ~s is not a suitable index for ~s."
+                         (type-specifier index-type)
+                         (type-specifier (lvar-type array)))))))
+  (ir2-convert-template node block))
 
 ;;;; template conversion
 
