@@ -63,5 +63,6 @@
                     lip-tn :offset 2)))
     (:none)))
 
+#-sb-xc-host ; CONTEXT-REGISTER is not defined at xc-time
 (defun return-machine-address (scp)
   (context-register scp lip-offset))
