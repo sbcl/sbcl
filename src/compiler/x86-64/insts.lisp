@@ -23,6 +23,8 @@
             sb!vm::frame-byte-offset
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
+(!begin-instruction-definitions)
+
 ;;; Note: In CMU CL, this used to be a call to SET-DISASSEM-PARAMS.
 (setf *disassem-inst-alignment-bytes* 1)
 

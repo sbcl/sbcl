@@ -22,6 +22,8 @@
             sb!vm::zero-tn
             sb!vm::null-offset sb!vm::code-offset sb!vm::zero-offset)))
 
+(!begin-instruction-definitions)
+
 ; normally assem-scheduler-p is t, and nil if debugging the assembler
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf *assem-scheduler-p* nil))

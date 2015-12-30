@@ -60,12 +60,6 @@
             (target-compile-stem stem flags))))
       (format t "~&Preloaded ~D files in ~D msec~%" i
               (- (get-internal-real-time) start))
-      ;; The disassembler, being of such stupendously clear design,
-      ;; has non-idempotent compile-time effects,
-      ;; so pretend that none of the breaking ones have happened yet.
-      (setq sb!disassem::*disassem-inst-formats* (make-hash-table)
-            sb!disassem::*disassem-arg-types* nil
-            sb!disassem::*disassem-fun-cache* (sb!disassem::make-fun-cache))
       (setf *target-object-file-names*
             (parallel-compile *make-host-2-parallel*)))
     (let ((reversed-target-object-file-names nil))

@@ -292,6 +292,10 @@
 (defvar *disassem-arg-types* nil)
 (defvar *disassem-fun-cache* (make-fun-cache))
 
+(defmacro !begin-instruction-definitions ()
+  '(eval-when (:compile-toplevel :execute)
+     (setq *disassem-fun-cache* (make-fun-cache))))
+
 (defstruct (arg (:copier nil)
                 (:predicate nil)
                 (:constructor %make-arg (name &optional position))
