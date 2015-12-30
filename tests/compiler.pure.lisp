@@ -5736,3 +5736,8 @@
             :skipped-on '(not :64-bit))
  (checked-compile `(lambda ()
                      (make-list (expt 2 30) :initial-element 0))))
+
+(with-test (:name :bad-cond)
+  (assert-error
+   (checked-compile
+    '(lambda () (cond (t 10) 20)))))
