@@ -243,21 +243,11 @@
 ;;;; These are the kind of values we can compute for an argument, and
 ;;;; how to compute them.
 
-(defvar *arg-form-kinds* nil)
-
-(defstruct (arg-form-kind (:copier nil))
-  (names nil :type list)
-  (producer (missing-arg) :type function))
-
-(defun arg-form-kind-or-lose (kind)
-  (or (getf *arg-form-kinds* kind)
-      (pd-error "unknown arg-form kind ~S" kind)))
+(defglobal *arg-form-kinds* nil)
 
 (defun find-arg-form-producer (kind)
-  (arg-form-kind-producer (arg-form-kind-or-lose kind)))
-
-(defun canonicalize-arg-form-kind (kind)
-  (car (arg-form-kind-names (arg-form-kind-or-lose kind))))
+  (or (getf *arg-form-kinds* kind)
+      (pd-error "unknown arg-form kind ~S" kind)))
 
 ;;;; only used during compilation of the instructions for a backend
 ;;;;
@@ -729,7 +719,7 @@
 (defmacro arg-access-macro (arg-name format-name chunk dstate)
   (let* ((funstate (make-funstate (format-args (format-or-lose format-name))))
          (arg (arg-or-lose arg-name funstate))
-         (arg-val-form (arg-value-form arg funstate :adjusted)))
+         (arg-val-form (arg-value-form arg funstate :numeric)))
     `(flet ((local-filtered-value (offset)
               (declare (type filtered-value-index offset))
               (aref (dstate-filtered-values ,dstate) offset))
@@ -742,7 +732,7 @@
 (defun arg-value-form (arg funstate
                        &optional
                        (kind :final)
-                       (allow-multiple-p (not (eq kind :numeric))))
+                       (allow-multiple-p (neq kind :numeric)))
   (let ((forms (gen-arg-forms arg kind funstate)))
     (when (and (not allow-multiple-p)
                (listp forms)
@@ -810,16 +800,14 @@
   (let ((this-arg-temps (assoc arg (funstate-arg-temps funstate))))
     (if this-arg-temps
         (let ((this-kind-temps
-               (assoc (canonicalize-arg-form-kind kind)
-                      (cdr this-arg-temps))))
+               (assoc kind (cdr this-arg-temps))))
           (values (cadr this-kind-temps) (cddr this-kind-temps)))
         (values nil nil))))
 
 (defun set-arg-temps (vars forms arg kind funstate)
   (let ((this-arg-temps
          (or (assoc arg (funstate-arg-temps funstate))
-             (car (push (cons arg nil) (funstate-arg-temps funstate)))))
-        (kind (canonicalize-arg-form-kind kind)))
+             (car (push (cons arg nil) (funstate-arg-temps funstate))))))
     (let ((this-kind-temps
            (or (assoc kind (cdr this-arg-temps))
                (car (push (cons kind nil) (cdr this-arg-temps))))))
@@ -864,76 +852,63 @@
          (push (modify-arg (%make-arg ',name) nil ,@args) *disassem-arg-types*))
        ',name)))
 
-(defmacro def-arg-form-kind ((&rest names) &rest inits)
-  `(let ((kind (make-arg-form-kind :names ',names ,@inits)))
-     ,@(mapcar (lambda (name)
-                 `(setf (getf *arg-form-kinds* ',name) kind))
-               names)))
+(defmacro def-arg-form-kind (name lambda-list &body body)
+  `(setf (getf *arg-form-kinds* ',name) (lambda ,lambda-list ,@body)))
 
-(def-arg-form-kind (:raw)
-  :producer (lambda (arg funstate)
-              (declare (ignore funstate))
-              (mapcar (lambda (bytespec)
-                        `(the (unsigned-byte ,(byte-size bytespec))
-                           (local-extract ',bytespec)))
-                      (arg-fields arg))))
+(def-arg-form-kind :raw (arg funstate)
+  (declare (ignore funstate))
+  (mapcar (lambda (bytespec)
+            `(the (unsigned-byte ,(byte-size bytespec))
+                  (local-extract ',bytespec)))
+          (arg-fields arg)))
 
-(def-arg-form-kind (:sign-extended :unfiltered)
-  :producer (lambda (arg funstate)
-              (let ((raw-forms (gen-arg-forms arg :raw funstate)))
-                (if (and (arg-sign-extend-p arg) (listp raw-forms))
-                    (mapcar (lambda (form field)
-                              `(the (signed-byte ,(byte-size field))
-                                 (sign-extend ,form
-                                              ,(byte-size field))))
-                            raw-forms
-                            (arg-fields arg))
-                    raw-forms))))
+(def-arg-form-kind :sign-extended (arg funstate)
+  (let ((raw-forms (gen-arg-forms arg :raw funstate)))
+    (if (and (arg-sign-extend-p arg) (listp raw-forms))
+        (mapcar (lambda (form field)
+                  `(the (signed-byte ,(byte-size field))
+                        (sign-extend ,form ,(byte-size field))))
+                raw-forms
+                (arg-fields arg))
+        raw-forms)))
 
-(def-arg-form-kind (:filtering)
-  :producer (lambda (arg funstate)
-              (let ((sign-extended-forms
-                     (gen-arg-forms arg :sign-extended funstate))
-                    (pf (arg-prefilter arg)))
-                (if pf
-                    (values
-                     `(local-filter ,(maybe-listify sign-extended-forms)
-                                    ,(source-form pf))
-                     t)
-                    (values sign-extended-forms nil)))))
+(def-arg-form-kind :filtering (arg funstate)
+  (let ((sign-extended-forms
+          (gen-arg-forms arg :sign-extended funstate))
+        (pf (arg-prefilter arg)))
+    (if pf
+        (values `(local-filter ,(maybe-listify sign-extended-forms)
+                               ,(source-form pf))
+                t)
+        (values sign-extended-forms nil))))
 
-(def-arg-form-kind (:filtered :unadjusted)
-  :producer (lambda (arg funstate)
-              (let ((pf (arg-prefilter arg)))
-                (if pf
-                    (values `(local-filtered-value ,(arg-position arg)) t)
-                    (gen-arg-forms arg :sign-extended funstate)))))
+(def-arg-form-kind :filtered (arg funstate)
+  (let ((pf (arg-prefilter arg)))
+    (if pf
+        (values `(local-filtered-value ,(arg-position arg)) t)
+        (gen-arg-forms arg :sign-extended funstate))))
 
-(def-arg-form-kind (:adjusted :numeric :unlabelled)
-  :producer (lambda (arg funstate)
-              (let ((filtered-forms (gen-arg-forms arg :filtered funstate))
-                    (use-label (arg-use-label arg)))
-                (if (and use-label (not (eq use-label t)))
-                    (list
-                     `(adjust-label ,(maybe-listify filtered-forms)
-                                    ,(source-form use-label)))
-                    filtered-forms))))
+(def-arg-form-kind :numeric (arg funstate)
+  (let ((filtered-forms (gen-arg-forms arg :filtered funstate))
+        (use-label (arg-use-label arg)))
+    (if (and use-label (not (eq use-label t)))
+        (list `(adjust-label ,(maybe-listify filtered-forms)
+                             ,(source-form use-label)))
+        filtered-forms)))
 
-(def-arg-form-kind (:labelled :final)
-  :producer (lambda (arg funstate)
-              (let ((adjusted-forms
-                     (gen-arg-forms arg :adjusted funstate))
-                    (use-label (arg-use-label arg)))
-                (if use-label
-                    (let ((form (maybe-listify adjusted-forms)))
-                      (if (and (not (eq use-label t))
-                               (not (atom adjusted-forms))
-                               (/= (length adjusted-forms) 1))
-                          (pd-error
-                           "cannot label a multiple-field argument ~
-                              unless using a function: ~S" arg)
-                          `((lookup-label ,form))))
-                    adjusted-forms))))
+(def-arg-form-kind :final (arg funstate)
+  (let ((adjusted-forms (gen-arg-forms arg :numeric funstate))
+        (use-label (arg-use-label arg)))
+    (if use-label
+        (let ((form (maybe-listify adjusted-forms)))
+          (if (and (not (eq use-label t))
+                   (not (atom adjusted-forms))
+                   (/= (length adjusted-forms) 1))
+              (pd-error
+               "cannot label a multiple-field argument unless using a function: ~S"
+               arg)
+              `((lookup-label ,form))))
+        adjusted-forms)))
 
 ;;; Returns a version of THING suitable for including in an evaluable
 ;;; position in some form.
@@ -1330,7 +1305,7 @@
       (when (arg-use-label arg)
         (setf labels-form
               `(let ((labels ,labels-form)
-                     (addr ,(arg-value-form arg funstate :adjusted nil)))
+                     (addr ,(arg-value-form arg funstate :numeric nil)))
                  ;; if labeler didn't return an integer, it isn't a label
                  (if (or (not (integerp addr)) (assoc addr labels))
                      labels
