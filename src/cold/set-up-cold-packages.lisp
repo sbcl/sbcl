@@ -130,9 +130,6 @@
           (reexport x))
         (assert (= (length done) (length package-data-list)))))))
 
-(defun backend-asm-package-name ()
-  (concatenate 'string "SB!" (string-upcase (target-platform-name)) "-ASM"))
-
 ;; Each backend should have a different package for its instruction set
 ;; so that they can co-exist.
 (make-assembler-package (backend-asm-package-name))

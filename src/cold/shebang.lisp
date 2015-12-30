@@ -22,6 +22,19 @@
 (declaim (type list *shebang-features*))
 (defvar *shebang-features*)
 
+(defun target-platform-name ()
+  (let ((arch (intersection '(:alpha :arm :arm64 :hppa :mips :ppc :sparc :x86 :x86-64)
+                            *shebang-features*)))
+    (cond ((not arch) (error "No architecture selected"))
+          ((> (length arch) 1) (error "More than one architecture selected")))
+    (string-downcase (car arch))))
+
+;;; Not necessarily the logical place to define BACKEND-ASM-PACKAGE-NAME,
+;;; but a convenient one, because *shebang-features* needs to have been
+;;; DEFVARed, and because 'chill' loads this and only this file.
+(defun backend-asm-package-name ()
+  (concatenate 'string "SB!" (string-upcase (target-platform-name)) "-ASM"))
+
 (defun feature-in-list-p (feature list)
   (labels ((sane-expr-p (x)
              (typecase x

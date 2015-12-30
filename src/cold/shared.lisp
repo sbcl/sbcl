@@ -146,10 +146,8 @@
           "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
           *shebang-backend-subfeatures*))
 
-(let ((arch (intersection '(:alpha :arm :arm64 :hppa :mips :ppc :sparc :x86 :x86-64)
-                          *shebang-features*)))
-  (cond ((not arch) (error "No architecture selected"))
-        ((> (length arch) 1) (error "More than one architecture selected"))))
+;;; Call for effect of signaling an error if no target picked.
+(target-platform-name)
 
 ;;; You can get all the way through make-host-1 without either one of these
 ;;; features, but then 'bit-bash' will fail to cross-compile.
@@ -257,18 +255,6 @@
              (,flags (rest ,stem-and-flags)))
          ,@body
          (clrhash *array-to-specialization*)))))
-
-(defun target-platform-name ()
-  (or #!+x86 "x86"
-      #!+x86-64 "x86-64"
-      #!+sparc "sparc"
-      #!+ppc "ppc"
-      #!+mips "mips"
-      #!+alpha "alpha"
-      #!+hppa "hppa"
-      #!+arm "arm"
-      #!+arm64 "arm64"
-      (error "What- no target-platform?")))
 
 ;;; Given a STEM, remap the path component "/target/" to a suitable
 ;;; target directory.

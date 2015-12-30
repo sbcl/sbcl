@@ -60,6 +60,9 @@
     (def 'defparameter)
     (def 'defvar)))
 
+(export '(sb-disassem::!begin-instruction-definitions)
+        'sb-disassem)
+
 (export '(sb-int::def!method sb-int::defmacro-mundanely
           sb-int::!cold-init-forms
           sb-int::!coerce-to-specialized
