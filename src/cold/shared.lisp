@@ -151,6 +151,11 @@
   (cond ((not arch) (error "No architecture selected"))
         ((> (length arch) 1) (error "More than one architecture selected"))))
 
+;;; You can get all the way through make-host-1 without either one of these
+;;; features, but then 'bit-bash' will fail to cross-compile.
+(unless (intersection '(:big-endian :little-endian) *shebang-features*)
+  (warn "You'll have bad time without either endian-ness defined"))
+
 ;;; Some feature combinations simply don't work, and sometimes don't
 ;;; fail until quite a ways into the build.  Pick off the more obvious
 ;;; combinations now, and provide a description of what the actual
