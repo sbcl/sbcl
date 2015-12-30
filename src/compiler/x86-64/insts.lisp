@@ -2286,6 +2286,11 @@
 (define-instruction imul (segment dst &optional src1 src2)
   (:printer accum-reg/mem ((op '(#b1111011 #b101))))
   (:printer ext-reg-reg/mem-no-width ((op #b10101111)))
+  ;; These next two are like a single format where one bit in the opcode byte
+  ;; determines the size of the immediate datum. A REG-REG/MEM-IMM format
+  ;; would save one entry in the decoding table, since that bit would become
+  ;; "don't care" from a decoding perspective, but we don't have (many) other
+  ;; 3-operand opcodes in the general purpose (non-SSE) opcode space.
   (:printer reg-reg/mem ((op #b0110100) (width 1)
                          (imm nil :type 'signed-imm-data))
             '(:name :tab reg ", " reg/mem ", " imm))

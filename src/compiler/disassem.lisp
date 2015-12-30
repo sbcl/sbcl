@@ -66,25 +66,6 @@
   #!+sb-doc
   "The column in which end-of-line comments for notes are started.")
 
-;;;; cached functions
-;;;;
-;;;; There's no need for 1000 different versions of a function equivalent
-;;;; to (PROGN (PRINT ADDR) (PRINT OPCODE) (PRINT ARG)) so we try to
-;;;; coalesce sexprs, since there is no such thing as coalescing compiled code.
-;;;; This is not really a "cache" as much as hashtable for coalescing.
-
-(defstruct (fun-cache (:copier nil)
-                      (:print-object (lambda (self stream)
-                                       (print-unreadable-object
-                                         (self stream :type t :identity t)))))
-  (serial-number 0 :type fixnum)
-  (printers nil :type list)
-  (labellers nil :type list)
-  (prefilters nil :type list))
-
-(defvar *disassem-fun-cache* (make-fun-cache))
-(declaim (type fun-cache *disassem-fun-cache*))
-
 ;;;; A DCHUNK contains the bits we look at to decode an
 ;;;; instruction.
 ;;;; I tried to keep this abstract so that if using integers > the machine
@@ -260,15 +241,13 @@
   (subspace (missing-arg) :type (or inst-space instruction)))
 
 ;;;; These are the kind of values we can compute for an argument, and
-;;;; how to compute them. The :CHECKER functions make sure that a given
-;;;; argument is compatible with another argument for a given use.
+;;;; how to compute them.
 
 (defvar *arg-form-kinds* nil)
 
 (defstruct (arg-form-kind (:copier nil))
   (names nil :type list)
-  (producer (missing-arg) :type function)
-  (checker (missing-arg) :type function))
+  (producer (missing-arg) :type function))
 
 (defun arg-form-kind-or-lose (kind)
   (or (getf *arg-form-kinds* kind)
@@ -276,8 +255,6 @@
 
 (defun find-arg-form-producer (kind)
   (arg-form-kind-producer (arg-form-kind-or-lose kind)))
-(defun find-arg-form-checker (kind)
-  (arg-form-kind-checker (arg-form-kind-or-lose kind)))
 
 (defun canonicalize-arg-form-kind (kind)
   (car (arg-form-kind-names (arg-form-kind-or-lose kind))))
@@ -290,11 +267,65 @@
 
 (defvar *disassem-inst-formats* (make-hash-table))
 (defvar *disassem-arg-types* nil)
-(defvar *disassem-fun-cache* (make-fun-cache))
 
+;;; The expander of DEFINE-INSTRUCTION has side-effects - if it finds a hit
+;;; in the interned-sexpr table, then the compiler thinks that it does not
+;;; have to emit a corresponding DEFUN. Depending on how you restart a
+;;; compile, this is a lie, so just wipe the table clean.
 (defmacro !begin-instruction-definitions ()
   '(eval-when (:compile-toplevel :execute)
-     (setq *disassem-fun-cache* (make-fun-cache))))
+     (makunbound (intern "INTERNED-SEXPRS"
+                         sb!assem::*backend-instruction-set-package*))))
+
+;;; FIXME: If GEN-ARG-FORMS used canonical temps vars, this would reduce to EQUAL.
+(defun equal-mod-gensyms (a b)
+  (aver (and (eq (car a) 'let*) (eq (car b) 'let*)))
+  (let ((bindings-a (mapcar #'car (second a)))
+        (bindings-b (mapcar #'car (second b))))
+    (named-let recurse ((a a) (b b))
+      (etypecase a
+        (null (null b))
+        (list (and (listp b) (recurse (car a) (car b)) (recurse (cdr a) (cdr b))))
+        (symbol (or (eq a b)
+                    (and (symbolp b)
+                         ;; Care is needed, as printers use uninterned symbols
+                         ;; in lieu of strings. It must be 1950 all over again.
+                         (not (symbol-package a))
+                         (not (symbol-package b))
+                         (or (string= a b)
+                             (let ((p (posq a bindings-a)))
+                               (and p (eq (nth p bindings-b) b)))))))
+        ((or number character) (eql a b))
+        (vector (and (vectorp b) (every #'recurse a b)))))))
+
+;;; Previously there were complicated checker functions which tried to attempt to
+;;; decide, given two FUNSTATEs, whether all their args were similarly used,
+;;; where "similarity" required that the prefilter and such be identical.
+;;; Instead we can just look at two sexprs and decide whether they act the same,
+;;; which is of course impossible in general; however, for this purpose,
+;;; if sexprs are EQUAL disregarding variations in gensyms, then their code
+;;; can be folded. If we miss (don't fold) things that act the same, it's ok.
+;;; N.B.: This definition of equivalence is admissible because there can be
+;;; no "interesting" non-null lexical environment. While it could be non-null,
+;;; it can't matter, because our auto-generated code can't depend on the lexenv.
+(defun generate-function (kind forms funstate skeleton)
+  (let* ((package sb!assem::*backend-instruction-set-package*)
+         (table-name (intern "INTERNED-SEXPRS" package))
+         (table (if (boundp table-name)
+                    (symbol-value table-name)
+                    (set table-name
+                         (list (list :printer) (list :prefilter) (list :labeller)))))
+         (sub-table (assq kind table))
+         (bindings (make-arg-temp-bindings funstate))
+         (guts `(let* ,bindings ,@forms))
+         (found (assoc guts (cdr sub-table) :test #'equal-mod-gensyms)))
+    (if found
+        (values (cdr found) nil)
+        (let ((name (intern (concatenate 'string "INST-" (string kind) "-"
+                                         (write-to-string (length sub-table)))
+                            package)))
+          (push (cons guts name) (cdr sub-table))
+          (values name `(defun ,name ,@(subst guts :body (cdr skeleton))))))))
 
 (defstruct (arg (:copier nil)
                 (:predicate nil)
@@ -356,20 +387,6 @@
       (setf (arg-position arg) i)
       (incf i)))
   (%make-funstate :args args))
-
-(defun funstate-compatible-p (funstate args)
-  (every (lambda (this-arg-temps)
-           (let* ((old-arg (car this-arg-temps))
-                  (new-arg (find (arg-name old-arg) args :key #'arg-name)))
-             (and new-arg
-                  (= (arg-position old-arg) (arg-position new-arg))
-                  (every (lambda (this-kind-temps)
-                           (funcall (find-arg-form-checker
-                                     (car this-kind-temps))
-                                    new-arg
-                                    old-arg))
-                         (cdr this-arg-temps)))))
-         (funstate-arg-temps funstate)))
 
 (defun arg-or-lose (name funstate)
   (let ((arg (find name (funstate-args funstate) :key #'arg-name)))
@@ -499,17 +516,16 @@
           (field-defs (filter-overrides field-defs evalp)))
       `(let* ((*current-instruction-flavor* ',(cons base-name format-name))
               (,format-var (format-or-lose ',format-name))
-              (args ,(gen-args-def-form field-defs format-var evalp))
-              (funcache *disassem-fun-cache*))
+              (args ,(gen-args-def-form field-defs format-var evalp)))
          (multiple-value-bind (printer-fun printer-defun)
              (find-printer-fun ,(if (eq printer-form :default)
                                      `(format-default-printer ,format-var)
                                      (maybe-quote evalp printer-form))
-                               args funcache)
+                               args)
            (multiple-value-bind (labeller-fun labeller-defun)
-               (find-labeller-fun args funcache)
+               (find-labeller-fun args)
              (multiple-value-bind (prefilter-fun prefilter-defun)
-                 (find-prefilter-fun args funcache)
+                 (find-prefilter-fun args)
                (multiple-value-bind (mask id)
                    (compute-mask-id args)
                  (values
@@ -860,10 +876,7 @@
               (mapcar (lambda (bytespec)
                         `(the (unsigned-byte ,(byte-size bytespec))
                            (local-extract ',bytespec)))
-                      (arg-fields arg)))
-  :checker (lambda (new-arg old-arg)
-             (equal (arg-fields new-arg)
-                    (arg-fields old-arg))))
+                      (arg-fields arg))))
 
 (def-arg-form-kind (:sign-extended :unfiltered)
   :producer (lambda (arg funstate)
@@ -875,16 +888,7 @@
                                               ,(byte-size field))))
                             raw-forms
                             (arg-fields arg))
-                    raw-forms)))
-  :checker (lambda (new-arg old-arg)
-             (equal (arg-sign-extend-p new-arg)
-                    (arg-sign-extend-p old-arg))))
-
-(defun valsrc-equal (f1 f2)
-  (if (null f1)
-      (null f2)
-      (equal (value-or-source f1)
-             (value-or-source f2))))
+                    raw-forms))))
 
 (def-arg-form-kind (:filtering)
   :producer (lambda (arg funstate)
@@ -896,23 +900,14 @@
                      `(local-filter ,(maybe-listify sign-extended-forms)
                                     ,(source-form pf))
                      t)
-                    (values sign-extended-forms nil))))
-  :checker (lambda (new-arg old-arg)
-             (valsrc-equal (arg-prefilter new-arg) (arg-prefilter old-arg))))
+                    (values sign-extended-forms nil)))))
 
 (def-arg-form-kind (:filtered :unadjusted)
   :producer (lambda (arg funstate)
               (let ((pf (arg-prefilter arg)))
                 (if pf
                     (values `(local-filtered-value ,(arg-position arg)) t)
-                    (gen-arg-forms arg :sign-extended funstate))))
-  :checker (lambda (new-arg old-arg)
-             (let ((pf1 (arg-prefilter new-arg))
-                   (pf2 (arg-prefilter old-arg)))
-               (if (null pf1)
-                   (null pf2)
-                   (= (arg-position new-arg)
-                      (arg-position old-arg))))))
+                    (gen-arg-forms arg :sign-extended funstate)))))
 
 (def-arg-form-kind (:adjusted :numeric :unlabelled)
   :producer (lambda (arg funstate)
@@ -922,9 +917,7 @@
                     (list
                      `(adjust-label ,(maybe-listify filtered-forms)
                                     ,(source-form use-label)))
-                    filtered-forms)))
-  :checker (lambda (new-arg old-arg)
-             (valsrc-equal (arg-use-label new-arg) (arg-use-label old-arg))))
+                    filtered-forms))))
 
 (def-arg-form-kind (:labelled :final)
   :producer (lambda (arg funstate)
@@ -940,23 +933,7 @@
                            "cannot label a multiple-field argument ~
                               unless using a function: ~S" arg)
                           `((lookup-label ,form))))
-                    adjusted-forms)))
-  :checker (lambda (new-arg old-arg)
-             (let ((lf1 (arg-use-label new-arg))
-                   (lf2 (arg-use-label old-arg)))
-               (if (null lf1) (null lf2) t))))
-
-;;; This is a bogus kind that's just used to ensure that printers are
-;;; compatible...
-(def-arg-form-kind (:printed)
-  :producer (lambda (&rest noise)
-              (declare (ignore noise))
-              (pd-error "bogus! can't use the :printed value of an arg!"))
-  :checker (lambda (new-arg old-arg)
-             (valsrc-equal (arg-printer new-arg) (arg-printer old-arg))))
-
-(defun remember-printer-use (arg funstate)
-  (set-arg-temps nil nil arg :printed funstate))
+                    adjusted-forms))))
 
 ;;; Returns a version of THING suitable for including in an evaluable
 ;;; position in some form.
@@ -980,67 +957,16 @@
       (valsrc-value thing)
       thing))
 
-(defstruct (cached-fun (:conc-name cached-fun-)
-                       (:copier nil))
-  (funstate nil :type (or null funstate))
-  (constraint nil :type list)
-  (name nil :type (or null symbol)))
-
-(defun find-cached-fun (cached-funs args constraint)
-  (dolist (cached-fun cached-funs nil)
-    (let ((funstate (cached-fun-funstate cached-fun)))
-      (when (and (equal constraint (cached-fun-constraint cached-fun))
-                 (or (null funstate)
-                     (funstate-compatible-p funstate args)))
-        (return cached-fun)))))
-
-(defmacro !with-cached-fun ((name-var
-                             funstate-var
-                             cache
-                             cache-slot
-                             args
-                             &key
-                             constraint
-                             (stem (missing-arg)))
-                            &body defun-maker-forms)
-  (let ((cache-var (gensym))
-        (constraint-var (gensym)))
-    `(let* ((,constraint-var ,constraint)
-            (,cache-var (find-cached-fun (,cache-slot ,cache)
-                                         ,args ,constraint-var)))
-       (cond (,cache-var
-              (values (cached-fun-name ,cache-var) nil))
-             (t
-              (let* ((,name-var
-                      (symbolicate
-                       ,stem
-                       (write-to-string (incf (fun-cache-serial-number cache)))))
-                     (,funstate-var (make-funstate ,args))
-                     (,cache-var
-                      (make-cached-fun :name ,name-var
-                                       :funstate ,funstate-var
-                                       :constraint ,constraint-var)))
-                (values ,name-var
-                        `(progn
-                           ,(progn ,@defun-maker-forms)
-                           (eval-when (:compile-toplevel :execute)
-                             (push ,,cache-var
-                                   (,',cache-slot ',,cache)))))))))))
-
-(defun find-printer-fun (printer-source args cache)
-  (if (null printer-source)
-      (values nil nil)
-      (let ((printer-source (preprocess-printer printer-source args)))
-        (!with-cached-fun
-           (name funstate cache fun-cache-printers args
-                 :constraint printer-source
-                 :stem "INST-PRINTER-")
-         (make-printer-defun printer-source funstate name)))))
-
-(defun make-printer-defun (source funstate fun-name)
-  (let ((printer-form (compile-printer-list source funstate))
-        (bindings (make-arg-temp-bindings funstate)))
-    `(defun ,fun-name (chunk inst stream dstate)
+(defun find-printer-fun (printer-source args)
+  (unless printer-source
+    (return-from find-printer-fun (values nil nil)))
+  (let ((source (preprocess-printer printer-source args))
+        (funstate (make-funstate args)))
+   (generate-function
+    :printer
+    (compile-printer-list source funstate)
+    funstate
+    '(lambda (chunk inst stream dstate)
        (declare (type dchunk chunk)
                 (type instruction inst)
                 (type stream stream)
@@ -1085,8 +1011,7 @@
                             local-call-arg-printer local-call-global-printer
                             local-filtered-value local-extract
                             lookup-label adjust-label))
-           (let* ,bindings
-             ,@printer-form))))))
+           :body))))))
 
 (defun preprocess-test (subj form args)
   (multiple-value-bind (subj test)
@@ -1243,6 +1168,7 @@
                   (apply #'concatenate
                          'string
                          (mapcar #'string (nreverse names)))))
+             ;; WTF? Everything else using INST-PRINT-NAME writes a string.
              (push (if (some #'alpha-char-p string)
                        `',(make-symbol string) ; Preserve casifying output.
                        string)
@@ -1303,7 +1229,6 @@
          (printer (or printer (arg-printer arg)))
          (printer-val (value-or-source printer))
          (printer-src (source-form printer)))
-    (remember-printer-use arg funstate)
     (cond ((stringp printer-val)
            `(local-format-arg ,(arg-value-form arg funstate) ,printer-val))
           ((vectorp printer-val)
@@ -1396,27 +1321,25 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
-(defun find-labeller-fun (args cache)
-  (let ((labelled-fields
-         (mapcar #'arg-name (remove-if-not #'arg-use-label args))))
-    (if (null labelled-fields)
-        (values nil nil)
-        (!with-cached-fun
-            (name funstate cache fun-cache-labellers args
-             :stem "INST-LABELLER-"
-             :constraint labelled-fields)
-          (let ((labels-form 'labels))
-            (dolist (arg args)
-              (when (arg-use-label arg)
-                (setf labels-form
-                      `(let ((labels ,labels-form)
-                             (addr
-                              ,(arg-value-form arg funstate :adjusted nil)))
-                         ;; if labeler didn't return an integer, it isn't a label
-                         (if (or (not (integerp addr)) (assoc addr labels))
-                             labels
-                             (cons (cons addr nil) labels))))))
-            `(defun ,name (chunk labels dstate)
+(defun find-labeller-fun (args)
+  (unless (some #'arg-use-label args)
+    (return-from find-labeller-fun (values nil nil)))
+  (let ((funstate (make-funstate args))
+        (labels-form 'labels))
+    (dolist (arg args)
+      (when (arg-use-label arg)
+        (setf labels-form
+              `(let ((labels ,labels-form)
+                     (addr ,(arg-value-form arg funstate :adjusted nil)))
+                 ;; if labeler didn't return an integer, it isn't a label
+                 (if (or (not (integerp addr)) (assoc addr labels))
+                     labels
+                     (cons (cons addr nil) labels))))))
+    (generate-function
+            :labeller
+            (list labels-form)
+            funstate
+            '(lambda (chunk labels dstate)
                (declare (type list labels)
                         (type dchunk chunk)
                         (type disassem-state dstate))
@@ -1431,44 +1354,38 @@
                                      #'adjust-label)
                           (inline local-filtered-value local-extract
                                   adjust-label))
-                 (let* ,(make-arg-temp-bindings funstate)
-                   ,labels-form))))))))
+                 :body)))))
 
-(defun find-prefilter-fun (args cache)
-  (let ((filtered-args (mapcar #'arg-name
-                               (remove-if-not #'arg-prefilter args))))
-    (if (null filtered-args)
-        (values nil nil)
-        (!with-cached-fun
-            (name funstate cache fun-cache-prefilters args
-             :stem "INST-PREFILTER-"
-             :constraint filtered-args)
-          (collect ((forms))
-            (dolist (arg args)
-              (let ((pf (arg-prefilter arg)))
-                (when pf
-                  (forms
-                   `(setf (local-filtered-value ,(arg-position arg))
-                          ,(maybe-listify
-                            (gen-arg-forms arg :filtering funstate)))))
-                ))
-            `(defun ,name (chunk dstate)
+(defun find-prefilter-fun (args)
+  (unless (some #'arg-prefilter args)
+    (return-from find-prefilter-fun (values nil nil)))
+  (let* ((funstate (make-funstate args))
+         (forms
+          (mapcan (lambda (arg &aux (pf (arg-prefilter arg)))
+                    (when pf
+                      (list `(setf (local-filtered-value ,(arg-position arg))
+                                   ,(maybe-listify
+                                     (gen-arg-forms arg :filtering funstate))))))
+                  args)))
+    (generate-function
+            :prefilter
+            forms
+            funstate
+            '(lambda (chunk dstate)
                (declare (type dchunk chunk)
                         (type disassem-state dstate))
                (flet (((setf local-filtered-value) (value offset)
-                       (declare (type filtered-value-index offset))
-                       (setf (aref (dstate-filtered-values dstate) offset)
-                             value))
+                        (declare (type filtered-value-index offset))
+                        (setf (aref (dstate-filtered-values dstate) offset)
+                              value))
                       (local-filter (value filter)
-                                    (funcall filter value dstate))
+                        (funcall filter value dstate))
                       (local-extract (bytespec)
-                                     (dchunk-extract chunk bytespec)))
+                        (dchunk-extract chunk bytespec)))
                 (declare (ignorable #'local-filter #'local-extract)
                          (inline (setf local-filtered-value)
                                  local-filter local-extract))
-                ;; Use them for side effects only.
-                (let* ,(make-arg-temp-bindings funstate)
-                  ,@(forms)))))))))
+                :body)))))
 
 (defun compute-mask-id (args)
   (let ((mask dchunk-zero)
