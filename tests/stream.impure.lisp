@@ -16,119 +16,140 @@
 
 ;;; type errors for inappropriate stream arguments, fixed in
 ;;; sbcl-0.7.8.19
-(locally
-    (declare (optimize (safety 3)))
-  (assert-error (make-two-way-stream (make-string-output-stream)
-                                     (make-string-output-stream))
-                type-error)
-  (assert-error (make-two-way-stream (make-string-input-stream "foo")
-                                     (make-string-input-stream "bar"))
-                type-error)
-  ;; the following two aren't actually guaranteed, because ANSI, as it
-  ;; happens, doesn't say "should signal an error" for
-  ;; MAKE-ECHO-STREAM. It's still good to have, but if future
-  ;; maintenance work causes this test to fail because of these
-  ;; MAKE-ECHO-STREAM clauses, consider simply removing these clauses
-  ;; from the test. -- CSR, 2002-10-06
-  (assert-error (make-echo-stream (make-string-output-stream)
-                                  (make-string-output-stream))
-                type-error)
-  (assert-error (make-echo-stream (make-string-input-stream "foo")
-                                  (make-string-input-stream "bar"))
-                type-error)
-  (assert-error (make-concatenated-stream
-                 (make-string-output-stream)
-                 (make-string-input-stream "foo"))
-                type-error))
+(with-test (:name (make-two-way-stream type-error))
+  (locally (declare (optimize (safety 3)))
+    (assert-error (make-two-way-stream (make-string-output-stream)
+                                       (make-string-output-stream))
+                  type-error)
+    (assert-error (make-two-way-stream (make-string-input-stream "foo")
+                                       (make-string-input-stream "bar"))
+                  type-error)))
+
+(with-test (:name (make-echo-stream type-error))
+  (locally (declare (optimize (safety 3)))
+    ;; the following two aren't actually guaranteed, because ANSI, as it
+    ;; happens, doesn't say "should signal an error" for
+    ;; MAKE-ECHO-STREAM. It's still good to have, but if future
+    ;; maintenance work causes this test to fail because of these
+    ;; MAKE-ECHO-STREAM clauses, consider simply removing these clauses
+    ;; from the test. -- CSR, 2002-10-06
+    (assert-error (make-echo-stream (make-string-output-stream)
+                                    (make-string-output-stream))
+                  type-error)
+    (assert-error (make-echo-stream (make-string-input-stream "foo")
+                                    (make-string-input-stream "bar"))
+                  type-error)))
+
+(with-test (:name (make-concatenated-stream type-error))
+  (locally (declare (optimize (safety 3)))
+    (assert-error (make-concatenated-stream
+                   (make-string-output-stream)
+                   (make-string-input-stream "foo"))
+                  type-error)))
 
 ;;; bug 225: STRING-STREAM was not a class
-(eval `(defgeneric bug225 (s)
-         ,@(mapcar (lambda (class)
-                     `(:method :around ((s ,class)) (cons ',class (call-next-method))))
-                   '(stream string-stream sb-impl::string-input-stream
-                     sb-impl::string-output-stream))
-         (:method (class) nil)))
+(macrolet
+    ((define-methods ()
+       `(defgeneric bug225 (s)
+          ,@(mapcar (lambda (class)
+                      `(:method :around ((s ,class))
+                         (cons ',class (call-next-method))))
+                    '(stream string-stream
+                      sb-impl::string-input-stream
+                      sb-impl::string-output-stream))
+          (:method (class) nil))))
+  (define-methods))
 
-(assert (equal (bug225 (make-string-input-stream "hello"))
-               '(sb-impl::string-input-stream string-stream stream)))
-(assert (equal (bug225 (make-string-output-stream))
-               '(sb-impl::string-output-stream string-stream stream)))
+(with-test (:name (string-stream class :bug-225))
+  (assert (equal (bug225 (make-string-input-stream "hello"))
+                 '(sb-impl::string-input-stream string-stream stream)))
+  (assert (equal (bug225 (make-string-output-stream))
+                 '(sb-impl::string-output-stream string-stream stream))))
 
 
 ;;; improper buffering on (SIGNED-BYTE 8) streams (fixed by David Lichteblau):
-(let ((p "signed-byte-8-test.data"))
-  (with-open-file (s p
-                     :direction :output
-                     :element-type '(unsigned-byte 8)
-                     :if-exists :supersede)
-    (write-byte 255 s))
-  (with-open-file (s p :element-type '(signed-byte 8))
-    (assert (= (read-byte s) -1)))
-  (delete-file p))
+(with-test (:name (write-byte (unsigned-byte 8) read-byte (signed-byte 8)))
+  (let ((p "signed-byte-8-test.data"))
+    (with-open-file (s p
+                       :direction :output
+                       :element-type '(unsigned-byte 8)
+                       :if-exists :supersede)
+      (write-byte 255 s))
+    (with-open-file (s p :element-type '(signed-byte 8))
+      (assert (= (read-byte s) -1)))
+    (delete-file p)))
 
 ;;; :IF-EXISTS got :ERROR and NIL the wrong way round (reported by
 ;;; Milan Zamazal)
-(let* ((p "this-file-will-exist")
-       (stream (open p :direction :output :if-exists :error)))
-  (assert (null (with-open-file (s p :direction :output :if-exists nil) s)))
-  (assert-error
-   (with-open-file (s p :direction :output :if-exists :error)))
-  (close stream)
-  (delete-file p))
+(with-test (:name (open :if-exists :error))
+  (let* ((p "this-file-will-exist")
+         (stream (open p :direction :output :if-exists :error)))
+    (assert (null (with-open-file (s p :direction :output :if-exists nil) s)))
+    (assert-error
+     (with-open-file (s p :direction :output :if-exists :error)))
+    (close stream)
+    (delete-file p)))
 
-(assert-error (read-byte (make-string-input-stream "abc"))
-              type-error)
-(assert-error (with-open-file (s "/dev/zero")
-                (read-byte s))
-              #-win32 type-error
-              #+win32 sb-int:simple-file-error)
+(with-test (:name (read-byte make-string-input-stream type-error))
+  (assert-error (read-byte (make-string-input-stream "abc"))
+                type-error))
+
+(with-test (:name (:default :element-type read-byte error))
+ (assert-error (with-open-file (s "/dev/zero")
+                 (read-byte s))
+               #-win32 type-error
+               #+win32 sb-int:simple-file-error))
+
 ;;; bidirectional streams getting confused about their position
-(let ((p "bidirectional-stream-test"))
-  (with-open-file (s p :direction :output :if-exists :supersede)
-    (with-standard-io-syntax
-      (format s "~S ~S ~S~%" 'these 'are 'symbols)))
-  (with-open-file (s p :direction :io :if-exists :overwrite)
-    (read s)
-    (with-standard-io-syntax
-      (prin1 'insert s)))
-  (with-open-file (s p)
-    (let ((line (read-line s))
-          (want "THESE INSERTMBOLS"))
-      (unless (equal line want)
-        (error "wanted ~S, got ~S" want line))))
-  (delete-file p))
+(with-test (:name (:direction :io))
+  (let ((p "bidirectional-stream-test"))
+    (with-open-file (s p :direction :output :if-exists :supersede)
+      (with-standard-io-syntax
+        (format s "~S ~S ~S~%" 'these 'are 'symbols)))
+    (with-open-file (s p :direction :io :if-exists :overwrite)
+      (read s)
+      (with-standard-io-syntax
+        (prin1 'insert s)))
+    (with-open-file (s p)
+      (let ((line (read-line s))
+            (want "THESE INSERTMBOLS"))
+        (assert (equal line want))))
+    (delete-file p)))
 
 ;;; :DIRECTION :IO didn't work on non-existent pathnames
-(let ((p "direction-io-test"))
-  (ignore-errors (delete-file p))
-  (with-open-file (s p :direction :io)
-    (format s "1")
-    (finish-output s)
-    (file-position s :start)
-    (assert (char= (read-char s) #\1)))
-  (delete-file p))
+(with-test (:name (with-open-file :direction :io :non-existent-pathname))
+  (let ((p "direction-io-test"))
+    (ignore-errors (delete-file p))
+    (with-open-file (s p :direction :io)
+      (format s "1")
+      (finish-output s)
+      (file-position s :start)
+      (assert (char= (read-char s) #\1)))
+    (delete-file p)))
 
 ;;; FILE-POSITION on broadcast-streams is mostly uncontroversial
-(assert (= 0 (file-position (make-broadcast-stream))))
-(assert (file-position (make-broadcast-stream) :start))
-(assert (file-position (make-broadcast-stream) 0))
-(assert (not (file-position (make-broadcast-stream) 1)))
-(let ((s (make-broadcast-stream)))
-  (write-char #\a s)
-  (assert (not (file-position s 1)))
-  (assert (= 0 (file-position s))))
+(with-test (:name (file-position broadcast-stream 1))
+  (assert (= 0 (file-position (make-broadcast-stream))))
+  (assert (file-position (make-broadcast-stream) :start))
+  (assert (file-position (make-broadcast-stream) 0))
+  (assert (not (file-position (make-broadcast-stream) 1)))
+  (let ((s (make-broadcast-stream)))
+    (write-char #\a s)
+    (assert (not (file-position s 1)))
+    (assert (= 0 (file-position s)))))
 
-(let ((p "broadcast-stream-test"))
-  (ignore-errors (delete-file p))
-  (with-open-file (f p :direction :output)
-    (let ((s (make-broadcast-stream f)))
-      (assert (= 0 (file-position s)))
-      (assert (file-position s :start))
-      (assert (file-position s 0))
-      (write-char #\a s)
-      (assert (= 1 (file-position s))) ; unicode...
-      (assert (file-position s 0))))
-  (delete-file p))
+(with-test (:name (file-position broadcast-stream 2))
+  (let ((p "broadcast-stream-test"))
+    (ignore-errors (delete-file p))
+    (with-open-file (f p :direction :output)
+      (let ((s (make-broadcast-stream f)))
+        (assert (= 0 (file-position s)))
+        (assert (file-position s :start))
+        (assert (file-position s 0))
+        (write-char #\a s)
+        (assert (= 1 (file-position s))) ; unicode...
+        (assert (file-position s 0))))
+    (delete-file p)))
 
 ;;; CLOSING a non-new streams should not delete them, and superseded
 ;;; files should be restored.
@@ -182,7 +203,10 @@
                        (error "~& * [(~s ~s)] ~a != ~a~%" type size
                               (by-out size byte) (by-out size nb))))))
     (delete-file file-name)))
-(loop for size from 2 to 40 do (bin-stream-test :size size :type 'signed-byte))
+
+(with-test (:name (:element-type signed-byte write-byte write-byte))
+  (loop for size from 2 to 40 do
+           (bin-stream-test :size size :type 'signed-byte)))
 
 ;;; Check READ-SEQUENCE signals a TYPE-ERROR when the sequence can't
 ;;; contain a stream element.
@@ -197,115 +221,116 @@
 ;;; The order should be ANSI-STREAM-READ-BYTE, READ-N-BYTES,
 ;;; READ-N-BYTES, ANSI-STREAM-READ-BYTE, ANSI-STREAM-READ-BYTE.
 
-(let ((pathname "read-sequence.data"))
+(with-test (:name (read-sequence type-error))
+  (let ((pathname "read-sequence.data"))
 
-  ;; Create the binary data.
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type '(unsigned-byte 8))
-    (write-byte 255 stream))
-
-  ;; Check the slow path for generic vectors.
-  (let ((sequence (make-array 1)))
+    ;; Create the binary data.
     (with-open-file (stream pathname
-                            :direction :input
+                            :direction :output
+                            :if-exists :supersede
                             :element-type '(unsigned-byte 8))
-    (read-sequence sequence stream)
-    (assert (equalp sequence #(255)))))
+      (write-byte 255 stream))
 
-  (let ((sequence (make-array 1)))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :external-format :latin-1
-                            :element-type 'character)
-      (read-sequence sequence stream)
-      (assert (equalp sequence #(#.(code-char 255))))))
+    ;; Check the slow path for generic vectors.
+    (let ((sequence (make-array 1)))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :element-type '(unsigned-byte 8))
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(255)))))
 
-  ;; Check the fast path works for (UNSIGNED-BYTE 8) and (SIGNED-BYTE
-  ;; 8) vectors.
-  (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :element-type '(unsigned-byte 8))
-      (read-sequence sequence stream)
-      (assert (equalp sequence #(255)))))
+    (let ((sequence (make-array 1)))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :external-format :latin-1
+                              :element-type 'character)
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(#.(code-char 255))))))
 
-  (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :element-type '(signed-byte 8))
-    (read-sequence sequence stream)
-    (assert (equalp sequence #(-1)))))
+    ;; Check the fast path works for (UNSIGNED-BYTE 8) and (SIGNED-BYTE
+    ;; 8) vectors.
+    (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :element-type '(unsigned-byte 8))
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(255)))))
 
-  ;; A bivalent stream can be read to a unsigned-byte vector, a
-  ;; string, or a generic vector
+    (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :element-type '(signed-byte 8))
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(-1)))))
 
-  (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :element-type :default)
-      (read-sequence sequence stream)
-      (assert (equalp sequence #(255)))))
+    ;; A bivalent stream can be read to a unsigned-byte vector, a
+    ;; string, or a generic vector
 
-  (let ((sequence (make-array 1 :element-type 'character)))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :external-format :latin-1
-                            :element-type :default)
-      (read-sequence sequence stream)
-      (assert (equalp sequence #(#.(code-char 255))))))
+    (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :element-type :default)
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(255)))))
 
-  (let ((sequence (make-array 1)))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :external-format :latin-1
-                            :element-type :default)
-      (read-sequence sequence stream)
-      (assert (equalp sequence #(#.(code-char 255))))))
+    (let ((sequence (make-array 1 :element-type 'character)))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :external-format :latin-1
+                              :element-type :default)
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(#.(code-char 255))))))
 
-  ;; Check that a TYPE-ERROR is signalled for incompatible (sequence,
-  ;; stream) pairs.
+    (let ((sequence (make-array 1)))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :external-format :latin-1
+                              :element-type :default)
+        (read-sequence sequence stream)
+        (assert (equalp sequence #(#.(code-char 255))))))
 
-  (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :element-type '(unsigned-byte 8))
-      (handler-case (progn
-                      (read-sequence sequence stream)
-                      (error "READ-SEQUENCE didn't signal an error"))
-        (type-error (condition)
-          (assert (= (type-error-datum condition) 255))
-          (assert (subtypep (type-error-expected-type condition)
-                            '(signed-byte 8)))))))
+    ;; Check that a TYPE-ERROR is signalled for incompatible (sequence,
+    ;; stream) pairs.
 
-  (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :element-type '(signed-byte 8))
-      (handler-case (progn
-                      (read-sequence sequence stream)
-                      (error "READ-SEQUENCE didn't signal an error"))
-        (type-error (condition)
-          (assert (= (type-error-datum condition) -1))
-          (assert (subtypep (type-error-expected-type condition)
-                            '(unsigned-byte 8)))))))
+    (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :element-type '(unsigned-byte 8))
+        (handler-case (progn
+                        (read-sequence sequence stream)
+                        (error "READ-SEQUENCE didn't signal an error"))
+          (type-error (condition)
+            (assert (= (type-error-datum condition) 255))
+            (assert (subtypep (type-error-expected-type condition)
+                              '(signed-byte 8)))))))
 
-  ;; Can't read a signed-byte from a bivalent stream
+    (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :element-type '(signed-byte 8))
+        (handler-case (progn
+                        (read-sequence sequence stream)
+                        (error "READ-SEQUENCE didn't signal an error"))
+          (type-error (condition)
+            (assert (= (type-error-datum condition) -1))
+            (assert (subtypep (type-error-expected-type condition)
+                              '(unsigned-byte 8)))))))
 
-  (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
-    (with-open-file (stream pathname
-                            :direction :input
-                            :external-format :latin1
-                            :element-type :default)
-      (handler-case (progn
-                      (read-sequence sequence stream)
-                      (error "READ-SEQUENCE didn't signal an error"))
-        (type-error (condition)
-          (assert (eql (type-error-datum condition) 255))
-          (assert (subtypep (type-error-expected-type condition)
-                            '(signed-byte 8)))))))
-  (delete-file pathname))
+    ;; Can't read a signed-byte from a bivalent stream
+
+    (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
+      (with-open-file (stream pathname
+                              :direction :input
+                              :external-format :latin1
+                              :element-type :default)
+        (handler-case (progn
+                        (read-sequence sequence stream)
+                        (error "READ-SEQUENCE didn't signal an error"))
+          (type-error (condition)
+            (assert (eql (type-error-datum condition) 255))
+            (assert (subtypep (type-error-expected-type condition)
+                              '(signed-byte 8)))))))
+    (delete-file pathname)))
 
 ;;; Check WRITE-SEQUENCE signals a TYPE-ERROR when the stream can't
 ;;; write a sequence element.
@@ -316,114 +341,116 @@
 ;;;
 ;;; (trace sb-impl::output-unsigned-byte-full-buffered sb-impl::output-signed-byte-full-buffered sb-impl::output-raw-bytes)
 
-(let ((pathname "write-sequence.data")
-      (generic-sequence (make-array 1 :initial-contents '(255)))
-      (generic-character-sequence (make-array 1 :initial-element #\a))
-      (generic-mixed-sequence (make-array 2 :initial-element #\a))
-      (string (make-array 1 :element-type 'character
-                          :initial-element (code-char 255)))
-      (unsigned-sequence (make-array 1
-                                     :element-type '(unsigned-byte 8)
-                                     :initial-contents '(255)))
-      (signed-sequence (make-array 1
-                                   :element-type '(signed-byte 8)
-                                   :initial-contents '(-1))))
+(with-test (:name (write-sequence type-error))
+  (let ((pathname "write-sequence.data")
+        (generic-sequence (make-array 1 :initial-contents '(255)))
+        (generic-character-sequence (make-array 1 :initial-element #\a))
+        (generic-mixed-sequence (make-array 2 :initial-element #\a))
+        (string (make-array 1 :element-type 'character
+                              :initial-element (code-char 255)))
+        (unsigned-sequence (make-array 1
+                                       :element-type '(unsigned-byte 8)
+                                       :initial-contents '(255)))
+        (signed-sequence (make-array 1
+                                     :element-type '(signed-byte 8)
+                                     :initial-contents '(-1))))
 
-  (setf (aref generic-mixed-sequence 1) 255)
+    (setf (aref generic-mixed-sequence 1) 255)
 
-  ;; Check the slow path for generic vectors.
-  (with-open-file (stream pathname
-                           :direction :output
-                           :if-exists :supersede
-                           :element-type '(unsigned-byte 8))
-    (write-sequence generic-sequence stream))
+    ;; Check the slow path for generic vectors.
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type '(unsigned-byte 8))
+      (write-sequence generic-sequence stream))
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type 'character)
-    (write-sequence generic-character-sequence stream))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type 'character)
+      (write-sequence generic-character-sequence stream))
 
-  ;; Check the fast path for unsigned and signed vectors.
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type '(unsigned-byte 8))
-    (write-sequence unsigned-sequence stream))
+    ;; Check the fast path for unsigned and signed vectors.
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type '(unsigned-byte 8))
+      (write-sequence unsigned-sequence stream))
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type '(signed-byte 8))
-    (write-sequence signed-sequence stream))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type '(signed-byte 8))
+      (write-sequence signed-sequence stream))
 
-  ;; Bivalent streams on unsigned-byte vectors, strings, and a simple
-  ;; vector with mixed characters and bytes
+    ;; Bivalent streams on unsigned-byte vectors, strings, and a simple
+    ;; vector with mixed characters and bytes
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type :default)
-    (write-sequence unsigned-sequence stream))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type :default)
+      (write-sequence unsigned-sequence stream))
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :external-format :latin-1
-                          :if-exists :supersede
-                          :element-type :default)
-    (write-sequence string stream))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :external-format :latin-1
+                            :if-exists :supersede
+                            :element-type :default)
+      (write-sequence string stream))
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :external-format :latin-1
-                          :if-exists :supersede
-                          :element-type :default)
-    (write-sequence generic-mixed-sequence stream))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :external-format :latin-1
+                            :if-exists :supersede
+                            :element-type :default)
+      (write-sequence generic-mixed-sequence stream))
 
-  ;; Check a TYPE-ERROR is signalled for unsigned and signed vectors
-  ;; which are incompatible with the stream element type.
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type '(signed-byte 8))
-    (handler-case (progn
-                    (write-sequence unsigned-sequence stream)
-                    (error "WRITE-SEQUENCE didn't signal an error"))
-      (type-error (condition)
-        (assert (= (type-error-datum condition) 255))
-        (assert (subtypep (type-error-expected-type condition)
-                          '(signed-byte 8))))))
+    ;; Check a TYPE-ERROR is signalled for unsigned and signed vectors
+    ;; which are incompatible with the stream element type.
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type '(signed-byte 8))
+      (handler-case (progn
+                      (write-sequence unsigned-sequence stream)
+                      (error "WRITE-SEQUENCE didn't signal an error"))
+        (type-error (condition)
+          (assert (= (type-error-datum condition) 255))
+          (assert (subtypep (type-error-expected-type condition)
+                            '(signed-byte 8))))))
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type '(unsigned-byte 8))
-    (handler-case (progn
-                    (write-sequence signed-sequence stream)
-                    (error "WRITE-SEQUENCE didn't signal an error"))
-      (type-error (condition)
-        (assert (= (type-error-datum condition) -1))
-        (assert (subtypep (type-error-expected-type condition)
-                          '(unsigned-byte 8))))))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type '(unsigned-byte 8))
+      (handler-case (progn
+                      (write-sequence signed-sequence stream)
+                      (error "WRITE-SEQUENCE didn't signal an error"))
+        (type-error (condition)
+          (assert (= (type-error-datum condition) -1))
+          (assert (subtypep (type-error-expected-type condition)
+                            '(unsigned-byte 8))))))
 
-  (with-open-file (stream pathname
-                          :direction :output
-                          :if-exists :supersede
-                          :element-type :default)
-    (handler-case (progn
-                    (write-sequence signed-sequence stream)
-                    (error "WRITE-SEQUENCE didn't signal an error"))
-      (type-error (condition)
-        (assert (= (type-error-datum condition) -1))
-        (assert (subtypep (type-error-expected-type condition)
-                          '(unsigned-byte 8))))))
+    (with-open-file (stream pathname
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type :default)
+      (handler-case (progn
+                      (write-sequence signed-sequence stream)
+                      (error "WRITE-SEQUENCE didn't signal an error"))
+        (type-error (condition)
+          (assert (= (type-error-datum condition) -1))
+          (assert (subtypep (type-error-expected-type condition)
+                            '(unsigned-byte 8))))))
 
-  (delete-file pathname))
+    (delete-file pathname)))
 
 ;;; writing looong lines. takes way too long and way too much space
 ;;; to test on 64 bit platforms
-#-64-bit
-(let ((test "long-lines-write-test.tmp"))
+(with-test (:name (:write-char :long-lines :stream-ouput-column)
+            :skipped-on :64-bit)
+  (let ((test "long-lines-write-test.tmp"))
     (unwind-protect
          (with-open-file (f test
                             :direction :output
@@ -444,32 +471,33 @@
              (assert (= (+ 1 p) (sb-impl::fd-stream-output-column f)))
              (assert (typep p 'bignum))))
       (when (probe-file test)
-        (delete-file test))))
+        (delete-file test)))))
 
 ;;; read-sequence misreported the amount read and lost position
-(let ((string (make-array (* 3 sb-impl::+ansi-stream-in-buffer-length+)
-                          :element-type 'character)))
-  (dotimes (i (length string))
-    (setf (char string i) (code-char (mod i char-code-limit))))
-  (with-open-file (f "read-sequence-character-test-data.tmp"
-                     :if-exists :supersede
-                     :direction :output
-                     :external-format :utf-8)
-    (write-sequence string f))
-  (let ((copy
-         (with-open-file (f "read-sequence-character-test-data.tmp"
-                            :if-does-not-exist :error
-                            :direction :input
-                            :external-format :utf-8)
-           (let ((buffer (make-array 128 :element-type 'character))
-                 (total 0))
-             (with-output-to-string (datum)
-               (loop for n-read = (read-sequence buffer f)
-                     do (write-sequence buffer datum :start 0 :end n-read)
-                        (assert (<= (incf total n-read) (length string)))
-                     while (and (= n-read 128))))))))
-    (assert (equal copy string)))
-  (delete-file "read-sequence-character-test-data.tmp"))
+(with-test (:name (read-sequence :read-elements))
+  (let ((string (make-array (* 3 sb-impl::+ansi-stream-in-buffer-length+)
+                            :element-type 'character)))
+    (dotimes (i (length string))
+      (setf (char string i) (code-char (mod i char-code-limit))))
+    (with-open-file (f "read-sequence-character-test-data.tmp"
+                       :if-exists :supersede
+                       :direction :output
+                       :external-format :utf-8)
+      (write-sequence string f))
+    (let ((copy
+            (with-open-file (f "read-sequence-character-test-data.tmp"
+                               :if-does-not-exist :error
+                               :direction :input
+                               :external-format :utf-8)
+              (let ((buffer (make-array 128 :element-type 'character))
+                    (total 0))
+                (with-output-to-string (datum)
+                  (loop for n-read = (read-sequence buffer f)
+                        do (write-sequence buffer datum :start 0 :end n-read)
+                           (assert (<= (incf total n-read) (length string)))
+                        while (and (= n-read 128))))))))
+      (assert (equal copy string)))
+    (delete-file "read-sequence-character-test-data.tmp")))
 
 ;;; ANSI-STREAM-OUTPUT-STREAM-P used to assume that a SYNONYM-STREAM's
 ;;; target was an ANSI stream, but it could be a user-defined stream,
@@ -477,49 +505,46 @@
 (defclass user-output-stream (fundamental-output-stream)
   ())
 
-(let ((*stream* (make-instance 'user-output-stream)))
-  (declare (special *stream*))
-  (with-open-stream (stream (make-synonym-stream '*stream*))
-    (assert (output-stream-p stream))))
+(with-test (:name (make-synonym-stream :user-defined output-stream-p))
+  (let ((*stream* (make-instance 'user-output-stream)))
+    (declare (special *stream*))
+    (with-open-stream (stream (make-synonym-stream '*stream*))
+      (assert (output-stream-p stream)))))
 
 (defclass user-input-stream (fundamental-input-stream)
   ())
 
-(let ((*stream* (make-instance 'user-input-stream)))
-  (declare (special *stream*))
-  (with-open-stream (stream (make-synonym-stream '*stream*))
-    (assert (input-stream-p stream))))
+(with-test (:name (make-synonym-stream :user-defined input-stream-p))
+  (let ((*stream* (make-instance 'user-input-stream)))
+    (declare (special *stream*))
+    (with-open-stream (stream (make-synonym-stream '*stream*))
+      (assert (input-stream-p stream)))))
 
 ;;; READ-LINE on ANSI-STREAM did not return T for the last line
 ;;; (reported by Yoshinori Tahara)
-(let ((pathname "test-read-line-eol"))
-  (with-open-file (out pathname :direction :output :if-exists :supersede)
-    (format out "a~%b"))
-  (let ((result (with-open-file (in pathname)
-                  (list (multiple-value-list (read-line in nil nil))
-                        (multiple-value-list (read-line in nil nil))
-                        (multiple-value-list (read-line in nil nil))))))
-    (delete-file pathname)
-    (assert (equal result '(("a" nil) ("b" t) (nil t))))))
+(with-test (:name (read-line :last-line))
+  (let ((pathname "test-read-line-eol"))
+    (with-open-file (out pathname :direction :output :if-exists :supersede)
+      (format out "a~%b"))
+    (let ((result (with-open-file (in pathname)
+                    (list (multiple-value-list (read-line in nil nil))
+                          (multiple-value-list (read-line in nil nil))
+                          (multiple-value-list (read-line in nil nil))))))
+      (delete-file pathname)
+      (assert (equal result '(("a" nil) ("b" t) (nil t)))))))
 
 ;;; READ-LINE used to work on closed streams because input buffers were left in place
-(with-test (:name :bug-425)
+(with-test (:name (close read-line :bug-425))
   ;; Normal close
   (let ((f (open "stream.impure.lisp" :direction :input)))
     (assert (stringp (read-line f)))
     (close f)
-    (assert (eq :fii
-                (handler-case
-                    (read-line f)
-                  (sb-int:closed-stream-error () :fii)))))
+    (assert-error (read-line f) sb-int:closed-stream-error))
   ;; Abort
   (let ((f (open "stream.impure.lisp" :direction :input)))
     (assert (stringp (read-line f nil nil)))
     (close f :abort t)
-    (assert (eq :faa
-                (handler-case
-                    (read-line f)
-                  (sb-int:closed-stream-error () :faa))))))
+    (assert-error (read-line f) sb-int:closed-stream-error)))
 
 (with-test (:name :regression-1.0.12.22)
   (with-open-file (s "stream.impure.lisp" :direction :input)
@@ -534,53 +559,57 @@
 ;;; unread-char: READ-BYTE would return the character, and
 ;;; READ-SEQUENCE into a byte buffer would lose when attempting to
 ;;; store the character in the vector.
-(let ((pathname "bivalent-stream-unread-char-test.tmp"))
-  (with-open-file (s pathname
-                     :element-type :default
-                     :direction :io :if-exists :rename)
-    (write-char #\a s)
-    (file-position s :start)
-    (unread-char (read-char s) s)
-    (assert (integerp (read-byte s))))
-  (delete-file pathname))
+(with-test (:name (:bivalent stream unread-char read-byte))
+  (let ((pathname "bivalent-stream-unread-char-test.tmp"))
+    (with-open-file (s pathname
+                       :element-type :default
+                       :direction :io :if-exists :rename)
+      (write-char #\a s)
+      (file-position s :start)
+      (unread-char (read-char s) s)
+      (assert (integerp (read-byte s))))
+    (delete-file pathname)))
 
-(let ((pathname "bivalent-stream-unread-char-test.tmp"))
-  (with-open-file (s pathname
-                     :element-type :default
-                     :direction :io :if-exists :rename)
-    (write-char #\a s)
-    (file-position s :start)
-    (unread-char (read-char s) s)
-    (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
-              (read-sequence buffer s))))
-  (delete-file pathname))
+(with-test (:name (:bivalent stream unread-char read-sequence))
+  (let ((pathname "bivalent-stream-unread-char-test.tmp"))
+    (with-open-file (s pathname
+                       :element-type :default
+                       :direction :io :if-exists :rename)
+      (write-char #\a s)
+      (file-position s :start)
+      (unread-char (read-char s) s)
+      (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
+                (read-sequence buffer s))))
+    (delete-file pathname)))
 
-#+sb-unicode
-(let ((pathname "bivalent-stream-unread-char-test.tmp"))
-  (with-open-file (s pathname
-                     :element-type :default
-                     :direction :io :if-exists :rename
-                     :external-format :utf8)
-    (write-char (code-char 192) s)
-    (file-position s :start)
-    (unread-char (read-char s) s)
-    (assert (integerp (read-byte s))))
-  (delete-file pathname))
+(with-test (:name (:bivalent stream unread-char read-byte :utf8)
+            :skipped-on '(:not :sb-unicode))
+  (let ((pathname "bivalent-stream-unread-char-test.tmp"))
+    (with-open-file (s pathname
+                       :element-type :default
+                       :direction :io :if-exists :rename
+                       :external-format :utf8)
+      (write-char (code-char 192) s)
+      (file-position s :start)
+      (unread-char (read-char s) s)
+      (assert (integerp (read-byte s))))
+    (delete-file pathname)))
 
-#+sb-unicode
-(let ((pathname "bivalent-stream-unread-char-test.tmp"))
-  (with-open-file (s pathname
-                     :element-type :default
-                     :direction :io :if-exists :rename
-                     :external-format :utf8)
-    (write-char (code-char 192) s)
-    (file-position s :start)
-    (unread-char (read-char s) s)
-    (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
-              (read-sequence buffer s))))
-  (delete-file pathname))
+(with-test (:name (:bivalent stream unread-char read-sequence :utf8)
+            :skipped-on '(:not :sb-unicode))
+  (let ((pathname "bivalent-stream-unread-char-test.tmp"))
+    (with-open-file (s pathname
+                       :element-type :default
+                       :direction :io :if-exists :rename
+                       :external-format :utf8)
+      (write-char (code-char 192) s)
+      (file-position s :start)
+      (unread-char (read-char s) s)
+      (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
+                (read-sequence buffer s))))
+    (delete-file pathname)))
 
-(with-test (:name :delete-file-on-streams)
+(with-test (:name (delete-file :on stream))
   (with-open-file (f "delete-file-on-stream-test.tmp"
                      :direction :io)
     (delete-file f)
@@ -594,7 +623,7 @@
 ;;; READ-CHAR-NO-HANG on bivalent streams (as returned by RUN-PROGRAM)
 ;;; was wrong.  CSR managed to promote the wrongness to all streams in
 ;;; the 1.0.32.x series, breaking slime instantly.
-(with-test (:name :read-char-no-hang-after-unread-char :skipped-on :win32)
+(with-test (:name (read-char :no-hang-after unread-char) :skipped-on :win32)
   (let* ((process (run-program "/bin/sh" '("-c" "echo a && sleep 10")
                                :output :stream :wait nil))
          (stream (process-output process))
@@ -611,7 +640,7 @@
 
 (require :sb-posix)
 #-win32
-(with-test (:name :interrupt-open :skipped-on :win32)
+(with-test (:name (open :interrupt) :skipped-on :win32)
   (let ((fifo nil)
         (to 0))
     (unwind-protect
@@ -646,8 +675,8 @@
     (maphash
      (lambda (format _)
        (declare (ignore _))
-       (format t "trying ~A~%" format)
-       (finish-output t)
+       ;; (format t "trying ~A~%" format)
+       ;; (finish-output t)
        (unwind-protect
             (progn
               (setf fifo (sb-posix:mktemp "SBCL-fifo-XXXXXXX"))
