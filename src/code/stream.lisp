@@ -2086,9 +2086,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                  (let ((el (funcall read-function stream nil :eof nil)))
                    (when (eq el :eof)
                      (return (+ start (- i offset-start))))
-                   (setf (aref data i) el)))))
+                   (setf (aref data i) el))))
+             (read-generic-sequence (read-function)
+               (declare (ignore read-function))
+               (error "~@<~A does not yet support generic sequences.~@:>"
+                      'read-sequence)))
       (declare (dynamic-extent #'compute-read-function
-                               #'read-list #'read-vector/fast #'read-vector))
+                               #'read-list #'read-vector/fast #'read-vector
+                               #'read-generic-sequence))
       (cond
         ((typep seq 'list)
          (read-list (compute-read-function nil)))
@@ -2101,7 +2106,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (if (compatible-vector-and-stream-element-types-p data stream)
                (read-vector/fast data offset-start)
                (read-vector (compute-read-function (array-element-type data))
-                            data offset-start offset-end))))))))
+                            data offset-start offset-end))))
+        (t
+         (read-generic-sequence (compute-read-function nil)))))))
 
 (defun ansi-stream-read-string-from-frc-buffer (seq stream start %end)
   (declare (type simple-string seq)
@@ -2193,10 +2200,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (do ((i start (1+ i)))
                    ((>= i end))
                  (declare (type index i))
-                 (funcall write-function stream (aref data i)))))
+                 (funcall write-function stream (aref data i))))
+             (write-generic-sequence (write-function)
+               (declare (ignore write-function))
+               (error "~@<~A does not yet support generic sequences.~@:>"
+                      'write-sequence)))
       (declare (dynamic-extent #'compute-write-function
                                #'write-element/bivalent #'write-list
-                               #'write-vector))
+                               #'write-vector  #'write-generic-sequence))
       (etypecase seq
         (list
          (write-list (compute-write-function nil)))
@@ -2210,7 +2221,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (buffer-output stream data offset-start offset-end)
                (write-vector data offset-start offset-end
                              (compute-write-function
-                              (array-element-type seq)))))))))
+                              (array-element-type seq))))))
+        (sequence
+         (write-generic-sequence (compute-write-function nil))))))
   seq)
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
