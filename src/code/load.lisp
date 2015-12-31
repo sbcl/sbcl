@@ -79,6 +79,11 @@
 ;;; FIXME: why do all of these reading functions and macros declare
 ;;; (SPEED 0)?  was there some bug in the compiler which has since
 ;;; been fixed?  --njf, 2004-09-08
+;;; Afaict, the (SPEED 0) declarations in here avoid code bloat,
+;;; by counteracting the INLINE declaration on the local definition
+;;; of FAST-READ-BYTE. At least, that is the effect, and it seems
+;;; reasonable. Pretty much the INLINE declaration is probably
+;;; the thing that deserves to go away.
 
 ;;; Read a signed integer.
 (defmacro fast-read-s-integer (n)

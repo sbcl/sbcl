@@ -460,6 +460,10 @@
   ;; that of a-s-read-char
   (declare (ignore recursive-p))
   (with-fast-read-byte (t stream eof-error-p eof-value)
+    ;; FIXME: the overhead of the UNWIND-PROTECT inserted by
+    ;; WITH-FAST-READ-BYTE significantly impacts the time taken
+    ;; by single byte reads. For this use-case we could
+    ;; probably just change it to a PROG1.
     (fast-read-byte)))
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
