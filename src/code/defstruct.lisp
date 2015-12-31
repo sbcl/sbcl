@@ -1583,6 +1583,7 @@ or they must be declared locally notinline at each call site.~@:>")
   (multiple-value-bind (info foundp) (info :function :type name)
     (values (cond ((defstruct-description-p info)
                    (specifier-type (struct-ctor-ftype info name)))
+                  #-sb-xc-host ; PCL doesn't exist
                   ((eq info :generic-function) (sb!pcl::compute-gf-ftype name))
                   (t info))
             foundp)))
