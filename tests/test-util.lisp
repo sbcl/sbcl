@@ -168,10 +168,11 @@
 ;;; allowed conditions of the respective kind.
 (defun checked-compile (form
                         &key
-                          allow-failure
-                          allow-warnings
-                          allow-style-warnings
-                          (allow-notes t))
+                        name
+                        allow-failure
+                        allow-warnings
+                        allow-style-warnings
+                        (allow-notes t))
   (let ((warnings '())
         (style-warnings '())
         (notes '())
@@ -190,7 +191,7 @@
                       (muffle-warning condition))))
       (multiple-value-bind (function warnings-p failure-p)
           (let ((*error-output* error-output))
-            (compile nil form))
+            (compile name form))
         (declare (ignore warnings-p))
         (labels ((fail (kind conditions &optional allowed-type)
                    (error "~@<Compilation of ~S signaled ~A~P:~
