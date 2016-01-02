@@ -6,26 +6,28 @@
 None of the following sections apply to SBCL built without package
 locking support.
 
+@quotation warning
 The interface described here is experimental: incompatible changes in
 future SBCL releases are possible, even expected: the concept of
 ``implementation packages'' and the associated operators may be renamed;
 more operations (such as naming restarts or catch tags) may be added to
 the list of operations violating package locks.
+@end quotation
 
 @menu
-* Package Lock Concepts::       
-* Package Lock Dictionary::     
+* Package Lock Concepts::
+* Package Lock Dictionary::
 @end menu
 
 @node Package Lock Concepts
 @section Package Lock Concepts
 
 @menu
-* Package Lock Overview::       
-* Implementation Packages::     
-* Package Lock Violations::     
-* Package Locks in Compiled Code::  
-* Operations Violating Package Locks::  
+* Package Lock Overview::
+* Implementation Packages::
+* Package Lock Violations::
+* Package Locks in Compiled Code::
+* Operations Violating Package Locks::
 @end menu
 
 @node Package Lock Overview

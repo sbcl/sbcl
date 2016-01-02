@@ -35,7 +35,7 @@ an alternate package instead of @code{*package*} for the reader to use
 as the default package for interning symbols:
 
 @lisp
-<package-name>::<form-with-interning-into-package>
+@var{package-name}::@var{form-with-interning-into-package}
 @end lisp
 
 Example:

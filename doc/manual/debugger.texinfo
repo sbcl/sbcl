@@ -8,16 +8,16 @@ the debugger, single-stepper and @code{trace}, and the effect of
 @code{(optimize debug)} declarations.
 
 @menu
-* Debugger Entry::              
-* Debugger Command Loop::       
-* Stack Frames::                
-* Variable Access::             
-* Source Location Printing::    
-* Debugger Policy Control::     
-* Exiting Commands::            
-* Information Commands::        
-* Function Tracing::            
-* Single Stepping::             
+* Debugger Entry::
+* Debugger Command Loop::
+* Stack Frames::
+* Variable Access::
+* Source Location Printing::
+* Debugger Policy Control::
+* Exiting Commands::
+* Information Commands::
+* Function Tracing::
+* Single Stepping::
 * Enabling and Disabling the Debugger::
 @end menu
 
@@ -26,8 +26,8 @@ the debugger, single-stepper and @code{trace}, and the effect of
 @section Debugger Entry
 
 @menu
-* Debugger Banner::             
-* Debugger Invocation::         
+* Debugger Banner::
+* Debugger Invocation::
 @end menu
 
 @node Debugger Banner
@@ -51,7 +51,7 @@ restarts (invokable by number or by possibly-abbreviated name):
 
 The first group of lines describe what the error was that put us in
 the debugger.  In this case @code{car} was called on @code{3}, causing
-a @code{type-error}.  
+a @code{type-error}.
 
 This is followed by the ``beginner help line'', which appears only if
 @code{sb-ext:*debug-beginner-help-p*} is true (default).
@@ -120,7 +120,7 @@ the command loop.
 The debugger prompt is ``@code{@var{frame}]}'', where @var{frame} is
 the number of the current frame.  Frames are numbered starting from
 zero at the top (most recent call), increasing down to the bottom.
-The current frame is the frame that commands refer to. 
+The current frame is the frame that commands refer to.
 
 It is possible to override the normal printing behaviour in the
 debugger by using the @code{sb-ext:*debug-print-variable-alist*}.
@@ -154,11 +154,11 @@ stopped to call another function, or because of an interrupt or error.
 @end itemize
 
 @menu
-* Stack Motion::                
-* How Arguments are Printed::   
-* Function Names::              
-* Debug Tail Recursion::        
-* Unknown Locations and Interrupts::  
+* Stack Motion::
+* How Arguments are Printed::
+* Function Names::
+* Debug Tail Recursion::
+* Unknown Locations and Interrupts::
 @end menu
 
 @node  Stack Motion
@@ -285,11 +285,11 @@ are present in the debugger, see @ref{Debugger Policy Control}.
 
 If a function is defined by @code{defun} it will appear in backtrace
 by that name. Functions defined by @code{labels} and @code{flet} will
-appear as @code{(FLET <name>)} and @code{(LABELS <name>)} respectively.
-Anonymous lambdas will appear as @code{(LAMDBA <lambda-list>)}.
+appear as @code{(FLET @var{name})} and @code{(LABELS @var{name})} respectively.
+Anonymous lambdas will appear as @code{(LAMDBA @var{lambda-list})}.
 
 @menu
-* Entry Point Details::         
+* Entry Point Details::
 @end menu
 
 @node  Entry Point Details
@@ -309,12 +309,12 @@ source. This is mostly done for argument type and count checking.
 @c FIXME: the following bits talked about block-compilation, but
 @c we don't currently support it...
 
-@c With recursive 
-@c or block compiled 
+@c With recursive
+@c or block compiled
 @c functions, an additional @code{:EXTERNAL} frame
 @c may appear before the frame representing the first call to the
 @c recursive function
-@c or entry to the compiled block. 
+@c or entry to the compiled block.
 @c This is a
 @c consequence of the way the compiler works: there is
 @c nothing odd with your program. You will also see @code{:CLEANUP}
@@ -340,7 +340,7 @@ a tail-recursive position, the stack frame will be deallocated
 Consider this backtrace:
 
 @example
-(BAR ...) 
+(BAR ...)
 (FOO ...)
 @end example
 
@@ -371,7 +371,7 @@ eliminated by finding the source location in the calling frame.
 
 The elimination of tail-recursive frames can be prevented by disabling
 tail-recursion optimization, which happens when the @code{debug}
-optimization quality is greater than @code{2}.  
+optimization quality is greater than @code{2}.
 @xref{Debugger Policy Control}.
 
 @comment FIXME: reinstate this link once the chapter is in the manual.
@@ -469,7 +469,7 @@ name unique.
 This function returns the value of the variable in the current frame
 with the specified @var{name}.  If supplied, @var{identifier}
 determines which value to return when there are ambiguous variables.
-  
+
 When @var{name} is a symbol, it is interpreted as the symbol name of
 the variable, i.e. the package is significant.  If @var{name} is an
 uninterned symbol (gensym), then return the value of the uninterned
@@ -483,8 +483,8 @@ that must unambiguously complete to the name of a valid variable.
 
 
 @menu
-* Variable Value Availability::  
-* Note On Lexical Variable Access::  
+* Variable Value Availability::
+* Note On Lexical Variable Access::
 @end menu
 
 @node Variable Value Availability
@@ -553,7 +553,7 @@ The variable is never set and its definition looks like
 @end lisp
 In this case, @code{var1} is substituted with @code{var2}.
 
-@item 
+@item
 The variable is never set and is referenced exactly once.  In this
 case, the reference is substituted with the variable initial value.
 
@@ -664,8 +664,8 @@ print:
 
 
 @menu
-* How the Source is Found::     
-* Source Location Availability::  
+* How the Source is Found::
+* Source Location Availability::
 @end menu
 
 @node  How the Source is Found
@@ -755,7 +755,7 @@ some properties of the block start location:
 
 @item The block start location may be the same as the true location.
 
-@item The block start location will never be later in the 
+@item The block start location will never be later in the
 program's flow of control than the true location.
 
 @item No conditional control structures (such as @code{if},
@@ -826,7 +826,7 @@ Level @code{1} plus all interned local variables, source location
 information, and lifetime information that tells the debugger when
 arguments are available (even when @code{speed} is @code{3} or the
 argument is set).
- 
+
 @item > 2
 Any level greater than @code{2} gives level @code{2} and in addition
 disables tail-call optimization, so that the backtrace will contain
@@ -896,7 +896,7 @@ useful for popping debug command loop levels or aborting to top level,
 as the case may be.
 @end deffn
 
-@deffn {Debugger Command} @nopkg{return} @var{value} 
+@deffn {Debugger Command} @nopkg{return} @var{value}
 Returns @var{value} from the current stack frame.  This command is
 available when the @code{debug} optimization quality is greater than
 both @code{speed} and @code{space}.  Care must be taken that the value
@@ -997,7 +997,7 @@ Displays all the frames from the current to the bottom. Only shows
 @c @end deffn
 
 @c @menu
-@c * Breakpoint Example::          
+@c * Breakpoint Example::
 @c @end menu
 
 @c @node  Breakpoint Example,  , Breakpoint Commands, Breakpoint Commands
@@ -1075,7 +1075,7 @@ Displays all the frames from the current to the bottom. Only shows
 
 @c (! 9) ; We hit the breakpoint in the recursive call
 @c Source: (* N (! (1- N)))
-@c 3] 
+@c 3]
 @c @end example
 
 
@@ -1120,7 +1120,7 @@ The following debugger commands are used for controlling single stepping.
 @deffn {Debugger Command} @nopkg{start}
 Selects the @code{continue} restart if one exists and starts single stepping.
 None of the other single stepping commands can be used before stepping has
-been started either by using @code{start} or by using the standard 
+been started either by using @code{start} or by using the standard
 @code{step} macro.
 @end deffn
 
@@ -1135,7 +1135,7 @@ the form is complete.
 @end deffn
 
 @deffn {Debugger Command} @nopkg{out}
-Steps out of the current frame. Stepping will be disabled until the 
+Steps out of the current frame. Stepping will be disabled until the
 topmost stack frame that had been stepped into returns.
 @end deffn
 
