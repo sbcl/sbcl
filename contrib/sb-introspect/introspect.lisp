@@ -78,21 +78,21 @@ include the pathname of the file and the position of the definition."
   "Debug function represent static compile-time information about a function."
   'sb-c::compiled-debug-fun)
 
-(declaim (ftype (function (function) debug-info) function-debug-info))
+(declaim (ftype (sb-int:sfunction (function) debug-info) function-debug-info))
 (defun function-debug-info (function)
   (let* ((function-object (sb-kernel::%fun-fun function))
          (function-header (sb-kernel:fun-code-header function-object)))
     (sb-kernel:%code-debug-info function-header)))
 
-(declaim (ftype (function (function) debug-source) function-debug-source))
+(declaim (ftype (sb-int:sfunction (function) debug-source) function-debug-source))
 (defun function-debug-source (function)
   (debug-info-source (function-debug-info function)))
 
-(declaim (ftype (function (debug-info) debug-source) debug-info-source))
+(declaim (ftype (sb-int:sfunction (debug-info) debug-source) debug-info-source))
 (defun debug-info-source (debug-info)
   (sb-c::debug-info-source debug-info))
 
-(declaim (ftype (function (t debug-info) debug-function) debug-info-debug-function))
+(declaim (ftype (sb-int:sfunction (t debug-info) debug-function) debug-info-debug-function))
 (defun debug-info-debug-function (function debug-info)
   (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
         (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
