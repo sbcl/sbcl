@@ -38,10 +38,7 @@
 ;;;; leaf reference
 
 ;;; Return the TN that holds the value of THING in the environment ENV.
-;;; KLUDGE: we get "too complex to check" - why? I don't know,
-;;; but PHYSENV-INFO checks type, and so does ECASE, so, really who cares.
-#+nil
-(declaim (ftype (function ((or nlx-info lambda-var clambda) physenv) tn)
+(declaim (ftype (sfunction ((or nlx-info lambda-var clambda) physenv) tn)
                 find-in-physenv))
 (defun find-in-physenv (thing physenv)
   (or (cdr (assoc thing (ir2-physenv-closure (physenv-info physenv))))
