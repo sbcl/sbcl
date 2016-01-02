@@ -100,11 +100,6 @@
     (let ((sb-aclrepl::*skip-address-display* t))
       (sb-aclrepl::display-inspect object strm print skip))))
 
-(defun do-inspect (object)
-  (with-output-to-string (strm)
-    (let ((sb-aclrepl::*skip-address-display* t))
-      (sb-aclrepl::inspector `(quote ,object) nil strm))))
-
 (defun istep (args)
   (with-output-to-string (strm)
     (let ((sb-aclrepl::*skip-address-display* t))
@@ -462,6 +457,3 @@ the symbol NIL, which was selected by FIRST
                         (istep '("-")))
   "Object has no parent
 ")
-
-
-
