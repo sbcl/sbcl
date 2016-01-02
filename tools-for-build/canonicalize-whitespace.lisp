@@ -81,7 +81,7 @@
 
 ;;; Repository-level functions
 
-(defvar *source-types* '("lisp" "lisp-expr" "c" "h" "asd"))
+(defvar *source-types* '("lisp" "lisp-expr" "c" "h" "asd" "texinfo"))
 
 (defvar *exceptions* '("compile-file-pos-utf16be"))
 
