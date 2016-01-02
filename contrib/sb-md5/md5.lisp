@@ -208,20 +208,6 @@ accordingly."
 ;;; Section 3.4:  Converting 8bit-vectors into 16-Word Blocks
 
 (declaim (inline fill-block fill-block-ub8 fill-block-char))
-(defun fill-block (block buffer offset)
-  "Convert a complete 64 byte input vector segment into the given 16
-word MD5 block.  This currently works on (unsigned-byte 8) and
-character simple-arrays, via the functions `fill-block-ub8' and
-`fill-block-char' respectively."
-  (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
-           (type (simple-array ub32 (16)) block)
-           (type (simple-array * (*)) buffer)
-           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-  (etypecase buffer
-    ((simple-array (unsigned-byte 8) (*))
-     (fill-block-ub8 block buffer offset))
-    (simple-string
-     (fill-block-char block buffer offset))))
 
 (defun fill-block-ub8 (block buffer offset)
   "Convert a complete 64 (unsigned-byte 8) input vector segment
@@ -262,6 +248,21 @@ offset into the given 16 word MD5 block."
                              (char-code (schar buffer (+ j 1)))
                              (char-code (schar buffer (+ j 2)))
                              (char-code (schar buffer (+ j 3)))))))
+
+(defun fill-block (block buffer offset)
+  "Convert a complete 64 byte input vector segment into the given 16
+word MD5 block.  This currently works on (unsigned-byte 8) and
+character simple-arrays, via the functions `fill-block-ub8' and
+`fill-block-char' respectively."
+  (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
+           (type (simple-array ub32 (16)) block)
+           (type (simple-array * (*)) buffer)
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+  (etypecase buffer
+    ((simple-array (unsigned-byte 8) (*))
+     (fill-block-ub8 block buffer offset))
+    (simple-string
+     (fill-block-char block buffer offset))))
 
 ;;; Section 3.5:  Message Digest Output
 
