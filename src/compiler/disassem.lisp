@@ -286,6 +286,7 @@
 ;;; N.B.: This definition of equivalence is admissible because there can be
 ;;; no "interesting" non-null lexical environment. While it could be non-null,
 ;;; it can't matter, because our auto-generated code can't depend on the lexenv.
+(defvar *current-instruction-flavor* nil)
 (defun generate-function (kind forms funstate skeleton)
   (let* ((package sb!assem::*backend-instruction-set-package*)
          (table-name (intern "INTERNED-SEXPRS" package))
@@ -385,7 +386,6 @@
          (%make-valsrc :value value :source source))))
 
 ;;; machinery to provide more meaningful error messages during compilation
-(defvar *current-instruction-flavor* nil)
 (defun pd-error (fmt &rest args)
   (if *current-instruction-flavor*
       (error "~@<in printer-definition for ~S(~S): ~3I~:_~?~:>"
