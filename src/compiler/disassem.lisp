@@ -258,26 +258,23 @@
      (makunbound (intern "INTERNED-SEXPRS"
                          sb!assem::*backend-instruction-set-package*))))
 
-;;; FIXME: If GEN-ARG-FORMS used canonical temps vars, this would reduce to EQUAL.
+;;; FIXME: If we we interned the temp vars,
+;;; and wouldn't use symbols qua strings, then this would reduce to EQUAL.
 (defun equal-mod-gensyms (a b)
-  (aver (and (eq (car a) 'let*) (eq (car b) 'let*)))
-  (let ((bindings-a (mapcar #'car (second a)))
-        (bindings-b (mapcar #'car (second b))))
-    (named-let recurse ((a a) (b b))
-      (etypecase a
-        (null (null b))
-        (list (and (listp b) (recurse (car a) (car b)) (recurse (cdr a) (cdr b))))
-        (symbol (or (eq a b)
-                    (and (symbolp b)
-                         ;; Care is needed, as printers use uninterned symbols
-                         ;; in lieu of strings. It must be 1950 all over again.
-                         (not (symbol-package a))
-                         (not (symbol-package b))
-                         (or (string= a b)
-                             (let ((p (posq a bindings-a)))
-                               (and p (eq (nth p bindings-b) b)))))))
-        ((or number character) (eql a b))
-        (vector (and (vectorp b) (every #'recurse a b)))))))
+  (named-let recurse ((a a) (b b))
+    (etypecase a
+      (null (null b))
+      (list (and (listp b) (recurse (car a) (car b)) (recurse (cdr a) (cdr b))))
+      (symbol (or (eq a b)
+                  (and (symbolp b)
+                       (not (symbol-package a))
+                       (not (symbol-package b))
+                       ;; If "strings", then comparison by STRING= is right,
+                       ;; and if lexical vars, it's also right because
+                       ;; we never rebind a given temp within a function.
+                       (string= a b))))
+      ((or number character) (eql a b))
+      (vector (and (vectorp b) (every #'recurse a b))))))
 
 ;;; Previously there were complicated checker functions which tried to attempt to
 ;;; decide, given two FUNSTATEs, whether all their args were similarly used,
@@ -301,12 +298,18 @@
          (guts `(let* ,bindings ,@forms))
          (found (assoc guts (cdr sub-table) :test #'equal-mod-gensyms)))
     (if found
-        (values (cdr found) nil)
-        (let ((name (intern (concatenate 'string "INST-" (string kind) "-"
-                                         (write-to-string (length sub-table)))
-                            package)))
-          (push (cons guts name) (cdr sub-table))
-          (values name `(defun ,name ,@(subst guts :body (cdr skeleton))))))))
+        (values (second found) nil)
+        (let* ((inst (car *current-instruction-flavor*))
+               (defun-name
+                 (intern (concatenate 'string (string kind) "." (string inst)
+                                      (string
+                                       (code-char
+                                        (+ 97 (count inst (cdr sub-table)
+                                                     :key #'cddr)))))
+                         package)))
+          (push (list* guts defun-name inst) (cdr sub-table))
+          (values defun-name `(defun ,defun-name
+                                ,@(subst guts :body (cdr skeleton))))))))
 
 (defstruct (arg (:copier nil)
                 (:predicate nil)
@@ -751,12 +754,12 @@
           (%gen-arg-forms arg rendering funstate)
         (setq forms new-forms
               vars (cond ((or single-value-p (atom forms))
-                          (if (symbolp forms) vars (gensym)))
+                          (if (symbolp forms) vars (sb!xc:gensym "_")))
                          ((every #'symbolp forms)
                           ;; just use the same as the forms
                           nil)
                          (t
-                          (make-gensym-list (length forms)))))
+                          (make-gensym-list (length forms) "_"))))
         (push (list* rendering vars forms) (cdr arg-cell))))
     (or vars forms)))
 
@@ -896,7 +899,7 @@
         (funstate (make-funstate args)))
    (generate-function
     :printer
-    (compile-printer-list source funstate)
+    (let ((sb!xc:*gensym-counter* 0)) (compile-printer-list source funstate))
     funstate
     '(lambda (chunk inst stream dstate)
        (declare (type dchunk chunk)
@@ -1258,15 +1261,16 @@
     (return-from find-labeller-fun (values nil nil)))
   (let ((funstate (make-funstate args))
         (labels-form 'labels))
-    (dolist (arg args)
-      (when (arg-use-label arg)
-        (setf labels-form
-              `(let ((labels ,labels-form)
-                     (addr ,(arg-value-form arg funstate :numeric nil)))
-                 ;; if labeler didn't return an integer, it isn't a label
-                 (if (or (not (integerp addr)) (assoc addr labels))
-                     labels
-                     (cons (cons addr nil) labels))))))
+    (let ((sb!xc:*gensym-counter* 0))
+      (dolist (arg args)
+        (when (arg-use-label arg)
+          (setf labels-form
+                `(let ((labels ,labels-form)
+                       (addr ,(arg-value-form arg funstate :numeric nil)))
+                   ;; if labeler didn't return an integer, it isn't a label
+                   (if (or (not (integerp addr)) (assoc addr labels))
+                       labels
+                       (cons (cons addr nil) labels)))))))
     (generate-function
             :labeller
             (list labels-form)
@@ -1293,12 +1297,13 @@
     (return-from find-prefilter-fun (values nil nil)))
   (let* ((funstate (make-funstate args))
          (forms
-          (mapcan (lambda (arg &aux (pf (arg-prefilter arg)))
-                    (when pf
-                      (list `(setf (local-filtered-value ,(arg-position arg funstate))
-                                   ,(maybe-listify
-                                     (gen-arg-forms arg :filtering funstate))))))
-                  args)))
+          (let ((sb!xc:*gensym-counter* 0))
+            (mapcan (lambda (arg &aux (pf (arg-prefilter arg)))
+                      (when pf
+                        (list `(setf (local-filtered-value ,(arg-position arg funstate))
+                                     ,(maybe-listify
+                                       (gen-arg-forms arg :filtering funstate))))))
+                    args))))
     (generate-function
             :prefilter
             forms
