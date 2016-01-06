@@ -1708,3 +1708,11 @@ to :INTERPRET, an interpreter will be used.")
            ,@forms
            (truly-the (simple-array character (*))
                       (get-output-stream-string ,var))))))
+
+(defun self-evaluating-p (x)
+  (typecase x
+    (null t)
+    (keyword t)
+    (symbol (eq x t))
+    (cons nil)
+    (t t)))

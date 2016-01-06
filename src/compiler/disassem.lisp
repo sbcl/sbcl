@@ -394,18 +394,6 @@
              fmt args)
       (apply #'error fmt args)))
 
-;;; FIXME:
-;;;  1. This should become a utility in SB!INT.
-;;;  2. Arrays and structures and maybe other things are
-;;;     self-evaluating too.
-(defun self-evaluating-p (x)
-  (typecase x
-    (null t)
-    (keyword t)
-    (symbol (eq x t))
-    (cons nil)
-    (t t)))
-
 (defun maybe-quote (evalp form)
   (if (or evalp (self-evaluating-p form)) form `',form))
 
