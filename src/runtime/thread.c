@@ -305,9 +305,16 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 #ifdef CREATE_POST_MORTEM_THREAD
     pthread_detach(pthread_self());
 #endif
+    int result;
     if (post_mortem) {
-        gc_assert(!pthread_join(post_mortem->os_thread, NULL));
-        gc_assert(!pthread_attr_destroy(post_mortem->os_attr));
+        if ((result = pthread_join(post_mortem->os_thread, NULL))) {
+            lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
+                 strerror(result));
+        }
+        if ((result = pthread_attr_destroy(post_mortem->os_attr))) {
+            lose("Error calling pthread_attr_destroy in perform_thread_post_mortem:\n%s",
+                 strerror(result));
+        }
         free(post_mortem->os_attr);
         os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
         free(post_mortem);
@@ -476,8 +483,6 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
 #else
     pthread_setspecific(specials, NULL);
 #endif
-
-    schedule_thread_post_mortem(th);
 }
 
 /* this is the first thing that runs in the child (which is why the
@@ -502,6 +507,8 @@ new_thread_trampoline(struct thread *th)
     init_new_thread(th, &scribble, 1);
     result = funcall0(function);
     undo_init_new_thread(th, &scribble);
+
+    schedule_thread_post_mortem(th);
 
     FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
     return result;
