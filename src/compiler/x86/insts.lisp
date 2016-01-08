@@ -1351,39 +1351,25 @@
      (t
       (error "bogus operands to ~A" name)))))
 
-(eval-when (:compile-toplevel :execute)
-  (defun arith-inst-printer-list (subop)
-    `((accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
-      (reg/mem-imm ((op (#b1000000 ,subop))))
-      (reg/mem-imm ((op (#b1000001 ,subop))
-                    (imm nil :type signed-imm-byte)))
-      (reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000)))))))
-
-(define-instruction add (segment dst src &optional prefix)
-  (:printer-list (arith-inst-printer-list #b000))
-  (:emitter
-   (emit-prefix segment prefix)
-   (emit-random-arith-inst "ADD" segment dst src #b000)))
-
-(define-instruction adc (segment dst src)
-  (:printer-list (arith-inst-printer-list #b010))
-  (:emitter (emit-random-arith-inst "ADC" segment dst src #b010)))
-
-(define-instruction sub (segment dst src &optional prefix)
-  (:printer-list (arith-inst-printer-list #b101))
-  (:emitter
-   (emit-prefix segment prefix)
-   (emit-random-arith-inst "SUB" segment dst src #b101)))
-
-(define-instruction sbb (segment dst src)
-  (:printer-list (arith-inst-printer-list #b011))
-  (:emitter (emit-random-arith-inst "SBB" segment dst src #b011)))
-
-(define-instruction cmp (segment dst src &optional prefix)
-  (:printer-list (arith-inst-printer-list #b111))
-  (:emitter
-   (emit-prefix segment prefix)
-   (emit-random-arith-inst "CMP" segment dst src #b111 t)))
+(macrolet ((define (name subop &optional allow-constants)
+             `(define-instruction ,name (segment dst src &optional prefix)
+                (:printer accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
+                (:printer reg/mem-imm ((op '(#b1000000 ,subop))))
+                (:printer reg/mem-imm ((op '(#b1000001 ,subop))
+                                       (imm nil :type 'signed-imm-byte)))
+                (:printer reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))
+                (:emitter
+                 (emit-prefix segment prefix)
+                 (emit-random-arith-inst ,(string name) segment dst src ,subop
+                                         ,allow-constants)))))
+  (define add #b000)
+  (define adc #b010)
+  (define sub #b101)
+  (define sbb #b011)
+  (define cmp #b111 t)
+  (define and #b100)
+  (define or  #b001)
+  (define xor #b110))
 
 (define-instruction inc (segment dst)
   ;; Register.
@@ -1612,31 +1598,18 @@
     (unless (eq amt :cl)
       (emit-byte segment amt))))
 
-(eval-when (:compile-toplevel :execute)
-  (defun double-shift-inst-printer-list (op)
-    `((ext-reg-reg/mem-no-width ((op ,(logior op #b100))
-                                 (imm nil :type imm-byte))
-         (:name :tab reg/mem ", " reg ", " imm))
-      (ext-reg-reg/mem-no-width ((op ,(logior op #b101)))
-         (:name :tab reg/mem ", " reg ", " 'cl)))))
-
-(define-instruction shld (segment dst src amt)
-  (:declare (type (or (member :cl) (mod 32)) amt))
-  (:printer-list (double-shift-inst-printer-list #b10100000))
-  (:emitter
-   (emit-double-shift segment #b0 dst src amt)))
-
-(define-instruction shrd (segment dst src amt)
-  (:declare (type (or (member :cl) (mod 32)) amt))
-  (:printer-list (double-shift-inst-printer-list #b10101000))
-  (:emitter
-   (emit-double-shift segment #b1 dst src amt)))
-
-(define-instruction and (segment dst src)
-  (:printer-list
-   (arith-inst-printer-list #b100))
-  (:emitter
-   (emit-random-arith-inst "AND" segment dst src #b100)))
+(macrolet ((define (name direction-bit op)
+             `(define-instruction ,name (segment dst src amt)
+                (:declare (type (or (member :cl) (mod 32)) amt))
+                (:printer ext-reg-reg/mem-no-width ((op ,(logior op #b100))
+                                                    (imm nil :type 'imm-byte))
+                          '(:name :tab reg/mem ", " reg ", " imm))
+                (:printer ext-reg-reg/mem ((op ,(logior op #b10)))
+                          '(:name :tab reg/mem ", " reg ", " 'cl))
+                (:emitter
+                 (emit-double-shift segment ,direction-bit dst src amt)))))
+  (define shld 0 #b10100000)
+  (define shrd 1 #b10101000))
 
 (define-instruction test (segment this that)
   (:printer accum-imm ((op #b1010100)))
@@ -1668,20 +1641,6 @@
               (test-reg-and-something that this))
              (t
               (error "bogus operands for TEST: ~S and ~S" this that)))))))
-
-(define-instruction or (segment dst src &optional prefix)
-  (:printer-list
-   (arith-inst-printer-list #b001))
-  (:emitter
-   (emit-prefix segment prefix)
-   (emit-random-arith-inst "OR" segment dst src #b001)))
-
-(define-instruction xor (segment dst src &optional prefix)
-  (:printer-list
-   (arith-inst-printer-list #b110))
-  (:emitter
-   (emit-prefix segment prefix)
-   (emit-random-arith-inst "XOR" segment dst src #b110)))
 
 (define-instruction not (segment dst)
   (:printer reg/mem ((op '(#b1111011 #b010))))
@@ -1789,17 +1748,15 @@
            (emit-byte segment (dpb opcode (byte 3 3) #b10000011))
            (emit-ea segment src (reg-tn-encoding index))))))
 
-(eval-when (:compile-toplevel :execute)
-  (defun bit-test-inst-printer-list (subop)
-    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))
-                                  (reg/mem nil :type sized-reg/mem)))
-      (ext-reg-reg/mem-no-width ((op ,(dpb subop (byte 3 3) #b10000011))
-                                 (reg/mem nil :type sized-reg/mem))
-                                (:name :tab reg/mem ", " reg)))))
-
 (macrolet ((define (inst opcode-extension)
              `(define-instruction ,inst (segment src index)
-                (:printer-list (bit-test-inst-printer-list ,opcode-extension))
+                (:printer ext-reg/mem-no-width+imm8
+                          ((op '(#xBA ,opcode-extension))
+                           (reg/mem nil :type 'sized-reg/mem)))
+                (:printer ext-reg-reg/mem-no-width
+                          ((op ,(dpb opcode-extension (byte 3 3) #b10000011))
+                           (reg/mem nil :type 'sized-reg/mem))
+                          '(:name :tab reg/mem ", " reg))
                 (:emitter (emit-bit-test-and-mumble segment src index
                                                     ,opcode-extension)))))
   (define bt  4)
