@@ -1614,21 +1614,21 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun double-shift-inst-printer-list (op)
-    `((ext-reg-reg/mem ((op ,(logior op #b10)) (width 0)
-                        (imm nil :type signed-imm-byte))
+    `((ext-reg-reg/mem-no-width ((op ,(logior op #b100))
+                                 (imm nil :type imm-byte))
          (:name :tab reg/mem ", " reg ", " imm))
-      (ext-reg-reg/mem ((op ,(logior op #b10)) (width 1))
+      (ext-reg-reg/mem-no-width ((op ,(logior op #b101)))
          (:name :tab reg/mem ", " reg ", " 'cl)))))
 
 (define-instruction shld (segment dst src amt)
   (:declare (type (or (member :cl) (mod 32)) amt))
-  (:printer-list (double-shift-inst-printer-list #b1010000))
+  (:printer-list (double-shift-inst-printer-list #b10100000))
   (:emitter
    (emit-double-shift segment #b0 dst src amt)))
 
 (define-instruction shrd (segment dst src amt)
   (:declare (type (or (member :cl) (mod 32)) amt))
-  (:printer-list (double-shift-inst-printer-list #b1010100))
+  (:printer-list (double-shift-inst-printer-list #b10101000))
   (:emitter
    (emit-double-shift segment #b1 dst src amt)))
 
@@ -1791,7 +1791,8 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun bit-test-inst-printer-list (subop)
-    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))))
+    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))
+                                  (reg/mem nil :type sized-reg/mem)))
       (ext-reg-reg/mem-no-width ((op ,(dpb subop (byte 3 3) #b10000011))
                                  (reg/mem nil :type sized-reg/mem))
                                 (:name :tab reg/mem ", " reg)))))

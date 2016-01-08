@@ -2653,7 +2653,8 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun bit-test-inst-printer-list (subop)
-    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))))
+    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))
+                                  (reg/mem nil :type sized-reg/mem)))
       (ext-reg-reg/mem-no-width ((op ,(dpb subop (byte 3 3) #b10000011))
                                  (reg/mem nil :type sized-reg/mem))
                                 (:name :tab reg/mem ", " reg)))))
