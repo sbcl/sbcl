@@ -991,7 +991,7 @@ be longer than the input.
 (defun casefold (string)
   #!+sb-doc
   "Returns the full casefolding of STRING according to the Unicode standard.
-Casefolding remove case information in a way that allaws the results to be used
+Casefolding removes case information in a way that allows the results to be used
 for case-insensitive comparisons.
 The result is not guaranteed to have the same length as the input."
   (string-somethingcase #'char-foldcase string (constantly nil)))
