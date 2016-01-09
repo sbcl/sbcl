@@ -101,19 +101,31 @@
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
         (unless translator
-          (error "unknown alien type: ~S" type))
+          (error (!uncross-format-control
+                  "unknown alien type: ~
+                   ~/sb!impl:print-type-specifier/")
+                 type))
         (funcall translator type env))
       (ecase (info :alien-type :kind type)
         (:primitive
          (let ((translator (info :alien-type :translator type)))
            (unless translator
-             (error "no translator for primitive alien type ~S" type))
+             (error (!uncross-format-control
+                     "no translator for primitive alien type ~
+                      ~/sb!impl:print-type-specifier/")
+                    type))
            (funcall translator (list type) env)))
         (:defined
          (or (info :alien-type :definition type)
-             (error "no definition for alien type ~S" type)))
+             (error (!uncross-format-control
+                     "no definition for alien type ~
+                      ~/sb!impl:print-type-specifier/")
+                    type)))
         (:unknown
-         (error "unknown alien type: ~S" type)))))
+         (error (!uncross-format-control
+                 "unknown alien type: ~
+                  ~/sb!impl:print-type-specifier/")
+                type)))))
 
 (defun auxiliary-alien-type (kind name env)
   (declare (type sb!kernel:lexenv-designator env))
@@ -190,11 +202,17 @@
   (defun %define-alien-type (name new)
     (ecase (info :alien-type :kind name)
       (:primitive
-       (error "~S is a built-in alien type." name))
+       (error (!uncross-format-control
+               "~/sb!impl:print-type-specifier/ is a built-in alien ~
+                type.")
+              name))
       (:defined
        (let ((old (info :alien-type :definition name)))
          (unless (or (null old) (alien-type-= new old))
-           (warn "redefining ~S to be:~%  ~S,~%was~%  ~S"
+           (warn (!uncross-format-control
+                  "redefining ~S to be:~% ~
+                   ~/sb!impl:print-type-specifier/,~%was~% ~
+                   ~/sb!impl:print-type-specifier/")
                  name
                  (unparse-alien-type new)
                  (unparse-alien-type old)))))
@@ -210,13 +228,7 @@
 
 (defmethod print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
-    ;; Kludge to avoid printing #'(SIGNED 64) instead of (FUNCTION (SIGNED 64))
-    ;; for a 0-argument function. This is only a problem with alien types
-    ;; because ordinary FUNCTION type specifiers are 3-lists.
-    (let ((sb!pretty:*pprint-quote-with-syntactic-sugar* nil))
-      ;; forward-reference of this special variable unfortunately
-      (declare (special sb!pretty:*pprint-quote-with-syntactic-sugar*))
-      (prin1 (unparse-alien-type type) stream))))
+    (sb!ext:print-type-specifier stream (unparse-alien-type type))))
 
 ;;;; the SAP type
 
@@ -367,6 +379,11 @@
 
 ;;;; default methods
 
+(defun missing-alien-operation-error (type operation)
+  (error (!uncross-format-control
+          "Cannot ~A aliens of type ~/sb!impl:print-type-specifier/.")
+         operation type))
+
 (define-alien-type-method (root :unparse) (type)
   `(<unknown-alien-type> ,(type-of type)))
 
@@ -387,11 +404,11 @@
 
 (define-alien-type-method (root :naturalize-gen) (type alien)
   (declare (ignore alien))
-  (error "cannot represent ~S typed aliens" type))
+  (missing-alien-operation-error "represent" type))
 
 (define-alien-type-method (root :deport-gen) (type object)
   (declare (ignore object))
-  (error "cannot represent ~S typed aliens" type))
+  (missing-alien-operation-error "represent" type))
 
 (define-alien-type-method (root :deport-alloc-gen) (type object)
   (declare (ignore type))
@@ -405,20 +422,20 @@
 
 (define-alien-type-method (root :extract-gen) (type sap offset)
   (declare (ignore sap offset))
-  (error "cannot represent ~S typed aliens" type))
+  (missing-alien-operation-error "represent" type))
 
 (define-alien-type-method (root :deposit-gen) (type sap offset value)
   `(setf ,(invoke-alien-type-method :extract-gen type sap offset) ,value))
 
 (define-alien-type-method (root :arg-tn) (type state)
   (declare (ignore state))
-  (error "Aliens of type ~S cannot be passed as arguments to CALL-OUT."
-         (unparse-alien-type type)))
+  (missing-alien-operation-error "pass as argument to CALL-OUT"
+                                 (unparse-alien-type type)))
 
 (define-alien-type-method (root :result-tn) (type state)
   (declare (ignore state))
-  (error "Aliens of type ~S cannot be returned from CALL-OUT."
-         (unparse-alien-type type)))
+  (missing-alien-operation-error "return from CALL-OUT"
+                                 (unparse-alien-type type)))
 
 ;;;; the INTEGER type
 

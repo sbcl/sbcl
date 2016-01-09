@@ -385,7 +385,9 @@
                       (grovel (%instance-ref value i))))
                    (t
                     (compiler-error
-                     "Objects of type ~S can't be dumped into fasl files."
+                     (!uncross-format-control
+                      "Objects of type ~/sb!impl:print-type-specifier/ ~
+                       can't be dumped into fasl files.")
                      (type-of value)))))))
       ;; Dump all non-trivial named constants using the name.
       (if (and namep (not (typep constant '(or symbol character
@@ -1277,12 +1279,13 @@
                                (warn
                                 'type-warning
                                 :format-control
-                                "The type declarations ~S and ~S for ~S conflict."
+                                (!uncross-format-control
+                                 "The type declarations ~
+                                  ~/sb!impl:print-type/ and ~
+                                  ~/sb!impl:print-type/ for ~
+                                  ~S conflict.")
                                 :format-arguments
-                                (list
-                                 (type-specifier old-type)
-                                 (type-specifier type)
-                                 var-name))))
+                                (list old-type type var-name))))
                             (bound-var
                              (setf (leaf-type bound-var) int
                                    (leaf-where-from bound-var) :declared))

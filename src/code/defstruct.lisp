@@ -395,7 +395,10 @@
                     `(and (>= (length (the ,ltype ,argname))
                            ,(dd-length defstruct))
                           (eq ',name (aref (the ,ltype ,argname) ,name-index))))
-                   (t (bug "Uncatered-for lisp type in typed DEFSTRUCT: ~S."
+                   (t (bug (!uncross-format-control
+                            "Uncatered-for lisp type in typed ~
+                             DEFSTRUCT: ~
+                             ~/sb!impl:print-type-specifier/.")
                            ltype))))))))))
 
 ;;; Return a list of forms to create a copier function of a typed DEFSTRUCT.
@@ -590,7 +593,9 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
            (multiple-value-bind (winp certainp)
                (subtypep 'symbol (dd-element-type dd))
              (when (and (not winp) certainp)
-               (error ":NAMED option is incompatible with element type ~S"
+               (error (!uncross-format-control
+                       ":NAMED option is incompatible with element ~
+                        type ~/sb!impl:print-type-specifier/")
                       (dd-element-type dd))))
            (when (dd-predicate-name dd)
              (error ":PREDICATE cannot be used with :TYPE ~

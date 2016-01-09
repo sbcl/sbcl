@@ -711,9 +711,11 @@
       *empty-type*
       (%make-simd-pack-type
        (dolist (pack-type *simd-pack-element-types*
-                          (error "~S element type must be a subtype of ~
-                                     ~{~S~#[~;, or ~:;, ~]~}."
-                                 'simd-pack *simd-pack-element-types*))
+                (error (!uncross-format-control
+                        "~S element type must be a subtype of ~
+                         ~{~/sb!impl:print-type-specifier/~#[~;, or ~
+                         ~:;, ~]~}.")
+                       'simd-pack *simd-pack-element-types*))
          (when (csubtypep element-type (specifier-type pack-type))
            (return (list pack-type)))))))
 
@@ -771,7 +773,10 @@
 (defun values-specifier-type-r (context type-specifier)
   (declare (type cons context))
   (labels ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
-             (error "bad thing to be a type specifier: ~S" spec))
+             (error (!uncross-format-control
+                     "bad thing to be a type specifier: ~
+                      ~/sb!impl:print-type-specifier/")
+                    spec))
            (instance-to-ctype (x)
              (flet ((translate (classoid)
                       ;; Hmm, perhaps this should signal PARSE-UNKNOWN-TYPE
@@ -869,7 +874,10 @@
 (defun specifier-type-r (context type-specifier)
   (let ((ctype (values-specifier-type-r context type-specifier)))
     (when (values-type-p ctype)
-      (error "VALUES type illegal in this context:~%  ~S" type-specifier))
+      (error (!uncross-format-control
+              "VALUES type illegal in this context:~% ~
+               ~/sb!impl:print-type-specifier/")
+             type-specifier))
     ctype))
 (defun specifier-type (type-specifier)
   (dx-let ((context (cons type-specifier t)))

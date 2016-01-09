@@ -67,7 +67,10 @@
          (let ((bound (ash 1 s)))
            `(integer 0 ,(- bound bite 1))))
         (t
-         (error "Bad size specified for UNSIGNED-BYTE type specifier: ~S." s))))
+         (error (!uncross-format-control
+                 "Bad size specified for UNSIGNED-BYTE type specifier: ~
+                  ~/sb!impl:print-type-specifier/.")
+                s))))
 
 ;;; Motivated by the mips port. -- CSR, 2002-08-22
 (def!type signed-byte-with-a-bite-out (s bite)
@@ -76,7 +79,10 @@
          (let ((bound (ash 1 (1- s))))
            `(integer ,(- bound) ,(- bound bite 1))))
         (t
-         (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
+         (error (!uncross-format-control
+                 "Bad size specified for SIGNED-BYTE type specifier: ~
+                  ~/sb!impl:print-type-specifier/.")
+                s))))
 
 (def!type load/store-index (scale lowtag min-offset
                                  &optional (max-offset min-offset))
@@ -1163,6 +1169,28 @@
   ;; symbol will not be printed without a prefix.
   (let ((*package* *keyword-package*))
     (write symbol :stream stream :escape t)))
+
+(declaim (special sb!pretty:*pprint-quote-with-syntactic-sugar*))
+(defun print-type-specifier (stream type-specifier &optional colon at)
+  (declare (ignore colon at))
+  ;; Binding *PPRINT-QUOTE-WITH-SYNTACTIC-SUGAR* prevents certain
+  ;; [f]types from being printed unhelpfully:
+  ;;
+  ;;   (function ())           => #'NIL
+  ;;   (function *)            => #'*
+  ;;   (function (function a)) => #'#'A
+  ;;
+  ;; Binding *PACKAGE* to the COMMON-LISP package causes specifiers
+  ;; like CL:FUNCTION, CL:INTEGER, etc. to be printed without package
+  ;; prefix but forces printing with package prefix for other
+  ;; specifiers.
+  (let ((sb!pretty:*pprint-quote-with-syntactic-sugar* nil)
+        (*package* *cl-package*))
+    (prin1 type-specifier stream)))
+
+(defun print-type (stream type &optional colon at)
+  (print-type-specifier stream (type-specifier type) colon at))
+
 
 ;;;; etc.
 

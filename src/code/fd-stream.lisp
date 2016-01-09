@@ -1801,20 +1801,23 @@
       (setf external-format (default-external-format)))
 
     (when input-p
-      (when (or (not character-stream-p) bivalent-stream-p)
-        (setf (values bin-routine bin-type bin-size read-n-characters
-                      char-size normalized-external-format)
-              (pick-input-routine (if bivalent-stream-p '(unsigned-byte 8)
-                                      target-type)
-                                  external-format))
-        (unless bin-routine
-          (error "could not find any input routine for ~S" target-type)))
-      (when character-stream-p
-        (setf (values cin-routine cin-type cin-size read-n-characters
-                      char-size normalized-external-format)
-              (pick-input-routine target-type external-format))
-        (unless cin-routine
-          (error "could not find any input routine for ~S" target-type)))
+      (flet ((no-input-routine ()
+               (error (!uncross-format-control
+                       "could not find any input routine for ~
+                        ~/sb!impl:print-type-specifier/")
+                      target-type)))
+        (when (or (not character-stream-p) bivalent-stream-p)
+          (setf (values bin-routine bin-type bin-size read-n-characters
+                        char-size normalized-external-format)
+                (pick-input-routine (if bivalent-stream-p '(unsigned-byte 8)
+                                        target-type)
+                                    external-format))
+          (unless bin-routine (no-input-routine)))
+        (when character-stream-p
+          (setf (values cin-routine cin-type cin-size read-n-characters
+                        char-size normalized-external-format)
+                (pick-input-routine target-type external-format))
+          (unless cin-routine (no-input-routine))))
       (setf (fd-stream-in fd-stream) cin-routine
             (fd-stream-bin fd-stream) bin-routine)
       ;; character type gets preferential treatment
@@ -1905,9 +1908,12 @@
                 ((subtypep output-type input-type)
                  output-type)
                 (t
-                 (error "Input type (~S) and output type (~S) are unrelated?"
-                        input-type
-                        output-type))))))
+                 (error (!uncross-format-control
+                         "Input type (~/sb!impl:print-type-specifier/) ~
+                          and output ~
+                          type (~/sb!impl:print-type-specifier/) are ~
+                          unrelated?")
+                        input-type output-type))))))
 
 ;;; Handles the resource-release aspects of stream closing, and marks
 ;;; it as closed.

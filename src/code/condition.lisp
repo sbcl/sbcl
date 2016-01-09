@@ -51,7 +51,10 @@
 
 (setf (condition-classoid-report (find-classoid 'condition))
       (lambda (cond stream)
-        (format stream "Condition ~S was signalled." (type-of cond))))
+        (format stream (!uncross-format-control
+                        "Condition ~/sb!impl:print-type-specifier/ was ~
+                         signalled.")
+                (type-of cond))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -513,8 +516,11 @@
    (expected-type :reader type-error-expected-type :initarg :expected-type))
   (:report
    (lambda (condition stream)
-     (format stream
-             "~@<The value ~2I~:_~S ~I~_is not of type ~2I~_~S.~:>"
+     (format stream (!uncross-format-control
+                     "~@<The value~
+                      ~@:_~2@T~S~@:_~
+                      is not of type~
+                      ~@:_~2@T~/sb!impl:print-type-specifier/~:@>")
              (type-error-datum condition)
              (type-error-expected-type condition)))))
 
@@ -529,7 +535,11 @@
               (datum (maybe-string (type-error-datum condition))))
           (if (and type datum)
               (print-unreadable-object (condition stream :type t)
-                (format stream "~@<expected-type: ~A ~_datum: ~A~:@>" type datum))
+                (format stream (!uncross-format-control
+                                "~@<expected-type: ~
+                                 ~/sb!impl:print-type-specifier/~_datum: ~
+                                 ~A~:@>")
+                        type datum))
               (call-next-method))))
       (call-next-method)))
 
@@ -1020,10 +1030,12 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (let ((*print-array* nil))
        (format stream
-               "~@<Displaced array originally of type ~S has been invalidated ~
-                due its displaced-to array ~S having become too small to hold ~
-                it: the displaced array's dimensions have all been set to zero ~
-                to trap accesses to it.~:@>"
+               (!uncross-format-control
+                "~@<Displaced array originally of type ~
+                 ~/sb!impl:print-type-specifier/ has been invalidated ~
+                 due its displaced-to array ~S having become too small ~
+                 to hold it: the displaced array's dimensions have all ~
+                 been set to zero to trap accesses to it.~:@>")
                (type-error-expected-type condition)
                (array-displacement (type-error-datum condition))))))
   (:default-initargs
@@ -1158,8 +1170,11 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                                                    simple-error)
   ()
   (:default-initargs
-      :format-control "symbol ~S cannot be both the name of a type and the name of a declaration"
-    :references (list '(:ansi-cl :section (3 8 21)))))
+   :format-control (!uncross-format-control
+                    "Symbol ~/sb!impl:print-symbol-with-prefix/ cannot ~
+                     be both the name of a type and the name of a ~
+                     declaration")
+   :references (list '(:ansi-cl :section (3 8 21)))))
 
 ;;; Single stepping conditions
 
@@ -1499,13 +1514,13 @@ the usual naming convention (names like *FOO*) for special variables"
    (new :initarg :new :reader proclamation-mismatch-new))
   (:report
    (lambda (condition stream)
-     ;; if we later decide we want package-qualified names, bind
-     ;; *PACKAGE* to (find-package "KEYWORD") here.
      (format stream
-             "~@<The new ~A proclamation for~@[ ~A~] ~S~
-              ~@:_~2@T~S~@:_~
-              does not match the old ~4:*~A~3* proclamation~
-              ~@:_~2@T~S~@:>"
+             (!uncross-format-control
+              "~@<The new ~A proclamation for~@[ ~A~] ~
+               ~/sb!impl:print-symbol-with-prefix/~
+               ~@:_~2@T~/sb!impl:print-type-specifier/~@:_~
+               does not match the old ~4:*~A~3* proclamation~
+               ~@:_~2@T~/sb!impl:print-type-specifier/~@:>")
              (proclamation-mismatch-kind condition)
              (proclamation-mismatch-description condition)
              (proclamation-mismatch-name condition)

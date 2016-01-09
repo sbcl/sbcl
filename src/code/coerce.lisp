@@ -120,7 +120,9 @@
   (declare (explicit-check))
   (flet ((coerce-error ()
            (error 'simple-type-error
-                  :format-control "~S can't be converted to type ~S."
+                  :format-control (!uncross-format-control
+                                   "~S can't be converted to type ~
+                                    ~/sb!impl:print-type-specifier/.")
                   :format-arguments (list object output-type-spec)
                   :datum object
                   :expected-type output-type-spec)))
@@ -266,7 +268,9 @@
   "Coerces the Object to an object of type Output-Type-Spec."
   (flet ((coerce-error ()
            (error 'simple-type-error
-                  :format-control "~S can't be converted to type ~S."
+                  :format-control (!uncross-format-control
+                                   "~S can't be converted to type ~
+                                    ~/sb!impl:print-type-specifier/.")
                   :format-arguments (list object output-type-spec)))
          (check-result (result)
            #!+high-security (aver (typep result output-type-spec))

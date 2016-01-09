@@ -439,8 +439,7 @@
             (push use not-ok-uses))))
     (dolist (use (nreverse not-ok-uses))
       (let* ((*compiler-error-context* use)
-             (dtype      (node-derived-type use))
-             (atype-spec (type-specifier atype))
+             (dtype (node-derived-type use))
              (what (when (and (combination-p dest)
                               (eq (combination-kind dest) :local))
                      (let ((lambda (combination-lambda dest))
@@ -454,16 +453,18 @@
         (cond ((and (ref-p use) (constant-p (ref-leaf use)))
                (warn condition
                      :format-control
-                     "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
+                     (!uncross-format-control
+                      "~:[This~;~:*~A~] is not a ~
+                       ~<~%~9T~:;~/sb!impl:print-type/:~>~% ~S")
                      :format-arguments
-                     (list what atype-spec
-                           (constant-value (ref-leaf use)))))
+                     (list what atype (constant-value (ref-leaf use)))))
               (t
                (warn condition
                      :format-control
-                     "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
-                     :format-arguments
-                     (list what (type-specifier dtype) atype-spec)))))))
+                     (!uncross-format-control
+                      "~:[Result~;~:*~A~] is a ~/sb!impl:print-type/, ~
+                       ~<~%~9T~:;not a ~/sb!impl:print-type/.~>")
+                     :format-arguments (list what dtype atype)))))))
   (values))
 
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,
@@ -522,8 +523,10 @@
              (let ((*compiler-error-context* cast))
                (when (policy cast (>= safety inhibit-warnings))
                  (compiler-notify
-                  "type assertion too complex to check:~% ~S."
-                  (type-specifier (coerce-to-values (cast-asserted-type cast))))))
+                  (!uncross-format-control
+                   "type assertion too complex to check:~%~
+                    ~/sb!impl:print-type/.")
+                  (coerce-to-values (cast-asserted-type cast)))))
              (setf (cast-type-to-check cast) *wild-type*)
              (setf (cast-%type-check cast) nil)))))))
   (values))

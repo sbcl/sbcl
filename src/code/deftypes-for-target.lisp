@@ -28,7 +28,10 @@
 
 (sb!xc:deftype mod (n)
   (unless (and (integerp n) (> n 0))
-    (error "bad modulus specified for MOD type specifier: ~S" n))
+    (error (!uncross-format-control
+            "bad modulus specified for MOD type specifier: ~
+             ~/sb!impl:print-type-specifier/")
+           n))
   `(integer 0 ,(1- n)))
 
 (sb!xc:deftype signed-byte (&optional s)
@@ -37,14 +40,20 @@
          (let ((bound (ash 1 (1- s))))
            `(integer ,(- bound) ,(1- bound))))
         (t
-         (error "bad size specified for SIGNED-BYTE type specifier: ~S" s))))
+         (error (!uncross-format-control
+                 "bad size specified for SIGNED-BYTE type specifier: ~
+                  ~/sb!impl:print-type-specifier/")
+                s))))
 
 (sb!xc:deftype unsigned-byte (&optional s)
   (cond ((eq s '*) '(integer 0))
         ((and (integerp s) (> s 0))
          `(integer 0 ,(1- (ash 1 s))))
         (t
-         (error "bad size specified for UNSIGNED-BYTE type specifier: ~S" s))))
+         (error (!uncross-format-control
+                 "bad size specified for UNSIGNED-BYTE type specifier: ~
+                  ~/sb!impl:print-type-specifier/")
+                s))))
 
 ;;; ANSI got UNSIGNED-BYTE wrong, prohibiting (UNSIGNED-BYTE 0).
 ;;; Since this is actually a substantial impediment to clarity...

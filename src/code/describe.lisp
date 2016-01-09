@@ -246,7 +246,8 @@
 
 (defmethod describe-object ((x array) s)
   (print-standard-describe-header x s)
-  (format s "~%Element-type: ~S" (array-element-type x))
+  (format s "~%Element-type: ~/sb-impl:print-type-specifier/"
+          (array-element-type x))
   (if (vectorp x)
       (if (array-has-fill-pointer-p x)
           (format s "~%Fill-pointer: ~S~%Size: ~S"
@@ -398,7 +399,7 @@
                      (slots (dd-slots dd)))
                 (if slots
                     (format stream "~@:_Slots:~:{~@:_  ~S~
-                                    ~@:_    Type: ~A ~@[~A~]~
+                                    ~@:_    Type: ~/sb-impl:print-type-specifier/ ~@[~A~]~
                                     ~@:_    Initform: ~S~}"
                             (mapcar (lambda (dsd)
                                       (list
@@ -412,7 +413,7 @@
               (let ((slots (sb-mop:class-direct-slots class)))
                 (if slots
                     (format stream "~@:_Direct slots:~:{~@:_  ~S~
-                                    ~@[~@:_    Type: ~S~]~
+                                    ~@[~@:_    Type: ~/sb-impl:print-type-specifier/~]~
                                     ~@[~@:_    Allocation: ~S~]~
                                     ~@[~@:_    Initargs: ~{~S~^, ~}~]~
                                     ~@[~@:_    Initform: ~S~]~
@@ -502,8 +503,8 @@
       (pprint-indent :block 2 stream)
       (describe-deprecation 'variable name stream)
       (when (eq (info :variable :where-from name) :declared)
-        (format stream "~@:_Declared type: ~S"
-                (type-specifier (info :variable :type name))))
+        (format stream "~@:_Declared type: ~/sb-impl:print-type/"
+                (info :variable :type name)))
       (when (info :variable :always-bound name)
         (format stream "~@:_Declared always-bound."))
       (cond
@@ -572,9 +573,8 @@
               (pprint-logical-block (stream nil)
                 (format stream "~%~A names an undefined function" name)
                 (pprint-indent :block 2 stream)
-                (format stream "~@:_~:(~A~) type: ~S"
-                        from
-                        (type-specifier (proclaimed-ftype name)))))))
+                (format stream "~@:_~:(~A~) type: ~/sb-impl:print-type/"
+                        from (proclaimed-ftype name))))))
         ;; Defined.
         (multiple-value-bind (fun what lambda-list derived-type declared-type
                               inline methods)
@@ -632,10 +632,14 @@
             (describe-deprecation 'function name stream)
             (describe-lambda-list lambda-list stream)
             (when declared-type
-              (format stream "~@:_Declared type: ~S" declared-type))
+              (format stream "~@:_Declared type: ~
+                              ~/sb-impl:print-type-specifier/"
+                      declared-type))
             (when (and derived-type
                        (not (equal declared-type derived-type)))
-              (format stream "~@:_Derived type: ~S" derived-type))
+              (format stream "~@:_Derived type: ~
+                              ~/sb-impl:print-type-specifier/"
+                      derived-type))
             (describe-documentation name 'function stream)
             (when (car inline)
               (format stream "~@:_Inline proclamation: ~

@@ -2706,3 +2706,29 @@
               :allow-style-warnings t)))
     (deftype make-sequence-unknown () 'fixnum)
     (assert-error (funcall fun 'abc) type-error)))
+
+(with-test (:name (:compiler-messages function :type-specifier))
+  ;; Previously, function types were often printed confusingly, e.g.:
+  ;;
+  ;;   (function ())           => #'NIL
+  ;;   (function *)            => #'*
+  ;;   (function (function a)) => #'#'A
+  ;;
+  (flet ((test-case (spec)
+           (destructuring-bind (type expected) spec
+             (unwind-protect
+                  (let ((report))
+                    (proclaim '(ftype (function () boolean) my-function))
+                    (handler-bind ((warning
+                                    (lambda (condition)
+                                      (setf report (princ-to-string condition))
+                                      (muffle-warning))))
+                      (proclaim `(ftype ,type my-function)))
+                    (assert (search expected report)))
+               (fmakunbound 'my-function)))))
+    (mapc
+     #'test-case
+     `(((function ())                 "(FUNCTION NIL)")
+       ((function *)                  "(FUNCTION *)")
+       ((function (function *))       "(FUNCTION (FUNCTION *))")
+       ((function (function (eql 1))) "(FUNCTION (FUNCTION (EQL 1))")))))

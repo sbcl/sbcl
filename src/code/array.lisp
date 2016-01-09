@@ -141,7 +141,9 @@
                                   sb!vm:*specialized-array-element-type-properties*
                                   :key #'sb!vm:saetp-typecode))))))
     (flet ((ill-type ()
-             (error "Invalid type specifier: ~s" type))
+             (error (!uncross-format-control
+                     "Invalid type specifier: ~/sb!impl:print-type-specifier/")
+                    type))
            (integer-interval-widetag (low high)
              (if (minusp low)
                  (%integer-vector-widetag-and-n-bits
@@ -524,7 +526,9 @@ of specialized arrays is supported."
   ;; is expensive, but probably worth the trouble as once we've allocated
   ;; the vector we have no way to get rid of it anymore...
   (when (eq t (upgraded-array-element-type element-type))
-    (error "Static arrays of type ~S not supported."
+    (error (!uncross-format-control
+            "Static arrays of type ~/sb!impl:print-type-specifier/ not ~
+             supported.")
            element-type))
   (validate-array-initargs initial-element-p initial-element
                            initial-contents-p initial-contents nil) ; for effect
@@ -535,11 +539,15 @@ of specialized arrays is supported."
              (length initial-contents)
              length))
     (unless (every (lambda (x) (typep x element-type)) initial-contents)
-      (error ":INITIAL-CONTENTS contains elements not of type ~S."
+      (error (!uncross-format-control
+              ":INITIAL-CONTENTS contains elements not of type ~
+               ~/sb!impl:print-type-specifier/.")
              element-type)))
   (when initial-element-p
     (unless (typep initial-element element-type)
-      (error ":INITIAL-ELEMENT ~S is not of type ~S."
+      (error (!uncross-format-control
+              ":INITIAL-ELEMENT ~S is not of type ~
+               ~/sb!impl:print-type-specifier/.")
              initial-element element-type)))
   ;; STEP 2
   ;;
@@ -1205,7 +1213,10 @@ of specialized arrays is supported."
            ;; This is weird. Should check upgraded type against actual
            ;; array element type I think. See lp#1331299. CLHS says that
            ;; "consequences are unspecified" so current behavior isn't wrong.
-           (error "The new element type, ~S, is incompatible with old type."
+           (error (!uncross-format-control
+                   "The new element type, ~
+                    ~/sb!impl:print-type-specifier/, is incompatible ~
+                    with old type.")
                   element-type))
           ((and fill-pointer (/= array-rank 1))
            (error "Only vectors can have fill pointers."))
@@ -1238,9 +1249,11 @@ of specialized arrays is supported."
              (unless (or (eql element-type (array-element-type displaced-to))
                          (subtypep element-type (array-element-type displaced-to)))
                ;; See lp#1331299 again. Require exact match on upgraded type?
-               (error "can't displace an array of type ~S into another of ~
-                       type ~S"
-                      element-type (array-element-type displaced-to)))
+               (error (!uncross-format-control
+                       "can't displace an array of type ~
+                        ~/sb!impl:print-type-specifier/ into another ~
+                        of type ~/sb!impl:print-type-specifier/")
+                        element-type (array-element-type displaced-to)))
              (let ((displacement (or displaced-index-offset 0))
                    (array-size (apply #'* dimensions)))
                (declare (fixnum displacement array-size))
@@ -1513,7 +1526,9 @@ function to be removed without further warning."
          ;; would be a win...
          (unless (or (not initial-element-p)
                      (typep initial-element element-type))
-           (error "~S can't be used to initialize an array of type ~S."
+           (error (!uncross-format-control
+                   "~S can't be used to initialize an array of type ~
+                    ~/sb!impl:print-type-specifier/.")
                   initial-element element-type))
          (let ((temp (if initial-element-p
                          (make-array new-length :initial-element initial-element)
