@@ -1712,7 +1712,6 @@ to :INTERPRET, an interpreter will be used.")
 (defun self-evaluating-p (x)
   (typecase x
     (null t)
-    (keyword t)
-    (symbol (eq x t))
+    (symbol (or (eq x t) (eq (symbol-package x) *keyword-package*)))
     (cons nil)
     (t t)))
