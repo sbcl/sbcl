@@ -129,12 +129,12 @@
                   regname
                   dstate))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter bo-kind-names
+(defconstant-eqx bo-kind-names
     #(:bo-dnzf :bo-dnzfp :bo-dzf :bo-dzfp :bo-f :bo-fp nil nil
       :bo-dnzt :bo-dnztp :bo-dzt :bo-dztp :bo-t :bo-tp nil nil
       :bo-dnz :bo-dnzp :bo-dz :bo-dzp :bo-u nil nil nil
-      nil nil nil nil nil nil nil nil)))
+      nil nil nil nil nil nil nil nil)
+    #'equalp)
 
 (define-arg-type bo-field
   :printer #'(lambda (value stream dstate)
@@ -143,6 +143,9 @@
                         (type fixnum value))
                (princ (svref bo-kind-names value) stream)))
 
+(define-compiler-macro valid-bo-encoding (&whole form enc)
+  (declare (notinline valid-bo-encoding))
+  (if (keywordp enc) (valid-bo-encoding enc) form))
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun valid-bo-encoding (enc)
   (or (if (integerp enc)
@@ -153,11 +156,11 @@
       (error "Invalid BO field spec: ~s" enc)))
 )
 
+(defconstant-eqx cr-bit-names #(:lt :gt :eq :so) #'equalp)
+(defconstant-eqx cr-bit-inverse-names #(:ge :le :ne :ns) #'equalp)
 
-(defparameter cr-bit-names #(:lt :gt :eq :so))
-(defparameter cr-bit-inverse-names #(:ge :le :ne :ns))
-
-(defparameter cr-field-names #(:cr0 :cr1 :cr2 :cr3 :cr4 :cr5 :cr6 :cr7))
+(defconstant-eqx cr-field-names #(:cr0 :cr1 :cr2 :cr3 :cr4 :cr5 :cr6 :cr7)
+  #'equalp)
 
 (defun valid-cr-bit-encoding (enc &optional error-p)
   (or (if (integerp enc)
@@ -209,10 +212,11 @@
                  (declare (type (signed-byte 24) value))
                  (+ (ash value 2) (dstate-cur-addr dstate))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter trap-values-alist '((:t . 31) (:lt . 16) (:le . 20) (:eq . 4) (:lng . 6)
-                                   (:ge .12) (:ne . 24) (:ng . 20) (:llt . 2) (:f . 0)
-                                   (:lle . 6) (:lge . 5) (:lgt . 1) (:lnl . 5))))
+(defconstant-eqx trap-values-alist
+  '((:t . 31) (:lt . 16) (:le . 20) (:eq . 4) (:lng . 6)
+    (:ge .12) (:ne . 24) (:ng . 20) (:llt . 2) (:f . 0)
+    (:lle . 6) (:lge . 5) (:lgt . 1) (:lnl . 5))
+  #'equal)
 
 
 (defun valid-tcond-encoding (enc)
@@ -315,14 +319,13 @@
                              0
                              lk-bit)))))))
 
-(eval-when (:compile-toplevel :execute :load-toplevel)
-(defparameter *spr-numbers-alist* '((:xer 1) (:lr 8) (:ctr 9))))
+(defconstant-eqx +spr-numbers-alist+ '((:xer 1) (:lr 8) (:ctr 9)) #'equal)
 
 (define-arg-type spr
   :printer #'(lambda (value stream dstate)
                (declare (ignore dstate)
                         (type (unsigned-byte 10) value))
-               (let* ((name (car (rassoc value *spr-numbers-alist*))))
+               (let* ((name (car (rassoc value +spr-numbers-alist+))))
                    (if name
                      (princ name stream)
                      (princ value stream)))))
@@ -338,15 +341,14 @@
 
 ;;;; dissassem:define-instruction-formats
 
-(eval-when (:compile-toplevel :execute)
-  (defmacro ppc-byte (startbit &optional (endbit startbit))
-    (unless (and (typep startbit '(unsigned-byte 32))
-                 (typep endbit '(unsigned-byte 32))
-                 (>= endbit startbit))
-      (error "Bad bits."))
-    ``(byte ,(1+ ,(- endbit startbit)) ,(- 31 ,endbit)))
+(defmacro ppc-byte (startbit &optional (endbit startbit))
+  (unless (and (typep startbit '(unsigned-byte 32))
+               (typep endbit '(unsigned-byte 32))
+               (>= endbit startbit))
+    (error "Bad bits."))
+  ``(byte ,(1+ ,(- endbit startbit)) ,(- 31 ,endbit)))
 
-  (defparameter *ppc-field-specs-alist*
+(defconstant-eqx +ppc-field-specs-alist+
     `((aa :field ,(ppc-byte 30))
       (ba :field ,(ppc-byte 11 15) :type 'bi-field)
       (bb :field ,(ppc-byte 16 20) :type 'bi-field)
@@ -385,8 +387,8 @@
       (ui :field ,(ppc-byte 16 31) :sign-extend nil)
       (xo21-30 :field ,(ppc-byte 21 30) :sign-extend nil)
       (xo22-30 :field ,(ppc-byte 22 30) :sign-extend nil)
-      (xo26-30 :field ,(ppc-byte 26 30) :sign-extend nil)))
-
+      (xo26-30 :field ,(ppc-byte 26 30) :sign-extend nil))
+    #'equal)
 
 
 (define-instruction-format (instr 32)
@@ -401,7 +403,7 @@
 
 (macrolet ((def-ppc-iformat ((name &optional default-printer) &rest specs)
                (flet ((specname-field (specname)
-                        (or (assoc specname *ppc-field-specs-alist*)
+                        (or (assoc specname +ppc-field-specs-alist+)
                             (error "Unknown ppc instruction field spec ~s" specname))))
                  (labels ((spec-field (spec)
                             (if (atom spec)
@@ -575,7 +577,8 @@
   rs ra rb mb me rc)
 
 (def-ppc-iformat (m-sh '(:name :tab ra "," rs "," sh "," mb "," me))
-  rs ra sh mb me rc)))
+  rs ra sh mb me rc)
+) ; end MACROLET DEF-PPC-IFORMAT
 
 (define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
   (op-to-a :field (byte 16 16))
@@ -648,7 +651,6 @@
        (nt "Object not instance trap")))))
 
 (eval-when (:compile-toplevel :execute)
-
 (defun classify-dependencies (deplist)
   (collect ((reads) (writes))
     (dolist (dep deplist)
@@ -1120,29 +1122,29 @@
 
   (define-instruction bu (segment target)
     (:declare (type label target))
-    (:printer b ((op 16) (bo #.(valid-bo-encoding :bo-u)) (bi 0) (aa 0) (lk 0))
+    (:printer b ((op 16) (bo (valid-bo-encoding :bo-u)) (bi 0) (aa 0) (lk 0))
               '(:name :tab bd))
     (:attributes branch)
     (:delay 0)
     (:emitter
-     (emit-conditional-branch segment #.(valid-bo-encoding :bo-u) 0 target nil nil)))
+     (emit-conditional-branch segment (valid-bo-encoding :bo-u) 0 target nil nil)))
 
 
   (define-instruction bt (segment bi  target)
-    (:printer b ((op 16) (bo #.(valid-bo-encoding :bo-t)) (aa 0) (lk 0))
+    (:printer b ((op 16) (bo (valid-bo-encoding :bo-t)) (aa 0) (lk 0))
               '(:name :tab bi "," bd))
     (:attributes branch)
     (:delay 0)
     (:emitter
-     (emit-conditional-branch segment #.(valid-bo-encoding :bo-t) bi target nil nil)))
+     (emit-conditional-branch segment (valid-bo-encoding :bo-t) bi target nil nil)))
 
   (define-instruction bf (segment bi  target)
-    (:printer b ((op 16) (bo #.(valid-bo-encoding :bo-f)) (aa 0) (lk 0))
+    (:printer b ((op 16) (bo (valid-bo-encoding :bo-f)) (aa 0) (lk 0))
               '(:name :tab bi "," bd))
     (:attributes branch)
     (:delay 0)
     (:emitter
-     (emit-conditional-branch segment #.(valid-bo-encoding :bo-f) bi target nil nil)))
+     (emit-conditional-branch segment (valid-bo-encoding :bo-f) bi target nil nil)))
 
   (define-instruction b? (segment cr-field-name cr-name  &optional (target nil target-p))
     (:attributes branch)
@@ -1202,7 +1204,7 @@
      (emit-i-form-inst segment 18 (ash target -2) 1 1)))
 
   (define-instruction blr (segment)
-    (:printer xl-bo-bi ((op 19) (xo 16) (bo #.(valid-bo-encoding :bo-u))(bi 0) (lk 0))  '(:name))
+    (:printer xl-bo-bi ((op 19) (xo 16) (bo (valid-bo-encoding :bo-u))(bi 0) (lk 0))  '(:name))
     (:attributes branch)
     (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
@@ -1258,20 +1260,20 @@
      (emit-x-form-inst segment 19 (valid-bo-encoding bo) (valid-bi-encoding bi) 0 528 1)))
 
   (define-instruction bctr (segment)
-    (:printer xl-bo-bi ((op 19) (xo 528) (bo #.(valid-bo-encoding :bo-u)) (bi 0) (lk 0))  '(:name))
+    (:printer xl-bo-bi ((op 19) (xo 528) (bo (valid-bo-encoding :bo-u)) (bi 0) (lk 0))  '(:name))
     (:attributes branch)
     (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
     (:emitter
-     (emit-x-form-inst segment 19 #.(valid-bo-encoding :bo-u) 0 0  528 0)))
+     (emit-x-form-inst segment 19 (valid-bo-encoding :bo-u) 0 0  528 0)))
 
   (define-instruction bctrl (segment)
-    (:printer xl-bo-bi ((op 19) (xo 528) (bo #.(valid-bo-encoding :bo-u)) (bi 0) (lk 1))  '(:name))
+    (:printer xl-bo-bi ((op 19) (xo 528) (bo (valid-bo-encoding :bo-u)) (bi 0) (lk 1))  '(:name))
     (:attributes branch)
     (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
     (:emitter
-     (emit-x-form-inst segment 19 #.(valid-bo-encoding :bo-u) 0 0  528 1)))
+     (emit-x-form-inst segment 19 (valid-bo-encoding :bo-u) 0 0  528 1)))
 
   (define-instruction rlwimi (segment ra rs sh mb me)
     (:printer m-sh ((op 20) (rc 0)))
