@@ -87,6 +87,7 @@
     #+x86-64
     (try `(bt ,(memref :qword) 3) "480FBA650003     BT QWORD PTR [$fp], 3")
     ;;
+    (try `(shld ,eax-tn ,ebx-tn :cl) "0FA5D8           SHLD EAX, EBX, CL")
     (try `(shld ,(memref :word)  ,bx-tn 6)  "660FA45D0006     SHLD [$fp], BX, 6")
     (try `(shld ,(memref :dword) ,ebx-tn 6) "0FA45D0006       SHLD [$fp], EBX, 6")
     #+x86-64

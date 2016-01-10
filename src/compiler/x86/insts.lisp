@@ -1604,7 +1604,7 @@
                 (:printer ext-reg-reg/mem-no-width ((op ,(logior op #b100))
                                                     (imm nil :type 'imm-byte))
                           '(:name :tab reg/mem ", " reg ", " imm))
-                (:printer ext-reg-reg/mem ((op ,(logior op #b10)))
+                (:printer ext-reg-reg/mem-no-width ((op ,(logior op #b101)))
                           '(:name :tab reg/mem ", " reg ", " 'cl))
                 (:emitter
                  (emit-double-shift segment ,direction-bit dst src amt)))))
