@@ -76,18 +76,21 @@
              (princ offset stream)
              (unless (eq mode :compute)
                (let ((addr (+ offset (dstate-next-addr dstate))))
-                 (or (nth-value
-                      1 (note-code-constant-absolute addr dstate width))
-                     (maybe-note-assembler-routine addr nil dstate)
-                     ;; Show the absolute address and maybe the contents.
-                     (note (format nil "[#x~x]~@[ = ~x~]"
-                                   addr
-                                   (case width
-                                     (:qword
-                                      (unboxed-constant-ref
-                                       dstate
-                                       (+ (dstate-next-offs dstate) offset)))))
-                           dstate)))))
+                 ;; The origin is zero when disassembling into a trace-file.
+                 ;; Don't crash on account of it.
+                 (when (plusp addr)
+                   (or (nth-value
+                        1 (note-code-constant-absolute addr dstate width))
+                       (maybe-note-assembler-routine addr nil dstate)
+                       ;; Show the absolute address and maybe the contents.
+                       (note (format nil "[#x~x]~@[ = ~x~]"
+                                     addr
+                                     (case width
+                                       (:qword
+                                        (unboxed-constant-ref
+                                         dstate
+                                         (+ (dstate-next-offs dstate) offset)))))
+                             dstate))))))
             (firstp
                (princ16 offset stream)
                (or (minusp offset)
