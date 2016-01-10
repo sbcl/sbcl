@@ -1551,19 +1551,6 @@
                                  name
                                  (cdr option-spec)))))
                  pdefs))
-          (:printer-list
-           ;; same as :PRINTER, but is EVALed first, and is a list of
-           ;; printers
-           #-sb-xc-host
-           (push
-            (eval
-             `(eval
-               `(list ,@(mapcar (lambda (printer)
-                                  `(multiple-value-list
-                                    ,(sb!disassem:gen-printer-def-forms-def-form
-                                      ',name printer nil)))
-                                ,(cadr option-spec)))))
-            pdefs))
           (t
            (error "unknown option: ~S" option)))))
     (sb!int:/noshow "done processing options")

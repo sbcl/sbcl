@@ -2999,8 +2999,7 @@
                                   (symbolicate "EXT-REX-" inst-format-stem))
                             (list inst-format-stem))))
       (mapcar (lambda (inst-format)
-                `(,inst-format ,fields ,@(when printer
-                                           (list printer))))
+                `(:printer ,inst-format ,fields ,@(if printer `(',printer))))
               inst-formats)))
   (defun 2byte-sse-inst-printer-list (inst-format-stem prefix op1 op2
                                        &key more-fields printer)
@@ -3014,8 +3013,7 @@
                                   (symbolicate "EXT-REX-" inst-format-stem))
                             (list inst-format-stem))))
       (mapcar (lambda (inst-format)
-                `(,inst-format ,fields ,@(when printer
-                                           (list printer))))
+                `(:printer ,inst-format ,fields ,@(if printer `(',printer))))
               inst-formats))))
 
 (defun emit-sse-inst (segment dst src prefix opcode
@@ -3061,9 +3059,8 @@
 (macrolet
     ((define-imm-sse-instruction (name opcode /i)
          `(define-instruction ,name (segment dst/src imm)
-            (:printer-list
-             ',(sse-inst-printer-list 'xmm-imm #x66 opcode
-                                      :more-fields `((/i ,/i))))
+            ,@(sse-inst-printer-list 'xmm-imm #x66 opcode
+                                     :more-fields `((/i ,/i)))
             (:emitter
              (emit-sse-inst-with-imm segment dst/src imm
                                      #x66 ,opcode ,/i
@@ -3104,8 +3101,7 @@
 
 (macrolet ((define-regular-sse-inst (name prefix opcode)
              `(define-instruction ,name (segment dst src)
-                (:printer-list
-                 ',(sse-inst-printer-list 'xmm-xmm/mem prefix opcode))
+                ,@(sse-inst-printer-list 'xmm-xmm/mem prefix opcode)
                 (:emitter
                  (emit-regular-sse-inst segment dst src ,prefix ,opcode)))))
   ;; moves
@@ -3248,11 +3244,10 @@
                       (intern (format nil "SSE-SHUFFLE-PATTERN-~D-~D"
                                       n-bits radix))))
                  `(define-instruction ,name (segment dst src pattern)
-                    (:printer-list
-                     ',(sse-inst-printer-list
+                    ,@(sse-inst-printer-list
                         'xmm-xmm/mem prefix opcode
-                        :more-fields `((imm nil :type ,shuffle-pattern))
-                        :printer '(:name :tab reg ", " reg/mem ", " imm)))
+                        :more-fields `((imm nil :type ',shuffle-pattern))
+                        :printer '(:name :tab reg ", " reg/mem ", " imm))
 
                     (:emitter
                      (aver (typep pattern '(unsigned-byte ,n-bits)))
@@ -3267,22 +3262,20 @@
 
 ;; MASKMOVDQU (dst is DS:RDI)
 (define-instruction maskmovdqu (segment src mask)
-  (:printer-list
-   (sse-inst-printer-list 'xmm-xmm/mem #x66 #xf7))
   (:emitter
    (aver (xmm-register-p src))
    (aver (xmm-register-p mask))
-   (emit-regular-sse-inst segment src mask #x66 #xf7)))
+   (emit-regular-sse-inst segment src mask #x66 #xf7))
+  . #.(sse-inst-printer-list 'xmm-xmm/mem #x66 #xf7))
 
 (macrolet ((define-comparison-sse-inst (name prefix opcode
                                         name-prefix name-suffix)
                `(define-instruction ,name (segment op x y)
-                  (:printer-list
-                   ',(sse-inst-printer-list
+                  ,@(sse-inst-printer-list
                       'xmm-xmm/mem prefix opcode
-                      :more-fields '((imm nil :type sse-condition-code))
+                      :more-fields '((imm nil :type 'sse-condition-code))
                       :printer `(,name-prefix imm ,name-suffix
-                                 :tab reg ", " reg/mem)))
+                                 :tab reg ", " reg/mem))
                   (:emitter
                    (let ((code (position op *sse-conditions*)))
                      (aver code)
@@ -3297,9 +3290,7 @@
 ;;; MOVSD, MOVSS
 (macrolet ((define-movsd/ss-sse-inst (name prefix)
              `(define-instruction ,name (segment dst src)
-                (:printer-list
-                 ',(sse-inst-printer-list 'xmm-xmm/mem-dir
-                                          prefix #b0001000))
+                ,@(sse-inst-printer-list 'xmm-xmm/mem-dir prefix #b0001000)
                 (:emitter
                  (cond ((xmm-register-p dst)
                         (emit-sse-inst segment dst src ,prefix #x10
@@ -3323,13 +3314,11 @@
                          (emit-regular-sse-inst segment dst src
                                                 ,prefix ,opcode-from))))
                   (define-instruction ,name (segment dst src)
-                    (:printer-list
-                     '(,@(when opcode-from
-                           (sse-inst-printer-list
-                            'xmm-xmm/mem prefix opcode-from))
-                       ,@(sse-inst-printer-list
+                    ,@(when opcode-from
+                        (sse-inst-printer-list 'xmm-xmm/mem prefix opcode-from))
+                    ,@(sse-inst-printer-list
                           'xmm-xmm/mem prefix opcode-to
-                          :printer '(:name :tab reg/mem ", " reg))))
+                          :printer '(:name :tab reg/mem ", " reg))
                     (:emitter
                      (cond ,@(when opcode-from
                                `(((xmm-register-p dst)
@@ -3366,20 +3355,14 @@
 
 ;;; MOVNTDQA
 (define-instruction movntdqa (segment dst src)
-  (:printer-list
-   (2byte-sse-inst-printer-list '2byte-xmm-xmm/mem #x66 #x38 #x2a))
   (:emitter
    (aver (and (xmm-register-p dst)
               (not (xmm-register-p src))))
-   (emit-regular-2byte-sse-inst segment dst src #x66 #x38 #x2a)))
+   (emit-regular-2byte-sse-inst segment dst src #x66 #x38 #x2a))
+  . #.(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem #x66 #x38 #x2a))
 
 ;;; MOVQ
 (define-instruction movq (segment dst src)
-  (:printer-list
-   (append
-    (sse-inst-printer-list 'xmm-xmm/mem #xf3 #x7e)
-    (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
-                           :printer '(:name :tab reg/mem ", " reg))))
   (:emitter
    (cond ((xmm-register-p dst)
           (emit-sse-inst segment dst src #xf3 #x7e
@@ -3387,7 +3370,10 @@
          (t
           (aver (xmm-register-p src))
           (emit-sse-inst segment src dst #x66 #xd6
-                         :operand-size :do-not-set)))))
+                         :operand-size :do-not-set))))
+  . #.(append (sse-inst-printer-list 'xmm-xmm/mem #xf3 #x7e)
+              (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
+                                     :printer '(:name :tab reg/mem ", " reg))))
 
 ;;; Instructions having an XMM register as the destination operand
 ;;; and a general-purpose register or a memory location as the source
@@ -3398,17 +3384,15 @@
 ;;; with zero extension or vice versa.
 ;;; We do not support the MMX version of this instruction.
 (define-instruction movd (segment dst src)
-  (:printer-list
-   (append
-    (sse-inst-printer-list 'xmm-reg/mem #x66 #x6e)
-    (sse-inst-printer-list 'xmm-reg/mem #x66 #x7e
-                           :printer '(:name :tab reg/mem ", " reg))))
   (:emitter
    (cond ((xmm-register-p dst)
           (emit-sse-inst segment dst src #x66 #x6e))
          (t
           (aver (xmm-register-p src))
-          (emit-sse-inst segment src dst #x66 #x7e)))))
+          (emit-sse-inst segment src dst #x66 #x7e))))
+  . #.(append (sse-inst-printer-list 'xmm-reg/mem #x66 #x6e)
+              (sse-inst-printer-list 'xmm-reg/mem #x66 #x7e
+                                     :printer '(:name :tab reg/mem ", " reg))))
 
 (macrolet ((define-extract-sse-instruction (name prefix op1 op2
                                             &key explicit-qword)
@@ -3475,16 +3459,6 @@
 ;; PEXTRW has a new 2-byte encoding in SSE4.1 to allow dst to be
 ;; a memory address.
 (define-instruction pextrw (segment dst src imm)
-  (:printer-list
-   (append
-    (2byte-sse-inst-printer-list '2byte-reg/mem-xmm #x66 #x3a #x15
-                                 :more-fields '((imm nil :type imm-byte))
-                                 :printer
-                                 '(:name :tab reg/mem ", " reg ", " imm))
-    (sse-inst-printer-list 'reg/mem-xmm #x66 #xc5
-                           :more-fields '((imm nil :type imm-byte))
-                           :printer
-                           '(:name :tab reg/mem ", " reg ", " imm))))
   (:emitter
    (aver (xmm-register-p src))
    (if (not (register-p dst))
@@ -3492,12 +3466,18 @@
                             :operand-size :do-not-set :remaining-bytes 1)
        (emit-sse-inst segment dst src #x66 #xc5
                             :operand-size :do-not-set :remaining-bytes 1))
-   (emit-byte segment imm)))
+   (emit-byte segment imm))
+  . #.(append
+       (2byte-sse-inst-printer-list '2byte-reg/mem-xmm #x66 #x3a #x15
+                                    :more-fields '((imm nil :type 'imm-byte))
+                                    :printer '(:name :tab reg/mem ", " reg ", " imm))
+       (sse-inst-printer-list 'reg/mem-xmm #x66 #xc5
+                              :more-fields '((imm nil :type 'imm-byte))
+                              :printer '(:name :tab reg/mem ", " reg ", " imm))))
 
 (macrolet ((define-integer-source-sse-inst (name prefix opcode &key mem-only)
              `(define-instruction ,name (segment dst src)
-                (:printer-list
-                 ',(sse-inst-printer-list 'xmm-reg/mem prefix opcode))
+                ,@(sse-inst-printer-list 'xmm-reg/mem prefix opcode)
                 (:emitter
                  (aver (xmm-register-p dst))
                  ,(when mem-only
@@ -3519,8 +3499,7 @@
 
 (macrolet ((define-gpr-destination-sse-inst (name prefix opcode &key reg-only)
              `(define-instruction ,name (segment dst src)
-                (:printer-list
-                 ',(sse-inst-printer-list 'reg-xmm/mem prefix opcode))
+                ,@(sse-inst-printer-list 'reg-xmm/mem prefix opcode)
                 (:emitter
                  (aver (register-p dst))
                  ,(when reg-only
@@ -3545,19 +3524,17 @@
 
 (macrolet ((regular-2byte-sse-inst (name prefix op1 op2)
              `(define-instruction ,name (segment dst src)
-                (:printer-list
-                 ',(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem prefix
-                                                op1 op2))
+                ,@(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem prefix
+                                                op1 op2)
                 (:emitter
                  (emit-regular-2byte-sse-inst segment dst src ,prefix
                                               ,op1 ,op2))))
            (regular-2byte-sse-inst-imm (name prefix op1 op2)
              `(define-instruction ,name (segment dst src imm)
-                (:printer-list
-                 ',(2byte-sse-inst-printer-list
+                ,@(2byte-sse-inst-printer-list
                     '2byte-xmm-xmm/mem prefix op1 op2
-                    :more-fields '((imm nil :type imm-byte))
-                    :printer `(:name :tab reg ", " reg/mem ", " imm)))
+                    :more-fields '((imm nil :type 'imm-byte))
+                    :printer `(:name :tab reg ", " reg/mem ", " imm))
                 (:emitter
                  (aver (typep imm '(unsigned-byte 8)))
                  (emit-regular-2byte-sse-inst segment dst src ,prefix ,op1 ,op2
@@ -3644,10 +3621,9 @@
 ;; Instructions implicitly using XMM0 as a mask
 (macrolet ((define-sse-inst-implicit-mask (name prefix op1 op2)
              `(define-instruction ,name (segment dst src mask)
-                (:printer-list
-                 ',(2byte-sse-inst-printer-list
+                ,@(2byte-sse-inst-printer-list
                     '2byte-xmm-xmm/mem prefix op1 op2
-                    :printer '(:name :tab reg ", " reg/mem ", XMM0")))
+                    :printer '(:name :tab reg ", " reg/mem ", XMM0"))
                 (:emitter
                  (aver (xmm-register-p dst))
                  (aver (and (xmm-register-p mask) (= (tn-offset mask) 0)))
