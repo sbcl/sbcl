@@ -1749,7 +1749,7 @@
            (emit-ea segment src (reg-tn-encoding index))))))
 
 (macrolet ((define (inst opcode-extension)
-             `(define-instruction ,inst (segment src index)
+             `(define-instruction ,inst (segment src index &optional prefix)
                 (:printer ext-reg/mem-no-width+imm8
                           ((op '(#xBA ,opcode-extension))
                            (reg/mem nil :type 'sized-reg/mem)))
@@ -1757,8 +1757,10 @@
                           ((op ,(dpb opcode-extension (byte 3 3) #b10000011))
                            (reg/mem nil :type 'sized-reg/mem))
                           '(:name :tab reg/mem ", " reg))
-                (:emitter (emit-bit-test-and-mumble segment src index
-                                                    ,opcode-extension)))))
+                (:emitter
+                 (emit-prefix segment prefix)
+                 (emit-bit-test-and-mumble segment src index
+                                           ,opcode-extension)))))
   (define bt  4)
   (define bts 5)
   (define btr 6)
