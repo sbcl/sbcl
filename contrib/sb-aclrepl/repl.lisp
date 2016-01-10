@@ -491,7 +491,7 @@
   (values))
 
 (defun bt-cmd (&optional (n most-positive-fixnum))
-  (sb-debug:print-backtrace n))
+  (sb-debug:print-backtrace :count n))
 
 (defun current-cmd ()
   (sb-debug::describe-debug-command))
