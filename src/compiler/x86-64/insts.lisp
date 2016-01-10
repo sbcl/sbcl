@@ -137,6 +137,17 @@
                         stream
                         dstate))
 
+;; Print a reg that can only be a :DWORD or :QWORD.
+;; Avoid use of INST-OPERAND-SIZE because it's wrong for this type of operand.
+(defun print-d/q-word-reg (value stream dstate)
+  (declare (type full-reg value)
+           (type stream stream)
+           (type disassem-state dstate))
+  (print-reg-with-width value
+                        (if (dstate-get-inst-prop dstate 'rex-w) :qword :dword)
+                        stream
+                        dstate))
+
 (defun print-byte-reg (value stream dstate)
   (declare (type full-reg value)
            (type stream stream)
@@ -3738,21 +3749,34 @@
    (emit-sse-inst segment dst src #xf3 #xb8)))
 
 (define-instruction crc32 (segment dst src)
-  (:printer-list
-   `(,@(mapcan (lambda (op2)
-                 (mapcar (lambda (instfmt)
-                           `(,instfmt ((prefix (#xf2)) (op1 (#x38))
-                                       (op2 (,op2)))))
-                         '(ext-rex-2byte-prefix-reg-reg/mem
-                           ext-2byte-prefix-reg-reg/mem)))
-               '(#xf0 #xf1))))
+  ;; The low bit of the final opcode byte sets the source size.
+  ;; REX.W bit sets the destination size. can't have #x66 prefix and REX.W = 1.
+  (:printer ext-2byte-prefix-reg-reg/mem
+            ((prefix #xf2) (op1 #x38)
+             (op2 #b1111000 :field (byte 7 25)) ; #xF0 ignoring the low bit
+             (src-width nil :field (byte 1 24) :prefilter #'prefilter-width)
+             (reg nil :printer #'print-d/q-word-reg)))
+  (:printer ext-rex-2byte-prefix-reg-reg/mem
+            ((prefix #xf2) (op1 #x38)
+             (op2 #b1111000 :field (byte 7 33)) ; ditto
+             (src-width nil :field (byte 1 32) :prefilter #'prefilter-width)
+             (reg nil :printer #'print-d/q-word-reg)))
   (:emitter
-   (let ((dst-size (operand-size dst)))
-     (aver (and (register-p dst) (not (or (eq dst-size :word)
-                                          (eq dst-size :byte)))))
-     (if (eq (operand-size src) :byte)
-         (emit-sse-inst-2byte segment dst src #xf2 #x38 #xf0)
-         (emit-sse-inst-2byte segment dst src #xf2 #x38 #xf1)))))
+   (let ((dst-size (operand-size dst))
+         (src-size (operand-size src)))
+     ;; The following operand size combinations are possible:
+     ;;   dst = r32, src = r/m{8, 16, 32}
+     ;;   dst = r64, src = r/m{8, 64}
+     (aver (and (register-p dst)
+                (memq src-size (case dst-size
+                                 (:dword '(:byte :word :dword))
+                                 (:qword '(:byte :qword))))))
+     (maybe-emit-operand-size-prefix segment src-size)
+     (emit-sse-inst-2byte segment dst src #xf2 #x38
+                          (if (eq src-size :byte) #xf0 #xf1)
+                          ;; :OPERAND-SIZE is ordinarily determined
+                          ;; from 'src', so override it to use 'dst'.
+                          :operand-size dst-size))))
 
 ;;;; Miscellany
 

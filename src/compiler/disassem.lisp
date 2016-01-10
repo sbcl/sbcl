@@ -631,10 +631,6 @@
 ;;; final target system
 (defun modify-or-add-arg (arg-name args &rest properties)
   (declare (dynamic-extent properties))
-  (when (get-properties properties '(:field :fields))
-    (error "~@<in arg ~S: ~3I~:_~
-          can't specify fields except using DEFINE-INSTRUCTION-FORMAT~:>"
-           arg-name))
   (let* ((cell (member arg-name args :key #'arg-name))
          (arg (if cell
                   (setf (car cell) (copy-structure (car cell)))
@@ -670,6 +666,9 @@
   (when use-label-p
     (setf (arg-use-label arg) use-label))
   (when fields-p
+    (awhen (and (null format-length) *current-instruction-flavor*)
+      (setq format-length ; FORMAT-LENGTH is not (FORMAT-LENGTH ...). wtf?
+            (bytes-to-bits (format-length (format-or-lose (cdr it))))))
     (setf (arg-fields arg)
           (mapcar (lambda (bytespec)
                     (when (> (+ (byte-position bytespec) (byte-size bytespec))
