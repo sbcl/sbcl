@@ -761,6 +761,36 @@
                                initial-contents
                                call))
 
+;;;; ADJUST-ARRAY
+(deftransform adjust-array ((array dims &key displaced-to displaced-index-offset)
+                            (array integer &key
+                                   (:displaced-to array)
+                                   (:displaced-index-offset *)))
+  (unless displaced-to
+    (give-up-ir1-transform))
+  `(progn
+     (when (invalid-array-p array)
+       (invalid-array-error array))
+     (unless (= 1 (array-rank array))
+       (error "The number of dimensions is not equal to the rank of the array"))
+     (unless (eql (array-element-type array) (array-element-type displaced-to))
+       (error "Can't displace an array of type ~S to another of type ~S"
+              (array-element-type array) (array-element-type displaced-to)))
+     (let ((displacement (or displaced-index-offset 0))
+           (array-size dims))
+       (when (< (array-total-size displaced-to) (+ displacement array-size))
+         (error "The :DISPLACED-TO array is too small"))
+       (if (adjustable-array-p array)
+           (let ((nfp (when (array-has-fill-pointer-p array)
+                        (when (> (%array-fill-pointer array) array-size)
+                          (error "Cannot ADJUST-ARRAY an array to a size smaller than its fill pointer"))
+                        (%array-fill-pointer array))))
+             (set-array-header array displaced-to array-size nfp
+                               displacement dims t nil))
+           (make-array dims :element-type (array-element-type array)
+                       :displaced-to displaced-to
+                       :displaced-index-offset displaced-index-offset)))))
+
 ;;;; miscellaneous properties of arrays
 
 ;;; Transforms for various array properties. If the property is know
