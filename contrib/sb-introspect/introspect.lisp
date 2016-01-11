@@ -643,28 +643,45 @@ value."
 
 (defun collect-xref (kind-index wanted-name)
   (let ((ret nil))
-    (call-with-each-global-functoid
-     (lambda (info-name value)
-          ;; Get a simple-fun for the definition, and an xref array
-          ;; from the table if available.
-          (let* ((simple-fun (get-simple-fun value))
-                 (xrefs (when simple-fun
-                          (sb-kernel:%simple-fun-xrefs simple-fun)))
-                 (array (when xrefs
-                          (aref xrefs kind-index))))
-            ;; Loop through the name/path xref entries in the table
-            (loop for i from 0 below (length array) by 2
-                  for xref-name = (aref array i)
-                  for xref-path = (aref array (1+ i))
-                  do (when (equal xref-name wanted-name)
-                       (let ((source-location
-                              (find-function-definition-source simple-fun)))
-                         ;; Use the more accurate source path from
-                         ;; the xref entry.
-                         (setf (definition-source-form-path source-location)
-                               xref-path)
-                         (push (cons info-name source-location)
-                               ret)))))))
+    (flet ((process (info-name value)
+             ;; Get a simple-fun for the definition, and an xref array
+             ;; from the table if available.
+             (let* ((simple-fun (get-simple-fun value))
+                    (xrefs (when simple-fun
+                             (sb-kernel:%simple-fun-xrefs simple-fun)))
+                    (array (when xrefs
+                             (aref xrefs kind-index))))
+               ;; Loop through the name/path xref entries in the table
+               (loop for i from 0 below (length array) by 2
+                     for xref-name = (aref array i)
+                     for xref-path = (aref array (1+ i))
+                     do (when (equal xref-name wanted-name)
+                          (let ((source-location
+                                  (find-function-definition-source simple-fun)))
+                            ;; Use the more accurate source path from
+                            ;; the xref entry.
+                            (setf (definition-source-form-path source-location)
+                                  xref-path)
+                            (push (cons info-name source-location)
+                                  ret)))))))
+      (call-with-each-global-functoid
+       (lambda (info-name value)
+         ;; Functions with EQL specializers no longer get a fdefinition,
+         ;; process all the methods from a generic function
+         (cond ((and (sb-kernel:fdefn-p value)
+                     (typep (sb-kernel:fdefn-fun value) 'generic-function))
+                (loop for method in (sb-mop:generic-function-methods (sb-kernel:fdefn-fun value))
+                      for fun = (sb-pcl::safe-method-fast-function method)
+                      when fun
+                      do
+                      (process (sb-kernel:%fun-name fun) fun)))
+               ;; Methods are alredy processed above
+               ((and (sb-kernel:fdefn-p value)
+                     (consp (sb-kernel:fdefn-name value))
+                     (member (car (sb-kernel:fdefn-name value))
+                             '(sb-pcl::slow-method sb-pcl::fast-method))))
+               (t
+                (process info-name value))))))
     ret))
 
 (defun who-calls (function-name)

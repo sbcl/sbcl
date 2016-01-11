@@ -33,7 +33,8 @@
    xref/8
    xref/12
    (sb-pcl::fast-method xref/10 (t t t t t t t t fixnum))
-   (sb-pcl::fast-method xref/11 (fixnum))))
+   (sb-pcl::fast-method xref/11 (fixnum))
+   (sb-pcl::fast-method xref/11 ((eql z)))))
 
 (define-xref-test who-calls.5
     (who-calls 'xref/3)

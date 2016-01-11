@@ -97,6 +97,10 @@
   (declare (ignore a))
   (xref/2))
 
+(defmethod xref/11 ((a (eql 'z)))
+  (declare (ignore a))
+  (xref/2))
+
 (defmethod xref/11 ((a float))
   (declare (ignore a))
   (xref/3))
