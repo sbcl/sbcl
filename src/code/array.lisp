@@ -379,6 +379,24 @@
         (contents-p (values :initial-contents contents))
         (t          (values nil nil))))
 
+(declaim (inline %save-displaced-array-backpointer))
+(defun %save-displaced-array-backpointer (array data)
+  (flet ((purge (pointers)
+           (remove-if (lambda (value)
+                        (or (not value) (eq array value)))
+                      pointers
+                      :key #'weak-pointer-value)))
+    ;; Add backpointer to the new data vector if it has a header.
+    (when (array-header-p data)
+      (setf (%array-displaced-from data)
+            (cons (make-weak-pointer array)
+                  (purge (%array-displaced-from data)))))
+    ;; Remove old backpointer, if any.
+    (let ((old-data (%array-data-vector array)))
+      (when (and (neq data old-data) (array-header-p old-data))
+        (setf (%array-displaced-from old-data)
+              (purge (%array-displaced-from old-data)))))))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits
@@ -1160,7 +1178,8 @@ of specialized arrays is supported."
                        array-data))))
           (displaced-to
              ;; We already established that no INITIAL-CONTENTS was supplied.
-             (unless (subtypep element-type (array-element-type displaced-to))
+             (unless (or (eql element-type (array-element-type displaced-to))
+                         (subtypep element-type (array-element-type displaced-to)))
                ;; See lp#1331299 again. Require exact match on upgraded type?
                (error "can't displace an array of type ~S into another of ~
                        type ~S"
@@ -1335,73 +1354,55 @@ of specialized arrays is supported."
 ;;; corruption, but because it walks the chain *upwards*, which
 ;;; may violate user expectations.
 
-(defun %save-displaced-array-backpointer (array data)
-  (flet ((purge (pointers)
-           (remove-if (lambda (value)
-                        (or (not value) (eq array value)))
-                      pointers
-                      :key #'weak-pointer-value)))
-    ;; Add backpointer to the new data vector if it has a header.
-    (when (array-header-p data)
-      (setf (%array-displaced-from data)
-            (cons (make-weak-pointer array)
-                  (purge (%array-displaced-from data)))))
-    ;; Remove old backpointer, if any.
-    (let ((old-data (%array-data-vector array)))
-      (when (and (neq data old-data) (array-header-p old-data))
-        (setf (%array-displaced-from old-data)
-              (purge (%array-displaced-from old-data)))))))
-
-(defun %walk-displaced-array-backpointers (array new-length)
-  (dolist (p (%array-displaced-from array))
-    (let ((from (weak-pointer-value p)))
-      (when (and from (eq array (%array-data-vector from)))
-        (let ((requires (+ (%array-available-elements from)
-                           (%array-displacement from))))
-          (unless (>= new-length requires)
-            ;; ANSI sayeth (ADJUST-ARRAY dictionary entry):
-            ;;
-            ;;   "If A is displaced to B, the consequences are unspecified if B is
-            ;;   adjusted in such a way that it no longer has enough elements to
-            ;;   satisfy A.
-            ;;
-            ;; since we're hanging on a weak pointer here, we can't signal an
-            ;; error right now: the array that we're looking at might be
-            ;; garbage. Instead, we set all dimensions to zero so that next
-            ;; safe access to the displaced array will trap. Additionally, we
-            ;; save the original dimensions, so we can signal a more
-            ;; understandable error when the time comes.
-            (%walk-displaced-array-backpointers from 0)
-            (setf (%array-fill-pointer from) 0
-                  (%array-available-elements from) 0
-                  (%array-displaced-p from) (array-dimensions array))
-            (dotimes (i (%array-rank from))
-              (setf (%array-dimension from i) 0))))))))
-
 ;;; Fill in array header with the provided information, and return the array.
 (defun set-array-header (array data length fill-pointer displacement dimensions
                          displacedp newp)
-  (if newp
-      (setf (%array-displaced-from array) nil)
-      (%walk-displaced-array-backpointers array length))
-  (when displacedp
-    (%save-displaced-array-backpointer array data))
-  (setf (%array-data-vector array) data)
-  (setf (%array-available-elements array) length)
-  (cond (fill-pointer
-         (setf (%array-fill-pointer array) fill-pointer)
-         (setf (%array-fill-pointer-p array) t))
-        (t
-         (setf (%array-fill-pointer array) length)
-         (setf (%array-fill-pointer-p array) nil)))
-  (setf (%array-displacement array) displacement)
-  (if (listp dimensions)
-      (dotimes (axis (array-rank array))
-        (declare (type index axis))
-        (setf (%array-dimension array axis) (pop dimensions)))
-      (setf (%array-dimension array 0) dimensions))
-  (setf (%array-displaced-p array) displacedp)
-  array)
+  (labels ((%walk-displaced-array-backpointers (array new-length)
+             (dolist (p (%array-displaced-from array))
+               (let ((from (weak-pointer-value p)))
+                 (when (and from (eq array (%array-data-vector from)))
+                   (let ((requires (+ (%array-available-elements from)
+                                      (%array-displacement from))))
+                     (unless (>= new-length requires)
+                       ;; ANSI sayeth (ADJUST-ARRAY dictionary entry):
+                       ;;
+                       ;;   "If A is displaced to B, the consequences are unspecified if B is
+                       ;;   adjusted in such a way that it no longer has enough elements to
+                       ;;   satisfy A.
+                       ;;
+                       ;; since we're hanging on a weak pointer here, we can't signal an
+                       ;; error right now: the array that we're looking at might be
+                       ;; garbage. Instead, we set all dimensions to zero so that next
+                       ;; safe access to the displaced array will trap. Additionally, we
+                       ;; save the original dimensions, so we can signal a more
+                       ;; understandable error when the time comes.
+                       (%walk-displaced-array-backpointers from 0)
+                       (setf (%array-fill-pointer from) 0
+                             (%array-available-elements from) 0
+                             (%array-displaced-p from) (array-dimensions array))
+                       (dotimes (i (%array-rank from))
+                         (setf (%array-dimension from i) 0)))))))))
+    (if newp
+        (setf (%array-displaced-from array) nil)
+        (%walk-displaced-array-backpointers array length))
+    (when displacedp
+      (%save-displaced-array-backpointer array data))
+    (setf (%array-data-vector array) data)
+    (setf (%array-available-elements array) length)
+    (cond (fill-pointer
+           (setf (%array-fill-pointer array) fill-pointer)
+           (setf (%array-fill-pointer-p array) t))
+          (t
+           (setf (%array-fill-pointer array) length)
+           (setf (%array-fill-pointer-p array) nil)))
+    (setf (%array-displacement array) displacement)
+    (if (listp dimensions)
+        (dotimes (axis (array-rank array))
+          (declare (type index axis))
+          (setf (%array-dimension array axis) (pop dimensions)))
+        (setf (%array-dimension array 0) dimensions))
+    (setf (%array-displaced-p array) displacedp)
+    array))
 
 ;;; User visible extension
 (declaim (ftype (function (array) (values (simple-array * (*)) &optional))
