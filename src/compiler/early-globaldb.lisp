@@ -150,7 +150,7 @@
                           ,form
                           (progn
                             #-sb-xc-host
-                            (style-warn "(INFO ~S ~S) will fail at runtime."
+                            (style-warn "(~S ~S) is not a defined info type."
                                         category kind)
                             .whole.)))
                     .whole.))))
