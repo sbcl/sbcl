@@ -221,27 +221,33 @@
                            :foreign))))
 
 (defun allocation-inline (alloc-tn size)
-  (let* ((ok (gen-label)) ;reindent after merging
-        (done (gen-label))
-        #!+(and sb-thread win32)
-        (scratch-tns (loop for my-tn in `(,eax-tn ,ebx-tn ,edx-tn ,ecx-tn)
-                           when (and (not (location= alloc-tn my-tn))
-                                     (or (not (tn-p size))
-                                         (not (location= size my-tn))))
-                             collect my-tn))
-        (tls-prefix #!+sb-thread :fs #!-sb-thread nil)
-        (free-pointer
-         (make-ea :dword :disp
-                  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-                  #!-sb-thread (make-fixup "boxed_region" :foreign)
-                  :scale 1)) ; thread->alloc_region.free_pointer
-        (end-addr
-         (make-ea :dword :disp
-                  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-                  #!-sb-thread (make-fixup "boxed_region" :foreign 4)
-                  :scale 1))   ; thread->alloc_region.end_addr
-        #!+(and sb-thread win32) (scratch-tn (pop scratch-tns))
-        #!+(and sb-thread win32) (swap-tn (pop scratch-tns)))
+  (let* ((ok (gen-label))
+         (done (gen-label))
+         #!+(and sb-thread win32)
+         (scratch-tns (loop for my-tn in `(,eax-tn ,ebx-tn ,edx-tn ,ecx-tn)
+                            when (and (not (location= alloc-tn my-tn))
+                                      (or (not (tn-p size))
+                                          (not (location= size my-tn))))
+                            collect my-tn))
+         (tls-prefix #!+sb-thread :fs)
+         #!+(and sb-thread win32) (scratch-tn (pop scratch-tns))
+         #!+(and sb-thread win32) (swap-tn (pop scratch-tns))
+         (free-pointer
+           ;; thread->alloc_region.free_pointer
+           (make-ea :dword
+                    :base (or #!+(and sb-thread win32)
+                              scratch-tn)
+                    :disp
+                    #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                    #!-sb-thread (make-fixup "boxed_region" :foreign)))
+         (end-addr
+            ;; thread->alloc_region.end_addr
+           (make-ea :dword
+                    :base (or #!+(and sb-thread win32)
+                              scratch-tn)
+                    :disp
+                    #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+                    #!-sb-thread (make-fixup "boxed_region" :foreign 4))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
     #!+(and sb-thread win32)
@@ -251,9 +257,7 @@
       (inst mov scratch-tn
             (make-ea :dword :disp
                      +win32-tib-arbitrary-field-offset+) tls-prefix)
-      (setf (ea-base free-pointer) scratch-tn
-            (ea-base end-addr) scratch-tn
-            tls-prefix nil))
+      (setf tls-prefix nil))
     (inst add alloc-tn free-pointer tls-prefix)
     (inst cmp alloc-tn end-addr tls-prefix)
     (inst jmp :be ok)
@@ -290,7 +294,6 @@
       (inst pop swap-tn)
       (inst pop scratch-tn))
     (values)))
-
 
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; SIZE.  The size may be an integer or a TN. If Inline is a VOP
