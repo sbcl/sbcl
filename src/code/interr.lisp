@@ -177,27 +177,12 @@
       ((or error sb!di:debug-condition) ()))))
 
 (defun find-interrupted-frame ()
-  (/show0 "entering FIND-INTERRUPTED-FRAME")
-  (unless *finding-frame*
+  (when (plusp *free-interrupt-context-index*)
     (handler-case
-        (let ((*finding-frame* t))
-          (/show0 "in ordinary case")
-          (do ((frame (sb!di:top-frame) (sb!di:frame-down frame)))
-              ((null frame)
-               (/show0 "null frame")
-               nil)
-            (/noshow0 "at head of DO loop")
-            (when (and (sb!di::compiled-frame-p frame)
-                       (sb!di::compiled-frame-escaped frame))
-              (sb!di:flush-frames-above frame)
-              (/show0 "returning from within DO loop")
-              (return frame))))
-      (error ()
-        (/show0 "trapped ERROR")
-        nil)
-      (sb!di:debug-condition ()
-        (/show0 "trapped DEBUG-CONDITION")
-        nil))))
+        (sb!di::signal-context-frame (sb!alien::alien-sap
+                                      (sb!di::nth-interrupt-context
+                                       (1- *free-interrupt-context-index*))))
+      ((or error sb!di:debug-condition) ()))))
 
 (defun find-caller-of-named-frame (name)
   (unless *finding-frame*
