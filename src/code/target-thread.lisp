@@ -1556,16 +1556,15 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
            (real-function (coerce function 'function))
            (arguments     (ensure-list arguments))
-           #!+win32
+           #!+(or win32 darwin)
            (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
                           (sb!vm:floating-point-modes)))
            ;; Allocate in the parent
            (thread-list (list thread thread)))
       (declare (dynamic-extent setup-sem))
       (dx-flet ((initial-thread-function ()
-                  ;; Win32 doesn't inherit parent thread's FP modes,
-                  ;; while it seems to happen everywhere else
-                  #!+win32
+                  ;; Inherit parent thread's FP modes
+                  #!+(or win32 darwin)
                   (setf (sb!vm:floating-point-modes) fp-modes)
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be very careful.
