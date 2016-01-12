@@ -285,7 +285,9 @@
 (def!method print-object ((des descriptor) stream)
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
-      (cond ((is-fixnum-lowtag lowtag)
+      (cond ((eq (descriptor-gspace des) :load-time-value)
+             (format stream "for LTV ~D" (descriptor-word-offset des)))
+            ((is-fixnum-lowtag lowtag)
              (format stream "for fixnum: ~W" (descriptor-fixnum des)))
             ((is-other-immediate-lowtag lowtag)
              (format stream
@@ -479,7 +481,11 @@
 
 ;;; (Note: In CMU CL, this function expected a SAP-typed ADDRESS
 ;;; value, instead of the object-and-offset we use here.)
-(declaim (ftype (function (descriptor sb!vm:word descriptor) (values))
+(declaim (ftype (function (descriptor
+                           (integer #.(- sb!vm:list-pointer-lowtag)
+                                    #.sb!ext:most-positive-word)
+                           descriptor)
+                          (values))
                 note-load-time-value-reference))
 (defun note-load-time-value-reference (address offset marker)
   (cold-push (cold-list (cold-intern :load-time-value-fixup)
