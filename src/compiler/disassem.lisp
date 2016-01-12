@@ -483,6 +483,7 @@
                            `(let* ,(make-arg-temp-bindings funstate) ,expr))))
                     (reader)))))))
         arg-specs)
+     #-sb-xc-host ; Host doesn't need the real definition.
      (%def-inst-format
       ',format-name ',include ,length-in-bits ,default-printer
       ,@(mapcar (lambda (arg) `(list ',(car arg) ,@(massage-arg arg :eval)))
@@ -649,7 +650,8 @@
     `(progn
        (eval-when (:compile-toplevel)
          (%def-arg-type ',name ,inherit ,@(massage-arg pair :compile)))
-     (%def-arg-type ',name ,inherit ,@(massage-arg pair :eval)))))
+       #-sb-xc-host ; Host doesn't need the real definition.
+       (%def-arg-type ',name ,inherit ,@(massage-arg pair :eval)))))
 
 (defun %def-arg-type (name inherit &rest properties)
   (setf (get name 'arg-type)
@@ -1189,6 +1191,7 @@
 (defun princ16 (value stream)
   (write value :stream stream :radix t :base 16 :escape nil))
 
+(declaim (ftype function read-suffix))
 (defun read-signed-suffix (length dstate)
   (declare (type (member 8 16 32 64) length)
            (type disassem-state dstate)

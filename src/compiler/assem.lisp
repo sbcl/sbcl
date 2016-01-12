@@ -1257,8 +1257,9 @@
   #!+sb-doc
   "Emit the specified instruction to the current segment."
   (let ((sym (inst-emitter-symbol instruction)))
-    (cond ((not (fboundp sym)) (error "unknown instruction: ~S" instruction))
-          ((get sym :macro) (funcall sym (cdr whole) env))
+    ;; An ordinary style-warning will suffice to indicate a missing emitter.
+    ;; There's no need for an extra check.
+    (cond ((get sym :macro) (funcall sym (cdr whole) env))
           (t `(,sym (%%current-segment%%) (%%current-vop%%) ,@args)))))
 
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
@@ -1623,11 +1624,7 @@
                #-sb-xc-host
                (declare (enable-package-locks %%current-segment%%))
                ,@emitter))
-           (values))
-         (eval-when (:compile-toplevel)
-           ;; Emitters are valid only if fboundp at compile-time.
-           (unless (fboundp ',defun-name) ; Don't clobber if reloading.
-             (setf (symbol-function ',defun-name) #'error)))))))
+           (values))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   (let* ((namestring (symbol-name name))
