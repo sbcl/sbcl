@@ -653,16 +653,81 @@
                   (format nil "L~W" max)))))
       (setf (dstate-labels dstate) labels))))
 
+(defun collect-inst-variants (base-name package variants cache)
+  (mapcar
+   (lambda (printer)
+     (destructuring-bind (format-name
+                          (&rest arg-constraints)
+                          &optional (printer :default)
+                          &key (print-name
+                                (without-package-locks (intern base-name package)))
+                               control)
+         printer
+       (declare (type (or symbol string) print-name))
+       (aver (= (length (remove-duplicates arg-constraints :key #'car))
+                (length arg-constraints)))
+       (let* ((flavor (cons base-name format-name))
+              (format (format-or-lose format-name))
+              (args (copy-list (format-args format)))
+              (format-length (bytes-to-bits (format-length format))))
+         (dolist (constraint arg-constraints)
+           (destructuring-bind (name . props) constraint
+             (let ((cell (member name args :key #'arg-name))
+                   (arg))
+               (if cell
+                   (setf (car cell) (setf arg (copy-structure (car cell))))
+                   (setf args (nconc args (list (setf arg (%make-arg name))))))
+               (apply #'modify-arg
+                      arg format-length (and props (cons :value props))))))
+         (let ((inst
+                (multiple-value-bind (mask id) (compute-mask-id args)
+                  (make-instruction
+                   base-name format-name print-name
+                   (format-length format) mask id
+                   (let ((printer (if (eq printer :default)
+                                      (format-default-printer format)
+                                      printer)))
+                     (when printer
+                       (lambda (chunk inst stream dstate)
+                         (funcall (setf (inst-printer inst)
+                                        (let ((*current-instruction-flavor* flavor))
+                                          (find-printer-fun printer args cache)))
+                                  chunk inst stream dstate))))
+                   nil ; labeller needs to close over INST
+                   nil ; prefilter needs to close over INST
+                   control))))
+           (when (some #'arg-use-label args)
+             (setf (inst-labeller inst)
+                   (lambda (chunk labels dstate)
+                     (funcall (setf (inst-labeller inst)
+                                    (let ((*current-instruction-flavor* flavor))
+                                      (find-labeller-fun args cache)))
+                              chunk labels dstate))))
+           (when (some #'arg-prefilter args)
+             (setf (inst-prefilter inst)
+                   (lambda (chunk dstate)
+                     (funcall (setf (inst-prefilter inst)
+                                    (let ((*current-instruction-flavor* flavor))
+                                      (find-prefilter-fun args cache)))
+                              chunk dstate))))
+           inst))))
+   variants))
+
 ;;; Get the instruction-space, creating it if necessary.
 (defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)
                             force)
   (let ((ispace *disassem-inst-space*))
     (when (or force (null ispace))
-      (let ((insts nil))
-        (do-symbols (name package)
-          (let ((inst-flavors (get name :disassembler)))
-            (dolist (flav inst-flavors)
-              (push flav insts))))
+      (let ((insts nil)
+            (cache (list (list :printer) (list :prefilter) (list :labeller))))
+        (do-symbols (symbol package)
+          (setq insts (nconc (collect-inst-variants
+                              (string-upcase symbol) package
+                              (get symbol 'instruction-flavors) cache)
+                             insts)))
+        (when force
+          (format t "~&~:{~@(~A~)s: ~D~:^, ~}~%"
+                  (mapcar (lambda (x) (list (car x) (length (cdr x)))) cache)))
         (setf ispace (build-inst-space insts)))
       (setf *disassem-inst-space* ispace))
     ispace))

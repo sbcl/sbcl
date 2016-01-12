@@ -330,12 +330,11 @@
                      (princ name stream)
                      (princ value stream)))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter jump-printer
+(defparameter jump-printer
     #'(lambda (value stream dstate)
         (let ((addr (ash value 2)))
           (maybe-note-assembler-routine addr t dstate)
-          (write addr :base 16 :radix t :stream stream)))))
+          (write addr :base 16 :radix t :stream stream))))
 
 
 

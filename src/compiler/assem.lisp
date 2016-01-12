@@ -1544,17 +1544,13 @@
                (error "You can only specify :VOP-VAR once per instruction.")
                (setf vop-name (car args))))
           (:printer
-           (sb!int:/noshow "uniquifying :PRINTER with" args)
-           #-sb-xc-host
-           (push (eval `(list (multiple-value-list
-                               ,(sb!disassem:gen-printer-def-forms-def-form
-                                 name
-                                 (cdr option-spec)))))
-                 pdefs))
+           (destructuring-bind (name operands . options) args
+             (push ``(,',name (,,@(mapcar (lambda (x) ``(,',(car x) ,,@(cdr x)))
+                                          operands))
+                              ,,@options) pdefs)))
           (t
            (error "unknown option: ~S" option)))))
     (sb!int:/noshow "done processing options")
-    (setf pdefs (nreverse pdefs))
     (unless vop-name
       (setq vop-name (make-symbol "VOP")))
     (multiple-value-bind (arg-reconstructor new-lambda-list)
@@ -1606,6 +1602,9 @@
                                       (queue-inst ,segment-name ,inst-name))
                                     (,flet-name ,segment-name))))))))
       `(progn
+         #-sb-xc-host ; The disassembler is not used on the host.
+         (setf (get ',defun-name 'sb!disassem::instruction-flavors)
+               (list ,@pdefs))
          (defun ,defun-name (,segment-name ,vop-name ,@new-lambda-list)
            ,@(when decls
                `((declare ,@decls)))
@@ -1628,11 +1627,7 @@
          (eval-when (:compile-toplevel)
            ;; Emitters are valid only if fboundp at compile-time.
            (unless (fboundp ',defun-name) ; Don't clobber if reloading.
-             (setf (symbol-function ',defun-name) #'error)))
-         ,@(extract-nths 1 'progn pdefs)
-         ,@(when pdefs
-             `((setf (get ',defun-name :disassembler)
-                (append ,@(extract-nths 0 'list pdefs)))))))))
+             (setf (symbol-function ',defun-name) #'error)))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   (let* ((namestring (symbol-name name))

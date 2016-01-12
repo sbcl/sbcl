@@ -115,6 +115,7 @@ Otherwise, use the Sparc register names")
       (aref reg-symbols index)
       (aref sparc-reg-symbols index)))
 
+;; FIXME: pathetic. DSTATE-PROPERTIES is the perfect place for this list.
 (defvar *note-sethi-inst* nil
   "An alist for the disassembler indicating the target register and
 value used in a SETHI instruction.  This is used to make annotations
@@ -856,9 +857,6 @@ about function addresses and register values.")
                                 op3 (reg-tn-encoding src1) 1
                                 (if extended 1 0) src2))))
 
-
-(eval-when (:compile-toplevel :execute)
-
 ;;; have to do this because def!constant is evalutated in the null lex env.
 (defmacro with-ref-format (printer)
   `(let* ((addend
@@ -875,8 +873,6 @@ about function addresses and register values.")
 (defconstant-eqx store-printer
   (with-ref-format `(:NAME :TAB rd ", " ,ref-format))
   #'equalp)
-
-) ; EVAL-WHEN
 
 (macrolet ((define-f3-inst (name op op3 &key fixup load-store (dest-kind 'reg)
                                  (printer :default) reads writes flushable print-name)
@@ -1102,8 +1098,7 @@ about function addresses and register values.")
   (:emitter (emit-format-3-immed segment #b11 1 #b100101
                                  (reg-tn-encoding src1) 1 src2)))
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun sethi-arg-printer (value stream dstate)
+(defun sethi-arg-printer (value stream dstate)
     (format stream "%hi(#x~8,'0x)" (ash value 10))
     ;; Save the immediate value and the destination register from this
     ;; sethi instruction.  This is used later to print some possible
@@ -1114,8 +1109,6 @@ about function addresses and register values.")
            (imm22 (ldb (byte 22 0) word))
            (rd (ldb (byte 5 25) word)))
       (push (cons rd imm22) *note-sethi-inst*)))
-) ; EVAL-WHEN
-
 
 (define-instruction sethi (segment dst src1)
   (:declare (type tn dst)

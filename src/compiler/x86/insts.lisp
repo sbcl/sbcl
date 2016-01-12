@@ -30,8 +30,6 @@
 
 (def!constant +default-operand-size+ :dword)
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
 (defun offset-next (value dstate)
   (declare (type integer value)
            (type disassem-state dstate))
@@ -246,8 +244,6 @@
     (:dword 32)
     (:float 32)
     (:double 64)))
-
-) ; EVAL-WHEN
 
 ;;;; disassembler argument types
 
@@ -342,7 +338,6 @@
   :printer #'print-word-reg/mem)
 
 ;;; added by jrd
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun print-fp-reg (value stream dstate)
   (declare (ignore dstate))
   (format stream "FR~D" value))
@@ -350,7 +345,7 @@
   ;; just return it
   (declare (ignore dstate))
   value)
-) ; EVAL-WHEN
+
 (define-arg-type fp-reg :prefilter #'prefilter-fp-reg
                         :printer #'print-fp-reg)
 
@@ -368,7 +363,6 @@
 ;;; prefixes.
 (define-arg-type seg :prefilter #'prefilter-seg)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
   '((:o . 0)
     (:no . 1)
@@ -392,7 +386,6 @@
       (when (null (aref vec (cdr cond)))
         (setf (aref vec (cdr cond)) (car cond))))
     vec))
-) ; EVAL-WHEN
 
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
@@ -406,11 +399,10 @@
 
 ;;;; disassembler instruction formats
 
-(eval-when (:compile-toplevel :execute)
-  (defun swap-if (direction field1 separator field2)
+(defun swap-if (direction field1 separator field2)
     `(:if (,direction :constant 0)
           (,field1 ,separator ,field2)
-          (,field2 ,separator ,field1))))
+          (,field2 ,separator ,field1)))
 
 (define-instruction-format (byte 8 :default-printer '(:name))
   (op    :field (byte 8 0))

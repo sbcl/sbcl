@@ -47,8 +47,6 @@
 ;;; and thus not supported by this assembler/disassembler.
 (def!constant +default-address-size+ :qword)
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
 (defun offset-next (value dstate)
   (declare (type integer value)
            (type disassem-state dstate))
@@ -358,7 +356,6 @@
   (maybe-note-assembler-routine value nil dstate)
   (maybe-note-static-symbol value dstate)
   (princ value stream))
-) ; EVAL-WHEN
 
 ;;;; disassembler argument types
 
@@ -505,8 +502,6 @@
   :prefilter #'prefilter-reg/mem
   :printer #'print-xmmreg/mem)
 
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
   '((:o . 0)
     (:no . 1)
@@ -530,7 +525,6 @@
       (when (null (aref vec (cdr cond)))
         (setf (aref vec (cdr cond)) (car cond))))
     vec))
-) ; EVAL-WHEN
 
 ;;; SSE shuffle patterns. The names end in the number of bits of the
 ;;; immediate byte that are used to encode the pattern and the radix
@@ -559,11 +553,10 @@
 
 ;;;; disassembler instruction formats
 
-(eval-when (:compile-toplevel :execute)
-  (defun swap-if (direction field1 separator field2)
+(defun swap-if (direction field1 separator field2)
     `(:if (,direction :constant 0)
           (,field1 ,separator ,field2)
-          (,field2 ,separator ,field1))))
+          (,field2 ,separator ,field1)))
 
 (define-instruction-format (byte 8 :default-printer '(:name))
   (op    :field (byte 8 0))
@@ -1101,8 +1094,7 @@
 
 ;; XMM comparison instruction
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *sse-conditions* #(:eq :lt :le :unord :neq :nlt :nle :ord)))
+(defparameter *sse-conditions* #(:eq :lt :le :unord :neq :nlt :nle :ord))
 
 (define-arg-type sse-condition-code
   ;; Inherit the prefilter from IMM-BYTE to READ-SUFFIX the byte.
@@ -2022,11 +2014,6 @@
              (t
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
-;; It's an error to compile instructions without their labeler and printer defined
-;; in the compiler, even though they aren't called.
-;; This stems from compile-time use of (MAKE-VALSRC #'f '#'f)
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
 ;; If the filtered VALUE (R/M field of LEA) should be treated as a label,
 ;; return the virtual address, otherwise the value unchanged.
 (defun lea-compute-label (value dstate)
@@ -2057,8 +2044,6 @@
       ;; though LEA Rx,Ry is an illegal instruction.
       (full-reg
        (print-reg-with-width value width stream dstate)))))
-
-) ; EVAL-WHEN
 
 (define-instruction lea (segment dst src)
   (:printer

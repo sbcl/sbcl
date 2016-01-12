@@ -198,21 +198,21 @@
                                            printer
                                            labeller prefilter control))
                         (:copier nil))
-  (name nil :type (or symbol string))
-  (format-name nil :type (or symbol string))
+  (name nil :type (or symbol string) :read-only t)
+  (format-name nil :type (or symbol string) :read-only t)
 
-  (mask dchunk-zero :type dchunk)       ; bits in the inst that are constant
-  (id dchunk-zero :type dchunk)         ; value of those constant bits
+  (mask dchunk-zero :type dchunk :read-only t)   ; bits in the inst that are constant
+  (id dchunk-zero :type dchunk :read-only t)     ; value of those constant bits
 
-  (length 0 :type disassem-length)               ; in bytes
+  (length 0 :type disassem-length :read-only t)  ; in bytes
 
-  (print-name nil :type symbol)
+  (print-name nil :type symbol :read-only t)
 
   ;; disassembly functions
   (prefilter nil :type (or null function))
   (labeller nil :type (or null function))
   (printer (missing-arg) :type (or null function))
-  (control nil :type (or null function))
+  (control nil :type (or null function) :read-only t)
 
   ;; instructions that are the same as this instruction but with more
   ;; constraints
@@ -240,23 +240,7 @@
   (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
   (subspace (missing-arg) :type (or inst-space instruction)))
 
-;;;; only used during compilation of the instructions for a backend
-;;;;
-;;;; FIXME: If only used then, isn't there some way we could do
-;;;; EVAL-WHEN tricks to keep this stuff from appearing in the target
-;;;; system?
-
-(defvar *disassem-inst-formats* (make-hash-table))
-(defvar *disassem-arg-types* nil)
-
-;;; The expander of DEFINE-INSTRUCTION has side-effects - if it finds a hit
-;;; in the interned-sexpr table, then the compiler thinks that it does not
-;;; have to emit a corresponding DEFUN. Depending on how you restart a
-;;; compile, this is a lie, so just wipe the table clean.
-(defmacro !begin-instruction-definitions ()
-  '(eval-when (:compile-toplevel :execute)
-     (makunbound (intern "INTERNED-SEXPRS"
-                         sb!assem::*backend-instruction-set-package*))))
+(defmacro !begin-instruction-definitions () nil) ; FIXME: remove
 
 ;;; FIXME: If we we interned the temp vars,
 ;;; and wouldn't use symbols qua strings, then this would reduce to EQUAL.
@@ -273,7 +257,7 @@
                        ;; and if lexical vars, it's also right because
                        ;; we never rebind a given temp within a function.
                        (string= a b))))
-      ((or number character) (eql a b))
+      ((or number character function) (eql a b))
       (vector (and (vectorp b) (every #'recurse a b))))))
 
 ;;; Previously there were complicated checker functions which tried to attempt to
@@ -287,30 +271,18 @@
 ;;; no "interesting" non-null lexical environment. While it could be non-null,
 ;;; it can't matter, because our auto-generated code can't depend on the lexenv.
 (defvar *current-instruction-flavor* nil)
-(defun generate-function (kind forms funstate skeleton)
-  (let* ((package sb!assem::*backend-instruction-set-package*)
-         (table-name (intern "INTERNED-SEXPRS" package))
-         (table (if (boundp table-name)
-                    (symbol-value table-name)
-                    (set table-name
-                         (list (list :printer) (list :prefilter) (list :labeller)))))
-         (sub-table (assq kind table))
+(defun generate-function (kind forms funstate code-folding-cache skeleton)
+  (let* ((sub-table (assq kind code-folding-cache))
          (bindings (make-arg-temp-bindings funstate))
-         (guts `(let* ,bindings ,@forms))
-         (found (assoc guts (cdr sub-table) :test #'equal-mod-gensyms)))
-    (if found
-        (values (second found) nil)
-        (let* ((inst (car *current-instruction-flavor*))
-               (defun-name
-                 (intern (concatenate 'string (string kind) "." (string inst)
-                                      (string
-                                       (code-char
-                                        (+ 97 (count inst (cdr sub-table)
-                                                     :key #'cddr)))))
-                         package)))
-          (push (list* guts defun-name inst) (cdr sub-table))
-          (values defun-name `(defun ,defun-name
-                                ,@(subst guts :body (cdr skeleton))))))))
+         (guts `(let* ,bindings ,@forms)))
+    (or (cdr (assoc guts (cdr sub-table) :test #'equal-mod-gensyms))
+        (let* ((name (concatenate 'string "INST-" (string kind) "-"
+                                  (write-to-string (length sub-table))))
+               (definition
+                 (compile nil
+                   `(named-lambda ,name ,@(subst guts :body (cdr skeleton))))))
+          (push (cons guts definition) (cdr sub-table))
+          definition))))
 
 (defstruct (arg (:copier nil)
                 (:predicate nil)
@@ -335,12 +307,12 @@
   (fields nil :type list)
 
   (value nil :type (or list integer))
-  (sign-extend-p nil :type (member t nil))
+  (sign-extend-p nil :type boolean)
 
   ;; functions to use
-  (printer nil)
-  (prefilter nil)
-  (use-label nil))
+  (printer nil :type (or null function vector))
+  (prefilter nil :type (or null function))
+  (use-label nil :type (or boolean function)))
 
 (defstruct (instruction-format (:conc-name format-)
                                (:constructor make-inst-format
@@ -372,19 +344,6 @@
 ;;;; (notably functions), we sometimes use a VALSRC structure to keep
 ;;;; track of the source from which they were derived.
 
-(defstruct (valsrc (:constructor %make-valsrc)
-                   (:copier nil))
-  (value nil)
-  (source nil))
-
-(defun make-valsrc (value source)
-  (cond ((equal value source)
-         source)
-        ((and (listp value) (eq (car value) 'function))
-         value)
-        (t
-         (%make-valsrc :value value :source source))))
-
 ;;; machinery to provide more meaningful error messages during compilation
 (defun pd-error (fmt &rest args)
   (if *current-instruction-flavor*
@@ -394,136 +353,48 @@
              fmt args)
       (apply #'error fmt args)))
 
-(defun maybe-quote (evalp form)
-  (if (or evalp (self-evaluating-p form)) form `',form))
-
-;;; Detect things that obviously don't need wrapping, like
-;;; variable-refs and #'function.
-(defun doesnt-need-wrapping-p (form)
-  (or (symbolp form)
-      (and (listp form)
-           (eq (car form) 'function)
-           (symbolp (cadr form)))))
-
-(defun make-wrapper (form arg-name funargs prefix)
-  (if (and (listp form)
-           (eq (car form) 'function))
-      ;; a function def
-      (let ((wrapper-name (symbolicate prefix "-" arg-name "-WRAPPER"))
-            (wrapper-args (make-gensym-list (length funargs))))
-        (values `#',wrapper-name
-                `(defun ,wrapper-name ,wrapper-args
-                   (funcall ,form ,@wrapper-args))))
-      ;; something else
-      (let ((wrapper-name (symbolicate "*" prefix "-" arg-name "-WRAPPER*")))
-        (values wrapper-name `(defparameter ,wrapper-name ,form)))))
-
-(defun filter-overrides (overrides evalp)
-  (mapcar (lambda (override)
-            (list* (car override) (cadr override)
-                   (munge-fun-refs (cddr override) evalp)))
-          overrides))
-
-(defparameter *arg-fun-params*
-  '((:printer . (value stream dstate))
-    (:use-label . (value dstate))
-    (:prefilter . (value dstate))))
-
-(defun munge-fun-refs (params evalp &optional wrap-defs-p (prefix ""))
-  (let ((params (copy-list params)))
-    (do ((tail params (cdr tail))
-         (wrapper-defs nil))
-        ((null tail)
-         (values params (nreverse wrapper-defs)))
-      (let ((fun-arg (assoc (car tail) *arg-fun-params*)))
-        (when fun-arg
-          (let* ((fun-form (cadr tail))
-                 (quoted-fun-form `',fun-form))
-            (when (and wrap-defs-p (not (doesnt-need-wrapping-p fun-form)))
-              (multiple-value-bind (access-form wrapper-def-form)
-                  (make-wrapper fun-form (car fun-arg) (cdr fun-arg) prefix)
-                (setf quoted-fun-form `',access-form)
-                (push wrapper-def-form wrapper-defs)))
-            (if evalp
-                (setf (cadr tail)
-                      `(make-valsrc ,fun-form ,quoted-fun-form))
-                (setf (cadr tail)
-                      fun-form))))))))
-
-(defun gen-args-def-form (overrides format-form &optional (evalp t))
-  (let ((args-var (gensym)))
-    `(let ((,args-var (copy-list (format-args ,format-form))))
-       ,@(mapcar (lambda (override)
-                   (update-args-form args-var
-                                     `',(car override)
-                                     (and (cdr override)
-                                          (cons :value (cdr override)))
-                                     evalp))
-                 overrides)
-       ,args-var)))
-
-(defun gen-printer-def-forms-def-form (base-name
-                                       def
-                                       &optional
-                                       (evalp t))
-  (declare (type symbol base-name))
-  (destructuring-bind
-      (format-name
-       (&rest field-defs)
-       &optional (printer-form :default)
-       &key ((:print-name print-name-form) `',base-name) control)
-      def
-    (let ((format-var (gensym))
-          (field-defs (filter-overrides field-defs evalp)))
-      `(let* ((*current-instruction-flavor* ',(cons base-name format-name))
-              (,format-var (format-or-lose ',format-name))
-              (args ,(gen-args-def-form field-defs format-var evalp)))
-         (multiple-value-bind (printer-fun printer-defun)
-             (find-printer-fun ,(if (eq printer-form :default)
-                                     `(format-default-printer ,format-var)
-                                     (maybe-quote evalp printer-form))
-                               args)
-           (multiple-value-bind (labeller-fun labeller-defun)
-               (find-labeller-fun args)
-             (multiple-value-bind (prefilter-fun prefilter-defun)
-                 (find-prefilter-fun args)
-               (multiple-value-bind (mask id)
-                   (compute-mask-id args)
-                 (values
-                  `(make-instruction ',',base-name
-                                     ',',format-name
-                                     ,',print-name-form
-                                     ,(format-length ,format-var)
-                                     ,mask
-                                     ,id
-                                     ,(and printer-fun `#',printer-fun)
-                                     ,(and labeller-fun `#',labeller-fun)
-                                     ,(and prefilter-fun `#',prefilter-fun)
-                                     ,',control)
-                  `(progn
-                     ,@(and printer-defun (list printer-defun))
-                     ,@(and labeller-defun (list labeller-defun))
-                     ,@(and prefilter-defun (list prefilter-defun))))
-                 ))))))))
-
-(defun update-args-form (var name-form descrip-forms evalp)
-  `(setf ,var
-         ,(if evalp
-              `(modify-or-add-arg ,name-form ,var ,@descrip-forms)
-              `(apply #'modify-or-add-arg ,name-form ,var ',descrip-forms))))
-
 (defun format-or-lose (name)
-  (or (gethash name *disassem-inst-formats*)
+  (or (get name 'inst-format)
       (pd-error "unknown instruction format ~S" name)))
 
-;;; FIXME: needed only at build-the-system time, not in running system
-;;; and FIXME: better syntax would allow inheriting the length to avoid
-;;; re-stating it needlessly in some derived formats. Perhaps:
-;;; (DEFINE-INSTRUCTION-FORMAT NAME (:bits N [more-format-keys]*) &rest fields)
-;;;
+;;; Return a modified copy of ARG that has property values changed
+;;; depending on whether it is being used at compile-time or load-time.
+;;; This is to avoid evaluating #'FOO references at compile-time
+;;; while allowing compile-time manipulation of byte specifiers.
+(defun massage-arg (spec when)
+  (ecase when
+    (:compile
+     ;; At compile-time we get a restricted view of the DEFINE-ARG-TYPE args,
+     ;; just enough to macroexpand :READER definitions. :TYPE and ::SIGN-EXTEND
+     ;; are as specified, but :PREFILTER, :LABELLER, and :PRINTER are not
+     ;; compile-time evaluated.
+     (loop for (indicator val) on (cdr spec) by #'cddr
+           nconc (case indicator
+                   (:sign-extend ; Only a literal T or NIL is allowed
+                    (list indicator (the boolean val)))
+                   (:prefilter
+                    ;; #'ERROR is a placeholder for any compile-time non-nil
+                    ;; value. If nil, it must be literally nil, not 'NIL.
+                    (list indicator (if val #'error nil)))
+                   ((:field :fields :type)
+                    (list indicator val)))))
+    (:eval
+     (loop for (indicator raw-val) on (cdr spec) by #'cddr
+           ;; Use NAMED-LAMBDAs to enhance debuggability,
+           for val = (if (typep raw-val '(cons (eql lambda)))
+                         `(named-lambda ,(format nil "~A.~A" (car spec) indicator)
+                                        ,@(cdr raw-val))
+                         raw-val)
+           nconc (case indicator
+                   (:reader nil) ; drop it
+                   (:prefilter ; Enforce compile-time-determined not-nullness.
+                    (list indicator (if val `(the (not null) ,val) nil)))
+                   (t (list indicator val)))))))
+
 (defmacro define-instruction-format ((format-name length-in-bits
                                       &key default-printer include)
                                      &rest arg-specs)
+  #+sb-xc-host (declare (ignore default-printer))
   #!+sb-doc
   "DEFINE-INSTRUCTION-FORMAT (Name Length {Format-Key Value}*) Arg-Def*
   Define an instruction format NAME for the disassembler's use. LENGTH is
@@ -581,64 +452,59 @@
       If non-NIL, the value of this argument is used as an address, and if
       that address occurs inside the disassembled code, it is replaced by a
       label. If this is a function, it is called to filter the value."
-  (let ((length-var (gensym)) ; are lengths ever non-constant? probably not.
-        (inherited-args
-         (if include
-             (copy-list (format-args (format-or-lose include)))))
-        added-args readers all-wrapper-defs)
+  `(progn
+     (eval-when (:compile-toplevel)
+       (%def-inst-format
+        ',format-name ',include ,length-in-bits nil
+        ,@(mapcar (lambda (arg) `(list ',(car arg) ,@(massage-arg arg :compile)))
+                  arg-specs)))
+     ,@(mapcan
+        (lambda (arg-spec)
+          (awhen (getf (cdr arg-spec) :reader)
+            `((defun ,it (dchunk dstate)
+                (declare (ignorable dchunk dstate))
+                (flet ((local-filtered-value (offset)
+                         (declare (type filtered-value-index offset))
+                         (aref (dstate-filtered-values dstate) offset))
+                       (local-extract (bytespec)
+                         (dchunk-extract dchunk bytespec)))
+                  (declare (ignorable #'local-filtered-value #'local-extract)
+                           (inline local-filtered-value local-extract))
+                  ;; Delay ARG-FORM-VALUE call until after compile-time-too
+                  ;; processing of !%DEF-INSTRUCTION-FORMAT has happened.
+                  (macrolet
+                      ((reader ()
+                         (let* ((format-args
+                                 (format-args (format-or-lose ',format-name)))
+                                (arg (find ',(car arg-spec) format-args
+                                           :key #'arg-name))
+                                (funstate (make-funstate format-args))
+                                (expr (arg-value-form arg funstate :numeric)))
+                           `(let* ,(make-arg-temp-bindings funstate) ,expr))))
+                    (reader)))))))
+        arg-specs)
+     (%def-inst-format
+      ',format-name ',include ,length-in-bits ,default-printer
+      ,@(mapcar (lambda (arg) `(list ',(car arg) ,@(massage-arg arg :eval)))
+                arg-specs))))
+
+(defun %def-inst-format (name inherit length printer &rest arg-specs)
+  (let ((args (if inherit (copy-list (format-args (format-or-lose inherit)))))
+        (seen))
     (dolist (arg-spec arg-specs)
-      (let ((arg-name (car arg-spec)))
-        (multiple-value-bind (props wrapper-defs)
-            (munge-fun-refs (cdr arg-spec) t t
-                            (symbolicate format-name '- arg-name))
-          (setf all-wrapper-defs (nconc wrapper-defs all-wrapper-defs))
-          (let ((reader (getf props :reader)))
-            (when reader
-              (setq readers (list* #!-sb-fluid `(declaim (inline ,reader))
-                                   `(defun ,reader (dchunk dstate)
-                                      (declare (ignorable dchunk dstate))
-                                      (arg-access-macro ,arg-name ,format-name
-                                                        dchunk dstate))
-                                   readers))
-              (remf props :reader))) ; ok because MUNGEing copied the plist
-          (let ((cell (member arg-name inherited-args
-                              :key (lambda (x)
-                                     (arg-name (if (listp x) (second x) x))))))
-            (cond ((not cell)
-                   (push `(make-arg ',arg-name ,length-var ,@props)
-                         added-args))
-                  (props ; do nothing if no alterations
-                   (rplaca cell
-                           `(copy-arg ,(car cell) ,length-var ,@props))))))))
-    `(progn
-       ,@all-wrapper-defs
-       (eval-when (:compile-toplevel :execute)
-         (let ((,length-var ,length-in-bits))
-           (setf (gethash ',format-name *disassem-inst-formats*)
-                 (make-inst-format ',format-name (bits-to-bytes ,length-var)
-                                   ,(maybe-quote t default-printer)
-                                   (list ,@inherited-args
-                                         ,@(nreverse added-args))))))
-       ,@readers)))
-
-(defun make-arg (name format-length-bits &rest properties)
-  (apply #'modify-arg (%make-arg name) format-length-bits properties))
-
-(defun copy-arg (arg format-length-bits &rest properties)
-  (apply #'modify-arg (copy-structure arg) format-length-bits properties))
-
-;;; FIXME: probably needed only at build-the-system time, not in
-;;; final target system
-(defun modify-or-add-arg (arg-name args &rest properties)
-  (declare (dynamic-extent properties))
-  (let* ((cell (member arg-name args :key #'arg-name))
-         (arg (if cell
-                  (setf (car cell) (copy-structure (car cell)))
-                  (let ((arg (%make-arg arg-name)))
-                    (setf args (nconc args (list arg)))
-                    arg))))
-    (apply #'modify-arg arg nil properties)
-    args))
+      (let* ((arg-name (car arg-spec))
+             (properties (cdr arg-spec))
+             (cell (member arg-name args :key #'arg-name)))
+        (aver (not (memq arg-name seen)))
+        (push arg-name seen)
+        (cond ((not cell)
+               (setq args (nconc args (list (apply #'modify-arg (%make-arg arg-name)
+                                                   length properties)))))
+              (properties
+               (rplaca cell (apply #'modify-arg (copy-structure (car cell))
+                                   length properties))))))
+    (setf (get name 'inst-format)
+          (make-inst-format name (bits-to-bytes length) printer args))))
 
 (defun modify-arg (arg format-length
                    &key   (value nil value-p)
@@ -654,7 +520,12 @@
         (error ":FIELD and :FIELDS are mutually exclusive")
         (setf fields (list field) fields-p t)))
   (when type-p
-    (set-arg-from-type arg type *disassem-arg-types*))
+    (let ((type-arg (or (get type 'arg-type)
+                        (pd-error "unknown argument type: ~S" type))))
+      (setf (arg-printer arg) (arg-printer type-arg))
+      (setf (arg-prefilter arg) (arg-prefilter type-arg))
+      (setf (arg-sign-extend-p arg) (arg-sign-extend-p type-arg))
+      (setf (arg-use-label arg) (arg-use-label type-arg))))
   (when value-p
     (setf (arg-value arg) value))
   (when prefilter-p
@@ -666,9 +537,6 @@
   (when use-label-p
     (setf (arg-use-label arg) use-label))
   (when fields-p
-    (awhen (and (null format-length) *current-instruction-flavor*)
-      (setq format-length ; FORMAT-LENGTH is not (FORMAT-LENGTH ...). wtf?
-            (bytes-to-bits (format-length (format-or-lose (cdr it))))))
     (setf (arg-fields arg)
           (mapcar (lambda (bytespec)
                     (when (> (+ (byte-position bytespec) (byte-size bytespec))
@@ -681,21 +549,6 @@
                      bytespec format-length sb!c:*backend-byte-order*))
                   fields)))
   arg)
-
-;; Generate a sexpr to extract ARG-NAME of FORMAT-NAME using CHUNK and DSTATE.
-;; The first two arguments to this macro are not runtime-evaluated.
-(defmacro arg-access-macro (arg-name format-name chunk dstate)
-  (let* ((funstate (make-funstate (format-args (format-or-lose format-name))))
-         (arg (arg-or-lose arg-name funstate))
-         (arg-val-form (arg-value-form arg funstate :numeric)))
-    `(flet ((local-filtered-value (offset)
-              (declare (type filtered-value-index offset))
-              (aref (dstate-filtered-values ,dstate) offset))
-            (local-extract (bytespec)
-              (dchunk-extract ,chunk bytespec)))
-       (declare (ignorable #'local-filtered-value #'local-extract)
-                (inline local-filtered-value local-extract))
-       (let* ,(make-arg-temp-bindings funstate) ,arg-val-form))))
 
 (defun arg-value-form (arg funstate
                        &optional
@@ -758,15 +611,6 @@
         (t
          (car forms))))
 
-(defun set-arg-from-type (arg type-name table)
-  (let ((type-arg (find type-name table :key #'arg-name)))
-    (when (null type-arg)
-      (pd-error "unknown argument type: ~S" type-name))
-    (setf (arg-printer arg) (arg-printer type-arg))
-    (setf (arg-prefilter arg) (arg-prefilter type-arg))
-    (setf (arg-sign-extend-p arg) (arg-sign-extend-p type-arg))
-    (setf (arg-use-label arg) (arg-use-label type-arg))))
-
 ;;; DEFINE-ARG-TYPE Name {Key Value}*
 ;;;
 ;;; Define a disassembler argument type NAME (which can then be referenced in
@@ -794,17 +638,23 @@
 ;;;     code, it is replaced by a label. If this is a function, it is
 ;;;     called to filter the value.
 (defmacro define-arg-type (name &rest args
-                           &key sign-extend type prefilter printer use-label)
-  (declare (ignore sign-extend type prefilter printer use-label))
-  (multiple-value-bind (args wrapper-defs)
-      (munge-fun-refs args t t name)
+                           &key ((:type inherit))
+                                sign-extend prefilter printer use-label)
+  (declare (ignore sign-extend prefilter printer use-label))
+  ;; FIXME: this should be an *unevaluated* macro arg (named :INHERIT)
+  (aver (typep inherit '(or null (cons (eql quote) (cons symbol null)))))
+  (let ((pair (cons name (loop for (ind val) on args by #'cddr
+                               unless (eq ind :type)
+                               nconc (list ind val)))))
     `(progn
-       ,@wrapper-defs
-       (eval-when (:compile-toplevel :execute)
-         (setq *disassem-arg-types*
-               (delete ',name *disassem-arg-types* :key #'arg-name))
-         (push (modify-arg (%make-arg ',name) nil ,@args) *disassem-arg-types*))
-       ',name)))
+       (eval-when (:compile-toplevel)
+         (%def-arg-type ',name ,inherit ,@(massage-arg pair :compile)))
+     (%def-arg-type ',name ,inherit ,@(massage-arg pair :eval)))))
+
+(defun %def-arg-type (name inherit &rest properties)
+  (setf (get name 'arg-type)
+        (apply 'modify-arg (%make-arg name) nil
+               (nconc (when inherit (list :type inherit)) properties))))
 
 (defun %gen-arg-forms (arg rendering funstate)
   (declare (type arg arg) (type list funstate))
@@ -830,9 +680,7 @@
      (let ((sign-extended-forms (gen-arg-forms arg :sign-extended funstate))
            (pf (arg-prefilter arg)))
        (if pf
-           (values `(local-filter ,(maybe-listify sign-extended-forms)
-                                  ,(source-form pf))
-                   t)
+           (values `(local-filter ,(maybe-listify sign-extended-forms) ,pf) t)
            (values sign-extended-forms nil))))
     (:filtered ; extract from the prefiltered value vector
      (let ((pf (arg-prefilter arg)))
@@ -846,8 +694,7 @@
        ;; otherwise non-nil means a function to call, and NIL means not a label.
        ;; So only the middle case needs to call ADJUST-LABEL.
        (if (and use-label (neq use-label t))
-           `((adjust-label ,(maybe-listify filtered-forms)
-                           ,(source-form use-label)))
+           `((adjust-label ,(maybe-listify filtered-forms) ,use-label))
            filtered-forms)))
     (:final ; if arg is not a label, return numeric value, otherwise a string
      (let ((numeric-forms (gen-arg-forms arg :numeric funstate))
@@ -857,37 +704,14 @@
               (pd-error "cannot label multi-field ~S without a labeller" arg))
              (t `((lookup-label ,(maybe-listify numeric-forms)))))))))
 
-;;; Returns a version of THING suitable for including in an evaluable
-;;; position in some form.
-(defun source-form (thing)
-  (cond ((valsrc-p thing)
-         (valsrc-source thing))
-        ((functionp thing)
-         (pd-error
-          "can't dump functions, so function ref form must be quoted: ~S"
-          thing))
-        ((self-evaluating-p thing)
-         thing)
-        ((eq (car thing) 'function)
-         thing)
-        (t
-         `',thing)))
-
-;;; Return anything but a VALSRC structure.
-(defun value-or-source (thing)
-  (if (valsrc-p thing)
-      (valsrc-value thing)
-      thing))
-
-(defun find-printer-fun (printer-source args)
-  (unless printer-source
-    (return-from find-printer-fun (values nil nil)))
+(defun find-printer-fun (printer-source args cache)
   (let ((source (preprocess-printer printer-source args))
         (funstate (make-funstate args)))
    (generate-function
     :printer
     (let ((sb!xc:*gensym-counter* 0)) (compile-printer-list source funstate))
     funstate
+    cache
     '(lambda (chunk inst stream dstate)
        (declare (type dchunk chunk)
                 (type instruction inst)
@@ -1117,8 +941,16 @@
                      (and (listp (cadr source))
                           (eq (caadr source) 'function)))
            (pd-error "The first arg to :USING must be a string or #'function."))
+         ;; For (:using #'F) to be stuffed in properly, the printer as expressed
+         ;; in its DSL would have to compile-time expand into a thing that
+         ;; reconstructs it such that #'F forms don't appear inside quoted list
+         ;; structure. Lacking the ability to do that, we treat #'F as a bit of
+         ;; syntax to be evaluated manually.
          (compile-print (caddr source) funstate
-                        (make-valsrc (eval (cadr source)) (cadr source))))
+                        (let ((f (cadr source)))
+                          (if (typep f '(cons (eql function) (cons symbol null)))
+                              (symbol-function (second f))
+                              f))))
         ((eq (car source) :plus-integer)
          ;; prints the given field proceed with a + or a -
          (let ((form
@@ -1148,24 +980,17 @@
 
 (defun compile-print (arg-name funstate &optional printer)
   (let* ((arg (arg-or-lose arg-name funstate))
-         (printer (or printer (arg-printer arg)))
-         (printer-val (value-or-source printer))
-         (printer-src (source-form printer)))
-    (cond ((stringp printer-val)
-           `(local-format-arg ,(arg-value-form arg funstate) ,printer-val))
-          ((vectorp printer-val)
-           `(local-princ
-             (aref ,printer-src
-                   ,(arg-value-form arg funstate :numeric))))
-          ((or (functionp printer-val)
-               (and (consp printer-val) (eq (car printer-val) 'function)))
-           `(local-call-arg-printer ,(arg-value-form arg funstate)
-                                    ,printer-src))
-          ((or (null printer-val) (eq printer-val t))
-           `(,(if (arg-use-label arg) 'local-princ16 'local-princ)
-             ,(arg-value-form arg funstate)))
-          (t
-           (pd-error "illegal printer: ~S" printer-src)))))
+         (printer (or printer (arg-printer arg))))
+    (etypecase printer
+      (string
+       `(local-format-arg ,(arg-value-form arg funstate) ,printer))
+      (vector
+       `(local-princ (aref ,printer ,(arg-value-form arg funstate :numeric))))
+      ((or function (cons (eql function)))
+       `(local-call-arg-printer ,(arg-value-form arg funstate) ,printer))
+      (boolean
+       `(,(if (arg-use-label arg) 'local-princ16 'local-princ)
+         ,(arg-value-form arg funstate))))))
 
 (defun string-or-qsym-p (thing)
   (or (stringp thing)
@@ -1243,9 +1068,7 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
-(defun find-labeller-fun (args)
-  (unless (some #'arg-use-label args)
-    (return-from find-labeller-fun (values nil nil)))
+(defun find-labeller-fun (args cache)
   (let ((funstate (make-funstate args))
         (labels-form 'labels))
     (let ((sb!xc:*gensym-counter* 0))
@@ -1259,9 +1082,7 @@
                        labels
                        (cons (cons addr nil) labels)))))))
     (generate-function
-            :labeller
-            (list labels-form)
-            funstate
+            :labeller (list labels-form) funstate cache
             '(lambda (chunk labels dstate)
                (declare (type list labels)
                         (type dchunk chunk)
@@ -1279,9 +1100,7 @@
                                   adjust-label))
                  :body)))))
 
-(defun find-prefilter-fun (args)
-  (unless (some #'arg-prefilter args)
-    (return-from find-prefilter-fun (values nil nil)))
+(defun find-prefilter-fun (args cache)
   (let* ((funstate (make-funstate args))
          (forms
           (let ((sb!xc:*gensym-counter* 0))
@@ -1292,9 +1111,7 @@
                                        (gen-arg-forms arg :filtering funstate))))))
                     args))))
     (generate-function
-            :prefilter
-            forms
-            funstate
+            :prefilter forms funstate cache
             '(lambda (chunk dstate)
                (declare (type dchunk chunk)
                         (type disassem-state dstate))
