@@ -85,25 +85,6 @@
                  (t (make-symbol (concatenate 'string "$" name)))))
        sb!vm::*register-names*))
 
-(defun maybe-add-notes (regno dstate)
-  (let* ((inst (sap-ref-int (dstate-segment-sap dstate)
-                            (dstate-cur-offs dstate)
-                n-word-bytes
-                (dstate-byte-order dstate)))
-         (op (ldb (byte 6 26) inst)))
-    (case op
-      ;; lwz
-      (32
-       (when (= regno (ldb (byte 5 16) inst)) ; only for the second
-         (case (ldb (byte 5 16) inst)
-           ;; reg_CODE
-           (19
-            (note-code-constant (ldb (byte 16 0) inst) dstate)))))
-      ;; addi
-      (14
-       (when (= regno null-offset)
-         (maybe-note-nil-indexed-object (ldb (byte 16 0) inst) dstate))))))
-
 (define-arg-type reg
   :printer
   (lambda (value stream dstate)
@@ -234,33 +215,6 @@
                           value)
                       stream)))
 
-(defun snarf-error-junk (sap offset &optional length-only)
-  (let* ((length (sap-ref-8 sap offset))
-         (vector (make-array length :element-type '(unsigned-byte 8))))
-    (declare (type system-area-pointer sap)
-             (type (unsigned-byte 8) length)
-             (type (simple-array (unsigned-byte 8) (*)) vector))
-    (cond (length-only
-           (values 0 (1+ length) nil nil))
-          (t
-           (copy-ub8-from-system-area sap (1+ offset) vector 0 length)
-           (collect ((sc-offsets)
-                     (lengths))
-             (lengths 1)                ; the length byte
-             (let* ((index 0)
-                    (error-number (read-var-integer vector index)))
-               (lengths index)
-               (loop
-                 (when (>= index length)
-                   (return))
-                 (let ((old-index index))
-                   (sc-offsets (read-var-integer vector index))
-                   (lengths (- index old-index))))
-               (values error-number
-                       (1+ length)
-                       (sc-offsets)
-                       (lengths))))))))
-
 (defun emit-conditional-branch (segment bo bi target &optional aa-p lk-p)
   (declare (type boolean aa-p lk-p))
   (let* ((bo (valid-bo-encoding bo))
@@ -330,6 +284,7 @@
                      (princ name stream)
                      (princ value stream)))))
 
+#-sb-xc-host ; no definition of MAYBE-NOTE-ASSEMBLER-ROUTINE
 (defparameter jump-printer
     #'(lambda (value stream dstate)
         (let ((addr (ash value 2)))
@@ -625,29 +580,6 @@
 
 
 
-
-(defun unimp-control (chunk inst stream dstate)
-  (declare (ignore inst))
-  (flet ((nt (x) (if stream (note x dstate))))
-    (case (xinstr-data chunk dstate)
-      (#.error-trap
-       (nt "Error trap")
-       (handle-break-args #'snarf-error-junk stream dstate))
-      (#.cerror-trap
-       (nt "Cerror trap")
-       (handle-break-args #'snarf-error-junk stream dstate))
-      (#.object-not-list-trap
-       (nt "Object not list trap"))
-      (#.breakpoint-trap
-       (nt "Breakpoint trap"))
-      (#.pending-interrupt-trap
-       (nt "Pending interrupt trap"))
-      (#.halt-trap
-       (nt "Halt trap"))
-      (#.fun-end-breakpoint-trap
-       (nt "Function end breakpoint trap"))
-      (#.object-not-instance-trap
-       (nt "Object not instance trap")))))
 
 (eval-when (:compile-toplevel :execute)
 (defun classify-dependencies (deplist)
