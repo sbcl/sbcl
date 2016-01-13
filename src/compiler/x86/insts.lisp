@@ -886,9 +886,7 @@
 ;;;; prefixes
 
 (define-instruction x66 (segment)
-  (:printer x66 () nil :print-name nil)
-  (:emitter
-   (bug "#X66 prefix used as a standalone instruction")))
+  (:printer x66 () nil :print-name nil))
 
 (defun emit-prefix (segment name)
   (ecase name
@@ -902,19 +900,13 @@
      (emit-byte segment #x65))))
 
 (define-instruction fs (segment)
-  (:printer seg ((fsgs #b0)) nil :print-name nil)
-  (:emitter
-   (bug "FS prefix used as a standalone instruction")))
+  (:printer seg ((fsgs #b0)) nil :print-name nil))
 
 (define-instruction gs (segment)
-  (:printer seg ((fsgs #b1)) nil :print-name nil)
-  (:emitter
-   (bug "GS prefix used as a standalone instruction")))
+  (:printer seg ((fsgs #b1)) nil :print-name nil))
 
 (define-instruction lock (segment)
-  (:printer byte ((op #b11110000)) nil)
-  (:emitter
-   (bug "LOCK prefix used as a standalone instruction")))
+  (:printer byte ((op #b11110000)) nil))
 
 (define-instruction rep (segment)
   (:emitter

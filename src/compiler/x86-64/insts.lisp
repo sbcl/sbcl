@@ -1537,14 +1537,10 @@
 ;;;; prefixes
 
 (define-instruction rex (segment)
-  (:printer rex () nil :print-name nil)
-  (:emitter
-   (bug "REX prefix used as a standalone instruction")))
+  (:printer rex () nil :print-name nil))
 
 (define-instruction x66 (segment)
-  (:printer x66 () nil :print-name nil)
-  (:emitter
-   (bug "#X66 prefix used as a standalone instruction")))
+  (:printer x66 () nil :print-name nil))
 
 (defun emit-prefix (segment name)
   (declare (ignorable segment))
@@ -1555,9 +1551,7 @@
      (emit-byte segment #xf0))))
 
 (define-instruction lock (segment)
-  (:printer byte ((op #b11110000)) nil)
-  (:emitter
-   (bug "LOCK prefix used as a standalone instruction")))
+  (:printer byte ((op #b11110000)) nil))
 
 (define-instruction rep (segment)
   (:emitter

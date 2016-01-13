@@ -1500,27 +1500,26 @@
           list-of-lists-of-lists))
 
 (defmacro define-instruction (name lambda-list &rest options)
-  (let* ((sym-name (symbol-name name))
-         (defun-name (inst-emitter-symbol sym-name t))
-         (segment-name (car lambda-list))
-         (vop-name nil)
-         (postits (gensym "POSTITS-"))
-         (emitter nil)
-         (decls nil)
-         (attributes nil)
-         (cost nil)
-         (dependencies nil)
-         (delay nil)
-         (pinned nil)
-         (pdefs nil))
-    (sb!int:/noshow "entering DEFINE-INSTRUCTION" name lambda-list options)
+  (binding* ((sym-name (symbol-name name))
+             (defun-name (inst-emitter-symbol sym-name t))
+             (segment-name (car lambda-list))
+             (vop-name nil)
+             (postits (gensym "POSTITS-"))
+             (emitter nil)
+             (decls nil)
+             (attributes nil)
+             (cost nil)
+             (dependencies nil)
+             (delay nil)
+             (pinned nil)
+             (pdefs nil)
+             ((arg-reconstructor new-lambda-list)
+              (make-arglist-forwarder (cdr lambda-list))))
     (dolist (option-spec options)
-      (sb!int:/noshow option-spec)
       (multiple-value-bind (option args)
           (if (consp option-spec)
               (values (car option-spec) (cdr option-spec))
               (values option-spec nil))
-        (sb!int:/noshow option args)
         (case option
           (:emitter
            (when emitter
@@ -1551,11 +1550,9 @@
                               ,,@options) pdefs)))
           (t
            (error "unknown option: ~S" option)))))
-    (sb!int:/noshow "done processing options")
     (unless vop-name
       (setq vop-name (make-symbol "VOP")))
-    (multiple-value-bind (arg-reconstructor new-lambda-list)
-        (make-arglist-forwarder (cdr lambda-list))
+    (when emitter
       (push `(let ((hook (segment-inst-hook ,segment-name)))
                (when hook
                  (multiple-value-call hook ,segment-name ,vop-name ,sym-name
@@ -1601,12 +1598,13 @@
                                                 (,segment-name ,inst-name)
                                               ,@dependencies)))
                                       (queue-inst ,segment-name ,inst-name))
-                                    (,flet-name ,segment-name))))))))
-      `(progn
-         #-sb-xc-host ; The disassembler is not used on the host.
-         (setf (get ',defun-name 'sb!disassem::instruction-flavors)
-               (list ,@pdefs))
-         (defun ,defun-name (,segment-name ,vop-name ,@new-lambda-list)
+                                    (,flet-name ,segment-name)))))))))
+    `(progn
+       #-sb-xc-host ; The disassembler is not used on the host.
+       (setf (get ',defun-name 'sb!disassem::instruction-flavors)
+             (list ,@pdefs))
+       ,(when emitter
+         `(defun ,defun-name (,segment-name ,vop-name ,@new-lambda-list)
            ,@(when decls
                `((declare ,@decls)))
            (let ((,postits (segment-postits ,segment-name)))
