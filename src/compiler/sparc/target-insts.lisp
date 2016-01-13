@@ -11,5 +11,191 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB!SPARC-ASM")
 
+(defun sethi-arg-printer (value stream dstate)
+    (format stream "%hi(#x~8,'0x)" (ash value 10))
+    ;; Save the immediate value and the destination register from this
+    ;; sethi instruction.  This is used later to print some possible
+    ;; notes about the value loaded by sethi.
+    (let* ((word (sap-ref-int (dstate-segment-sap dstate)
+                              (dstate-cur-offs dstate) n-word-bytes
+                              (dstate-byte-order dstate)))
+           (imm22 (ldb (byte 22 0) word))
+           (rd (ldb (byte 5 25) word)))
+      (push (cons rd imm22) *note-sethi-inst*)))
+
+;; Look at the current instruction and see if we can't add some notes
+;; about what's happening.
+
+(defun maybe-add-notes (reg dstate)
+  ;; FIXME: these accessors should all be defined using the :READER option
+  ;; of DEFINE-INSTRUCTION-FORMAT.
+  (let* ((word (sap-ref-int (dstate-segment-sap dstate)
+                            (dstate-cur-offs dstate) n-word-bytes
+                            (dstate-byte-order dstate)))
+         (format (ldb (byte 2 30) word))
+         (op3 (ldb (byte 6 19) word))
+         (rs1 (ldb (byte 5 14) word))
+         (rd (ldb (byte 5 25) word))
+         (immed-p (not (zerop (ldb (byte 1 13) word))))
+         (immed-val (sign-extend-immed-value (ldb (byte 13 0) word))))
+    (declare (ignore immed-p))
+    ;; Only the value of format and rd are guaranteed to be correct
+    ;; because the disassembler is trying to print out the value of a
+    ;; register.  The other values may not be right.
+    (case format
+      (2
+       (case op3
+         (#b000000
+          (when (= reg rs1)
+            (handle-add-inst rs1 immed-val rd dstate)))
+         (#b111000
+          (when (= reg rs1)
+            (handle-jmpl-inst rs1 immed-val rd dstate)))
+         (#b010001
+          (when (= reg rs1)
+            (handle-andcc-inst rs1 immed-val rd dstate)))))
+      (3
+       (case op3
+         ((#b000000 #b000100)
+          (when (= reg rs1)
+            (handle-ld/st-inst rs1 immed-val rd dstate))))))
+    ;; If this is not a SETHI instruction, and RD is the same as some
+    ;; register used by SETHI, we delete the entry.  (In case we have
+    ;; a SETHI without any additional instruction because the low bits
+    ;; were zero.)
+    (unless (and (zerop format) (= #b100 (ldb (byte 3 22) word)))
+      (let ((sethi (assoc rd *note-sethi-inst*)))
+        (when sethi
+          (setf *note-sethi-inst* (delete sethi *note-sethi-inst*)))))))
+
+(defun handle-add-inst (rs1 immed-val rd dstate)
+  (let* ((sethi (assoc rs1 *note-sethi-inst*)))
+    (cond
+      (sethi
+       ;; RS1 was used in a SETHI instruction.  Assume that
+       ;; this is the offset part of the SETHI instruction for
+       ;; a full 32-bit address of something.  Make a note
+       ;; about this usage as a Lisp assembly routine or
+       ;; foreign routine, if possible.  If not, just note the
+       ;; final value.
+       (let ((addr (+ immed-val (ash (cdr sethi) 10))))
+         (or (note-code-constant-absolute addr dstate)
+             (maybe-note-assembler-routine addr t dstate)
+             (note (format nil "~A = #x~8,'0X" (get-reg-name rd) addr) dstate)))
+       (setf *note-sethi-inst* (delete sethi *note-sethi-inst*)))
+      ((= rs1 null-offset)
+       ;; We have an ADD %NULL, <n>, RD instruction.  This is a
+       ;; reference to a static symbol.
+       (maybe-note-nil-indexed-object immed-val dstate))
+      ((= rs1 alloc-offset)
+       ;; ADD %ALLOC, n.  This must be some allocation or
+       ;; pseudo-atomic stuff
+       (cond ((and (= immed-val 4) (= rd alloc-offset)
+                   (not *pseudo-atomic-set*))
+              ;; "ADD 4, %ALLOC" sets the flag
+              (note "Set pseudo-atomic flag" dstate)
+              (setf *pseudo-atomic-set* t))
+             ((= rd alloc-offset)
+              ;; "ADD n, %ALLOC" is reseting the flag, with extra
+              ;; allocation.
+              (note (format nil "Reset pseudo-atomic, allocated ~D bytes"
+                            (+ immed-val 4)) dstate)
+              (setf *pseudo-atomic-set* nil))))
+      #+nil ((and (= rs1 zero-offset) *pseudo-atomic-set*)
+       ;; "ADD %ZERO, num, RD" inside a pseudo-atomic is very
+       ;; likely loading up a header word.  Make a note to that
+       ;; effect.
+       (let ((type (second (assoc (logand immed-val #xff) header-word-type-alist)))
+             (size (ldb (byte 24 8) immed-val)))
+         (when type
+           (note (format nil "Header word ~A, size ~D?" type size) dstate)))))))
+
+(defun handle-jmpl-inst (rs1 immed-val rd dstate)
+  (declare (ignore rd))
+  (let* ((sethi (assoc rs1 *note-sethi-inst*)))
+    (when sethi
+      ;; RS1 was used in a SETHI instruction.  Assume that
+      ;; this is the offset part of the SETHI instruction for
+      ;; a full 32-bit address of something.  Make a note
+      ;; about this usage as a Lisp assembly routine or
+      ;; foreign routine, if possible.  If not, just note the
+      ;; final value.
+      (let ((addr (+ immed-val (ash (cdr sethi) 10))))
+        (maybe-note-assembler-routine addr t dstate)
+        (setf *note-sethi-inst* (delete sethi *note-sethi-inst*))))))
+
+(defun handle-ld/st-inst (rs1 immed-val rd dstate)
+  (declare (ignore rd))
+  ;; Got an LDUW/LD or STW instruction, with immediate offset.
+  (case rs1
+    (29
+     ;; A reference to a code constant (reg = %CODE)
+     (note-code-constant immed-val dstate))
+    (2
+     ;; A reference to a static symbol or static function (reg =
+     ;; %NULL)
+     (or (maybe-note-nil-indexed-symbol-slot-ref immed-val dstate)
+         #+nil (sb!disassem::maybe-note-static-function immed-val dstate)))
+    (t
+     (let ((sethi (assoc rs1 *note-sethi-inst*)))
+       (when sethi
+         (let ((addr (+ immed-val (ash (cdr sethi) 10))))
+           (maybe-note-assembler-routine addr nil dstate)
+           (setf *note-sethi-inst* (delete sethi *note-sethi-inst*))))))))
+
+(defun handle-andcc-inst (rs1 immed-val rd dstate)
+  ;; ANDCC %ALLOC, 3, %ZERO instruction
+  (when (and (= rs1 alloc-offset) (= rd zero-offset) (= immed-val 3))
+    (note "pseudo-atomic interrupted?" dstate)))
+
+(defun snarf-error-junk (sap offset &optional length-only)
+  (let* ((length (sap-ref-8 sap offset))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type system-area-pointer sap)
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
+    (cond (length-only
+           (values 0 (1+ length) nil nil))
+          (t
+           (copy-ub8-from-system-area sap (1+ offset) vector 0 length)
+           (collect ((sc-offsets)
+                     (lengths))
+             (lengths 1)                ; the length byte
+             (let* ((index 0)
+                    (error-number (read-var-integer vector index)))
+               (lengths index)
+               (loop
+                 (when (>= index length)
+                   (return))
+                 (let ((old-index index))
+                   (sc-offsets (read-var-integer vector index))
+                   (lengths (- index old-index))))
+               (values error-number
+                       (1+ length)
+                       (sc-offsets)
+                       (lengths))))))))
+
+(defun unimp-control (chunk inst stream dstate)
+  (declare (ignore inst))
+  (flet ((nt (x) (if stream (note x dstate))))
+    (case (format-2-unimp-data chunk dstate)
+      (#.error-trap
+       (nt "Error trap")
+       (handle-break-args #'snarf-error-junk stream dstate))
+      (#.cerror-trap
+       (nt "Cerror trap")
+       (handle-break-args #'snarf-error-junk stream dstate))
+      (#.object-not-list-trap
+       (nt "Object not list trap"))
+      (#.breakpoint-trap
+       (nt "Breakpoint trap"))
+      (#.pending-interrupt-trap
+       (nt "Pending interrupt trap"))
+      (#.halt-trap
+       (nt "Halt trap"))
+      (#.fun-end-breakpoint-trap
+       (nt "Function end breakpoint trap"))
+      (#.object-not-instance-trap
+       (nt "Object not instance trap")))))

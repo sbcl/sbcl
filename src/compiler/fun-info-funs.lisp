@@ -41,6 +41,7 @@
                                                  lowtag inits))))))
   name)
 
+#!+compare-and-swap-vops ; same as IR2-CONVERT-CASSER
 (defun %def-casser (name offset lowtag)
   (let ((fun-info (fun-info-or-lose name)))
     (setf (fun-info-ir2-convert fun-info)

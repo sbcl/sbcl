@@ -252,6 +252,7 @@ been defined. (See SB-EXT:CAS for more information.)
   (def %raw-instance-cas/word (instance index)
        %raw-instance-ref/word
        %raw-instance-set/word)
+  #-sb-xc-host
   (def %compare-and-swap-symbol-info (symbol) symbol-info)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
