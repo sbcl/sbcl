@@ -50,6 +50,9 @@
         for dx = (leaf-dynamic-extent var)
         when (and dx arg (not (lvar-dynamic-extent arg)))
         append (handle-nested-dynamic-extent-lvars dx arg) into dx-lvars
+        ;; The block may end up being deleted due to cast optimization
+        ;; caused by USE-GOOD-FOR-DX-P
+        when (node-to-be-deleted-p call) return nil
         finally (when dx-lvars
                   ;; Stack analysis requires that the CALL ends the block, so
                   ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.

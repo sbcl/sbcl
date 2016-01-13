@@ -5741,3 +5741,12 @@
   (assert-error
    (checked-compile
     '(lambda () (cond (t 10) 20)))))
+
+(with-test (:name :removed-dx-cast)
+  (assert (= (funcall
+              (checked-compile `(lambda ()
+                                  (loop
+                                   (let ((x (the integer (return 0))))
+                                     (declare (dynamic-extent x))
+                                     (unwind-protect x 1))))))
+             0)))
