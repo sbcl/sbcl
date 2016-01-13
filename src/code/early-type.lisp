@@ -453,8 +453,8 @@
             (%make-character-set-type (list (cons low high))))))
     (setq *character-type* (range 0 (1- sb!xc:char-code-limit)))
     #!+sb-unicode
-    (setq *base-char-type* (range 0 127)
-          *extended-char-type* (range 128 (1- sb!xc:char-code-limit)))))
+    (setq *base-char-type* (range 0 (1- base-char-code-limit))
+          *extended-char-type* (range base-char-code-limit (1- sb!xc:char-code-limit)))))
 
 (defun make-character-set-type (pairs)
   ; (aver (equal (mapcar #'car pairs)
@@ -483,14 +483,18 @@
         *empty-type*
         (or (and (singleton-p pairs)
                  (let* ((pair (car pairs))
-                        (low (car pair)))
-                   (case (cdr pair) ; high
+                        (low (car pair))
+                        (high (cdr pair)))
+                   (case high
                      (#.(1- sb!xc:char-code-limit)
                       (case low
                         (0 *character-type*)
-                        #!+sb-unicode (128 *extended-char-type*)))
+                        #!+sb-unicode
+                        (#.base-char-code-limit *extended-char-type*)))
                      #!+sb-unicode
-                     (127 (if (eql low 0) *base-char-type*)))))
+                     (#.(1- base-char-code-limit)
+                      (when (eql low 0)
+                        *base-char-type*)))))
             (%make-character-set-type pairs)))))
 
 ;; For all ctypes which are the element types of specialized arrays,
