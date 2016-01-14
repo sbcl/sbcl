@@ -664,8 +664,6 @@
                                control)
          printer
        (declare (type (or symbol string) print-name))
-       (aver (= (length (remove-duplicates arg-constraints :key #'car))
-                (length arg-constraints)))
        (let* ((flavor (cons base-name format-name))
               (format (format-or-lose format-name))
               (args (copy-list (format-args format)))
