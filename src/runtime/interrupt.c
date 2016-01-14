@@ -2091,6 +2091,10 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     * now -- some address is better then no address in this case.
     */
     current_memory_fault_address = addr;
+
+    /* If we lose on corruption, provide LDB with debugging information. */
+    fake_foreign_function_call(context);
+
     /* To allow debugging memory faults in signal handlers and such. */
     corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, sp=%p)",
                                       addr,
@@ -2103,10 +2107,12 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
                                       );
     unblock_signals_in_context_and_maybe_warn(context);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    undo_fake_foreign_function_call(context);
     arrange_return_to_lisp_function(context,
                                     StaticSymbolFunction(MEMORY_FAULT_ERROR));
 #else
     funcall0(StaticSymbolFunction(MEMORY_FAULT_ERROR));
+    undofake_foreign_function_call(context);
 #endif
 }
 #endif
