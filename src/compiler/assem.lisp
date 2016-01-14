@@ -1544,6 +1544,10 @@
                (error "You can only specify :VOP-VAR once per instruction.")
                (setf vop-name (car args))))
           (:printer
+           (let* ((inst-args (second args))
+                  (names (mapcar #'car inst-args)))
+             (when (> (length names) (length (remove-duplicates names)))
+               (error "Duplicate operand names in ~S~%" args)))
            (destructuring-bind (name operands . options) args
              (push ``(,',name (,,@(mapcar (lambda (x) ``(,',(car x) ,,@(cdr x)))
                                           operands))

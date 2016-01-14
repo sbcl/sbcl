@@ -1135,7 +1135,7 @@
    (emit-register-inst segment special-op 0 0 0 0 #b001110)))
 
 (define-instruction nop (segment)
-  (:printer register ((op 0) (rd 0) (rd 0) (rs 0) (funct 0)) '(:name))
+  (:printer register ((op 0) (rd 0) (rs 0) (funct 0)) '(:name))
   (:attributes flushable)
   (:delay 0)
   (:emitter

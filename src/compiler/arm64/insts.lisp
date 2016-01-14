@@ -860,7 +860,7 @@
 (def-add-sub adds #b01
   (:printer add-sub-imm ((op #b01) (rd nil :type 'reg)))
   (:printer add-sub-ext-reg ((op #b01) (rd nil :type 'reg)))
-  (:printer add-sub-shift-reg ((op #b01) (op #b01)))
+  (:printer add-sub-shift-reg ((op #b01)))
   (:printer add-sub-imm ((op #b01) (rd #b11111))
             '('cmn :tab rn ", " imm shift))
   (:printer add-sub-ext-reg ((op #b01) (rd #b11111))
