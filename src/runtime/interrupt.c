@@ -2112,7 +2112,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
                                     StaticSymbolFunction(MEMORY_FAULT_ERROR));
 #else
     funcall0(StaticSymbolFunction(MEMORY_FAULT_ERROR));
-    undofake_foreign_function_call(context);
+    undo_fake_foreign_function_call(context);
 #endif
 }
 #endif
