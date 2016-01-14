@@ -20,6 +20,22 @@
 (setq sb-c::*check-consistency* t
       sb-ext:*stack-allocate-dynamic-extent* t)
 
+(defun crashme (a)
+  (declare (optimize (speed 3) (safety 0) (space 0)))
+  (declare (muffle-conditions style-warning)) ; re F1 and F2
+  (restart-case
+      (progn (ignore-errors (error "Foo")) (write-char #\.))
+    (retry () (f1 a))
+    (use-value (new) (f2 new))))
+
+;; lp#1530390
+(with-test (:name :do-not-dxify-restarts)
+  (let ((a (make-array 100))) (unwind-protect (crashme 'bork) (fill a 0)))
+  (let ((a (make-array 100))) (unwind-protect (crashme 'bork) (fill a 0)))
+  (let ((a (make-array 100))) (unwind-protect (crashme 'bork) (fill a 0)))
+  (let ((a (make-array 100))) (unwind-protect (crashme 'bork) (fill a 0)))
+  )
+
 (defmacro defun-with-dx (name arglist &body body)
   (let ((debug-name (sb-int:symbolicate name "-HIGH-DEBUG"))
         (default-name (sb-int:symbolicate name "-DEFAULT")))
