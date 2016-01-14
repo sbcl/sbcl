@@ -2105,12 +2105,13 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
                                       0
 #endif
                                       );
-    unblock_signals_in_context_and_maybe_warn(context);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     undo_fake_foreign_function_call(context);
+    unblock_signals_in_context_and_maybe_warn(context);
     arrange_return_to_lisp_function(context,
                                     StaticSymbolFunction(MEMORY_FAULT_ERROR));
 #else
+    unblock_gc_signals(0, 0);
     funcall0(StaticSymbolFunction(MEMORY_FAULT_ERROR));
     undo_fake_foreign_function_call(context);
 #endif

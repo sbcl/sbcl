@@ -351,8 +351,9 @@
 
 #!-win32
 (defun memory-fault-error ()
-  (error 'memory-fault-error
-         :address current-memory-fault-address))
+  (let ((sb!debug:*stack-top-hint* (find-interrupted-frame)))
+    (error 'memory-fault-error
+           :address current-memory-fault-address)))
 
 ;;; This is SIGTRAP / EXCEPTION_BREAKPOINT that runtime could not deal
 ;;; with. Prior to Windows we just had a Lisp side handler for
