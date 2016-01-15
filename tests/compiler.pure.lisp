@@ -5750,3 +5750,10 @@
                                      (declare (dynamic-extent x))
                                      (unwind-protect x 1))))))
              0)))
+
+(with-test (:name :isqrt-derivation)
+  (assert (eql (funcall (checked-compile
+                         `(lambda (i)
+                            (isqrt (count (the bit i) #*11101))))
+                        1)
+               2)))
