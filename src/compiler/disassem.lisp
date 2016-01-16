@@ -1108,7 +1108,8 @@
           (let ((sb!xc:*gensym-counter* 0))
             (mapcan (lambda (arg &aux (pf (arg-prefilter arg)))
                       (when pf
-                        (list `(setf (local-filtered-value ,(arg-position arg funstate))
+                        (list `(setf (aref (dstate-filtered-values dstate)
+                                           ,(arg-position arg funstate))
                                      ,(maybe-listify
                                        (gen-arg-forms arg :filtering funstate))))))
                     args))))
@@ -1117,17 +1118,12 @@
             '(lambda (chunk dstate)
                (declare (type dchunk chunk)
                         (type disassem-state dstate))
-               (flet (((setf local-filtered-value) (value offset)
-                        (declare (type filtered-value-index offset))
-                        (setf (aref (dstate-filtered-values dstate) offset)
-                              value))
-                      (local-filter (value filter)
+               (flet ((local-filter (value filter)
                         (funcall filter value dstate))
                       (local-extract (bytespec)
                         (dchunk-extract chunk bytespec)))
                 (declare (ignorable #'local-filter #'local-extract)
-                         (inline (setf local-filtered-value)
-                                 local-filter local-extract))
+                         (inline local-filter local-extract))
                 :body)))))
 
 (defun compute-mask-id (args)
