@@ -17,9 +17,9 @@
   (when (sb!c:policy env (> space speed))
     (return-from maphash form))
   (with-unique-names (fun table size i kv-vector key value)
-    `(let ((,fun (%coerce-callable-to-fun ,function-designator))
-           (,table ,hash-table)
-           (,size (* 2 (length (hash-table-next-vector ,hash-table)))))
+    `(let* ((,fun (%coerce-callable-to-fun ,function-designator))
+            (,table ,hash-table)
+            (,size (* 2 (length (hash-table-next-vector ,table)))))
        ;; Regarding this TRULY-THE: in the theoretical edge case of the largest
        ;; possible NEXT-VECTOR, it is not really true that the I+2 is an index.
        ;; However, for all intents and purposes, it is an INDEX because if not,

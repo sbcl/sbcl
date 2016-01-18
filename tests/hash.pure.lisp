@@ -108,3 +108,10 @@
                   (randomize-v)
                   (when (/= (sxhash v) sxhash)
                     (return)))))))))
+
+(with-test (:name :maphash-multiple-evaluation)
+  (assert (null
+           (check-function-evaluation-order
+            (maphash
+             (constantly nil)
+             (make-hash-table))))))

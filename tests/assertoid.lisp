@@ -18,7 +18,7 @@
            "HAS-ERROR?" "IS" "ASSERTOID"
            "ASSERT-SIGNAL" "ASSERT-NO-SIGNAL"
            "LEGACY-EVAL-P"
-           "EQUAL-MOD-GENSYMS"))
+           "EQUAL-MOD-GENSYMS" "CHECK-FUNCTION-EVALUATION-ORDER"))
 
 (cl:in-package "ASSERTOID")
 
@@ -196,3 +196,22 @@
 (defun legacy-eval-p ()
   (and (eq sb-ext:*evaluator-mode* :interpret)
        (find-package "SB-EVAL")))
+
+(defmacro check-function-evaluation-order (form)
+  (let ((evals (gensym "EVALS"))
+        expected)
+    `(let ((,evals))
+       (multiple-value-prog1
+           (,(car form)
+            ,@(loop for i from 0
+                    for arg in (cdr form)
+                    collect `(progn
+                               (push ,i ,evals)
+                               ,arg)
+                    do
+                    (push i expected)))
+         (assert (equal ,evals ',expected)
+                 () 'simple-error
+                 :format-control "Bad evaluation order of ~s:~% ~s"
+                 :format-arguments (list ',form
+                                         (reverse ,evals)))))))
