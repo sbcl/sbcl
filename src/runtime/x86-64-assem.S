@@ -95,7 +95,7 @@
 /* From lower to higher-numbered addresses, the stack contains 
  * return address, arg 0, arg 1, arg 2 ...
  * rax contains the address of the function to call
- * Lisp expects return value in rax, whic is already consistent with C
+ * Lisp expects return value in rax, which is already consistent with C
  * XXXX correct floating point handling is unimplemented so far
  * Based on comments cleaned from x86-assem.S, we believe that 
  * Lisp is expecting us to preserve rsi, rdi, rsp (no idea about r8-15)

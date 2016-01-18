@@ -2038,6 +2038,9 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
 void
 sigabrt_handler(int signal, siginfo_t *info, os_context_t *context)
 {
+    /* Save the interrupt context. No need to undo it, since lose()
+     * shouldn't return. */
+    fake_foreign_function_call(context);
     lose("SIGABRT received.\n");
 }
 
