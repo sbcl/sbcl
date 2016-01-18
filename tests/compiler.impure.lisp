@@ -2691,3 +2691,8 @@
   (defun environment-around-inline.2 (z)
     (environment-around-inline z))
   (assert (= (environment-around-inline.2 10) 340)))
+
+(with-test (:name :defun-setf-return-value)
+  (let ((name `(setf ,(gensym))))
+    (assert (equal (eval `(defun ,name ()))
+                   name))))

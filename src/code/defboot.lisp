@@ -215,7 +215,8 @@ evaluated as a PROGN."
          ;; function, then the warning ought not to have been issued at all.
          ,@(when (typep name '(cons (eql setf)))
              `((eval-when (:compile-toplevel :execute)
-                 (sb!c::warn-if-setf-macro ',name))))))))
+                 (sb!c::warn-if-setf-macro ',name))
+               ',name))))))
 
 #-sb-xc-host
 (progn
