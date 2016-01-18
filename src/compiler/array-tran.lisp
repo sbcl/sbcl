@@ -776,20 +776,20 @@
      (unless (eql (array-element-type array) (array-element-type displaced-to))
        (error "Can't displace an array of type ~S to another of type ~S"
               (array-element-type array) (array-element-type displaced-to)))
-     (let ((displacement (or displaced-index-offset 0))
-           (array-size dims))
-       (when (< (array-total-size displaced-to) (+ displacement array-size))
+     (let ((displacement (or displaced-index-offset 0)))
+       (when (< (array-total-size displaced-to) (+ displacement dims))
          (error "The :DISPLACED-TO array is too small"))
        (if (adjustable-array-p array)
            (let ((nfp (when (array-has-fill-pointer-p array)
-                        (when (> (%array-fill-pointer array) array-size)
+                        (when (> (%array-fill-pointer array) dims)
                           (error "Cannot ADJUST-ARRAY an array to a size smaller than its fill pointer"))
                         (%array-fill-pointer array))))
-             (set-array-header array displaced-to array-size nfp
+             (set-array-header array displaced-to dims nfp
                                displacement dims t nil))
            (make-array dims :element-type (array-element-type array)
-                       :displaced-to displaced-to
-                       :displaced-index-offset displaced-index-offset)))))
+                            :displaced-to displaced-to
+                            ,@(and displaced-index-offset
+                                   '(:displaced-index-offset displacement)))))))
 
 ;;;; miscellaneous properties of arrays
 

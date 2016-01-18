@@ -373,13 +373,22 @@
     (assert (not (eq a b)))))
 
 (with-test (:name :check-bound-elision)
-  (assert-error (funcall (compile nil `(lambda (x)
-                                         (char "abcd" x)))
+  (assert-error (funcall (checked-compile
+                          `(lambda (x)
+                             (char "abcd" x)))
                          4)
                 sb-int:invalid-array-index-error)
-  (assert (eql (funcall (compile nil `(lambda (x)
-                                        (declare (optimize (safety 0)))
-                                        ;; Strins are null-terminated for C interoperability
-                                        (char "abcd" x)))
+  (assert (eql (funcall (checked-compile
+                         `(lambda (x)
+                            (declare (optimize (safety 0)))
+                            ;; Strings are null-terminated for C interoperability
+                            (char "abcd" x)))
                         4)
                #\Nul)))
+
+(with-test (:name :adjust-array-transform)
+  (assert (equalp (funcall
+                  (checked-compile
+                   `(lambda ()
+                      (adjust-array #(1 2 3) 3 :displaced-to #(4 5 6)))))
+                 #(4 5 6))))
