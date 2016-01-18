@@ -2421,7 +2421,7 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual."
                      "VOP" "VOP-ARGS" "VOP-INFO" "VOP-INFO-ARG-LOAD-SCS"
                      "VOP-INFO-MOVE-ARGS" "VOP-INFO-NAME"
                      "VOP-INFO-RESULT-LOAD-SCS" "VOP-INFO-SAVE-P"
-                     "VOP-INFO-TARGET-FUN" "VOP-NEXT" "VOP-NODE"
+                     "VOP-NEXT" "VOP-NODE"
                      "VOP-PARSE-OR-LOSE" "VOP-PARSE-TEMPS" "VOP-PREV"
                      "VOP-REFS" "VOP-RESULTS" "VOP-SAVE-SET" "VOP-TEMPS"))
       :export ("PACK" "TARGET-IF-DESIRABLE" "*REGISTER-ALLOCATION-METHOD*"
