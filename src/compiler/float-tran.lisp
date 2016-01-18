@@ -216,18 +216,20 @@
   '(integer-decode-double-float x))
 
 (deftransform scale-float ((f ex) (single-float *) *)
-  (if (and #!+x86 t #!-x86 nil
-           (csubtypep (lvar-type ex)
-                      (specifier-type '(signed-byte 32))))
-      '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float)
-      '(scale-single-float f ex)))
+  (cond #!+x86
+        ((csubtypep (lvar-type ex)
+                    (specifier-type '(signed-byte 32)))
+         '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float))
+        (t
+         '(scale-single-float f ex))))
 
 (deftransform scale-float ((f ex) (double-float *) *)
-  (if (and #!+x86 t #!-x86 nil
-           (csubtypep (lvar-type ex)
-                      (specifier-type '(signed-byte 32))))
-      '(%scalbn f ex)
-      '(scale-double-float f ex)))
+  (cond #!+x86
+        ((csubtypep (lvar-type ex)
+                    (specifier-type '(signed-byte 32)))
+         '(%scalbn f ex))
+        (t
+         '(scale-double-float f ex))))
 
 ;;; Given a number X, create a form suitable as a bound for an
 ;;; interval. Make the bound open if OPEN-P is T. NIL remains NIL.
