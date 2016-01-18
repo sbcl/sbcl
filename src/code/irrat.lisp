@@ -682,7 +682,7 @@
 ;;;;   complex-tan
 ;;;;
 ;;;; utility functions:
-;;;;   scalb logb
+;;;;   logb
 ;;;;
 ;;;; internal functions:
 ;;;;    square coerce-to-complex-type cssqs complex-log-scaled
@@ -726,19 +726,11 @@
   (declare (double-float x))
   (* x x))
 
-;;; original CMU CL comment, apparently re. SCALB and LOGB and
+;;; original CMU CL comment, apparently re. LOGB and
 ;;; perhaps CSSQS:
 ;;;   If you have these functions in libm, perhaps they should be used
 ;;;   instead of these Lisp versions. These versions are probably good
 ;;;   enough, especially since they are portable.
-
-;;; Compute 2^N * X without computing 2^N first. (Use properties of
-;;; the underlying floating-point format.)
-(declaim (inline scalb))
-(defun scalb (x n)
-  (declare (type double-float x)
-           (type double-float-exponent n))
-  (scale-float x n))
 
 ;;; This is like LOGB, but X is not infinity and non-zero and not a
 ;;; NaN, so we can always return an integer.
@@ -833,8 +825,8 @@
               ;; least one is non-zero.. Thus logb returns a nice
               ;; integer.
               (let ((k (- (logb-finite (max (abs x) (abs y))))))
-                (values (+ (square (scalb x k))
-                           (square (scalb y k)))
+                (values (+ (square (scale-float x k))
+                           (square (scale-float y k)))
                         (- k))))
              (t
               (values rho 0)))))))
@@ -858,14 +850,11 @@
           (y (float (imagpart z) 1.0d0))
           (eta 0d0)
           (nu 0d0))
-      (declare (double-float x y eta nu))
-
-      (locally
-         ;; space 0 to get maybe-inline functions inlined.
-         (declare (optimize (speed 3) (space 0)))
-
+      (declare (double-float x y eta nu)
+               ;; get maybe-inline functions inlined.
+               (optimize (space 0)))
       (if (not (float-nan-p x))
-          (setf rho (+ (scalb (abs x) (- k)) (sqrt rho))))
+          (setf rho (+ (scale-float (abs x) (- k)) (sqrt rho))))
 
       (cond ((oddp k)
              (setf k (ash k -1)))
@@ -873,18 +862,18 @@
              (setf k (1- (ash k -1)))
              (setf rho (+ rho rho))))
 
-      (setf rho (scalb (sqrt rho) k))
+      (setf rho (scale-float (sqrt rho) k))
 
       (setf eta rho)
       (setf nu y)
 
       (when (/= rho 0d0)
-            (when (not (float-infinity-p (abs nu)))
-                  (setf nu (/ (/ nu rho) 2d0)))
-            (when (< x 0d0)
-                  (setf eta (abs nu))
-                  (setf nu (float-sign y rho))))
-       (coerce-to-complex-type eta nu z)))))
+        (when (not (float-infinity-p (abs nu)))
+          (setf nu (/ (/ nu rho) 2d0)))
+        (when (< x 0d0)
+          (setf eta (abs nu))
+          (setf nu (float-sign y rho))))
+      (coerce-to-complex-type eta nu z))))
 
 ;;; Compute log(2^j*z).
 ;;;

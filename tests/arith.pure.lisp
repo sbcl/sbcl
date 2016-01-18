@@ -721,3 +721,7 @@
                   (let (z)
                     (expt (setf z (complex -0.123 -0.789)) 2)))))
              #C(-0.60739195 0.194094))))
+
+(with-test (:name :complex-sqrt)
+  (assert (= (expt (sqrt least-negative-double-float) 2)
+             least-negative-double-float)))
