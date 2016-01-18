@@ -72,7 +72,10 @@
                :format-arguments (list option)))
       (case (car option)
         (:nicknames
-         (setf nicknames (stringify-package-designators (cdr option))))
+         (setf nicknames
+               (append
+                nicknames
+                (stringify-package-designators (cdr option)))))
         (:local-nicknames
          (setf local-nicknames
                (append local-nicknames
