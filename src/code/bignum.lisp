@@ -1470,6 +1470,38 @@
 ;;;; There used to be a bunch of code to implement "efficient" versions of LDB
 ;;;; and DPB here.  But it apparently was never used, so it's been deleted.
 ;;;;   --njf, 2007-02-04
+
+;; This could be used by way of a transform, though for now it's specifically
+;; a helper for %LDB in the limited case that it recognizes as non-consing.
+(defun ldb-bignum=>fixnum (byte-size byte-pos bignum)
+  (declare (type (integer 0 #.sb!vm:n-positive-fixnum-bits) byte-size)
+           (type bit-index byte-pos))
+  (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
+    (let ((n-digits (%bignum-length bignum)))
+      (cond ((>= word-index n-digits) ; load from the infinitely extended sign word
+             (ldb (byte byte-size 0) (%sign-digit bignum n-digits)))
+            ((<= (+ bit-index byte-size) digit-size) ; contained in one word
+             ;; This case takes care of byte-size = 0 also.
+             (ldb (byte byte-size bit-index) (%bignum-ref bignum word-index)))
+            (t
+             ;; At least one bit is obtained from each of two words,
+             ;; and not more than two words.
+             (let* ((low-part-size
+                     (truly-the (integer 1 #.(1- sb!vm:n-positive-fixnum-bits))
+                                (- digit-size bit-index)))
+                    (high-part-size
+                     (truly-the (integer 1 #.(1- sb!vm:n-positive-fixnum-bits))
+                                (- byte-size low-part-size))))
+               (logior (truly-the (and fixnum unsigned-byte) ; high part
+                         (let ((word-index (1+ word-index)))
+                           (if (< word-index n-digits) ; next word exists
+                               (ash (ldb (byte high-part-size 0)
+                                         (%bignum-ref bignum word-index))
+                                    low-part-size)
+                               (mask-field (byte high-part-size low-part-size)
+                                           (%sign-digit bignum n-digits)))))
+                       (ldb (byte low-part-size bit-index) ; low part
+                            (%bignum-ref bignum word-index)))))))))
 
 ;;;; TRUNCATE
 
