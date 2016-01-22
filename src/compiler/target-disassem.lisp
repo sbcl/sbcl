@@ -612,6 +612,30 @@
         (setf (dstate-inst-properties dstate) nil)))))
 
 
+(defun collect-labelish-operands (args cache)
+  (awhen (remove-if-not #'arg-use-label args)
+    (let* ((list (mapcar (lambda (arg &aux (fun (arg-use-label arg))
+                                           (prefilter (arg-prefilter arg))
+                                           (bytes (arg-fields arg)))
+                           ;; Require byte specs or a prefilter (or both).
+                           ;; Prefilter alone is ok - it can use READ-SUFFIX.
+                           ;; Additionally, you can't have :use-label T
+                           ;; if multiple fields exist with no prefilter.
+                           (aver (or prefilter
+                                     (if (eq fun t) (singleton-p bytes) bytes)))
+                           ;; If arg has a prefilter, just compute its index,
+                           ;; otherwise keep the byte specs for extraction.
+                           (coerce (cons (if (eq fun t) #'identity fun)
+                                         (if prefilter
+                                             (list (posq arg args))
+                                             (cons (arg-sign-extend-p arg) bytes)))
+                                   'vector))
+                         it))
+           (repr (if (cdr list) list (car list))) ; usually just 1 item
+           (table (assq :labeller cache)))
+      (or (find repr (cdr table) :test 'equalp)
+          (car (push repr (cdr table)))))))
+
 ;;; Make an initial non-printing disassembly pass through DSTATE,
 ;;; noting any addresses that are referenced by instructions in this
 ;;; segment.
@@ -623,9 +647,38 @@
     (map-segment-instructions
      (lambda (chunk inst)
        (declare (type dchunk chunk) (type instruction inst))
-       (let ((labeller (inst-labeller inst)))
-         (when labeller
-           (setf labels (funcall labeller chunk labels dstate)))))
+       (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+       (loop with list = (inst-labeller inst)
+             while list
+             ;; item = #(FUNCTION PREFILTERED-VALUE-INDEX)
+             ;;      | #(FUNCTION SIGN-EXTEND-P BYTE-SPEC ...)
+             for item = (if (listp list) (pop list) (prog1 list (setq list nil)))
+             then (pop list)
+          do (let* ((item-length (length item))
+                    (index/signedp (svref item 1))
+                    (adjusted-value
+                     (funcall
+                      (svref item 0)
+                      (flet ((extract-byte (spec-index)
+                               (let* ((byte-spec (svref item spec-index))
+                                      (integer (dchunk-extract chunk byte-spec)))
+                                 (if index/signedp
+                                     (sign-extend integer (byte-size byte-spec))
+                                     integer))))
+                        (case item-length
+                          (2 (svref (dstate-filtered-values dstate) index/signedp))
+                          (3 (extract-byte 2)) ; extract exactly one byte
+                          (t ; extract >1 byte.
+                           ;; FIXME: this is strictly redundant.
+                           ;; You should combine fields in the prefilter
+                           ;; so that the labeller receives a single byte.
+                           ;; AARCH64 and HPPA make use of this though.
+                           (loop for i from 2 below item-length
+                                 collect (extract-byte i)))))
+                      dstate)))
+               ;; If non-integer, the value is not a label.
+               (when (integerp adjusted-value)
+                 (push (cons adjusted-value nil) labels)))))
      segment
      dstate)
     (setf (dstate-labels dstate) labels)
@@ -691,16 +744,9 @@
                                         (let ((*current-instruction-flavor* flavor))
                                           (find-printer-fun printer args cache)))
                                   chunk inst stream dstate))))
-                   nil ; labeller needs to close over INST
+                   (collect-labelish-operands args cache)
                    nil ; prefilter needs to close over INST
                    control))))
-           (when (some #'arg-use-label args)
-             (setf (inst-labeller inst)
-                   (lambda (chunk labels dstate)
-                     (funcall (setf (inst-labeller inst)
-                                    (let ((*current-instruction-flavor* flavor))
-                                      (find-labeller-fun args cache)))
-                              chunk labels dstate))))
            (when (some #'arg-prefilter args)
              (setf (inst-prefilter inst)
                    (lambda (chunk dstate)
@@ -726,6 +772,7 @@
         (when force
           (format t "~&~:{~@(~A~)s: ~D~:^, ~}~%"
                   (mapcar (lambda (x) (list (car x) (length (cdr x)))) cache)))
+        (setf (cddr cache) nil) ; discard the labeller cache
         (setf ispace (build-inst-space insts)))
       (setf *disassem-inst-space* ispace))
     ispace))

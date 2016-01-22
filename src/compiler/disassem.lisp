@@ -210,7 +210,7 @@
 
   ;; disassembly functions
   (prefilter nil :type (or null function))
-  (labeller nil :type (or null function))
+  (labeller nil :type (or list vector))
   (printer (missing-arg) :type (or null function))
   (control nil :type (or null function) :read-only t)
 
@@ -699,12 +699,10 @@
            `((adjust-label ,(maybe-listify filtered-forms) ,use-label))
            filtered-forms)))
     (:final ; if arg is not a label, return numeric value, otherwise a string
-     (let ((numeric-forms (gen-arg-forms arg :numeric funstate))
-           (use-label (arg-use-label arg)))
-       (cond ((not use-label) numeric-forms)
-             ((and (eq use-label t) (listp numeric-forms) (cdr numeric-forms))
-              (pd-error "cannot label multi-field ~S without a labeller" arg))
-             (t `((lookup-label ,(maybe-listify numeric-forms)))))))))
+     (let ((numeric-forms (gen-arg-forms arg :numeric funstate)))
+       (if (arg-use-label arg)
+           `((lookup-label ,(maybe-listify numeric-forms)))
+           numeric-forms)))))
 
 (defun find-printer-fun (printer-source args cache)
   (let ((source (preprocess-printer printer-source args))
@@ -1070,38 +1068,6 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
-(defun find-labeller-fun (args cache)
-  (let ((funstate (make-funstate args))
-        (labels-form 'labels))
-    (let ((sb!xc:*gensym-counter* 0))
-      (dolist (arg args)
-        (when (arg-use-label arg)
-          (setf labels-form
-                `(let ((labels ,labels-form)
-                       (addr ,(arg-value-form arg funstate :numeric nil)))
-                   ;; if labeler didn't return an integer, it isn't a label
-                   (if (or (not (integerp addr)) (assoc addr labels))
-                       labels
-                       (cons (cons addr nil) labels)))))))
-    (generate-function
-            :labeller (list labels-form) funstate cache
-            '(lambda (chunk labels dstate)
-               (declare (type list labels)
-                        (type dchunk chunk)
-                        (type disassem-state dstate))
-               (flet ((local-filtered-value (offset)
-                        (declare (type filtered-value-index offset))
-                        (aref (dstate-filtered-values dstate) offset))
-                      (local-extract (bytespec)
-                        (dchunk-extract chunk bytespec))
-                      (adjust-label (val adjust-fun)
-                        (funcall adjust-fun val dstate)))
-                 (declare (ignorable #'local-filtered-value #'local-extract
-                                     #'adjust-label)
-                          (inline local-filtered-value local-extract
-                                  adjust-label))
-                 :body)))))
-
 (defun find-prefilter-fun (args cache)
   (let* ((funstate (make-funstate args))
          (forms

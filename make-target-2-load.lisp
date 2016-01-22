@@ -6,6 +6,13 @@
       (*print-circle* t))
   (load "src/cold/warm.lisp"))
 
+;;; Test that BUILD-INST-SPACE will work - there are assertions
+;;; in there about correctness of all instructions' operands.
+(progn
+  (sb-disassem::get-inst-space :force t)
+  ;; Saving the memoized result is a waste of memory.
+  (setq sb-disassem::*disassem-inst-space* nil))
+
 ;;; Unintern no-longer-needed stuff before the possible PURIFY in
 ;;; SAVE-LISP-AND-DIE.
 #-sb-fluid (sb-impl::!unintern-init-only-stuff)
