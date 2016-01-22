@@ -101,14 +101,6 @@
                (declare (type (signed-byte 21) value)
                         (type disassem-state dstate))
                (+ 4 (ash value 2) (dstate-cur-addr dstate))))
-
-;; We use CALL-PAL BUGCHK as part of our trap logic.  It is invariably
-;; followed by a trap-code word, which we pick out with the
-;; semi-traditional prefilter approach.
-(define-arg-type bugchk-trap-code
-    :prefilter (lambda (value dstate)
-                 (declare (ignore value))
-                 (read-suffix 32 dstate)))
 
 ;;;; DEFINE-INSTRUCTION-FORMATs for the disassembler
 
@@ -172,7 +164,11 @@
                             :default-printer '('call_pal :tab 'pal_bugchk "," code))
   (op      :field (byte 6 26) :value 0)
   (palcode :field (byte 26 0) :value #x81)
-  (code :type 'bugchk-trap-code :reader bugchk-trap-code))
+  ;; We use CALL-PAL BUGCHK as part of our trap logic.  It is invariably
+  ;; followed by a trap-code word, which we pick out with the
+  ;; semi-traditional prefilter approach.
+  (code :prefilter (lambda (dstate) (read-suffix 32 dstate))
+        :reader bugchk-trap-code))
 
 ;;;; emitters
 

@@ -225,17 +225,6 @@
 
 (define-arg-type load/store-register :printer #'print-load/store-register)
 
-;; We use a prefilter in order to read trap codes in order to avoid
-;; encoding the code within the instruction body (requiring the use of
-;; a different trap instruction and a SIGILL handler) and in order to
-;; avoid attempting to include the code in the decoded instruction
-;; proper (requiring moving to a 40-bit instruction for disassembling
-;; trap codes, and being affected by endianness issues).
-(define-arg-type debug-trap-code
-    :prefilter (lambda (value dstate)
-                 (declare (ignore value))
-                 (read-suffix 8 dstate)))
-
 (define-arg-type msr-field-mask :printer #'print-msr-field-mask)
 
 ;;;; disassembler instruction format definitions
@@ -322,7 +311,14 @@
 
 (define-instruction-format (debug-trap 32 :default-printer '(:name :tab code))
   (opcode-32 :field (byte 32 0))
-  (code :type 'debug-trap-code :reader debug-trap-code))
+  ;; We use a prefilter in order to read trap codes in order to avoid
+  ;; encoding the code within the instruction body (requiring the use of
+  ;; a different trap instruction and a SIGILL handler) and in order to
+  ;; avoid attempting to include the code in the decoded instruction
+  ;; proper (requiring moving to a 40-bit instruction for disassembling
+  ;; trap codes, and being affected by endianness issues).
+  (code :prefilter (lambda (dstate) (read-suffix 8 dstate))
+        :reader debug-trap-code))
 
 (define-instruction-format (msr-immediate 32
                             :default-printer

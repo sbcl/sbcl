@@ -560,18 +560,31 @@
                               (+ (dstate-cur-offs dstate)
                                  (inst-length inst)))
                         (let ((orig-next (dstate-next-offs dstate))
-                              (prefilter (inst-prefilter inst))
                               (control (inst-control inst)))
                           (print-inst (inst-length inst) stream dstate
                                       :trailing-space nil)
-                          (when prefilter
-                            #!+(or x86 x86-64)
-                            ;; "prefilter" is list of prefilters
-                            ;; in an abstract representation.
-                            (call-prefilters prefilter chunk dstate)
-                            #!-(or x86 x86-64)
-                            ;; else it's a callable function
-                            (funcall prefilter chunk dstate))
+
+                          (dolist (item (inst-prefilters inst))
+                            (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                            ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
+                            (flet ((extract-byte (spec-index)
+                                     (let* ((byte-spec (svref item spec-index))
+                                            (integer (dchunk-extract chunk byte-spec)))
+                                       (if (svref item 2) ; SIGN-EXTEND-P
+                                           (sign-extend integer (byte-size byte-spec))
+                                           integer))))
+                              (let ((item-length (length item))
+                                    (fun (svref item 1)))
+                                (setf (svref (dstate-filtered-values dstate) (svref item 0))
+                                      (case item-length
+                                        (2 (funcall fun dstate)) ; no subfields
+                                        (3 (bug "Bogus prefilter"))
+                                        (4 (funcall fun dstate (extract-byte 3))) ; one subfield
+                                        (5 (funcall fun dstate ; two subfields
+                                                    (extract-byte 3) (extract-byte 4)))
+                                        (t (apply fun dstate ; > 2 subfields
+                                                  (loop for i from 3 below item-length
+                                                        collect (extract-byte i)))))))))
 
                           (setf prefix-p (null (inst-printer inst)))
 
@@ -737,9 +750,8 @@
                    (setf args (nconc args (list (setf arg (%make-arg name))))))
                (apply #'modify-arg
                       arg format-length (and props (cons :value props))))))
-         (let ((inst
-                (multiple-value-bind (mask id) (compute-mask-id args)
-                  (make-instruction
+         (multiple-value-bind (mask id) (compute-mask-id args)
+           (make-instruction
                    base-name format-name print-name
                    (format-length format) mask id
                    (let ((printer (if (eq printer :default)
@@ -752,18 +764,8 @@
                                           (find-printer-fun printer args cache)))
                                   chunk inst stream dstate))))
                    (collect-labelish-operands args cache)
-                   #!+(or x86 x86-64) (collect-prefiltering-args args cache)
-                   #!-(or x86 x86-64) nil ; prefilter needs to close over INST
-                   control))))
-           #!-(or x86 x86-64)
-           (when (some #'arg-prefilter args)
-             (setf (inst-prefilter inst)
-                   (lambda (chunk dstate)
-                     (funcall (setf (inst-prefilter inst)
-                                    (let ((*current-instruction-flavor* flavor))
-                                      (find-prefilter-fun args cache)))
-                              chunk dstate))))
-           inst))))
+                   (collect-prefiltering-args args cache)
+                   control)))))
    variants))
 
 ;;; Get the instruction-space, creating it if necessary.
@@ -2116,44 +2118,18 @@
     (incf (dstate-next-offs dstate)
           adjust)))
 
-#!+(or x86 x86-64)
-(progn
-
 ;; A prefilter set is a list of vectors specifying bytes to extract
 ;; and a function to call on the extracted value(s).
 ;; EQUALP lists of vectors can be coalesced, since they're immutable.
 (defun collect-prefiltering-args (args cache)
   (awhen (remove-if-not #'arg-prefilter args)
-    (let ((repr (mapcar (lambda (arg)
-                          (coerce (list* (posq arg args)
-                                         (arg-prefilter arg)
-                                         (arg-sign-extend-p arg)
-                                         (arg-fields arg)) 'vector))
-                        it))
+    (let ((repr
+           (mapcar (lambda (arg &aux (bytes (arg-fields arg)))
+                     (coerce (list* (posq arg args)
+                                    (arg-prefilter arg)
+                                    (and bytes (cons (arg-sign-extend-p arg) bytes)))
+                             'vector))
+                   it))
           (table (assq :prefilter cache)))
       (or (find repr (cdr table) :test 'equalp)
           (car (push repr (cdr table)))))))
-
-(defun call-prefilters (filters chunk dstate)
-  (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-  (dolist (item filters)
-    ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
-    (let ((item-length (length item))
-          (fun (svref item 1)))
-      (flet ((extract-byte (spec-index)
-               (let* ((byte-spec (svref item spec-index))
-                      (integer (dchunk-extract chunk byte-spec)))
-                 (if (svref item 2) ; SIGN-EXTEND-P
-                     (sign-extend integer (byte-size byte-spec))
-                     integer))))
-        (setf (svref (dstate-filtered-values dstate) (svref item 0))
-              (case item-length
-                ;; Low-hanging fruit: make sure there is an explicit case
-                ;; for each statically observable subfield count.
-                (3 (funcall fun dstate)) ; no subfields
-                (4 (funcall fun dstate (extract-byte 3))) ; one subfield
-                (5 (funcall fun dstate (extract-byte 3) (extract-byte 4)))
-                (t (apply fun dstate ; > 2 subfields
-                          (loop for i from 3 below item-length
-                                collect (extract-byte i))))))))))
-) ; end PROGN

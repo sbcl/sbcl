@@ -196,7 +196,7 @@
                                            length
                                            mask id
                                            printer
-                                           labeller prefilter control))
+                                           labeller prefilters control))
                         (:copier nil))
   (name nil :type (or symbol string) :read-only t)
   (format-name nil :type (or symbol string) :read-only t)
@@ -208,9 +208,8 @@
 
   (print-name nil :type symbol :read-only t)
 
-  ;; disassembly functions
-  (prefilter nil :type #!+(or x86 x86-64) list
-                       #!-(or x86 x86-64) (or null function))
+  ;; disassembly "functions"
+  (prefilters nil :type list)
   (labeller nil :type (or list vector))
   (printer (missing-arg) :type (or null function))
   (control nil :type (or null function) :read-only t)
@@ -583,7 +582,7 @@
               (push `(,vars ,vals) bindings)))))))
 
 ;;; Return the form(s) that should be evaluated to render ARG in the chosen
-;;; RENDERING style, which is one of :RAW, :SIGN-EXTENDED, :FILTERING,
+;;; RENDERING style, which is one of :RAW, :SIGN-EXTENDED,
 ;;; :FILTERED, :NUMERIC, and :FINAL. Each rendering depends on the preceding
 ;;; one, so asking for :FINAL will implicitly compute all renderings.
 (defun gen-arg-forms (arg rendering funstate)
@@ -676,15 +675,6 @@
                    raw-forms
                    (arg-fields arg))
            raw-forms)))
-    (:filtering ; pass the sign-extended arg to the filter function
-     ;; The prefilter is not required to be side-effect-free -
-     ;; e.g. it might touch DSTATE-CUR-OFFS - so it stores :FILTERING values
-     ;; into :FILTERED values, which can be repeatedly accessed as needed.
-     (let ((sign-extended-forms (gen-arg-forms arg :sign-extended funstate))
-           (pf (arg-prefilter arg)))
-       (if pf
-           (values `(local-filter ,(maybe-listify sign-extended-forms) ,pf) t)
-           (values sign-extended-forms nil))))
     (:filtered ; extract from the prefiltered value vector
      (let ((pf (arg-prefilter arg)))
        (if pf
@@ -1068,31 +1058,6 @@
            (compile-test subj key funstate))
           (t
            (pd-error "bogus test-form: ~S" test)))))
-
-#!-(or x86 x86-64)
-(defun find-prefilter-fun (args cache)
-  (let* ((funstate (make-funstate args))
-         (forms
-          (let ((sb!xc:*gensym-counter* 0))
-            (mapcan (lambda (arg &aux (pf (arg-prefilter arg)))
-                      (when pf
-                        (list `(setf (aref (dstate-filtered-values dstate)
-                                           ,(arg-position arg funstate))
-                                     ,(maybe-listify
-                                       (gen-arg-forms arg :filtering funstate))))))
-                    args))))
-    (generate-function
-            :prefilter forms funstate cache
-            '(lambda (chunk dstate)
-               (declare (type dchunk chunk)
-                        (type disassem-state dstate))
-               (flet ((local-filter (value filter)
-                        (funcall filter value dstate))
-                      (local-extract (bytespec)
-                        (dchunk-extract chunk bytespec)))
-                (declare (ignorable #'local-filter #'local-extract)
-                         (inline local-filter local-extract))
-                :body)))))
 
 (defun compute-mask-id (args)
   (let ((mask dchunk-zero)
