@@ -93,9 +93,9 @@
 (def!constant dchunk-zero 0)
 (def!constant dchunk-one #.(1- (expt 2 sb!vm:n-word-bits)))
 
-(defun dchunk-extract (from pos)
-  (declare (type dchunk from))
-  (the dchunk (ldb pos (the dchunk from))))
+(defun dchunk-extract (chunk byte-spec)
+  (declare (type dchunk chunk))
+  (the dchunk (ldb byte-spec (the dchunk chunk))))
 
 (defmacro dchunk-copy (x)
   `(the dchunk ,x))
