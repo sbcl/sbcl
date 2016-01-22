@@ -683,7 +683,8 @@
                                  collect (extract-byte i)))))
                       dstate)))
                ;; If non-integer, the value is not a label.
-               (when (integerp adjusted-value)
+               (when (and (integerp adjusted-value)
+                          (not (assoc adjusted-value labels)))
                  (push (cons adjusted-value nil) labels)))))
      segment
      dstate)
