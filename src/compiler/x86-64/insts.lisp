@@ -98,7 +98,7 @@
 ;;; This prefilter is used solely for its side effects, namely to put
 ;;; the bits found in the REX prefix into the DSTATE for use by other
 ;;; prefilters and by printers.
-(defun prefilter-wrxb (value dstate)
+(defun prefilter-wrxb (dstate value)
   (declare (type (unsigned-byte 4) value)
            (type disassem-state dstate))
   (dstate-put-inst-prop dstate 'rex)
@@ -115,20 +115,20 @@
 ;;; The two following prefilters are used instead of prefilter-wrxb when
 ;;; the bits of the REX prefix need to be treated individually. They are
 ;;; always used together, so only the first one sets the REX property.
-(defun prefilter-rex-w (value dstate)
+(defun prefilter-rex-w (dstate value)
   (declare (type bit value) (type disassem-state dstate))
   (dstate-put-inst-prop dstate 'rex)
   (when (plusp value)
     (dstate-put-inst-prop dstate 'rex-w)))
 
-(defun prefilter-rex-b (value dstate)
+(defun prefilter-rex-b (dstate value)
   (declare (type bit value) (type disassem-state dstate))
   (when (plusp value)
     (dstate-put-inst-prop dstate 'rex-b)))
 
 ;;; This prefilter is used solely for its side effect, namely to put
 ;;; the property OPERAND-SIZE-8 into the DSTATE if VALUE is 0.
-(defun prefilter-width (value dstate)
+(defun prefilter-width (dstate value)
   (declare (type bit value) (type disassem-state dstate))
   (when (zerop value)
     (dstate-put-inst-prop dstate 'operand-size-8))
@@ -136,19 +136,17 @@
 
 ;;; This prefilter is used solely for its side effect, namely to put
 ;;; the property OPERAND-SIZE-16 into the DSTATE.
-(defun prefilter-x66 (value dstate)
-  (declare (type (eql #x66) value)
-           (ignore value)
-           (type disassem-state dstate))
+(defun prefilter-x66 (dstate junk)
+  (declare (type disassem-state dstate) (ignore junk))
   (dstate-put-inst-prop dstate 'operand-size-16))
 
 ;;; A register field that can be extended by REX.R.
-(defun prefilter-reg-r (value dstate)
+(defun prefilter-reg-r (dstate value)
   (declare (type reg value) (type disassem-state dstate))
   (if (dstate-get-inst-prop dstate 'rex-r) (+ value 8) value))
 
 ;;; A register field that can be extended by REX.B.
-(defun prefilter-reg-b (value dstate)
+(defun prefilter-reg-b (dstate value)
   (declare (type reg value) (type disassem-state dstate))
   (if (dstate-get-inst-prop dstate 'rex-b) (+ value 8) value))
 
@@ -161,16 +159,15 @@
 ;;; REX.B bit from DSTATE is used to extend the sole register or the
 ;;; BASE-REG to a full register, the REX.X bit does the same for the
 ;;; INDEX-REG.
-(defun prefilter-reg/mem (value dstate)
-  (declare (type list value)
-           (type disassem-state dstate))
+(defun prefilter-reg/mem (dstate mod r/m)
+  (declare (type disassem-state dstate)
+           (type (unsigned-byte 2) mod)
+           (type (unsigned-byte 3) r/m))
   (flet ((extend (bit-name reg)
            (logior (if (dstate-get-inst-prop dstate bit-name) 8 0)
                    reg)))
     (declare (inline extend))
-    (let* ((mod (the (unsigned-byte 2) (first value)))
-           (r/m (the (unsigned-byte 3) (second value)))
-           (full-reg (extend 'rex-b r/m)))
+    (let ((full-reg (extend 'rex-b r/m)))
       (cond ((= mod #b11)
              ;; registers
              full-reg)
@@ -204,8 +201,7 @@
             (t                            ; (= mod #b10)
              (list full-reg (read-signed-suffix 32 dstate)))))))
 
-(defun read-address (value dstate)
-  (declare (ignore value))              ; always nil anyway
+(defun read-address (dstate)
   (read-suffix (width-bits (inst-operand-size dstate)) dstate))
 
 (defun width-bits (width)
@@ -268,8 +264,7 @@
 ;;; :dword and are sign-extended to 64 bits. For an exception, see the
 ;;; argument type definition of SIGNED-IMM-DATA-UPTO-QWORD below.
 (define-arg-type signed-imm-data
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (let ((width (width-bits (inst-operand-size dstate))))
                  (when (= width 64)
                    (setf width 32))
@@ -283,8 +278,7 @@
 ;;; move immediates of all sizes (i.e. including :qword) into a
 ;;; register.
 (define-arg-type signed-imm-data-upto-qword
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-signed-suffix
                 (width-bits (inst-operand-size dstate))
                 dstate)))
@@ -299,8 +293,7 @@
 ;;; The only instruction of this kind having a variant with an immediate
 ;;; argument is PUSH.
 (define-arg-type signed-imm-data-default-qword
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (let ((width (width-bits
                              (inst-operand-size-default-qword dstate))))
                  (when (= width 64)
@@ -308,19 +301,16 @@
                  (read-signed-suffix width dstate))))
 
 (define-arg-type signed-imm-byte
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-signed-suffix 8 dstate)))
 
 (define-arg-type imm-byte
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-suffix 8 dstate)))
 
 ;;; needed for the ret imm16 instruction
 (define-arg-type imm-word-16
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-suffix 16 dstate)))
 
 (define-arg-type reg/mem

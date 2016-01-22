@@ -209,7 +209,8 @@
   (print-name nil :type symbol :read-only t)
 
   ;; disassembly functions
-  (prefilter nil :type (or null function))
+  (prefilter nil :type #!+(or x86 x86-64) list
+                       #!-(or x86 x86-64) (or null function))
   (labeller nil :type (or list vector))
   (printer (missing-arg) :type (or null function))
   (control nil :type (or null function) :read-only t)
@@ -1068,6 +1069,7 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
+#!-(or x86 x86-64)
 (defun find-prefilter-fun (args cache)
   (let* ((funstate (make-funstate args))
          (forms

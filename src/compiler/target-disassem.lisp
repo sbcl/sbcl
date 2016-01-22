@@ -565,6 +565,12 @@
                           (print-inst (inst-length inst) stream dstate
                                       :trailing-space nil)
                           (when prefilter
+                            #!+(or x86 x86-64)
+                            ;; "prefilter" is list of prefilters
+                            ;; in an abstract representation.
+                            (call-prefilters prefilter chunk dstate)
+                            #!-(or x86 x86-64)
+                            ;; else it's a callable function
                             (funcall prefilter chunk dstate))
 
                           (setf prefix-p (null (inst-printer inst)))
@@ -745,8 +751,10 @@
                                           (find-printer-fun printer args cache)))
                                   chunk inst stream dstate))))
                    (collect-labelish-operands args cache)
-                   nil ; prefilter needs to close over INST
+                   #!+(or x86 x86-64) (collect-prefiltering-args args cache)
+                   #!-(or x86 x86-64) nil ; prefilter needs to close over INST
                    control))))
+           #!-(or x86 x86-64)
            (when (some #'arg-prefilter args)
              (setf (inst-prefilter inst)
                    (lambda (chunk dstate)
@@ -2106,3 +2114,45 @@
               (emit-note (get-sc-name sc-offs))))))
     (incf (dstate-next-offs dstate)
           adjust)))
+
+#!+(or x86 x86-64)
+(progn
+
+;; A prefilter set is a list of vectors specifying bytes to extract
+;; and a function to call on the extracted value(s).
+;; EQUALP lists of vectors can be coalesced, since they're immutable.
+(defun collect-prefiltering-args (args cache)
+  (awhen (remove-if-not #'arg-prefilter args)
+    (let ((repr (mapcar (lambda (arg)
+                          (coerce (list* (posq arg args)
+                                         (arg-prefilter arg)
+                                         (arg-sign-extend-p arg)
+                                         (arg-fields arg)) 'vector))
+                        it))
+          (table (assq :prefilter cache)))
+      (or (find repr (cdr table) :test 'equalp)
+          (car (push repr (cdr table)))))))
+
+(defun call-prefilters (filters chunk dstate)
+  (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+  (dolist (item filters)
+    ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
+    (let ((item-length (length item))
+          (fun (svref item 1)))
+      (flet ((extract-byte (spec-index)
+               (let* ((byte-spec (svref item spec-index))
+                      (integer (dchunk-extract chunk byte-spec)))
+                 (if (svref item 2) ; SIGN-EXTEND-P
+                     (sign-extend integer (byte-size byte-spec))
+                     integer))))
+        (setf (svref (dstate-filtered-values dstate) (svref item 0))
+              (case item-length
+                ;; Low-hanging fruit: make sure there is an explicit case
+                ;; for each statically observable subfield count.
+                (3 (funcall fun dstate)) ; no subfields
+                (4 (funcall fun dstate (extract-byte 3))) ; one subfield
+                (5 (funcall fun dstate (extract-byte 3) (extract-byte 4)))
+                (t (apply fun dstate ; > 2 subfields
+                          (loop for i from 3 below item-length
+                                collect (extract-byte i))))))))))
+) ; end PROGN

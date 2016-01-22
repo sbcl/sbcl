@@ -78,17 +78,14 @@
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
 ;;; may be missing or nil to indicate that it's not used or has the
 ;;; obvious default value (e.g., 1 for the index-scale).
-(defun prefilter-reg/mem (value dstate)
-  (declare (type list value)
-           (type disassem-state dstate))
-  (let ((mod (car value))
-        (r/m (cadr value)))
-    (declare (type (unsigned-byte 2) mod)
-             (type (unsigned-byte 3) r/m))
-    (cond ((= mod #b11)
+(defun prefilter-reg/mem (dstate mod r/m)
+  (declare (type disassem-state dstate)
+           (type (unsigned-byte 2) mod)
+           (type (unsigned-byte 3) r/m))
+  (cond ((= mod #b11)
            ;; registers
            r/m)
-          ((= r/m #b100)
+        ((= r/m #b100)
            ;; sib byte
            (let ((sib (read-suffix 8 dstate)))
              (declare (type (unsigned-byte 8) sib))
@@ -111,19 +108,19 @@
                        offset
                        (if (= index-reg #b100) nil index-reg)
                        (ash 1 index-scale))))))
-          ((and (= mod #b00) (= r/m #b101))
+        ((and (= mod #b00) (= r/m #b101))
            (list nil (read-signed-suffix 32 dstate)) )
-          ((= mod #b00)
+        ((= mod #b00)
            (list r/m))
-          ((= mod #b01)
+        ((= mod #b01)
            (list r/m (read-signed-suffix 8 dstate)))
-          (t                            ; (= mod #b10)
-           (list r/m (read-signed-suffix 32 dstate))))))
+        (t                            ; (= mod #b10)
+           (list r/m (read-signed-suffix 32 dstate)))))
 
 
 ;;; This is a sort of bogus prefilter that just stores the info globally for
 ;;; other people to use; it probably never gets printed.
-(defun prefilter-width (value dstate)
+(defun prefilter-width (dstate value)
   (declare (type bit value)
            (type disassem-state dstate))
   (when (zerop value)
@@ -132,24 +129,21 @@
 
 ;;; This prefilter is used solely for its side effect, namely to put
 ;;; the property OPERAND-SIZE-16 into the DSTATE.
-(defun prefilter-x66 (value dstate)
-  (declare (type (eql #x66) value)
-           (ignore value)
-           (type disassem-state dstate))
+(defun prefilter-x66 (dstate junk)
+  (declare (type disassem-state dstate) (ignore junk))
   (dstate-put-inst-prop dstate 'operand-size-16))
 
 ;;; This prefilter is used solely for its side effect, namely to put
 ;;; one of the properties [FG]S-SEGMENT-PREFIX into the DSTATE.
 ;;; Unlike PREFILTER-X66, this prefilter only catches the low bit of
 ;;; the prefix byte.
-(defun prefilter-seg (value dstate)
+(defun prefilter-seg (dstate value)
   (declare (type bit value)
            (type disassem-state dstate))
   (dstate-put-inst-prop
    dstate (elt '(fs-segment-prefix gs-segment-prefix) value)))
 
-(defun read-address (value dstate)
-  (declare (ignore value))              ; always nil anyway
+(defun read-address (dstate)
   (read-suffix (width-bits *default-address-size*) dstate))
 
 (defun width-bits (width)
@@ -194,47 +188,39 @@
   :printer #'print-label)
 
 (define-arg-type imm-data
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-suffix (width-bits (inst-operand-size dstate)) dstate)))
 
 (define-arg-type signed-imm-data
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (let ((width (inst-operand-size dstate)))
                  (read-signed-suffix (width-bits width) dstate))))
 
 (define-arg-type imm-byte
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-suffix 8 dstate)))
 
 (define-arg-type signed-imm-byte
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-signed-suffix 8 dstate)))
 
 (define-arg-type signed-imm-dword
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-signed-suffix 32 dstate)))
 
 (define-arg-type imm-word
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (let ((width (inst-word-operand-size dstate)))
                  (read-suffix (width-bits width) dstate))))
 
 (define-arg-type signed-imm-word
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (let ((width (inst-word-operand-size dstate)))
                  (read-signed-suffix (width-bits width) dstate))))
 
 ;;; needed for the ret imm16 instruction
 (define-arg-type imm-word-16
-  :prefilter (lambda (value dstate)
-               (declare (ignore value)) ; always nil anyway
+  :prefilter (lambda (dstate)
                (read-suffix 16 dstate)))
 
 (define-arg-type reg/mem
@@ -555,20 +541,20 @@
 (define-instruction-format (near-cond-jump 16)
   (op    :fields (list (byte 8 0) (byte 4 12)) :value '(#b00001111 #b1000))
   (cc    :field (byte 4 8) :type 'condition-code)
+  ;; XXX: the following comment is bogus. x86-64 has 48-bit instructions.
   ;; The disassembler currently doesn't let you have an instruction > 32 bits
   ;; long, so we fake it by using a prefilter to read the offset.
   (label :type 'displacement
-         :prefilter (lambda (value dstate)
-                      (declare (ignore value)) ; always nil anyway
+         :prefilter (lambda (dstate)
                       (read-signed-suffix 32 dstate))))
 
 (define-instruction-format (near-jump 8 :default-printer '(:name :tab label))
   (op    :field (byte 8 0))
+  ;; XXX: the following comment is bogus. x86-64 has 48-bit instructions.
   ;; The disassembler currently doesn't let you have an instruction > 32 bits
   ;; long, so we fake it by using a prefilter to read the address.
   (label :type 'displacement
-         :prefilter (lambda (value dstate)
-                      (declare (ignore value)) ; always nil anyway
+         :prefilter (lambda (dstate)
                       (read-signed-suffix 32 dstate))))
 
 
