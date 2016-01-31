@@ -1484,7 +1484,7 @@ sentence breaking rules specified in UAX #29"
 (defun lines (string &key (margin *print-right-margin*))
   #!+sb-doc
   "Breaks STRING into lines that are no wider than :MARGIN according to the
-line breaking rules outlined in UAX #14. Combining marks will awsays be kept
+line breaking rules outlined in UAX #14. Combining marks will always be kept
 together with their base characters, and spaces (but not other types of
 whitespace) will be removed from the end of lines. If :MARGIN is unspecified,
 it defaults to 80 characters"
