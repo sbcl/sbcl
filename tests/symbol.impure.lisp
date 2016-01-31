@@ -202,3 +202,11 @@
 
 (with-test (:name :check-cl-symbols)
   (check-symbols *cl-classification*))
+
+(with-test (:name :makunbound-constant)
+  (let ((name (gensym)))
+    (eval `(defconstant ,name 32))
+    (handler-bind ((error #'continue))
+      (makunbound name))
+    (eval `(defvar ,name 33))
+    (assert (= (symbol-value name) 33))))

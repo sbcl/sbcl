@@ -96,6 +96,8 @@ distinct from the global value. Can also be SETF."
     (when (eq (info :variable :always-bound symbol) :always-bound)
       (error "Can't make ~A variable unbound: ~S" 'always-bound symbol))
     (about-to-modify-symbol-value symbol 'makunbound)
+    (when (eq (info :variable :kind symbol) :constant)
+      (clear-info :variable :kind symbol))
     (%makunbound symbol)
     symbol))
 
