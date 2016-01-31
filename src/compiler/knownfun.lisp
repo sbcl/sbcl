@@ -71,18 +71,21 @@
                                 (:optimizer (or function null))
                                 (:destroyed-constant-args (or function null))
                                 (:result-arg (or index null))
-                                (:overwrite-fndb-silently boolean))
+                                (:overwrite-fndb-silently boolean)
+                                (:foldable-call-check (or function null)))
                           *)
                 %defknown))
 (defun %defknown (names type attributes location
                   &key derive-type optimizer destroyed-constant-args result-arg
-                       overwrite-fndb-silently)
+                       overwrite-fndb-silently
+                       foldable-call-check)
   (let ((ctype (specifier-type type))
         (info (make-fun-info :attributes attributes
                              :derive-type derive-type
                              :optimizer optimizer
                              :destroyed-constant-args destroyed-constant-args
-                             :result-arg result-arg)))
+                             :result-arg result-arg
+                             :foldable-call-check foldable-call-check)))
     (dolist (name names)
       (unless overwrite-fndb-silently
         (let ((old-fun-info (info :function :info name)))

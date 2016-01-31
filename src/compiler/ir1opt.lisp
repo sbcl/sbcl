@@ -28,7 +28,7 @@
            ;; check for EQL types and singleton numeric types
            (values (type-singleton-p (lvar-type thing))))))
 
-;;; Same as above except for EQL types
+;;; Same as above except it doesn't consider EQL types
 (defun strictly-constant-lvar-p (thing)
   (declare (type (or lvar null) thing))
   (and (lvar-p thing)
@@ -960,14 +960,7 @@
                  (return-from ir1-optimize-combination))))))
 
        (let ((attr (fun-info-attributes info)))
-         (when (and (ir1-attributep attr foldable)
-                    ;; KLUDGE: The next test could be made more sensitive,
-                    ;; only suppressing constant-folding of functions with
-                    ;; CALL attributes when they're actually passed
-                    ;; function arguments. -- WHN 19990918
-                    (not (ir1-attributep attr call))
-                    (every #'constant-lvar-p args)
-                    (node-lvar node))
+         (when (constant-fold-call-p node)
            (constant-fold-call node)
            (return-from ir1-optimize-combination))
          (when (and (ir1-attributep attr commutative)
@@ -1451,6 +1444,37 @@
         (locall-analyze-component *current-component*))))
   (values))
 
+(defun constant-fold-arg-p (name)
+  (if name
+      (let* ((info (and name
+                        (info :function :info name)))
+             (attributes (and info
+                              (fun-info-attributes info))))
+        (and info
+             (ir1-attributep attributes foldable)
+             (not (ir1-attributep attributes call))))
+      t))
+
+;;; Return T if the function is foldable and if it's marked as CALL
+;;; all function arguments are FOLDABLE too.
+(defun constant-fold-call-p (combination)
+  (let* ((info (basic-combination-fun-info combination))
+         (attr (fun-info-attributes info))
+         (args (basic-combination-args combination)))
+    (cond ((not (ir1-attributep attr foldable))
+           nil)
+          ((ir1-attributep attr call)
+           (apply (fun-info-foldable-call-check info)
+                  (mapcar (lambda (lvar)
+                            (let ((fun-name (lvar-fun-name lvar t)))
+                              (or fun-name
+                                  (if (constant-lvar-p lvar)
+                                      (lvar-value lvar)
+                                      (return-from constant-fold-call-p nil)))))
+                          args)))
+          (t
+           (every #'constant-lvar-p args)))))
+
 ;;; Replace a call to a foldable function of constant arguments with
 ;;; the result of evaluating the form. If there is an error during the
 ;;; evaluation, we give a warning and leave the call alone, making the
@@ -1459,7 +1483,12 @@
 ;;; If there is more than one value, then we transform the call into a
 ;;; VALUES form.
 (defun constant-fold-call (call)
-  (let ((args (mapcar #'lvar-value (combination-args call)))
+  (let ((args (mapcar (lambda (lvar)
+                        (let ((name (lvar-fun-name lvar t)))
+                          (if name
+                              (fdefinition name)
+                              (lvar-value lvar))))
+                      (combination-args call)))
         (fun-name (combination-fun-source-name call)))
     (multiple-value-bind (values win)
         (careful-call fun-name

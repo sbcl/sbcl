@@ -154,7 +154,10 @@
   (predicate-type nil :type (or ctype null))
   ;; If non-null, the index of the argument which becomes the result
   ;; of the function.
-  (result-arg nil :type (or index null)))
+  (result-arg nil :type (or index null))
+  ;; For functions with attributes FOLDABLE & CALL check that the
+  ;; arguments declared as CALLABLE or FUNCTION are foldable as well.
+  (foldable-call-check nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))
