@@ -455,13 +455,14 @@
   (assert (functionp (allocate-instance (find-class 'sb-pcl::ctor)))))
 
 ;;; from PFD ansi-tests
-(let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
-                       (integer -234496 215373))
-                 integer))
-      (t2 '(cons (cons (cons integer integer)
-                       (integer -234496 215373))
-                 t)))
-  (assert (null (values (subtypep `(not ,t2) `(not ,t1))))))
+(with-test (:name (:subtypep :complex-cons-type))
+ (let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
+                   (integer -234496 215373))
+             integer))
+       (t2 '(cons (cons (cons integer integer)
+                   (integer -234496 215373))
+             t)))
+   (assert (null (values (subtypep `(not ,t2) `(not ,t1)))))))
 
 (defstruct misc-629a)
 (defclass misc-629b () ())
