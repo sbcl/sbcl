@@ -2471,7 +2471,8 @@
           (multiple-value-bind (fd errno)
               (if namestring
                   (sb!unix:unix-open namestring mask mode)
-                  (values nil sb!unix:enoent))
+                  (values nil #!-win32 sb!unix:enoent
+                              #!+win32 sb!win32::error_file_not_found))
             (flet ((vanilla-open-error ()
                      (simple-file-perror "error opening ~S" pathname errno)))
               (cond ((numberp fd)
@@ -2503,14 +2504,17 @@
                                                  :element-type element-type)))
                           (close stream)
                           stream))))
-                    ((eql errno sb!unix:enoent)
+                    ((eql errno #!-win32 sb!unix:enoent
+                                #!+win32 sb!win32::error_file_not_found)
                      (case if-does-not-exist
                        (:error (vanilla-open-error))
                        (:create
                         (open-error "~@<The path ~2I~_~S ~I~_does not exist.~:>"
                                     pathname))
                        (t nil)))
-                    ((and (eql errno sb!unix:eexist) (null if-exists))
+                    ((and (eql errno #!-win32 sb!unix:eexist
+                                     #!+win32 sb!win32::error_already_exists)
+                          (null if-exists))
                      nil)
                     (t
                      (vanilla-open-error))))))))))

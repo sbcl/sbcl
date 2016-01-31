@@ -1009,14 +1009,7 @@ absense."
                          file-flag-sequential-scan)
                         0)))
       (if (eql handle invalid-handle)
-          (values nil
-                  (let ((error-code (get-last-error)))
-                    (case error-code
-                      (#.error_file_not_found
-                       sb!unix:enoent)
-                      ((#.error_already_exists #.error_file_exists)
-                       sb!unix:eexist)
-                      (otherwise error-code))))
+          (values nil (get-last-error))
           (progn
             ;; FIXME: seeking to the end is not enough for real APPEND
             ;; semantics, but it's better than nothing.

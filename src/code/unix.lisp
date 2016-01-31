@@ -167,8 +167,7 @@ corresponds to NAME, or NIL if there is none."
   (with-restarted-syscall (value errno)
     (int-syscall ("open" c-string int int)
                  path
-                 (logior #!+win32 o_binary
-                         #!+largefile o_largefile
+                 (logior #!+largefile o_largefile
                          flags)
                  mode)))
 
