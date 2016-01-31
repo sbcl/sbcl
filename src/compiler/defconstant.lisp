@@ -38,7 +38,7 @@
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (sb!c::%defconstant ',name ,value (sb!c:source-location)
                          ,@(and docp
-                                `(,doc)))))
+                                `(',doc)))))
 
 (declaim (ftype (function (symbol t &optional t t) (values null &optional))
                 about-to-modify-symbol-value))

@@ -259,7 +259,7 @@ evaluated as a PROGN."
               ,@(and valp
                      `((unless (boundp ',var) ,val)))
               ,@(and docp
-                     `(,doc)))))
+                     `(',doc)))))
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
   #!+sb-doc
@@ -273,7 +273,7 @@ evaluated as a PROGN."
        (%compiler-defvar ',var))
      (%defparameter ',var ,val (sb!c:source-location)
                     ,@(and docp
-                           `(,doc)))))
+                           `(',doc)))))
 
 (defun %compiler-defvar (var)
   (sb!xc:proclaim `(special ,var)))
