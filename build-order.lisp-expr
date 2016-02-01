@@ -60,7 +60,7 @@
  ("src/code/globals" :not-host)
 
  ("src/code/defsetfs")
- ("src/code/cmacros" :not-host)
+ ("src/code/cmacros" :not-host :slam-forcibly)
 
  ("src/code/cold-init-helper-macros")
 
@@ -115,7 +115,7 @@
  ("src/code/barrier" :not-host)
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/unportable-float")
- ("src/compiler/policy")
+ ("src/compiler/policy" :slam-forcibly)
  #!+sb-fasteval ("src/interpreter/basic-env")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
@@ -183,7 +183,7 @@
  ("src/compiler/info-vector")
  ("src/code/fdefinition" :not-host)
 
- ("src/code/maphash" :not-host)
+ ("src/code/maphash" :not-host :slam-forcibly)
  ("src/code/pred" :not-host)
 
  ("src/compiler/generic/vm-array")

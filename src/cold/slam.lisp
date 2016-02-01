@@ -42,13 +42,14 @@
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
           (objname (stem-object-path stem flags :target-compile)))
-      (unless (and (output-up-to-date-wrt-input-p objname srcname)
-                   ;; Back to our "new-trace-file" case, also build if
-                   ;; a trace file is desired but is out-of-date.
-                   (or (not (position :trace-file flags))
-                       (output-up-to-date-wrt-input-p
-                        (concatenate 'string (stem-remap-target stem)
-                                     ".trace")
-                        srcname)))
+      (when (or (member :slam-forcibly flags)
+                (not (output-up-to-date-wrt-input-p objname srcname))
+                ;; Back to our "new-trace-file" case, also build if
+                ;; a trace file is desired but is out-of-date.
+                (and (position :trace-file flags)
+                     (not (output-up-to-date-wrt-input-p
+                           (concatenate 'string (stem-remap-target stem)
+                                        ".trace")
+                           srcname))))
         (target-compile-stem stem flags)))))
 (save-initial-symbol-values)
