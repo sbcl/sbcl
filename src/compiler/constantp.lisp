@@ -202,17 +202,8 @@ constantness of the FORM in ENVIRONMENT."
 ;;; Was in 'primordial-extensions', but wants to inline CONSTANTP.
 (defun sb!impl::%defconstant-eqx-value (symbol expr eqx)
   (declare (type function eqx))
-  (flet ((bummer (explanation)
-           (error "~@<bad DEFCONSTANT-EQX ~S ~2I~_~S: ~2I~_~A ~S~:>"
-                  symbol
-                  expr
-                  explanation
-                  (symbol-value symbol))))
-    (cond ((not (boundp symbol))
-           expr)
-          ((not (constantp symbol))
-           (bummer "already bound as a non-constant"))
-          ((not (funcall eqx (symbol-value symbol) expr))
-           (bummer "already bound as a different constant value"))
-          (t
-           (symbol-value symbol)))))
+  (if (boundp symbol)
+      (let ((oldval (symbol-value symbol)))
+        ;; %DEFCONSTANT offers CONTINUE,ABORT restarts on non-equivalence.
+        (if (funcall eqx oldval expr) oldval expr))
+      expr))
