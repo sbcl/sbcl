@@ -310,10 +310,10 @@
            (mark-ctype-interned
             (%make-numeric-type :class 'float :complexp complexp
                                 :format format :enumerable nil)))
-         (int-type (enumerable low high)
+         (int-type (low high)
            (mark-ctype-interned
             (%make-numeric-type :class 'integer :complexp :real
-                                :enumerable enumerable
+                                :enumerable (and low high)
                                 :low low :high high))))
     (setq *real-ffloat-type*      (float-type 'single-float :real)
           *real-dfloat-type*      (float-type 'double-float :real)
@@ -321,18 +321,18 @@
           *complex-dfloat-type*   (float-type 'double-float :complex)
           *rational-type*         (mark-ctype-interned
                                    (%make-numeric-type :class 'rational))
-          *unsigned-byte-type*    (int-type nil 0 nil)
-          *integer-type*          (int-type nil nil nil)
-          *index-type*            (int-type nil 0 (1- sb!xc:array-dimension-limit))
-          *negative-bignum-type*  (int-type nil nil (1- sb!xc:most-negative-fixnum))
-          *positive-bignum-type*  (int-type nil (1+ sb!xc:most-positive-fixnum) nil)
+          *unsigned-byte-type*    (int-type 0 nil)
+          *integer-type*          (int-type nil nil)
+          *index-type*            (int-type 0 (1- sb!xc:array-dimension-limit))
+          *negative-bignum-type*  (int-type nil (1- sb!xc:most-negative-fixnum))
+          *positive-bignum-type*  (int-type (1+ sb!xc:most-positive-fixnum) nil)
           *unsigned-byte-n-types* (make-array (1+ sb!vm:n-word-bits))
           *signed-byte-n-types*   (make-array sb!vm:n-word-bits))
     (dotimes (j (1+ sb!vm:n-word-bits))
-      (setf (svref *unsigned-byte-n-types* j) (int-type t 0 (1- (ash 1 j)))))
+      (setf (svref *unsigned-byte-n-types* j) (int-type 0 (1- (ash 1 j)))))
     (dotimes (j sb!vm:n-word-bits)
       (setf (svref *signed-byte-n-types* j)
-            (let ((high (1- (ash 1 j)))) (int-type t (- (1+ high)) high))))))
+            (let ((high (1- (ash 1 j)))) (int-type (- (1+ high)) high))))))
 
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
