@@ -36,7 +36,6 @@
            (constant-special-variable-p form)))
       (list
        (or (constant-special-form-p form environment envp)
-           #-sb-xc-host
            (values (constant-function-call-p form environment envp))))
       (t t))))
 
@@ -58,9 +57,8 @@
        ;; a host value of a constant in the CL package.
        (or #+sb-xc-host (xc-constant-value form) (symbol-value form)))
       (list
-       (if (special-operator-p (car form))
+       (if (sb!xc:special-operator-p (car form))
            (constant-special-form-value form environment envp)
-           #-sb-xc-host
            (constant-function-call-value form environment envp)))
       (t
        form))))
