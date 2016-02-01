@@ -566,10 +566,10 @@ distinct from the global value. Can also be SETF."
               (cerror "Modify the constant." what (describe-action) symbol)
               (error what (describe-action) symbol)))
         (when valuep
-          ;; :VARIABLE :TYPE is in the db only if it is declared, so no need to
-          ;; check.
-          (let ((type (info :variable :type symbol)))
-            (unless (%%typep new-value type nil)
+          (multiple-value-bind (type declaredp) (info :variable :type symbol)
+            ;; If globaldb returned the default of *UNIVERSAL-TYPE*,
+            ;; don't bother with a type test.
+            (when (and declaredp (not (%%typep new-value type nil)))
               (let ((spec (type-specifier type)))
                 (error 'simple-type-error
                        :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
