@@ -369,8 +369,12 @@ guaranteed to be collected."
   (scrub-power-cache)
   ;; Clear caches depending on the generation being collected.
   #!+gencgc
-  (cond ((eql 0 gen))
+  (cond ((eql 0 gen)
+         ;; Drop strings because the hash is pointer-hash
+         ;; but there is no automatic cache rehashing after GC.
+         (sb!format::tokenize-control-string-cache-clear))
         ((eql 1 gen)
+         (sb!format::tokenize-control-string-cache-clear)
          (ctype-of-cache-clear))
         (t
          (drop-all-hash-caches)))

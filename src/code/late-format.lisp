@@ -11,7 +11,17 @@
 
 ;;;; TOKENIZE-CONTROL-STRING
 
-(defun tokenize-control-string (string)
+;;; The case for caching is to speed up out-of-line calls that use a fixed
+;;; control string in a loop, not to avoid re-tokenizing all strings that
+;;; happen to be STRING= to that string.
+(defun-cached (tokenize-control-string
+               :hash-bits 7
+               :hash-function #+sb-xc-host
+                              (lambda (x) (declare (ignore x)) 1)
+                              #-sb-xc-host #'pointer-hash)
+    ;; Due to string mutability, the comparator is STRING=
+    ;; even though the hash is address-based.
+    ((string string=))
   (declare (simple-string string))
   (let ((index 0)
         (end (length string))
