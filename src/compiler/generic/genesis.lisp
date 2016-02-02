@@ -442,7 +442,7 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(defvar *current-reversed-cold-toplevels*) ; except for DEFUNs and SETF macros
+(declaim (special *!cold-toplevels* *!cold-setf-macros* *!cold-defuns*))
 
 ;;; the head of a list of DEBUG-SOURCEs which need to be patched when
 ;;; the cold core starts up
@@ -454,13 +454,13 @@
 ;;;; miscellaneous stuff to read and write the core memory
 
 ;;; FIXME: should be DEFINE-MODIFY-MACRO
-(defmacro cold-push (thing list)
+(defmacro cold-push (thing list) ; for making a target list held in a host symbol
   "Push THING onto the given cold-load LIST."
   `(setq ,list (cold-cons ,thing ,list)))
 
 ;; Like above, but the list is held in the target's image of the host symbol,
 ;; not the host's value of the symbol.
-(defun target-push (cold-thing host-symbol)
+(defun cold-target-push (cold-thing host-symbol)
   (cold-set host-symbol (cold-cons cold-thing (cold-symbol-value host-symbol))))
 
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
@@ -479,8 +479,6 @@
   "Return the value at ADDRESS."
   (read-wordindexed address 0))
 
-;;; (Note: In CMU CL, this function expected a SAP-typed ADDRESS
-;;; value, instead of the object-and-offset we use here.)
 (declaim (ftype (function (descriptor
                            (integer #.(- sb!vm:list-pointer-lowtag)
                                     #.sb!ext:most-positive-word)
@@ -488,11 +486,11 @@
                           (values))
                 note-load-time-value-reference))
 (defun note-load-time-value-reference (address offset marker)
-  (cold-push (cold-list (cold-intern :load-time-value-fixup)
-                        address
-                        (number-to-core offset)
-                        (number-to-core (descriptor-word-offset marker)))
-             *current-reversed-cold-toplevels*)
+  (push (cold-list (cold-intern :load-time-value-fixup)
+                   address
+                   (number-to-core offset)
+                   (number-to-core (descriptor-word-offset marker)))
+        *!cold-toplevels*)
   (values))
 
 (declaim (ftype (function (descriptor sb!vm:word (or symbol descriptor))) write-wordindexed))
@@ -797,9 +795,8 @@ core and return a descriptor to it."
                          (pop objects)))
     result))
 (defun cold-svset (vector index value)
-  (write-wordindexed vector
-                     (+ (descriptor-fixnum index) sb!vm:vector-data-offset)
-                     value))
+  (let ((i (if (integerp index) index (descriptor-fixnum index))))
+    (write-wordindexed vector (+ i sb!vm:vector-data-offset) value)))
 
 (declaim (inline cold-vector-len cold-svref))
 (defun cold-vector-len (vector)
@@ -1591,7 +1588,6 @@ core and return a descriptor to it."
    (attach-fdefinitions-to-symbols
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
 
-  (cold-set '*!reversed-cold-toplevels* *current-reversed-cold-toplevels*)
   (cold-set '*!initial-debug-sources* *current-debug-sources*)
 
   #!+(or x86 x86-64)
@@ -1737,8 +1733,7 @@ core and return a descriptor to it."
     (when (gethash warm-name *cold-fset-warm-names*)
       (error "duplicate COLD-FSET for ~S" warm-name))
     (setf (gethash warm-name *cold-fset-warm-names*) t)
-    (target-push (cold-cons cold-name inline-expansion)
-                 '*!reversed-cold-defuns*)
+    (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
     (static-fset cold-name compiled-lambda)))
 
 (defun initialize-static-fns ()
@@ -2611,25 +2606,23 @@ core and return a descriptor to it."
            (symbol-global-value (cold-symbol-value (first args)))
            (t (call fun :sb-cold-funcall-handler/for-value args)))
           (let ((counter *load-time-value-counter*))
-            (cold-push (cold-list (cold-intern :load-time-value) fun
-                                  (number-to-core counter))
-                       *current-reversed-cold-toplevels*)
+            (push (cold-list (cold-intern :load-time-value) fun
+                             (number-to-core counter)) *!cold-toplevels*)
             (setf *load-time-value-counter* (1+ counter))
             (make-descriptor 0 :load-time-value counter)))))
 
   (define-cold-fop (fop-funcall-for-effect)
     (multiple-value-bind (fun args) (pop-args (fasl-input))
       (if (not args)
-          (cold-push fun *current-reversed-cold-toplevels*)
+          (push fun *!cold-toplevels*)
           (case fun
             (sb!impl::%defun (apply #'cold-fset args))
             (sb!kernel::%defstruct
              (push args *known-structure-classoids*)
-             (cold-push (apply #'cold-list (cold-intern 'defstruct) args)
-                        *current-reversed-cold-toplevels*))
+             (push (apply #'cold-list (cold-intern 'defstruct) args)
+                   *!cold-toplevels*))
             (sb!impl::%defsetf
-             (target-push (host-constant-to-core args nil)
-                          '*!reversed-cold-setf-macros*))
+             (push (apply #'cold-list args) *!cold-setf-macros*))
             (set
              (aver (= (length args) 2))
              (cold-set (first args)
@@ -3679,7 +3672,9 @@ initially undefined function references:~2%")
            (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
-           (*current-reversed-cold-toplevels* *nil-descriptor*)
+           (*!cold-defuns* nil)
+           (*!cold-setf-macros* nil)
+           (*!cold-toplevels* nil)
            (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
                               0
@@ -3731,11 +3726,15 @@ initially undefined function references:~2%")
                    (layout (gethash name *cold-layouts*)))
               (aver layout)
               (write-slots layout *host-layout-of-layout* :info dd))))
-        (format t "~&; SB!Loader: ~D DEFSTRUCTs, ~D DEFUNs, ~D SETF macros~%"
+        (format t "~&; SB!Loader: ~D DEFSTRUCTs, ~D DEFUNs, ~D SETF macros, ~D other forms~%"
                 (length *known-structure-classoids*)
-                (cold-list-length (cold-symbol-value '*!reversed-cold-defuns*))
-                (cold-list-length
-                 (cold-symbol-value '*!reversed-cold-setf-macros*))))
+                (length *!cold-defuns*)
+                (length *!cold-setf-macros*)
+                (length *!cold-toplevels*)))
+
+      (dolist (symbol '(*!cold-defuns* *!cold-setf-macros* *!cold-toplevels*))
+        (cold-set symbol (vector-in-core (nreverse (symbol-value symbol))))
+        (makunbound symbol)) ; so no further PUSHes can be done
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-deferred-known-funs)

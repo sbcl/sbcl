@@ -13,9 +13,8 @@
 #+sb-xc-host
 (setf (get '%define-fun-name-syntax :sb-cold-funcall-handler/for-effect)
       (lambda (symbol checker)
-        (sb!fasl::target-push
-         (sb!fasl::cold-cons (sb!fasl::cold-intern symbol) checker)
-         '*valid-fun-names-alist*)))
+        (cold-target-push (cold-cons (cold-intern symbol) checker)
+                          '*valid-fun-names-alist*)))
 
 (defmacro define-function-name-syntax (symbol (var) &body body)
   #!+sb-doc

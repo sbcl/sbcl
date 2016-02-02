@@ -591,9 +591,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "NEW-DIRECTORY-CORE-ENTRY-TYPE-CODE"
                "OPEN-FASL-OUTPUT" "PAGE-TABLE-CORE-ENTRY-TYPE-CODE"
                "READ-ONLY-CORE-SPACE-ID"
-               "*!REVERSED-COLD-SETF-MACROS*"
-               "*!REVERSED-COLD-DEFUNS*"
-               "*!REVERSED-COLD-TOPLEVELS*"
+               "*!COLD-SETF-MACROS*" "*!COLD-DEFUNS*" "*!COLD-TOPLEVELS*"
+               "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"
                "STATIC-CORE-SPACE-ID"))
 
    ;; This package is a grab bag for things which used to be internal

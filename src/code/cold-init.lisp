@@ -104,9 +104,10 @@
 ;;;; !COLD-INIT
 
 ;;; a list of toplevel things set by GENESIS
-(defvar *!reversed-cold-toplevels*)
-(!defvar *!reversed-cold-setf-macros* nil) ; just SETF macros
-(!defvar *!reversed-cold-defuns* nil)      ; just DEFUNs
+(defvar *!cold-toplevels*)                 ; except for DEFUNs and SETF macros
+(defvar *!cold-setf-macros*)               ; just SETF macros
+(defvar *!cold-defuns*)                    ; just DEFUNs
+(declaim (simple-vector *!cold-toplevels*))
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
@@ -202,9 +203,9 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb!kernel::!set-up-structure-object-class)
 
-  (dolist (x (nreverse *!reversed-cold-setf-macros*))
+  (dovector (x (the simple-vector *!cold-setf-macros*))
     (apply #'!quietly-defsetf x))
-  (dolist (x (nreverse *!reversed-cold-defuns*))
+  (dovector (x (the simple-vector *!cold-defuns*))
     (destructuring-bind (name . inline-expansion) x
       (!%quietly-defun name inline-expansion)))
 
@@ -212,23 +213,11 @@
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
   (/show0 "doing cold toplevel forms and fixups")
-  (/show0 "(LISTP *!REVERSED-COLD-TOPLEVELS*)=..")
-  (/hexstr (if (listp *!reversed-cold-toplevels*) "true" "NIL"))
   #!-win32
-  (progn (write `("Length(TLFs)= " ,(length *!reversed-cold-toplevels*)))
+  (progn (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
          (terpri))
-  #!+win32
-  (progn (/show0 "about to calculate (LENGTH *!REVERSED-COLD-TOPLEVELS*)")
-         (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
-         #!+sb-show (let ((r-c-tl-length (length *!reversed-cold-toplevels*)))
-                      (/show0 "(length calculated..)")
-                      (let ((hexstr (hexstr r-c-tl-length)))
-                        (/show0 "(hexstr calculated..)")
-                        (/primitive-print hexstr))))
-  (let (#!+sb-show (index-in-cold-toplevels 0))
-    #!+sb-show (declare (type fixnum index-in-cold-toplevels))
 
-    (encapsulate
+  (encapsulate
      'find-package '!bootstrap
      (lambda (f designator)
        (cond ((packagep designator) designator)
@@ -236,8 +225,8 @@
                              (if (eql (mismatch s "SB!") 3)
                                  (concatenate 'string "SB-" (subseq s 3))
                                  s)))))))
-    (encapsulate '%failed-aver '!bootstrap
-                 (lambda (f expr)
+  (encapsulate '%failed-aver '!bootstrap
+               (lambda (f expr)
                    ;; output the message before signaling error,
                    ;; as it may be this is too early in the cold init.
                    (fresh-line)
@@ -246,37 +235,29 @@
                    (terpri)
                    (funcall f expr)))
 
-    (dolist (toplevel-thing (prog1
-                                (nreverse *!reversed-cold-toplevels*)
-                              ;; (Now that we've NREVERSEd it, it's
-                              ;; somewhat scrambled, so keep anyone
-                              ;; else from trying to get at it.)
-                              (makunbound '*!reversed-cold-toplevels*)))
+  (loop for index-in-cold-toplevels from 0
+        for toplevel-thing across (prog1 *!cold-toplevels*
+                                    (makunbound '*!cold-toplevels*))
+        do
       #!+sb-show
       (when (zerop (mod index-in-cold-toplevels 1024))
         (/show0 "INDEX-IN-COLD-TOPLEVELS=..")
         (/hexstr index-in-cold-toplevels))
-      #!+sb-show
-      (setf index-in-cold-toplevels
-            (the fixnum (1+ index-in-cold-toplevels)))
       (typecase toplevel-thing
         (function
          (funcall toplevel-thing))
-        (cons
-         (case (first toplevel-thing)
-           (:load-time-value
+        ((cons (eql :load-time-value))
             (setf (svref *!load-time-values* (third toplevel-thing))
                   (funcall (second toplevel-thing))))
-           (:load-time-value-fixup
+        ((cons (eql :load-time-value-fixup))
             (setf (sap-ref-word (int-sap (get-lisp-obj-address (second toplevel-thing)))
                                 (third toplevel-thing))
                   (get-lisp-obj-address
                    (svref *!load-time-values* (fourth toplevel-thing)))))
-           (defstruct
-            (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
-           (t
-            (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
-        (t (!cold-lose "bogus operation in *!REVERSED-COLD-TOPLEVELS*")))))
+        ((cons (eql defstruct))
+         (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
+        (t
+         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*"))))
   (/show0 "done with loop over cold toplevel forms and fixups")
   (unencapsulate '%failed-aver '!bootstrap)
   (unencapsulate 'find-package '!bootstrap)
