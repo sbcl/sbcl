@@ -54,13 +54,3 @@
        (setf (,next ,(first stores)) ,access)
        ,store
        (values))))
-
-;;; the target-code case of setting boolean attributes
-#+sb-xc-host
-(defmacro-mundanely !def-boolean-attribute-setter (test-name
-                                                   translations-name
-                                                   &rest attribute-names)
-  (guts-of-!def-boolean-attribute-setter test-name
-                                         translations-name
-                                         attribute-names
-                                         'sb!xc:get-setf-expansion))
