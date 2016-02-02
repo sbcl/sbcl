@@ -2048,7 +2048,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
 ;;; FIXME: Shouldn't these^ variables be unbound outside LET forms?
 (defun emit-make-load-form (constant &optional (name nil namep)
                                      &aux (fasl *compile-object*))
-  (aver (fasl-output-p *compile-object*))
+  (aver (fasl-output-p fasl))
   (unless (or (fasl-constant-already-dumped-p constant fasl)
               ;; KLUDGE: This special hack is because I was too lazy
               ;; to rework DEF!STRUCT so that the MAKE-LOAD-FORM
@@ -2108,7 +2108,6 @@ SPEED and COMPILATION-SPEED optimization values, and the
                     (circular-ref
                      (catch 'pending-init
                        (loop for (name form) on (cdr info) by #'cddr
-                         collect name into names
                          collect form into forms
                          finally (or (fopcompile-constant-init-forms fasl forms)
                                      (compile-make-load-form-init-forms forms)))
