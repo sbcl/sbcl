@@ -658,3 +658,40 @@
             (:constructor %make-alien-type-type (alien-type))
             (:copier nil))
   (alien-type nil :type alien-type :read-only t))
+
+;;; the description of a &KEY argument
+(defstruct (key-info #-sb-xc-host (:pure t)
+                     (:copier nil))
+  ;; the key (not necessarily a keyword in ANSI Common Lisp)
+  (name (missing-arg) :type symbol :read-only t)
+  ;; the type of the argument value
+  (type (missing-arg) :type ctype :read-only t))
+
+;;; ARGS-TYPE objects are used both to represent VALUES types and
+;;; to represent FUNCTION types.
+(defstruct (args-type (:include ctype)
+                      (:constructor nil)
+                      (:copier nil))
+  ;; Lists of the type for each required and optional argument.
+  (required nil :type list :read-only t)
+  (optional nil :type list :read-only t)
+  ;; The type for the rest arg. NIL if there is no &REST arg.
+  (rest nil :type (or ctype null) :read-only t)
+  ;; true if &KEY arguments are specified
+  (keyp nil :type boolean :read-only t)
+  ;; list of KEY-INFO structures describing the &KEY arguments
+  (keywords nil :type list :read-only t)
+  ;; true if other &KEY arguments are allowed
+  (allowp nil :type boolean :read-only t))
+
+;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
+(defstruct (fun-type (:include args-type
+                               (class-info (type-class-or-lose 'function)))
+                     (:constructor
+                      %make-fun-type (required optional rest
+                                      keyp keywords allowp wild-args returns)))
+  ;; true if the arguments are unrestrictive, i.e. *
+  (wild-args nil :type boolean :read-only t)
+  ;; type describing the return values. This is a values type
+  ;; when multiple values were specified for the return.
+  (returns (missing-arg) :type ctype :read-only t))
