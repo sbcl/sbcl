@@ -157,7 +157,10 @@
   (result-arg nil :type (or index null))
   ;; For functions with attributes FOLDABLE & CALL check that the
   ;; arguments declared as CALLABLE or FUNCTION are foldable as well.
-  (foldable-call-check nil :type (or function null)))
+  (foldable-call-check nil :type (or function null))
+  ;; A function that is called with lvars to check that the functions
+  ;; passed to CALLABLE arguments have the right argument counts.
+  (callable-check nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

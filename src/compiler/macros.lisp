@@ -347,43 +347,88 @@
     (error "function cannot have both good and bad attributes: ~S" attributes))
 
   (when (member 'any attributes)
-    (setq attributes (union '(call unwind) attributes)))
+    (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  `(%defknown ',(if (and (consp name)
-                         (not (legal-fun-name-p name)))
-                    name
-                    (list name))
-              '(sfunction ,arg-types ,result-type)
-              (ir1-attributes ,@attributes)
-              (source-location)
-              :foldable-call-check
-              ,(and (member 'call attributes)
-                    (member 'foldable attributes)
-                    (let ((type (specifier-type `(sfunction ,arg-types)))
-                          (callable (specifier-type 'callable))
-                          (function (specifier-type 'function))
-                          (vars)
-                          (call-vars))
-                      (flet ((process-var (x &optional (name (gensym)))
-                               (if (or (type= x callable)
-                                       (type= x function))
-                                   (push name call-vars)
-                                   (push name vars))
-                               name))
-                        `(lambda (,@(mapcar #'process-var (fun-type-required type))
-                                  &optional ,@(mapcar #'process-var (fun-type-optional type))
-                                  ,@ (and (fun-type-keyp type)
-                                          `(&key
-                                              ,@(loop for key in (fun-type-keywords type)
-                                                      for var = (gensym)
-                                                      do (process-var (key-info-type key) var)
-                                                      collect `((,(key-info-name key) ,var))))))
-                           (declare (ignore ,@vars))
-                           ,@(assert call-vars)
-                           (and ,@(loop for x in call-vars
-                                        collect `(constant-fold-arg-p ,x)))))))
-              ,@keys))
+  (multiple-value-bind (foldable-call callable arg-types)
+      (make-foldable-call-check arg-types attributes)
+    `(%defknown ',(if (and (consp name)
+                           (not (legal-fun-name-p name)))
+                      name
+                      (list name))
+                '(sfunction ,arg-types ,result-type)
+                (ir1-attributes ,@attributes)
+                (source-location)
+                :foldable-call-check ,foldable-call
+                :callable-check ,callable
+                ,@keys)))
+
+(defun make-foldable-call-check (arg-types attributes)
+  (let ((call (member 'call attributes))
+        (fold (member 'foldable attributes)))
+    (if (not call)
+        (values nil nil arg-types)
+        (multiple-value-bind (llks required optional rest keys)
+            (parse-lambda-list
+             arg-types
+             :context :function-type
+             :accept (lambda-list-keyword-mask
+                      '(&optional &rest &key &allow-other-keys))
+             :silent t)
+          (let (vars
+                call-vars
+                arg-count-specified)
+            (flet ((process-var (x &optional (name (gensym)))
+                     (if (member (if (consp x)
+                                     (car x)
+                                     x)
+                                 '(callable function))
+                         (push (cons name
+                                     (cond ((consp x)
+                                            (setf arg-count-specified t)
+                                            (cadr x))))
+                               call-vars)
+                         (push name vars))
+                     name)
+                   (process-type (type)
+                     (if (and (consp type)
+                              (member (car type) '(callable function)))
+                         (car type)
+                         type)))
+              (let ((lambda-list `(,@(mapcar #'process-var required)
+                                   &optional ,@(mapcar #'process-var optional)
+                                   ,@ (and (ll-kwds-keyp llks)
+                                           `(&key
+                                             ,@(loop for (key type) in keys
+                                                     for var = (gensym)
+                                                     do (process-var type var)
+                                                     collect `((,key ,var))))))))
+
+                (assert call-vars)
+                (values
+                 (and fold
+                      `(lambda ,lambda-list
+                         (declare (ignore ,@vars))
+
+                         (and ,@(loop for (x) in call-vars
+                                      collect `(constant-fold-arg-p ,x)))))
+                 (and arg-count-specified
+                      `(lambda ,lambda-list
+                         (declare (ignore ,@vars))
+                         ,@(loop for (x . arg-count) in call-vars
+                                 when arg-count
+                                 collect `(valid-callable-argument ,x ,arg-count))))
+                 `(,@(mapcar #'process-type required)
+                   ,@(and optional
+                          `(&optional ,@(mapcar #'process-type optional)))
+                   ,@(and (ll-kwds-restp llks)
+                          `(&rest ,@rest))
+                   ,@(and (ll-kwds-keyp llks)
+                          `(&key
+                            ,@(loop for (key type) in keys
+                                    collect `(,key ,(process-type type)))))
+                   ,@(and (ll-kwds-allowp llks)
+                          '(&allow-other-keys)))))))))))
 
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list

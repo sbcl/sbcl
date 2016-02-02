@@ -1445,15 +1445,16 @@
   (values))
 
 (defun constant-fold-arg-p (name)
-  (if name
-      (let* ((info (and name
-                        (info :function :info name)))
-             (attributes (and info
-                              (fun-info-attributes info))))
-        (and info
-             (ir1-attributep attributes foldable)
-             (not (ir1-attributep attributes call))))
-      t))
+  (typecase name
+    (null
+     t)
+    ((or symbol cons)
+     (let* ((info (info :function :info name))
+            (attributes (and info
+                             (fun-info-attributes info))))
+       (and info
+            (ir1-attributep attributes foldable)
+            (not (ir1-attributep attributes call)))))))
 
 ;;; Return T if the function is foldable and if it's marked as CALL
 ;;; all function arguments are FOLDABLE too.
@@ -1466,11 +1467,10 @@
           ((ir1-attributep attr call)
            (apply (fun-info-foldable-call-check info)
                   (mapcar (lambda (lvar)
-                            (let ((fun-name (lvar-fun-name lvar t)))
-                              (or fun-name
-                                  (if (constant-lvar-p lvar)
-                                      (lvar-value lvar)
-                                      (return-from constant-fold-call-p nil)))))
+                            (or (lvar-fun-name lvar t)
+                                (if (constant-lvar-p lvar)
+                                    (lvar-value lvar)
+                                    (return-from constant-fold-call-p nil))))
                           args)))
           (t
            (every #'constant-lvar-p args)))))

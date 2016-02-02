@@ -54,6 +54,7 @@
 ;;; these as STYLE-WARNINGs. -- WHN 2001-02-10
 (defvar *lossage-detected*)
 (defvar *unwinnage-detected*)
+(defvar *valid-fun-use-name*)
 
 ;;; Signal a warning if appropriate and set *FOO-DETECTED*.
 (declaim (ftype (function (string &rest t) (values)) note-lossage note-unwinnage))
@@ -173,15 +174,126 @@
         (loop for arg in args
               and i from 1
               do (check-arg-type arg *wild-type* i)))
-    ;; One more check for structure constructors:
     (awhen (lvar-fun-name (combination-fun call) t)
-      (let ((info (info :function :type it)))
-        (when (typep info 'defstruct-description)
-          (awhen (assq it (dd-constructors info))
-            (check-structure-constructor-call call info (cdr it))))))
+      (let ((type (info :function :type it))
+            (info (info :function :info it)))
+        (when (and (not *lossage-detected*)
+                   info
+                   (fun-info-callable-check info))
+          (let ((*valid-fun-use-name* it))
+            (apply (fun-info-callable-check info)
+                   (resolve-key-args args type))))
+        ;; One more check for structure constructors:
+        (when (typep type 'defstruct-description)
+          (awhen (assq it (dd-constructors type))
+            (check-structure-constructor-call call type (cdr it))))))
     (cond (*lossage-detected* (values nil t))
           (*unwinnage-detected* (values nil nil))
           (t (values t t)))))
+
+;;; Turn constant LVARs in keyword arg positions to constants so that
+;;; they can be passed to FUN-INFO-CALLABLE-CHECK.
+(defun resolve-key-args (args type)
+  (if (fun-type-keyp type)
+      (let ((non-key (+ (length (fun-type-required type))
+                        (length (fun-type-optional type))))
+            key-arguments)
+        (do ((key (nthcdr non-key args) (cddr key)))
+            ((null key))
+          (let ((k (first key))
+                (v (second key)))
+            (when (constant-lvar-p k)
+              (let* ((name (lvar-value k))
+                     (info (find name (fun-type-keywords type)
+                                 :key #'key-info-name)))
+                (when info
+                  (push name key-arguments)
+                  (push v key-arguments))))))
+
+        (nconc (subseq args 0 non-key)
+               (nreverse key-arguments)))
+      args))
+
+;;; Return MIN, MAX, whether it contaions &optional/&key/&rest
+(defun fun-arg-limits (function)
+  (cond ((fun-type-p function)
+         (if (fun-type-wild-args function)
+             (values nil nil)
+             (let* ((min (length (fun-type-required function)))
+                    (max (and (not (or (fun-type-rest function)
+                                       (fun-type-keyp function)))
+                              (+ min
+                                 (length (fun-type-optional function))))))
+               (values min max (or (fun-type-rest function)
+                                   (fun-type-keyp function)
+                                   (fun-type-optional function))))))
+        ((lambda-p function)
+         (let ((args (length (lambda-vars function))))
+           (values args args)))
+        ((not (optional-dispatch-p function))
+         (values nil nil nil))
+        ((optional-dispatch-more-entry function)
+         (values (optional-dispatch-min-args function)
+                 nil
+                 t))
+        (t
+         (values (optional-dispatch-min-args function)
+                 (optional-dispatch-max-args function)
+                 t))))
+
+(defun valid-callable-argument (lvar arg-count)
+  (when lvar
+    ;; Handle #'function,  'function and (lambda (x y))
+    (let* ((use (principal-lvar-use lvar))
+           (leaf (if (ref-p use)
+                     (ref-leaf use)
+                     (return-from valid-callable-argument nil)))
+           (defined-type (and (global-var-p leaf)
+                              (global-var-defined-type leaf)))
+           (lvar-type (or defined-type
+                          (lvar-type lvar)))
+           (fun-name (cond ((or (fun-type-p lvar-type)
+                                (functional-p leaf))
+                            (if (constant-lvar-p lvar)
+                                (%fun-name (lvar-value lvar))
+                                (lvar-fun-debug-name lvar)))
+                           ((constant-lvar-p lvar)
+                            (lvar-value lvar))
+                           (t
+                            (return-from valid-callable-argument nil))))
+           (type (cond ((fun-type-p lvar-type)
+                        lvar-type)
+                       ((symbolp fun-name)
+                        (proclaimed-ftype fun-name))
+                       (t
+                        leaf)))
+           (*lossage-fun* (if (and (not (eq (leaf-where-from leaf)
+                                            :defined-here))
+                                   (not (lambda-p leaf))
+                                   (or (not fun-name)
+                                       (not (info :function :info fun-name))))
+                              #'compiler-style-warn
+                              *lossage-fun*)))
+      (multiple-value-bind (min max optional)
+          (fun-arg-limits type)
+        (cond
+          ((and (not min) (not max)))
+          ((not optional)
+           (when (/= arg-count min)
+             (note-lossage
+              "The function ~S is called by ~S with ~R argument~:P, but wants exactly ~R."
+              fun-name
+              *valid-fun-use-name*
+              arg-count min)))
+          ((< arg-count min)
+           (note-lossage
+            "The function was called with ~R argument~:P, but wants at least ~R."
+            arg-count min))
+          ((not max))
+          ((> arg-count max)
+           (note-lossage
+            "The function was called with ~R argument~:P, but wants at most ~R."
+            arg-count max)))))))
 
 (defun check-structure-constructor-call (call dd ctor-ll-parts)
   (destructuring-bind (&optional req opt rest keys aux)

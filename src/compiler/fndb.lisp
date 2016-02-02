@@ -549,8 +549,8 @@
 (defknown (every notany notevery) (callable sequence &rest sequence) boolean
   (foldable unsafely-flushable call))
 
-(defknown reduce (callable sequence &rest t &key (:from-end t) (:start index)
-                  (:end sequence-end) (:initial-value t) (:key callable))
+(defknown reduce ((callable 2) sequence &rest t &key (:from-end t) (:start index)
+                  (:end sequence-end) (:initial-value t) (:key (callable 1)))
   t
   (foldable flushable call))
 
@@ -569,133 +569,133 @@
   :result-arg 0)
 
 (defknown remove
-  (t sequence &rest t &key (:from-end t) (:test callable)
-     (:test-not callable) (:start index) (:end sequence-end)
-     (:count sequence-count) (:key callable))
+  (t sequence &rest t &key (:from-end t) (:test (callable 2))
+     (:test-not (callable 2)) (:start index) (:end sequence-end)
+     (:count sequence-count) (:key (callable 1)))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown substitute
-  (t t sequence &rest t &key (:from-end t) (:test callable)
-     (:test-not callable) (:start index) (:end sequence-end)
-     (:count sequence-count) (:key callable))
+  (t t sequence &rest t &key (:from-end t) (:test (callable 2))
+     (:test-not (callable 2)) (:start index) (:end sequence-end)
+     (:count sequence-count) (:key (callable 1)))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown (remove-if remove-if-not)
-  (callable sequence &rest t &key (:from-end t) (:start index)
-            (:end sequence-end) (:count sequence-count) (:key callable))
+  ((callable 1) sequence &rest t &key (:from-end t) (:start index)
+            (:end sequence-end) (:count sequence-count) (:key (callable 1)))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown (substitute-if substitute-if-not)
-  (t callable sequence &rest t &key (:from-end t) (:start index)
-     (:end sequence-end) (:count sequence-count) (:key callable))
+  (t (callable 1) sequence &rest t &key (:from-end t) (:start index)
+     (:end sequence-end) (:count sequence-count) (:key (callable 1)))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown delete
-  (t sequence &rest t &key (:from-end t) (:test callable)
-     (:test-not callable) (:start index) (:end sequence-end)
-     (:count sequence-count) (:key callable))
+  (t sequence &rest t &key (:from-end t) (:test (callable 2))
+     (:test-not (callable 2)) (:start index) (:end sequence-end)
+     (:count sequence-count) (:key (callable 1)))
   sequence
   (flushable call important-result)
   :derive-type (sequence-result-nth-arg 2)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown nsubstitute
-  (t t sequence &rest t &key (:from-end t) (:test callable)
-     (:test-not callable) (:start index) (:end sequence-end)
-     (:count sequence-count) (:key callable))
+  (t t sequence &rest t &key (:from-end t) (:test (callable 2))
+     (:test-not (callable 2)) (:start index) (:end sequence-end)
+     (:count sequence-count) (:key (callable 1)))
   sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown (delete-if delete-if-not)
-  (callable sequence &rest t &key (:from-end t) (:start index)
-            (:end sequence-end) (:count sequence-count) (:key callable))
+  ((callable 1) sequence &rest t &key (:from-end t) (:start index)
+   (:end sequence-end) (:count sequence-count) (:key (callable 1)))
   sequence
   (flushable call important-result)
   :derive-type (sequence-result-nth-arg 2)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
-  (t callable sequence &rest t &key (:from-end t) (:start index)
-     (:end sequence-end) (:count sequence-count) (:key callable))
+  (t (callable 1) sequence &rest t &key (:from-end t) (:start index)
+     (:end sequence-end) (:count sequence-count) (:key (callable 1)))
   sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown remove-duplicates
-  (sequence &rest t &key (:test callable) (:test-not callable) (:start index)
-            (:from-end t) (:end sequence-end) (:key callable))
+  (sequence &rest t &key (:test (callable 2)) (:test-not (callable 2)) (:start index)
+            (:from-end t) (:end sequence-end) (:key (callable 1)))
   consed-sequence
   (unsafely-flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown delete-duplicates
-  (sequence &rest t &key (:test callable) (:test-not callable) (:start index)
-            (:from-end t) (:end sequence-end) (:key callable))
+  (sequence &rest t &key (:test (callable 2)) (:test-not (callable 2)) (:start index)
+            (:from-end t) (:end sequence-end) (:key (callable 1)))
   sequence
   (unsafely-flushable call important-result)
   :derive-type (sequence-result-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
-(defknown find (t sequence &rest t &key (:test callable)
-                (:test-not callable) (:start index) (:from-end t)
-                (:end sequence-end) (:key callable))
+(defknown find (t sequence &rest t &key (:test (callable 2))
+                (:test-not (callable 2)) (:start index) (:from-end t)
+                (:end sequence-end) (:key (callable 1)))
   t
   (foldable flushable call))
 
 (defknown (find-if find-if-not)
-  (callable sequence &rest t &key (:from-end t) (:start index)
-   (:end sequence-end) (:key callable))
+  ((callable 1) sequence &rest t &key (:from-end t) (:start index)
+   (:end sequence-end) (:key (callable 1)))
   t
   (foldable flushable call))
 
-(defknown position (t sequence &rest t &key (:test callable)
-                    (:test-not callable) (:start index) (:from-end t)
-                    (:end sequence-end) (:key callable))
+(defknown position (t sequence &rest t &key (:test (callable 2))
+                    (:test-not (callable 2)) (:start index) (:from-end t)
+                    (:end sequence-end) (:key (callable 1)))
   (or index null)
   (foldable flushable call)
   :derive-type #'position-derive-type)
 
 (defknown (position-if position-if-not)
-  (callable sequence &rest t &key (:from-end t) (:start index)
-   (:end sequence-end) (:key callable))
+  ((callable 1) sequence &rest t &key (:from-end t) (:start index)
+   (:end sequence-end) (:key (callable 1)))
   (or index null)
   (foldable flushable call)
   :derive-type #'position-derive-type)
 
 (defknown count (t sequence &rest t &key
-                   (:test callable) (:test-not callable) (:start index)
-                   (:from-end t) (:end sequence-end) (:key callable))
+                   (:test (callable 2)) (:test-not (callable 2)) (:start index)
+                   (:from-end t) (:end sequence-end) (:key (callable 1)))
   index
   (foldable flushable call)
   :derive-type #'count-derive-type)
 
 (defknown (count-if count-if-not)
-  (callable sequence &rest t &key
-            (:from-end t) (:start index) (:end sequence-end) (:key callable))
+  ((callable 1) sequence &rest t &key
+   (:from-end t) (:start index) (:end sequence-end) (:key (callable 1)))
   index
   (foldable flushable call)
   :derive-type #'count-derive-type)
 
 (defknown (mismatch search)
-  (sequence sequence &rest t &key (:from-end t) (:test callable)
-   (:test-not callable) (:start1 index) (:end1 sequence-end)
-   (:start2 index) (:end2 sequence-end) (:key callable))
+  (sequence sequence &rest t &key (:from-end t) (:test (callable 2))
+   (:test-not (callable 2)) (:start1 index) (:end1 sequence-end)
+   (:start2 index) (:end2 sequence-end) (:key (callable 1)))
   (or index null)
   (foldable flushable call))
 
 ;;; not FLUSHABLE, since vector sort guaranteed in-place...
-(defknown (stable-sort sort) (sequence callable &rest t &key (:key callable))
+(defknown (stable-sort sort) (sequence (callable 2) &rest t &key (:key (callable 1)))
   sequence
   (call)
   :derive-type (sequence-result-nth-arg 1)
@@ -720,8 +720,8 @@
   (call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
-(defknown merge (type-specifier sequence sequence callable
-                                &key (:key callable))
+(defknown merge (type-specifier sequence sequence (callable 2)
+                                &key (:key (callable 1)))
   sequence
   (call important-result)
   :derive-type (creation-result-type-specifier-nth-arg 1)
@@ -762,7 +762,7 @@
 
 (defknown cons (t t) cons (movable flushable))
 
-(defknown tree-equal (t t &key (:test callable) (:test-not callable)) boolean
+(defknown tree-equal (t t &key (:test (callable 2)) (:test-not (callable 2))) boolean
   (foldable flushable call))
 (defknown endp (list) boolean (foldable flushable movable))
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
@@ -812,55 +812,55 @@
 (defknown (rplaca rplacd) (cons t) cons ()
   :destroyed-constant-args (nth-constant-args 1))
 
-(defknown subst (t t t &key (:key callable) (:test callable)
-                   (:test-not callable))
+(defknown subst (t t t &key (:key (callable 1)) (:test (callable 2))
+                   (:test-not (callable 2)))
   t (flushable call))
-(defknown nsubst (t t t &key (:key callable) (:test callable)
-                    (:test-not callable))
+(defknown nsubst (t t t &key (:key (callable 1)) (:test (callable 2))
+                    (:test-not (callable 2)))
   t (call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown (subst-if subst-if-not)
-          (t callable t &key (:key callable))
+          (t (callable 1) t &key (:key (callable 1)))
   t (flushable call))
 (defknown (nsubst-if nsubst-if-not)
-          (t callable t &key (:key callable))
+          (t (callable 1) t &key (:key (callable 1)))
   t (call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
-(defknown sublis (list t &key (:key callable) (:test callable)
-                       (:test-not callable))
+(defknown sublis (list t &key (:key (callable 1)) (:test (callable 2))
+                       (:test-not (callable 2)))
   t (flushable call))
-(defknown nsublis (list t &key (:key callable) (:test callable)
-                        (:test-not callable))
+(defknown nsublis (list t &key (:key (callable 1)) (:test (callable 2))
+                        (:test-not (callable 2)))
   t (flushable call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
-(defknown member (t list &key (:key callable) (:test callable)
-                    (:test-not callable))
+(defknown member (t list &key (:key (callable 1)) (:test (callable 2))
+                    (:test-not (callable 2)))
   list (foldable flushable call))
-(defknown (member-if member-if-not) (callable list &key (:key callable))
+(defknown (member-if member-if-not) ((callable 1) list &key (:key (callable 1)))
   list (foldable flushable call))
 
 (defknown tailp (t list) boolean (foldable flushable))
 
-(defknown adjoin (t list &key (:key callable) (:test callable)
-                    (:test-not callable))
+(defknown adjoin (t list &key (:key (callable 1)) (:test (callable 2))
+                    (:test-not (callable 2)))
   cons (flushable call))
 
 (defknown (union intersection set-difference set-exclusive-or)
-  (list list &key (:key callable) (:test callable) (:test-not callable))
+  (list list &key (:key (callable 1)) (:test (callable 2)) (:test-not (callable 2)))
   list
   (foldable flushable call))
 
 (defknown (nunion nintersection nset-difference nset-exclusive-or)
-  (list list &key (:key callable) (:test callable) (:test-not callable))
+  (list list &key (:key (callable 1)) (:test (callable 2)) (:test-not (callable 2)))
   list
   (foldable flushable call important-result)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1 2))
 
 (defknown subsetp
-  (list list &key (:key callable) (:test callable) (:test-not callable))
+  (list list &key (:key (callable 1)) (:test (callable 2)) (:test-not (callable 2)))
   boolean
   (foldable flushable call))
 
@@ -868,10 +868,10 @@
 (defknown pairlis (t t &optional t) list (flushable))
 
 (defknown (rassoc assoc)
-          (t list &key (:key callable) (:test callable) (:test-not callable))
+          (t list &key (:key (callable 1)) (:test (callable 2)) (:test-not (callable 2)))
   list (foldable flushable call))
 (defknown (assoc-if-not assoc-if rassoc-if rassoc-if-not)
-          (callable list &key (:key callable)) list (foldable flushable call))
+          ((callable 1) list &key (:key (callable 1))) list (foldable flushable call))
 
 (defknown (memq assq) (t list) list (foldable flushable))
 (defknown delq (t list) list (flushable)
@@ -898,7 +898,7 @@
   :derive-type #'result-type-last-arg)
 (defknown remhash (t hash-table) boolean ()
   :destroyed-constant-args (nth-constant-args 2))
-(defknown maphash (callable hash-table) null (flushable call))
+(defknown maphash ((callable 2) hash-table) null (flushable call))
 (defknown clrhash (hash-table) hash-table ()
   :destroyed-constant-args (nth-constant-args 2))
 (defknown hash-table-count (hash-table) index (flushable))
@@ -1102,9 +1102,9 @@
   (character character &optional readtable (or readtable null)) (eql t)
   ())
 
-(defknown set-macro-character (character callable &optional t (or readtable null))
+(defknown set-macro-character (character (callable 2) &optional t (or readtable null))
   (eql t)
-  ())
+  (call))
 (defknown get-macro-character (character &optional (or readtable null))
   (values callable boolean) (flushable))
 
