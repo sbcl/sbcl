@@ -4311,7 +4311,8 @@
 ;;; the identity. ONE-ARG-RESULT-TYPE is the type to ensure (with THE)
 ;;; that the argument in one-argument calls is.
 (declaim (ftype (function (symbol list t &optional symbol list)
-                          (values t &optional (member nil t)))
+                          * ; KLUDGE: avoid "assertion too complex to check"
+                          #|(values t &optional (member nil t))|#)
                 source-transform-transitive))
 (defun source-transform-transitive (fun args identity
                                     &optional (one-arg-result-type 'number)
@@ -4349,7 +4350,8 @@
 ;;; /. With one arg, we form the inverse. With two args we pass.
 ;;; Otherwise we associate into two-arg calls.
 (declaim (ftype (function (symbol symbol list list &optional symbol)
-                          (values list &optional (member nil t)))
+                          * ; KLUDGE: avoid "assertion too complex to check"
+                          #|(values list &optional (member nil t))|#)
                 source-transform-intransitive))
 (defun source-transform-intransitive (fun fun* args one-arg-prefixes
                                       &optional (one-arg-result-type 'number))
