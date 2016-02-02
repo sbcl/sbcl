@@ -40,41 +40,6 @@
     (format stream "~S ~S, ~D" (meta-info-category x) (meta-info-kind x)
             (meta-info-number x))))
 
-(!begin-collecting-cold-init-forms)
-#!+sb-show (!cold-init-forms (/show0 "early in globaldb.lisp cold init"))
-
-;;; This is sorta semantically equivalent to SXHASH, but better-behaved for
-;;; legal function names. It performs more work by not cutting off as soon
-;;; in the CDR direction, thereby improving the distribution of method names.
-;;; More work here equates to less work in the global hashtable.
-;;; To wit: (eq (sxhash '(foo a b c bar)) (sxhash '(foo a b c d))) => T
-;;; but the corresponding globaldb-sxhashoids differ.
-;;; This is no longer inline because for the cases where it is needed -
-;;; names which are not just symbols or (SETF F) - an extra call has no impact.
-(defun globaldb-sxhashoid (name)
-  ;; we can't use MIX because it's in 'target-sxhash',
-  ;; so use the host's sxhash, but ensure that the result is a target fixnum.
-  #+sb-xc-host (logand (sxhash name) sb!xc:most-positive-fixnum)
-  #-sb-xc-host
-  (locally
-      (declare (optimize (safety 0))) ; after the argc check
-    ;; TRAVERSE will walk across more cons cells than RECURSE will descend.
-    ;; That's why this isn't just one self-recursive function.
-    (labels ((traverse (accumulator x length-limit)
-               (declare (fixnum length-limit))
-               (cond ((atom x) (sb!int:mix (sxhash x) accumulator))
-                     ((zerop length-limit) accumulator)
-                     (t (traverse (sb!int:mix (recurse (car x) 4) accumulator)
-                                  (cdr x) (1- length-limit)))))
-             (recurse (x depthoid) ; depthoid = a blend of level and length
-               (declare (fixnum depthoid))
-               (cond ((atom x) (sxhash x))
-                     ((zerop depthoid)
-                      #.(logand sb!xc:most-positive-fixnum #36Rglobaldbsxhashoid))
-                     (t (sb!int:mix (recurse (car x) (1- depthoid))
-                                    (recurse (cdr x) (1- depthoid)))))))
-      (traverse 0 name 10))))
-
 ;;; Given any non-negative integer, return a prime number >= to it.
 ;;;
 ;;; FIXME: This logic should be shared with ALMOST-PRIMIFY in
@@ -142,12 +107,6 @@
             :category category :kind kind :type-spec type-spec
             :type-checker checker :validate-function validator
             :default default :number id)))))
-
-(!cold-init-forms
- (dovector (x (the simple-vector *info-types*))
-   ;; Genesis writes the *INFO-TYPES* array, but setting up the mapping
-   ;; from keyword-pair to object is deferred until cold-init.
-   (when x (!register-meta-info x))))
 
 ;;;; info types, and type numbers, part II: what's
 ;;;; needed only at compile time, not at run time
@@ -269,9 +228,12 @@
 
 ;;;; *INFO-ENVIRONMENT*
 
-(!cold-init-forms
-  (setq *info-environment* (make-info-hashtable))
-  (/show0 "done setting *INFO-ENVIRONMENT*"))
+(defun !globaldb-cold-init ()
+  ;; Genesis writes the *INFO-TYPES* array, but setting up the mapping
+  ;; from keyword-pair to object is deferred until cold-init.
+  (dovector (x (the simple-vector *info-types*))
+    (when x (!register-meta-info x)))
+  (setq *info-environment* (make-info-hashtable)))
 
 ;;;; GET-INFO-VALUE
 
@@ -600,34 +562,6 @@
 ;;; The classoid-cell for this type
 (define-info-type (:type :classoid-cell) :type-spec t)
 
-(defun find-classoid-cell (name &key create)
-  (let ((real-name (uncross name)))
-    (cond ((info :type :classoid-cell real-name))
-          (create
-           (get-info-value-initializing
-            :type :classoid-cell real-name
-            (sb!kernel::make-classoid-cell real-name))))))
-
-;;; Return the classoid with the specified NAME. If ERRORP is false,
-;;; then NIL is returned when no such class exists.
-(defun find-classoid (name &optional (errorp t))
-  (declare (type symbol name))
-  (let ((cell (find-classoid-cell name)))
-    (cond ((and cell (classoid-cell-classoid cell)))
-          (errorp
-           (error 'simple-type-error
-                  :datum nil
-                  :expected-type 'class
-                  :format-control "Class not yet defined: ~S"
-                  :format-arguments (list name))))))
-
-;;; layout for this type being used by the compiler
-(define-info-type (:type :compiler-layout)
-  :type-spec (or layout null)
-  :default (lambda (name)
-             (let ((class (find-classoid name nil)))
-               (when class (classoid-layout class)))))
-
 ;;; DEFTYPE lambda-list
 ;; FIXME: remove this after making swank-fancy-inspector not use it.
 (define-info-type (:type :lambda-list) :type-spec t)
@@ -727,5 +661,3 @@
                      (list (meta-info-category type) (meta-info-kind type))))
          (write val :level 1)))
      sym)))
-
-(!defun-from-collected-cold-init-forms !globaldb-cold-init)
