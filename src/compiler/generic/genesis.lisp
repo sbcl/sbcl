@@ -1286,25 +1286,24 @@ core and return a descriptor to it."
 
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
-(defun host-constant-to-core (host-value &optional (sanity-check t))
-  ;; rough check for no shared substructure and/or circularity.
-  ;; of course this would be wrong if it were a string containing "#1="
-  (when (and sanity-check
-             (search "#1=" (write-to-string host-value :circle t :readably t)))
-    (warn "Strange constant to core from Genesis: ~S" host-value))
-  (labels ((target-representation (value)
-             (etypecase value
-               (descriptor value)
-               (symbol (if (symbol-package value)
-                           (cold-intern value)
-                           (get-uninterned-symbol (string value))))
-               (number (number-to-core value))
-               (string (base-string-to-core value))
-               (cons (cold-cons (target-representation (car value))
-                                (target-representation (cdr value))))
-               (simple-vector
-                (vector-in-core (map 'list #'target-representation value))))))
-    (target-representation host-value)))
+(defun host-constant-to-core (host-value)
+  (let (visited)
+    (named-let target-representation ((value host-value))
+      (unless (typep value '(or symbol number descriptor))
+        (if (memq value visited) ; Sharing/circularity not handled
+            (bug "circular constant?")
+            (push value visited)))
+      (etypecase value
+        (descriptor value)
+        (symbol (if (symbol-package value)
+                    (cold-intern value)
+                    (get-uninterned-symbol (string value))))
+        (number (number-to-core value))
+        (string (base-string-to-core value))
+        (cons (cold-cons (target-representation (car value))
+                         (target-representation (cdr value))))
+        (simple-vector
+         (vector-in-core (map 'list #'target-representation value)))))))
 
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
 (defun target-symbol-function (symbol)
@@ -3822,11 +3821,13 @@ initially undefined function references:~2%")
           (write-initial-core-file core-file-name))))))
 
 ;; This generalization of WARM-FUN-NAME will do in a pinch
-;; to view strings and things in a gspace.
+;; to make a human-readable object. It isn't 100% pedantically correct.
 (defun warmelize (descriptor)
   (labels ((recurse (x)
             (when (cold-null x)
               (return-from recurse nil))
+            (when (is-fixnum-lowtag (descriptor-lowtag x))
+              (return-from recurse (descriptor-fixnum x)))
             (ecase (descriptor-lowtag x)
               (#.sb!vm:list-pointer-lowtag
                (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
@@ -3841,5 +3842,7 @@ initially undefined function references:~2%")
                     ;; this is only approximate, as it disregards package
                     (intern (recurse (read-wordindexed x sb!vm:symbol-name-slot))))
                    (#.sb!vm:simple-base-string-widetag
-                    (base-string-from-core x))))))))
+                    (base-string-from-core x))
+                   (#.sb!vm:simple-vector-widetag
+                    (vector-from-core x #'recurse))))))))
     (recurse descriptor)))
