@@ -366,10 +366,7 @@
             (t
              ;; no canonicalization necessary
              (values low high)))
-        (when (and (eq class 'rational)
-                   (integerp low)
-                   (integerp high)
-                   (= low high))
+        (when (and (eq class 'rational) (integerp low) (eql low high))
           (setf class 'integer))
 
         ;; Either lookup the canonical interned object for
