@@ -66,7 +66,6 @@
 ;;; sources partway through bootstrapping, tch tch, overwriting its
 ;;; version with our version would be unlikely to help, because that
 ;;; would make the cross-compiler very confused.)
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun !register-meta-info (metainfo)
   (let* ((name (meta-info-kind metainfo))
          (list (!get-meta-infos name)))
@@ -87,8 +86,6 @@
      (setf (aref *info-types* id)
            (!make-meta-info id category kind type-spec type-checker
                             validate-function default)))))
-
-) ; EVAL-WHEN
 
 #-sb-xc
 (setf (get '!%define-info-type :sb-cold-funcall-handler/for-effect)
@@ -140,8 +137,7 @@
   ;; There was formerly a remark that (COPY-TREE TYPE-SPEC) ensures repeatable
   ;; fasls. That's not true now, probably never was. A compiler is permitted to
   ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
-  (let ((form
-         `(!%define-info-type
+  `(!%define-info-type
            ,category ,kind ',type-spec
            ,(cond ((eq type-spec 't) '#'identity)
                   ;; evil KLUDGE to avoid "undefined type" warnings
@@ -163,7 +159,6 @@
            ,(or (and (eq category :function) (eq kind :definition)
                      +fdefn-info-num+)
                 #+sb-xc (meta-info-number (meta-info category kind))))))
-    `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute) ,form))))
 
 
 (macrolet ((meta-info-or-lose (category kind)

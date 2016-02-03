@@ -362,10 +362,9 @@
                        append `(,(keywordicate name)
                                 (,(!type-class-fun-slot name) parent))))))))
     #-sb-xc
-    `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-         (unless (find ',name *type-classes* :key #'type-class-name)
-           (vector-push-extend ,make-it *type-classes*))))
+    `(if (find ',name *type-classes* :key #'type-class-name)
+         (warn "Not redefining type-class ~S" ',name)
+         (vector-push-extend ,make-it *type-classes*))
     #+sb-xc
     `(!cold-init-forms
       (setf (svref *type-classes*
