@@ -182,6 +182,25 @@
   (def clear-info (category kind name)
     `(clear-info-values ,name '(,(meta-info-number meta-info)))))
 
+;; interface to %ATOMIC-SET-INFO-VALUE
+;; GET-INFO-VALUE-INITIALIZING is a restricted case of this,
+;; and perhaps could be implemented as such.
+;; Atomic update will be important for making the fasloader threadsafe
+;; using a predominantly lock-free design, and other nice things.
+(defmacro atomic-set-info-value (category kind name lambda)
+  (with-unique-names (info-number proc)
+    `(let ((,info-number
+            ,(if (and (keywordp category) (keywordp kind))
+                 (meta-info-number (meta-info category kind))
+                 `(meta-info-number (meta-info ,category ,kind)))))
+       ,(if (and (listp lambda) (eq (car lambda) 'lambda))
+            ;; rewrite as FLET because the compiler is unable to dxify
+            ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
+            (destructuring-bind (lambda-list . body) (cdr lambda)
+              `(dx-flet ((,proc ,lambda-list ,@body))
+                 (%atomic-set-info-value ,name ,info-number #',proc)))
+            `(%atomic-set-info-value ,name ,info-number ,lambda)))))
+
 ;; Perform the approximate equivalent operations of retrieving
 ;; (INFO :CATEGORY :KIND NAME), but if no info is found, invoke CREATION-FORM
 ;; to produce an object that becomes the value for that piece of info, storing

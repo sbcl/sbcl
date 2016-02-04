@@ -272,25 +272,6 @@
         (funcall (truly-the function (cdr hook)) name info-number answer nil))
       (values answer nil))))
 
-;; interface to %ATOMIC-SET-INFO-VALUE
-;; GET-INFO-VALUE-INITIALIZING is a restricted case of this,
-;; and perhaps could be implemented as such.
-;; Atomic update will be important for making the fasloader threadsafe
-;; using a predominantly lock-free design, and other nice things.
-(def!macro atomic-set-info-value (category kind name lambda)
-  (with-unique-names (info-number proc)
-    `(let ((,info-number
-            ,(if (and (keywordp category) (keywordp kind))
-                 (meta-info-number (meta-info category kind))
-                 `(meta-info-number (meta-info ,category ,kind)))))
-       ,(if (and (listp lambda) (eq (car lambda) 'lambda))
-            ;; rewrite as FLET because the compiler is unable to dxify
-            ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
-            (destructuring-bind (lambda-list . body) (cdr lambda)
-              `(dx-flet ((,proc ,lambda-list ,@body))
-                 (%atomic-set-info-value ,name ,info-number #',proc)))
-            `(%atomic-set-info-value ,name ,info-number ,lambda)))))
-
 ;; Call FUNCTION once for each Name in globaldb that has information associated
 ;; with it, passing the function the Name as its only argument.
 ;;
