@@ -395,14 +395,15 @@
                               (member (car type) '(callable function)))
                          (car type)
                          type)))
-              (let ((lambda-list `(,@(mapcar #'process-var required)
-                                   &optional ,@(mapcar #'process-var optional)
-                                   ,@ (and (ll-kwds-keyp llks)
-                                           `(&key
-                                             ,@(loop for (key type) in keys
-                                                     for var = (gensym)
-                                                     do (process-var type var)
-                                                     collect `((,key ,var))))))))
+              (let ((lambda-list
+                     `(,@(mapcar #'process-var required)
+                       ,@(and optional
+                              `(&optional ,@(mapcar #'process-var optional)))
+                       ,@(and (ll-kwds-keyp llks)
+                              `(&key ,@(loop for (key type) in keys
+                                             for var = (gensym)
+                                             do (process-var type var)
+                                             collect `((,key ,var))))))))
 
                 (assert call-vars)
                 (values
