@@ -198,12 +198,3 @@ constantness of the FORM in ENVIRONMENT."
            (constant-form-value* (car (last forms)))))
 
 (!defun-from-collected-cold-init-forms !constantp-cold-init)
-
-;;; Was in 'primordial-extensions', but wants to inline CONSTANTP.
-(defun sb!impl::%defconstant-eqx-value (symbol expr eqx)
-  (declare (type function eqx))
-  (if (boundp symbol)
-      (let ((oldval (symbol-value symbol)))
-        ;; %DEFCONSTANT offers CONTINUE,ABORT restarts on non-equivalence.
-        (if (funcall eqx oldval expr) oldval expr))
-      expr))

@@ -293,18 +293,6 @@
       (incf index))
     `(progn
        ,@(nreverse results))))
-
-;;; generalization of DEFCONSTANT to values which are the same not
-;;; under EQL but under e.g. EQUAL or EQUALP
-;;;
-;;; DEFCONSTANT-EQX is to be used instead of DEFCONSTANT for values
-;;; which are appropriately compared using the function given by the
-;;; EQX argument instead of EQL.
-;;;
-(defmacro defconstant-eqx (symbol expr eqx &optional doc)
-  `(def!constant ,symbol
-     (%defconstant-eqx-value ',symbol ,expr ,eqx)
-     ,@(when doc (list doc))))
 
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.

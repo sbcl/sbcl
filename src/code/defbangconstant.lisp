@@ -53,3 +53,24 @@
         ;; about it because it definitely shouldn't come up in an
         ;; ordinary build process.
         (warn "*DELAYED-DEF!CONSTANTS* is already unbound."))))
+
+(defun %defconstant-eqx-value (symbol expr eqx)
+  (declare (type function eqx))
+  (if (boundp symbol)
+      (let ((oldval (symbol-value symbol)))
+        ;; %DEFCONSTANT will give a choice of how to proceeed on error.
+        (if (funcall eqx oldval expr) oldval expr))
+      expr))
+
+;;; generalization of DEFCONSTANT to values which are the same not
+;;; under EQL but under e.g. EQUAL or EQUALP
+;;;
+;;; DEFCONSTANT-EQX is to be used instead of DEFCONSTANT for values
+;;; which are appropriately compared using the function given by the
+;;; EQX argument instead of EQL.
+;;;
+(defmacro defconstant-eqx (symbol expr eqx &optional doc)
+  `(def!constant ,symbol
+     (%defconstant-eqx-value ',symbol ,expr ,eqx)
+     ,@(when doc (list doc))))
+

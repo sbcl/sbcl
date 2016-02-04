@@ -43,8 +43,6 @@
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
 
- ("src/code/early-constants")
-
  ;; This comes early because the cross-compilation host's backquote
  ;; logic can expand into something which can't be executed on the
  ;; target Lisp (e.g. in CMU CL where it expands into internal
@@ -89,6 +87,7 @@
  ("src/code/defbangtype")
  ("src/code/defbangmacro")
  ("src/code/defbangconstant")
+ ("src/code/early-constants") ; needs DEF!CONSTANT
 
  ("src/compiler/early-lexenv")
  ("src/code/primordial-extensions")
