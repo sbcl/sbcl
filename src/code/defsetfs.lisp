@@ -14,6 +14,9 @@
 
 (sb!int:/show0 "entering defsetfs.lisp")
 
+;;; FIXME: this entire file looks like it should be :not-host
+;;; (The bits that aren't #-sb-xc-host look like innocuous bugs)
+
 ;;; from alieneval.lisp
 (in-package "SB!ALIEN")
 (defsetf slot %set-slot)

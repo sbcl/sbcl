@@ -425,17 +425,6 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
- (macrolet ((assign-it ()
-               `(progn
-                  (when inverse
-                    (clear-info :setf :expander name)
-                    (setf (info :setf :inverse name) inverse))
-                  (when expander
-                    (clear-info :setf :inverse name)
-                    (setf (info :setf :expander name) expander))
-                  (when doc
-                    (setf (fdocumentation name 'setf) doc))
-                  name)))
   (defun %defsetf (name expander inverse &optional doc)
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
@@ -465,10 +454,23 @@
            ;; The user can declare an FTYPE if both things are intentional.
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
-    (assign-it))
-  ;; For cold-init, because any warning will cause a crash.
-  (defun !quietly-defsetf (name expander inverse &optional doc)
-    (assign-it))))
+    (when inverse
+      (clear-info :setf :expander name)
+      (setf (info :setf :inverse name) inverse))
+    (when expander
+      (clear-info :setf :inverse name)
+      (setf (info :setf :expander name) expander))
+    (when doc
+      (setf (fdocumentation name 'setf) doc))
+    name))
+(defun !quietly-defsetf (&rest args)
+  ;; Because !QUIETLY-DEFSETF calls occur before any condition classoids
+  ;; have been installed, HANDLER-BIND would lead to infinite regress.
+  ;; The only thing we can do to avoid that is: nothing at all.
+  #-sb-xc-host (encapsulate 'style-warn '!bootstrap
+                            (lambda (&rest l) (declare (ignore l))))
+  (apply #'%defsetf args)
+  #-sb-xc-host (unencapsulate 'style-warn '!bootstrap))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
   #!+sb-doc
