@@ -37,10 +37,8 @@
             (setf *!cold-init-forms*
                   (nconc *!cold-init-forms* (copy-list forms)))
             nil)
-  ;; In the cross-compilation host Lisp, cold load might not be a
-  ;; meaningful concept and in any case would have happened long ago,
-  ;; so just execute the forms at load time (i.e. basically as soon as
-  ;; possible).
+  ;; In the cross-compilation host Lisp, cold load is not a
+  ;; meaningful concept. Just execute the forms at load time.
   #-sb-xc `(progn ,@forms))
 
 (defmacro !defun-from-collected-cold-init-forms (name)
