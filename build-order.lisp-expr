@@ -57,7 +57,7 @@
  ;; of CL special binding when the variable is undeclared.
  ("src/code/globals" :not-host)
 
- ("src/code/defsetfs")
+ ("src/code/defsetfs" :not-host)
  ("src/code/cmacros" :not-host :slam-forcibly)
 
  ("src/code/cold-init-helper-macros")

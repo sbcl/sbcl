@@ -531,14 +531,19 @@
          (obj (ref-fop-table (fasl-input) obi))
          (idx (read-word-arg (fasl-input-stream))))
     (if (%instancep obj) ; suspicious. should have been FOP-STRUCTSET
-        (setf (%instance-ref obj idx) val)
+        #+sb-xc (setf (%instance-ref obj idx) val)
+        #-sb-xc (bug "%instance-set?")
         (setf (svref obj idx) val))))
 
 (!define-fop 204 (fop-structset (val) nil)
+  #+sb-xc
   (setf (%instance-ref (ref-fop-table (fasl-input)
                                       (read-word-arg (fasl-input-stream)))
                        (read-word-arg (fasl-input-stream)))
-        val))
+        val)
+  ;; can't (SETF %INSTANCE-REF), but the FOP number must be defined
+  #-sb-xc (declare (ignorable val))
+  #-sb-xc (bug "%instance-set?"))
 
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-FOP.
