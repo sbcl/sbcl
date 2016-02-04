@@ -481,6 +481,7 @@ distinct from the global value. Can also be SETF."
                      (if (plusp q)
                          (recurse (1+ depth) q)
                          (let ((et (if (or (base-string-p prefix)
+                                           #!+sb-unicode ; no #'base-char-p
                                            (every #'base-char-p prefix))
                                        'base-char 'character)))
                            (setq s (make-string (+ (length prefix) depth)
