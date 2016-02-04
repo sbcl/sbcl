@@ -1344,7 +1344,8 @@
 ;;; good idea to go OO, representing the reasons by objects, using
 ;;; CLOS methods on the objects instead of CASE, and (possibly) using
 ;;; SIGNAL instead of THROW.
-(declaim (ftype (function (&rest t) nil) give-up-ir1-transform))
+(declaim (ftype (function (&rest t) #+(and sb-xc-host ccl) *
+                                    #-(and sb-xc-host ccl) nil) give-up-ir1-transform))
 (defun give-up-ir1-transform (&rest args)
   (throw 'give-up-ir1-transform (values :failure args)))
 (defun abort-ir1-transform (&rest args)

@@ -963,7 +963,8 @@
 ;;; error indicating that a required &KEY argument was not supplied.
 ;;; This function is also useful for DEFSTRUCT slot defaults
 ;;; corresponding to required arguments.
-(declaim (ftype (function () nil) missing-arg))
+(declaim (ftype (function () #+(and sb-xc-host ccl) *
+                             #-(and sb-xc-host ccl) nil) missing-arg))
 (defun missing-arg ()
   #!+sb-doc
   (/show0 "entering MISSING-ARG")
