@@ -370,6 +370,16 @@
              (let ((class (find-classoid name nil)))
                (when class (classoid-layout class)))))
 
+;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION
+;;; or the symbol :GENERIC-FUNTION.
+;;; If a DD, it must contain a constructor whose name is
+;;; the one being sought in globaldb, which is used to derive the type.
+;;; If :GENERIC-FUNCTION, the info is recomputed from existing methods
+;;; and stored back into globaldb.
+(define-info-type (:function :type)
+  :type-spec (or ctype defstruct-description (member :generic-function))
+  :default #'ftype-from-fdefn)
+
 ;;; This is sorta semantically equivalent to SXHASH, but better-behaved for
 ;;; legal function names. It performs more work by not cutting off as soon
 ;;; in the CDR direction, thereby improving the distribution of method names.

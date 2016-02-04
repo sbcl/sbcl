@@ -353,16 +353,6 @@
           (specifier-type (sb!impl::%fun-type fun)))
         (specifier-type 'function)))))
 
-;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION
-;;; or the symbol :GENERIC-FUNTION.
-;;; If a DD, it must contain a constructor whose name is
-;;; the one being sought in globaldb, which is used to derive the type.
-;;; If :GENERIC-FUNCTION, the info is recomputed from existing methods
-;;; and stored back into globaldb.
-(define-info-type (:function :type)
-  :type-spec (or ctype defstruct-description (member :generic-function))
-  :default #'ftype-from-fdefn)
-
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition
 (define-info-type (:function :assumed-type)
