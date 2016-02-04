@@ -336,8 +336,6 @@
  ("src/code/defmacro")
  ("src/code/force-delayed-defbangmacros")
 
- ("src/compiler/late-macros")
-
  ;; for e.g. !DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
  ("src/compiler/meta-vmdef")

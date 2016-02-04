@@ -847,21 +847,9 @@
     (when (funcall test (funcall key current) element)
       (return i))))
 
-
-;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
-;;;   (DEF!MACRO FOO (..) .. CL:GET-SETF-EXPANSION ..)
-;;;   #+SB-XC-HOST
-;;;   (SB!XC:DEFMACRO FOO (..) .. SB!XC:GET-SETF-EXPANSION ..)
-;;; arrangement, in order to get it to work in cross-compilation. This
-;;; duplication should be removed, perhaps by rewriting the macro in a more
-;;; cross-compiler-friendly way, or perhaps just by using some (MACROLET ((FROB
-;;; ..)) .. FROB .. FROB) form, or perhaps by completely eliminating this macro
-;;; and its partner PUSH-IN, but I don't want to do it now, because the system
-;;; isn't running yet, so it'd be too hard to check that my changes were
-;;; correct -- WHN 19990806
-(def!macro deletef-in (next place item &environment env)
+(defmacro deletef-in (next place item &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (get-setf-expansion place env)
+      (#+sb-xc sb!xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     (let ((n-item (gensym))
@@ -881,25 +869,13 @@
                   (setf (,next ,n-prev)
                         (,next ,n-current)))))
          (values)))))
-;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
 
 ;;; Push ITEM onto a list linked by the accessor function NEXT that is
 ;;; stored in PLACE.
 ;;;
-;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
-;;;   (DEF!MACRO FOO (..) .. CL:GET-SETF-EXPANSION ..)
-;;;   #+SB-XC-HOST
-;;;   (SB!XC:DEFMACRO FOO (..) .. SB!XC:GET-SETF-EXPANSION ..)
-;;; arrangement, in order to get it to work in cross-compilation. This
-;;; duplication should be removed, perhaps by rewriting the macro in a more
-;;; cross-compiler-friendly way, or perhaps just by using some (MACROLET ((FROB
-;;; ..)) .. FROB .. FROB) form, or perhaps by completely eliminating this macro
-;;; and its partner DELETEF-IN, but I don't want to do it now, because the
-;;; system isn't running yet, so it'd be too hard to check that my changes were
-;;; correct -- WHN 19990806
-(def!macro push-in (next item place &environment env)
+(defmacro push-in (next item place &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (get-setf-expansion place env)
+      (#+sb-xc sb!xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     `(let (,@(mapcar #'list temps vals)
@@ -907,7 +883,6 @@
        (setf (,next ,(first stores)) ,access)
        ,store
        (values))))
-;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
 
 (defmacro position-or-lose (&rest args)
   `(or (position ,@args)

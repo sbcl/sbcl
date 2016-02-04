@@ -1175,11 +1175,8 @@
 ;;;
 ;;; FIXME: The way this macro uses MACROEXPAND internally breaks my
 ;;; old assumptions about macros which are needed both in the host and
-;;; the target. (This is more or less the same way that PUSH-IN,
-;;; DELETEF-IN, and !DEF-BOOLEAN-ATTRIBUTE break my old assumptions,
-;;; except that they used GET-SETF-EXPANSION instead of MACROEXPAND to
-;;; do the dirty deed.) The quick and dirty "solution" here is the
-;;; same as there: use cut and paste to duplicate the defmacro in a
+;;; the target.  The quick and dirty "solution" here is to
+;;; use cut and paste to duplicate the defmacro in a
 ;;; (SB!INT:DEF!MACRO FOO (..) .. CL:MACROEXPAND ..) #+SB-XC-HOST
 ;;; (DEFMACRO FOO (..) .. SB!XC:MACROEXPAND ..) idiom. This is
 ;;; disgusting and unmaintainable, and there are obviously better
