@@ -59,14 +59,25 @@
     ;; We can't use both register and immediate offsets in the same
     ;; load/store instruction, so we need to bias our register offset
     ;; on big-endian systems.
-    (when (eq *backend-byte-order* :big-endian)
-      (inst sub result result (1- n-word-bytes)))
+    #!+big-endian
+    (inst sub result result (1- n-word-bytes))
 
     ;; And, finally, pick out the widetag from the header.
     (inst neg result result)
     (inst ldrb result (@ object result))
     done))
 
+(define-vop (%other-pointer-widetag)
+  (:translate %other-pointer-widetag)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (inst ldrb result (@ object #!+little-endian
+                                (- other-pointer-lowtag)
+                                #!+big-endian
+                                (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
 
 (define-vop (fun-subtype)
   (:translate fun-subtype)

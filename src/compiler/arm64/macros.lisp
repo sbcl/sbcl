@@ -76,9 +76,8 @@
   (once-only ((n-target target)
               (n-source source)
               (n-offset offset))
-    (let ((target-offset (ecase *backend-byte-order*
-                           (:little-endian n-offset)
-                           (:big-endian `(+ ,n-offset (1- n-word-bytes))))))
+    (let ((target-offset #!+little-endian n-offset
+                         #!+big-endian `(+ ,n-offset (1- n-word-bytes))))
       `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
 ;;; Macros to handle the fact that our stack pointer isn't actually in

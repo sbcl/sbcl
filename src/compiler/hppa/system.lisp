@@ -56,6 +56,15 @@
 
     DONE))
 
+(define-vop (%other-pointer-widetag)
+  (:translate %other-pointer-widetag)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (load-type result object (- other-pointer-lowtag))))
+
 (define-vop (fun-subtype)
   (:translate fun-subtype)
   (:policy :fast-safe)

@@ -121,7 +121,8 @@
 
 (defknown lowtag-of (t) (unsigned-byte #.sb!vm:n-lowtag-bits)
   (flushable movable))
-(defknown widetag-of (t) (unsigned-byte #.sb!vm:n-widetag-bits)
+(defknown (widetag-of %other-pointer-widetag) (t)
+  (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable movable))
 
 ;; FIXME: Sure looks like 24 should be (- n-word-bytes n-widetag-bits).
