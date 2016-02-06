@@ -378,11 +378,12 @@
           (let (vars
                 call-vars
                 arg-count-specified)
-            (flet ((process-var (x &optional (name (gensym)))
-                     (if (member (if (consp x)
-                                     (car x)
-                                     x)
-                                 '(callable function))
+            (labels ((callable-p (x)
+                     (member x '(callable function)))
+                   (process-var (x &optional (name (gensym)))
+                     (if (callable-p (if (consp x)
+                                         (car x)
+                                         x))
                          (push (cons name
                                      (cond ((consp x)
                                             (setf arg-count-specified t)
@@ -392,25 +393,38 @@
                      name)
                    (process-type (type)
                      (if (and (consp type)
-                              (member (car type) '(callable function)))
+                              (callable-p (car type)))
                          (car type)
-                         type)))
-              (let ((lambda-list
-                     `(,@(mapcar #'process-var required)
-                       ,@(and optional
-                              `(&optional ,@(mapcar #'process-var optional)))
-                       ,@(and (ll-kwds-keyp llks)
-                              `(&key ,@(loop for (key type) in keys
-                                             for var = (gensym)
-                                             do (process-var type var)
-                                             collect `((,key ,var))))))))
+                         type))
+                   (callable-rest-p (x)
+                     (and (consp x)
+                          (callable-p (car x))
+                          (eql (cadr x) '&rest))))
+              (let* (rest-var
+                     (lambda-list
+                       (cond ((find-if #'callable-rest-p required)
+                              (setf rest-var (gensym))
+                              `(,@(loop for var in required
+                                       collect (process-var var)
+                                       until (callable-rest-p var))
+                                &rest ,rest-var))
+                             (t
+                              `(,@(mapcar #'process-var required)
+                                ,@(and optional
+                                       `(&optional ,@(mapcar #'process-var optional)))
+                                ,@(and rest
+                                       `(&rest ,@(mapcar #'process-var rest)))
+                                ,@(and (ll-kwds-keyp llks)
+                                       `(&key ,@(loop for (key type) in keys
+                                                      for var = (gensym)
+                                                      do (process-var type var)
+                                                      collect `((,key ,var))))))))))
 
                 (assert call-vars)
                 (values
                  (and fold
                       `(lambda ,lambda-list
                          (declare (ignore ,@vars))
-
                          (and ,@(loop for (x) in call-vars
                                       collect `(constant-fold-arg-p ,x)))))
                  (and arg-count-specified
@@ -418,7 +432,9 @@
                          (declare (ignore ,@vars))
                          ,@(loop for (x . arg-count) in call-vars
                                  when arg-count
-                                 collect `(valid-callable-argument ,x ,arg-count))))
+                                 collect (if (eq arg-count '&rest)
+                                             `(valid-callable-argument ,x (length ,rest-var))
+                                             `(valid-callable-argument ,x ,arg-count)))))
                  `(,@(mapcar #'process-type required)
                    ,@(and optional
                           `(&optional ,@(mapcar #'process-type optional)))
