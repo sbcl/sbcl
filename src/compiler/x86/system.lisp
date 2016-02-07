@@ -68,19 +68,19 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type result object (- other-pointer-lowtag))))
+    (inst movzx result (make-ea :byte :base object
+                                      :disp (- other-pointer-lowtag)))))
 
 
 (define-vop (fun-subtype)
   (:translate fun-subtype)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
-  (:temporary (:sc byte-reg :from (:eval 0) :to (:eval 1)) temp)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type temp function (- fun-pointer-lowtag))
-    (inst movzx result temp)))
+    (inst movzx result (make-ea :byte :base object
+                                      :disp (- other-pointer-lowtag)))))
 
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
@@ -130,7 +130,7 @@
   (:generator 6
     (move eax data)
     (inst shl eax (- n-widetag-bits 2))
-    (inst mov al-tn (make-ea :byte :base x :disp (- other-pointer-lowtag)))
+    (load-type al-tn x (- other-pointer-lowtag))
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
 
