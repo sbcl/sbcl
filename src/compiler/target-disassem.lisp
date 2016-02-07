@@ -301,11 +301,6 @@
   (declare (type sb!kernel:code-component code-component))
   (sb!kernel:%code-code-size code-component))
 
-;;; Return the address of the instruction area in CODE-COMPONENT.
-(defun code-inst-area-address (code-component)
-  (declare (type sb!kernel:code-component code-component))
-  (sb!sys:sap-int (sb!kernel:code-instructions code-component)))
-
 (defun segment-offs-to-code-offs (offset segment)
   (sb!sys:without-gcing
    (let* ((seg-base-addr (sb!sys:sap-int (funcall (seg-sap-maker segment))))
