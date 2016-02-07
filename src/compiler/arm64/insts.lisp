@@ -1295,7 +1295,7 @@
             '((:cond
                 ((rn :same-as rm) 'ror)
                 (t :name))
-              :tab rd  ", " rn (:unless (:same-as rn) "," rm) ", " imm))
+              :tab rd  ", " rn (:unless (:same-as rn) ", " rm) ", " imm))
   (:emitter
    (assert-same-size rd rn rm)
    (let ((size (reg-size rd)))

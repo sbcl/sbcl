@@ -74,10 +74,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldrb result (@ object #!+little-endian
-                                (- other-pointer-lowtag)
-                                #!+big-endian
-                                (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
+    (load-type result object (- other-pointer-lowtag))))
 
 (define-vop (fun-subtype)
   (:translate fun-subtype)
@@ -137,10 +134,6 @@
       (any-reg
        (inst orr t1 t1 (lsl data (- n-widetag-bits n-fixnum-tag-bits))))
       (immediate
-       ;; FIXME: This will break if DATA has bits spread over more
-       ;; than an eight bit range aligned on an even bit position.
-       ;; See SYS:SRC;COMPILER;ARM;MOVE.LISP for a partial fix...  And
-       ;; maybe it should be promoted to an instruction-macro?
        (inst orr t1 t1 (logical-mask (ash (tn-value data) n-widetag-bits)))))
     (storew t1 x 0 other-pointer-lowtag)
     (move res x)))
@@ -193,9 +186,8 @@
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
     (inst lsr ndescr ndescr n-widetag-bits)
-    (inst lsl ndescr ndescr word-shift)
-    (inst sub ndescr ndescr other-pointer-lowtag)
-    (inst add sap code ndescr)))
+    (inst add sap code (lsl ndescr word-shift))
+    (inst sub sap sap other-pointer-lowtag)))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
