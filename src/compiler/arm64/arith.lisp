@@ -292,13 +292,11 @@
 ;;;
 (define-vop (fast-lognor/fixnum=>fixnum fast-fixnum-binop)
   (:translate lognor)
-  (:args (x :target r :scs (any-reg))
-         (y :target r :scs (any-reg)))
-  (:temporary (:sc non-descriptor-reg) temp)
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg)))
   (:generator 3
-    (inst orr temp x y)
-    (inst mvn temp temp)
-    (inst eor r temp fixnum-tag-mask)))
+    (inst orr r x y)
+    (inst eor r r (lognot fixnum-tag-mask))))
 
 (define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
   (:args (x :scs (signed-reg) :target r)
