@@ -323,13 +323,25 @@
 (defun list* (arg &rest others)
   #!+sb-doc
   "Return a list of the arguments with last cons a dotted pair."
-  ;; We know the &REST is a proper list.
-  (declare (optimize (sb!c::type-check 0)))
-  (cond ((atom others) arg)
-        ((atom (cdr others)) (cons arg (car others)))
-        (t (do ((x others (cdr x)))
-               ((null (cddr x)) (rplacd x (cadr x))))
-           (cons arg others))))
+  (let ((length (length others)))
+    (cond ((= length 0) arg)
+          ((= length 1)
+           (cons arg (fast-&rest-nth 0 others)))
+          (t
+           (let* ((cons (list arg))
+                  (result cons)
+                  (index 0)
+                  (1-length (1- length)))
+             (loop
+              (cond
+                ((< index 1-length)
+                 (setf cons
+                       (setf (cdr cons)
+                             (list (fast-&rest-nth index others))))
+                 (incf index))
+                (t (return nil))))
+             (setf (cdr cons) (fast-&rest-nth index others))
+             result)))))
 
 (defun make-list (size &key initial-element)
   #!+sb-doc
