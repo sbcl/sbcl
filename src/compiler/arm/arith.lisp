@@ -342,15 +342,15 @@
     (inst cmp temp 0)
     (inst b :ge LEFT)
     (inst rsb temp temp 0) ;; negate
-    (inst cmp temp sb!vm:n-word-bits)
-    (inst mov :gt temp sb!vm:n-word-bits)
+    (inst cmp temp n-word-bits)
+    (inst mov :gt temp n-word-bits)
     (inst mov result (ecase variant
                        (:signed (asr number temp))
                        (:unsigned (lsr number temp))))
     (inst b END)
     LEFT
-    (inst cmp temp sb!vm:n-word-bits)
-    (inst mov :gt temp sb!vm:n-word-bits)
+    (inst cmp temp n-word-bits)
+    (inst mov :gt temp n-word-bits)
     (inst mov result (lsl number temp))
     END))
 
@@ -386,8 +386,8 @@
                 (:policy :fast-safe)
                 (:generator ,cost
                   (move temp amount)
-                  (inst cmp temp sb!vm:n-word-bits)
-                  (inst mov :gt temp sb!vm:n-word-bits)
+                  (inst cmp temp n-word-bits)
+                  (inst mov :gt temp n-word-bits)
                   (inst mov result (lsl number temp))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03

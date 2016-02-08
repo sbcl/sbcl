@@ -390,18 +390,18 @@
     (inst cmp temp 0)
     (inst b :ge LEFT)
     (inst neg temp temp)
-    (inst cmp temp sb!vm:n-word-bits)
+    (inst cmp temp n-word-bits)
     (inst b :lt DO)
-    (inst mov temp (1- sb!vm:n-word-bits))
+    (inst mov temp (1- n-word-bits))
     DO
     (ecase variant
       (:signed (inst asr result number temp))
       (:unsigned (inst lsr result number temp)))
     (inst b END)
     LEFT
-    (inst cmp temp sb!vm:n-word-bits)
+    (inst cmp temp n-word-bits)
     (inst b :lt DO2)
-    (inst mov temp (1- sb!vm:n-word-bits))
+    (inst mov temp (1- n-word-bits))
     DO2
     (inst lsl result number temp)
     END))
@@ -438,7 +438,7 @@
                 (:policy :fast-safe)
                 (:generator ,cost
                   (let ((amount (cond (cut
-                                       (inst cmp amount sb!vm:n-word-bits)
+                                       (inst cmp amount n-word-bits)
                                        ;; Only the first 6 bits count for shifts.
                                        ;; This sets all bits to 1 if AMOUNT is larger than 63,
                                        ;; cutting the amount to 63.
