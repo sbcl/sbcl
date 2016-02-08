@@ -79,8 +79,8 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst movzx result (make-ea :byte :base object
-                                      :disp (- other-pointer-lowtag)))))
+    (inst movzx result (make-ea :byte :base function
+                                      :disp (- fun-pointer-lowtag)))))
 
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
