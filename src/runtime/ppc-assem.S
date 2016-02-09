@@ -548,6 +548,7 @@ lra:
 	the tagged lisp registers may now contain garbage (since the
 	registers were saved by C and not seen by the GC.)  Put something
 	harmless in all such registers before allowing an interrupt */
+        li reg_FDEFN,0
 	li reg_CODE,0
 	li reg_CNAME,0
 	li reg_LEXENV,0
