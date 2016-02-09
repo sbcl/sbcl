@@ -494,8 +494,7 @@
 
       ;; Grab one value.
       ENTER
-      (loadw temp context)
-      (inst add context context n-word-bytes)
+      (inst ldr temp (@ context n-word-bytes :post-index))
 
       ;; Dec count, and if != zero, go back for more.
       (inst subs count count (fixnumize 1))
