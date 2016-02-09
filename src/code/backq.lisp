@@ -68,6 +68,7 @@
 
 (defun comma-charmacro (stream char)
   (declare (ignore char))
+  (declare (notinline read-char unread-char))
   (unless (> *backquote-depth* 0)
     (when *read-suppress*
       (return-from comma-charmacro nil))

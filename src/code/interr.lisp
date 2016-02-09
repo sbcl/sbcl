@@ -84,6 +84,8 @@
     (when (listp tag)
       (multiple-value-bind (name frame)
           (sb!debug::find-interrupted-name-and-frame)
+        ;; KLUDGE: can't inline due to build ordering problem.
+        (declare (notinline sb!di:frame-debug-fun))
         (let ((down (and (eq name 'sb!c::unwind) ; is this tautological ?
                          (sb!di:frame-down frame))))
           (when frame
