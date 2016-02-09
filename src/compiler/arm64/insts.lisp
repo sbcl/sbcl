@@ -1617,9 +1617,7 @@
      :include ldr-str)
   (op4 :field (byte 1 21) :value #b0)
   (imm-writeback :fields (list (byte 9 12) (byte 2 10)) :type 'imm-writeback)
-  (op5 :field (byte 2 10) :value #b00)
   (ldr-str-annotation :field (byte 9 12)))
-
 
 (def-emitter ldr-str-reg
   (size 2 30)
