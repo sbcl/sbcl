@@ -41,12 +41,9 @@
 ;; way to allow it with DEFCLASS.  But, KLUDGE - loading the cross-compiler
 ;; seals the class before the run of the cross-compiler gets to doing the declaim
 ;; because 'target-misc' is cross-compiled before 'early-full-eval' is.
-#+sb-xc-host (sb!c::seal-class (specifier-type 'interpreted-function))
 (declaim (freeze-type interpreted-function))
 
-#-sb-xc-host
-(progn
-  (defun make-interpreted-function
+(defun make-interpreted-function
       (&key name lambda-list env declarations documentation body source-location
             (debug-lambda-list lambda-list))
     (let ((function (%make-interpreted-function
@@ -57,11 +54,11 @@
                 (interpreted-apply function args)))
       function))
 
-  (defun interpreted-function-p (function)
-    (typep function 'interpreted-function))
+(defun interpreted-function-p (function)
+  (typep function 'interpreted-function))
 
-  (sb!int:def!method print-object ((obj interpreted-function) stream)
-    (print-unreadable-object (obj stream
-                              :identity (not (interpreted-function-name obj)))
-      (format stream "~A ~A" '#:interpreted-function
-              (interpreted-function-name obj)))))
+(defmethod print-object ((obj interpreted-function) stream)
+  (print-unreadable-object (obj stream
+                            :identity (not (interpreted-function-name obj)))
+    (format stream "~A ~A" '#:interpreted-function
+            (interpreted-function-name obj))))

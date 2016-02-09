@@ -18,7 +18,6 @@
 ;; compiler/main and code/deftypes-for-target.
 
 ;; This is 8 words: header, layout, trampoline, fin-fun, info[4]
-#+sb-xc
 (sb!kernel::!defstruct-with-alternate-metaclass
  interpreted-function
  :slot-names (proto-fn env frame cookie)
@@ -29,10 +28,9 @@
  :dd-type funcallable-structure
  :runtime-type-checks-p nil)
 
-#+sb-xc ; (sb!c::seal-class (specifier-type 'interpreted-function))
 (declaim (freeze-type interpreted-function))
 
-#-sb-xc-host (defun interpreted-function-p (function) ; necessary stub
+(defun interpreted-function-p (function) ; necessary stub
   (typep function 'interpreted-function))
 
 (defstruct (interpreted-fun-prototype
