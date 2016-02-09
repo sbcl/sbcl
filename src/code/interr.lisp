@@ -159,47 +159,6 @@
   ;; recursive error.
   (%primitive print "Thread local storage exhausted.")
   (sb!impl::%halt))
-
-
-;;;; fetching errorful function name
-
-;;; This flag is used to prevent infinite recursive lossage when
-;;; we can't find the caller for some reason.
-(defvar *finding-frame* nil)
-
-(defun find-caller-frame ()
-  (unless *finding-frame*
-    (handler-case
-        (let* ((*finding-frame* t)
-               (frame (sb!di:frame-down (sb!di:frame-down (sb!di:top-frame)))))
-          (sb!di:flush-frames-above frame)
-          frame)
-      ((or error sb!di:debug-condition) ()))))
-
-(defun find-interrupted-frame ()
-  (when (plusp *free-interrupt-context-index*)
-    (handler-case
-        (sb!di::signal-context-frame (sb!alien::alien-sap
-                                      (sb!di::nth-interrupt-context
-                                       (1- *free-interrupt-context-index*))))
-      ((or error sb!di:debug-condition) ()))))
-
-(defun find-caller-of-named-frame (name)
-  (unless *finding-frame*
-    (handler-case
-        (let ((*finding-frame* t))
-          (do ((frame (sb!di:top-frame) (sb!di:frame-down frame)))
-              ((null frame))
-            (when (and (sb!di::compiled-frame-p frame)
-                       (eq name (sb!di:debug-fun-name
-                                 (sb!di:frame-debug-fun frame))))
-              (let ((caller (sb!di:frame-down frame)))
-                (sb!di:flush-frames-above caller)
-                (return caller)))))
-      ((or error sb!di:debug-condition) ()
-        nil)
-      (sb!di:debug-condition ()
-        nil))))
 
 
 ;;; Returns true if number of arguments matches required/optional

@@ -3497,3 +3497,40 @@ register."
 (defun find-stepped-frame ()
   (or *step-frame*
       (top-frame)))
+
+;;;; fetching errorful function name
+
+;;; This flag is used to prevent infinite recursive lossage when
+;;; we can't find the caller for some reason.
+(defvar *finding-frame* nil)
+
+(defun find-caller-frame ()
+  (unless *finding-frame*
+    (handler-case
+        (let* ((*finding-frame* t)
+               (frame (frame-down (frame-down (top-frame)))))
+          (flush-frames-above frame)
+          frame)
+      ((or error debug-condition) ()))))
+
+(defun find-interrupted-frame ()
+  (when (plusp *free-interrupt-context-index*)
+    (handler-case
+        (signal-context-frame
+         (sb!alien:alien-sap
+          (nth-interrupt-context (1- *free-interrupt-context-index*))))
+      ((or error debug-condition) ()))))
+
+(defun find-caller-of-named-frame (name)
+  (unless *finding-frame*
+    (handler-case
+        (let ((*finding-frame* t))
+          (do ((frame (top-frame) (frame-down frame)))
+              ((null frame))
+            (when (and (compiled-frame-p frame)
+                       (eq name (debug-fun-name
+                                 (frame-debug-fun frame))))
+              (let ((caller (frame-down frame)))
+                (flush-frames-above caller)
+                (return caller)))))
+      ((or error debug-condition) ()))))
