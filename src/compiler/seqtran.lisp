@@ -1614,7 +1614,7 @@
                           (maybe-return))))
            (values nil nil))))))
 
-(def!macro %find-position-vector-macro (item sequence
+(sb!xc:defmacro %find-position-vector-macro (item sequence
                                              from-end start end key test)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
@@ -1628,7 +1628,7 @@
      ;; or after the checked sequence element.)
      `(funcall ,test ,item (funcall ,key ,element)))))
 
-(def!macro %find-position-if-vector-macro (predicate sequence
+(sb!xc:defmacro %find-position-if-vector-macro (predicate sequence
                                                      from-end start end key)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
@@ -1639,7 +1639,7 @@
      element
      `(funcall ,predicate (funcall ,key ,element)))))
 
-(def!macro %find-position-if-not-vector-macro (predicate sequence
+(sb!xc:defmacro %find-position-if-not-vector-macro (predicate sequence
                                                          from-end start end key)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
