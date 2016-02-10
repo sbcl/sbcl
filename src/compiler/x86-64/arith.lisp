@@ -1970,6 +1970,24 @@ constant shift greater than word length")))
            (let ((delta (- n-word-bits width)))
              (inst shl r delta)
              (inst sar r delta))))))
+
+(define-vop (mask-signed-field-fixnum)
+  (:translate sb!c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg) :target r))
+  (:arg-types (:constant (eql #.n-fixnum-bits)) t)
+  (:results (r :scs (any-reg)))
+  (:result-types fixnum)
+  (:info width)
+  (:ignore width)
+  (:generator 5
+    (move r x)
+    (generate-fixnum-test r)
+    (inst jmp :z DONE)
+    (loadw r r bignum-digits-offset other-pointer-lowtag)
+    (inst shl r (- n-word-bits n-fixnum-bits))
+    DONE))
+
 
 ;;;; static functions
 
