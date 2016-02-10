@@ -84,6 +84,7 @@
                 ;; dependency database.
                 #+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
                 #+nil "SRC;PCL;EARLY-LOW"
+                "SRC;CODE;LATE-CAS" ; used by pcl/slots
                 "SRC;PCL;MACROS"
                 "SRC;PCL;COMPILER-SUPPORT"
                 #+nil "SRC;PCL;LOW"

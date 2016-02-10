@@ -9,7 +9,7 @@
 ;;;; SETF.
 
 ;;; This is what it all comes down to.
-(def!macro cas (place old new &environment env)
+(defmacro cas (place old new &environment env)
   #!+sb-doc
   "Synonym for COMPARE-AND-SWAP.
 
@@ -34,6 +34,7 @@ EXPERIMENTAL: Interface subject to change."
             (,new-temp ,new))
        ,cas-form)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun get-cas-expansion (place &optional environment)
   #!+sb-doc
   "Analogous to GET-SETF-EXPANSION. Returns the following six values:
@@ -102,7 +103,7 @@ EXPERIMENTAL: Interface subject to change."
                      (vals nil)
                      (args nil))
                  (dolist (x (reverse (cdr expanded)))
-                   (cond ((constantp x environment)
+                   (cond ((sb!xc:constantp x environment)
                           (push x args))
                          (t
                           (let ((tmp (gensymify x)))
@@ -143,9 +144,9 @@ EXPERIMENTAL: Interface subject to change."
                             (,casser ,instance ,index
                              (the ,type ,old)
                              (the ,type ,new)))
-                `(,op ,instance))))))
+                `(,op ,instance)))))))
 
-(def!macro define-cas-expander (accessor lambda-list &body body)
+(defmacro define-cas-expander (accessor lambda-list &body body)
   #!+sb-doc
   "Analogous to DEFINE-SETF-EXPANDER. Defines a CAS-expansion for ACCESSOR.
 BODY must return six values as specified in GET-CAS-EXPANSION.
@@ -167,7 +168,7 @@ EXPERIMENTAL: Interface subject to change."
 ;; code to read the variables?
 ;; And as mentioned no sbcl-devel, &REST is beyond bogus, it's broken.
 ;;
-(def!macro defcas (accessor lambda-list function &optional docstring)
+(defmacro defcas (accessor lambda-list function &optional docstring)
   #!+sb-doc
   "Analogous to short-form DEFSETF. Defines FUNCTION as responsible
 for compare-and-swap on places accessed using ACCESSOR. LAMBDA-LIST
@@ -197,7 +198,7 @@ EXPERIMENTAL: Interface subject to change."
                  `(,',function ,@temps ,old ,new)
                  `(,',accessor ,@temps))))))
 
-(def!macro compare-and-swap (place old new)
+(defmacro compare-and-swap (place old new)
   #!+sb-doc
   "Atomically stores NEW in PLACE if OLD matches the current value of PLACE.
 Two values are considered to match if they are EQ. Returns the previous value
@@ -226,69 +227,199 @@ been defined. (See SB-EXT:CAS for more information.)
 "
   `(cas ,place ,old ,new))
 
-;;; Out-of-line definitions for various primitive cas functions.
-(macrolet ((def (name lambda-list ref &optional set)
-             #!+compare-and-swap-vops
-             (declare (ignore ref set))
-             `(defun ,name (,@lambda-list old new)
-                #!+compare-and-swap-vops
-                (,name ,@lambda-list old new)
-                #!-compare-and-swap-vops
-                (progn
-                  #!+sb-thread
-                  ,(error "No COMPARE-AND-SWAP-VOPS on a threaded build?")
-                  #!-sb-thread
-                  (let ((current (,ref ,@lambda-list)))
-                    ;; Shouldn't this be inside a WITHOUT-INTERRUPTS ?
-                    (when (eq current old)
-                      ,(if set
-                           `(,set ,@lambda-list new)
-                           `(setf (,ref ,@lambda-list) new)))
-                    current)))))
-  (def %compare-and-swap-car (cons) car)
-  (def %compare-and-swap-cdr (cons) cdr)
-  (def %instance-cas (instance index) %instance-ref %instance-set)
-  #!+(or x86-64 x86)
-  (def %raw-instance-cas/word (instance index)
-       %raw-instance-ref/word
-       %raw-instance-set/word)
-  #-sb-xc-host
-  (def %compare-and-swap-symbol-info (symbol) symbol-info)
-  (def %compare-and-swap-symbol-value (symbol) symbol-value)
-  (def %compare-and-swap-svref (vector index) svref))
+(define-cas-expander symbol-value (name &environment env)
+  (multiple-value-bind (tmp val cname)
+      (if (sb!xc:constantp name env)
+          (values nil nil (constant-form-value name env))
+          (values (gensymify name) name nil))
+    (let ((symbol (or tmp `',cname)))
+      (with-unique-names (old new)
+        (values (when tmp (list tmp))
+                (when val (list val))
+                old
+                new
+                (let ((slow
+                        `(progn
+                           (about-to-modify-symbol-value ,symbol 'compare-and-swap ,new)
+                           (%compare-and-swap-symbol-value ,symbol ,old ,new))))
+                  (if cname
+                      (if (member (info :variable :kind cname) '(:special :global))
+                          ;; We can generate the type-check reasonably.
+                          `(%compare-and-swap-symbol-value
+                            ',cname ,old (the ,(info :variable :type cname) ,new))
+                          slow)
+                      slow))
+                `(symbol-value ,symbol))))))
 
-;; Atomic increment/decrement ops on tagged storage cells (as contrasted with
-;; specialized arrays and raw structure slots) are defined in terms of CAS.
+(define-cas-expander svref (vector index)
+  (with-unique-names (v i old new)
+    (values (list v i)
+            (list vector index)
+            old
+            new
+            `(locally (declare (simple-vector ,v))
+               (%compare-and-swap-svref ,v (check-bound ,v (length ,v) ,i) ,old ,new))
+            `(svref ,v ,i))))
 
-;; This code would be more concise if workable versions
-;; of +-MODFX, --MODFX were defined generically.
-#-sb-xc-host
-(macrolet ((modular (fun a b)
-             #!+(or x86 x86-64)
-             `(,(let ((*package* (find-package "SB!VM")))
-                  (symbolicate fun "-MODFX"))
-                ,a ,b)
-             #!-(or x86 x86-64)
-             ;; algorithm of https://graphics.stanford.edu/~seander/bithacks
-             `(let ((res (logand (,fun ,a ,b)
-                                 (ash sb!ext:most-positive-word
-                                      (- sb!vm:n-fixnum-tag-bits))))
-                    (m (ash 1 (1- sb!vm:n-fixnum-bits))))
-                (- (logxor res m) m))))
+;;;; ATOMIC-INCF and ATOMIC-DECF
 
-  ;; Atomically frob the CAR or CDR of a cons, or a symbol-value.
-  ;; The latter will be a global value because the ATOMIC-INCF/DECF
-  ;; macros work on a symbol only if it is known global.
-  (macrolet ((def-frob (name op type slot)
-               `(defun ,name (place delta)
-                  (declare (type ,type place) (type fixnum delta))
-                  (loop (let ((old (the fixnum (,slot place))))
-                          (when (eq (cas (,slot place) old
-                                         (modular ,op old delta)) old)
-                            (return old)))))))
-    (def-frob %atomic-inc-symbol-global-value + symbol symbol-value)
-    (def-frob %atomic-dec-symbol-global-value - symbol symbol-value)
-    (def-frob %atomic-inc-car + cons car)
-    (def-frob %atomic-dec-car - cons car)
-    (def-frob %atomic-inc-cdr + cons cdr)
-    (def-frob %atomic-dec-cdr - cons cdr)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun expand-atomic-frob
+    (name specified-place diff env
+          &aux (place (sb!xc:macroexpand specified-place env)))
+       (declare (type (member atomic-incf atomic-decf) name))
+  (flet ((invalid-place ()
+           (error "Invalid first argument to ~S: ~S" name specified-place))
+         (compute-newval (old) ; used only if no atomic inc vop
+           `(logand (,(case name (atomic-incf '+) (atomic-decf '-)) ,old
+                     (the sb!vm:signed-word ,diff)) sb!ext:most-positive-word))
+         (compute-delta () ; used only with atomic inc vop
+           `(logand ,(case name
+                       (atomic-incf `(the sb!vm:signed-word ,diff))
+                       (atomic-decf `(- (the sb!vm:signed-word ,diff))))
+                    sb!ext:most-positive-word)))
+    (declare (ignorable #'compute-newval #'compute-delta))
+    (when (and (symbolp place)
+               (eq (info :variable :kind place) :global)
+               (type= (info :variable :type place) (specifier-type 'fixnum)))
+      ;; Global can't be lexically rebound.
+      (return-from expand-atomic-frob
+        `(truly-the fixnum (,(case name
+                               (atomic-incf '%atomic-inc-symbol-global-value)
+                               (atomic-decf '%atomic-dec-symbol-global-value))
+                            ',place (the fixnum ,diff)))))
+    (unless (consp place) (invalid-place))
+    (destructuring-bind (op . args) place
+      ;; FIXME: The lexical environment should not be disregarded.
+      ;; CL builtins can't be lexically rebound, but structure accessors can.
+      (case op
+        (aref
+         (unless (singleton-p (cdr args))
+           (invalid-place))
+         (with-unique-names (array)
+           `(let ((,array (the (simple-array word (*)) ,(car args))))
+              #!+compare-and-swap-vops
+              (%array-atomic-incf/word
+               ,array
+               (check-bound ,array (array-dimension ,array 0) ,(cadr args))
+               ,(compute-delta))
+              #!-compare-and-swap-vops
+              ,(with-unique-names (index old-value)
+                `(without-interrupts
+                  (let* ((,index ,(cadr args))
+                         (,old-value (aref ,array ,index)))
+                    (setf (aref ,array ,index) ,(compute-newval old-value))
+                    ,old-value))))))
+        ((car cdr first rest)
+         (when (cdr args)
+           (invalid-place))
+         `(truly-the
+           fixnum
+           (,(case op
+              ((first car) (case name
+                            (atomic-incf '%atomic-inc-car)
+                            (atomic-decf '%atomic-dec-car)))
+              ((rest cdr)  (case name
+                            (atomic-incf '%atomic-inc-cdr)
+                            (atomic-decf '%atomic-dec-cdr))))
+             ,(car args) (the fixnum ,diff))))
+        (t
+         (when (or (cdr args)
+         ;; Because accessor info is identical for the writer and reader
+         ;; functions, without a SYMBOLP check this would erroneously allow
+         ;;   (ATOMIC-INCF ((SETF STRUCT-SLOT) x))
+                   (not (symbolp op))
+                   (not (structure-instance-accessor-p op)))
+             (invalid-place))
+         (let* ((accessor-info (structure-instance-accessor-p op))
+                (slotd (cdr accessor-info))
+                (type (dsd-type slotd)))
+           (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
+                        (type= (specifier-type type) (specifier-type 'sb!vm:word)))
+             (error "~S requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
+                    name sb!vm:n-word-bits type place))
+           (when (dsd-read-only slotd)
+             (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
+                    name place))
+           #!+compare-and-swap-vops
+           `(truly-the sb!vm:word
+             (%raw-instance-atomic-incf/word
+              (the ,(dd-name (car accessor-info)) ,@args)
+              ,(dsd-index slotd)
+              ,(compute-delta)))
+           #!-compare-and-swap-vops
+           (with-unique-names (structure old-value)
+             `(without-interrupts
+               (let* ((,structure ,@args)
+                      (,old-value (,op ,structure)))
+                 (setf (,op ,structure) ,(compute-newval old-value))
+                 ,old-value))))))))))
+
+(defmacro atomic-incf (&environment env place &optional (diff 1))
+  #!+sb-doc
+  #.(format nil
+  "Atomically increments PLACE by DIFF, and returns the value of PLACE before
+the increment.
+
+PLACE must access one of the following:
+ - a DEFSTRUCT slot with declared type (UNSIGNED-BYTE ~D~:*)
+   or AREF of a (SIMPLE-ARRAY (UNSIGNED-BYTE ~D~:*) (*))
+   The type SB-EXT:WORD can be used for these purposes.
+ - CAR or CDR (respectively FIRST or REST) of a CONS.
+ - a variable defined using DEFGLOBAL with a proclaimed type of FIXNUM.
+Macroexpansion is performed on PLACE before expanding ATOMIC-INCF.
+
+Incrementing is done using modular arithmetic,
+which is well-defined over two different domains:
+ - For structures and arrays, the operation accepts and produces
+   an (UNSIGNED-BYTE ~D~:*), and DIFF must be of type (SIGNED-BYTE ~D).
+   ATOMIC-INCF of #x~x by one results in #x0 being stored in PLACE.
+ - For other places, the domain is FIXNUM, and DIFF must be a FIXNUM.
+   ATOMIC-INCF of #x~x by one results in #x~x
+   being stored in PLACE.
+
+DIFF defaults to 1.
+
+EXPERIMENTAL: Interface subject to change."
+  sb!vm:n-word-bits most-positive-word
+  sb!xc:most-positive-fixnum sb!xc:most-negative-fixnum)
+  (expand-atomic-frob 'atomic-incf place diff env))
+
+(defmacro atomic-decf (&environment env place &optional (diff 1))
+  #!+sb-doc
+  #.(format nil
+  "Atomically decrements PLACE by DIFF, and returns the value of PLACE before
+the decrement.
+
+PLACE must access one of the following:
+ - a DEFSTRUCT slot with declared type (UNSIGNED-BYTE ~D~:*)
+   or AREF of a (SIMPLE-ARRAY (UNSIGNED-BYTE ~D~:*) (*))
+   The type SB-EXT:WORD can be used for these purposes.
+ - CAR or CDR (respectively FIRST or REST) of a CONS.
+ - a variable defined using DEFGLOBAL with a proclaimed type of FIXNUM.
+Macroexpansion is performed on PLACE before expanding ATOMIC-DECF.
+
+Decrementing is done using modular arithmetic,
+which is well-defined over two different domains:
+ - For structures and arrays, the operation accepts and produces
+   an (UNSIGNED-BYTE ~D~:*), and DIFF must be of type (SIGNED-BYTE ~D).
+   ATOMIC-DECF of #x0 by one results in #x~x being stored in PLACE.
+ - For other places, the domain is FIXNUM, and DIFF must be a FIXNUM.
+   ATOMIC-DECF of #x~x by one results in #x~x
+   being stored in PLACE.
+
+DIFF defaults to 1.
+
+EXPERIMENTAL: Interface subject to change."
+  sb!vm:n-word-bits most-positive-word
+  sb!xc:most-negative-fixnum sb!xc:most-positive-fixnum)
+  (expand-atomic-frob 'atomic-decf place diff env))
+
+;; Interpreter stubs for ATOMIC-INCF.
+#!+(and compare-and-swap-vops (host-feature sb-xc))
+(progn
+  ;; argument types are declared in vm-fndb
+  (defun %array-atomic-incf/word (array index diff)
+    (%array-atomic-incf/word array index diff))
+  (defun %raw-instance-atomic-incf/word (instance index diff)
+    (%raw-instance-atomic-incf/word instance index diff)))

@@ -161,6 +161,7 @@
  ;; later. (Avoiding full calls increases efficiency)
  ("src/code/type-class")
 
+ ("src/code/cas" :not-host)
  ("src/compiler/early-c")
  ("src/compiler/fun-info")
  ("src/pcl/slot-name") ; for calls from 'info-vector'
@@ -747,8 +748,6 @@
  ("src/code/setf")
  ("src/code/macros")
  ("src/code/loop")
- ("src/code/cas")
- ("src/code/late-cas")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; other target-code-building stuff which can't be processed until
