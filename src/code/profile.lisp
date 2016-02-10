@@ -378,11 +378,6 @@ uncalled profiled functions are listed."
   (let ((time-info-list ())
         (no-call-name-list ()))
     (dohash ((name pinfo) *profiled-fun-name->info* :locked t)
-      (unless (eq (fdefinition name)
-                  (profile-info-encapsulation-fun pinfo))
-        (warn "Function ~S has been redefined, so times may be inaccurate.~@
-               PROFILE it again to record calls to the new definition."
-              name))
       (multiple-value-bind (calls ticks consing profile gc-run-time)
           (funcall (profile-info-read-stats-fun pinfo))
         (if (zerop calls)
