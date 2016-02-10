@@ -757,6 +757,7 @@
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
  ("src/code/signal")
  ("src/code/late-defbangmethod")
+ ("src/code/late-cas" :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; PCL-related stuff, which shouldn't need to be done earlier than
