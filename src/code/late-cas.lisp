@@ -49,7 +49,7 @@
              #!-(or x86 x86-64)
              ;; algorithm of https://graphics.stanford.edu/~seander/bithacks
              `(let ((res (logand (,fun ,a ,b)
-                                 (ash sb-ext:most-positive-word
+                                 (ash sb!ext:most-positive-word
                                       (- sb!vm:n-fixnum-tag-bits))))
                     (m (ash 1 (1- sb!vm:n-fixnum-bits))))
                 (- (logxor res m) m))))
