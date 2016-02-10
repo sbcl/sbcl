@@ -216,8 +216,7 @@
           (if (eq val 'sb!pcl::..slot-unbound..)
               ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
               (slot-makunbound obj slot-name)
-              ;; FIXME: the DEFSETF for this isn't defined until warm load
-              (sb!pcl::set-slot-value obj slot-name val))))))
+              (setf (slot-value obj slot-name) val))))))
 
 (!define-fop 64 (fop-end-group () nil)
   (/show0 "THROWing FASL-GROUP-END")
@@ -535,15 +534,11 @@
         #-sb-xc (bug "%instance-set?")
         (setf (svref obj idx) val))))
 
-(!define-fop 204 (fop-structset (val) nil)
-  #+sb-xc
+(!define-fop 204 :not-host (fop-structset (val) nil)
   (setf (%instance-ref (ref-fop-table (fasl-input)
                                       (read-word-arg (fasl-input-stream)))
                        (read-word-arg (fasl-input-stream)))
-        val)
-  ;; can't (SETF %INSTANCE-REF), but the FOP number must be defined
-  #-sb-xc (declare (ignorable val))
-  #-sb-xc (bug "%instance-set?"))
+        val))
 
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-FOP.
