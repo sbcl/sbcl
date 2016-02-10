@@ -82,7 +82,7 @@
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
-  (def!constant  register-arg-count 4)
+  (def!constant register-arg-count 4)
   ;; names and offsets for registers used to pass arguments
   (defregset *register-arg-offsets*  r0 r1 r2 r3)
   (defparameter *register-arg-names* '(r0 r1 r2 r3)))

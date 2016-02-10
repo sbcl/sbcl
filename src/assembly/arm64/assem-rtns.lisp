@@ -32,8 +32,7 @@
   (inst cmp nvals 0)
   (inst b :le default-r0-and-on)
   (inst cmp nvals (fixnumize 2))
-  (loadw r0 vals)
-  (loadw r1 vals 1)
+  (inst ldp r0 r1 (@ vals))
   (inst b :le default-r2-and-on)
   (inst cmp nvals (fixnumize 3))
   (loadw r2 vals 2)
@@ -111,10 +110,8 @@
 
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations, and we need ARGS to be dead for the blt)
-  (loadw r0 args 0)
-  (loadw r1 args 1)
-  (loadw r2 args 2)
-  (loadw r3 args 3)
+  (inst ldp r0 r1 (@ args))
+  (inst ldp r2 r3 (@ args (* n-word-bytes 2)))
 
   ;; ARGS is now dead, we access the remaining arguments by offset
   ;; from CSP-TN.
@@ -147,12 +144,12 @@
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (throw
-                          (:return-style :none))
-                         ((:arg target descriptor-reg r0-offset)
-                          (:arg start any-reg r8-offset)
-                          (:arg count any-reg nargs-offset)
-                          (:temp catch any-reg r1-offset)
-                          (:temp tag descriptor-reg r2-offset))
+                             (:return-style :none))
+    ((:arg target descriptor-reg r0-offset)
+     (:arg start any-reg r8-offset)
+     (:arg count any-reg nargs-offset)
+     (:temp catch any-reg r1-offset)
+     (:temp tag descriptor-reg r2-offset))
   (declare (ignore start count))
 
   (load-tl-symbol-value catch *current-catch-block*)
@@ -162,15 +159,16 @@
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst cbz catch error))
 
-  (assemble ()
-    (loadw tag catch catch-block-tag-slot)
-    (inst cmp tag target)
-    (inst b :eq DONE)
-    (loadw catch catch catch-block-previous-catch-slot)
-    (inst b LOOP)
-    DONE
-    (move target catch)  ;; TARGET coincides with UNWIND's BLOCK argument
-    (inst b (make-fixup 'unwind :assembly-routine))))
+  #.(assert (and (= catch-block-tag-slot 4)
+                 (= catch-block-previous-catch-slot 5)))
+  (inst ldp tag tmp-tn (@ catch (* 4 n-word-bytes)))
+  (inst cmp tag target)
+  (inst b :eq DONE)
+  (inst mov catch tmp-tn)
+  (inst b LOOP)
+  DONE
+  (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
+  (inst b (make-fixup 'unwind :assembly-routine)))
 
 (define-assembly-routine (unwind
                           (:return-style :none)
@@ -195,7 +193,8 @@
   EQ
   (inst csel cur-uwp block cur-uwp :eq)
 
-  (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
-  (loadw code-tn cur-uwp unwind-block-current-code-slot)
+  #.(assert (and (= unwind-block-current-cont-slot 1)
+                 (= unwind-block-current-code-slot 2)))
+  (inst ldp cfp-tn code-tn (@ cur-uwp n-word-bytes))
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
   (lisp-return lra lip :known))

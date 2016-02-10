@@ -285,14 +285,15 @@
     (inst mov count (fixnumize 1))
     (inst b DONE)
     MULTIPLE
-    (do ((arg *register-arg-tns* (rest arg))
-         (i 0 (1+ i)))
+    #.(assert (evenp register-arg-count))
+    (do ((arg *register-arg-tns* (cddr arg))
+         (i 0 (+ i 2)))
         ((null arg))
-      (storew (first arg) args i 0))
+      (inst stp (first arg) (second arg)
+            (@ args (* i n-word-bytes))))
     (move start args)
     (move count nargs)
     DONE))
-
 
 ;;; VOP that can be inherited by unknown values receivers.  The main
 ;;; thing this handles is allocation of the result temporaries.
@@ -866,10 +867,14 @@
                                (inst add csp-tn nargs-pass (* 2 n-word-bytes))
                                (inst sub nargs-pass nargs-pass new-fp)
                                (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
-                               ,@(let ((index -1))
-                                   (mapcar #'(lambda (name)
-                                               `(loadw ,name new-fp ,(incf index)))
-                                           *register-arg-names*))
+                               ,@(do ((arg *register-arg-names* (cddr arg))
+                                      (i 0 (+ i 2))
+                                      (insts))
+                                     ((null arg) (nreverse insts))
+                                   #.(assert (evenp register-arg-count))
+                                   (push `(inst ldp ,(first arg) ,(second arg)
+                                                (@ new-fp ,(* i n-word-bytes)))
+                                         insts))
                                (storew cfp-tn new-fp ocfp-save-offset))
                              '((inst mov nargs-pass (fixnumize nargs)))))
                       ,@(if (eq return :tail)
