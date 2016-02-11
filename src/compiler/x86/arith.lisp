@@ -314,6 +314,23 @@
                                (location= x r))))
          (y :scs (signed-reg signed-stack)))
   (:arg-types unsigned-num signed-num))
+
+(define-vop (mask-signed-field-fixnum)
+  (:translate sb!c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg) :target r))
+  (:arg-types (:constant (eql #.n-fixnum-bits)) t)
+  (:results (r :scs (any-reg)))
+  (:result-types fixnum)
+  (:info width)
+  (:ignore width)
+  (:generator 5
+    (move r x)
+    (generate-fixnum-test r)
+    (inst jmp :z DONE)
+    (loadw r r bignum-digits-offset other-pointer-lowtag)
+    (inst shl r (- n-word-bits n-fixnum-bits))
+    DONE))
 
 
 (define-vop (fast-+-c/signed=>signed fast-safe-arith-op)
@@ -1495,12 +1512,11 @@ constant shift greater than word length")))
       ;; constant SCALE and DISP.
       (ldb (byte 32 0) (+ base (* index scale) disp))))
   (defun sb!vm::%lea-modfx (base index scale disp)
-    (let* ((fixnum-width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
-           (base (mask-signed-field fixnum-width base))
-           (index (mask-signed-field fixnum-width index)))
+    (let ((base (mask-signed-field sb!vm:n-fixnum-bits base))
+          (index (mask-signed-field sb!vm:n-fixnum-bits index)))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
-      (mask-signed-field fixnum-width (+ base (* index scale) disp)))))
+      (mask-signed-field sb!vm:n-fixnum-bits (+ base (* index scale) disp)))))
 
 (in-package "SB!VM")
 
