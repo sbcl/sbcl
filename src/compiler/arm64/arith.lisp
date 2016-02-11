@@ -835,27 +835,36 @@
   (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:variant-cost 6))
 
-;; (macrolet ((define-logtest-vops ()
-;;              `(progn
-;;                 ,@(loop for suffix in '(/fixnum -c/fixnum
-;;                                         /signed -c/signed
-;;                                         /unsigned -c/unsigned)
-;;                         for cost in '(4 3 6 5 6 5)
-;;                         collect
-;;                         `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
-;;                                       ,(symbolicate "FAST-CONDITIONAL" suffix))
-;;                            (:translate logtest)
-;;                            (:conditional :ne)
-;;                            (:generator ,cost
-;;                                        (inst tst x
-;;                                              ,(case suffix
-;;                                                 (-c/fixnum
-;;                                                  `(fixnumize y))
-;;                                                 ((-c/signed -c/unsigned)
-;;                                                  `y)
-;;                                                 (t
-;;                                                  'y)))))))))
-;;   (define-logtest-vops))
+(macrolet ((define-logtest-vops ()
+             `(progn
+                ,@(loop for suffix in '(/fixnum -c/fixnum
+                                        /signed -c/signed
+                                        /unsigned -c/unsigned)
+                        for cost in '(4 3 6 5 6 5)
+                        for arg-types in '(nil
+                                           (fixnum
+                                            (:constant
+                                             (satisfies fixnum-encode-logical-immediate)))
+                                           nil
+                                           (signed-num
+                                            (:constant
+                                             (satisfies encode-logical-immediate)))
+                                           nil
+                                           (unsigned-num
+                                            (:constant (satisfies encode-logical-immediate))))
+                        collect
+                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
+                           (:translate logtest)
+                           (:conditional :ne)
+                           ,@(and arg-types
+                                  `((:arg-types ,@arg-types)))
+                           (:generator ,cost
+                                       (inst tst x
+                                             ,(if (eq suffix '-c/fixnum)
+                                                  '(fixnumize y)
+                                                  'y))))))))
+  (define-logtest-vops))
 
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))

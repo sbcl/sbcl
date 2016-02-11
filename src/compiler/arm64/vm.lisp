@@ -331,14 +331,11 @@
                                  `(function ,args ,result)))))
     (case (sb!c::combination-fun-source-name node)
       (logtest
-       (cond
-         ((valid-funtype '(fixnum fixnum) '*)
-          (values :maybe nil))
-         ((valid-funtype '(signed-word signed-word) '*)
-          (values :maybe nil))
-         ((valid-funtype '(word word) '*)
-          (values :maybe nil))
-         (t (values :default nil))))
+       (if (or (valid-funtype '(fixnum fixnum) '*)
+               (valid-funtype '(signed-word signed-word) '*)
+               (valid-funtype '(word word) '*))
+           (values :maybe nil)
+           (values :default nil)))
       (logbitp
        (cond
          ((or (valid-funtype '((constant-arg (integer 0 #.(1- n-fixnum-bits))) fixnum) '*)
