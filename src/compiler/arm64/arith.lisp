@@ -903,9 +903,7 @@
           ((= width 64)
            (move r x))
           (t
-           (let ((delta (- n-word-bits width)))
-             (inst lsl r x delta)
-             (inst asr r r delta))))))
+           (inst sbfm r x 0 (1- width))))))
 
 (define-vop (mask-signed-field-bignum/c)
   (:translate sb!c::mask-signed-field)
@@ -920,9 +918,24 @@
            (inst mov r 0))
           (t
            (loadw r x bignum-digits-offset other-pointer-lowtag)
-           (let ((delta (- n-word-bits width)))
-             (inst lsl r r delta)
-             (inst asr r r delta))))))
+           (inst sbfm r r 0 (1- width))))))
+
+(define-vop (mask-signed-field-fixnum)
+  (:translate sb!c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg) :target r))
+  (:arg-types (:constant (eql #.n-fixnum-bits)) t)
+  (:results (r :scs (any-reg)))
+  (:result-types fixnum)
+  (:info width)
+  (:ignore width)
+  (:generator 5
+    (move r x)
+    (inst tbz r 0 DONE)
+    (loadw tmp-tn r bignum-digits-offset other-pointer-lowtag)
+    (inst lsl r tmp-tn (- n-word-bits n-fixnum-bits))
+    DONE))
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)
