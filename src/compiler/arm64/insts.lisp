@@ -145,6 +145,11 @@
     (declare (ignore dstate))
     (format stream "#~D" value))
 
+  (defun print-test-branch-immediate (value stream dstate)
+    (declare (ignore dstate))
+    (format stream "#~D"
+            (dpb (car value) (byte 1 5) (car value))))
+
   (defun decode-scaled-immediate (value)
     (destructuring-bind (size opc value simd) value
       (if (= simd 1)
@@ -379,6 +384,8 @@
   (define-arg-type imm-writeback :printer #'print-imm-writeback)
 
   (define-arg-type pair-imm-writeback :printer #'print-pair-imm-writeback)
+
+  (define-arg-type test-branch-immediate :printer #'print-test-branch-immediate)
 
   (define-arg-type reg :printer #'print-reg)
 
@@ -2072,10 +2079,19 @@
   (#b011011 6 25)
   (op 1 24)
   (b40 5 19)
-  (imm 14 5)
+  (label 14 5)
   (rt 5 0))
 
+(define-instruction-format (test-branch-imm 32
+                            :default-printer '(:name :tab rt ", " index ", " label))
+  (op1 :field (byte 6 25) :value #b011011)
+  (op  :field (byte 1 24))
+  (index :fields (list (byte 1 31) (byte 5 19)) :type 'test-branch-immediate)
+  (label :field (byte 14 5) :type 'label)
+  (rt :field (byte 5 0) :type 'reg))
+
 (define-instruction tbz (segment rt bit label)
+  (:printer test-branch-imm ((op 0)))
   (:emitter
    (assert (label-p label))
    (check-type bit (integer 0 63))
@@ -2089,6 +2105,7 @@
                                             (tn-offset rt))))))
 
 (define-instruction tbnz (segment rt bit label)
+  (:printer test-branch-imm ((op 1)))
   (:emitter
    (assert (label-p label))
    (check-type bit (integer 0 63))
