@@ -5,6 +5,7 @@ changes relative to sbcl-1.3.2:
     arguments to other functions (e.g. REDUCE, MAP) at compile-time.
   * optimization: functions accepting other functions (e.g. REDUCE, FIND) can
     now be constant-folded if all function arguments are declared as foldable.
+  * optimization: improved logical operations on integers of unknown type.
 
 changes in sbcl-1.3.2 relative to sbcl-1.3.1:
   * enhancement: {READ,WRITE}-SEQUENCE are much faster for some combinations
