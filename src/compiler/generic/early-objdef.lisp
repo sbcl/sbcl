@@ -168,7 +168,7 @@
 (defenum (;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
           ;; a long, horrible death.  --njf, 2004-08-09
-          :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
+          :start #.(+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
           :step 4)
                                             ; +unicode -unicode
 ;;                             Word bits    ;  32 | 64  32 | 64

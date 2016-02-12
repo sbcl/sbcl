@@ -217,23 +217,18 @@
 ;;; Give names to elements of a numeric sequence.
 (defmacro defenum ((&key (start 0) (step 1))
                    &rest identifiers)
-  (let ((results nil)
-        (index 0)
-        (start (eval start))
-        (step (eval step)))
-    (dolist (id identifiers)
-      (when id
-        (multiple-value-bind (sym docs)
-            (if (consp id)
-                (values (car id) (cdr id))
-                (values id nil))
-          (push `(def!constant ,sym
-                   ,(+ start (* step index))
-                   ,@docs)
-                results)))
-      (incf index))
+  (declare (type integer start step))
+  (let ((value (- start step)))
     `(progn
-       ,@(nreverse results))))
+       ,@(mapcar (lambda (id)
+                   (incf value step)
+                   (when id
+                     (multiple-value-bind (sym docstring)
+                         (if (consp id)
+                             (values (car id) (cdr id))
+                             (values id nil))
+                       `(def!constant ,sym ,value ,@docstring))))
+                 identifiers))))
 
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.
