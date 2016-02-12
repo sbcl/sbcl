@@ -725,3 +725,10 @@
 (with-test (:name :complex-sqrt)
   (assert (= (expt (sqrt least-negative-double-float) 2)
              least-negative-double-float)))
+
+(with-test (:name :ldb-sign)
+  (assert (= (funcall (compile nil
+                               `(lambda (x)
+                                  (ldb (byte ,(1- sb-vm:n-word-bits) 0) x)))
+                      12)
+             12)))

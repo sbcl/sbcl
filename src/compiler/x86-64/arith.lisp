@@ -1988,6 +1988,28 @@ constant shift greater than word length")))
     (inst shl r (- n-word-bits n-fixnum-bits))
     DONE))
 
+(define-vop (logand-word-mask)
+  (:translate logand)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types t (:constant (member #.most-positive-word
+                                   #.(ash most-positive-word -1))))
+  (:results (r :scs (unsigned-reg)))
+  (:info mask)
+  (:result-types unsigned-num)
+  (:generator 10
+    (move r x)
+    (generate-fixnum-test r)
+    (inst jmp :nz BIGNUM)
+    (if (= mask most-positive-word)
+        (inst sar r n-fixnum-tag-bits)
+        (inst shr r n-fixnum-tag-bits))
+    (inst jmp DONE)
+    BIGNUM
+    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    (unless (= mask most-positive-word)
+      (inst btr r (1- n-word-bits)))
+    DONE))
 
 ;;;; static functions
 

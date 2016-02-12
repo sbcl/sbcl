@@ -945,6 +945,27 @@
     (inst lsl r tmp-tn (- n-word-bits n-fixnum-bits))
     DONE))
 
+(define-vop (logand-word-mask)
+  (:translate logand)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types t (:constant (member #.most-positive-word
+                                   #.(ash most-positive-word -1))))
+  (:results (r :scs (unsigned-reg)))
+  (:info mask)
+  (:result-types unsigned-num)
+  (:generator 10
+    (inst tbnz x 0 BIGNUM)
+    (if (= mask most-positive-word)
+        (inst asr r x n-fixnum-tag-bits)
+        (inst lsr r x n-fixnum-tag-bits))
+    (inst b DONE)
+    BIGNUM
+    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    (unless (= mask most-positive-word)
+      (inst ubfm r r 0 (- n-word-bits 2)))
+    DONE))
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)
