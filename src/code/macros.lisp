@@ -408,6 +408,21 @@ invoked. In that case it will store into PLACE and start over."
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then an error is signalled."
   (case-body 'etypecase keyform cases nil 'typep t nil t))
+
+;;; Compile a version of BODY for all TYPES, and dispatch to the
+;;; correct one based on the value of VAR. This was originally used
+;;; only for strings, hence the name. Renaming it to something more
+;;; generic might not be a bad idea.
+(defmacro-mundanely string-dispatch ((&rest types) var &body body)
+  (let ((fun (sb!xc:gensym "STRING-DISPATCH-FUN")))
+    `(flet ((,fun (,var)
+              ,@body))
+       (declare (inline ,fun))
+       (etypecase ,var
+         ,@(loop for type in types
+                 ;; TRULY-THE allows transforms to take advantage of the type
+                 ;; information without need for constraint propagation.
+                 collect `(,type (,fun (truly-the ,type ,var))))))))
 
 ;;;; WITH-FOO i/o-related macros
 

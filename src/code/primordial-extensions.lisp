@@ -199,21 +199,6 @@
        '*default-pathname-defaults*))
     dfd))
 
-;;; Compile a version of BODY for all TYPES, and dispatch to the
-;;; correct one based on the value of VAR. This was originally used
-;;; only for strings, hence the name. Renaming it to something more
-;;; generic might not be a bad idea.
-(def!macro string-dispatch ((&rest types) var &body body)
-  (let ((fun (sb!xc:gensym "STRING-DISPATCH-FUN")))
-    `(flet ((,fun (,var)
-              ,@body))
-       (declare (inline ,fun))
-       (etypecase ,var
-         ,@(loop for type in types
-                 ;; TRULY-THE allows transforms to take advantage of the type
-                 ;; information without need for constraint propagation.
-                 collect `(,type (,fun (truly-the ,type ,var))))))))
-
 ;;; Give names to elements of a numeric sequence.
 (defmacro defenum ((&key (start 0) (step 1))
                    &rest identifiers)
