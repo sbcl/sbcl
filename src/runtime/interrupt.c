@@ -1819,7 +1819,7 @@ see_if_sigaction_nodefer_works(void)
 static void *
 signal_thread_trampoline(void *pthread_arg)
 {
-    int signo = (int) pthread_arg;
+    intptr_t signo = (intptr_t) pthread_arg;
     os_context_t fake_context;
     siginfo_t fake_info;
 #ifdef LISP_FEATURE_PPC
@@ -1833,9 +1833,9 @@ signal_thread_trampoline(void *pthread_arg)
     fake_context.uc_mcontext.uc_regs = &uc_regs;
 #endif
 
-    *os_context_pc_addr(&fake_context) = &signal_thread_trampoline;
+    *os_context_pc_addr(&fake_context) = (intptr_t) &signal_thread_trampoline;
 #ifdef ARCH_HAS_STACK_POINTER /* aka x86(-64) */
-    *os_context_sp_addr(&fake_context) = __builtin_frame_address(0);
+    *os_context_sp_addr(&fake_context) = (intptr_t) __builtin_frame_address(0);
 #endif
 
     signal_handler_callback(interrupt_handlers[signo].lisp,
@@ -1884,7 +1884,7 @@ spawn_signal_thread_handler(int signal, siginfo_t *info, void *void_context)
         goto lost;
     if (pthread_attr_setstacksize(&attr, thread_control_stack_size))
         goto lost;
-    if (pthread_create(&th, &attr, &signal_thread_trampoline, (void*) signal))
+    if (pthread_create(&th, &attr, &signal_thread_trampoline, (void*)(intptr_t) signal))
         goto lost;
     if (pthread_attr_destroy(&attr))
         goto lost;

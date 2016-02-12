@@ -50,6 +50,8 @@
 void os_preinit();
 #endif
 
+void os_link_runtime();
+
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
 
 typedef enum {

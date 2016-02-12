@@ -354,28 +354,28 @@ arch_install_interrupt_handlers()
  */
 
 void
-arch_write_linkage_table_jmp(char * reloc, void * fun)
+arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
     /* Make JMP to function entry. JMP offset is calculated from next
      * instruction.
      */
-    long offset = (char *)fun - (reloc + 5);
+    long offset = (char *)target_addr - (reloc_addr + 5);
     int i;
 
-    *reloc++ = 0xe9;            /* opcode for JMP rel32 */
+    *reloc_addr++ = 0xe9;       /* opcode for JMP rel32 */
     for (i = 0; i < 4; i++) {
-        *reloc++ = offset & 0xff;
+        *reloc_addr++ = offset & 0xff;
         offset >>= 8;
     }
 
     /* write a nop for good measure. */
-    *reloc = 0x90;
+    *reloc_addr = 0x90;
 }
 
 void
-arch_write_linkage_table_ref(void * reloc, void * data)
+arch_write_linkage_table_ref(void *reloc_addr, void *target_addr)
 {
-    *(unsigned long *)reloc = (unsigned long)data;
+    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
 }
 
 #endif

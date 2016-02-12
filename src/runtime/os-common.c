@@ -25,6 +25,7 @@
 #include "thread.h"
 #include "sbcl.h"
 #include "os.h"
+#include "arch.h"
 #include "interr.h"
 #if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
 # include <dlfcn.h>

@@ -414,7 +414,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
     header = calloc(os_vm_page_size, 1);
 
     count = read(fd, header, os_vm_page_size);
-    if (count < os_vm_page_size) {
+    if (count < (ssize_t) os_vm_page_size) {
         lose("premature end of core file\n");
     }
     SHOW("successfully read first page of core");

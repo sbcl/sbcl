@@ -134,7 +134,7 @@ os_context_fp_addr(os_context_t *context)
 unsigned long
 os_context_fp_control(os_context_t *context)
 {
-    return (os_context_register_t*)&context->uc_mcontext.gregs[REG_RSP];
+    return (uintptr_t)&context->uc_mcontext.gregs[REG_RSP];
 
 }
 
@@ -166,4 +166,3 @@ void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
 }
-

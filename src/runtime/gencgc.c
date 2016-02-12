@@ -3145,7 +3145,7 @@ verify_space(lispobj *start, size_t words)
                 }
                 */
             } else {
-                extern void funcallable_instance_tramp;
+                extern char funcallable_instance_tramp;
                 /* Verify that it points to another valid space. */
                 if (!to_readonly_space && !to_static_space
                     && (thing != (lispobj)&funcallable_instance_tramp)
@@ -3578,7 +3578,6 @@ move_pinned_pages_to_newspace()
 static void
 garbage_collect_generation(generation_index_t generation, int raise)
 {
-    uword_t bytes_freed;
     page_index_t i;
     uword_t static_space_size;
     struct thread *th;
@@ -3881,7 +3880,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     gc_alloc_update_all_page_tables();
 
     /* Free the pages in oldspace, but not those marked dont_move. */
-    bytes_freed = free_oldspace();
+    free_oldspace();
 
     /* If the GC is not raising the age then lower the generation back
      * to its normal generation number */
@@ -4433,7 +4432,7 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
     void *new_free_pointer;
     os_vm_size_t trigger_bytes = 0;
 
-    gc_assert(nbytes>0);
+    gc_assert(nbytes > 0);
 
     /* Check for alignment allocation problems. */
     gc_assert((((uword_t)region->free_pointer & LOWTAG_MASK) == 0)
@@ -4444,7 +4443,7 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
     gc_assert(get_pseudo_atomic_atomic(thread));
 #endif
 
-    if (nbytes > large_allocation)
+    if ((os_vm_size_t) nbytes > large_allocation)
         large_allocation = nbytes;
 
     /* maybe we can do this quickly ... */
@@ -4461,7 +4460,7 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
      * large objects we are in danger of exhausting the heap without
      * running sufficient GCs.
      */
-    if (nbytes >= bytes_consed_between_gcs)
+    if ((os_vm_size_t) nbytes >= bytes_consed_between_gcs)
         trigger_bytes = nbytes;
 
     /* we have to go the long way around, it seems. Check whether we

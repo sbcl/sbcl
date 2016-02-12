@@ -428,31 +428,31 @@ arch_install_interrupt_handlers()
  */
 
 void
-arch_write_linkage_table_jmp(char * reloc, void * fun)
+arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
-    uword_t addr = (uword_t) fun;
+    uword_t addr = (uword_t)target_addr;
     int i;
 
-    *reloc++ = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
-    *reloc++ = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
-    *reloc++ = 0x00; /* 32-bit displacement field = 0 */
-    *reloc++ = 0x00; /* ... */
-    *reloc++ = 0x00; /* ... */
-    *reloc++ = 0x00; /* ... */
+    *reloc_addr++ = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
+    *reloc_addr++ = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
+    *reloc_addr++ = 0x00; /* 32-bit displacement field = 0 */
+    *reloc_addr++ = 0x00; /* ... */
+    *reloc_addr++ = 0x00; /* ... */
+    *reloc_addr++ = 0x00; /* ... */
 
     for (i = 0; i < 8; i++) {
-        *reloc++ = addr & 0xff;
+        *reloc_addr++ = addr & 0xff;
         addr >>= 8;
     }
 
     /* write a nop for good measure. */
-    *reloc = 0x90;
+    *reloc_addr = 0x90;
 }
 
 void
-arch_write_linkage_table_ref(void * reloc, void * data)
+arch_write_linkage_table_ref(void *reloc_addr, void *target_addr)
 {
-    *(uword_t *)reloc = (uword_t)data;
+    *(uword_t *)reloc_addr = (uword_t)target_addr;
 }
 
 #endif
