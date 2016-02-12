@@ -17,6 +17,9 @@
 
 ;;; Is X a list for which LENGTH is meaningful, i.e. a list which is
 ;;; not improper and which is not circular?
+;;; FIXME: the reason this can't be defined adjacent to its friends
+;;; PROPER-LIST-P and PROPER-LIST-OF-LENGTH-P is that HANDLER-BIND
+;;; does not work in 'primordial-extensions'.
 (defun list-with-length-p (x)
   (values (ignore-errors (list-length x))))
 

@@ -42,14 +42,26 @@
 
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
+ ("src/code/defsetfs" :not-host)
 
- ;; This comes early because the cross-compilation host's backquote
- ;; logic can expand into something which can't be executed on the
- ;; target Lisp (e.g. in CMU CL where it expands into internal
- ;; functions like BACKQ-LIST), and by replacing the host backquote
- ;; logic with our own as early as possible, we minimize the chance of
- ;; any forms referring to cross-compilation host internal functions
- ;; leaking into target SBCL code.
+ ;; Things like DX-FLET and AWHEN are available for use in both the host
+ ;; and target very early, with no DEF! obfuscation necessary.
+ ("src/code/primordial-extensions")
+
+ ;; ASAP we replace the host's backquote reader with our own, to avoid leaking
+ ;; details of the host into the target. This is not a concern in make-host-2
+ ;; becase IN-TARGET-CROSS-COMPILATION-MODE assigns the reader macros before
+ ;; compiling anything. It is, however, a minor concern for make-host-1, but
+ ;; usually a problem can be exposed only by contrived code / poor style.
+ ;; e.g. if the host's reader were used when compiling
+ ;;  (EVAL-WHEN (#-SB-XC :COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+ ;;    (DEFUN A-MACRO-HELPER () '`(FOO ,A ,B))
+ ;; then A-MACRO-HELPER returns host code, and calling it might be wrong, either
+ ;; obviously or subtly. If the result is (LIST* 'FOO (LIST* A (LIST B)))
+ ;; then it's subtly wrong because it might not be the optimal strategy;
+ ;; whereas if it's (BACKQUOTE (FOO (UNQUOTE A) (UNQUOTE B))) then it's
+ ;; flat out wrong. At any rate, judicious avoidance of EVAL-WHEN and nested
+ ;; quasiquotation in 'primordial-extensions' prevents any such issues.
  ("src/code/backq")
 
  ;; It's difficult to be too early with a DECLAIM SPECIAL (or DEFVAR
@@ -57,7 +69,6 @@
  ;; of CL special binding when the variable is undeclared.
  ("src/code/globals" :not-host)
 
- ("src/code/defsetfs" :not-host)
  ("src/code/cmacros" :not-host :slam-forcibly)
 
  ("src/code/cold-init-helper-macros")
@@ -90,7 +101,6 @@
  ("src/code/early-constants") ; needs DEF!CONSTANT
 
  ("src/compiler/early-lexenv")
- ("src/code/primordial-extensions")
  ("src/compiler/early-globaldb")
  ("src/compiler/constantp")
 

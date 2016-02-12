@@ -12,6 +12,22 @@
 
 (in-package "SB!IMPL")
 
+;;; Helper for making the DX closure allocation in macros expanding
+;;; to CALL-WITH-FOO less ugly.
+(defmacro dx-flet (functions &body forms)
+  `(flet ,functions
+     (declare (truly-dynamic-extent ,@(mapcar (lambda (func) `#',(car func))
+                                              functions)))
+     ,@forms))
+
+;;; Another similar one.
+(defmacro dx-let (bindings &body forms)
+  `(let ,bindings
+     (declare (truly-dynamic-extent
+               ,@(mapcar (lambda (bind) (if (listp bind) (car bind) bind))
+                         bindings)))
+     ,@forms))
+
 ;;;; target constants which need to appear as early as possible
 
 ;;; an internal tag for marking empty slots, which needs to be defined
@@ -35,8 +51,8 @@
 ;;; gencgc.c code on this value being a symbol. (This is only one of
 ;;; several nasty dependencies between that code and this, alas.)
 ;;; -- WHN 2001-08-17
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant +empty-ht-slot+ '%empty-ht-slot%))
+(defconstant +empty-ht-slot+ '%empty-ht-slot%)
+;;; Q: What "mess" should we not need?
 ;;; We shouldn't need this mess now that EVAL-WHEN works.
 
 ;;; KLUDGE: Using a private symbol still leaves us vulnerable to users
@@ -100,7 +116,7 @@
 (macrolet ((def-it (sym expr)
              #+sb-xc-host
              `(progn (declaim (type package ,sym))
-                     (defglobal ,sym ,expr))
+                     (defvar ,sym ,expr))
              #-sb-xc-host
              ;; We don't need to declaim the type. FIND-PACKAGE
              ;; returns a package, and L-T-V propagates types.
@@ -109,12 +125,15 @@
   (def-it *cl-package* (find-package "COMMON-LISP"))
   (def-it *keyword-package* (find-package "KEYWORD")))
 
+(declaim (inline singleton-p))
+(defun singleton-p (list)
+  (and (listp list) (null (rest list)) list))
+
 ;;; Concatenate together the names of some strings and symbols,
 ;;; producing a symbol in the current package.
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun symbolicate (&rest things)
-    (declare (dynamic-extent things))
-    (values
+(defun symbolicate (&rest things)
+  (declare (dynamic-extent things))
+  (values
      (intern
       (if (singleton-p things)
           (string (first things))
@@ -125,7 +144,7 @@
             (dolist (thing things name)
               (let ((x (string thing)))
                 (replace name x :start1 index)
-                (incf index (length x))))))))))
+                (incf index (length x)))))))))
 
 (defun gensymify (x)
   (if (symbolp x)

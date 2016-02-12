@@ -1600,22 +1600,6 @@
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
 
-;;; Helper for making the DX closure allocation in macros expanding
-;;; to CALL-WITH-FOO less ugly.
-(def!macro dx-flet (functions &body forms)
-  `(flet ,functions
-     (declare (truly-dynamic-extent ,@(mapcar (lambda (func) `#',(car func))
-                                              functions)))
-     ,@forms))
-
-;;; Another similar one.
-(def!macro dx-let (bindings &body forms)
-  `(let ,bindings
-     (declare (truly-dynamic-extent
-               ,@(mapcar (lambda (bind) (if (listp bind) (car bind) bind))
-                         bindings)))
-     ,@forms))
-
 ;; This is not my preferred name for this function, but chosen for harmony
 ;; with everything else that refers to these as 'hash-caches'.
 ;; Hashing is just one particular way of memoizing, and it would have been

@@ -33,10 +33,6 @@
   (svref #(unquote unquote-nsplice unquote-splice) (comma-kind x)))
 (defun comma-splicing-p (comma) (not (zerop (comma-kind comma))))
 
-(declaim (inline singleton-p))
-(defun singleton-p (list)
-  (and (listp list) (null (rest list)) list))
-
 #+sb-xc-host
 (progn
   ;; tell the host how to dump it

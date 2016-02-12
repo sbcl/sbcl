@@ -24,6 +24,7 @@
                     (value (sb!xc:gensym "VAL")))
              (let ((form
                     `(block ,blockname
+                       ;; Does DX actually help? INLINE should win anyway.
                        (dx-flet ((,wrapper (,@elements)
                                   (declare (optimize
                                             (sb!c::check-tag-existence 0)))
