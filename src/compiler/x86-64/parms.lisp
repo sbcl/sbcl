@@ -107,13 +107,11 @@
 ;;; run under the default 512M data size limit.
 
 (!gencgc-space-setup #x20000000
-                     #x1000000000
+                     :dynamic-space-start #x1000000000
 
-                     ;; :default-dynamic-space-size
-                     #!+openbsd #x1bcf0000
+                     #!+openbsd :default-dynamic-space-size #!+openbsd #x1bcf0000
 
-                     ;; :alignment
-                     #!+win32 #!+win32 nil #x10000)
+                     #!+win32 :alignment #!+win32 #x10000)
 
 (def!constant linkage-table-entry-size 16)
 

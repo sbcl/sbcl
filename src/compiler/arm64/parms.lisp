@@ -90,7 +90,7 @@
   (def!constant linkage-table-space-end   #x0b000000))
 
 #!+gencgc
-(!gencgc-space-setup #x04000000 #x4f000000)
+(!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
 (def!constant linkage-table-entry-size 16)
 

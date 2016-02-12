@@ -101,6 +101,7 @@
 ;;; While on gencgc we don't.
 #!+gencgc
 (!gencgc-space-setup #x04000000
+                     :dynamic-space-start
                      #!+linux   #x4f000000
                      #!+netbsd  #x4f000000
                      #!+openbsd #x4f000000

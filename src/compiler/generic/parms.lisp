@@ -12,7 +12,7 @@
 
 (in-package "SB!VM")
 
-(def!macro !configure-dynamic-space-end (&optional default)
+(defmacro !configure-dynamic-space-end (&optional default)
   (with-open-file (f "output/dynamic-space-size.txt")
     (let ((line (read-line f)))
       (multiple-value-bind (number end)
@@ -59,15 +59,9 @@
 ;;     happy -- hence the need for an extra `alignment' configuration
 ;;     option below, which parms.lisp can set to #x10000 on Windows.
 ;;
-;; Cosmetic problem:
-;;
-;;     In the interest of readability, &KEY would be much nicer than
-;;     &OPTIONAL.  But is it possible to use keyword arguments to
-;;     DEF!MACRO?
-;;
-(def!macro !gencgc-space-setup
+(defmacro !gencgc-space-setup
     (small-spaces-start
-     &optional dynamic-space-start*
+          &key ((:dynamic-space-start dynamic-space-start*))
                default-dynamic-space-size
                ;; Smallest os_validate()able alignment; used as safepoint
                ;; page size.  Default suitable for POSIX platforms.
