@@ -122,12 +122,10 @@
 ;;; */SHOW* at runtime, because messing with special variables early
 ;;; in cold load is too much trouble to be worth it.
 (defmacro /show0 (&rest string-designators)
-  ;; We can't use inline MAPCAR here because, at least in 0.6.11.x,
-  ;; this code gets compiled before DO-ANONYMOUS is defined.
-  ;; Similarly, we don't use inline CONCATENATE, because some of the
+  ;; We don't inline CONCATENATE, because some of the
   ;; machinery behind its optimizations isn't available in the
   ;; cross-compiler.
-  (declare (notinline mapcar concatenate))
+  (declare (notinline concatenate))
   (let ((s (apply #'concatenate
                   'simple-string
                   (mapcar #'string string-designators))))

@@ -302,12 +302,45 @@ evaluated as a PROGN."
 
 ;;;; iteration constructs
 
-;;; (These macros are defined in terms of a function FROB-DO-BODY which
-;;; is also used by SB!INT:DO-ANONYMOUS. Since these macros should not
-;;; be loaded on the cross-compilation host, but SB!INT:DO-ANONYMOUS
-;;; and FROB-DO-BODY should be, these macros can't conveniently be in
-;;; the same file as FROB-DO-BODY.)
-(defmacro-mundanely do (varlist endlist &body body)
+(flet
+    ((frob-do-body (varlist endlist decls-and-code bind step name block)
+       ;; Check for illegal old-style DO.
+       (when (or (not (listp varlist)) (atom endlist))
+         (error "ill-formed ~S -- possibly illegal old style DO?" name))
+       (collect ((steps))
+         (let ((inits
+                (mapcar (lambda (var)
+                          (or (cond ((symbolp var) var)
+                                    ((listp var)
+                                     (unless (symbolp (first var))
+                                       (error "~S step variable is not a symbol: ~S"
+                                              name (first var)))
+                                     (case (length var)
+                                       ((1 2) var)
+                                       (3 (steps (first var) (third var))
+                                          (list (first var) (second var))))))
+                              (error "~S is an illegal form for a ~S varlist."
+                                     var name)))
+                        varlist)))
+           (multiple-value-bind (code decls) (parse-body decls-and-code nil)
+             (let ((label-1 (sb!xc:gensym)) (label-2 (sb!xc:gensym)))
+               `(block ,block
+                  (,bind ,inits
+                    ,@decls
+                    (tagbody
+                     (go ,label-2)
+                     ,label-1
+                     (tagbody ,@code)
+                     (,step ,@(steps))
+                     ,label-2
+                     (unless ,(first endlist) (go ,label-1))
+                     (return-from ,block (progn ,@(rest endlist))))))))))))
+
+  ;; This is like DO, except it has no implicit NIL block.
+  (defmacro-mundanely do-anonymous (varlist endlist &rest body)
+    (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (sb!xc:gensym)))
+
+  (defmacro-mundanely do (varlist endlist &body body)
   #!+sb-doc
   "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
   Iteration construct. Each Var is initialized in parallel to the value of the
@@ -318,7 +351,8 @@ evaluated as a PROGN."
   named NIL is established around the entire expansion, allowing RETURN to be
   used as an alternate exit mechanism."
   (frob-do-body varlist endlist body 'let 'psetq 'do nil))
-(defmacro-mundanely do* (varlist endlist &body body)
+
+  (defmacro-mundanely do* (varlist endlist &body body)
   #!+sb-doc
   "DO* ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
   Iteration construct. Each Var is initialized sequentially (like LET*) to the
@@ -328,7 +362,7 @@ evaluated as a PROGN."
   the Exit-Forms are evaluated as a PROGN, with the result being the value
   of the DO. A block named NIL is established around the entire expansion,
   allowing RETURN to be used as an alternate exit mechanism."
-  (frob-do-body varlist endlist body 'let* 'setq 'do* nil))
+  (frob-do-body varlist endlist body 'let* 'setq 'do* nil)))
 
 ;;; DOTIMES and DOLIST could be defined more concisely using
 ;;; destructuring macro lambda lists or DESTRUCTURING-BIND, but then

@@ -55,62 +55,6 @@
 ;;;     into FASL files.
 ;;; -- WHN 20000622
 
-;;;; DO-related stuff which needs to be visible on the cross-compilation host
-
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun frob-do-body (varlist endlist decls-and-code bind step name block)
-    (let* ((r-inits nil) ; accumulator for reversed list
-           (r-steps nil) ; accumulator for reversed list
-           (label-1 (gensym))
-           (label-2 (gensym)))
-      ;; Check for illegal old-style DO.
-      (when (or (not (listp varlist)) (atom endlist))
-        (error "ill-formed ~S -- possibly illegal old style DO?" name))
-      ;; Parse VARLIST to get R-INITS and R-STEPS.
-      (dolist (v varlist)
-        (flet (;; (We avoid using CL:PUSH here so that CL:PUSH can be
-               ;; defined in terms of CL:SETF, and CL:SETF can be
-               ;; defined in terms of CL:DO, and CL:DO can be defined
-               ;; in terms of the current function.)
-               (push-on-r-inits (x)
-                 (setq r-inits (cons x r-inits)))
-               ;; common error-handling
-               (illegal-varlist ()
-                 (error "~S is an illegal form for a ~S varlist." v name)))
-          (cond ((symbolp v) (push-on-r-inits v))
-                ((listp v)
-                 (unless (symbolp (first v))
-                   (error "~S step variable is not a symbol: ~S"
-                          name
-                          (first v)))
-                 (let ((lv (length v)))
-                   ;; (We avoid using CL:CASE here so that CL:CASE can
-                   ;; be defined in terms of CL:SETF, and CL:SETF can
-                   ;; be defined in terms of CL:DO, and CL:DO can be
-                   ;; defined in terms of the current function.)
-                   (cond ((= lv 1)
-                          (push-on-r-inits (first v)))
-                         ((= lv 2)
-                          (push-on-r-inits v))
-                         ((= lv 3)
-                          (push-on-r-inits (list (first v) (second v)))
-                          (setq r-steps (list* (third v) (first v) r-steps)))
-                         (t (illegal-varlist)))))
-                (t (illegal-varlist)))))
-      ;; Construct the new form.
-      (multiple-value-bind (code decls) (parse-body decls-and-code nil)
-        `(block ,block
-           (,bind ,(nreverse r-inits)
-                  ,@decls
-                  (tagbody
-                     (go ,label-2)
-                     ,label-1
-                     (tagbody ,@code)
-                     (,step ,@(nreverse r-steps))
-                     ,label-2
-                     (unless ,(first endlist) (go ,label-1))
-                     (return-from ,block (progn ,@(rest endlist))))))))))
-
 ;; Define "exchanged subtract" So that DECF on a symbol requires no LET binding:
 ;;  (DECF I (EXPR)) -> (SETQ I (XSUBTRACT (EXPR) I))
 ;; which meets the CLHS 5.1.3 requirement to eval (EXPR) prior to reading
@@ -198,9 +142,6 @@
 ;;; (Such an assignment is undefined behavior, so it's sort of reasonable for
 ;;; it to cause the system to go totally insane afterwards, but it's a
 ;;; fairly easy mistake to make, so let's try to recover gracefully instead.)
-;;; This function is called while compiling this file because DO-ANONYMOUS
-;;; is a delayed-def!macro, the constructor for which calls SANE-PACKAGE.
-(eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
 (defun sane-package ()
   ;; Perhaps it's possible for *PACKAGE* to be set to a non-package in some
   ;; host Lisp, but in SBCL it isn't, and the PACKAGEP test below would be
@@ -237,7 +178,7 @@
                                             (if packagep
                                                 "deleted package"
                                                 (type-of maybe-package))
-                                            really-package))))))))
+                                            really-package)))))))
 
 ;;; Access *DEFAULT-PATHNAME-DEFAULTS*, issuing a warning if its value
 ;;; is silly. (Unlike the vaguely-analogous SANE-PACKAGE, we don't
@@ -347,10 +288,6 @@
      (error 'unsupported-operator
             :format-control ,control
             :format-arguments (if ,controlp ',arguments (list ',name)))))
-
-;;; This is like DO, except it has no implicit NIL block.
-(def!macro do-anonymous (varlist endlist &rest body)
-  (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)
