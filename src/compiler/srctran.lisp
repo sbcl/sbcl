@@ -165,10 +165,17 @@
 
 (deftransform %make-list ((length item) ((constant-arg (eql 0)) t)) nil)
 
-(define-source-transform nconc (&rest args)
-  (case (length args)
+(define-source-transform append (&rest lists)
+  (case (length lists)
+    (0 nil)
+    (1 (car lists))
+    (2 `(sb!impl::append2 ,@lists))
+    (t (values nil t))))
+
+(define-source-transform nconc (&rest lists)
+  (case (length lists)
     (0 ())
-    (1 (car args))
+    (1 (car lists))
     (t (values nil t))))
 
 ;;; (append nil nil nil fixnum) => fixnum
