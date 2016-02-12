@@ -19,14 +19,14 @@ notably in the name of the @code{SB-ALIEN} package.
 @end quotation
 
 @menu
-* Introduction to the Foreign Function Interface::  
-* Foreign Types::               
-* Operations On Foreign Values::  
-* Foreign Variables::           
-* Foreign Data Structure Examples::  
-* Loading Shared Object Files::  
-* Foreign Function Calls::      
-* Step-By-Step Example of the Foreign Function Interface::  
+* Introduction to the Foreign Function Interface::
+* Foreign Types::
+* Operations On Foreign Values::
+* Foreign Variables::
+* Foreign Data Structure Examples::
+* Loading Shared Object Files::
+* Foreign Function Calls::
+* Step-By-Step Example of the Foreign Function Interface::
 @end menu
 
 @node  Introduction to the Foreign Function Interface
@@ -103,9 +103,9 @@ has the corresponding SBCL @acronym{FFI} type
 
 
 @menu
-* Defining Foreign Types::      
-* Foreign Types and Lisp Types::  
-* Foreign Type Specifiers::     
+* Defining Foreign Types::
+* Foreign Types and Lisp Types::
+* Foreign Type Specifiers::
 @end menu
 
 @node  Defining Foreign Types
@@ -162,7 +162,7 @@ the @code{common-lisp} package, in which case they are
 reexported from the @code{sb-alien} package, so that
 e.g. it is legal to refer to @code{sb-alien:single-float}.
 
-These are the basic foreign type specifiers: 
+These are the basic foreign type specifiers:
 
 @itemize
 @item
@@ -365,9 +365,9 @@ to coerce foreign values to different kinds of foreign values, and how
 to dynamically allocate and free foreign variables.
 
 @menu
-* Accessing Foreign Values::    
-* Coercing Foreign Values::     
-* Foreign Dynamic Allocation::  
+* Accessing Foreign Values::
+* Coercing Foreign Values::
+* Foreign Dynamic Allocation::
 @end menu
 
 @node  Accessing Foreign Values
@@ -499,8 +499,8 @@ Both local (stack allocated) and external (C global) foreign variables
 are supported.
 
 @menu
-* Local Foreign Variables::     
-* External Foreign Variables::  
+* Local Foreign Variables::
+* External Foreign Variables::
 @end menu
 
 @node  Local Foreign Variables
@@ -517,7 +517,7 @@ the initial value is copied.  This form is less analogous to
 captured in closures: they live only for the dynamic extent of the
 body, and referring to them outside is a gruesome error.
 
-The @var{var-definitions} argument is a list of 
+The @var{var-definitions} argument is a list of
 variable definitions, each of the form
 @lisp
 (@var{name} @var{type} &optional @var{initial-value})
@@ -596,7 +596,7 @@ For example, to access a C-level counter @var{foo}, one could write
 Since in modern C libraries, the @code{errno} ``variable'' is typically
 no longer a variable, but some bizarre artificial construct
 which behaves superficially like a variable within a given thread,
-it can no longer reliably be accessed through the ordinary 
+it can no longer reliably be accessed through the ordinary
 @code{define-alien-variable} mechanism. Instead, SBCL provides
 the operator @code{sb-alien:get-errno} to allow Lisp code to read it.
 @end defun
@@ -715,10 +715,10 @@ the only documentation.  Users of a Lisp built with the
 @ref{Threading}.
 
 @menu
-* The alien-funcall Primitive::  
-* The define-alien-routine Macro::  
-* define-alien-routine Example::  
-* Calling Lisp From C::         
+* The alien-funcall Primitive::
+* The define-alien-routine Macro::
+* define-alien-routine Example::
+* Calling Lisp From C::
 @end menu
 
 @node  The alien-funcall Primitive
@@ -792,7 +792,7 @@ only one name is specified, the other is automatically derived as for
 @code{extern-alien}.  @var{result-type} is the alien type of the
 return value.
 
-Each element of the @var{arg-specifiers} list 
+Each element of the @var{arg-specifiers} list
 specifies an argument to the foreign function, and is
 of the form
 @lisp
@@ -897,7 +897,7 @@ is documented only by the source code and, in parts, by the old CMUCL
 
 Note that the garbage collector moves objects, and won't be
 able to fix up any references in C variables.  There are three
-mechanisms for coping with this: 
+mechanisms for coping with this:
 
 @enumerate
 @item
@@ -919,7 +919,7 @@ Disable GC, using the @code{without-gcing} macro.
 @end enumerate
 
 @c <!-- FIXME: This is a "changebar" section from the CMU CL manual.
-@c      I (WHN 2002-07-14) am not very familiar with this content, so 
+@c      I (WHN 2002-07-14) am not very familiar with this content, so
 @c      I'm not immediately prepared to try to update it for SBCL, and
 @c      I'm not feeling masochistic enough to work to encourage this
 @c      kind of low-level hack anyway. However, I acknowledge that callbacks
@@ -928,7 +928,7 @@ Disable GC, using the @code{without-gcing} macro.
 @c      anyone brings the information up to date for SBCL, it belong
 @c      either in the main manual or on a CLiki SBCL Internals page.
 @c LaTeX \subsection{Accessing Lisp Arrays}
-@c LaTeX 
+@c LaTeX
 @c LaTeX Due to the way \cmucl{} manages memory, the amount of memory that can
 @c LaTeX be dynamically allocated by \code{malloc} or \funref{make-alien} is
 @c LaTeX limited\footnote{\cmucl{} mmaps a large piece of memory for it's own
@@ -941,14 +941,14 @@ Disable GC, using the @code{without-gcing} macro.
 
 @c Note that this technique is used in SB-GROVEL in the SBCL contrib
 
-@c LaTeX 
+@c LaTeX
 @c LaTeX To overcome this limitation, it is possible to access the content of
 @c LaTeX Lisp arrays which are limited only by the amount of physical memory
 @c LaTeX and swap space available.  However, this technique is only useful if
 @c LaTeX the foreign function takes pointers to memory instead of allocating
 @c LaTeX memory for itself.  In latter case, you will have to modify the
 @c LaTeX foreign functions.
-@c LaTeX 
+@c LaTeX
 @c LaTeX This technique takes advantage of the fact that \cmucl{} has
 @c LaTeX specialized array types (\pxlref{specialized-array-types}) that match
 @c LaTeX a typical C array.  For example, a \code{(simple-array double-float
@@ -959,10 +959,10 @@ Disable GC, using the @code{without-gcing} macro.
 @c LaTeX (defun array-data-address (array)
 @c LaTeX   "Return the physical address of where the actual data of an array is
 @c LaTeX stored.
-@c LaTeX 
+@c LaTeX
 @c LaTeX ARRAY must be a specialized array type in CMU Lisp.  This means ARRAY
 @c LaTeX must be an array of one of the following types:
-@c LaTeX 
+@c LaTeX
 @c LaTeX                   double-float
 @c LaTeX                   single-float
 @c LaTeX                   (unsigned-byte 32)
@@ -1020,14 +1020,14 @@ Disable GC, using the @code{without-gcing} macro.
 @c LaTeX       (system:int-sap (the (unsigned-byte 32)
 @c LaTeX                         (+ addr (* type-size start)))))))
 @c LaTeX \end{example}
-@c LaTeX 
+@c LaTeX
 @c LaTeX Assume we have the C function below that we wish to use:
 @c LaTeX \begin{example}
 @c LaTeX   double dotprod(double* x, double* y, int n)
 @c LaTeX   \{
 @c LaTeX     int k;
 @c LaTeX     double sum = 0;
-@c LaTeX 
+@c LaTeX
 @c LaTeX     for (k = 0; k < n; ++k) \{
 @c LaTeX       sum += x[k] * y[k];
 @c LaTeX     \}
@@ -1042,13 +1042,13 @@ Disable GC, using the @code{without-gcing} macro.
 @c LaTeX     (x (* double-float) :in)
 @c LaTeX     (y (* double-float) :in)
 @c LaTeX     (n int :in))
-@c LaTeX     
+@c LaTeX
 @c LaTeX   (let ((x (make-array 1000000 :element-type 'double-float))
 @c LaTeX         (y (make-array 1000000 :element-type 'double-float)))
 @c LaTeX     ;; Initialize X and Y somehow
 @c LaTeX     (let ((x-addr (system:int-sap (array-data-address x)))
 @c LaTeX           (y-addr (system:int-sap (array-data-address y))))
-@c LaTeX       (dotprod x-addr y-addr 1000000)))    
+@c LaTeX       (dotprod x-addr y-addr 1000000)))
 @c LaTeX \end{example}
 @c LaTeX In this example, it may be useful to wrap the inner \code{let}
 @c LaTeX expression in an \code{unwind-protect} that first turns off garbage
@@ -1056,7 +1056,7 @@ Disable GC, using the @code{without-gcing} macro.
 @c LaTeX prevent garbage collection from moving \code{x} and \code{y} after we
 @c LaTeX have obtained the (now erroneous) addresses but before the call to
 @c LaTeX \code{dotprod} is made.
-@c LaTeX 
+@c LaTeX
 @c -->
 
 
@@ -1161,11 +1161,11 @@ separately. You don't have to recompile every time.)
 @samp{(compile-file "test.lisp")}
 
 Within Lisp, load the foreign object file to define the necessary
-symbols: @samp{(load-shared-object "test.so")}. 
+symbols: @samp{(load-shared-object "test.so")}.
 
 Now you can load the compiled Lisp (``fasl'') file into Lisp:
 @samp{(load "test.fasl")}
-And once the Lisp file is loaded, you can call the 
+And once the Lisp file is loaded, you can call the
 Lisp routine that sets up the parameters and calls the C
 function:
 @samp{(test-c-call::call-cfun)}

@@ -16,16 +16,16 @@
 There are many aspects of ANSI Common Lisp's pathname support which are
 implementation-defined and so need documentation.
 
-@c FIXME: as a matter of ANSI conformance, we are required to document 
-@c implementation-defined stuff, which for pathnames (chapter 19 of CLtS) 
+@c FIXME: as a matter of ANSI conformance, we are required to document
+@c implementation-defined stuff, which for pathnames (chapter 19 of CLtS)
 @c includes:
-@c  
+@c
 @c * Otherwise, the parsing of thing is implementation-defined.
 @c   (PARSE-NAMESTRING)
 @c
-@c * If thing contains an explicit host name and no explicit device name, 
+@c * If thing contains an explicit host name and no explicit device name,
 @c   then it is implementation-defined whether parse-namestring will supply
-@c   the standard default device for that host as the device component of 
+@c   the standard default device for that host as the device component of
 @c   the resulting pathname.  (PARSE-NAMESTRING)
 @c
 @c * The specific nature of the search is implementation-defined.
@@ -34,7 +34,7 @@ implementation-defined and so need documentation.
 @c * Any additional elements are implementation-defined.
 @c   (LOGICAL-PATHNAME-TRANSLATIONS)
 @c
-@c * The matching rules are implementation-defined but should be consistent 
+@c * The matching rules are implementation-defined but should be consistent
 @c   with directory.  (PATHNAME-MATCH-P)
 @c
 @c * Any such additional translations are implementation-defined.
@@ -43,27 +43,27 @@ implementation-defined and so need documentation.
 @c * ...or an implementation-defined portion of a component...
 @c   (TRANSLATE-PATHNAME)
 @c
-@c * The portion of source that is copied into the resulting pathname is 
+@c * The portion of source that is copied into the resulting pathname is
 @c   implementation-defined.  (TRANSLATE-PATHNAME)
 @c
-@c * During the copying of a portion of source into the resulting 
-@c   pathname, additional implementation-defined translations of case or 
+@c * During the copying of a portion of source into the resulting
+@c   pathname, additional implementation-defined translations of case or
 @c   file naming conventions might occur.  (TRANSLATE-PATHNAME)
 @c
-@c * In general, the syntax of namestrings involves the use of 
+@c * In general, the syntax of namestrings involves the use of
 @c   implementation-defined conventions.  (19.1.1)
 @c
 @c * The nature of the mapping between structure imposed by pathnames and
-@c   the structure, if any, that is used by the underlying file system is 
+@c   the structure, if any, that is used by the underlying file system is
 @c   implementation-defined.  (19.1.2)
 @c
-@c * The mapping of the pathname components into the concepts peculiar to 
+@c * The mapping of the pathname components into the concepts peculiar to
 @c   each file system is implementation-defined.  (19.1.2)
 @c
-@c * Whether separator characters are permitted as part of a string in a 
+@c * Whether separator characters are permitted as part of a string in a
 @c   pathname component is implementation-defined;  (19.2.2.1.1)
 @c
-@c * Whether a value of :unspecific is permitted for any component on any 
+@c * Whether a value of :unspecific is permitted for any component on any
 @c   given file system accessible to the implementation is
 @c   implementation-defined.  (19.2.2.2.3)
 @c

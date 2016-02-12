@@ -3,7 +3,7 @@
 @chapter Build
 
 @menu
-* Cold init::                   
+* Cold init::
 @end menu
 
 @node Cold init

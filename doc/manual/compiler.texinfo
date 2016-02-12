@@ -12,10 +12,10 @@ separate that they have their own chapter, @ref{Efficiency}.
 
 @menu
 * Diagnostic Messages::
-* Handling of Types::           
-* Compiler Policy::             
-* Compiler Errors::             
-* Open Coding and Inline Expansion::  
+* Handling of Types::
+* Compiler Policy::
+* Compiler Errors::
+* Open Coding and Inline Expansion::
 * Interpreter::
 @end menu
 
@@ -26,9 +26,9 @@ separate that they have their own chapter, @ref{Efficiency}.
 @cindex Compiler messages
 
 @menu
-* Controlling Verbosity::       
-* Diagnostic Severity::         
-* Understanding Compiler Diagnostics::  
+* Controlling Verbosity::
+* Diagnostic Severity::
+* Understanding Compiler Diagnostics::
 @end menu
 
 @node Controlling Verbosity
@@ -89,29 +89,29 @@ compiler, see @ref{Customization Hooks for Users}.
 
 @c <!-- FIXME: How much control over error messages is in SBCL?
 @c      _     How much should be? How much of this documentation should
-@c      _     we save or adapt? 
-@c      _ 
+@c      _     we save or adapt?
+@c      _
 @c      _ %%\node Error Message Parameterization,  , Read Errors, Interpreting Error Messages
 @c      _ \subsection{Error Message Parameterization}
 @c      _ \cpsubindex{error messages}{verbosity}
 @c      _ \cpsubindex{verbosity}{of error messages}
-@c      _ 
+@c      _
 @c      _ There is some control over the verbosity of error messages.  See also
 @c      _ \varref{undefined-warning-limit}, \code{*efficiency-note-limit*} and
 @c      _ \varref{efficiency-note-cost-threshold}.
-@c      _ 
+@c      _
 @c      _ \begin{defvar}{}{enclosing-source-cutoff}
-@c      _ 
+@c      _
 @c      _   This variable specifies the number of enclosing actual source forms
 @c      _   that are printed in full, rather than in the abbreviated processing
 @c      _   path format.  Increasing the value from its default of \code{1}
 @c      _   allows you to see more of the guts of the macroexpanded source,
 @c      _   which is useful when debugging macros.
 @c      _ \end{defvar}
-@c      _ 
+@c      _
 @c      _ \begin{defmac}{extensions:}{define-source-context}{%
 @c      _     \args{\var{name} \var{lambda-list} \mstar{form}}}
-@c      _ 
+@c      _
 @c      _   This macro defines how to extract an abbreviated source context from
 @c      _   the \var{name}d form when it appears in the compiler input.
 @c      _   \var{lambda-list} is a \code{defmacro} style lambda-list used to
@@ -122,7 +122,7 @@ compiler, see @ref{Customization Hooks for Users}.
 @c      _   Note that this facility implicitly determines the string name
 @c      _   associated with anonymous functions.
 @c      _ \end{defmac}
-@c      _ 
+@c      _
 @c      _ -->
 
 @node  Diagnostic Severity
@@ -136,7 +136,7 @@ compiler, see @ref{Customization Hooks for Users}.
 @tindex @sbext{compiler-note}
 @tindex @sbext{code-deletion-note}
 
-There are four levels of compiler diagnostic severity: 
+There are four levels of compiler diagnostic severity:
 
 @enumerate 1
 @item error
@@ -149,7 +149,7 @@ The first three levels correspond to condition classes which are
 defined in the ANSI standard for Common Lisp and which have special
 significance to the @code{compile} and @code{compile-file} functions.
 These levels of compiler error severity occur when the compiler
-handles conditions of these classes. 
+handles conditions of these classes.
 
 The fourth level of compiler error severity, @emph{note}, corresponds
 to the @code{sb-ext:compiler-note}, and is used for problems which are
@@ -188,9 +188,9 @@ The main problem with this program is that it is trying to add
 @code{ploq} aren't defined anywhere.
 
 @menu
-* The Parts of a Compiler Diagnostic::  
-* The Original and Actual Source::  
-* The Processing Path::         
+* The Parts of a Compiler Diagnostic::
+* The Original and Actual Source::
+* The Processing Path::
 @end menu
 
 @node  The Parts of a Compiler Diagnostic
@@ -481,10 +481,10 @@ involving the @code{satisfies} type specifier.
 @c Whose paper?
 
 @menu
-* Declarations as Assertions::  
-* Precise Type Checking::       
-* Getting Existing Programs to Run::  
-* Implementation Limitations::  
+* Declarations as Assertions::
+* Precise Type Checking::
+* Getting Existing Programs to Run::
+* Implementation Limitations::
 @end menu
 
 @node Declarations as Assertions
@@ -567,7 +567,7 @@ intersected producing a single @code{and} type specifier.
 To gain maximum benefit from the compiler's type checking, you should
 always declare the types of function arguments and structure slots as
 precisely as possible. This often involves the use of @code{or},
-@code{member}, and other list-style type specifiers. 
+@code{member}, and other list-style type specifiers.
 
 
 @node  Getting Existing Programs to Run
@@ -662,8 +662,8 @@ the expansion:
 @end lisp
 
 In this case, it would be stylistically preferable to change this
-macro back to a function and declare it inline. 
-@c <!--FIXME: <xref>inline-expansion, once we crib the 
+macro back to a function and declare it inline.
+@c <!--FIXME: <xref>inline-expansion, once we crib the
 @c      relevant text from the CMU CL manual.-->
 
 Some more subtle problems are caused by incorrect declarations that
@@ -712,7 +712,7 @@ legal numeric argument. Another possible fix would be to say:
 This would be preferable in some circumstances, since it would allow a
 non-standard representation to be used for the local @code{pos}
 variable in the loop body.
-@c <!-- FIXME: <xref>ND-variables, once we crib the text from the 
+@c <!-- FIXME: <xref>ND-variables, once we crib the text from the
 @c      CMU CL manual. -->
 
 @node  Implementation Limitations
@@ -742,7 +742,7 @@ known, only consumed values are checked.
 For example,
 
 @lisp
-(defun foo (x) 
+(defun foo (x)
   (the integer (bar x)))
 @end lisp
 
@@ -933,9 +933,9 @@ is to slow the program by causing cache misses or even swapping.
 @section Compiler Errors
 
 @menu
-* Type Errors at Compile Time::  
-* Errors During Macroexpansion::  
-* Read Errors::                 
+* Type Errors at Compile Time::
+* Errors During Macroexpansion::
+* Read Errors::
 @end menu
 
 @node  Type Errors at Compile Time

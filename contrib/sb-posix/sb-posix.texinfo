@@ -20,15 +20,15 @@ encouraged to submit a patch to the SBCL mailing list.
 Some facilities are omitted where they offer absolutely no additional
 use over some portable function, or would be actively dangerous to the
 consistency of Lisp.  Not all functions are available on all
-platforms.  
+platforms.
 
 @menu
-* Lisp names for C names::      
-* Types::                       
-* Function Parameters::         
-* Function Return Values::      
-* Lisp objects and C structures::  
-* Functions with idiosyncratic bindings::  
+* Lisp names for C names::
+* Types::
+* Function Parameters::
+* Function Return Values::
+* Lisp objects and C structures::
+* Functions with idiosyncratic bindings::
 @end menu
 
 
@@ -68,8 +68,8 @@ passed to these functions.  For example, @code{rename} accepts both
 pathnames and strings as its arguments.
 
 @menu
-* File-descriptors::            
-* Filenames::                   
+* File-descriptors::
+* Filenames::
 @end menu
 
 @node File-descriptors

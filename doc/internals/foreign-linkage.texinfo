@@ -3,9 +3,9 @@
 @chapter Foreign Linkage
 
 @menu
-* Linkage-table::               
-* Lazy Alien Resolution::       
-* Callbacks::                   
+* Linkage-table::
+* Lazy Alien Resolution::
+* Callbacks::
 @end menu
 
 @node Linkage-table
@@ -24,7 +24,7 @@ is initialized at startup to contain jumps & references to the correct
 addresses, based on information stored on the lisp side in
 @code{*LINKAGE-INFO*}.
 
-@subsection Differences to CMUCL 
+@subsection Differences to CMUCL
 
 CMUCL does lazy linkage for code, keeps all foreign addresses in the
 linkage-table, and handles the initialization from C. We do eager
@@ -34,7 +34,7 @@ linkage for everything, maintain a separate
 easier to achieve, and cuts one jump's worth of overhead from stuff
 like closure_tramp), and do the initialization from lisp.
 
-@subsection Nitty Gritty Details 
+@subsection Nitty Gritty Details
 
 Symbols in @code{*STATIC-FOREIGN-SYMBOLS*} are handled the old
 fashioned way: linkage-table is only used for symbols resolved with
@@ -76,7 +76,7 @@ is used by SB-POSIX.)
 
 @subsection Porting
 
-@subsubsection Porting to new operating systems 
+@subsubsection Porting to new operating systems
 
 Find a memory area for the linkage-table, and add it for the OS in
 @file{src/compiler/target/parms.lisp} by defining

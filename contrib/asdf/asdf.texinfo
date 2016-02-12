@@ -3439,7 +3439,7 @@ Directories may be included by specifying a directory pathname
 or namestring in an @code{:include} directive, e.g.:
 
 @example
-	(:include "/foo/bar/")
+        (:include "/foo/bar/")
 @end example
 
 Hence, to achieve the same effect as
@@ -4068,7 +4068,7 @@ which will do the same thing internally for you:
      (:root ,wild-subdir :implementation ,wild-file)))
 @end lisp
 Starting with ASDF 2.011.4, you can use the simpler:
-	@code{`(:root (:root :**/ :implementation :*.*.*))}
+        @code{`(:root (:root :**/ :implementation :*.*.*))}
 
 
 
@@ -4135,7 +4135,7 @@ Directories may be included by specifying a directory pathname
 or namestring in an @code{:include} directive, e.g.:
 
 @verbatim
-	(:include "/foo/bar/")
+        (:include "/foo/bar/")
 @end verbatim
 
 @node Output Shell-friendly syntax for configuration, Semantics of Output Translations, Output Configuration Directories, Controlling where ASDF saves compiled files

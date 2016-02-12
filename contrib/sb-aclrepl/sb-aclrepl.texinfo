@@ -3,7 +3,7 @@
 @cindex Read-Eval-Print Loop
 @cindex REPL
 
-@c FIXME: I wanted to use @registeredsymbol{}, but that's 
+@c FIXME: I wanted to use @registeredsymbol{}, but that's
 @c only available in Texinfo 4.7.  sigh.
 The @code{sb-aclrepl} module offers an Allegro CL-style
 Read-Eval-Print Loop for SBCL, with integrated inspector.  Adding a
@@ -31,7 +31,7 @@ some of the features of @code{sb-aclrepl}:
 #+aclrepl
 (progn
   (setq sb-aclrepl:*max-history* 100)
-  (setf (sb-aclrepl:alias "asdc") 
+  (setf (sb-aclrepl:alias "asdc")
        #'(lambda (sys) (asdf:operate 'asdf:compile-op sys)))
   (sb-aclrepl:alias "l" (sys) (asdf:operate 'asdf:load-op sys))
   (sb-aclrepl:alias "t" (sys) (asdf:operate 'asdf:test-op sys))

@@ -1,6 +1,6 @@
 @cindex Profiling, statistical
 
-The @code{sb-sprof} module, loadable by 
+The @code{sb-sprof} module, loadable by
 @lisp
 (require :sb-sprof)
 @end lisp
@@ -58,7 +58,7 @@ during
                           :show-progress t)
   (cpu-test 24))
   
-;;;; Allocation profiling 
+;;;; Allocation profiling
 
 (defun foo (&rest args)
   (mapcar (lambda (x) (float x 1d0)) args))
@@ -68,7 +68,7 @@ during
   (apply #'foo (loop repeat n collect n)))
 
 (sb-sprof:with-profiling (:max-samples 10000
-                          :mode :alloc 
+                          :mode :alloc
                           :report :flat)
   (bar 1000))
 @end lisp
@@ -77,7 +77,7 @@ during
 
 The flat report format will show a table of all functions that the
 profiler encountered on the call stack during sampling, ordered by the
-number of samples taken while executing that function. 
+number of samples taken while executing that function.
 
 @lisp
            Self        Total        Cumul
@@ -92,7 +92,7 @@ number of samples taken while executing that function.
 For each function, the table will show three absolute and relative
 sample counts. The Self column shows samples taken while directly
 executing that function. The Total column shows samples taken while
-executing that function or functions called from it (sampled to a 
+executing that function or functions called from it (sampled to a
 platform-specific depth). The Cumul column shows the sum of all
 Self columns up to and including that line in the table.
 
@@ -124,7 +124,7 @@ language idiom for marking sections of code to be treated as atomic by
 the garbage collector;  However, it should work on other platforms,
 and the deficiency on the Alpha will eventually be rectified.
 
-Allocation profiling is only supported on SBCL builds that use 
+Allocation profiling is only supported on SBCL builds that use
 the generational garbage collector. Tracking of call stacks at a
 depth of more than two levels is only supported on x86 and x86-64.
 

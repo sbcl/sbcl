@@ -3,11 +3,11 @@
 @chapter Starting and Stopping
 
 @menu
-* Starting SBCL::               
-* Stopping SBCL::               
-* Command Line Options::        
-* Initialization Files::        
-* Initialization and Exit Hooks::  
+* Starting SBCL::
+* Stopping SBCL::
+* Command Line Options::
+* Initialization Files::
+* Initialization and Exit Hooks::
 @end menu
 
 @node Starting SBCL
@@ -15,9 +15,9 @@
 @section Starting SBCL
 
 @menu
-* Running from Shell::          
-* Running from Emacs::          
-* Shebang Scripts::             
+* Running from Shell::
+* Running from Emacs::
+* Shebang Scripts::
 @end menu
 
 @node Running from Shell
@@ -97,9 +97,9 @@ Hello, World!
 
 @menu
 * Exit::
-* End of File::                 
-* Saving a Core Image::         
-* Exit on Errors::              
+* End of File::
+* Saving a Core Image::
+* Exit on Errors::
 @end menu
 
 @node Exit
@@ -189,8 +189,8 @@ passed on to the user program even if they was intended for the
 runtime system or the Lisp system.
 
 @menu
-* Runtime Options::             
-* Toplevel Options::            
+* Runtime Options::
+* Toplevel Options::
 @end menu
 
 @node Runtime Options

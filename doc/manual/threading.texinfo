@@ -17,16 +17,16 @@ platforms threads must be explicitly enabled at build-time, see
 @file{INSTALL} for directions.
 
 @menu
-* Threading basics::            
-* Special Variables::           
-* Atomic Operations::           
-* Mutex Support::               
-* Semaphores::                  
-* Waitqueue/condition variables::  
-* Barriers::                    
-* Sessions/Debugging::          
-* Foreign threads::             
-* Implementation (Linux x86/x86-64)::  
+* Threading basics::
+* Special Variables::
+* Atomic Operations::
+* Mutex Support::
+* Semaphores::
+* Waitqueue/condition variables::
+* Barriers::
+* Sessions/Debugging::
+* Foreign threads::
+* Implementation (Linux x86/x86-64)::
 @end menu
 
 @node Threading basics

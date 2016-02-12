@@ -3,8 +3,8 @@
 @chapter Objects In Memory
 
 @menu
-* Type tags::                   
-* Heap Object Layout::          
+* Type tags::
+* Heap Object Layout::
 @end menu
 
 @node Type tags

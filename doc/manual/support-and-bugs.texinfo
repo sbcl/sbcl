@@ -3,9 +3,9 @@
 @chapter Getting Support and Reporting Bugs
 
 @menu
-* Volunteer Support::           
-* Commercial Support::          
-* Reporting Bugs::              
+* Volunteer Support::
+* Commercial Support::
+* Reporting Bugs::
 @end menu
 
 @node Volunteer Support

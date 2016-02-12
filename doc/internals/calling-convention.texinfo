@@ -3,12 +3,12 @@
 @chapter Calling Convention
 
 @menu
-* Assembly Routines::           
-* Local Calls::                 
-* Full Calls::                  
-* Unknown-Values Returns::      
-* IR2 Conversion::              
-* Additional Notes::            
+* Assembly Routines::
+* Local Calls::
+* Full Calls::
+* Unknown-Values Returns::
+* IR2 Conversion::
+* Additional Notes::
 @end menu
 
 The calling convention used within Lisp code on SBCL/x86 was, for the

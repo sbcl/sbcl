@@ -68,7 +68,7 @@ marker, we return it.
 
 @float Example,ex:slot-value-using-class
 @example
-(defmethod slot-value-using-class 
+(defmethod slot-value-using-class
     ((class std-class)
      (object standard-object)
      (slotd standard-effective-slot-definition))
@@ -161,7 +161,7 @@ involving adding or removing methods from
 (defclass foo () ((a :initform 0)))
 (defun foo (x) (slot-value x 'a))
 (foo (make-instance 'foo)) ; => 0
-(defmethod slot-value-using-class :after 
+(defmethod slot-value-using-class :after
   ((class std-class) (object foo)
    (slotd standard-effective-slot-definition))
   (print "hi"))

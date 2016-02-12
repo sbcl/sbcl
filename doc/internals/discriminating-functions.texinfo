@@ -132,7 +132,7 @@ methods on @code{SB-MOP:SLOT-VALUE-USING-CLASS} and its siblings.  The
 first state is @code{SB-PCL::ONE-CLASS}, entered when one class of
 instance has been accessed; the discriminating function here closes over
 the wrapper of the class and the slot index, and accesses the slot of
-the instance directly.  
+the instance directly.
 
 If a direct instance of another class is passed to the generic function
 for slot access, then another accessor discriminating function is

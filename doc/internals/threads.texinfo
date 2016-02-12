@@ -3,7 +3,7 @@
 @chapter Threads
 
 @menu
-* Implementation (Linux x86)::  
+* Implementation (Linux x86)::
 @end menu
 
 @node Implementation (Linux x86)

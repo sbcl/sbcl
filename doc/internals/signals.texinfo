@@ -3,10 +3,10 @@
 @chapter Signal handling
 
 @menu
-* Groups of signals::           
-* The deferral mechanism::      
-* Implementation warts::        
-* Programming with signal handling in mind::  
+* Groups of signals::
+* The deferral mechanism::
+* Implementation warts::
+* Programming with signal handling in mind::
 @end menu
 
 @node Groups of signals

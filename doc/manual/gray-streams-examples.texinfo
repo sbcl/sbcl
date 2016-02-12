@@ -128,14 +128,14 @@ Here's a sample use of this class:
        unless (numberp thing) do
          (error "Non-number ~S (line ~D, column ~D)" thing
                 (line-count-of counted-stream)
-                (- (col-count-of counted-stream) 
+                (- (col-count-of counted-stream)
                    (length (format nil "~S" thing))))
        end
        do (print thing))))
 @end group
 @verbatim
-1 
-2 
+1
+2
 3
 Non-number :FOO (line 2, column 5)
   [Condition of type SIMPLE-ERROR]
