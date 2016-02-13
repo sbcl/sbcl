@@ -27,6 +27,13 @@
   (declare (type (unsigned-byte 21) first second third))
   (sb!c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
 
+(define-load-time-global **character-misc-database** nil)
+(declaim (type (simple-array (unsigned-byte 8) (*)) **character-misc-database**))
+(declaim (inline both-case-index-p))
+(defun both-case-index-p (misc-index)
+  (declare (type (unsigned-byte 16) misc-index))
+  (logbitp 7 (aref **character-misc-database** (+ 5 misc-index))))
+
 (macrolet ((frob ()
              (flet ((coerce-it (array)
                       (!coerce-to-specialized array '(unsigned-byte 8)))
@@ -138,11 +145,6 @@
                                               (dotimes (i len)
                                                 (push (read-codepoint) ret))
                                               (nreverse ret))))))
-                            ;; Dependency cycle: BOTH-CASE-INDEX-P is defined later
-                            ;; because it uses **CHARACTER-MISC-DATABASE** which is
-                            ;; defined by the DEFGLOBAL above. This declaration
-                            ;; suppresses the warning that it can't be inlined.
-                            (declare (notinline both-case-index-p))
                             (loop until (>= index length)
                                   for key = (read-codepoint)
                                   for upper = (read-length-tagged)
@@ -554,11 +556,6 @@ NIL."
   "The argument must be a character object. ALPHA-CHAR-P returns T if the
 argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (< (ucd-general-category char) 5))
-
-(declaim (inline both-case-index-p))
-(defun both-case-index-p (misc-index)
-  (declare (type (unsigned-byte 16) misc-index))
-  (logbitp 7 (aref **character-misc-database** (+ 5 misc-index))))
 
 (defun both-case-p (char)
   #!+sb-doc
