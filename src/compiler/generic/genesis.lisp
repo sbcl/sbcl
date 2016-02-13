@@ -765,16 +765,17 @@ core and return a descriptor to it."
     (write-wordindexed dest sb!vm:cons-car-slot car)
     (write-wordindexed dest sb!vm:cons-cdr-slot cdr)
     dest))
-(defun cold-list (&rest args)
+(defun list-to-core (list)
   (let ((head *nil-descriptor*)
         (tail nil))
     ;; A recursive algorithm would have the first cons at the highest
     ;; address. This way looks nicer when viewed in ldb.
     (loop
-     (unless args (return head))
-     (let ((cons (cold-cons (pop args) *nil-descriptor*)))
+     (unless list (return head))
+     (let ((cons (cold-cons (pop list) *nil-descriptor*)))
        (if tail (cold-rplacd tail cons) (setq head cons))
        (setq tail cons)))))
+(defun cold-list (&rest args) (list-to-core args))
 (defun cold-list-length (list) ; but no circularity detection
   ;; a recursive implementation uses too much stack for some Lisps
   (let ((n 0))
@@ -1207,11 +1208,11 @@ core and return a descriptor to it."
               (push (cadr cell) use)
               (push this (cddr cell))))
           (write-slots this package-layout
-                       :%use-list (apply 'cold-list (nreverse use)))))
+                       :%use-list (list-to-core (nreverse use)))))
       ;; pass 3: set the 'used-by' lists
       (dolist (cell target-pkg-list)
         (write-slots (cadr cell) package-layout
-                     :%used-by-list (apply 'cold-list (cddr cell)))))))
+                     :%used-by-list (list-to-core (cddr cell)))))))
 
 ;;; sanity check for a symbol we're about to create on the target
 ;;;
@@ -1558,8 +1559,8 @@ core and return a descriptor to it."
                                :key #'symbol-package) #'string<))))
           (write-slots (car (gethash pkg-name *cold-package-symbols*)) ; package
                        (find-layout 'package)
-                       :%shadowing-symbols
-                       (apply 'cold-list (mapcar 'cold-intern shadow))))
+                       :%shadowing-symbols (list-to-core
+                                            (mapcar 'cold-intern shadow))))
         (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
           (let ((host-pkg (find-package pkg-name))
                 (sb-xc-pkg (find-package "SB-XC"))
@@ -2621,7 +2622,7 @@ core and return a descriptor to it."
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
             (sb!impl::%defsetf
-             (push (apply #'cold-list args) *!cold-setf-macros*))
+             (push (list-to-core args) *!cold-setf-macros*))
             (set
              (aver (= (length args) 2))
              (cold-set (first args)
@@ -3732,7 +3733,7 @@ initially undefined function references:~2%")
                 (length *!cold-toplevels*)))
 
       (dolist (symbol '(*!cold-defuns* *!cold-setf-macros* *!cold-toplevels*))
-        (cold-set symbol (vector-in-core (nreverse (symbol-value symbol))))
+        (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")

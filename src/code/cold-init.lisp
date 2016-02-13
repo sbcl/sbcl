@@ -107,7 +107,6 @@
 (defvar *!cold-toplevels*)                 ; except for DEFUNs and SETF macros
 (defvar *!cold-setf-macros*)               ; just SETF macros
 (defvar *!cold-defuns*)                    ; just DEFUNs
-(declaim (simple-vector *!cold-toplevels*))
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
@@ -203,9 +202,9 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb!kernel::!set-up-structure-object-class)
 
-  (dovector (x (the simple-vector *!cold-setf-macros*))
+  (dolist (x *!cold-setf-macros*)
     (apply #'!quietly-defsetf x))
-  (dovector (x (the simple-vector *!cold-defuns*))
+  (dolist (x *!cold-defuns*)
     (destructuring-bind (name . inline-expansion) x
       (!%quietly-defun name inline-expansion)))
 
@@ -236,8 +235,8 @@
                    (funcall f expr)))
 
   (loop for index-in-cold-toplevels from 0
-        for toplevel-thing across (prog1 *!cold-toplevels*
-                                    (makunbound '*!cold-toplevels*))
+        for toplevel-thing in (prog1 *!cold-toplevels*
+                                (makunbound '*!cold-toplevels*))
         do
       #!+sb-show
       (when (zerop (mod index-in-cold-toplevels 1024))
