@@ -1288,12 +1288,12 @@ core and return a descriptor to it."
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
 (defun host-constant-to-core (host-value)
-  (let (visited)
+  (let ((visited (make-hash-table :test #'eq)))
     (named-let target-representation ((value host-value))
       (unless (typep value '(or symbol number descriptor))
-        (if (memq value visited) ; Sharing/circularity not handled
+        (if (gethash value visited) ; Sharing/circularity not handled
             (bug "circular constant?")
-            (push value visited)))
+            (setf (gethash value visited) t)))
       (etypecase value
         (descriptor value)
         (symbol (if (symbol-package value)
