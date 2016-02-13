@@ -452,7 +452,7 @@ arch_install_interrupt_handlers(void)
 
 /* Insert the necessary jump instructions at the given address. */
 void
-arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
   /* Make JMP to function entry. The instruction sequence is:
        lui    $25, 0, %hi(addr)

@@ -625,7 +625,7 @@ ppc_flush_icache(os_vm_address_t address, os_vm_size_t length)
  * Insert the necessary jump instructions at the given address.
  */
 void
-arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
   /*
    * Make JMP to function entry.
@@ -681,7 +681,7 @@ arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
   inst = (19 << 26) | (20 << 21) | (528 << 1);
   *inst_ptr++ = inst;
 
-  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
+  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
 
 void

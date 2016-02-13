@@ -152,7 +152,7 @@ void arch_install_interrupt_handlers()
 
 #define LINKAGE_TEMP_REG        reg_NFP
 
-void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+void arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
   /*
     ldr reg,=address
@@ -175,7 +175,7 @@ void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
   // address
   *(unsigned long *)inst_ptr++ = target_addr;
 
-  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
+  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
 
 void
