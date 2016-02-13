@@ -114,16 +114,22 @@
                  (push (cons name cell) likely-suspicious)
                  (push (cons name cell) possibly-suspicious))))))
     (flet ((show (label list)
-             (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
-                     label
-                     (mapcar (lambda (x) (list* (ash (cadr x) -2) (car x) (cddr x)))
-                             (sort list #'> :key #'cadr)))))
+             (when list
+               (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
+                       label
+                       (mapcar (lambda (x) (list* (ash (cadr x) -2) (car x) (cddr x)))
+                               (sort list #'> :key #'cadr))))))
       ;; Called inlines not in the presence of a declaration to the contrary
       ;; indicate that perhaps the function definition appeared too late.
       (show "Likely" likely-suspicious)
       ;; Failed transforms are considered not quite as suspicious
       ;; because it could either be too late, or that the transform failed.
-      (show "Possibly" possibly-suspicious))))
+      (show "Possibly" possibly-suspicious))
+    ;; As each platform's build becomes warning-free,
+    ;; it should be added to the list here to prevent regresssions.
+    #!+(and (or x86 x86-64) (or linux darwin))
+    (when likely-suspicious
+      (warn "Expected zero inlinining failures"))))
 
 ;; After cross-compiling, show me a list of types that checkgen
 ;; would have liked to use primitive traps for but couldn't.
