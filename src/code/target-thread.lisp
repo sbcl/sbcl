@@ -983,8 +983,9 @@ around the call, checking the the associated data:
   (locally (declare (inline %condition-wait))
     (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
         (decode-timeout timeout)
-      (%condition-wait queue mutex timeout
-                       to-sec to-usec stop-sec stop-usec deadlinep))))
+      (values
+       (%condition-wait queue mutex timeout
+                        to-sec to-usec stop-sec stop-usec deadlinep)))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
