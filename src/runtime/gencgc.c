@@ -2764,6 +2764,12 @@ scavenge_newspace_generation_one_scan(generation_index_t generation,
             && (page_table[i].bytes_used != 0)
             && (page_table[i].gen == generation)
             && ((page_table[i].write_protected == 0)
+                /* Disable this when we are looking for information on
+                 * this ptr.  Fixme - this can be optimized by determining
+                 * whether the interesting_pointer lives in a younger
+                 * generation.  If not the write-protected page can't
+                 * point to it - cracauer */
+                || ctx->interesting_pointer
                 /* (This may be redundant as write_protected is now
                  * cleared before promotion.) */
                 || (page_table[i].dont_move == 1))) {
