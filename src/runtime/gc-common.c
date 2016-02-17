@@ -93,12 +93,19 @@ set_forwarding_pointer(lispobj * pointer, lispobj newspace_copy) {
     return newspace_copy;
 }
 
-sword_t (*scavtab[256])(lispobj *where, lispobj object);
+sword_t (*scavtab[256])(lispobj *where, lispobj object, struct scavctx *ctx);
 lispobj (*transother[256])(lispobj object);
 sword_t (*sizetab[256])(lispobj *where);
 struct weak_pointer *weak_pointers;
 
 os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
+
+void init_scavctx(struct scavctx *const ctx)
+{
+  ctx->scav_reason = NULL;
+  ctx->interesting_pointer = NULL;
+  ctx->printto = stderr;
+}
 
 /*
  * copying objects
@@ -119,13 +126,14 @@ copy_code_object(lispobj object, sword_t nwords)
     return gc_general_copy_object(object, nwords, CODE_PAGE_FLAG);
 }
 
-static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
+/* forward decl */
+static sword_t scav_lose(lispobj *where, lispobj object, struct scavctx *ctx);
 
 /* FIXME: Most calls end up going to some trouble to compute an
  * 'n_words' value for this function. The system might be a little
  * simpler if this function used an 'end' parameter instead. */
 void
-scavenge(lispobj *start, sword_t n_words)
+scavenge(lispobj *start, sword_t n_words, struct scavctx *const ctx)
 {
     lispobj *end = start + n_words;
     lispobj *object_ptr;
@@ -149,7 +157,7 @@ scavenge(lispobj *start, sword_t n_words)
                 } else {
                     /* Scavenge that pointer. */
                     object_ptr +=
-                        (scavtab[widetag_of(object)])(object_ptr, object);
+                      (scavtab[widetag_of(object)])(object_ptr, object, ctx);
                 }
             } else {
                 /* It points somewhere other than oldspace. Leave it
@@ -162,7 +170,7 @@ scavenge(lispobj *start, sword_t n_words)
             object_ptr++;
         } else {
             /* It's some sort of header object or another. */
-            object_ptr += (scavtab[widetag_of(object)])(object_ptr, object);
+          object_ptr += (scavtab[widetag_of(object)])(object_ptr, object, ctx);
         }
     }
     gc_assert_verbose(object_ptr == end, "Final object pointer %p, start %p, end %p\n",
@@ -173,7 +181,7 @@ static lispobj trans_fun_header(lispobj object); /* forward decls */
 static lispobj trans_boxed(lispobj object);
 
 static sword_t
-scav_fun_pointer(lispobj *where, lispobj object)
+scav_fun_pointer(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     lispobj *first_pointer;
     lispobj copy;
@@ -308,7 +316,7 @@ trans_code(struct code *code)
 }
 
 static sword_t
-scav_code_header(lispobj *where, lispobj object)
+scav_code_header(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     struct code *code;
     sword_t n_header_words, n_code_words, n_words;
@@ -322,7 +330,7 @@ scav_code_header(lispobj *where, lispobj object)
     n_words = CEILING(n_words, 2);
 
     /* Scavenge the boxed section of the code data block. */
-    scavenge(where + 1, n_header_words - 1);
+    scavenge(where + 1, n_header_words - 1, ctx);
 
     /* Scavenge the boxed section of each function object in the
      * code data block. */
@@ -337,7 +345,7 @@ scav_code_header(lispobj *where, lispobj object)
         function_ptr = (struct simple_fun *) native_pointer(entry_point);
         gc_assert(widetag_of(function_ptr->header)==SIMPLE_FUN_HEADER_WIDETAG);
         scavenge(SIMPLE_FUN_SCAV_START(function_ptr),
-                 SIMPLE_FUN_SCAV_NWORDS(function_ptr));
+                 SIMPLE_FUN_SCAV_NWORDS(function_ptr), ctx);
     }
 
     return n_words;
@@ -371,7 +379,8 @@ size_code_header(lispobj *where)
 
 #if !defined(LISP_FEATURE_X86) && ! defined(LISP_FEATURE_X86_64)
 static sword_t
-scav_return_pc_header(lispobj *where, lispobj object)
+scav_return_pc_header(lispobj *where, lispobj object,
+                      struct scavctx *const ctx)
 {
     lose("attempted to scavenge a return PC header where=0x%08x object=0x%08x\n",
          (uword_t) where,
@@ -406,14 +415,14 @@ trans_return_pc_header(lispobj object)
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 static sword_t
-scav_closure_header(lispobj *where, lispobj object)
+scav_closure_header(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     struct closure *closure;
     lispobj fun;
 
     closure = (struct closure *)where;
     fun = closure->fun - FUN_RAW_ADDR_OFFSET;
-    scavenge(&fun, 1);
+    scavenge(&fun, 1, ctx);
 #ifdef LISP_FEATURE_GENCGC
     /* The function may have moved so update the raw address. But
      * don't write unnecessarily. */
@@ -426,7 +435,7 @@ scav_closure_header(lispobj *where, lispobj object)
 
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 static sword_t
-scav_fun_header(lispobj *where, lispobj object)
+scav_fun_header(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     lose("attempted to scavenge a function header where=0x%08x object=0x%08x\n",
          (uword_t) where,
@@ -487,7 +496,8 @@ size_instance(lispobj *where)
 }
 
 static sword_t
-scav_instance_pointer(lispobj *where, lispobj object)
+scav_instance_pointer(lispobj *where, lispobj object,
+                      struct scavctx *const ctx)
 {
     lispobj copy, *first_pointer;
 
@@ -513,7 +523,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
 static lispobj trans_list(lispobj object);
 
 static sword_t
-scav_list_pointer(lispobj *where, lispobj object)
+scav_list_pointer(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     lispobj first, *first_pointer;
 
@@ -597,7 +607,7 @@ trans_list(lispobj object)
  */
 
 static sword_t
-scav_other_pointer(lispobj *where, lispobj object)
+scav_other_pointer(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     lispobj first, *first_pointer;
 
@@ -633,7 +643,7 @@ size_pointer(lispobj *where)
 }
 
 static sword_t
-scav_immediate(lispobj *where, lispobj object)
+scav_immediate(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     return 1;
 }
@@ -653,7 +663,7 @@ size_immediate(lispobj *where)
 
 
 static sword_t
-scav_boxed(lispobj *where, lispobj object)
+scav_boxed(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     return 1;
 }
@@ -727,7 +737,7 @@ instance_scan_interleaved(void (*proc)(),
 #endif
 
 static sword_t
-scav_instance(lispobj *where, lispobj header)
+scav_instance(lispobj *where, lispobj header, struct scavctx *const ctx)
 {
     sword_t ntotal = instance_length(header);
     lispobj* layout = (lispobj*)instance_layout(where);
@@ -808,7 +818,7 @@ size_tiny_boxed(lispobj *where)
 /* 'cause the raw-addr has a function lowtag. */
 #if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM)
 static sword_t
-scav_fdefn(lispobj *where, lispobj object)
+scav_fdefn(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     struct fdefn *fdefn;
 
@@ -818,7 +828,7 @@ scav_fdefn(lispobj *where, lispobj object)
        fdefn->fun, fdefn->raw_addr)); */
 
     if ((char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET) == fdefn->raw_addr) {
-        scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1);
+      scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1, ctx);
 
         /* Don't write unnecessarily. */
         if (fdefn->raw_addr != (char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET))
@@ -835,7 +845,7 @@ scav_fdefn(lispobj *where, lispobj object)
 #endif
 
 static sword_t
-scav_unboxed(lispobj *where, lispobj object)
+scav_unboxed(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     uword_t length;
 
@@ -877,7 +887,7 @@ size_unboxed(lispobj *where)
 
 /* vector-like objects */
 static sword_t
-scav_base_string(lispobj *where, lispobj object)
+scav_base_string(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -929,7 +939,8 @@ size_base_string(lispobj *where)
 
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
 static sword_t
-scav_character_string(lispobj *where, lispobj object)
+scav_character_string(lispobj *where, lispobj object,
+                      struct scavctx *const ctx)
 {
     struct vector *vector;
     int length, nwords;
@@ -1010,7 +1021,7 @@ size_vector(lispobj *where)
 }
 
 static sword_t
-scav_vector_nil(lispobj *where, lispobj object)
+scav_vector_nil(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     return 2;
 }
@@ -1030,7 +1041,7 @@ size_vector_nil(lispobj *where)
 }
 
 static sword_t
-scav_vector_bit(lispobj *where, lispobj object)
+scav_vector_bit(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1071,7 +1082,8 @@ size_vector_bit(lispobj *where)
 }
 
 static sword_t
-scav_vector_unsigned_byte_2(lispobj *where, lispobj object)
+scav_vector_unsigned_byte_2(lispobj *where, lispobj object,
+                            struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1112,7 +1124,8 @@ size_vector_unsigned_byte_2(lispobj *where)
 }
 
 static sword_t
-scav_vector_unsigned_byte_4(lispobj *where, lispobj object)
+scav_vector_unsigned_byte_4(lispobj *where, lispobj object,
+                            struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1153,7 +1166,8 @@ size_vector_unsigned_byte_4(lispobj *where)
 
 
 static sword_t
-scav_vector_unsigned_byte_8(lispobj *where, lispobj object)
+scav_vector_unsigned_byte_8(lispobj *where, lispobj object,
+                            struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1199,7 +1213,8 @@ size_vector_unsigned_byte_8(lispobj *where)
 
 
 static sword_t
-scav_vector_unsigned_byte_16(lispobj *where, lispobj object)
+scav_vector_unsigned_byte_16(lispobj *where, lispobj object,
+                             struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1240,7 +1255,8 @@ size_vector_unsigned_byte_16(lispobj *where)
 }
 
 static sword_t
-scav_vector_unsigned_byte_32(lispobj *where, lispobj object)
+scav_vector_unsigned_byte_32(lispobj *where, lispobj object,
+                             struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1282,7 +1298,8 @@ size_vector_unsigned_byte_32(lispobj *where)
 
 #if N_WORD_BITS == 64
 static sword_t
-scav_vector_unsigned_byte_64(lispobj *where, lispobj object)
+scav_vector_unsigned_byte_64(lispobj *where, lispobj object,
+                             struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1324,7 +1341,8 @@ size_vector_unsigned_byte_64(lispobj *where)
 #endif
 
 static sword_t
-scav_vector_single_float(lispobj *where, lispobj object)
+scav_vector_single_float(lispobj *where, lispobj object,
+                         struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1365,7 +1383,8 @@ size_vector_single_float(lispobj *where)
 }
 
 static sword_t
-scav_vector_double_float(lispobj *where, lispobj object)
+scav_vector_double_float(lispobj *where, lispobj object,
+                         struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1407,7 +1426,8 @@ size_vector_double_float(lispobj *where)
 
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
 static long
-scav_vector_long_float(lispobj *where, lispobj object)
+scav_vector_long_float(lispobj *where, lispobj object,
+                       struct scavctx *const ctx)
 {
     struct vector *vector;
     long length, nwords;
@@ -1452,7 +1472,8 @@ size_vector_long_float(lispobj *where)
 
 #ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
 static sword_t
-scav_vector_complex_single_float(lispobj *where, lispobj object)
+scav_vector_complex_single_float(lispobj *where, lispobj object,
+                                 struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1495,7 +1516,8 @@ size_vector_complex_single_float(lispobj *where)
 
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
 static sword_t
-scav_vector_complex_double_float(lispobj *where, lispobj object)
+scav_vector_complex_double_float(lispobj *where, lispobj object,
+                                 struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1539,7 +1561,8 @@ size_vector_complex_double_float(lispobj *where)
 
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
 static long
-scav_vector_complex_long_float(lispobj *where, lispobj object)
+scav_vector_complex_long_float(lispobj *where, lispobj object,
+                               struct scavctx *const ctx)
 {
     struct vector *vector;
     sword_t length, nwords;
@@ -1618,7 +1641,7 @@ size_weak_pointer(lispobj *where)
 }
 
 
-void scan_weak_pointers(void)
+void scan_weak_pointers (struct scavctx *const ctx)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointers, next_wp = NULL; wp != NULL; wp = next_wp) {
@@ -1723,7 +1746,8 @@ get_array_data (lispobj array, int widetag, uword_t *length)
  * either called this function directly or arranged for it to be
  * called later by pushing the hash table onto weak_hash_tables. */
 static void
-scav_hash_table_entries (struct hash_table *hash_table)
+scav_hash_table_entries (struct hash_table *hash_table,
+                         struct scavctx *const ctx)
 {
     lispobj *kv_vector;
     uword_t kv_length;
@@ -1780,7 +1804,7 @@ scav_hash_table_entries (struct hash_table *hash_table)
             weak_hash_entry_alivep(weakness, old_key, value)) {
 
             /* Scavenge the key and value. */
-            scavenge(&kv_vector[2*i],2);
+          scavenge(&kv_vector[2*i], 2, ctx);
 
             /* If an EQ-based key has moved, mark the hash-table for
              * rehashing. */
@@ -1800,7 +1824,7 @@ scav_hash_table_entries (struct hash_table *hash_table)
 }
 
 sword_t
-scav_vector (lispobj *where, lispobj object)
+scav_vector (lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     uword_t kv_length;
     struct hash_table *hash_table;
@@ -1815,7 +1839,7 @@ scav_vector (lispobj *where, lispobj object)
     /*FSHOW((stderr,"/kv_length = %d\n", kv_length));*/
 
     /* Scavenge element 0, which may be a hash-table structure. */
-    scavenge(where+2, 1);
+    scavenge(where+2, 1, ctx);
     if (!is_lisp_pointer(where[2])) {
         /* This'll happen when REHASH clears the header of old-kv-vector
          * and fills it with zero, but some other thread simulatenously
@@ -1840,7 +1864,7 @@ scav_vector (lispobj *where, lispobj object)
 
     /* Scavenge element 1, which should be some internal symbol that
      * the hash table code reserves for marking empty slots. */
-    scavenge(where+3, 1);
+    scavenge(where+3, 1, ctx);
     if (!is_lisp_pointer(where[3])) {
         lose("not empty-hash-table-slot symbol pointer: %x\n", where[3]);
     }
@@ -1848,7 +1872,7 @@ scav_vector (lispobj *where, lispobj object)
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
     scavenge((lispobj *)hash_table,
-             sizeof(struct hash_table) / sizeof(lispobj));
+             sizeof(struct hash_table) / sizeof(lispobj), ctx);
 
     /* Cross-check the kv_vector. */
     if (where != (lispobj *)native_pointer(hash_table->table)) {
@@ -1856,7 +1880,7 @@ scav_vector (lispobj *where, lispobj object)
     }
 
     if (hash_table->weakness == NIL) {
-        scav_hash_table_entries(hash_table);
+      scav_hash_table_entries(hash_table, ctx);
     } else {
         /* Delay scavenging of this table by pushing it onto
          * weak_hash_tables (if it's not there already) for the weak
@@ -1871,14 +1895,14 @@ scav_vector (lispobj *where, lispobj object)
 }
 
 void
-scav_weak_hash_tables (void)
+scav_weak_hash_tables (struct scavctx *const ctx)
 {
     struct hash_table *table;
 
     /* Scavenge entries whose triggers are known to survive. */
     for (table = weak_hash_tables; table != NULL;
          table = (struct hash_table *)table->next_weak_hash_table) {
-        scav_hash_table_entries(table);
+      scav_hash_table_entries(table, ctx);
     }
 }
 
@@ -1948,7 +1972,7 @@ scan_weak_hash_table (struct hash_table *hash_table)
 
 /* Remove dead entries from weak hash tables. */
 void
-scan_weak_hash_tables (void)
+scan_weak_hash_tables (struct scavctx *const ctx)
 {
     struct hash_table *table, *next;
 
@@ -1967,7 +1991,7 @@ scan_weak_hash_tables (void)
  */
 
 static sword_t
-scav_lose(lispobj *where, lispobj object)
+scav_lose(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     lose("no scavenge function for object %p (widetag 0x%x)\n",
          (uword_t)object,

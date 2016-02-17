@@ -1976,7 +1976,7 @@ trans_unboxed_large(lispobj object)
     CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
 static sword_t
-scav_weak_pointer(lispobj *where, lispobj object)
+scav_weak_pointer(lispobj *where, lispobj object, struct scavctx *const ctx)
 {
     /* Since we overwrite the 'next' field, we have to make
      * sure not to do so for pointers already in the list.
@@ -2323,7 +2323,7 @@ maybe_adjust_large_object(lispobj *where)
  * areas you cannot scavenge it again until those are gone.
  */
 void
-scavenge_pages_with_conservative_pointers_to_them_protected_objects_only()
+scavenge_pages_with_conservative_pointers_to_them_protected_objects_only(struct scavctx *const ctx)
 {
     page_index_t i;
     for (i = 0; i < last_free_page; i++) {
@@ -2342,13 +2342,14 @@ scavenge_pages_with_conservative_pointers_to_them_protected_objects_only()
             } else {
                 // contiguous area stopped
                 if (scavme_begin) {
-                    scavenge(scavme_begin, (begin + dword * 2) - scavme_begin);
+                  scavenge(scavme_begin, (begin + dword * 2) - scavme_begin,
+                           ctx);
                 }
                 scavme_begin = NULL;
             }
         }
         if (scavme_begin) {
-            scavenge(scavme_begin, (begin + dword * 2) - scavme_begin);
+          scavenge(scavme_begin, (begin + dword * 2) - scavme_begin, ctx);
         }
     }
 }
@@ -2644,7 +2645,8 @@ update_page_write_prot(page_index_t page)
  * pointers as the objects contain a link to the next and are written
  * if a weak pointer is scavenged. Still it's a useful check. */
 static void
-scavenge_generations(generation_index_t from, generation_index_t to)
+scavenge_generations(generation_index_t from, generation_index_t to,
+                     struct scavctx *const ctx)
 {
     page_index_t i;
     page_index_t num_wp = 0;
@@ -2680,7 +2682,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                 scavenge(page_address(i),
                          ((uword_t)(page_table[last_page].bytes_used
                                           + npage_bytes(last_page-i)))
-                         /N_WORD_BYTES);
+                         /N_WORD_BYTES, ctx);
 
                 /* Now scan the pages and write protect those that
                  * don't have pointers to younger generations. */
@@ -2748,7 +2750,8 @@ static struct new_area new_areas_2[NUM_NEW_AREAS];
  * complete the job as new objects may be added to the generation in
  * the process which are not scavenged. */
 static void
-scavenge_newspace_generation_one_scan(generation_index_t generation)
+scavenge_newspace_generation_one_scan(generation_index_t generation,
+                                      struct scavctx *const ctx)
 {
     page_index_t i;
 
@@ -2797,7 +2800,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
                                / N_WORD_BYTES);
                 new_areas_ignore_page = last_page;
 
-                scavenge(page_scan_start(i), nwords);
+                scavenge(page_scan_start(i), nwords, ctx);
 
             }
             i = last_page;
@@ -2810,7 +2813,8 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
 /* Do a complete scavenge of the newspace generation. */
 static void
-scavenge_newspace_generation(generation_index_t generation)
+scavenge_newspace_generation(generation_index_t generation,
+                             struct scavctx *const ctx)
 {
     size_t i;
 
@@ -2834,7 +2838,7 @@ scavenge_newspace_generation(generation_index_t generation)
     record_new_objects = 1;
 
     /* Start with a full scavenge. */
-    scavenge_newspace_generation_one_scan(generation);
+    scavenge_newspace_generation_one_scan(generation, ctx);
 
     /* Record all new areas now. */
     record_new_objects = 2;
@@ -2844,7 +2848,7 @@ scavenge_newspace_generation(generation_index_t generation)
      * is O(W^2+N) as Bruno Haible warns in
      * http://www.haible.de/bruno/papers/cs/weak/WeakDatastructures-writeup.html
      * see "Implementation 2". */
-    scav_weak_hash_tables();
+    scav_weak_hash_tables(ctx);
 
     /* Flush the current regions updating the tables. */
     gc_alloc_update_all_page_tables();
@@ -2889,12 +2893,12 @@ scavenge_newspace_generation(generation_index_t generation)
              * anyway during scavenge_newspace_generation_one_scan. */
             record_new_objects = 1;
 
-            scavenge_newspace_generation_one_scan(generation);
+            scavenge_newspace_generation_one_scan(generation, ctx);
 
             /* Record all new areas now. */
             record_new_objects = 2;
 
-            scav_weak_hash_tables();
+            scav_weak_hash_tables(ctx);
 
             /* Flush the current regions updating the tables. */
             gc_alloc_update_all_page_tables();
@@ -2907,10 +2911,10 @@ scavenge_newspace_generation(generation_index_t generation)
                 size_t offset = (*previous_new_areas)[i].offset;
                 size_t size = (*previous_new_areas)[i].size / N_WORD_BYTES;
                 gc_assert((*previous_new_areas)[i].size % N_WORD_BYTES == 0);
-                scavenge(page_address(page)+offset, size);
+                scavenge(page_address(page)+offset, size, ctx);
             }
 
-            scav_weak_hash_tables();
+            scav_weak_hash_tables(ctx);
 
             /* Flush the current regions updating the tables. */
             gc_alloc_update_all_page_tables();
@@ -3576,7 +3580,8 @@ move_pinned_pages_to_newspace()
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void
-garbage_collect_generation(generation_index_t generation, int raise)
+garbage_collect_generation(generation_index_t generation, int raise,
+			   struct scavctx *const ctx)
 {
     page_index_t i;
     uword_t static_space_size;
@@ -3782,7 +3787,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         union interrupt_handler handler = interrupt_handlers[i];
         if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
             !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
-            scavenge((lispobj *)(interrupt_handlers + i), 1);
+          scavenge((lispobj *)(interrupt_handlers + i), 1, ctx);
         }
     }
     /* Scavenge the binding stacks. */
@@ -3791,12 +3796,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
         for_each_thread(th) {
             sword_t len= (lispobj *)get_binding_stack_pointer(th) -
                 th->binding_stack_start;
-            scavenge((lispobj *) th->binding_stack_start,len);
+            scavenge((lispobj *) th->binding_stack_start, len, ctx);
 #ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
             len=(SymbolValue(FREE_TLS_INDEX,0) >> WORD_SHIFT) -
                 (sizeof (struct thread))/(sizeof (lispobj));
-            scavenge((lispobj *) (th+1),len);
+            scavenge((lispobj *) (th+1),len, ctx);
 #endif
         }
     }
@@ -3829,18 +3834,18 @@ garbage_collect_generation(generation_index_t generation, int raise)
                "/scavenge static space: %d bytes\n",
                static_space_size * sizeof(lispobj)));
     }
-    scavenge( (lispobj *) STATIC_SPACE_START, static_space_size);
+    scavenge( (lispobj *) STATIC_SPACE_START, static_space_size, ctx);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
      * objects may be moved in - it is handled separately below. */
-    scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
+    scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION, ctx);
 
-    scavenge_pages_with_conservative_pointers_to_them_protected_objects_only();
+    scavenge_pages_with_conservative_pointers_to_them_protected_objects_only(ctx);
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
-    scavenge_newspace_generation(new_space);
+    scavenge_newspace_generation(new_space, ctx);
 
     /* FIXME: I tried reenabling this check when debugging unrelated
      * GC weirdness ca. sbcl-0.6.12.45, and it failed immediately.
@@ -3872,9 +3877,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 #endif
 
-    scan_weak_hash_tables();
-    scan_weak_pointers();
-    do_the_wipe();
+    scan_weak_hash_tables(ctx);
+    scan_weak_pointers(ctx);
+    do_the_wipe(ctx);
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables();
@@ -4004,12 +4009,15 @@ generation_index_t small_generation_limit = 1;
 void
 collect_garbage(generation_index_t last_gen)
 {
+    struct scavctx ctx;
     generation_index_t gen = 0, i;
     int raise, more = 0;
     int gen_to_wp;
     /* The largest value of last_free_page seen since the time
      * remap_free_pages was called. */
     static page_index_t high_water_mark = 0;
+
+    init_scavctx(&ctx);
 
     FSHOW((stderr, "/entering collect_garbage(%d)\n", last_gen));
     log_generation_stats(gc_logfile, "=== GC Start ===");
@@ -4074,7 +4082,7 @@ collect_garbage(generation_index_t last_gen)
                 generations[gen+1].bytes_allocated;
         }
 
-        garbage_collect_generation(gen, raise);
+        garbage_collect_generation(gen, raise, &ctx);
 
         /* Reset the memory age cum_sum. */
         generations[gen].cum_sum_bytes_allocated = 0;
