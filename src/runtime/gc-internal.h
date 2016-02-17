@@ -20,22 +20,6 @@
 #include "thread.h"
 #include "interr.h"
 
-#include <stdio.h>
-struct scavctx {
-  /* Scavenging context.  A place where you pass information through
-   * levels of GC function calls instead of using globals.
-   * Holds debug and diagnosis related information for now.
-   * Will be critical to multithreaded GC in the future.
-   */
-  /* What kind of scavenging are we doing right now? */
-  const char *scav_reason;
-  /* User requested additional information about this location. */
-  void *interesting_pointer;
-  FILE *printto; /* stream to print debug info to */
-};
-
-void init_scavctx(struct scavctx *const ctx);
-
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-internal.h"
 #else
@@ -151,20 +135,18 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
     return make_lispobj(new, lowtag_of(object));
 }
 
-extern sword_t (*scavtab[256])(lispobj *where, lispobj object,
-                               struct scavctx *ctx);
+extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
 extern lispobj (*transother[256])(lispobj object);
 extern sword_t (*sizetab[256])(lispobj *where);
 
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
-extern void scavenge(lispobj *start, sword_t n_words, struct scavctx *ctx);
-extern void scavenge_interrupt_contexts(struct thread *thread,
-                                        struct scavctx *ctx);
-extern void scav_weak_hash_tables(struct scavctx *ctx);
-extern void scan_weak_hash_tables(struct scavctx *ctx);
-extern void scan_weak_pointers(struct scavctx *ctx);
+extern void scavenge(lispobj *start, sword_t n_words);
+extern void scavenge_interrupt_contexts(struct thread *thread);
+extern void scav_weak_hash_tables(void);
+extern void scan_weak_hash_tables(void);
+extern void scan_weak_pointers(void);
 
 lispobj  copy_large_unboxed_object(lispobj object, sword_t nwords);
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
@@ -180,7 +162,7 @@ lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
 
 extern int looks_like_valid_lisp_pointer_p(lispobj pointer, lispobj *start_addr);
 
-extern void scavenge_control_stack(struct thread *th, struct scavctx *ctx);
+extern void scavenge_control_stack(struct thread *th);
 extern void scrub_control_stack(void);
 extern void scrub_thread_control_stack(struct thread *);
 
