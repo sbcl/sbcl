@@ -3581,7 +3581,7 @@ move_pinned_pages_to_newspace()
  * generation are not raised to the next generation. */
 static void
 garbage_collect_generation(generation_index_t generation, int raise,
-			   struct scavctx *const ctx)
+                           struct scavctx *const ctx)
 {
     page_index_t i;
     uword_t static_space_size;
