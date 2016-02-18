@@ -47,7 +47,7 @@
            (and (symbolp thing)
                 (integerp index)
                 (eq (info :variable :kind thing) :global)
-                (typep value '(cons (eql function) (cons symbol null)))))))
+                (typep value '(cons (member lambda named-lambda function)))))))
  (defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.

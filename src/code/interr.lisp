@@ -19,7 +19,7 @@
                                        :key #'car :from-end t))))
                `(progn
                   (declaim ((simple-vector ,n) **internal-error-handlers**))
-                  (defglobal **internal-error-handlers**
+                  (!defglobal **internal-error-handlers**
                     (make-array ,n :initial-element 0))))))
   (def-it))
 
