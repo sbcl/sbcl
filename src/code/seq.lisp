@@ -424,7 +424,7 @@
 ;;;; SUBSEQ
 ;;;;
 
-(define-array-dispatch vector-subseq-dispatch (array start end)
+(!define-array-dispatch vector-subseq-dispatch (array start end)
   (declare (optimize speed (safety 0)))
   (declare (type index start end))
   (subseq array start end))
@@ -1145,7 +1145,7 @@ many elements are copied."
          (apply #'%map nil #'f ,sequences)
          (loop (f)))))
 
-(define-array-dispatch vector-map-into (data start end fun sequences)
+(!define-array-dispatch vector-map-into (data start end fun sequences)
   (declare (type index start end)
            (type function fun)
            (type list sequences))

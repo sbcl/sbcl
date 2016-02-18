@@ -1626,7 +1626,7 @@ function to be removed without further warning."
 ;;; Finally, the DISPATCH-FOO macro is defined which does the actual
 ;;; dispatching when called. It expects arguments that match PARAMS.
 ;;;
-(defmacro define-array-dispatch (dispatch-name params &body body)
+(defmacro !define-array-dispatch (dispatch-name params &body body)
   (let ((table-name (symbolicate "%%" dispatch-name "-FUNS%%"))
         (error-name (symbolicate "HAIRY-" dispatch-name "-ERROR")))
     `(progn
