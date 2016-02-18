@@ -62,12 +62,8 @@ echo //checking for leftover cold-init symbols
   (sb-vm::map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
-     (when (and (symbolp obj)
-                (search "!" (string obj))
-                (not (symbol-package obj)))
+     (when (and (symbolp obj) (not (symbol-package obj)) (search "!" (string obj)))
        (push obj l)))
    :dynamic)
-  (format t "Found ~D:~%" (1- (length l)))
-  (write (remove (quote sb-sys:structure!object) l))
-  (terpri))' \
+  (format t "Found ~D:~%~S~%" (length l) l))' \
 --quit
