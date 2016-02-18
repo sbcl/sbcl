@@ -148,10 +148,10 @@
                          #+sb-xc-host (find-package "SB-XC")
                          (remove-if-not
                           (lambda (package)
-                            (= (mismatch "SB!"
+                            (= (mismatch #+sb-xc "SB-" #-sb-xc "SB!"
                                          (package-name package))
                                3))
-                          (list-all-packages)))))
+                          (list-all-packages))) t))
          #+sb-xc-host   ; again, special case like in genesis and dump
          (multiple-value-bind (cl-symbol cl-status)
              (find-symbol (symbol-name what) sb!int:*cl-package*)
