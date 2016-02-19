@@ -62,70 +62,69 @@
 ;;;       (setf (nth 0 foo) (eval-nth-arg ...))
 ;;;       (values-list foo)
 ;;;
-;;; Dispatch to the appropriate immediate handler based on the contents of EXP.
-;;; This is the double-secret entry point: do not use except in %EVAL.
-(declaim (inline %%eval))
-(defun %%eval (exp env)
-  (cond ((symbolp exp)
-         ;; CLHS 3.1.2.1.1 Symbols as Forms
-         (binding* (((val expanded-p type) (expand-or-eval-symbol env exp))
-                    (eval-val (if expanded-p (%eval val env) val)))
-           (when (and type (not (itypep eval-val type)))
-             (typecheck-fail/ref exp eval-val type))
-           (return-from %%eval eval-val)))
-        ;; CLHS 3.1.2.1.3 Self-Evaluating Objects
-        ;; We can save a few instructions vs. testing ATOM
-        ;; because SYMBOLP was already picked off.
-        ((not (listp exp))
-         (return-from %%eval exp)))
-  (flet ((apply-it (f)
-           (let ((args (mapcar (lambda (arg) (%eval arg env))
-                               (cdr exp)))
-                 (h *applyhook*))
-             (if (or (null h)
-                     (eq h (load-time-value #'funcall t))
-                     (eq h 'funcall))
-                 (apply f args)
-               (funcall h f args)))))
-    ;; CLHS 3.1.2.1.2 Conses as Forms
-    (let ((fname (car exp)))
-      ;; CLHS 3.1.2.1.2.4 Lambda Forms
-      (cond ((eq fname 'setq)
-             (eval-setq (cdr exp) env nil)) ; SEXPR = nil
-            ((typep fname '(cons (eql lambda)))
-             ;; It should be possible to avoid consing a function,
-             ;; but this syntax isn't common enough to matter.
-             (apply-it (locally (declare (notinline %%eval))
-                                (%%eval `(function ,fname) env))))
-            ((not (symbolp fname))
-             (ip-error "Invalid function name: ~S" fname))
-            (t
-             ;; CLHS 3.1.2.1.2.1 Special Forms
-             ;; Pick off special forms first for speed. Special operators
-             ;; can't be shadowed by local defs.
-             (let ((fdefn (sb-impl::symbol-fdefn fname)))
-               (acond
-                ((and fdefn (!special-form-handler fdefn))
-                 (funcall (truly-the function (car it)) (cdr exp) env))
-                (t
-                 ;; Everything else: macros and functions.
-                 (multiple-value-bind (fn macro-p) (get-function (car exp) env)
-                   (if macro-p
-                       (%eval (funcall (valid-macroexpand-hook) fn exp env) env)
-                       (apply-it fn)))))))))))
 
 (defparameter *eval-level* -1)
 (defparameter *eval-verbose* nil)
 
 (defun %eval (exp env)
   (incf *eval-calls*)
-  ;; Binding *EVAL-LEVEL* inhibits tail-call, so try to avoid it
-  (if *eval-verbose*
-      (let ((*eval-level* (1+ *eval-level*)))
-        (let ((*print-circle* t))
-          (format t "~&~vA~S~%" *eval-level* "" `(%eval ,exp)))
-        (%%eval exp env))
-      (%%eval exp env)))
+  (labels
+      ((%%eval ()
+         (cond
+          ((symbolp exp)
+           ;; CLHS 3.1.2.1.1 Symbols as Forms
+           (binding* (((val expanded-p type) (expand-or-eval-symbol env exp))
+                      (eval-val (if expanded-p (%eval val env) val)))
+             (when (and type (not (itypep eval-val type)))
+               (typecheck-fail/ref exp eval-val type))
+             eval-val))
+          ;; CLHS 3.1.2.1.3 Self-Evaluating Objects
+          ;; We can save a few instructions vs. testing ATOM
+          ;; because SYMBOLP was already picked off.
+          ((not (listp exp))
+           exp)
+          (t
+           ;; CLHS 3.1.2.1.2 Conses as Forms
+           (let ((fname (car exp)))
+             ;; CLHS 3.1.2.1.2.4 Lambda Forms
+             (cond ((eq fname 'setq)
+                    (eval-setq (cdr exp) env nil)) ; SEXPR = nil
+                   ((typep fname '(cons (eql lambda)))
+                    ;; It should be possible to avoid consing a function,
+                    ;; but this syntax isn't common enough to matter.
+                    (apply-it (funcall (if (must-freeze-p env) #'enclose-freeze #'enclose)
+                                       (make-proto-fn fname) env nil)))
+                   ((not (symbolp fname))
+                    (ip-error "Invalid function name: ~S" fname))
+                   (t
+                    ;; CLHS 3.1.2.1.2.1 Special Forms
+                    ;; Pick off special forms first for speed. Special operators
+                    ;; can't be shadowed by local defs.
+                    (let ((fdefn (sb-impl::symbol-fdefn fname)))
+                      (acond
+                       ((and fdefn (!special-form-handler fdefn))
+                        (funcall (truly-the function (car it)) (cdr exp) env))
+                       (t
+                        ;; Everything else: macros and functions.
+                        (multiple-value-bind (fn macro-p) (get-function (car exp) env)
+                          (if macro-p
+                              (%eval (funcall (valid-macroexpand-hook) fn exp env) env)
+                              (apply-it fn))))))))))))
+       (apply-it (f)
+         (let ((args (mapcar (lambda (arg) (%eval arg env)) (cdr exp)))
+               (h *applyhook*))
+           (if (or (null h)
+                   (eq h (load-time-value #'funcall t))
+                   (eq h 'funcall))
+               (apply f args)
+               (funcall h f args)))))
+    ;; Binding *EVAL-LEVEL* inhibits tail-call, so try to avoid it
+    (if *eval-verbose*
+        (let ((*eval-level* (1+ *eval-level*)))
+          (let ((*print-circle* t))
+            (format t "~&~vA~S~%" *eval-level* "" `(%eval ,exp)))
+          (%%eval))
+        (%%eval))))
 
 ;; DIGEST-FORM both "digests" and EVALs a form.
 ;; It should stash an optimized handler into the SEXPR so that DIGEST-FORM
