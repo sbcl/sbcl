@@ -16,6 +16,8 @@
 (defvar *assem-scheduler-p* nil)
 (declaim (type boolean *assem-scheduler-p*))
 
+(defvar *assem-instructions* (make-hash-table))
+
 (defvar *assem-max-locations* 0)
 (declaim (type index *assem-max-locations*))
 
