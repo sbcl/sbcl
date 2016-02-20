@@ -635,18 +635,9 @@ static void
 free_thread_struct(struct thread *th)
 {
 #if defined(LISP_FEATURE_WIN32)
-    if (th->interrupt_data) {
-        os_invalidate_free((os_vm_address_t) th->interrupt_data,
-                      (sizeof (struct interrupt_data)));
-    }
-    os_invalidate_free((os_vm_address_t) th->os_address,
-                  THREAD_STRUCT_SIZE);
+    os_invalidate_free((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
 #else
-    if (th->interrupt_data)
-        os_invalidate((os_vm_address_t) th->interrupt_data,
-                      (sizeof (struct interrupt_data)));
-    os_invalidate((os_vm_address_t) th->os_address,
-                  THREAD_STRUCT_SIZE);
+    os_invalidate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
 #endif
 }
 
@@ -727,11 +718,12 @@ create_thread_struct(lispobj initial_function) {
     
     struct nonpointer_thread_data *nonpointer_data
       = (void *) &per_thread->dynamic_values[TLS_SIZE];
-    th->os_attr=&nonpointer_data->os_attr;
+    th->os_attr = &nonpointer_data->os_attr;
+    th->interrupt_data = &nonpointer_data->interrupt_data;
 # ifndef LISP_FEATURE_SB_SAFEPOINT
-    th->state_sem=&nonpointer_data->state_sem;
-    th->state_not_running_sem=&nonpointer_data->state_not_running_sem;
-    th->state_not_stopped_sem=&nonpointer_data->state_not_stopped_sem;
+    th->state_sem = &nonpointer_data->state_sem;
+    th->state_not_running_sem = &nonpointer_data->state_not_running_sem;
+    th->state_not_stopped_sem = &nonpointer_data->state_not_stopped_sem;
     os_sem_init(th->state_sem, 1);
     os_sem_init(th->state_not_running_sem, 0);
     os_sem_init(th->state_not_stopped_sem, 0);
@@ -812,17 +804,6 @@ create_thread_struct(lispobj initial_function) {
     access_control_stack_pointer(th)=th->control_stack_start;
 #endif
 
-#if defined(LISP_FEATURE_WIN32)
-    th->interrupt_data = (struct interrupt_data *)
-        calloc((sizeof (struct interrupt_data)),1);
-#else
-    th->interrupt_data = (struct interrupt_data *)
-        os_validate(0,(sizeof (struct interrupt_data)));
-#endif
-    if (!th->interrupt_data) {
-        free_thread_struct(th);
-        return 0;
-    }
     th->interrupt_data->pending_handler = 0;
     th->interrupt_data->gc_blocked_deferrables = 0;
 #ifdef GENCGC_IS_PRECISE
