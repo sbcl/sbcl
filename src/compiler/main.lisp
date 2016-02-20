@@ -643,14 +643,15 @@ necessary, since type inference may take arbitrarily long to converge.")
           (maybe-mumble "code ")
           (multiple-value-bind (code-length fixup-notes)
               (generate-code component)
-
-            #-sb-xc-host
-            (when *compiler-trace-output*
-              (format *compiler-trace-output*
-                      "~|~%disassembly of code for ~S~2%" component)
-              (sb!disassem:disassemble-assem-segment *code-segment*
-                                                     *compiler-trace-output*))
-
+            ;; FIXME: The disassembler now compiles printer functions
+            ;; on demand and invoking the compiler from with the
+            ;; compiler is not going to end up well.
+            ;; #-sb-xc-host
+            ;; (when *compiler-trace-output*
+            ;;   (format *compiler-trace-output*
+            ;;           "~|~%disassembly of code for ~S~2%" component)
+            ;;   (sb!disassem:disassemble-assem-segment *code-segment*
+            ;;                                          *compiler-trace-output*))
             (etypecase *compile-object*
               (fasl-output
                (maybe-mumble "fasl")
