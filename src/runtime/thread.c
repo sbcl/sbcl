@@ -261,7 +261,6 @@ schedule_thread_post_mortem(struct thread *corpse)
 {
     pthread_detach(pthread_self());
     gc_assert(!pthread_attr_destroy(corpse->os_attr));
-    free(corpse->os_attr);
 #if defined(LISP_FEATURE_WIN32)
     os_invalidate_free(corpse->os_address, THREAD_STRUCT_SIZE);
 #else
@@ -315,7 +314,6 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
             lose("Error calling pthread_attr_destroy in perform_thread_post_mortem:\n%s",
                  strerror(result));
         }
-        free(post_mortem->os_attr);
         os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
         free(post_mortem);
     }
@@ -726,15 +724,11 @@ create_thread_struct(lispobj initial_function) {
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-    /* Contrary to the "allocate all the spaces at once" comment above,
-     * the os_attr is allocated separately.  We cannot put it into the
-     * nonpointer data, because it's used for post_mortem and freed
-     * separately */
-    th->os_attr=malloc(sizeof(pthread_attr_t));
-# ifndef LISP_FEATURE_SB_SAFEPOINT
+    
     struct nonpointer_thread_data *nonpointer_data
       = (void *) &per_thread->dynamic_values[TLS_SIZE];
-
+    th->os_attr=&nonpointer_data->os_attr;
+# ifndef LISP_FEATURE_SB_SAFEPOINT
     th->state_sem=&nonpointer_data->state_sem;
     th->state_not_running_sem=&nonpointer_data->state_not_running_sem;
     th->state_not_stopped_sem=&nonpointer_data->state_not_stopped_sem;

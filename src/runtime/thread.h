@@ -105,6 +105,7 @@ struct nonpointer_thread_data
     os_sem_t state_not_running_sem;
     os_sem_t state_not_stopped_sem;
 #endif
+    pthread_attr_t os_attr;
 };
 
 extern struct thread *all_threads;
