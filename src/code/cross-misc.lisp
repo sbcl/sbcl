@@ -195,3 +195,6 @@
 (defun sb!impl::split-seconds-for-sleep (&rest args)
   (declare (ignore args))
   (error "Can't call SPLIT-SECONDS-FOR-SLEEP"))
+
+;;; Avoid an unknown type reference from globaldb.
+(deftype fdefn () '(satisfies fdefn-p))

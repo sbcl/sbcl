@@ -294,3 +294,15 @@ the stack without triggering overflow protection.")
 ;;; Set this to NIL to inhibit assembly-level optimization. (For
 ;;; compiler debugging, rather than policy control.)
 (defvar *assembly-optimize* t)
+
+(in-package "SB!ALIEN")
+
+;;; Information describing a heap-allocated alien.
+(def!struct (heap-alien-info
+             (:make-load-form-fun sb!kernel:just-dump-it-normally))
+  ;; The type of this alien.
+  (type (missing-arg) :type alien-type)
+  ;; Its name.
+  (alien-name (missing-arg) :type simple-string)
+  ;; Data or code?
+  (datap (missing-arg) :type boolean))

@@ -139,21 +139,9 @@
   ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
   `(!%define-info-type
            ,category ,kind ',type-spec
-           ,(cond ((eq type-spec 't) '#'identity)
-                  ;; evil KLUDGE to avoid "undefined type" warnings
-                  ;; when building the cross-compiler.
-                  #+sb-xc-host
-                  ((member type-spec
-                           '((or fdefn null)
-                             (or alien-type null) (or heap-alien-info null))
-                           :test 'equal)
-                   `(lambda (x)
-                      (declare (notinline typep))
-                      (if (typep x ',type-spec)
-                          x
-                          (error "~S is not a ~S" x ',type-spec))))
-                  (t
-                   `(named-lambda "check-type" (x) (the ,type-spec x))))
+           ,(if (eq type-spec 't)
+                '#'identity
+                `(named-lambda "check-type" (x) (the ,type-spec x)))
            ,validate-function ,default
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
            ,(or (and (eq category :function) (eq kind :definition)

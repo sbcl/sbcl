@@ -375,15 +375,6 @@
 
 ;;; HEAP-ALIEN-INFO -- defstruct.
 ;;;
-;;; Information describing a heap-allocated alien.
-(def!struct (heap-alien-info
-             (:make-load-form-fun sb!kernel:just-dump-it-normally))
-  ;; The type of this alien.
-  (type (missing-arg) :type alien-type)
-  ;; Its name.
-  (alien-name (missing-arg) :type simple-string)
-  ;; Data or code?
-  (datap (missing-arg) :type boolean))
 (def!method print-object ((info heap-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (funcall (formatter "~S ~S~@[ (data)~]")
