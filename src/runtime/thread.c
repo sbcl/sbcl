@@ -452,12 +452,6 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
     os_sem_destroy(th->state_not_stopped_sem);
 #endif
 
-#if defined(LISP_FEATURE_WIN32)
-    free((os_vm_address_t)th->interrupt_data);
-#else
-    os_invalidate((os_vm_address_t)th->interrupt_data,
-                  (sizeof (struct interrupt_data)));
-#endif
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     mach_lisp_thread_destroy(th);
