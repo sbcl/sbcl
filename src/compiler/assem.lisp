@@ -194,7 +194,7 @@
   ;; branch delay slot.
   variable-length)
 
-(def!struct (instruction
+(defstruct (instruction
             (:include sset-element)
             (:conc-name inst-)
             (:constructor make-instruction (number emitter attributes delay))
@@ -226,7 +226,7 @@
   (read-dependents (make-sset) :type sset))
 #!+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
 #!+sb-show-assem (defvar *next-inst-id* 0)
-(sb!int:def!method print-object ((inst instruction) stream)
+(defmethod print-object ((inst instruction) stream)
   (print-unreadable-object (inst stream :type t :identity t)
     #!+sb-show-assem
     (princ (or (gethash inst *inst-ids*)
@@ -684,7 +684,7 @@
 ;;;; structure used during output emission
 
 ;;; a constraint on how the output stream must be aligned
-(def!struct (alignment-note (:include annotation)
+(defstruct (alignment-note (:include annotation)
                             (:conc-name alignment-)
                             (:predicate alignment-p)
                             (:constructor make-alignment (bits size pattern))
@@ -700,7 +700,7 @@
 
 ;;; a reference to someplace that needs to be back-patched when
 ;;; we actually know what label positions, etc. are
-(def!struct (back-patch (:include annotation)
+(defstruct (back-patch (:include annotation)
                         (:constructor make-back-patch (size fun))
                         (:copier nil))
   ;; the area affected by this back-patch
@@ -712,7 +712,7 @@
 ;;; amount of stuff output depends on label positions, etc.
 ;;; BACK-PATCHes can't change their mind about how much stuff to emit,
 ;;; but CHOOSERs can.
-(def!struct (chooser (:include annotation)
+(defstruct (chooser (:include annotation)
                      (:constructor make-chooser
                                    (size alignment maybe-shrink worst-case-fun))
                      (:copier nil))
@@ -731,7 +731,7 @@
 
 ;;; This is used internally when we figure out a chooser or alignment
 ;;; doesn't really need as much space as we initially gave it.
-(def!struct (filler (:include annotation)
+(defstruct (filler (:include annotation)
                     (:constructor make-filler (bytes))
                     (:copier nil))
   ;; the number of bytes of filler here

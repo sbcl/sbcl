@@ -254,7 +254,7 @@
   (fun (missing-arg) :type function)
   (before-address nil :type (member t nil)))
 
-(def!method print-object ((seg segment) stream)
+(defmethod print-object ((seg segment) stream)
   (print-unreadable-object (seg stream :type t)
     (let ((addr (sb!sys:sap-int (funcall (seg-sap-maker seg)))))
       (format stream "#X~X..~X[~W]~:[ (#X~X)~;~*~]~@[ in ~S~]"

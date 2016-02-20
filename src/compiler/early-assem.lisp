@@ -28,43 +28,43 @@
 ;;; ASSEMBLY-UNIT-BITS -- the number of bits in the minimum assembly
 ;;; unit, (also referred to as a ``byte''). Hopefully, different
 ;;; instruction sets won't require changing this.
-(def!constant assembly-unit-bits 8)
-(def!constant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))
+(defconstant assembly-unit-bits 8)
+(defconstant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))
 
-(def!type assembly-unit ()
+(deftype assembly-unit ()
   `(unsigned-byte ,assembly-unit-bits))
 
 ;;; Some functions which accept assembly units can meaningfully accept
 ;;; signed values with the same number of bits and silently munge them
 ;;; into appropriate unsigned values. (This is handy behavior e.g.
 ;;; when assembling branch instructions on the X86.)
-(def!type possibly-signed-assembly-unit ()
+(deftype possibly-signed-assembly-unit ()
   `(or assembly-unit
        (signed-byte ,assembly-unit-bits)))
 
 ;;; the maximum alignment we can guarantee given the object format. If
 ;;; the loader only loads objects 8-byte aligned, we can't do any
 ;;; better then that ourselves.
-(def!constant max-alignment sb!vm:n-lowtag-bits)
+(defconstant max-alignment sb!vm:n-lowtag-bits)
 
-(def!type alignment ()
+(deftype alignment ()
   `(integer 0 ,max-alignment))
 
 ;;; common supertype for all the different kinds of annotations
-(def!struct (annotation (:constructor nil)
+(defstruct (annotation (:constructor nil)
                         (:copier nil))
   ;; Where in the raw output stream was this annotation emitted?
   (index 0 :type index)
   ;; What position does that correspond to?
   (posn nil :type (or index null)))
 
-(def!struct (label (:include annotation)
+(defstruct (label (:include annotation)
                    (:constructor gen-label ())
                    (:copier nil))
   ;; (doesn't need any additional information beyond what is in the
   ;; annotation structure)
   )
-(sb!int:def!method print-object ((label label) stream)
+(defmethod print-object ((label label) stream)
   (if (or *print-escape* *print-readably*)
       (print-unreadable-object (label stream :type t)
         (prin1 (sb!c:label-id label) stream))

@@ -13,7 +13,7 @@
 
 ;;; types and defaults
 
-(def!constant label-column-width 7)
+(defconstant label-column-width 7)
 
 (deftype text-width () '(integer 0 1000))
 (deftype alignment () '(integer 0 64))
@@ -22,7 +22,7 @@
 (deftype disassem-length () '(unsigned-byte 24))
 (deftype column () '(integer 0 1000))
 
-(def!constant max-filtered-value-index 32)
+(defconstant max-filtered-value-index 32)
 (deftype filtered-value-index ()
   `(integer 0 (,max-filtered-value-index)))
 (deftype filtered-value-vector ()
@@ -83,15 +83,15 @@
                  dchunk=
                  dchunk-count-bits))
 
-(def!constant dchunk-bits #.sb!vm:n-word-bits)
+(defconstant dchunk-bits sb!vm:n-word-bits)
 
 (deftype dchunk ()
   `(unsigned-byte ,dchunk-bits))
 (deftype dchunk-index ()
   `(integer 0 ,dchunk-bits))
 
-(def!constant dchunk-zero 0)
-(def!constant dchunk-one #.(1- (expt 2 sb!vm:n-word-bits)))
+(defconstant dchunk-zero 0)
+(defconstant dchunk-one (1- (expt 2 sb!vm:n-word-bits)))
 
 (defun dchunk-extract (chunk byte-spec)
   (declare (type dchunk chunk))
@@ -217,7 +217,7 @@
   ;; instructions that are the same as this instruction but with more
   ;; constraints
   (specializers nil :type list))
-(def!method print-object ((inst instruction) stream)
+(defmethod print-object ((inst instruction) stream)
   (print-unreadable-object (inst stream :type t :identity t)
     (format stream "~A(~A)" (inst-name inst) (inst-format-name inst))))
 
@@ -228,7 +228,7 @@
                        (:copier nil))
   (valid-mask dchunk-zero :type dchunk) ; applies to *children*
   (choices nil :type list))
-(def!method print-object ((ispace inst-space) stream)
+(defmethod print-object ((ispace inst-space) stream)
   (print-unreadable-object (ispace stream :type t :identity t)))
 
 ;;; now that we've defined the structure, we can declaim the type of
@@ -1200,7 +1200,7 @@
 
   ;; currently active source variables
   (current-valid-locations nil :type (or null (vector bit))))
-(def!method print-object ((dstate disassem-state) stream)
+(defmethod print-object ((dstate disassem-state) stream)
   (print-unreadable-object (dstate stream :type t)
     (format stream
             "+~W~@[ in ~S~]"
