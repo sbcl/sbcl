@@ -238,25 +238,10 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
                               void (*handler)(int, siginfo_t *, void *))
 {
 
-    /* CLH: FIXME **NOTE: HACK ALERT!** Ideally, we would allocate
-     * context and regs on the stack as local variables, but this
-     * causes problems for the lisp debugger. When it walks the stack
-     * for a back trace, it sees the 1) address of the local variable
-     * on the stack and thinks that is a frame pointer to a lisp
-     * frame, and, 2) the address of the sap that we alloc'ed in
-     * dynamic space and thinks that is a return address, so it,
-     * heuristicly (and wrongly), chooses that this should be
-     * interpreted as a lisp frame instead of as a C frame.
-     * We can work around this in this case by os_validating the
-     * context (and regs just for symmetry).
-     */
+    os_context_t context;
+    _STRUCT_MCONTEXT32 regs;
 
-    os_context_t *context;
-    mcontext_t *regs;
-
-    context = (os_context_t*) os_validate(0, sizeof(os_context_t));
-    regs = (mcontext_t*) os_validate(0, sizeof(mcontext_t));
-    context->uc_mcontext = regs;
+    context.uc_mcontext = &regs;
 
     /* when BSD signals are fired, they mask they signals in sa_mask
        which always seem to be the blockable_sigset, for us, so we
@@ -265,17 +250,13 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
        2) block blockable signals
        3) call the signal handler
        4) restore the sigmask */
-
-    build_fake_signal_context(context, thread_state, float_state);
+    build_fake_signal_context(&context, thread_state, float_state);
 
     block_blockable_signals(0, 0);
 
-    handler(signal, siginfo, context);
+    handler(signal, siginfo, &context);
 
-    update_thread_state_from_context(thread_state, float_state, context);
-
-    os_invalidate((os_vm_address_t)context, sizeof(os_context_t));
-    os_invalidate((os_vm_address_t)regs, sizeof(mcontext_t));
+    update_thread_state_from_context(thread_state, float_state, &context);
 
     /* Trap to restore the signal context. */
     asm volatile (".long 0xffff0b0f"
