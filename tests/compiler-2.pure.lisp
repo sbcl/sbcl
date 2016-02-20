@@ -121,5 +121,5 @@
                        (make-a-foo-1 :a 'wat :b 3)))))
     (assert (not (ctu:find-named-callees f)))))
 
-(with-test (:name :internal-name-p)
+(with-test (:name :internal-name-p :skipped-on :sb-xref-for-internals)
   (assert (sb-c::internal-name-p 'sb-int:neq)))
