@@ -541,24 +541,25 @@
   (:generator 3
     (let ((err-lab
            (generate-error-code vop 'invalid-arg-count-error)))
-      (flet ((load-immediate (x)
-               (add-sub-immediate (fixnumize x))))
+      (labels ((load-immediate (x)
+                 (add-sub-immediate (fixnumize x)))
+               (check-min ()
+                 (cond ((= min 1)
+                        (inst cbz nargs err-lab))
+                       ((plusp min)
+                        (inst cmp nargs (load-immediate min))
+                        (inst b :lo err-lab)))))
         (cond ((eql max 0)
                (inst cbnz nargs err-lab))
               ((not min)
                (inst cmp nargs (load-immediate max))
                (inst b :ne err-lab))
-             (max
-              (when (plusp min)
-                (inst cmp nargs (load-immediate min))
-                (inst b :lo err-lab))
-              (inst cmp nargs (load-immediate max))
-              (inst b :hi err-lab))
-             ((eql min 1)
-              (inst cbz nargs err-lab))
-             ((plusp min)
-              (inst cmp nargs (load-immediate min))
-              (inst b :lo err-lab)))))))
+              (max
+               (check-min)
+               (inst cmp nargs (load-immediate max))
+               (inst b :hi err-lab))
+              (t
+               (check-min)))))))
 
 ;;;; Local call with unknown values convention return:
 

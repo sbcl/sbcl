@@ -1311,21 +1311,26 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
-    (let ((err-lab (generate-error-code vop 'invalid-arg-count-error)))
-      (cond ((not min)
-             (if (zerop max)
-                 (inst test nargs nargs)
-                 (inst cmp nargs (fixnumize max)))
-             (inst jmp :ne err-lab))
-            (max
-             (when (plusp min)
-               (inst cmp nargs (fixnumize min))
-               (inst jmp :b err-lab))
-             (inst cmp nargs (fixnumize max))
-             (inst jmp :a err-lab))
-            ((plusp min)
-             (inst cmp nargs (fixnumize min))
-             (inst jmp :b err-lab))))))
+    (let ((err-lab
+            (generate-error-code vop 'invalid-arg-count-error nargs)))
+      (flet ((check-min ()
+               (cond ((= min 1)
+                      (inst test nargs nargs)
+                      (inst jmp :e err-lab))
+                     ((plusp min)
+                      (inst cmp nargs (fixnumize min))
+                      (inst jmp :b err-lab)))))
+        (cond ((not min)
+               (if (zerop max)
+                   (inst test nargs nargs)
+                   (inst cmp nargs (fixnumize max)))
+               (inst jmp :ne err-lab))
+              (max
+               (check-min)
+               (inst cmp nargs (fixnumize max))
+               (inst jmp :a err-lab))
+              (t
+               (check-min)))))))
 
 ;; Signal an error about an untagged number.
 ;; These are pretty much boilerplate and could be generic except:
