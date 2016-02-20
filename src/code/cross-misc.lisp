@@ -14,11 +14,6 @@
 
 ;;; Forward declarations
 
-#!+sb-fasteval
-(declaim (ftype function
-                sb!interpreter::interpreted-function-proto-fn
-                sb!interpreter::interpreted-function-env))
-
 ;;; In correct code, TRULY-THE has only a performance impact and can
 ;;; be safely degraded to ordinary THE.
 (defmacro truly-the (type expr)
