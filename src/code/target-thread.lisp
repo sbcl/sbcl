@@ -1595,7 +1595,7 @@ supplied, return two values: 1) DEFAULT 2) :TIMEOUT. If DEFAULT is not
 supplied, signal a JOIN-THREAD-ERROR with JOIN-THREAD-PROBLEM equal
 to :TIMEOUT.
 
-If THREAD did not exit normally (i.e. aborted) and DEFAULT is
+If THREAD does not exit normally (i.e. aborted) and DEFAULT is
 supplied, return two values: 1) DEFAULT 2) :ABORT. If DEFAULT is not
 supplied, signal a JOIN-THREAD-ERROR with JOIN-THREAD-PROBLEM equal
 to :ABORT.
@@ -1603,8 +1603,8 @@ to :ABORT.
 If THREAD is the current thread, signal a JOIN-THREAD-ERROR with
 JOIN-THREAD-PROBLEM equal to :SELF-JOIN.
 
-Trying to join the main thread will cause JOIN-THREAD to block until
-TIMEOUT occurs or the process exits: when main thread exits, the
+Trying to join the main thread causes JOIN-THREAD to block until
+TIMEOUT occurs or the process exits: when the main thread exits, the
 entire process exits.
 
 NOTE: Return convention in case of a timeout is experimental and

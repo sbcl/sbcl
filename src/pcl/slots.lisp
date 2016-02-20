@@ -493,7 +493,7 @@
       (cons
        (car position))))))
 
-;;; FIXME: AMOP says that allocate-instance imples finalize-inheritance
+;;; FIXME: AMOP says that allocate-instance implies finalize-inheritance
 ;;; if the class is not yet finalized, but we don't seem to be taking
 ;;; care of this for non-standard-classes.
 (defmethod allocate-instance ((class standard-class) &rest initargs)
