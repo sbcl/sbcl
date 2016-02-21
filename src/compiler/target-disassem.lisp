@@ -518,8 +518,7 @@
     (rewind-current-segment dstate segment)
 
     (loop
-      (when (>= (dstate-cur-offs dstate)
-                (seg-opcodes-length (dstate-segment dstate)))
+      (when (>= (dstate-cur-offs dstate) (seg-length (dstate-segment dstate)))
         ;; done!
         (when (and stream (> prefix-len 0))
           (pad-inst-column stream prefix-len)
@@ -1084,7 +1083,6 @@
           (%make-segment
            :sap-maker sap-maker
            :length length
-           :opcodes-length length
            :virtual-location (or virtual-location
                                  (sb!sys:sap-int (funcall sap-maker)))
            :hooks hooks

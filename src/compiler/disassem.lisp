@@ -1116,10 +1116,6 @@
              :type (function () sb!sys:system-area-pointer))
   ;; Length in bytes of the range of memory covered by this segment.
   (length 0 :type disassem-length)
-  ;; Length of the memory range excluding any trailing untagged data.
-  ;; Defaults to 'length' but could be shorter.
-  ;; FIXME: can opcodes-length really be shorter? Nothing ever alters it.
-  (opcodes-length 0 :type disassem-length)
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   ;; KLUDGE: CODE-COMPONENT is not a type the host understands
