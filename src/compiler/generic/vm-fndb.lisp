@@ -153,7 +153,8 @@
 (defknown %instance-ref (instance index) t
   (flushable always-translatable))
 (defknown %instance-set (instance index t) t
-  (always-translatable))
+  (always-translatable)
+  :derive-type #'result-type-last-arg)
 (defknown %layout-invalid-error (t layout) nil)
 
 #!+(or x86 x86-64)
@@ -162,29 +163,34 @@
 (defknown %raw-instance-ref/word (instance index) sb!vm:word
   (flushable always-translatable))
 (defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
-  (always-translatable))
+  (always-translatable)
+  :derive-type #'result-type-last-arg)
 (defknown %raw-instance-ref/single (instance index) single-float
   (flushable always-translatable))
 (defknown %raw-instance-set/single (instance index single-float) single-float
-  (always-translatable))
+  (always-translatable)
+  :derive-type #'result-type-last-arg)
 (defknown %raw-instance-ref/double (instance index) double-float
   (flushable always-translatable))
 (defknown %raw-instance-set/double (instance index double-float) double-float
-  (always-translatable))
+  (always-translatable)
+  :derive-type #'result-type-last-arg)
 (defknown %raw-instance-ref/complex-single (instance index)
   (complex single-float)
   (flushable always-translatable))
 (defknown %raw-instance-set/complex-single
     (instance index (complex single-float))
   (complex single-float)
-  (always-translatable))
+  (always-translatable)
+  :derive-type #'result-type-last-arg)
 (defknown %raw-instance-ref/complex-double (instance index)
   (complex double-float)
   (flushable always-translatable))
 (defknown %raw-instance-set/complex-double
     (instance index (complex double-float))
   (complex double-float)
-  (always-translatable))
+  (always-translatable)
+  :derive-type #'result-type-last-arg)
 
 #!+compare-and-swap-vops
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
