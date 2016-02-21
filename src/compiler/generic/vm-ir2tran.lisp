@@ -242,10 +242,21 @@
              #!+x86-64
              index))
       (let ((setter (compute-setter))
-            (length (length initial-contents)))
+            (length (length initial-contents))
+            (dx-p (and lvar
+                       (lvar-dynamic-extent lvar)))
+            (character (eq (primitive-type-name elt-ptype)
+                           'character)))
         (dotimes (i length)
-          (emit-move node block (lvar-tn node block (pop initial-contents)) tmp)
-          (funcall setter (tnify i) tmp))))
+          (let ((value (pop initial-contents)))
+            ;; dynamic-space is already zeroed
+            (unless (and (not dx-p)
+                         (constant-lvar-p value)
+                         (if character
+                             (eql (char-code (lvar-value value)) 0)
+                             (eql (lvar-value value) 0)))
+              (emit-move node block (lvar-tn node block value) tmp)
+              (funcall setter (tnify i) tmp))))))
     (move-lvar-result node block locs lvar)))
 
 ;;; :SET-TRANS (in objdef.lisp !DEFINE-PRIMITIVE-OBJECT) doesn't quite
