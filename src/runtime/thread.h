@@ -100,12 +100,14 @@ union per_thread_data {
  * pointers can be later shoved into the thread struct. */
 struct nonpointer_thread_data
 {
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_SAFEPOINT)
+#ifdef LISP_FEATURE_SB_THREAD
+    pthread_attr_t os_attr;
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     os_sem_t state_sem;
     os_sem_t state_not_running_sem;
     os_sem_t state_not_stopped_sem;
 #endif
-    pthread_attr_t os_attr;
+#endif
     struct interrupt_data interrupt_data;
 };
 

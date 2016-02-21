@@ -708,12 +708,13 @@ create_thread_struct(lispobj initial_function) {
     th->csp_around_foreign_call = csp_page;
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
-    
     struct nonpointer_thread_data *nonpointer_data
       = (void *) &per_thread->dynamic_values[TLS_SIZE];
-    th->os_attr = &nonpointer_data->os_attr;
+
     th->interrupt_data = &nonpointer_data->interrupt_data;
+
+#ifdef LISP_FEATURE_SB_THREAD
+    th->os_attr = &nonpointer_data->os_attr;
 # ifndef LISP_FEATURE_SB_SAFEPOINT
     th->state_sem = &nonpointer_data->state_sem;
     th->state_not_running_sem = &nonpointer_data->state_not_running_sem;
