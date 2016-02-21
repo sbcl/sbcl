@@ -499,6 +499,20 @@
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc (sc-number-or-lose 'immediate)))
+
+(defun encode-value-if-immediate (tn &optional (tag t))
+  (if (sc-is tn immediate)
+      (let ((val (tn-value tn)))
+        (etypecase val
+          (integer (if tag
+                       (fixnumize val)
+                       val))
+          (symbol (+ nil-value (static-symbol-offset val)))
+          (character (if tag
+                         (logior (ash (char-code val) n-widetag-bits)
+                                 character-widetag)
+                         (char-code val)))))
+      tn))
 
 ;;;; miscellaneous function call parameters
 

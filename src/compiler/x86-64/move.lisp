@@ -25,17 +25,7 @@
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))
-  (let ((val (tn-value x)))
-    (etypecase val
-      (integer
-       (if (zerop val)
-           (zeroize y)
-         (inst mov y (fixnumize val))))
-      (symbol
-       (load-symbol y val))
-      (character
-       (inst mov y (logior (ash (char-code val) n-widetag-bits)
-                           character-widetag))))))
+  (move-immediate y (encode-value-if-immediate x)))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
@@ -87,15 +77,7 @@
   (:generator 0
     (if (and (sc-is x immediate)
              (sc-is y any-reg descriptor-reg control-stack))
-        (let ((val (tn-value x)))
-          (etypecase val
-            (integer
-             (move-immediate y (fixnumize val) temp))
-            (symbol
-             (inst mov y (+ nil-value (static-symbol-offset val))))
-            (character
-             (inst mov y (logior (ash (char-code val) n-widetag-bits)
-                                 character-widetag)))))
+        (move-immediate y (encode-value-if-immediate x) temp)
         (move y x))))
 
 (define-move-vop move :move
@@ -137,49 +119,15 @@
     (sc-case y
       ((any-reg descriptor-reg)
        (if (sc-is x immediate)
-           (let ((val (tn-value x)))
-             (etypecase val
-               ((integer 0 0)
-                (zeroize y))
-               (integer
-                (inst mov y (fixnumize val)))
-               (symbol
-                (load-symbol y val))
-               (character
-                (inst mov y (logior (ash (char-code val) n-widetag-bits)
-                                    character-widetag)))))
+           (inst mov y (encode-value-if-immediate x))
            (move y x)))
       ((control-stack)
-       (if (sc-is x immediate)
-           (let ((val (tn-value x)))
-             (if (= (tn-offset fp) esp-offset)
-                 ;; C-call
-                 (etypecase val
-                   (integer
-                    (storew (fixnumize val) fp (tn-offset y)))
-                   (symbol
-                    (storew (+ nil-value (static-symbol-offset val))
-                            fp (tn-offset y)))
-                   (character
-                    (storew (logior (ash (char-code val) n-widetag-bits)
-                                    character-widetag)
-                            fp (tn-offset y))))
-               ;; Lisp stack
-               (etypecase val
-                 (integer
-                  (storew (fixnumize val) fp (frame-word-offset (tn-offset y))))
-                 (symbol
-                  (storew (+ nil-value (static-symbol-offset val))
-                          fp (frame-word-offset (tn-offset y))))
-                 (character
-                  (storew (logior (ash (char-code val) n-widetag-bits)
-                                  character-widetag)
-                          fp (frame-word-offset (tn-offset y)))))))
-         (if (= (tn-offset fp) esp-offset)
-             ;; C-call
-             (storew x fp (tn-offset y))
+       (if (= (tn-offset fp) esp-offset)
+           ;; C-call
+           (storew (encode-value-if-immediate x) fp (tn-offset y))
            ;; Lisp stack
-           (storew x fp (frame-word-offset (tn-offset y)))))))))
+           (storew (encode-value-if-immediate x) fp
+               (frame-word-offset (tn-offset y))))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)

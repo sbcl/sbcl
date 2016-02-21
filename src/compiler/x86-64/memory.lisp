@@ -184,19 +184,11 @@
   (:info offset)
   (:generator 4
      (if (sc-is value immediate)
-         (let ((val (tn-value value)))
-           (move-immediate (make-ea :qword :base object
-                                    :disp (- (* (+ base offset) n-word-bytes)
-                                             lowtag))
-                           (etypecase val
-                             (integer
-                              (fixnumize val))
-                             (symbol
-                              (+ nil-value (static-symbol-offset val)))
-                             (character
-                              (logior (ash (char-code val) n-widetag-bits)
-                                      character-widetag)))
-                           temp))
+         (move-immediate (make-ea :qword :base object
+                                         :disp (- (* (+ base offset) n-word-bytes)
+                                                  lowtag))
+                         (encode-value-if-immediate value)
+                         temp)
          ;; Else, value not immediate.
          (storew value object (+ base offset) lowtag))))
 

@@ -125,23 +125,11 @@
                 (let ((code (logxor 1 (conditional-opcode name))))
                   (aref *condition-name-vec* code)))
               (load-immediate (dst constant-tn
-                                   &optional (sc (sc-name (tn-sc dst))))
-                (let ((val (tn-value constant-tn)))
-                  (etypecase val
-                    (integer
-                     ;; Can't use ZEROIZE here, since XOR will affect
-                     ;; the flags.
-                     (if (memq sc '(any-reg descriptor-reg))
-                         (inst mov dst (fixnumize val))
-                         (inst mov dst val)))
-                    (symbol
-                     (aver (eq sc 'descriptor-reg))
-                     (load-symbol dst val))
-                    (character
-                     (if (eq sc 'descriptor-reg)
-                         (inst mov dst (logior (ash (char-code val) n-widetag-bits)
-                                               character-widetag))
-                         (inst mov dst (char-code val))))))))
+                               &optional (sc (sc-name (tn-sc dst))))
+                ;; Can't use ZEROIZE, since XOR will affect the flags.
+                (inst mov dst
+                      (encode-value-if-immediate constant-tn
+                                                 (memq sc '(any-reg descriptor-reg))))))
          (cond ((null (rest flags))
                 (if (sc-is else immediate)
                     (load-immediate res else)
@@ -219,43 +207,21 @@
   (:translate eq)
   (:generator 6
     (cond
-     ((sc-is y immediate)
-      (let ((val (tn-value y)))
-        (etypecase val
-          (integer
-           (if (and (zerop val) (sc-is x any-reg descriptor-reg))
-               (inst test x x) ; smaller
-             (let ((fixnumized (fixnumize val)))
-               (if (typep fixnumized
-                          '(or (signed-byte 32) (unsigned-byte 31)))
-                   (inst cmp x fixnumized)
-                 (progn
-                   (inst mov temp fixnumized)
-                   (inst cmp x temp))))))
-          (symbol
-           (inst cmp x (+ nil-value (static-symbol-offset val))))
-          (character
-           (inst cmp x (logior (ash (char-code val) n-widetag-bits)
-                               character-widetag))))))
-     ((sc-is x immediate) ; and y not immediate
-      ;; Swap the order to fit the compare instruction.
-      (let ((val (tn-value x)))
-        (etypecase val
-          (integer
-           (if (and (zerop val) (sc-is y any-reg descriptor-reg))
-               (inst test y y) ; smaller
-             (let ((fixnumized (fixnumize val)))
-               (if (typep fixnumized
-                          '(or (signed-byte 32) (unsigned-byte 31)))
-                   (inst cmp y fixnumized)
-                 (progn
-                   (inst mov temp fixnumized)
-                   (inst cmp y temp))))))
-          (symbol
-           (inst cmp y (+ nil-value (static-symbol-offset val))))
-          (character
-           (inst cmp y (logior (ash (char-code val) n-widetag-bits)
-                               character-widetag))))))
+      ((or (sc-is y immediate)
+           (sc-is x immediate))
+       (when (sc-is x immediate)
+         (rotatef x y))
+       (let ((value (encode-value-if-immediate y))
+             (immediate (immediate32-p x)))
+         (cond ((and (zerop value) (sc-is x any-reg descriptor-reg))
+                (inst test x x))
+               (immediate
+                (inst cmp x immediate))
+               ((not (sc-is x control-stack))
+                (inst cmp x (constantize value)))
+               (t
+                (inst mov temp value)
+                (inst cmp x temp)))))
       (t
        (inst cmp x y)))))
 
