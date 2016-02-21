@@ -190,13 +190,9 @@
 
 (defstruct (instruction (:conc-name inst-)
                         (:constructor
-                         make-instruction (name
-                                           format-name
-                                           print-name
-                                           length
-                                           mask id
-                                           printer
-                                           labeller prefilters control))
+                         make-instruction (name format-name print-name
+                                           length mask id %printer labeller
+                                           prefilters control))
                         (:copier nil))
   (name nil :type (or symbol string) :read-only t)
   (format-name nil :type (or symbol string) :read-only t)
@@ -211,7 +207,7 @@
   ;; disassembly "functions"
   (prefilters nil :type list)
   (labeller nil :type (or list vector))
-  (printer (missing-arg) :type (or null function))
+  (%printer nil)
   (control nil :type (or null function) :read-only t)
 
   ;; instructions that are the same as this instruction but with more
@@ -260,34 +256,9 @@
       ((or number character function) (eql a b))
       (vector (and (vectorp b) (every #'recurse a b))))))
 
-;;; Previously there were complicated checker functions which tried to attempt to
-;;; decide, given two FUNSTATEs, whether all their args were similarly used,
-;;; where "similarity" required that the prefilter and such be identical.
-;;; Instead we can just look at two sexprs and decide whether they act the same,
-;;; which is of course impossible in general; however, for this purpose,
-;;; if sexprs are EQUAL disregarding variations in gensyms, then their code
-;;; can be folded. If we miss (don't fold) things that act the same, it's ok.
-;;; N.B.: This definition of equivalence is admissible because there can be
-;;; no "interesting" non-null lexical environment. While it could be non-null,
-;;; it can't matter, because our auto-generated code can't depend on the lexenv.
-(defvar *current-instruction-flavor* nil)
-(defun generate-function (kind forms funstate code-folding-cache skeleton)
-  (let* ((sub-table (assq kind code-folding-cache))
-         (bindings (make-arg-temp-bindings funstate))
-         (guts `(let* ,bindings ,@forms)))
-    (or (cdr (assoc guts (cdr sub-table) :test #'equal-mod-gensyms))
-        (let* ((name (concatenate 'string "INST-" (string kind) "-"
-                                  (write-to-string (length sub-table))))
-               (definition
-                 (compile nil
-                   `(named-lambda ,name ,@(subst guts :body (cdr skeleton))))))
-          (push (cons guts definition) (cdr sub-table))
-          definition))))
-
 (defstruct (arg (:copier nil)
                 (:predicate nil)
                 (:constructor %make-arg (name))
-                (:constructor standard-make-arg) ; only so #S readmacro works
                 (:print-object
                  (lambda (self stream)
                    (if *print-readably*
@@ -340,17 +311,11 @@
   (or (car (assoc name funstate :key #'arg-name :test #'eq))
       (pd-error "unknown argument ~S" name)))
 
-;;;; Since we can't include some values in compiled output as they are
-;;;; (notably functions), we sometimes use a VALSRC structure to keep
-;;;; track of the source from which they were derived.
-
 ;;; machinery to provide more meaningful error messages during compilation
+(defvar *current-instruction-flavor*)
 (defun pd-error (fmt &rest args)
-  (if *current-instruction-flavor*
-      (error "~@<in printer-definition for ~S(~S): ~3I~:_~?~:>"
-             (car *current-instruction-flavor*)
-             (cdr *current-instruction-flavor*)
-             fmt args)
+  (if (boundp '*current-instruction-flavor*)
+      (error "~{A printer ~D~}: ~?" *current-instruction-flavor* fmt args)
       (apply #'error fmt args)))
 
 (defun format-or-lose (name)
@@ -695,19 +660,30 @@
            `((lookup-label ,(maybe-listify numeric-forms)))
            numeric-forms)))))
 
-(defun find-printer-fun (printer-source args cache)
-  (let ((source (preprocess-printer printer-source args))
-        (funstate (make-funstate args)))
-   (generate-function
-    :printer
-    (let ((sb!xc:*gensym-counter* 0)) (compile-printer-list source funstate))
-    funstate
-    cache
-    '(lambda (chunk inst stream dstate)
-       (declare (type dchunk chunk)
-                (type instruction inst)
-                (type stream stream)
-                (type disassem-state dstate))
+(defun find-printer-fun (printer-source args cache *current-instruction-flavor*)
+  (let* ((source (preprocess-printer printer-source args))
+         (funstate (make-funstate args))
+         (forms (let ((sb!xc:*gensym-counter* 0))
+                  (compile-printer-list source funstate)))
+         (bindings (make-arg-temp-bindings funstate))
+         (guts `(let* ,bindings ,@forms))
+         (sub-table (assq :printer cache)))
+    (or (cdr (assoc guts (cdr sub-table) :test #'equal-mod-gensyms))
+        (let ((cell (list guts)))
+          (push (cons guts cell) (cdr sub-table))
+          cell))))
+
+(defun inst-printer (inst &aux (printer (inst-%printer inst))
+                               (function (car printer)))
+  (unless (consp function) ; if not a cons, it is NIL or a function
+    (return-from inst-printer function))
+  (let
+    ((template
+     '(lambda (chunk inst stream dstate
+               &aux (chunk (truly-the dchunk chunk))
+                    (inst (truly-the instruction inst))
+                    (stream (truly-the stream stream))
+                    (dstate (truly-the disassem-state dstate)))
        (macrolet ((local-format-arg (arg fmt)
                     `(funcall (formatter ,fmt) stream ,arg)))
          (flet ((local-tab-to-arg-column ()
@@ -748,7 +724,9 @@
                             local-call-arg-printer local-call-global-printer
                             local-filtered-value local-extract
                             lookup-label adjust-label))
-           :body))))))
+           :body)))))
+   (setf (car printer)
+         (compile nil (subst function :body template)))))
 
 (defun preprocess-test (subj form args)
   (multiple-value-bind (subj test)

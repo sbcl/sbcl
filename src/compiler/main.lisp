@@ -23,7 +23,6 @@
                   *compiler-warning-count* *compiler-style-warning-count*
                   *compiler-note-count*
                   *compiler-error-bailout*
-                  #!+sb-show *compiler-trace-output*
                   *last-source-context* *last-original-source*
                   *last-source-form* *last-format-string* *last-format-args*
                   *last-message-count* *last-error-context*
@@ -643,15 +642,14 @@ necessary, since type inference may take arbitrarily long to converge.")
           (maybe-mumble "code ")
           (multiple-value-bind (code-length fixup-notes)
               (generate-code component)
-            ;; FIXME: The disassembler now compiles printer functions
-            ;; on demand and invoking the compiler from with the
-            ;; compiler is not going to end up well.
-            ;; #-sb-xc-host
-            ;; (when *compiler-trace-output*
-            ;;   (format *compiler-trace-output*
-            ;;           "~|~%disassembly of code for ~S~2%" component)
-            ;;   (sb!disassem:disassemble-assem-segment *code-segment*
-            ;;                                          *compiler-trace-output*))
+
+            #-sb-xc-host
+            (when *compiler-trace-output*
+              (format *compiler-trace-output*
+                      "~|~%disassembly of code for ~S~2%" component)
+              (sb!disassem:disassemble-assem-segment *code-segment*
+                                                     *compiler-trace-output*))
+
             (etypecase *compile-object*
               (fasl-output
                (maybe-mumble "fasl")
@@ -1894,6 +1892,11 @@ SPEED and COMPILATION-SPEED optimization values, and the
           (make-file-source-info input-pathname external-format
                                  #-sb-xc-host t)) ; can't track, no SBCL streams
          (*compiler-trace-output* nil)) ; might be modified below
+
+    (when trace-file
+      ;; Avoid calling COMPILE from disassembler within a dynamic binding
+      ;; of *COMPILER-TRACE-OUTPUT* to a non-nil value.
+      (sb!disassem::precompile-inst-printers))
 
     (unwind-protect
         (progn

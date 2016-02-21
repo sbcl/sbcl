@@ -204,6 +204,17 @@
             (print-inst-space (ischoice-subspace choice)
                               (+ 4 indent)))
           (ispace-choices inst-space)))))
+
+(defun precompile-inst-printers ()
+  (named-let recurse ((obj (get-inst-space)))
+    (etypecase obj
+      (inst-space
+       (map nil
+            (lambda (x) (recurse (ischoice-subspace x)))
+            (ispace-choices obj)))
+      (instruction
+       (inst-printer obj) ; for side-effect
+       (mapc #'recurse (inst-specializers obj))))))
 
 ;;;; (The actual disassembly part follows.)
 
@@ -722,8 +733,9 @@
       (setf (dstate-labels dstate) labels))))
 
 (defun collect-inst-variants (base-name package variants cache)
-  (mapcar
-   (lambda (printer)
+  (loop for printer in variants
+        for index from 1
+        collect
      (destructuring-bind (format-name
                           (&rest arg-constraints)
                           &optional (printer :default)
@@ -732,8 +744,7 @@
                                control)
          printer
        (declare (type (or symbol string) print-name))
-       (let* ((flavor (cons base-name format-name))
-              (format (format-or-lose format-name))
+       (let* ((format (format-or-lose format-name))
               (args (copy-list (format-args format)))
               (format-length (bytes-to-bits (format-length format))))
          (dolist (constraint arg-constraints)
@@ -749,19 +760,13 @@
            (make-instruction
                    base-name format-name print-name
                    (format-length format) mask id
-                   (let ((printer (if (eq printer :default)
-                                      (format-default-printer format)
-                                      printer)))
-                     (when printer
-                       (lambda (chunk inst stream dstate)
-                         (funcall (setf (inst-printer inst)
-                                        (let ((*current-instruction-flavor* flavor))
-                                          (find-printer-fun printer args cache)))
-                                  chunk inst stream dstate))))
+                   (awhen (if (eq printer :default)
+                              (format-default-printer format)
+                              printer)
+                     (find-printer-fun it args cache (list base-name index)))
                    (collect-labelish-operands args cache)
                    (collect-prefiltering-args args cache)
-                   control)))))
-   variants))
+                   control))))))
 
 ;;; Get the instruction-space, creating it if necessary.
 (defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)
@@ -778,7 +783,6 @@
         (when force
           (format t "~&~:{~@(~A~)s: ~D~:^, ~}~%"
                   (mapcar (lambda (x) (list (car x) (length (cdr x)))) cache)))
-        (setf (cddr cache) nil) ; discard the labeller cache
         (setf ispace (build-inst-space insts)))
       (setf *disassem-inst-space* ispace))
     ispace))
@@ -1549,9 +1553,8 @@
     (map-segment-instructions
      (lambda (chunk inst)
        (declare (type dchunk chunk) (type instruction inst))
-       (let ((printer (inst-printer inst)))
-         (when printer
-           (funcall printer chunk inst stream dstate))))
+       (awhen (inst-printer inst)
+         (funcall it chunk inst stream dstate)))
      segment
      dstate
      stream)))
