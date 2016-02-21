@@ -92,7 +92,6 @@ static struct thread_post_mortem * volatile pending_thread_post_mortem = 0;
 
 int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
 struct thread *all_threads;
-extern struct interrupt_data * global_interrupt_data;
 
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
