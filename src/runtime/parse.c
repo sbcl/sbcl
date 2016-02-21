@@ -155,47 +155,6 @@ char **ptr;
     return token;
 }
 
-#if 0
-static boolean number_p(token)
-char *token;
-{
-    char *okay;
-
-    if (token == NULL)
-        return 0;
-
-    okay = "abcdefABCDEF987654321d0";
-
-    if (token[0] == '0')
-        if (token[1] == 'x' || token[1] == 'X')
-            token += 2;
-        else {
-            token++;
-            okay += 14;
-        }
-    else if (token[0] == '#') {
-        switch (token[1]) {
-            case 'x':
-            case 'X':
-                break;
-            case 'o':
-            case 'O':
-                okay += 14;
-                break;
-            default:
-                return 0;
-        }
-    }
-    else
-        okay += 12;
-
-    while (*token != '\0')
-        if (index(okay, *token++) == NULL)
-            return 0;
-    return 1;
-}
-#endif
-
 uword_t parse_number(ptr)
 char **ptr;
 {

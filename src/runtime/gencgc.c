@@ -1944,24 +1944,6 @@ trans_boxed_large(lispobj object)
 
     return copy_large_object(object, length);
 }
-
-/* Doesn't seem to be used, delete it after the grace period. */
-#if 0
-static lispobj
-trans_unboxed_large(lispobj object)
-{
-    lispobj header;
-    uword_t length;
-
-    gc_assert(is_lisp_pointer(object));
-
-    header = *((lispobj *) native_pointer(object));
-    length = HeaderValue(header) + 1;
-    length = CEILING(length, 2);
-
-    return copy_large_unboxed_object(object, length);
-}
-#endif
 
 /*
  * weak pointers

@@ -306,9 +306,6 @@ os_install_interrupt_handlers(void)
 static void
 sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-#if 0
-    unsigned int pc =  (unsigned int *)(*os_context_pc_addr(context));
-#endif
     os_vm_address_t addr;
 
     addr = arch_get_bad_addr(signal, info, context);
