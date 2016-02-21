@@ -172,7 +172,8 @@
 ;;; This macro should only be used inside a pseudo-atomic section,
 ;;; which should also cover subsequent initialization of the
 ;;; object.
-(defun allocation-tramp (alloc-tn size lowtag)
+(defun allocation-tramp (alloc-tn size lowtag
+                         &optional (result-tn alloc-tn))
   (cond ((typep size '(and integer (not (signed-byte 32))))
          ;; MOV accepts large immediate operands, PUSH does not
          (inst mov alloc-tn size)
@@ -181,9 +182,9 @@
          (inst push size)))
   (inst mov alloc-tn (make-fixup "alloc_tramp" :foreign))
   (inst call alloc-tn)
-  (inst pop alloc-tn)
+  (inst pop result-tn)
   (when lowtag
-    (inst or (reg-in-size alloc-tn :byte) lowtag))
+    (inst or (reg-in-size result-tn :byte) lowtag))
   (values))
 
 (defun allocation (alloc-tn size &optional ignored dynamic-extent lowtag)
@@ -237,17 +238,17 @@
            (inst cmp alloc-tn end-addr)
            (inst jmp :a NOT-INLINE)
            (inst mov free-pointer alloc-tn)
+           (emit-label DONE)
            (if lowtag
                (inst lea alloc-tn (make-ea :byte :base temp-reg-tn :disp lowtag))
                (inst mov alloc-tn temp-reg-tn))
-           (emit-label DONE)
            (assemble (*elsewhere*)
              (emit-label NOT-INLINE)
              (cond ((numberp size)
-                    (allocation-tramp alloc-tn size lowtag))
+                    (allocation-tramp alloc-tn size nil temp-reg-tn))
                    (t
                     (inst sub alloc-tn free-pointer)
-                    (allocation-tramp alloc-tn alloc-tn lowtag)))
+                    (allocation-tramp alloc-tn alloc-tn nil temp-reg-tn)))
              (inst jmp DONE))))
     (values)))
 
