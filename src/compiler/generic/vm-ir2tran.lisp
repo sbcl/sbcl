@@ -73,67 +73,80 @@
   #!-raw-instance-init-vops
   (declare (ignore instance-length))
   (let ((unbound-marker-tn nil)
-        (funcallable-instance-tramp-tn nil))
-    (dolist (init inits)
-      (let ((kind (car init))
-            (slot (cdr init)))
-        (case kind
-          (:slot
-           ;; FIXME: with #!+interleaved-raw-slots the only reason INIT-SLOT
-           ;; and its raw variants exist is to avoid an extra MOVE -
-           ;; setters are expected to return something, but INITers don't.
-           ;; It would probably produce better code by not assuming that
-           ;; setters return a value, because as things are, if you call
-           ;; 8 setters in a row, then you probably produce 7 extraneous moves,
-           ;; because not all of them can deliver a value to the final result.
-           (let* ((raw-type (pop slot))
-                  (arg (pop args))
-                  (arg-tn (lvar-tn node block arg)))
-             (macrolet
-                 ((make-case (&optional rsd-list)
-                    `(ecase raw-type
-                       ((t)
-                        (vop init-slot node block object arg-tn
-                             name (+ sb!vm:instance-slots-offset slot) lowtag))
-                       ,@(map 'list
-                          (lambda (rsd)
-                            `(,(sb!kernel::raw-slot-data-raw-type rsd)
-                              (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
-                                   node block object arg-tn
-                                   #!-interleaved-raw-slots instance-length
-                                   slot)))
-                          (symbol-value rsd-list)))))
-               (make-case #!+raw-instance-init-vops
-                          sb!kernel::*raw-slot-data*))))
-          (:dd
-           (vop init-slot node block object
-                (emit-constant (sb!kernel::dd-layout-or-lose slot))
-                name sb!vm:instance-slots-offset lowtag))
-          (otherwise
-           (vop init-slot node block object
-                (ecase kind
-                  (:arg
-                   (aver args)
-                   (lvar-tn node block (pop args)))
-                  (:unbound
-                   (or unbound-marker-tn
-                       (setf unbound-marker-tn
-                             (let ((tn (make-restricted-tn
-                                        nil
-                                        (sc-number-or-lose 'sb!vm::any-reg))))
-                               (vop make-unbound-marker node block tn)
-                               tn))))
-                  (:null
-                   (emit-constant nil))
-                  (:funcallable-instance-tramp
-                   (or funcallable-instance-tramp-tn
-                       (setf funcallable-instance-tramp-tn
-                             (let ((tn (make-restricted-tn
-                                        nil
-                                        (sc-number-or-lose 'sb!vm::any-reg))))
-                               (vop make-funcallable-instance-tramp node block tn)
-                               tn)))))
-                name slot lowtag))))))
+        (funcallable-instance-tramp-tn nil)
+        (lvar (node-lvar node)))
+    (flet ((zero-init-p (x)
+             ;; dynamic-space is already zeroed
+             (and (or (not lvar)
+                      (not (lvar-dynamic-extent lvar)))
+                  (constant-lvar-p x)
+                  (eql (lvar-value x) 0))))
+     (dolist (init inits)
+       (let ((kind (car init))
+             (slot (cdr init)))
+         (case kind
+           (:slot
+            ;; FIXME: with #!+interleaved-raw-slots the only reason INIT-SLOT
+            ;; and its raw variants exist is to avoid an extra MOVE -
+            ;; setters are expected to return something, but INITers don't.
+            ;; It would probably produce better code by not assuming that
+            ;; setters return a value, because as things are, if you call
+            ;; 8 setters in a row, then you probably produce 7 extraneous moves,
+            ;; because not all of them can deliver a value to the final result.
+            (let ((raw-type (pop slot))
+                  (arg (pop args)))
+              (unless (and (or (eq raw-type t)
+                               (eq raw-type 'word)) ;; can be made to handle floats
+                           (zero-init-p arg))
+                (let ((arg-tn (lvar-tn node block arg)))
+                  (macrolet
+                      ((make-case (&optional rsd-list)
+                         `(ecase raw-type
+                            ((t)
+                             (vop init-slot node block object arg-tn
+                                  name (+ sb!vm:instance-slots-offset slot) lowtag))
+                            ,@(map 'list
+                               (lambda (rsd)
+                                 `(,(sb!kernel::raw-slot-data-raw-type rsd)
+                                   (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
+                                        node block object arg-tn
+                                        #!-interleaved-raw-slots instance-length
+                                        slot)))
+                               (symbol-value rsd-list)))))
+                    (make-case #!+raw-instance-init-vops
+                               sb!kernel::*raw-slot-data*))))))
+           (:dd
+            (vop init-slot node block object
+                 (emit-constant (sb!kernel::dd-layout-or-lose slot))
+                 name sb!vm:instance-slots-offset lowtag))
+           (otherwise
+            (if (and (eq kind :arg)
+                     (zero-init-p (car args)))
+                (pop args)
+                (vop init-slot node block object
+                     (ecase kind
+                       (:arg
+                        (aver args)
+                        (lvar-tn node block (pop args)))
+                       (:unbound
+                        (or unbound-marker-tn
+                            (setf unbound-marker-tn
+                                  (let ((tn (make-restricted-tn
+                                             nil
+                                             (sc-number-or-lose 'sb!vm::any-reg))))
+                                    (vop make-unbound-marker node block tn)
+                                    tn))))
+                       (:null
+                        (emit-constant nil))
+                       (:funcallable-instance-tramp
+                        (or funcallable-instance-tramp-tn
+                            (setf funcallable-instance-tramp-tn
+                                  (let ((tn (make-restricted-tn
+                                             nil
+                                             (sc-number-or-lose 'sb!vm::any-reg))))
+                                    (vop make-funcallable-instance-tramp node block tn)
+                                    tn)))))
+                     name slot lowtag))))))))
   (unless (null args)
     (bug "Leftover args: ~S" args)))
 
