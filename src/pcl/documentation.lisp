@@ -101,6 +101,23 @@
                documentation)))
   documentation)
 
+;;; Generic behavior
+
+;;; default if DOC-TYPE doesn't match one of the specified types
+(defmethod documentation (object doc-type)
+  (warn "unsupported DOCUMENTATION: doc-type ~S for object of type ~S"
+        doc-type (type-of object))
+  nil)
+
+;;; default if DOC-TYPE doesn't match one of the specified types
+(defmethod (setf documentation) (new-value object doc-type)
+  ;; CMU CL made this an error, but since ANSI says that even for supported
+  ;; doc types an implementation is permitted to discard docs at any time
+  ;; for any reason, this feels to me more like a warning. -- WHN 19991214
+  (warn "discarding unsupported DOCUMENTATION: doc-type ~S for object of type ~S"
+        doc-type (type-of object))
+  new-value)
+
 ;;; Deprecation note
 
 (defun maybe-add-deprecation-note (namespace name documentation)
@@ -265,16 +282,27 @@
   (setf (package-doc-string x) new-value))
 
 ;;; types, classes, and structure names
+
 (defmethod documentation ((x structure-class) (doc-type (eql 't)))
   (fdocumentation (class-name x) 'type))
 
 (defmethod documentation ((x structure-class) (doc-type (eql 'type)))
   (fdocumentation (class-name x) 'type))
 
+(defmethod (setf documentation) (new-value
+                                 (x structure-class)
+                                 (doc-type (eql 't)))
+  (setf (fdocumentation (class-name x) 'type) new-value))
+
+(defmethod (setf documentation) (new-value
+                                 (x structure-class)
+                                 (doc-type (eql 'type)))
+  (setf (fdocumentation (class-name x) 'type) new-value))
+
 (defmethod documentation ((x class) (doc-type (eql 't)))
   (slot-value x '%documentation))
 
-(defmethod documentation ((x class) (doc-type (eql 'type))) ; TODO setf
+(defmethod documentation ((x class) (doc-type (eql 'type)))
   (slot-value x '%documentation))
 
 (defmethod (setf documentation) (new-value
@@ -297,6 +325,16 @@
 (defmethod documentation ((x condition-class) (doc-type (eql 'type)))
   (fdocumentation (class-name x) 'type))
 
+(defmethod (setf documentation) (new-value
+                                 (x condition-class)
+                                 (doc-type (eql 't)))
+  (setf (fdocumentation (class-name x) 'type) new-value))
+
+(defmethod (setf documentation) (new-value
+                                 (x condition-class)
+                                 (doc-type (eql 'type)))
+  (setf (fdocumentation (class-name x) 'type) new-value))
+
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (fdocumentation x 'type)
       (awhen (find-class x nil)
@@ -304,26 +342,6 @@
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
   (fdocumentation x 'structure))
-
-(defmethod (setf documentation) (new-value
-                                 (x structure-class)
-                                 (doc-type (eql 't)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x structure-class)
-                                 (doc-type (eql 'type)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x condition-class)
-                                 (doc-type (eql 't)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x condition-class)
-                                 (doc-type (eql 'type)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
   (if (or (structure-type-p x) (condition-type-p x))
@@ -354,23 +372,6 @@
         (t
          (ignore-nil-doc 'variable)
          new-value)))
-
-;;; default if DOC-TYPE doesn't match one of the specified types
-(defmethod documentation (object doc-type)
-  (warn "unsupported DOCUMENTATION: doc-type ~S for object of type ~S"
-        doc-type
-        (type-of object))
-  nil)
-
-;;; default if DOC-TYPE doesn't match one of the specified types
-(defmethod (setf documentation) (new-value object doc-type)
-  ;; CMU CL made this an error, but since ANSI says that even for supported
-  ;; doc types an implementation is permitted to discard docs at any time
-  ;; for any reason, this feels to me more like a warning. -- WHN 19991214
-  (warn "discarding unsupported DOCUMENTATION: doc-type ~S for object of type ~S"
-        doc-type
-        (type-of object))
-  new-value)
 
 ;;; extra-standard methods, for getting at slot documentation
 (defmethod documentation ((slotd standard-slot-definition) (doc-type (eql 't)))
