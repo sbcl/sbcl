@@ -211,6 +211,50 @@
   (with-test (:name (documentation condition))
     (do-class baz "BAZ")))
 
+(defclass documentation-metaclass (standard-class)
+  ()
+  (:documentation "metaclass with methods on DOCUMENTATION."))
+
+(defmethod documentation ((thing documentation-metaclass)
+                          (doc-type (eql 't)))
+  (sb-int:awhen (call-next-method)
+    (concatenate 'string ":" sb-int:it)))
+
+(defmethod (setf documentation) (new-value
+                                 (thing documentation-metaclass)
+                                 (doc-type (eql 't)))
+  (call-next-method (when new-value
+                      (substitute #\! #\. new-value))
+                    thing doc-type))
+
+(defmethod sb-mop:validate-superclass ((class documentation-metaclass)
+                                       (superclass standard-class))
+  t)
+
+(defclass documentation-class ()
+  ()
+  (:metaclass documentation-metaclass)
+  (:documentation "normal"))
+
+(with-test (:name (documentation :non-stanadard :metaclass))
+  (flet ((check (expected class-name)
+           (let ((class (find-class class-name)))
+             (assert-documentation class-name 'type expected)
+             (assert-documentation class 'type expected)
+             (assert-documentation class t expected))))
+    ;; Make sure methods specialized on the metaclass are not bypassed
+    ;; when retrieving and modifying class documentation.
+    (check ":normal" 'documentation-class)
+    (setf (documentation 'documentation-class 'type) "2.")
+    (check ":2!" 'documentation-class)
+    (setf (documentation 'documentation-class 'type) nil)
+    (check nil 'documentation-class)
+
+    ;; Sanity check: make sure the metaclass has its own documentation
+    ;; and is not affected by the above modifications.
+    (check "metaclass with methods on DOCUMENTATION."
+           'documentation-metaclass)))
+
 (defstruct (frob (:type vector)) "FROB")
 
 (with-test (:name (documentation struct 2))

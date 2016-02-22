@@ -274,20 +274,37 @@
     ((define-type-documentation-methods (specializer get-form set-form)
        `(progn
           (defmethod documentation ((x ,specializer) (doc-type (eql 't)))
-            (documentation x 'type))
+            ,get-form)
 
           (defmethod documentation ((x ,specializer) (doc-type (eql 'type)))
-            ,get-form)
+            (documentation x t))
 
           (defmethod (setf documentation) (new-value
                                            (x ,specializer)
                                            (doc-type (eql 't)))
-            (setf (documentation x 'type) new-value))
+            ,set-form)
 
           (defmethod (setf documentation) (new-value
                                            (x ,specializer)
                                            (doc-type (eql 'type)))
-            ,set-form))))
+            (setf (documentation x 't) new-value))))
+     (define-type-documentation-lookup-methods (doc-type)
+       `(progn
+          (defmethod documentation ((x symbol) (doc-type (eql ',doc-type)))
+            (acond
+             ((find-class x nil)
+              (documentation it t))
+             (t
+              (fdocumentation x ',doc-type))))
+
+          (defmethod (setf documentation) (new-value
+                                           (x symbol)
+                                           (doc-type (eql ',doc-type)))
+            (acond
+             ((find-class x nil)
+              (setf (documentation it t) new-value))
+             (t
+              (setf (fdocumentation x ',doc-type) new-value)))))))
 
   (define-type-documentation-methods structure-class
       (fdocumentation (class-name x) 'type)
@@ -303,28 +320,11 @@
   ;; standard-class or structure-class).
   (define-type-documentation-methods condition-class
       (fdocumentation (class-name x) 'type)
-      (setf (fdocumentation (class-name x) 'type) new-value)))
+      (setf (fdocumentation (class-name x) 'type) new-value))
 
-(defmethod documentation ((x symbol) (doc-type (eql 'type)))
-  (or (fdocumentation x 'type)
-      (awhen (find-class x nil)
-        (slot-value it '%documentation))))
+  (define-type-documentation-lookup-methods type)
+  (define-type-documentation-lookup-methods structure))
 
-(defmethod documentation ((x symbol) (doc-type (eql 'structure)))
-  (fdocumentation x 'structure))
-
-(defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
-  (if (or (structure-type-p x) (condition-type-p x))
-      (setf (fdocumentation x 'type) new-value)
-      (let ((class (find-class x nil)))
-        (if class
-            (setf (slot-value class '%documentation) new-value)
-            (setf (fdocumentation x 'type) new-value)))))
-
-(defmethod (setf documentation) (new-value
-                                 (x symbol)
-                                 (doc-type (eql 'structure)))
-  (setf (fdocumentation x 'structure) new-value))
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
