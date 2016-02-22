@@ -122,10 +122,13 @@
                   :timeout)))))
 
 ;;; DOCUMENTATION should return nil, not signal slot-unbound
-(documentation 'fixnum 'type)
-(documentation 'class 'type)
-(documentation (find-class 'class) 'type)
-(documentation 'foo 'structure)
+(with-test (:name (documentation :return nil))
+  (flet ((test (thing doc-type)
+           (assert (eq nil (documentation thing doc-type)))))
+    (test 'fixnum 'type)
+    (test 'class 'type)
+    (test (find-class 'class) 'type)
+    (test 'foo 'structure)))
 
 ;;; DECODE-UNIVERSAL-TIME should accept second-resolution time-zones.
 (macrolet ((test (ut time-zone list)

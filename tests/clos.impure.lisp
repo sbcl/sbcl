@@ -579,7 +579,7 @@
 ;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
 ;;; preserved through the bootstrap process until sbcl-0.7.8.39.
 ;;; (thanks to Gerd Moellmann)
-(with-test (:name :documentation-argument-precedence-order)
+(with-test (:name (documentation :argument-precedence-order))
   (defun foo022 ()
     "Documentation"
     t)
