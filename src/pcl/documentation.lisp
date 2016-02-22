@@ -270,57 +270,40 @@
 
 ;;; types, classes, and structure names
 
-(defmethod documentation ((x structure-class) (doc-type (eql 't)))
-  (fdocumentation (class-name x) 'type))
+(macrolet
+    ((define-type-documentation-methods (specializer get-form set-form)
+       `(progn
+          (defmethod documentation ((x ,specializer) (doc-type (eql 't)))
+            (documentation x 'type))
 
-(defmethod documentation ((x structure-class) (doc-type (eql 'type)))
-  (fdocumentation (class-name x) 'type))
+          (defmethod documentation ((x ,specializer) (doc-type (eql 'type)))
+            ,get-form)
 
-(defmethod (setf documentation) (new-value
-                                 (x structure-class)
-                                 (doc-type (eql 't)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
+          (defmethod (setf documentation) (new-value
+                                           (x ,specializer)
+                                           (doc-type (eql 't)))
+            (setf (documentation x 'type) new-value))
 
-(defmethod (setf documentation) (new-value
-                                 (x structure-class)
-                                 (doc-type (eql 'type)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
+          (defmethod (setf documentation) (new-value
+                                           (x ,specializer)
+                                           (doc-type (eql 'type)))
+            ,set-form))))
 
-(defmethod documentation ((x class) (doc-type (eql 't)))
-  (slot-value x '%documentation))
+  (define-type-documentation-methods structure-class
+      (fdocumentation (class-name x) 'type)
+      (setf (fdocumentation (class-name x) 'type) new-value))
 
-(defmethod documentation ((x class) (doc-type (eql 'type)))
-  (slot-value x '%documentation))
+  (define-type-documentation-methods class
+      (slot-value x '%documentation)
+      (setf (slot-value x '%documentation) new-value))
 
-(defmethod (setf documentation) (new-value
-                                 (x class)
-                                 (doc-type (eql 't)))
-  (setf (slot-value x '%documentation) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x class)
-                                 (doc-type (eql 'type)))
-  (setf (slot-value x '%documentation) new-value))
-
-;;; although the CLHS doesn't mention this, it is reasonable to assume
-;;; that parallel treatment of condition-class was intended (if
-;;; condition-class is in fact not implemented as a standard-class or
-;;; structure-class).
-(defmethod documentation ((x condition-class) (doc-type (eql 't)))
-  (fdocumentation (class-name x) 'type))
-
-(defmethod documentation ((x condition-class) (doc-type (eql 'type)))
-  (fdocumentation (class-name x) 'type))
-
-(defmethod (setf documentation) (new-value
-                                 (x condition-class)
-                                 (doc-type (eql 't)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x condition-class)
-                                 (doc-type (eql 'type)))
-  (setf (fdocumentation (class-name x) 'type) new-value))
+  ;; although the CLHS doesn't mention this, it is reasonable to
+  ;; assume that parallel treatment of condition-class was intended
+  ;; (if condition-class is in fact not implemented as a
+  ;; standard-class or structure-class).
+  (define-type-documentation-methods condition-class
+      (fdocumentation (class-name x) 'type)
+      (setf (fdocumentation (class-name x) 'type) new-value)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (fdocumentation x 'type)
