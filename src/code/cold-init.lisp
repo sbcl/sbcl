@@ -66,8 +66,7 @@
                 ;; can't disappear from the image, but we don't need to preserve
                 ;; their functions, so FMAKUNBOUND them. This doesn't have
                 ;; the intended effect if the function shares a code-component
-                ;; with non-cold-init lambdas, such as in !CONSTANTP-COLD-INIT
-                ;; and !GLOBALDB-COLD-INIT. Though the cold-init function is
+                ;; with non-cold-init lambdas. Though the cold-init function is
                 ;; never called post-build, it is not discarded. Also, I suspect
                 ;; that the following loop should print nothing, but it does:
 #|
@@ -195,8 +194,6 @@
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
-  (show-and-call !constantp-cold-init)
-  (show-and-call !constantp2-cold-init)
   ;; Must be done before toplevel forms are invoked
   ;; because a toplevel defstruct will need to add itself
   ;; to the subclasses of STRUCTURE-OBJECT.

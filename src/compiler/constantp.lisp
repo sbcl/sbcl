@@ -11,17 +11,6 @@
 
 (in-package "SB!C")
 
-(!begin-collecting-cold-init-forms)
-
-(defglobal **special-form-constantp-tests** nil)
-#-sb-xc-host
-(declaim (type hash-table **special-form-constantp-tests**))
-;; FIXME: inlined FIND in a simple-vector of 8 things seems to perform
-;; roughly twice as fast as GETHASH when optimized for speed.
-;; Even for as many as 16 things it would be faster.
-(!cold-init-forms
-  (setf **special-form-constantp-tests** (make-hash-table)))
-
 (!defvar *special-constant-variables* nil)
 
 (defun %constantp (form environment envp)
@@ -35,8 +24,10 @@
        (or (eq (info :variable :kind form) :constant)
            (constant-special-variable-p form)))
       (list
-       (or (constant-special-form-p form environment envp)
-           (values (constant-function-call-p form environment envp))))
+       (let ((answer (constant-special-form-p form environment envp)))
+         (if (eq answer :maybe)
+             (values (constant-function-call-p form environment envp))
+             answer)))
       (t t))))
 
 (defun %constant-form-value (form environment envp)
@@ -57,56 +48,41 @@
        ;; a host value of a constant in the CL package.
        (or #+sb-xc-host (xc-constant-value form) (symbol-value form)))
       (list
-       (if (sb!xc:special-operator-p (car form))
+       (multiple-value-bind (specialp value)
            (constant-special-form-value form environment envp)
-           (constant-function-call-value form environment envp)))
+         (if specialp value (constant-function-call-value
+                             form environment envp))))
       (t
        form))))
 
-(defun constant-special-form-p (form environment envp)
-  (let ((fun (gethash (car form) **special-form-constantp-tests**)))
-    (when fun
-      (funcall (car fun) form environment envp))))
-
-(defun constant-special-form-value (form environment envp)
-  (let ((fun (gethash (car form) **special-form-constantp-tests**)))
-    (if fun
-        (funcall (cdr fun) form environment envp)
-        (error "Not a constant-foldable special form: ~S" form))))
-
 (defun constant-special-variable-p (name)
   (and (member name *special-constant-variables*) t))
+
+;;; FIXME: It would be nice to deal with inline functions
+;;; too.
+(defun constant-function-call-p (form environment envp)
+  (let ((name (car form)))
+    (if (and (legal-fun-name-p name)
+             (eq :function (info :function :kind name))
+             (let ((info (info :function :info name)))
+               (and info (ir1-attributep (fun-info-attributes info)
+                                         foldable)))
+             (and (every (lambda (arg)
+                           (%constantp arg environment envp))
+                         (cdr form))))
+        ;; Even though the function may be marked as foldable
+        ;; the call may still signal an error -- eg: (CAR 1).
+        (handler-case
+            (values t (constant-function-call-value form environment envp))
+          (error ()
+            (values nil nil)))
+        (values nil nil))))
 
 (defun constant-function-call-value (form environment envp)
   (apply (fdefinition (car form))
          (mapcar (lambda (arg)
                    (%constant-form-value arg environment envp))
                  (cdr form))))
-
-#!-sb-fluid (declaim (inline sb!xc:constantp))
-(defun sb!xc:constantp (form &optional (environment nil envp))
-  #!+sb-doc
-  "True of any FORM that has a constant value: self-evaluating objects,
-keywords, defined constants, quote forms. Additionally the
-constant-foldability of some function calls special forms is recognized. If
-ENVIRONMENT is provided the FORM is first macroexpanded in it."
-  (%constantp form environment envp))
-
-#!-sb-fluid (declaim (inline constant-form-value))
-(defun constant-form-value (form &optional (environment nil envp))
-  #!+sb-doc
-  "Returns the value of the constant FORM in ENVIRONMENT. Behaviour
-is undefined unless CONSTANTP has been first used to determine the
-constantness of the FORM in ENVIRONMENT."
-  (%constant-form-value form environment envp))
-
-(declaim (inline constant-typep))
-(defun constant-typep (form type &optional (environment nil envp))
-  (and (%constantp form environment envp)
-       ;; FIXME: We probably should be passing the environment to
-       ;; TYPEP too, but (1) our XC version of typep AVERs that the
-       ;; environment is null (2) our real version ignores it anyhow.
-       (sb!xc:typep (%constant-form-value form environment envp) type)))
 
 ;;;; NOTE!!!
 ;;;;
@@ -117,32 +93,52 @@ constantness of the FORM in ENVIRONMENT."
 ;;;; analysis to assignments then other forms must take this
 ;;;; into account.
 
+(eval-when (:compile-toplevel :execute)
+(defparameter *special-form-constantp-defs* (make-array 20 :fill-pointer 0)))
+
 (defmacro !defconstantp (operator lambda-list &key test eval)
-  (let ((test-fn (symbolicate "CONSTANTP-TEST$" operator))
-        (eval-fn (symbolicate "CONSTANTP-EVAL$" operator))
-        (form (make-symbol "FORM"))
-        (environment (make-symbol "ENV"))
-        (envp (make-symbol "ENVP")))
-    (flet ((frob (body)
-             `(flet ((constantp* (x)
-                       (%constantp x ,environment ,envp))
-                     (constant-form-value* (x)
-                       (%constant-form-value x ,environment ,envp)))
-                (declare (ignorable #'constantp* #'constant-form-value*))
-                (destructuring-bind ,lambda-list (cdr ,form)
-                  ;; KLUDGE: is all we need, so we keep it simple
-                  ;; instead of general (not handling cases like &key (x y))
-                  (declare (ignorable
-                            ,@(remove-if (lambda (arg)
-                                           (member arg sb!xc:lambda-list-keywords))
-                                         lambda-list)))
-                   ,body))))
-      `(progn
-         (defun ,test-fn (,form ,environment ,envp) ,(frob test))
-         (defun ,eval-fn (,form ,environment ,envp) ,(frob eval))
-         (!cold-init-forms
-          (setf (gethash ',operator **special-form-constantp-tests**)
-                (cons #',test-fn #',eval-fn)))))))
+  (let ((args (make-symbol "ARGS")))
+    (flet
+        ;; FIXME: DESTRUCTURING-BIND should have the option to expand this way.
+        ;; It would be useful for DEFINE-SOURCE-TRANSFORM as well.
+        ((binding-maker (input on-error)
+           (multiple-value-bind (llks req opt rest key aux env whole)
+               (parse-lambda-list
+                lambda-list
+                :accept (lambda-list-keyword-mask '(&whole &optional &rest &body)))
+             (declare (ignore llks key aux env))
+             (aver (every (lambda (x) (and (symbolp x) x)) (append req opt rest)))
+             (flet ((bind (var pred enforce-end)
+                      `(,(car var)
+                        ,(if enforce-end
+                             `(if (and (,pred ,args) (not (cdr ,args)))
+                                  (car ,args)
+                                  ,on-error)
+                             `(if (,pred ,args) (pop ,args) ,on-error)))))
+               `((,args ,input)
+                 ,@(when whole
+                     ;; If both &WHOLE and &REST are present, the &WHOLE var
+                     ;; must be a list, although we don't know that just yet.
+                     ;; It will be verified when the &REST arg is bound.
+                     `((,(car whole) ,(if rest `(truly-the list ,args) args))))
+                 ,@(maplist (lambda (x)
+                              (bind x (if (cdr x) 'listp 'consp)
+                                    (and (not (cdr x)) (not opt) (not rest))))
+                            req)
+                 ,@(maplist (lambda (x) (bind x 'listp (and (not (cdr x)) (not rest))))
+                            opt)
+                 ,@(when rest
+                     `((,(car rest)
+                        (if (proper-list-p ,args)
+                            (truly-the list ,args) ; to open-code EVERY #'P on &REST arg
+                            ,on-error)))))))))
+      `(eval-when (:compile-toplevel :execute)
+         (vector-push-extend ',(list* operator test eval
+                                      (binding-maker 'args '(go fail)))
+                             *special-form-constantp-defs*)))))
+
+;;; NOTE: special forms are tested in the order as written,
+;;; so there is some benefit to listing important ones earliest.
 
 (!defconstantp quote (value)
    :test t
@@ -158,12 +154,38 @@ constantness of the FORM in ENVIRONMENT."
              (constant-form-value* then)
              (constant-form-value* else)))
 
+;; FIXME: isn't it sufficient for non-final forms to be flushable and/or
+;; maybe satisfy some other conditions? e.g. (PROGN (LIST 1) 'FOO) is constant.
 (!defconstantp progn (&body forms)
    :test (every #'constantp* forms)
    :eval (constant-form-value* (car (last forms))))
 
-(!defconstantp unwind-protect (protected-form &body cleanup-forms)
-   :test (every #'constantp* (cons protected-form cleanup-forms))
+(!defconstantp the (type form)
+   ;; We can't call TYPEP because the form might be (THE (FUNCTION (t) t) #<fn>)
+   ;; which is valid for declaration but not for discrimination.
+   ;; Instead use %%TYPEP in non-strict mode. FIXME:
+   ;; (1) CAREFUL-SPECIFIER-TYPE should never fail. See lp#1395910.
+   ;; (2) CONTAINS-UNKNOWN-TYPE-P should grovel into ARRAY-TYPE-ELEMENT-TYPE
+   ;; so that (C-U-T-P (SPECIFIER-TYPE '(OR (VECTOR BAD) FUNCTION))) => T
+   ;; and then we can parse, check for unknowns, and get rid of HANDLER-CASE.
+   :test (and (constantp* form)
+              (handler-case
+                  ;; in case the type-spec is malformed!
+                  (let ((parsed (careful-specifier-type type)))
+                    ;; xc can't rely on a "non-strict" mode of TYPEP.
+                    (and parsed
+                         #+sb-xc-host
+                         (typep (constant-form-value* form)
+                                (let ((*unparse-fun-type-simplify* t))
+                                  (declare (special *unparse-fun-type-simplify*))
+                                  (type-specifier parsed)))
+                         #-sb-xc-host
+                         (%%typep (constant-form-value* form) parsed nil)))
+                (error () nil)))
+   :eval (constant-form-value* form))
+
+(!defconstantp unwind-protect (&whole subforms protected-form &body cleanup-forms)
+   :test (every #'constantp* subforms)
    :eval (constant-form-value* protected-form))
 
 (!defconstantp block (name &body forms)
@@ -178,8 +200,8 @@ constantness of the FORM in ENVIRONMENT."
    :test (every #'constantp* forms)
    :eval (constant-form-value* (car (last forms))))
 
-(!defconstantp multiple-value-prog1 (first-form &body forms)
-   :test (every #'constantp* (cons first-form forms))
+(!defconstantp multiple-value-prog1 (&whole subforms first-form &body forms)
+   :test (every #'constantp* subforms)
    :eval (constant-form-value* first-form))
 
 (!defconstantp progv (symbols values &body forms)
@@ -197,4 +219,38 @@ constantness of the FORM in ENVIRONMENT."
              (constant-form-value* values)
            (constant-form-value* (car (last forms)))))
 
-(!defun-from-collected-cold-init-forms !constantp-cold-init)
+;;;
+
+(macrolet
+    ((expand-cases (expr-selector default-clause)
+       `(flet ((constantp* (x) (%constantp x environment envp))
+               (constant-form-value* (x) (%constant-form-value x environment envp)))
+          (declare (optimize speed) (ignorable #'constantp*)
+                   (ftype (function (t) (values t &optional)) ; avoid "unknown values"
+                          constantp* constant-form-value*))
+          (let ((args (cdr (truly-the list form))))
+            (case (car form)
+              ,@(map 'list
+                     (lambda (spec &aux (bindings (cdddr spec)))
+                       `(,(first spec)
+                         (let* ,bindings
+                           (declare (ignorable ,@(mapcar #'car bindings)))
+                           ,(nth expr-selector spec))))
+                     *special-form-constantp-defs*)
+              (t
+               ,default-clause))))))
+
+  (defun constant-special-form-p (form environment envp)
+    (let (result)
+      (tagbody (setq result (expand-cases 1 :maybe)) fail)
+      result))
+
+  (defun constant-special-form-value (form environment envp)
+    (let ((result))
+      (tagbody
+       (setq result (expand-cases 2 (return-from constant-special-form-value
+                                      (values nil nil))))
+       (return-from constant-special-form-value (values t result))
+       fail))
+    ;; Mutatation of FORM could cause failure. It's user error, not a bug.
+    (error "CONSTANT-FORM-VALUE called with invalid expression ~S" form)))

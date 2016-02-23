@@ -102,7 +102,7 @@
 
  ("src/compiler/early-lexenv")
  ("src/compiler/early-globaldb")
- ("src/compiler/constantp")
+ ("src/compiler/early-constantp")
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names")
@@ -308,7 +308,7 @@
 
  ("src/compiler/macros")
 
- ("src/compiler/late-constantp")
+ ("src/compiler/constantp")
  ("src/code/early-classoid")
  ("src/compiler/info-functions")
 
