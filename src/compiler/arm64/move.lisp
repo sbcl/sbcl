@@ -118,13 +118,23 @@
 (define-vop (move)
   (:args (x :target y
             :scs (any-reg descriptor-reg null)
-            :load-if (not (location= x y))))
-  (:results (y :scs (any-reg descriptor-reg)
+            :load-if (not (or (location= x y)
+                              (and (sc-is x immediate)
+                                   (eql (tn-value x) 0))))))
+  (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
-    (move y x)))
+    (let ((x (if (and (sc-is x immediate)
+                      (eql (tn-value x) 0))
+                 zr-tn
+                 x)))
+      (cond ((location= x y))
+            ((sc-is y control-stack)
+             (store-stack-tn y x))
+            (t
+             (move y x))))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg)

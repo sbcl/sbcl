@@ -115,12 +115,16 @@
   (:args (x :target y
             :scs (any-reg descriptor-reg null)
             :load-if (not (location= x y))))
-  (:results (y :scs (any-reg descriptor-reg)
+  (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
-    (move y x)))
+    (cond ((location= x y))
+          ((sc-is y control-stack)
+           (store-stack-tn y x))
+          (t
+           (move y x)))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg)
