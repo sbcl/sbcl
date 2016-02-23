@@ -640,6 +640,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             (describe-ir2-component component *compiler-trace-output*))
 
           (maybe-mumble "code ")
+          (optimize-constant-loads component)
           (multiple-value-bind (code-length fixup-notes)
               (generate-code component)
 
