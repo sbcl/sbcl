@@ -736,8 +736,8 @@
 (with-test (:name :mod-arith-large-constant)
   (assert (= (funcall (checked-compile
                        '(lambda (x)
-                         (declare ((unsigned-byte 64) x))
+                         (declare (sb-ext:word x))
                          (logand sb-ext:most-positive-word
-                          (+ x 23124234234))))
+                          (+ x 2312423423))))
                       12)
-             23124234246)))
+             2312423435)))
