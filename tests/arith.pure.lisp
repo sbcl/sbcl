@@ -727,8 +727,17 @@
              least-negative-double-float)))
 
 (with-test (:name :ldb-sign)
-  (assert (= (funcall (compile nil
-                               `(lambda (x)
-                                  (ldb (byte ,(1- sb-vm:n-word-bits) 0) x)))
+  (assert (= (funcall (checked-compile
+                       `(lambda (x)
+                          (ldb (byte ,(1- sb-vm:n-word-bits) 0) x)))
                       12)
              12)))
+
+(with-test (:name :mod-arith-large-constant)
+  (assert (= (funcall (checked-compile
+                       '(lambda (x)
+                         (declare ((unsigned-byte 64) x))
+                         (logand sb-ext:most-positive-word
+                          (+ x 23124234234))))
+                      12)
+             23124234246)))

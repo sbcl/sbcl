@@ -696,8 +696,7 @@
   `(define-vop (,name ,prototype)
      (:args (x :target r :scs (unsigned-reg signed-reg)))
      (:info y)
-     (:arg-types untagged-num (:constant (or word
-                                             signed-word)))
+     (:arg-types untagged-num (:constant (satisfies add-sub-immediate-p)))
      (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
      (:result-types unsigned-num)
      (:translate ,function)))
