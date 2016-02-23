@@ -16,6 +16,8 @@
          (inst movz y val))
         ((typep val '(and (signed-byte 16) (integer * -1)))
          (inst movn y (lognot val)))
+        ((typep (ldb (byte 64 0) (lognot val)) '(unsigned-byte 16))
+         (inst movn y (ldb (byte 64 0) (lognot val))))
         ((encode-logical-immediate val)
          (inst orr y zr-tn val))
         ((minusp val)
