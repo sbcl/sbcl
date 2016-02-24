@@ -12,6 +12,15 @@
 ;;; SAVE-LISP-AND-DIE.
 #-sb-fluid (sb-impl::!unintern-init-only-stuff)
 
+;;; A symbol whose INFO slot underwent any kind of manipulation
+;;; such that it now has neither properties nor globaldb info,
+;;; can have the slot set back to NIL if it wasn't already.
+(do-all-symbols (symbol)
+  (when (and (sb-kernel:symbol-info symbol)
+             (null (sb-kernel:symbol-info-vector symbol))
+             (null (symbol-plist symbol)))
+    (setf (sb-kernel:symbol-info symbol) nil)))
+
 "done with warm.lisp, about to GC :FULL T"
 (sb-ext:gc :full t)
 
