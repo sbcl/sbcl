@@ -5757,3 +5757,23 @@
                             (isqrt (count (the bit i) #*11101))))
                         1)
                2)))
+
+(with-test (:name :vector-zero-initialization)
+  (assert (equalp (funcall (funcall (checked-compile
+                              `(lambda (x b)
+                                 (declare ((eql 0) x)
+                                          (optimize (debug 2)))
+                                 (lambda ()
+                                   (vector x (isqrt b)))))
+                                    0 4))
+                  #(0 2))))
+
+(with-test (:name :cons-zero-initialization)
+  (assert (equalp (funcall (funcall (checked-compile
+                              `(lambda (x b)
+                                 (declare ((eql 0) x)
+                                          (optimize (debug 2)))
+                                 (lambda ()
+                                   (cons x (isqrt b)))))
+                                    0 4))
+                  '(0 . 2))))

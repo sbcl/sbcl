@@ -79,7 +79,12 @@
              ;; dynamic-space is already zeroed
              (and (or (not lvar)
                       (not (lvar-dynamic-extent lvar)))
-                  (constant-lvar-p x)
+                  ;; KLUDGE: can't ignore type-derived
+                  ;; constants since they can be closed over
+                  ;; and not using them confuses the register
+                  ;; allocator.
+                  ;; See compiler.pure/cons-zero-initialization
+                  (strictly-constant-lvar-p x)
                   (eql (lvar-value x) 0))))
      (dolist (init inits)
        (let ((kind (car init))
@@ -251,7 +256,12 @@
           (let ((value (pop initial-contents)))
             ;; dynamic-space is already zeroed
             (unless (and (not dx-p)
-                         (constant-lvar-p value)
+                         ;; KLUDGE: can't ignore type-derived
+                         ;; constants since they can be closed over
+                         ;; and not using them confuses the register
+                         ;; allocator.
+                         ;; See compiler.pure/vector-zero-initialization
+                         (strictly-constant-lvar-p value)
                          (if character
                              (eql (char-code (lvar-value value)) 0)
                              (eql (lvar-value value) 0)))
