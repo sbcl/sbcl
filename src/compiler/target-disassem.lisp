@@ -204,17 +204,6 @@
             (print-inst-space (ischoice-subspace choice)
                               (+ 4 indent)))
           (ispace-choices inst-space)))))
-
-(defun precompile-inst-printers ()
-  (named-let recurse ((obj (get-inst-space)))
-    (etypecase obj
-      (inst-space
-       (map nil
-            (lambda (x) (recurse (ischoice-subspace x)))
-            (ispace-choices obj)))
-      (instruction
-       (inst-printer obj) ; for side-effect
-       (mapc #'recurse (inst-specializers obj))))))
 
 ;;;; (The actual disassembly part follows.)
 
@@ -767,21 +756,24 @@
                    (collect-prefiltering-args args cache)
                    control))))))
 
+(defun !compile-inst-printers ()
+  (let ((package sb!assem::*backend-instruction-set-package*)
+        (cache (list (list :printer) (list :prefilter) (list :labeller))))
+    (do-symbols (symbol package)
+      (awhen (get symbol 'instruction-flavors)
+        (setf (get symbol 'instruction-flavors)
+              (collect-inst-variants
+               (string-upcase symbol) package it cache))))))
+
 ;;; Get the instruction-space, creating it if necessary.
 (defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)
                             force)
   (let ((ispace *disassem-inst-space*))
     (when (or force (null ispace))
-      (let ((insts nil)
-            (cache (list (list :printer) (list :prefilter) (list :labeller))))
+      (let ((insts nil))
         (do-symbols (symbol package)
-          (setq insts (nconc (collect-inst-variants
-                              (string-upcase symbol) package
-                              (get symbol 'instruction-flavors) cache)
+          (setq insts (nconc (copy-list (get symbol 'instruction-flavors))
                              insts)))
-        (when force
-          (format t "~&~:{~@(~A~)s: ~D~:^, ~}~%"
-                  (mapcar (lambda (x) (list (car x) (length (cdr x)))) cache)))
         (setf ispace (build-inst-space insts)))
       (setf *disassem-inst-space* ispace))
     ispace))
@@ -2129,3 +2121,44 @@
           (table (assq :prefilter cache)))
       (or (find repr (cdr table) :test 'equalp)
           (car (push repr (cdr table)))))))
+
+(defun unintern-init-only-stuff ()
+  ;; Remove compile-time-only metadata. This preserves compatibility with the
+  ;; older disassembler macros which wrapped GEN-ARG-TYPE-DEF-FORM and such
+  ;; in (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE)), which in turn required that
+  ;; all prefilters, labellers, and printers be defined at cross-compile-time.
+  ;; A consequence of :LOAD-TOPLEVEL not being there was that was not possible
+  ;; to add instruction definitions to an image without also recompiling
+  ;; the backend's "insts" file. It also was not possible to incrementally
+  ;; recompile and/or use slam.sh because of a bunch of mostly harmless bugs
+  ;; in the function cache (a/k/a identical-code-folding) logic that was only
+  ;; guaranteed to do the right thing from a clean compile. Additionally,
+  ;; you had to use (GET-INST-SPACE :FORCE T) to pick up new definitions.
+  ;; Given those considerations which made extending a running disassembler
+  ;; nontrivial, the code-generating code is not so useful after the
+  ;; initial instruction space is built, so it can all be removed.
+  ;; But if you need all these macros to exist for some reason,
+  ;; then define one of the two following features to keep them:
+  #!+(or sb-fluid sb-retain-assembler-macros)
+  (return-from unintern-init-only-stuff)
+
+  (do-symbols (symbol sb!assem::*backend-instruction-set-package*)
+    (remf (symbol-plist symbol) 'arg-type)
+    (remf (symbol-plist symbol) 'inst-format))
+
+  ;; Get rid of functions that only make sense with metadata available.
+  (dolist (s '(%def-arg-type %def-inst-format %gen-arg-forms
+               all-arg-refs-relevant-p arg-or-lose arg-position arg-value-form
+               collect-labelish-operands collect-prefiltering-args
+               compare-fields-form compile-inst-printer compile-print
+               compile-printer-body compile-printer-list compile-test
+               correct-dchunk-bytespec-for-endianness
+               define-arg-type define-instruction-format equal-mod-gensyms
+               find-first-field-name find-printer-fun format-or-lose
+               gen-arg-forms make-arg-temp-bindings make-funstate massage-arg
+               maybe-listify modify-arg pd-error pick-printer-choice
+               preprocess-chooses preprocess-conditionals preprocess-printer
+               preprocess-test sharing-cons sharing-mapcar
+               string-or-qsym-p strip-quote))
+    (fmakunbound s)
+    (unintern s 'sb-disassem)))

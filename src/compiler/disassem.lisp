@@ -191,7 +191,7 @@
 (defstruct (instruction (:conc-name inst-)
                         (:constructor
                          make-instruction (name format-name print-name
-                                           length mask id %printer labeller
+                                           length mask id printer labeller
                                            prefilters control))
                         (:copier nil))
   (name nil :type (or symbol string) :read-only t)
@@ -205,9 +205,9 @@
   (print-name nil :type symbol :read-only t)
 
   ;; disassembly "functions"
-  (prefilters nil :type list)
-  (labeller nil :type (or list vector))
-  (%printer nil)
+  (prefilters nil :type list :read-only t)
+  (labeller nil :type (or list vector) :read-only t)
+  (printer nil :type (or null function) :read-only t)
   (control nil :type (or null function) :read-only t)
 
   ;; instructions that are the same as this instruction but with more
@@ -669,16 +669,7 @@
          (guts `(let* ,bindings ,@forms))
          (sub-table (assq :printer cache)))
     (or (cdr (assoc guts (cdr sub-table) :test #'equal-mod-gensyms))
-        (let ((cell (list guts)))
-          (push (cons guts cell) (cdr sub-table))
-          cell))))
-
-(defun inst-printer (inst &aux (printer (inst-%printer inst))
-                               (function (car printer)))
-  (unless (consp function) ; if not a cons, it is NIL or a function
-    (return-from inst-printer function))
-  (let
-    ((template
+        (let ((template
      '(lambda (chunk inst stream dstate
                &aux (chunk (truly-the dchunk chunk))
                     (inst (truly-the instruction inst))
@@ -725,9 +716,9 @@
                             local-filtered-value local-extract
                             lookup-label adjust-label))
            :body)))))
-   (setf (car printer)
-         (compile nil (subst function :body template)))))
-
+          (cdar (push (cons guts (compile nil (subst guts :body template)))
+                      (cdr sub-table)))))))
+
 (defun preprocess-test (subj form args)
   (multiple-value-bind (subj test)
       (if (and (consp form) (symbolp (car form)) (not (keywordp (car form))))

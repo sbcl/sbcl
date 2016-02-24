@@ -1894,11 +1894,6 @@ SPEED and COMPILATION-SPEED optimization values, and the
                                  #-sb-xc-host t)) ; can't track, no SBCL streams
          (*compiler-trace-output* nil)) ; might be modified below
 
-    (when trace-file
-      ;; Avoid calling COMPILE from disassembler within a dynamic binding
-      ;; of *COMPILER-TRACE-OUTPUT* to a non-nil value.
-      (sb!disassem::precompile-inst-printers))
-
     (unwind-protect
         (progn
           (when output-file
