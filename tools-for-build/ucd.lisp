@@ -332,8 +332,7 @@ Length should be adjusted when the standard changes.")
 (defun fixup-decompositions ()
   (loop for did-something = nil
         do
-        (loop for code being each hash-key of *ucd-entries*
-              using (hash-value ucd)
+        (loop for ucd being each hash-value of *ucd-entries*
               when (and (ucd-decomp ucd)
                         (not (logbitp 7 (elt (aref *misc-table* (ucd-misc ucd)) 4))))
               do

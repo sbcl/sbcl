@@ -2107,7 +2107,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
              (let* ((*constants-created-since-last-init* nil)
                     (circular-ref
                      (catch 'pending-init
-                       (loop for (name form) on (cdr info) by #'cddr
+                       (loop for (nil form) on (cdr info) by #'cddr
                          collect form into forms
                          finally (or (fopcompile-constant-init-forms fasl forms)
                                      (compile-make-load-form-init-forms forms)))

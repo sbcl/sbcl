@@ -1089,13 +1089,6 @@
 (defun princ16 (value stream)
   (write value :stream stream :radix t :base 16 :escape nil))
 
-(declaim (ftype function read-suffix))
-(defun read-signed-suffix (length dstate)
-  (declare (type (member 8 16 32 64) length)
-           (type disassem-state dstate)
-           (optimize (speed 3) (safety 0)))
-  (sign-extend (read-suffix length dstate) length))
-
 (defstruct (storage-info (:copier nil))
   (groups nil :type list)               ; alist of (name . location-group)
   (debug-vars #() :type vector))
@@ -1198,3 +1191,10 @@
 ;;; DSTATE.
 (defun dstate-get-inst-prop (dstate name)
   (member name (dstate-inst-properties dstate) :test #'eq))
+
+(declaim (ftype function read-suffix))
+(defun read-signed-suffix (length dstate)
+  (declare (type (member 8 16 32 64) length)
+           (type disassem-state dstate)
+           (optimize (speed 3) (safety 0)))
+  (sign-extend (read-suffix length dstate) length))
