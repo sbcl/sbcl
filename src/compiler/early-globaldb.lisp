@@ -63,7 +63,7 @@
   (validate-function nil :type (or function null) :read-only t)
   ;; If FUNCTIONP, then a function called when there is no information of
   ;; this type. If not FUNCTIONP, then any object serving as a default.
-  (default nil))
+  (default nil :read-only t))
 
 (declaim (freeze-type meta-info))
 

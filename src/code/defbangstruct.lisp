@@ -20,6 +20,10 @@
 
 (in-package "SB!KERNEL")
 
+;;; Has the type system been properly initialized? (I.e. is it OK to
+;;; use it?)
+(!defglobal *type-system-initialized* nil)
+
 ;;; A bootstrap MAKE-LOAD-FORM method can be a function or the name
 ;;; of a function.
 (deftype def!struct-type-make-load-form-fun () '(or function symbol))

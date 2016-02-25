@@ -39,9 +39,7 @@
                 ;; COLD-INIT-FORMS will already have been run.
                 (defglobal *ctype-hash-state* ,initform)
                 (defglobal *type-classes* (make-array ,n))
-                (!cold-init-forms
-                 (setq *ctype-hash-state* ,initform
-                       *type-classes* (make-array ,n)))))))
+                (!cold-init-forms (setq *ctype-hash-state* ,initform))))))
   (def))
 
 (defun type-class-or-lose (name)
@@ -71,21 +69,6 @@
 (defun must-supply-this (&rest foo)
   (/show0 "failing in MUST-SUPPLY-THIS")
   (error "missing type method for ~S" foo))
-
-(declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))
-;;; Look for nice relationships for types that have nice relationships
-;;; only when one is a hierarchical subtype of the other.
-(defun hierarchical-intersection2 (type1 type2)
-  (multiple-value-bind (subtypep1 win1) (csubtypep type1 type2)
-    (multiple-value-bind (subtypep2 win2) (csubtypep type2 type1)
-      (cond (subtypep1 type1)
-            (subtypep2 type2)
-            ((and win1 win2) *empty-type*)
-            (t nil)))))
-(defun hierarchical-union2 (type1 type2)
-  (cond ((csubtypep type1 type2) type2)
-        ((csubtypep type2 type1) type1)
-        (t nil)))
 
 ;;; A TYPE-CLASS object represents the "kind" of a type. It mainly
 ;;; contains functions which are methods on that kind of type, but is
@@ -284,6 +267,22 @@
                 (type-hash-value obj)))
   obj)
 
+;; For cold-init: improve the randomness of the hash.
+;; (The host uses at most 21 bits of randomness. See CTYPE-RANDOM)
+#+sb-xc
+(defun !fix-ctype-hash (obj)
+  (let ((saetp-index (!ctype-saetp-index obj)))
+    ;; Preserve the interned-p and type=-optimization bits
+    ;; by flipping only the bits under the hash-mask.
+    (setf (type-hash-value obj)
+          (logxor (logand (sb!impl::quasi-random-address-based-hash
+                           *ctype-hash-state* +ctype-hash-mask+))
+                   (type-hash-value obj)))
+    ;; Except that some of those "non-intelligent" bits contain
+    ;; critical information, if this type is an array specialization.
+    (setf (!ctype-saetp-index obj) saetp-index))
+  obj)
+
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)
   (type-class-might-contain-other-types-p (type-class-info ctype)))
@@ -365,11 +364,30 @@
     `(if (find ',name *type-classes* :key #'type-class-name)
          (warn "Not redefining type-class ~S" ',name)
          (vector-push-extend ,make-it *type-classes*))
+    ;; The Nth entry in the array of classes contain a list of instances
+    ;; of the type-class created by genesis that need patching.
+    ;; Types are dumped into the cold core without pointing to their class
+    ;; which avoids a bootstrap problem: it's tricky to dump a type-class.
     #+sb-xc
-    `(!cold-init-forms
-      (setf (svref *type-classes*
-                   ,(position name *type-classes* :key #'type-class-name))
-            ,make-it))))
+    (let ((type-class-index
+           (position name *type-classes* :key #'type-class-name))
+          (slot-index
+           ;; KLUDGE: silence bogus warning that FIND "certainly" returns NIL
+           (locally (declare (notinline find))
+             (dsd-index (find 'class-info
+                              (dd-slots (find-defstruct-description 'ctype))
+                              :key #'dsd-name)))))
+      `(!cold-init-forms
+        (let* ((backpatch-list (svref *type-classes* ,type-class-index))
+               (type-class ,make-it))
+          (setf (svref *type-classes* ,type-class-index) type-class)
+          #+nil
+          (progn
+            (princ ,(format nil "Patching type-class ~A into instances: " name))
+            (princ (length backpatch-list))
+            (terpri))
+          (dolist (instance backpatch-list)
+            (setf (%instance-ref instance ,slot-index) type-class)))))))
 
 ;;; Define the translation from a type-specifier to a type structure for
 ;;; some particular type. Syntax is identical to DEFTYPE.
@@ -502,6 +520,20 @@
 
 ;;; A few type representations need to be defined slightly earlier than
 ;;; 'early-type' is compiled, so they're defined here.
+
+;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
+;;; special cases, as well as other special cases needed to
+;;; interpolate between regions of the type hierarchy, such as
+;;; INSTANCE (which corresponds to all those classes with slots which
+;;; are not funcallable), FUNCALLABLE-INSTANCE (those classes with
+;;; slots which are funcallable) and EXTENDED-SEQUUENCE (non-LIST
+;;; non-VECTOR classes which are also sequences).  These special cases
+;;; are the ones that aren't really discussed by Baker in his
+;;; "Decision Procedure for SUBTYPEP" paper.
+(defstruct (named-type (:include ctype
+                                 (class-info (type-class-or-lose 'named)))
+                       (:copier nil))
+  (name nil :type symbol :read-only t))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
@@ -694,3 +726,25 @@
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype :read-only t))
+
+(declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))
+;;; Look for nice relationships for types that have nice relationships
+;;; only when one is a hierarchical subtype of the other.
+(defun hierarchical-intersection2 (type1 type2)
+  ;; *EMPTY-TYPE* is involved in a dependency cycle: It wants to be a constant
+  ;; instance of NAMED-TYPE. To construct an instance of a type, you need a
+  ;; type-class. A type-class needs to refer to this function, which refers
+  ;; to *EMPTY-TYPE*, which .... etc.
+  ;; In the cross-compiler, it is actually a constant.
+  #+sb-xc-host (declare (special *empty-type*))
+  (multiple-value-bind (subtypep1 win1) (csubtypep type1 type2)
+    (multiple-value-bind (subtypep2 win2) (csubtypep type2 type1)
+      (cond (subtypep1 type1)
+            (subtypep2 type2)
+            ((and win1 win2) *empty-type*)
+            (t nil)))))
+
+(defun hierarchical-union2 (type1 type2)
+  (cond ((csubtypep type1 type2) type2)
+        ((csubtypep type2 type1) type1)
+        (t nil)))

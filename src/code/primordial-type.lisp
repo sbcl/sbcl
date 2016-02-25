@@ -9,20 +9,45 @@
 
 (in-package "SB!KERNEL")
 
-;;; Has the type system been properly initialized? (I.e. is it OK to
-;;; use it?)
-(!defglobal *type-system-initialized* nil)
+(!begin-collecting-cold-init-forms)
 
-;; These are set by cold-init-forms in 'late-type' (look for "macrolet frob").
-;; It is a requirement of the type machinery that there be
-;; exactly one instance of each of these, which is to say,
-;; any type named T is exactly EQ to *UNIVERSAL-TYPE*, etc.
-(defglobal *wild-type* -1)
-(defglobal *empty-type* -1)
-(defglobal *universal-type* -1)
-(defglobal *instance-type* -1)
-(defglobal *funcallable-instance-type* -1)
-(defglobal *extended-sequence-type* -1)
+(!define-type-class named :enumerable nil :might-contain-other-types nil)
+
+(macrolet ((frob (type global-sym)
+            `(progn
+               #+sb-xc-host
+               (progn (defvar ,global-sym
+                        (mark-ctype-interned (make-named-type :name ',type)))
+                      ;; Make it known as a constant in the cross-compiler.
+                      (setf (info :variable :kind ',global-sym) :constant))
+               (!cold-init-forms
+                #+sb-xc (sb!c::!%quietly-defconstant
+                         ',global-sym
+                         (!fix-ctype-hash ,global-sym)
+                         (sb!c::source-location))
+                (setf (info :type :builtin ',type) ,global-sym
+                      (info :type :kind ',type) :primitive)))))
+   ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
+   ;; special symbol which can be stuck in some places where an
+   ;; ordinary type can go, e.g. (ARRAY * 1) instead of (ARRAY T 1).
+   ;; In SBCL it also used to denote universal VALUES type.
+   (frob * *wild-type*)
+   (frob nil *empty-type*)
+   (frob t *universal-type*)
+   ;; new in sbcl-0.9.5: these used to be CLASSOID types, but that
+   ;; view of them was incompatible with requirements on the MOP
+   ;; metaobject class hierarchy: the INSTANCE and
+   ;; FUNCALLABLE-INSTANCE types are disjoint (instances have
+   ;; instance-pointer-lowtag; funcallable-instances have
+   ;; fun-pointer-lowtag), while FUNCALLABLE-STANDARD-OBJECT is
+   ;; required to be a subclass of STANDARD-OBJECT.  -- CSR,
+   ;; 2005-09-09
+   (frob instance *instance-type*)
+   (frob funcallable-instance *funcallable-instance-type*)
+   ;; new in sbcl-1.0.3.3: necessary to act as a join point for the
+   ;; extended sequence hierarchy.  (Might be removed later if we use
+   ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
+   (frob extended-sequence *extended-sequence-type*))
 
 ;; Unlike the above, this one is not a NAMED-TYPE, and as such
 ;; does not have to be a singleton, but it improves efficiency.
@@ -33,3 +58,5 @@
 ;;; the layouts of built-in classes
 (defglobal **built-in-class-codes** #()) ; initialized in cold load
 (declaim (type simple-vector **built-in-class-codes**))
+
+(!defun-from-collected-cold-init-forms !primordial-type-cold-init)

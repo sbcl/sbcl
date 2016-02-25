@@ -935,10 +935,22 @@ core and return a descriptor to it."
 (defun cold-symbol-value (symbol)
   (let ((val (read-wordindexed (cold-intern symbol) sb!vm:symbol-value-slot)))
     (if (= (descriptor-bits val) sb!vm:unbound-marker-widetag)
-        (error "Taking Cold-symbol-value of unbound symbol ~S" symbol)
+        (unbound-cold-symbol-handler symbol)
         val)))
 (defun cold-fdefn-fun (cold-fdefn)
   (read-wordindexed cold-fdefn sb!vm:fdefn-fun-slot))
+
+(defun unbound-cold-symbol-handler (symbol)
+  (let ((host-val (and (boundp symbol) (symbol-value symbol))))
+    (if (typep host-val 'sb!kernel:named-type)
+        (let ((target-val (ctype-to-core (sb!kernel:named-type-name host-val)
+                                         host-val)))
+          ;; Though it looks complicated to assign cold symbols on demand,
+          ;; it avoids writing code to build the layout of NAMED-TYPE in the
+          ;; way we build other primordial stuff such as layout-of-layout.
+          (cold-set symbol target-val)
+          target-val)
+        (error "Taking Cold-symbol-value of unbound symbol ~S" symbol))))
 
 ;;;; layouts and type system pre-initialization
 
@@ -979,6 +991,28 @@ core and return a descriptor to it."
                (or (gethash (descriptor-bits des) *cold-layout-names*)
                    (error "~S is not the descriptor of a cold-layout" des)))
        (vector-from-core x)))
+
+;;; COLD-DD-SLOTS is a cold descriptor for the list of slots
+;;; in a cold defstruct-description. INDEX is a DSD-INDEX.
+;;; Return the host's accessor name for the host image of that slot.
+(defun dsd-accessor-from-cold-slots (cold-dd-slots desired-index)
+  (let* ((dsd-slots (dd-slots
+                     (find-defstruct-description 'defstruct-slot-description)))
+         (index-slot
+          (dsd-index (find 'sb!kernel::index dsd-slots :key #'dsd-name)))
+         (accessor-fun-name-slot
+          (dsd-index (find 'sb!kernel::accessor-name dsd-slots :key #'dsd-name))))
+    (do ((list cold-dd-slots (cold-cdr list)))
+        ((cold-null list))
+      (when (= (descriptor-fixnum
+                (read-wordindexed (cold-car list)
+                                  (+ sb!vm:instance-slots-offset index-slot)))
+               desired-index)
+        (return
+         (warm-symbol
+          (read-wordindexed (cold-car list)
+                            (+ sb!vm:instance-slots-offset
+                               accessor-fun-name-slot))))))))
 
 (flet ((get-slots (host-layout-or-type)
          (etypecase host-layout-or-type
@@ -1075,6 +1109,49 @@ core and return a descriptor to it."
 
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name
           (gethash name *cold-layouts*) result)))
+
+;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
+;;; in the cold core. Presently this is used only for NAMED-TYPE,
+;;; but the code is capable of dumping more complex structure so that
+;;; things like (SPECIFIER-TYPE 'LIST) can be dump as constants.
+(defvar *ctype-cache*)
+(defun ctype-to-core (specifier obj)
+  (declare (type ctype obj))
+  ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
+  (or (gethash specifier *ctype-cache*)
+      (let* ((host-type (type-of obj)) ; e.g. MEMBER-TYPE, NUMERIC-TYPE
+             (target-layout (or (gethash host-type *cold-layouts*)
+                                (error "No target layout for ~S" obj)))
+             (result (allocate-struct *dynamic* target-layout))
+             (cold-dd-slots (dd-slots-from-core host-type))
+             (class-info-slot
+              (dsd-index (find 'sb!kernel::class-info
+                               (dd-slots (find-defstruct-description 'ctype))
+                               :key #'dsd-name))))
+        (aver (zerop (layout-raw-slot-metadata (find-layout host-type))))
+        (setf (gethash specifier *ctype-cache*) result)
+        ;; Dump the slots.
+        (do ((len (cold-layout-length target-layout))
+             (index 1 (1+ index)))
+            ((= index len) result)
+          (write-wordindexed
+           result
+           (+ sb!vm:instance-slots-offset index)
+           (if (= index class-info-slot)
+               (let ((cold-vector
+                      (cold-symbol-value 'sb!kernel::*type-classes*))
+                     (class-index
+                      (position (sb!kernel::type-class-info obj)
+                                sb!kernel::*type-classes*)))
+                 (cold-svset cold-vector class-index
+                             (cold-cons result
+                                        (cold-svref cold-vector class-index)))
+                 *nil-descriptor*)
+               (host-constant-to-core
+                (funcall (dsd-accessor-from-cold-slots cold-dd-slots index) obj)
+                (lambda (obj)
+                  (typecase obj
+                   (ctype (ctype-to-core (type-specifier obj) obj)))))))))))
 
 ;; This is called to backpatch three small sets of objects:
 ;;  - layouts which are made before layout-of-layout is made (4 of them)
@@ -1288,14 +1365,14 @@ core and return a descriptor to it."
 
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
-(defun host-constant-to-core (host-value)
+(defun host-constant-to-core (host-value &optional helper)
   (let ((visited (make-hash-table :test #'eq)))
     (named-let target-representation ((value host-value))
       (unless (typep value '(or symbol number descriptor))
         (if (gethash value visited) ; Sharing/circularity not handled
             (bug "circular constant?")
             (setf (gethash value visited) t)))
-      (etypecase value
+      (typecase value
         (descriptor value)
         (symbol (if (symbol-package value)
                     (cold-intern value)
@@ -1305,7 +1382,10 @@ core and return a descriptor to it."
         (cons (cold-cons (target-representation (car value))
                          (target-representation (cdr value))))
         (simple-vector
-         (vector-in-core (map 'list #'target-representation value)))))))
+         (vector-in-core (map 'list #'target-representation value)))
+        (t
+         (or (and helper (funcall helper value))
+             (error "host-constant-to-core: can't convert ~S" value)))))))
 
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
 (defun target-symbol-function (symbol)
@@ -3678,6 +3758,7 @@ initially undefined function references:~2%")
            (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
+           (*ctype-cache* (make-hash-table :test 'equal))
            (*!cold-defconstants* nil)
            (*!cold-defuns* nil)
            (*!cold-setf-macros* nil)
@@ -3719,6 +3800,10 @@ initially undefined function references:~2%")
       (dolist (exported-name
                (sb-cold:read-from-file "common-lisp-exports.lisp-expr"))
         (cold-intern (intern exported-name *cl-package*) :access :external))
+
+      ;; Create SB!KERNEL::*TYPE-CLASSES* as an array of NIL
+      (cold-set (cold-intern 'sb!kernel::*type-classes*)
+                (vector-in-core (make-list (length sb!kernel::*type-classes*))))
 
       ;; Cold load.
       (dolist (file-name object-file-names)

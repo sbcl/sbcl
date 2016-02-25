@@ -1149,8 +1149,6 @@
 
 ;;;; built-in types
 
-(!define-type-class named :enumerable nil :might-contain-other-types nil)
-
 ;; This is used when parsing (SATISFIES KEYWORDP)
 ;; so that simplifications can be made when computing intersections,
 ;; without which we would see this kind of "empty-type in disguise"
@@ -1171,35 +1169,6 @@
 ;; This leads to about 20KB of extra code being retained on x86-64.
 ;; An educated guess is that DEFINE-SUPERCLASSES is responsible for the problem.
 (defun !late-type-cold-init2 ()
- (macrolet ((frob (name var)
-              `(progn
-                 (setq ,var
-                       (mark-ctype-interned (make-named-type :name ',name)))
-                 (setf (info :type :kind ',name) :primitive)
-                 (setf (info :type :builtin ',name) ,var))))
-   ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
-   ;; special symbol which can be stuck in some places where an
-   ;; ordinary type can go, e.g. (ARRAY * 1) instead of (ARRAY T 1).
-   ;; In SBCL it also used to denote universal VALUES type.
-   (frob * *wild-type*)
-   (frob nil *empty-type*)
-   (frob t *universal-type*)
-   (setf (sb!c::meta-info-default (sb!c::meta-info :variable :type))
-         *universal-type*)
-   ;; new in sbcl-0.9.5: these used to be CLASSOID types, but that
-   ;; view of them was incompatible with requirements on the MOP
-   ;; metaobject class hierarchy: the INSTANCE and
-   ;; FUNCALLABLE-INSTANCE types are disjoint (instances have
-   ;; instance-pointer-lowtag; funcallable-instances have
-   ;; fun-pointer-lowtag), while FUNCALLABLE-STANDARD-OBJECT is
-   ;; required to be a subclass of STANDARD-OBJECT.  -- CSR,
-   ;; 2005-09-09
-   (frob instance *instance-type*)
-   (frob funcallable-instance *funcallable-instance-type*)
-   ;; new in sbcl-1.0.3.3: necessary to act as a join point for the
-   ;; extended sequence hierarchy.  (Might be removed later if we use
-   ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
-   (frob extended-sequence *extended-sequence-type*))
  (!intern-important-fun-type-instances)
  (!intern-important-member-type-instances)
  (!intern-important-cons-type-instances)

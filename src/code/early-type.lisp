@@ -233,20 +233,6 @@
   ;; specifier to win.
   (type (missing-arg) :type ctype :read-only t))
 
-;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
-;;; special cases, as well as other special cases needed to
-;;; interpolate between regions of the type hierarchy, such as
-;;; INSTANCE (which corresponds to all those classes with slots which
-;;; are not funcallable), FUNCALLABLE-INSTANCE (those classes with
-;;; slots which are funcallable) and EXTENDED-SEQUUENCE (non-LIST
-;;; non-VECTOR classes which are also sequences).  These special cases
-;;; are the ones that aren't really discussed by Baker in his
-;;; "Decision Procedure for SUBTYPEP" paper.
-(defstruct (named-type (:include ctype
-                                 (class-info (type-class-or-lose 'named)))
-                       (:copier nil))
-  (name nil :type symbol :read-only t))
-
 ;; For some numeric subtypes, uniqueness of the object representation
 ;; is enforced. These encompass all array specializations and more.
 (defglobal *unsigned-byte-type* -1)
