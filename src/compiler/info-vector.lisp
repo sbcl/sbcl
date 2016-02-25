@@ -1043,7 +1043,7 @@ This is interpreted as
 ;; The info for a symbol's fdefn must precede other info-numbers.
 ;; and SETF must be the first aux key if other aux keys are present.
 ;; The test function does not enforce these invariants.
-;; N.B. As this function starts with "!", is is omitted from the target image.
+#+nil ; for debugging only
 (defun !test-packify-infos (&rest lists)
   (flet ((check (plist)
            (and (evenp (length plist))
