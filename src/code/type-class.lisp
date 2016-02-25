@@ -549,9 +549,9 @@
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
   (complexp :maybe :type (member t nil :maybe) :read-only t)
   ;; the element type as originally specified
-  (element-type (missing-arg) :type ctype :read-only t)
+  (element-type nil :type ctype :read-only t)
   ;; the element type as it is specialized in this implementation
-  (specialized-element-type *wild-type* :type ctype :read-only t))
+  (specialized-element-type nil :type ctype :read-only t))
 
 (defstruct (character-set-type
             (:include ctype
