@@ -202,14 +202,14 @@
                        (not (eq (tn-kind x) :constant)))
                       (remove-written-tns))
                      ((setf constant (find-constant-tn x (tn-sc y)))
+                      (when (register-p y)
+                        (setf (svref loaded-constants (tn-offset y))
+                              (cons x y)))
                       ;; XOR is more compact on x86oids and many
                       ;; RISCs have a zero register
                       (unless (and (constant-p (tn-leaf x))
                                    (eql (tn-value x) 0)
                                    (register-p y))
-                        (when (register-p y)
-                          (setf (svref loaded-constants (tn-offset y))
-                                (cons x y)))
                         (setf (tn-ref-tn args) constant)
                         (setf (tn-ref-load-tn args) nil)))
                      ((register-p y)
