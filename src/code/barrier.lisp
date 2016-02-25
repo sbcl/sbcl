@@ -36,12 +36,6 @@
 
 
 ;;;; The actual barrier macro and support
-(defconstant-eqx +barrier-kind-functions+
-  '(:compiler sb!vm:%compiler-barrier :memory sb!vm:%memory-barrier
-    :read sb!vm:%read-barrier :write sb!vm:%write-barrier
-    :data-dependency sb!vm:%data-dependency-barrier)
-  #'equal)
-
 (defmacro barrier ((kind) &body forms)
   #!+sb-doc
   "Insert a barrier in the code stream, preventing some sort of
@@ -74,5 +68,10 @@ The file \"memory-barriers.txt\" in the Linux kernel documentation is
 highly recommended reading for anyone programming at this level."
   `(multiple-value-prog1
     (progn ,@forms)
-    (,(or (getf +barrier-kind-functions+ kind)
+    (,(or (getf '(:compiler        sb!vm:%compiler-barrier
+                  :memory          sb!vm:%memory-barrier
+                  :read            sb!vm:%read-barrier
+                  :write           sb!vm:%write-barrier
+                  :data-dependency sb!vm:%data-dependency-barrier)
+                kind)
           (error "Unknown barrier kind ~S" kind)))))

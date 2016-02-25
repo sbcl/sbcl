@@ -105,6 +105,7 @@
 ;;; a list of toplevel things set by GENESIS
 (defvar *!cold-toplevels*)                 ; except for DEFUNs and SETF macros
 (defvar *!cold-setf-macros*)               ; just SETF macros
+(defvar *!cold-defconstants*)              ; just DEFCONSTANT-EQXs
 (defvar *!cold-defuns*)                    ; just DEFUNs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
@@ -199,6 +200,11 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb!kernel::!set-up-structure-object-class)
 
+  (dolist (x *!cold-defconstants*)
+    (destructuring-bind (name source-loc &optional docstring) x
+      (setf (info :variable :kind name) :constant)
+      (when source-loc (setf (info :source-location :constant name) source-loc))
+      (when docstring (setf (fdocumentation name 'variable) docstring))))
   (dolist (x *!cold-setf-macros*)
     (apply #'!quietly-defsetf x))
   (dolist (x *!cold-defuns*)

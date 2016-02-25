@@ -82,6 +82,15 @@
                   (or (member function '(sb!impl::%defun
                                          sb!impl::%defsetf
                                          sb!kernel::%defstruct))
+                      (and (eq function 'sb!c::%defconstant)
+                           ;; %DEFCONSTANT is fopcompilable only if the value
+                           ;; is trivially a compile-time constant,
+                           ;; and not, e.g. (COMPLICATED-FOLDABLE-EXPR),
+                           ;; because we can't compute that with fasl ops.
+                           (let ((val (third form)))
+                             (and (typep val '(or rational (cons (eql quote))))
+                                  (constant-fopcompilable-p
+                                   (constant-form-value val)))))
                       (and (symbolp function) ; no ((lambda ...) ...)
                            (get-properties (symbol-plist function)
                                            '(:sb-cold-funcall-handler/for-effect

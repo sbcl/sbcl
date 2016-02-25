@@ -69,8 +69,29 @@
 ;;; which are appropriately compared using the function given by the
 ;;; EQX argument instead of EQL.
 ;;;
-(defmacro defconstant-eqx (symbol expr eqx &optional doc)
-  `(def!constant ,symbol
-     (%defconstant-eqx-value ',symbol ,expr ,eqx)
-     ,@(when doc (list doc))))
+(#+sb-xc-host defmacro
+ #-sb-xc-host defmacro-mundanely ; don't want this definition until warm load
+  defconstant-eqx (symbol expr eqx &optional doc)
+    `(def!constant ,symbol
+       (%defconstant-eqx-value ',symbol ,expr ,eqx)
+       ,@(when doc (list doc))))
+
+;; We want DEFCONSTANT-EQX to work in cold-load so that non-EQL-comparable
+;; constants (like BYTE specifiers) can be accessed immediately in cold-init.
+;; There are two issues: (1) we can't have expressions like (BYTE s p)
+;; reach the fopcompiler, because it would emit a fop-funcall. That would
+;; entail conversion of arguments from target to host integers, then
+;; eval'ing and pushing a target object. It's easier to fold BYTE now and
+;; have it dumped in the usual way. SB!XC:CONSTANTP recognizes that BYTE
+;; can be folded; and (2) we must avoid %DEFCONSTANT-EQX-VALUE.
+#+sb-xc
+(eval-when (:compile-toplevel) ; DEFMACRO-MUNDANELY took care of load-time
+  (sb!xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
+    (declare (ignore eqx))
+    `(sb!c::%defconstant ',symbol
+                         ,(if (sb!xc:constantp expr)
+                              (list 'quote (constant-form-value expr))
+                              expr)
+                         (sb!c:source-location)
+                         ,@(when doc (list doc)))))
 

@@ -2062,15 +2062,15 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (when (find constant *constants-created-since-last-init* :test #'eq)
           (throw constant t))
         (throw 'pending-init circular-ref)))
+    ;; If this is a global constant reference, we can call SYMBOL-GLOBAL-VALUE
+    ;; during LOAD as a fasl op, and not compile a lambda.
+    (when namep
+      (fopcompile `(symbol-global-value ',name) nil t nil)
+      (fasl-note-handle-for-constant constant (sb!fasl::dump-pop fasl) fasl)
+      (return-from emit-make-load-form nil))
     (multiple-value-bind (creation-form init-form)
-        (if namep
-            ;; If the constant is a reference to a named constant, we can
-            ;; just use SYMBOL-VALUE during LOAD.
-            (values `(symbol-value ',name) nil)
-            (handler-case
-                (sb!xc:make-load-form constant (make-null-lexenv))
-              (error (condition)
-                (compiler-error condition))))
+        (handler-case (sb!xc:make-load-form constant (make-null-lexenv))
+          (error (condition) (compiler-error condition)))
       #-sb-xc-host
       (when (and (not namep)
                  (listp creation-form) ; skip if already a magic keyword
