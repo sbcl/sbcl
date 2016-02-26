@@ -288,12 +288,16 @@
               arg-count min)))
           ((< arg-count min)
            (note-lossage
-            "The function was called with ~R argument~:P, but wants at least ~R."
+            "The function ~S is called by ~S with ~R argument~:P, but wants at least ~R."
+            fun-name
+            *valid-fun-use-name*
             arg-count min))
           ((not max))
           ((> arg-count max)
            (note-lossage
-            "The function was called with ~R argument~:P, but wants at most ~R."
+            "The function ~S called by ~S with ~R argument~:P, but wants at most ~R."
+            fun-name
+            *valid-fun-use-name*
             arg-count max)))))))
 
 (defun check-structure-constructor-call (call dd ctor-ll-parts)
