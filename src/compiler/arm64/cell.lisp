@@ -24,7 +24,7 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg null)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
