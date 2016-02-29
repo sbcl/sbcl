@@ -814,10 +814,7 @@
 ;;; never return a VALUES type.
 (defun specifier-type-r (context type-specifier)
   (let ((ctype (values-specifier-type-r context type-specifier)))
-    (when (or (values-type-p ctype)
-              ;; bootstrap magic :-(
-              (and (named-type-p ctype)
-                   (eq (named-type-name ctype) '*)))
+    (when (values-type-p ctype)
       (error "VALUES type illegal in this context:~%  ~S" type-specifier))
     ctype))
 (defun specifier-type (type-specifier)
