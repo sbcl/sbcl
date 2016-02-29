@@ -554,7 +554,8 @@ invoked. In that case it will store into PLACE and start over."
 (defun funarg-bind/call-forms (funarg arg-forms)
   (if (typep funarg
              '(or (cons (eql function) (cons (satisfies legal-fun-name-p) null))
-                  (cons (eql quote) (cons symbol null))))
+                  (cons (eql quote) (cons symbol null))
+                  (cons (eql lambda))))
       (values nil `(funcall ,funarg . ,arg-forms))
     (let ((fn-sym (sb!xc:gensym))) ; for ONCE-ONLY-ish purposes
       (values `((,fn-sym (%coerce-callable-to-fun ,funarg)))
