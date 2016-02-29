@@ -191,7 +191,7 @@
           ((simple-array base-char (*))
            (data-vector-set string index new-value))
           ((simple-array nil (*))
-           (data-vector-set string index new-value))))))
+           (%type-check-error/c string 'nil-array-accessed-error))))))
 
 ;;; This and the corresponding -REF transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
