@@ -95,11 +95,15 @@
                           (list nil))))
                    (declare (truly-dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
-                     (,endtest (truly-the list (cdr ,map-result)))
+                     (,endtest
+                      (%rplacd ,temp nil) ;; replace the 0
+                      (truly-the list (cdr ,map-result)))
                      ;; Accumulate using %RPLACD. RPLACD becomes (SETF CDR)
                      ;; which becomes %RPLACD but relies on "defsetfs".
                      ;; This is for effect, not value, so makes no difference.
-                     (%rplacd ,temp (setq ,temp (list ,call)))))))
+                     (%rplacd ,temp (setq ,temp
+                                          ;; 0 is not written to the heap
+                                          (cons ,call 0)))))))
              ((nil)
               `(let ((,n-first ,(first arglists)))
                  (do-anonymous ,(do-clauses)
