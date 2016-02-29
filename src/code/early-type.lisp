@@ -754,11 +754,22 @@
                      ((sb!pcl::classp x) (translate (sb!pcl::class-classoid x)))
                      #-sb-xc-host
                      ((sb!pcl::eql-specializer-p type-specifier)
+                      ;; FIXME: these aren't always cached. Should they be?
+                      ;; It seems so, as "parsing" constructs a new object.
+                      ;; Perhaps better, the EQL specializer itself could store
+                      ;; (by memoizing, if not precomputing) a CTYPE
                       (make-eql-type
                        (sb!mop:eql-specializer-object type-specifier)))
                      (t (fail x))))))
     (when (typep type-specifier 'instance)
       (return-from values-specifier-type-r (instance-to-ctype type-specifier)))
+    (when (atom type-specifier)
+      ;; Try to bypass the cache, which avoids using a cache line for standard
+      ;; atomic specifiers. This is a trade-off- cache seek might be faster,
+      ;; but this solves the problem that a full call to (TYPEP #\A 'FIXNUM)
+      ;; consed a cache line every time the cache missed on FIXNUM (etc).
+      (awhen (info :type :builtin type-specifier)
+        (return-from values-specifier-type-r it)))
     (!values-specifier-type-memo-wrapper
      (lambda ()
        (labels
