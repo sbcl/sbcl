@@ -605,16 +605,6 @@ be a lambda expression."
                `(%coerce-callable-to-fun ,lvar-name))))))
 
 ;;;; FUNCALL
-
-;;; FUNCALL is implemented on %FUNCALL, which can only call functions
-;;; (not symbols). %FUNCALL is used directly in some places where the
-;;; call should always be open-coded even if FUNCALL is :NOTINLINE.
-(deftransform funcall ((function &rest args) * *)
-  (let ((arg-names (make-gensym-list (length args))))
-    `(lambda (function ,@arg-names)
-       (declare (ignorable function))
-       `(%funcall ,(ensure-lvar-fun-form function 'function) ,@arg-names))))
-
 (def-ir1-translator %funcall ((function &rest args) start next result)
   ;; MACROEXPAND so that (LAMBDA ...) forms arriving here don't get an
   ;; extra cast inserted for them.
