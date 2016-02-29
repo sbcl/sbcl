@@ -635,12 +635,13 @@ necessary, since type inference may take arbitrarily long to converge.")
             (maybe-mumble "check-pack ")
             (check-pack-consistency component))
 
+          (optimize-constant-loads component)
           (when *compiler-trace-output*
             (describe-component component *compiler-trace-output*)
             (describe-ir2-component component *compiler-trace-output*))
 
           (maybe-mumble "code ")
-          (optimize-constant-loads component)
+
           (multiple-value-bind (code-length fixup-notes)
               (generate-code component)
 

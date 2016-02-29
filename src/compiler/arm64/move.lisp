@@ -161,6 +161,116 @@
   (any-reg descriptor-reg)
   (any-reg descriptor-reg))
 
+;;; Use LDP/STP when possible
+(defun load-store-two-words (vop1 vop2)
+  (let ((register-sb (sb-or-lose 'sb!vm::registers))
+        used-load-tn)
+    (labels ((register-p (tn)
+               (and (tn-p tn)
+                    (eq (sc-sb (tn-sc tn)) register-sb)))
+             (stack-p (tn)
+               (and (tn-p tn)
+                    (sc-is tn control-stack)))
+             (source (vop)
+               (tn-ref-tn (sb!c::vop-args  vop)))
+             (dest (vop)
+               (tn-ref-tn (sb!c::vop-results vop)))
+             (load-tn (vop)
+               (tn-ref-load-tn (sb!c::vop-args vop)))
+             (suitable-offsets-p (tn1 tn2)
+               (and (= (abs (- (tn-offset tn1)
+                               (tn-offset tn2)))
+                       1)
+                    (ldp-stp-offset-p (* (min (tn-offset tn1)
+                                              (tn-offset tn2))
+                                         n-word-bytes)
+                                      n-word-bits)))
+             (load-arg (x load-tn)
+               (sc-case x
+                 (null
+                  null-tn)
+                 ((constant immediate control-stack)
+                  (let ((tn (if (and used-load-tn
+                                     (location= used-load-tn
+                                                load-tn))
+                                tmp-tn
+                                load-tn)))
+                    (sc-case x
+                      (constant
+                       (load-constant vop1 x tn))
+                      (immediate
+                       (load-immediate vop1 x tn))
+                      (control-stack
+                       (load-stack vop1 x tn)))
+                    (setf used-load-tn tn)
+                    tn))
+                 (t
+                  (setf used-load-tn x)
+                  x)))
+             (do-moves (source1 source2 dest1 dest2 &optional (fp cfp-tn))
+               (cond ((and (stack-p dest1)
+                           (stack-p dest2)
+                           (not (location= dest1 source1))
+                           (not (location= dest2 source2))
+                           (or (not (eq fp cfp-tn))
+                               (and (not (location= dest1 source2))
+                                    (not (location= dest2 source1))))
+                           (suitable-offsets-p dest1 dest2))
+                      (if (and (stack-p source1)
+                               (stack-p source2)
+                               (do-moves source1 source2
+                                 (load-tn vop1)
+                                 (if (location= (load-tn vop1) (load-tn vop2))
+                                     tmp-tn
+                                     (load-tn vop2))))
+                          (setf source1 (load-tn vop1)
+                                source2 (if (location= (load-tn vop1) (load-tn vop2))
+                                            tmp-tn
+                                            (load-tn vop2)))
+                          (setf source1 (load-arg source1 (load-tn vop1))
+                                source2 (load-arg source2 (load-tn vop2))))
+                      (assemble (*code-segment* vop1)
+                        (when (> (tn-offset dest1)
+                                 (tn-offset dest2))
+                          (rotatef dest1 dest2)
+                          (rotatef source1 source2))
+                        (inst stp source1 source2
+                              (@ fp (* (tn-offset dest1) n-word-bytes))))
+                      t)
+                     ((and (stack-p source1)
+                           (stack-p source2)
+                           (register-p dest1)
+                           (register-p dest2)
+                           (not (location= dest1 dest2))
+                           (suitable-offsets-p source1 source2))
+                      (assemble (*code-segment* vop1)
+                        (when (> (tn-offset source1)
+                                 (tn-offset source2))
+                          (rotatef dest1 dest2)
+                          (rotatef source1 source2))
+                        (inst ldp dest1 dest2
+                              (@ fp (* (tn-offset source1) n-word-bytes))))
+                      t))))
+      (case (sb!c::vop-name vop1)
+        (move
+         (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)))
+        (sb!c::move-operand
+         (cond ((and (equal (sb!c::vop-codegen-info vop1)
+                            (sb!c::vop-codegen-info vop2))
+                     (memq (car (sb!c::vop-codegen-info vop1))
+                           '(load-stack store-stack)))
+                (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)))))
+        (move-arg
+         (let ((fp1 (tn-ref-tn (tn-ref-across (sb!c::vop-args vop1))))
+               (fp2 (tn-ref-tn (tn-ref-across (sb!c::vop-args vop2))))
+               (dest1 (dest vop1))
+               (dest2 (dest vop2)))
+           (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)
+             (if (and (stack-p dest1)
+                      (stack-p dest2)
+                      (eq fp1 fp2))
+                 fp1
+                 cfp-tn))))))))
 
 
 ;;;; ILLEGAL-MOVE

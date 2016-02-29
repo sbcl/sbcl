@@ -197,9 +197,12 @@
                     (x (tn-ref-tn args))
                     (y (tn-ref-tn (vop-results vop)))
                     constant)
-               (cond ((or
-                       (eq (sc-name (tn-sc x)) 'null)
-                       (not (eq (tn-kind x) :constant)))
+               (cond ((and (eq (vop-name vop) 'move)
+                           (location= x y))
+                      ;; Helps subsequent optimization of adjacent VOPs
+                      (delete-vop vop))
+                     ((or (eq (sc-name (tn-sc x)) 'null)
+                          (not (eq (tn-kind x) :constant)))
                       (remove-written-tns))
                      ((setf constant (find-constant-tn x (tn-sc y)))
                       (when (register-p y)
@@ -264,11 +267,19 @@
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
         (let ((gen (vop-info-generator-function (vop-info vop))))
-          (if gen
-            (funcall gen vop)
-            (format t
-                    "missing generator for ~S~%"
-                    (template-name (vop-info vop)))))))
+          (cond ((not gen)
+                 (format t
+                         "missing generator for ~S~%"
+                         (template-name (vop-info vop))))
+                #!+arm64
+                ((and (vop-next vop)
+                      (eq (vop-name vop)
+                          (vop-name (vop-next vop)))
+                      (memq (vop-name vop) '(move move-operand sb!vm::move-arg))
+                      (sb!vm::load-store-two-words vop (vop-next vop)))
+                 (setf vop (vop-next vop)))
+                (t
+                 (funcall gen vop))))))
     (sb!assem:append-segment *code-segment* *elsewhere*)
     (setf *elsewhere* nil)
     #!+inline-constants
