@@ -470,7 +470,7 @@
                                (= 1 (length args))
                                for-value-p)
                           (fopcompile (first args) path t)
-                          (sb!fasl::dump-fop 'sb!fasl::fop-package fasl))
+                          (dump-fop 'sb!fasl::fop-package fasl))
                          (t
                           (when (eq (info :function :where-from operator) :assumed)
                             (note-undefined-reference operator :function))
@@ -478,9 +478,8 @@
                           (dolist (arg args)
                             (fopcompile arg path t))
                           (if for-value-p
-                              (sb!fasl::dump-fop 'sb!fasl::fop-funcall fasl)
-                              (sb!fasl::dump-fop 'sb!fasl::fop-funcall-for-effect
-                                                 fasl))
+                              (dump-fop 'sb!fasl::fop-funcall fasl)
+                              (dump-fop 'sb!fasl::fop-funcall-for-effect fasl))
                           (let ((n-args (length args)))
                             ;; stub: FOP-FUNCALL isn't going to be usable
                             ;; to compile more than this, since its count
@@ -511,7 +510,7 @@
       (sb!fasl::dump-integer else-label fasl)
       (fopcompile condition path t)
       ;; If condition was false, skip to the ELSE
-      (sb!fasl::dump-fop 'sb!fasl::fop-skip-if-false fasl)
+      (dump-fop 'sb!fasl::fop-skip-if-false fasl)
       (fopcompile then path for-value-p)
       ;; The THEN branch will have produced a value even if we were
       ;; currently skipping to the ELSE branch (or over this whole
@@ -520,25 +519,25 @@
       ;; executed even when skipping over code. But this particular
       ;; value will be bogus, so we drop it.
       (when for-value-p
-        (sb!fasl::dump-fop 'sb!fasl::fop-drop-if-skipping fasl))
+        (dump-fop 'sb!fasl::fop-drop-if-skipping fasl))
       ;; Now skip to the END
       (sb!fasl::dump-integer end-label fasl)
-      (sb!fasl::dump-fop 'sb!fasl::fop-skip fasl)
+      (dump-fop 'sb!fasl::fop-skip fasl)
       ;; Start of the ELSE branch
       (sb!fasl::dump-integer else-label fasl)
-      (sb!fasl::dump-fop 'sb!fasl::fop-maybe-stop-skipping fasl)
+      (dump-fop 'sb!fasl::fop-maybe-stop-skipping fasl)
       (fopcompile else path for-value-p)
       ;; As before
       (when for-value-p
-        (sb!fasl::dump-fop 'sb!fasl::fop-drop-if-skipping fasl))
+        (dump-fop 'sb!fasl::fop-drop-if-skipping fasl))
       ;; End of IF
       (sb!fasl::dump-integer end-label fasl)
-      (sb!fasl::dump-fop 'sb!fasl::fop-maybe-stop-skipping fasl)
+      (dump-fop 'sb!fasl::fop-maybe-stop-skipping fasl)
       ;; If we're still skipping, we must've triggered both of the
       ;; drop-if-skipping fops. To keep the stack balanced, push a
       ;; dummy value if needed.
       (when for-value-p
-        (sb!fasl::dump-fop 'sb!fasl::fop-push-nil-if-skipping fasl)))))
+        (dump-fop 'sb!fasl::fop-push-nil-if-skipping fasl)))))
 
 (defun fopcompile-constant (fasl form for-value-p)
   (when for-value-p
@@ -565,7 +564,7 @@
   (let ((class-name (canonical-instance-maker-form-p form)))
     (when class-name
         (dump-object class-name fasl)
-        (sb!fasl::dump-fop 'sb!fasl::fop-allocate-instance fasl)
+        (dump-fop 'sb!fasl::fop-allocate-instance fasl)
         (let ((index (sb!fasl::fasl-output-table-free fasl)))
           (setf (sb!fasl::fasl-output-table-free fasl) (1+ index))
           index))))
@@ -613,7 +612,7 @@
                  (dump-object (cons (length slot-names) (nreverse slot-names))
                               fasl)
                  (dump-object instance fasl)
-                 (sb!fasl::dump-fop 'sb!fasl::fop-initialize-instance fasl)
+                 (dump-fop 'sb!fasl::fop-initialize-instance fasl)
                  t))
         (multiple-value-bind (obj slot val)
             (trivial-load-form-initform-args form)
