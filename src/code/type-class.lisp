@@ -150,7 +150,7 @@
   ;; is disjoint from MEMBER-TYPE and so forth. But types which can
   ;; contain other types, like HAIRY-TYPE and INTERSECTION-TYPE, can
   ;; violate this rule.
-  (might-contain-other-types-p nil)
+  (might-contain-other-types-p nil :type boolean :read-only t)
   ;; a function which returns T if the CTYPE could possibly be
   ;; equivalent to a MEMBER type. If not a function, then it's
   ;; a constant T or NIL for all instances of this type class.
@@ -162,7 +162,7 @@
   ;; set enumerable=T for NEGATION and HAIRY and some other things.
   ;; Conceptually the choices are really {yes, no, unknown}, but
   ;; whereas "no" means "definitely not", T means "yes or maybe".
-  (enumerable-p nil :type (or function null t))
+  (enumerable-p nil :type (or function boolean) :read-only t)
   ;; a function which returns T if the CTYPE is inhabited by a single
   ;; object and, as a value, the object.  Otherwise, returns NIL, NIL.
   ;; The default case (NIL) is interpreted as a function that always
