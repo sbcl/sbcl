@@ -1376,23 +1376,28 @@ core and return a descriptor to it."
   (let ((visited (make-hash-table :test #'eq)))
     (named-let target-representation ((value host-value))
       (unless (typep value '(or symbol number descriptor))
-        (if (gethash value visited) ; Sharing/circularity not handled
-            (bug "circular constant?")
-            (setf (gethash value visited) t)))
-      (typecase value
-        (descriptor value)
-        (symbol (if (symbol-package value)
-                    (cold-intern value)
-                    (get-uninterned-symbol (string value))))
-        (number (number-to-core value))
-        (string (base-string-to-core value))
-        (cons (cold-cons (target-representation (car value))
-                         (target-representation (cdr value))))
-        (simple-vector
-         (vector-in-core (map 'list #'target-representation value)))
-        (t
-         (or (and helper (funcall helper value))
-             (error "host-constant-to-core: can't convert ~S" value)))))))
+        (let ((found (gethash value visited)))
+          (cond ((eq found :pending)
+                 (bug "circular constant?")) ; Circularity not permitted
+                (found
+                 (return-from target-representation found))))
+        (setf (gethash value visited) :pending))
+      (setf (gethash value visited)
+            (typecase value
+              (descriptor value)
+              (symbol (if (symbol-package value)
+                          (cold-intern value)
+                          (get-uninterned-symbol (string value))))
+              (number (number-to-core value))
+              (string (base-string-to-core value))
+              (cons (cold-cons (target-representation (car value))
+                               (target-representation (cdr value))))
+              (simple-vector
+               (vector-in-core (map 'list #'target-representation value)))
+              (t
+               (or (and helper (funcall helper value))
+                   (error "host-constant-to-core: can't convert ~S"
+                          value))))))))
 
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
 (defun target-symbol-function (symbol)
@@ -3923,29 +3928,34 @@ initially undefined function references:~2%")
         (when core-file-name
           (write-initial-core-file core-file-name))))))
 
-;; This generalization of WARM-FUN-NAME will do in a pinch
-;; to make a human-readable object. It isn't 100% pedantically correct.
-(defun warmelize (descriptor)
-  (labels ((recurse (x)
-            (when (cold-null x)
-              (return-from recurse nil))
-            (when (is-fixnum-lowtag (descriptor-lowtag x))
-              (return-from recurse (descriptor-fixnum x)))
-            (ecase (descriptor-lowtag x)
-              (#.sb!vm:list-pointer-lowtag
-               (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
-              (#.sb!vm:fun-pointer-lowtag
-               (let ((name (read-wordindexed x sb!vm:simple-fun-name-slot)))
-                 `(function ,(recurse name))))
-              (#.sb!vm:other-pointer-lowtag
-               (let ((widetag (logand (descriptor-bits (read-memory x))
-                                      sb!vm:widetag-mask)))
-                 (ecase widetag
-                   (#.sb!vm:symbol-header-widetag
-                    ;; this is only approximate, as it disregards package
-                    (intern (recurse (read-wordindexed x sb!vm:symbol-name-slot))))
-                   (#.sb!vm:simple-base-string-widetag
-                    (base-string-from-core x))
-                   (#.sb!vm:simple-vector-widetag
-                    (vector-from-core x #'recurse))))))))
-    (recurse descriptor)))
+;;; Invert the action of HOST-CONSTANT-TO-CORE. If STRICTP is given as NIL,
+;;; then we can produce a host object even if it is not a faithful rendition.
+(defun host-object-from-core (descriptor &optional (strictp t))
+  (named-let recurse ((x descriptor))
+    (when (cold-null x)
+      (return-from recurse nil))
+    (when (eq (descriptor-gspace x) :load-time-value)
+      (error "Can't warm a deferred LTV placeholder"))
+    (when (is-fixnum-lowtag (descriptor-lowtag x))
+      (return-from recurse (descriptor-fixnum x)))
+    (ecase (descriptor-lowtag x)
+      (#.sb!vm:list-pointer-lowtag
+       (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
+      (#.sb!vm:fun-pointer-lowtag
+       (if strictp
+           (error "Can't map cold-fun -> warm-fun")
+           (let ((name (read-wordindexed x sb!vm:simple-fun-name-slot)))
+             `(function ,(recurse name)))))
+      (#.sb!vm:other-pointer-lowtag
+       (let ((widetag (logand (descriptor-bits (read-memory x))
+                              sb!vm:widetag-mask)))
+         (ecase widetag
+           (#.sb!vm:symbol-header-widetag
+            (if strictp
+                (warm-symbol x)
+                (or (gethash (descriptor-bits x) *cold-symbols*) ; first try
+                    (make-symbol
+                     (recurse (read-wordindexed x sb!vm:symbol-name-slot))))))
+           (#.sb!vm:simple-base-string-widetag (base-string-from-core x))
+           (#.sb!vm:simple-vector-widetag (vector-from-core x #'recurse))
+           (#.sb!vm:bignum-widetag (bignum-from-core x))))))))
