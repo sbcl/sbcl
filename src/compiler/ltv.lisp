@@ -13,6 +13,37 @@
 
 (defknown %load-time-value (t) t (flushable movable))
 
+;;; Compile FORM and arrange for it to be called at load-time. Return
+;;; the dumper handle and our best guess at the type of the object.
+;;; It would be nice if L-T-V forms were generally eligible
+;;; for fopcompilation, as it could eliminate special cases below.
+(defun compile-load-time-value (form)
+  (acond ((typecase form
+            ;; This case is important for dumping packages as constants
+            ;; in cold-init, but works fine in the normal target too.
+            ((cons (eql find-package) (cons string null)) 'package)
+            ;; Another similar case - this allows the printer to work
+            ;; immediately in cold-init. (See SETUP-PRINTER-STATE.)
+            ((cons (eql function)
+                   (cons (satisfies sb!int:legal-fun-name-p) null))
+             'function)
+            ;; Case(s) that should only happen in the cross-compiler.
+            ;; We want to construct cold classoid cells, but in general
+            ;; FIND-CLASSOID-CELL could be called with :CREATE NIL.
+            #+sb-xc-host
+            ((cons (eql find-classoid-cell) (cons (cons (eql quote))))
+             (aver (eq (getf (cddr form) :create) t))
+             'sb!kernel::classoid-cell))
+          (fopcompile form nil t)
+          (values (sb!fasl::dump-pop *compile-object*) (specifier-type it)))
+         (t
+          (let ((lambda (compile-load-time-stuff form t)))
+            (values (fasl-dump-load-time-value-lambda lambda *compile-object*)
+                    (let ((type (leaf-type lambda)))
+                      (if (fun-type-p type)
+                          (single-value-type (fun-type-returns type))
+                          *wild-type*)))))))
+
 (def-ir1-translator load-time-value
     ((form &optional read-only-p) start next result)
   #!+sb-doc
@@ -60,9 +91,8 @@ guaranteed to never be modified, so it can be put in read-only storage."
             ;; the time if we had a way of telling the compiler that
             ;; "this object isn't really a constant the way you
             ;; think". --NS 2009-06-28
-            (compile-load-time-value (if read-only-p
-                                         form
-                                         `(make-value-cell ,form)))
+            (compile-load-time-value
+             (if read-only-p form `(make-value-cell ,form)))
           (unless (csubtypep type source-type)
             (setf type source-type))
           (let ((value-form
