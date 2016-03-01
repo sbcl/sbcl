@@ -308,6 +308,9 @@
     (assert-error (eval '(declare (print "foo" *out*))))
     (assert (string= (get-output-stream-string *out*) ""))))
 
+(with-test (:name :the-keyword-not-borked)
+  (assert (the (or integer keyword) :foo)))
+
 ;; If the DEFUN macro produces a style-warning, it needs to perform the
 ;; effect of defun no matter what. The style-warning comes from an EVAL-WHEN,
 ;; not as part of the execution-time behavior of %DEFUN because it is neither

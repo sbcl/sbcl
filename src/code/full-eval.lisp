@@ -933,20 +933,20 @@
                         (rest (values-type-rest vtype)))
                        ((null vs) (values-list values))
                      (if rest
-                         (unless (ctypep (car vs) rest)
+                         (unless (%%typep (car vs) rest nil)
                            (error 'type-error :datum (car vs) :expected-type (type-specifier rest)))
                          (error 'type-error :datum vs :expected-type nil))))
                 (let ((v (car vs))
                       (type (car ts)))
                   (when vs
-                    (unless (ctypep v type)
+                    (unless (%%typep v type nil)
                       (error 'type-error :datum v :expected-type (type-specifier type)))))))
            (let ((v (car vs))
                  (type (car ts)))
-             (unless (ctypep v type)
+             (unless (%%typep v type nil)
                (error 'type-error :datum v :expected-type (type-specifier type))))))
 
-        ((ctypep (car values) vtype) (values-list values))
+        ((%%typep (car values) vtype nil) (values-list values))
         (t (error 'type-error :datum (car values) :expected-type (type-specifier vtype)))))))
 
 (defun eval-unwind-protect (body env)
