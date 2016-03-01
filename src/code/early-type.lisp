@@ -464,34 +464,46 @@
                             (make-1 type-index '(*) t      element-type)
                             (make-1 type-index '*   nil    element-type)
                             (make-1 type-index '*   :maybe element-type))
-                      :start1 (* type-index 5))))
+                      :start1 (* type-index 5)))
+           (integer-range (low high)
+             (make-numeric-type :class 'integer :complexp :real
+                                :enumerable t :low low :high high)))
     (let ((index 0))
-      (dolist (x '#.*specialized-array-element-types*)
-        (make-all
-         (cond ((typep x '(cons (eql unsigned-byte)))
-                (aref *unsigned-byte-n-types* (cadr x)))
-               ((eq x 'bit) (aref *unsigned-byte-n-types* 1))
-               ((typep x '(cons (eql signed-byte)))
-                ;; 1- because there is no such thing as (signed-byte 0)
-                (aref *signed-byte-n-types* (1- (cadr x))))
-               ;; FIXNUM is its own thing, why? See comment in vm-array
-               ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
-               ((eq x 'fixnum) ; One good kludge deserves another.
-                (aref *signed-byte-n-types* (1- sb!vm:n-fixnum-bits)))
-               ((eq x 'single-float) *real-ffloat-type*)
-               ((eq x 'double-float) *real-dfloat-type*)
-               ((equal x '(complex single-float)) *complex-ffloat-type*)
-               ((equal x '(complex double-float)) *complex-dfloat-type*)
-               ((eq x 'character) *character-type*)
-               #!+sb-unicode ((eq x 'base-char) *base-char-type*)
-               ((eq x t) *universal-type*)
-               ((null x) *empty-type*))
-         index)
-        (incf index))
       ;; Index 31 is available to store *WILD-TYPE*
       ;; because there are fewer than 32 array widetags.
-      (aver (< index 31))
-      (make-all *wild-type* 31))))
+      (make-all *wild-type* 31)
+      (dolist (x '#.*specialized-array-element-types*
+                 (aver (< index 31)))
+        (make-all
+         ;; Produce element-type representation without parsing a spec.
+         ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
+         ;; The MAKE- constructors return an interned object as appropriate.
+         (etypecase x
+           ((cons (eql unsigned-byte))
+            (integer-range 0 (1- (ash 1 (second x)))))
+           ((cons (eql signed-byte))
+            (let ((lim (ash 1 (1- (second x)))))
+              (integer-range (- lim) (1- lim))))
+           ((eql bit) (integer-range 0 1))
+           ;; FIXNUM is its own thing, why? See comment in vm-array
+           ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
+           ((eql fixnum) ; One good kludge deserves another.
+            (integer-range sb!xc:most-negative-fixnum
+                           sb!xc:most-positive-fixnum))
+           ((member single-float double-float)
+            (make-numeric-type :class 'float :format x :complexp :real))
+           ((cons (eql complex))
+            (make-numeric-type :class 'float :format (cadr x)
+                               :complexp :complex))
+           ((eql character)
+            (make-character-set-type `((0 . ,(1- sb!xc:char-code-limit)))))
+           #!+sb-unicode
+           ((eql base-char)
+            (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
+           ((eql t) *universal-type*)
+           ((eql nil) *empty-type*))
+         index)
+        (incf index)))))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
