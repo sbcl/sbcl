@@ -387,7 +387,10 @@
             (princ (length backpatch-list))
             (terpri))
           (dolist (instance backpatch-list)
-            (setf (%instance-ref instance ,slot-index) type-class)))))))
+            ;; Fixup the class first, in case fixing the hash needs the class.
+            ;; (It doesn't currently, but just in case it does)
+            (setf (%instance-ref instance ,slot-index) type-class)
+            (!fix-ctype-hash instance)))))))
 
 ;;; Define the translation from a type-specifier to a type structure for
 ;;; some particular type. Syntax is identical to DEFTYPE.
