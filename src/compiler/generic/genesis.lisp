@@ -1119,39 +1119,46 @@ core and return a descriptor to it."
   (declare (type ctype obj))
   ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
   (or (gethash specifier *ctype-cache*)
-      (let* ((host-type (type-of obj)) ; e.g. MEMBER-TYPE, NUMERIC-TYPE
-             (target-layout (or (gethash host-type *cold-layouts*)
-                                (error "No target layout for ~S" obj)))
-             (result (allocate-struct *dynamic* target-layout))
-             (cold-dd-slots (dd-slots-from-core host-type))
-             (class-info-slot
+      (let* ((class-info-slot
               (dsd-index (find 'sb!kernel::class-info
                                (dd-slots (find-defstruct-description 'ctype))
-                               :key #'dsd-name))))
-        (aver (zerop (layout-raw-slot-metadata (find-layout host-type))))
-        (setf (gethash specifier *ctype-cache*) result)
-        ;; Dump the slots.
-        (do ((len (cold-layout-length target-layout))
-             (index 1 (1+ index)))
-            ((= index len) result)
-          (write-wordindexed
-           result
-           (+ sb!vm:instance-slots-offset index)
-           (if (= index class-info-slot)
-               (let ((cold-vector
-                      (cold-symbol-value 'sb!kernel::*type-classes*))
-                     (class-index
-                      (position (sb!kernel::type-class-info obj)
-                                sb!kernel::*type-classes*)))
-                 (cold-svset cold-vector class-index
-                             (cold-cons result
-                                        (cold-svref cold-vector class-index)))
-                 *nil-descriptor*)
-               (host-constant-to-core
-                (funcall (dsd-accessor-from-cold-slots cold-dd-slots index) obj)
-                (lambda (obj)
-                  (typecase obj
-                   (ctype (ctype-to-core (type-specifier obj) obj)))))))))))
+                               :key #'dsd-name)))
+             (result
+              (ctype-to-core-helper
+               obj
+               (lambda (obj)
+                 (typecase obj
+                   (xset (ctype-to-core-helper obj nil))
+                   (ctype (ctype-to-core (type-specifier obj) obj))))
+               (cons class-info-slot *nil-descriptor*))))
+        (let ((type-class-vector
+               (cold-symbol-value 'sb!kernel::*type-classes*))
+              (index (position (sb!kernel::type-class-info obj)
+                               sb!kernel::*type-classes*)))
+          ;; Push this instance into the list of fixups for its type class
+          (cold-svset type-class-vector index
+                      (cold-cons result (cold-svref type-class-vector index))))
+        (setf (gethash specifier *ctype-cache*) result))))
+
+(defun ctype-to-core-helper (obj obj-to-core-helper &rest exceptional-slots)
+  (let* ((host-type (type-of obj))
+         (target-layout (or (gethash host-type *cold-layouts*)
+                            (error "No target layout for ~S" obj)))
+         (result (allocate-struct *dynamic* target-layout))
+         (cold-dd-slots (dd-slots-from-core host-type)))
+    (aver (zerop (layout-raw-slot-metadata (find-layout host-type))))
+    ;; Dump the slots.
+    (do ((len (cold-layout-length target-layout))
+         (index 1 (1+ index)))
+        ((= index len) result)
+      (write-wordindexed
+       result
+       (+ sb!vm:instance-slots-offset index)
+       (acond ((assq index exceptional-slots) (cdr it))
+              (t (host-constant-to-core
+                  (funcall (dsd-accessor-from-cold-slots cold-dd-slots index)
+                           obj)
+                  obj-to-core-helper)))))))
 
 ;; This is called to backpatch three small sets of objects:
 ;;  - layouts which are made before layout-of-layout is made (4 of them)
