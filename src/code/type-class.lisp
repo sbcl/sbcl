@@ -628,7 +628,7 @@
                          (:copier nil))
   ;; Formerly defined in every CTYPE, but now just in the ones
   ;; for which enumerability is variable.
-  (enumerable nil :read-only t)
+  (enumerable nil :type boolean :read-only t)
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
   ;;

@@ -262,7 +262,7 @@
          (int-type (low high)
            (mark-ctype-interned
             (%make-numeric-type :class 'integer :complexp :real
-                                :enumerable (and low high)
+                                :enumerable (if (and low high) t nil)
                                 :low low :high high))))
     (setq *real-ffloat-type*      (float-type 'single-float :real)
           *real-dfloat-type*      (float-type 'double-float :real)
