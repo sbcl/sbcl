@@ -1481,6 +1481,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Return T if we are currently producing a fasl file and hence
 ;;; constants need to be dumped carefully.
+(declaim (inline producing-fasl-file))
 (defun producing-fasl-file ()
   (fasl-output-p *compile-object*))
 

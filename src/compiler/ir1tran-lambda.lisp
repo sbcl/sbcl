@@ -1316,7 +1316,7 @@
                   (get-defined-fun name (fifth inline-lambda))
                   (get-defined-fun name))))
       (when (boundp '*lexenv*)
-        (aver (fasl-output-p *compile-object*))
+        (aver (producing-fasl-file))
         (if (member name *fun-names-in-this-file* :test #'equal)
             (warn 'duplicate-definition :name name)
             (push name *fun-names-in-this-file*)))
@@ -1355,7 +1355,7 @@
   (when compile-toplevel
     (let ((name-key `(,kind ,name)))
       (when (boundp '*lexenv*)
-        (aver (fasl-output-p *compile-object*))
+        (aver (producing-fasl-file))
         (if (member name-key *fun-names-in-this-file* :test #'equal)
             (compiler-style-warn 'same-file-redefinition-warning :name name)
             (push name-key *fun-names-in-this-file*))))))
