@@ -349,9 +349,11 @@
 (assert (not (type= (specifier-type '(function (t) (values &optional)))
                     (specifier-type '(function (t) (values))))))
 
-;; Why this assertion? Because INDEX type is defined in 'early-extensions'
-;; which is far removed from the logic to return *INDEX-TYPE* which is
-;; hardwired into the kernel. We had best ensure that it remains correct.
-(assert (type= (specifier-type 'index) *index-type*))
+;; Assert that INDEX is an interned numeric type by parsing it twice,
+;; dropping the specifier-type cache in between.
+(let ((a (specifier-type 'index)))
+  (drop-all-hash-caches)
+  (let ((b (specifier-type 'index)))
+    (assert (eq a b))))
 
 (/show "done with tests/type.before-xc.lisp")

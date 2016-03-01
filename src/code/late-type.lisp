@@ -1172,9 +1172,6 @@
  (!intern-important-fun-type-instances)
  (!intern-important-member-type-instances)
  (!intern-important-cons-type-instances)
- (!intern-important-numeric-type-instances)
- (!intern-important-character-set-type-instances)
- (!intern-important-array-type-instances) ; must be after numeric and char
  (setf *satisfies-keywordp-type*
        (mark-ctype-interned (%make-hairy-type '(satisfies keywordp))))
  (setf *fun-name-type*
@@ -1716,9 +1713,6 @@
   (type-negation (specifier-type-r context typespec)))
 
 ;;;; numeric types
-
-(!define-type-class number :enumerable #'numeric-type-enumerable
-                    :might-contain-other-types nil)
 
 (declaim (inline numeric-type-equal))
 (defun numeric-type-equal (type1 type2)
@@ -2479,9 +2473,6 @@ used for a COMPLEX component.~:@>"
       (specifier-type 'number)))
 
 ;;;; array types
-
-(!define-type-class array :enumerable nil
-                    :might-contain-other-types nil)
 
 (!define-type-method (array :simple-=) (type1 type2)
   (cond ((not (and (equal (array-type-dimensions type1)
@@ -3466,15 +3457,6 @@ used for a COMPLEX component.~:@>"
 (!define-superclasses cons ((cons)) !cold-init-forms)
 
 ;;;; CHARACTER-SET types
-
-;; all character-set types are enumerable, but it's not possible
-;; for one to be TYPE= to a MEMBER type because (MEMBER #\x)
-;; is not internally represented as a MEMBER type.
-;; So in case it wasn't clear already ENUMERABLE-P does not mean
-;;  "possibly a MEMBER type in the Lisp-theoretic sense",
-;; but means "could be implemented in SBCL as a MEMBER type".
-(!define-type-class character-set :enumerable nil
-                    :might-contain-other-types nil)
 
 (!def-type-translator character-set
     (&optional (pairs '((0 . #.(1- sb!xc:char-code-limit)))))

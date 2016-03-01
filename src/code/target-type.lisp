@@ -140,7 +140,7 @@
       (array (ctype-of-array x))
       (cons *cons-t-t-type*)
       ;; This makes no distinction for BASE/EXTENDED-CHAR. Should it?
-      (character *character-type*)
+      (character (specifier-type 'character))
       #!+sb-simd-pack
       (simd-pack
        (let ((tag (%simd-pack-tag x)))

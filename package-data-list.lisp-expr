@@ -2153,6 +2153,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
                "!CONSTANTP-COLD-INIT" "!CONSTANTP2-COLD-INIT"
                "!WORLD-LOCK-COLD-INIT"
+               "!SPECIFIER-TYPE"
 
                "FLOAT-COLD-INIT-OR-REINIT"
                "GC-REINIT"

@@ -28,8 +28,13 @@
                    (cons (satisfies sb!int:legal-fun-name-p) null))
              'function)
             ;; Case(s) that should only happen in the cross-compiler.
+            #+sb-xc-host
+            ((or (cons (eql vector) (cons (cons (eql !specifier-type))))
+                 (cons (eql !specifier-type)))
+             'ctype)
             ;; We want to construct cold classoid cells, but in general
-            ;; FIND-CLASSOID-CELL could be called with :CREATE NIL.
+            ;; FIND-CLASSOID-CELL could be called with :CREATE NIL
+            ;; which can not be handled in cold-load.
             #+sb-xc-host
             ((cons (eql find-classoid-cell) (cons (cons (eql quote))))
              (aver (eq (getf (cddr form) :create) t))

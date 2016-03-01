@@ -371,7 +371,7 @@
            ((extended-sequence) (any))
            ((nil) (any))))
         (character-set-type
-         (if (eq type sb!kernel::*character-type*)
+         (if (eq type (specifier-type 'character))
              (exactly character)
              (part-of character)))
         #!+sb-simd-pack

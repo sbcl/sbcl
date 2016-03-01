@@ -800,6 +800,9 @@ core and return a descriptor to it."
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
     (write-wordindexed vector (+ i sb!vm:vector-data-offset) value)))
 
+(setf (get 'vector :sb-cold-funcall-handler/for-value)
+      (lambda (&rest args) (vector-in-core args)))
+
 (declaim (inline cold-vector-len cold-svref))
 (defun cold-vector-len (vector)
   (descriptor-fixnum (read-wordindexed vector sb!vm:vector-length-slot)))
@@ -3462,7 +3465,7 @@ core and return a descriptor to it."
     (format t "assembler routines defined in core image:~2%")
     (dolist (routine (sort (copy-list *cold-assembler-routines*) #'<
                            :key #'cdr))
-      (format t "#X~8,'0X: ~S~%" (cdr routine) (car routine)))
+      (format t "~8,'0X: ~S~%" (cdr routine) (car routine)))
     (let ((funs nil)
           (undefs nil))
       (maphash (lambda (name fdefn)
@@ -3477,7 +3480,7 @@ core and return a descriptor to it."
       (format t "~%~|~%initially defined functions:~2%")
       (setf funs (sort funs #'< :key #'cdr))
       (dolist (info funs)
-        (format t "0x~8,'0X: ~S   #X~8,'0X~%" (cdr info) (car info)
+        (format t "~8,'0X: ~S   #X~8,'0X~%" (cdr info) (car info)
                 (- (cdr info) #x17)))
       (format t
 "~%~|
@@ -3503,8 +3506,13 @@ initially undefined function references:~2%")
       (let* ((des (cdr x))
              (inherits (read-slot des *host-layout-of-layout* :inherits)))
         (format t "~8,'0X: ~S[~D]~%~10T~:S~%" (descriptor-bits des) (car x)
-                  (cold-layout-length des) (listify-cold-inherits inherits)))))
+                  (cold-layout-length des) (listify-cold-inherits inherits))))
 
+    (format t "~%~|~%parsed type specifiers:~2%")
+    (mapc (lambda (cell)
+            (format t "~X: ~S~%" (descriptor-bits (cdr cell)) (car cell)))
+          (sort (%hash-table-alist *ctype-cache*) #'<
+                :key (lambda (x) (descriptor-bits (cdr x))))))
   (values))
 
 ;;;; writing core file

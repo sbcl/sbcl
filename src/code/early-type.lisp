@@ -9,6 +9,43 @@
 
 (in-package "SB!KERNEL")
 
+(eval-when (:compile-toplevel #+sb-xc-host :load-toplevel :execute)
+  ;; The following macros expand into either constructor calls,
+  ;; if building the cross-compiler, or forms which reference
+  ;; previously constructed objects, if running the cross-compiler.
+  #+sb-xc-host
+  (progn
+    (defmacro literal-ctype (constructor specifier)
+      (declare (ignorable specifier))
+      ;; Technically the instances are not read-only,
+      ;; because the hash-value slot is rewritten.
+      `(load-time-value (mark-ctype-interned ,constructor) nil))
+
+    (defmacro literal-ctype-vector (var)
+      `(load-time-value ,var nil)))
+
+  #-sb-xc-host
+  (progn
+    (sb!xc:defmacro literal-ctype (constructor specifier)
+      (declare (ignorable constructor))
+      ;; The source-transform for SPECIFIER-TYPE turn this call into
+      ;; (LOAD-TIME-VALUE (!SPECIFIER-TYPE ',specifier)).
+      ;; It's best to go through the transform rather than expand directly
+      ;; into that, because the transform canonicalizes the spec,
+      ;; ensuring correctness of the hash lookups performed during genesis.
+      `(specifier-type ',specifier))
+
+    (sb!xc:defmacro literal-ctype-vector (var)
+      (let ((vector (symbol-value var)))
+        `(truly-the (simple-vector ,(length vector))
+          (load-time-value
+           (vector ,@(map 'list
+                          (lambda (x)
+                            (if (ctype-p x)
+                                `(!specifier-type ',(type-specifier x))
+                                x)) ; allow NIL or 0 in the vector
+                          vector)) t))))))
+
 (!begin-collecting-cold-init-forms)
 
 ;;;; representations of types
@@ -233,55 +270,28 @@
   ;; specifier to win.
   (type (missing-arg) :type ctype :read-only t))
 
-;; For some numeric subtypes, uniqueness of the object representation
-;; is enforced. These encompass all array specializations and more.
-(defglobal *unsigned-byte-type* -1)
-(defglobal *integer-type* -1)
-(defglobal *index-type* -1)
-;; BIGNUM is not an interned type because union types aren't interned,
-;; though some of the important ones probably ought to be.
-(defglobal *positive-bignum-type* -1)
-(defglobal *negative-bignum-type* -1)
-(defglobal *rational-type* -1)
-(defglobal *unsigned-byte-n-types* -1)
-(defglobal *signed-byte-n-types* -1)
-(defglobal *real-ffloat-type* -1)
-(defglobal *real-dfloat-type* -1)
-(defglobal *complex-ffloat-type* -1)
-(defglobal *complex-dfloat-type* -1)
-#-sb-xc-host
-(declaim (type (simple-vector #.(1+ sb!vm:n-word-bits)) *unsigned-byte-n-types*)
-         (type (simple-vector #.sb!vm:n-word-bits) *signed-byte-n-types*))
+(!define-type-class number :enumerable #'numeric-type-enumerable
+                    :might-contain-other-types nil)
 
-;; Called after NUMBER-TYPE type-class has been made.
-(defun !intern-important-numeric-type-instances ()
-  (flet ((float-type (format complexp)
-           (mark-ctype-interned
-            (%make-numeric-type :class 'float :complexp complexp
-                                :format format :enumerable nil)))
-         (int-type (low high)
-           (mark-ctype-interned
-            (%make-numeric-type :class 'integer :complexp :real
-                                :enumerable (if (and low high) t nil)
-                                :low low :high high))))
-    (setq *real-ffloat-type*      (float-type 'single-float :real)
-          *real-dfloat-type*      (float-type 'double-float :real)
-          *complex-ffloat-type*   (float-type 'single-float :complex)
-          *complex-dfloat-type*   (float-type 'double-float :complex)
-          *rational-type*         (mark-ctype-interned
-                                   (%make-numeric-type :class 'rational))
-          *unsigned-byte-type*    (int-type 0 nil)
-          *integer-type*          (int-type nil nil)
-          *index-type*            (int-type 0 (1- sb!xc:array-dimension-limit))
-          *negative-bignum-type*  (int-type nil (1- sb!xc:most-negative-fixnum))
-          *positive-bignum-type*  (int-type (1+ sb!xc:most-positive-fixnum) nil)
-          *unsigned-byte-n-types* (make-array (1+ sb!vm:n-word-bits))
-          *signed-byte-n-types*   (make-array sb!vm:n-word-bits))
-    (dotimes (j (1+ sb!vm:n-word-bits))
-      (setf (svref *unsigned-byte-n-types* j) (int-type 0 (1- (ash 1 j)))))
-    (dotimes (j sb!vm:n-word-bits)
-      (setf (svref *signed-byte-n-types* j)
-            (let ((high (1- (ash 1 j)))) (int-type (- (1+ high)) high))))))
+#+sb-xc-host
+(progn
+  ;; Work around an ABCL bug. This fails to load:
+  ;;   (macrolet ((foo-it (x) `(- ,x))) (defvar *var* (foo-it 3)))
+  (defvar *interned-signed-byte-types*)
+  (defvar *interned-unsigned-byte-types*)
+  (macrolet ((int-type (low high)
+               `(mark-ctype-interned
+                 (%make-numeric-type :class 'integer :enumerable t
+                                     :low ,low :high ,high))))
+    (setq *interned-signed-byte-types*
+          (let ((v (make-array sb!vm:n-word-bits))
+                (j -1))
+            (dotimes (i sb!vm:n-word-bits v)
+              (setf (svref v i) (int-type j (lognot j)) j (ash j 1)))))
+    (setq *interned-unsigned-byte-types*
+          (let ((v (make-array (1+ sb!vm:n-word-bits))))
+            (dotimes (i (length v) v)
+              (setf (svref v i) (int-type 0 (1- (ash 1 i)))))))))
 
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
@@ -304,70 +314,76 @@
            (if (or (consp low) (consp high)) ; if either bound is exclusive
                (>= (type-bound-number low) (type-bound-number high))
                (> low high)))
-      *empty-type*
-      (multiple-value-bind (low high)
-          (case class
-            (integer
+      (return-from make-numeric-type *empty-type*))
+  (multiple-value-bind (low high)
+      (case class
+        (integer
              ;; INTEGER types always have their LOW and HIGH bounds
              ;; represented as inclusive, not exclusive values.
-             (values (if (consp low) (1+ (type-bound-number low)) low)
-                     (if (consp high) (1- (type-bound-number high)) high)))
-            (t
+         (values (if (consp low) (1+ (type-bound-number low)) low)
+                 (if (consp high) (1- (type-bound-number high)) high)))
+        (t
              ;; no canonicalization necessary
-             (values low high)))
-        (when (and (eq class 'rational) (integerp low) (eql low high))
-          (setf class 'integer))
-
+         (values low high)))
+    (when (and (eq class 'rational) (integerp low) (eql low high))
+      (setf class 'integer))
         ;; Either lookup the canonical interned object for
         ;; a point in the type lattice, or construct a new one.
-        (or (cond ((eq class 'float)
-                   (when (and (null low) (null high))
-                     (case format
-                       (single-float
-                        (case complexp
-                          (:real    *real-ffloat-type*)
-                          (:complex *complex-ffloat-type*)))
-                       (double-float
-                        (case complexp
-                          (:real    *real-dfloat-type*)
-                          (:complex *complex-dfloat-type*))))))
-                  ((and (eq class 'integer) (eq complexp :real))
-                   (flet ((n-bits () (integer-length (truly-the word high))))
-                     (declare (inline n-bits))
-                     (cond ((null high)
-                            (cond ((eql low 0) *unsigned-byte-type*)
-                                  ((not low) *integer-type*)
-                                  ((eql low (1+ sb!xc:most-positive-fixnum))
-                                   *positive-bignum-type*)))
-                           ((or (= high most-positive-word)
-                                (and (typep high 'word)
-                                     ;; is (1+ high) a power-of-2 ?
-                                     (zerop (logand (1+ high) high))))
-                            (cond ((eql low 0)
-                                   (svref *unsigned-byte-n-types* (n-bits)))
-                                  ((and (< high most-positive-word)
-                                        (eql low (lognot high)))
-                                   (svref *signed-byte-n-types* (n-bits)))))
-                           ((and (eql low 0)
-                                 (eql high (1- sb!xc:array-dimension-limit)))
-                            *index-type*)
-                           ((and (not low)
-                                 (eql high (1- sb!xc:most-negative-fixnum)))
-                            *negative-bignum-type*))))
-                  ((and (eq class 'rational) (eq complexp :real)
-                        (null low) (eq high low))
-                   *rational-type*))
-            (let ((result
-                   (%make-numeric-type :class class
-                                       :format format
-                                       :complexp complexp
-                                       :low low
-                                       :high high
-                                       :enumerable enumerable)))
-              (setf (type-hash-value result)
-                    (logior (type-hash-value result)
-                            +type-admits-type=-optimization+))
-              result)))))
+    (or (case class
+          (float
+           (macrolet ((float-type (fmt complexp)
+                        `(literal-ctype
+                          (%make-numeric-type :class 'float :complexp ,complexp
+                                              :format ',fmt :enumerable nil)
+                          ,(if (eq complexp :complex) `(complex ,fmt) fmt))))
+             (when (and (null low) (null high))
+               (case format
+                 (single-float
+                  (case complexp
+                    (:real    (float-type single-float :real))
+                    (:complex (float-type single-float :complex))))
+                 (double-float
+                  (case complexp
+                    (:real    (float-type double-float :real))
+                    (:complex (float-type double-float :complex))))))))
+          (integer
+           (macrolet ((int-type (low high)
+                        `(literal-ctype
+                          (%make-numeric-type
+                           :class 'integer :low ,low :high ,high
+                           :enumerable (if (and ,low ,high) t nil))
+                          (integer ,(or low '*) ,(or high '*)))))
+             (cond ((neq complexp :real) nil)
+                   ((and (eql low 0) (eql high (1- sb!xc:array-dimension-limit)))
+                    (int-type 0 #.(1- sb!xc:array-dimension-limit))) ; INDEX type
+                   ((null high)
+                    (cond ((not low) (int-type nil nil))
+                          ((eql low 0) (int-type 0 nil))
+                          ((eql low (1+ sb!xc:most-positive-fixnum))
+                           ;; positive bignum
+                           (int-type #.(1+ sb!xc:most-positive-fixnum) nil))))
+                   ((or (eql high most-positive-word)
+                        ;; is (1+ high) a power-of-2 ?
+                        (and (typep high 'word) (zerop (logand (1+ high) high))))
+                    (cond ((eql low 0)
+                           (svref (literal-ctype-vector *interned-unsigned-byte-types*)
+                                  (integer-length (truly-the word high))))
+                          ((and (< high most-positive-word) (eql low (lognot high)))
+                           (svref (literal-ctype-vector *interned-signed-byte-types*)
+                                  (integer-length (truly-the word high))))))
+                   ((and (not low) (eql high (1- sb!xc:most-negative-fixnum)))
+                    ;; negative bignum
+                    (int-type nil #.(1- sb!xc:most-negative-fixnum))))))
+          (rational
+           (when (and (eq complexp :real) (null low) (eq high low))
+             (literal-ctype (%make-numeric-type :class 'rational) rational))))
+        (let ((result (%make-numeric-type :class class :format format
+                                          :complexp complexp
+                                          :low low :high high
+                                          :enumerable enumerable)))
+          (setf (type-hash-value result)
+                (logior (type-hash-value result) +type-admits-type=-optimization+))
+          result))))
 
 (defun modified-numeric-type (base
                               &key
@@ -384,32 +400,23 @@
                      :high high
                      :enumerable enumerable))
 
-;; Interned character-set types.
-(defglobal *character-type* -1)
-#!+sb-unicode
-(progn (defglobal *base-char-type* -1)
-       (defglobal *extended-char-type* -1))
-#+sb-xc (declaim (type ctype *character-type*
-                       #!+sb-unicode *base-char-type*
-                       #!+sb-unicode *extended-char-type*))
-
-(defun !intern-important-character-set-type-instances ()
-  (flet ((range (low high)
-           (mark-ctype-interned
-            (%make-character-set-type (list (cons low high))))))
-    (setq *character-type* (range 0 (1- sb!xc:char-code-limit)))
-    #!+sb-unicode
-    (setq *base-char-type* (range 0 (1- base-char-code-limit))
-          *extended-char-type* (range base-char-code-limit (1- sb!xc:char-code-limit)))))
+;; all character-set types are enumerable, but it's not possible
+;; for one to be TYPE= to a MEMBER type because (MEMBER #\x)
+;; is not internally represented as a MEMBER type.
+;; So in case it wasn't clear already ENUMERABLE-P does not mean
+;;  "possibly a MEMBER type in the Lisp-theoretic sense",
+;; but means "could be implemented in SBCL as a MEMBER type".
+(!define-type-class character-set :enumerable nil
+                    :might-contain-other-types nil)
 
 (defun make-character-set-type (pairs)
   ; (aver (equal (mapcar #'car pairs)
   ;              (sort (mapcar #'car pairs) #'<)))
   ;; aver that the cars of the list elements are sorted into increasing order
-  (aver (or (null pairs)
-            (do ((p pairs (cdr p)))
-                ((null (cdr p)) t)
-              (when (> (caar p) (caadr p)) (return nil)))))
+  (when pairs
+    (do ((p pairs (cdr p)))
+        ((null (cdr p)))
+      (aver (<= (caar p) (caadr p)))))
   (let ((pairs (let (result)
                 (do ((pairs pairs (cdr pairs)))
                     ((null pairs) (nreverse result))
@@ -425,40 +432,42 @@
                       (t (push (cons (max 0 low)
                                      (min high (1- sb!xc:char-code-limit)))
                                result))))))))
-    (if (null pairs)
-        *empty-type*
-        (or (and (singleton-p pairs)
-                 (let* ((pair (car pairs))
-                        (low (car pair))
-                        (high (cdr pair)))
-                   (case high
-                     (#.(1- sb!xc:char-code-limit)
-                      (case low
-                        (0 *character-type*)
-                        #!+sb-unicode
-                        (#.base-char-code-limit *extended-char-type*)))
-                     #!+sb-unicode
-                     (#.(1- base-char-code-limit)
-                      (when (eql low 0)
-                        *base-char-type*)))))
-            (%make-character-set-type pairs)))))
+    (unless pairs
+      (return-from make-character-set-type *empty-type*))
+    (unless (cdr pairs)
+      (macrolet ((range (low high)
+                   `(return-from make-character-set-type
+                      (literal-ctype (%make-character-set-type '((,low . ,high)))
+                                     (character-set ((,low . ,high)))))))
+        (let* ((pair (car pairs))
+               (low (car pair))
+               (high (cdr pair)))
+          (cond ((eql high (1- sb!xc:char-code-limit))
+                 (cond ((eql low 0) (range 0 #.(1- sb!xc:char-code-limit)))
+                       #!+sb-unicode
+                       ((eql low base-char-code-limit)
+                        (range #.base-char-code-limit
+                               #.(1- sb!xc:char-code-limit)))))
+                #!+sb-unicode
+                ((and (eql low 0) (eql high (1- base-char-code-limit)))
+                 (range 0 #.(1- base-char-code-limit)))))))
+    (%make-character-set-type pairs)))
+
+(!define-type-class array :enumerable nil
+                    :might-contain-other-types nil)
 
 ;; For all ctypes which are the element types of specialized arrays,
 ;; 3 ctype objects are stored for the rank-1 arrays of that specialization,
 ;; one for each of simple, maybe-simple, and non-simple (in that order),
 ;; and 2 ctype objects for unknown-rank arrays, one each for simple
 ;; and maybe-simple. (Unknown rank, known-non-simple isn't important)
-(defglobal *canonical-array-ctypes* -1)
-(defun !intern-important-array-type-instances ()
-  ;; Having made the canonical numeric and character ctypes
-  ;; representing the points in the type lattice for which there
-  ;; are array specializations, we can make the canonical array types.
-  (setq *canonical-array-ctypes* (make-array (* 32 5)))
+#+sb-xc-host
+(defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
              (setf (!ctype-saetp-index type) type-index)
              (mark-ctype-interned (%make-array-type dims complexp type type)))
-           (make-all (element-type type-index)
-             (replace *canonical-array-ctypes*
+           (make-all (element-type type-index array)
+             (replace array
                       (list (make-1 type-index '(*) nil    element-type)
                             (make-1 type-index '(*) :maybe element-type)
                             (make-1 type-index '(*) t      element-type)
@@ -468,12 +477,13 @@
            (integer-range (low high)
              (make-numeric-type :class 'integer :complexp :real
                                 :enumerable t :low low :high high)))
-    (let ((index 0))
+    (let ((array (make-array (* 32 5)))
+          (index 0))
       ;; Index 31 is available to store *WILD-TYPE*
       ;; because there are fewer than 32 array widetags.
-      (make-all *wild-type* 31)
-      (dolist (x '#.*specialized-array-element-types*
-                 (aver (< index 31)))
+      (make-all *wild-type* 31 array)
+      (dolist (x *specialized-array-element-types*
+                 (progn (aver (< index 31)) array))
         (make-all
          ;; Produce element-type representation without parsing a spec.
          ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
@@ -502,7 +512,7 @@
             (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
            ((eql t) *universal-type*)
            ((eql nil) *empty-type*))
-         index)
+         index array)
         (incf index)))))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
@@ -514,7 +524,7 @@
   (if (and (eq element-type specialized-element-type)
            (or (and (eq dimensions '*) (neq complexp t))
                (typep dimensions '(cons (eql *) null))))
-      (let ((res (svref *canonical-array-ctypes*
+      (let ((res (svref (literal-ctype-vector *interned-array-types*)
                         (+ (* (!ctype-saetp-index element-type) 5)
                            (if (listp dimensions) 0 3)
                            (ecase complexp ((nil) 0) ((:maybe) 1) ((t) 2))))))
@@ -895,3 +905,52 @@ expansion happened."
 
 
 (!defun-from-collected-cold-init-forms !early-type-cold-init)
+
+;;; When cross-compiling SPECIFIER-TYPE with a quoted argument,
+;;; it can be rendered as a literal object unless it:
+;;;  - mentions a classoid or unknown type
+;;;  - uses a floating-point literal (perhaps positive zero could be allowed?)
+;;;
+;;; This is important for type system initialization, but it will also
+;;; apply to hand-written calls and make-load-form expressions.
+;;;
+;;; After the target is built, we remove this transform, both because calls
+;;; to SPECIFIER-TYPE do not arise organically through user code,
+;;; and because it is possible that user changes to types could make parsing
+;;; return a different thing, e.g. changing a DEFTYPE to a DEFCLASS.
+;;;
+#+sb-xc-host
+(progn
+(sb!c::define-source-transform specifier-type (type-spec &environment env)
+  (or (and (sb!xc:constantp type-spec env)
+           (let ((parse (specifier-type (constant-form-value type-spec env))))
+             (cond
+              ((contains-unknown-type-p parse)
+               (bug "SPECIFIER-TYPE transform parsed an unknown type"))
+              ((cold-dumpable-type-p parse)
+               ;; Obtain a canonical form by unparsing so that TYPE= specs
+               ;; coalesce in presence of DEFTYPEs. LOAD-TIME-VALUE in the
+               ;; cross-compiler has a special-case to turn !SPECIFIER-TYPE
+               ;; into a fop-funcall, which is handled by genesis.
+               `(load-time-value (!specifier-type ',(type-specifier parse))
+                                 t)))))
+      (values nil t)))
+
+(defun cold-dumpable-type-p (ctype)
+  (typecase ctype
+    (character-set-type t)
+    (numeric-type
+     ;; Floating-point constants are not dumpable. (except maybe +0.0)
+     (if (or (typep (numeric-type-low ctype) '(or float (cons float)))
+             (typep (numeric-type-high ctype) '(or float (cons float))))
+         nil
+         t))))
+
+(setf (get '!specifier-type :sb-cold-funcall-handler/for-value)
+      (lambda (arg)
+        (let ((specifier
+               (if (symbolp arg) arg (sb!fasl::host-object-from-core arg))))
+          (sb!fasl::ctype-to-core specifier (specifier-type specifier)))))
+
+(setf (info :function :where-from '!specifier-type) :declared) ; lie
+) ; end PROGN
