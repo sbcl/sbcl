@@ -47,11 +47,6 @@
    ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
    (frob extended-sequence *extended-sequence-type*))
 
-;; Unlike the above, this one is not a NAMED-TYPE, and as such
-;; does not have to be a singleton, but it improves efficiency.
-;; (Except that we never really need it for anything)
-(defglobal *universal-fun-type* -1)
-
 ;;; a vector that maps type codes to layouts, used for quickly finding
 ;;; the layouts of built-in classes
 (defglobal **built-in-class-codes** #()) ; initialized in cold load

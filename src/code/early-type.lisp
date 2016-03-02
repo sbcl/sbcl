@@ -15,8 +15,8 @@
   ;; previously constructed objects, if running the cross-compiler.
   #+sb-xc-host
   (progn
-    (defmacro literal-ctype (constructor specifier)
-      (declare (ignorable specifier))
+    (defmacro literal-ctype (constructor &optional specifier)
+      (declare (ignore specifier))
       ;; Technically the instances are not read-only,
       ;; because the hash-value slot is rewritten.
       `(load-time-value (mark-ctype-interned ,constructor) nil))
@@ -26,14 +26,21 @@
 
   #-sb-xc-host
   (progn
-    (sb!xc:defmacro literal-ctype (constructor specifier)
-      (declare (ignorable constructor))
-      ;; The source-transform for SPECIFIER-TYPE turn this call into
+    ;; Omitting the specifier works only if the unparser method has been
+    ;; defined in time to use it, and you're sure that constructor's result
+    ;; can be unparsed - some unparsers may be confused if called on a
+    ;; non-canonical object, such as an instance of (CONS T T) that is
+    ;; not EQ to the interned instance.
+    (sb!xc:defmacro literal-ctype (constructor
+                                   &optional (specifier nil specifier-p))
+      ;; The source-transform for SPECIFIER-TYPE turns this call into
       ;; (LOAD-TIME-VALUE (!SPECIFIER-TYPE ',specifier)).
       ;; It's best to go through the transform rather than expand directly
       ;; into that, because the transform canonicalizes the spec,
       ;; ensuring correctness of the hash lookups performed during genesis.
-      `(specifier-type ',specifier))
+      `(specifier-type ',(if specifier-p
+                             specifier
+                             (type-specifier (symbol-value constructor)))))
 
     (sb!xc:defmacro literal-ctype-vector (var)
       (let ((vector (symbol-value var)))
@@ -79,6 +86,23 @@
 ;; because we don't call random predicates when performing operations on types
 ;; as objects, only when checking for inclusion of something in the type.
 (!define-type-class hairy :enumerable t :might-contain-other-types t)
+
+;;; Without some special HAIRY cases, we massively pollute the type caches
+;;; with objects that are all equivalent to *EMPTY-TYPE*. e.g.
+;;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*))) and
+;;;  (AND (SATISFIES KEYWORDP) CONS). Since the compiler doesn't know
+;;; that they're just *EMPTY-TYPE*, its keeps building more and more complex
+;;; expressions involving them. I'm not sure why those two are so prevalent
+;;; but they definitely seem to be.  We can improve performance by reducing
+;;; them to *EMPTY-TYPE* which means we need a way to recognize those hairy
+;;; types in order reason about them. Interning them is how we recognize
+;;; them, as they can be compared by EQ.
+#+sb-xc-host
+(progn
+  (defvar *satisfies-keywordp-type*
+    (mark-ctype-interned (%make-hairy-type '(satisfies keywordp))))
+  (defvar *fun-name-type*
+    (mark-ctype-interned (%make-hairy-type '(satisfies legal-fun-name-p)))))
 
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
@@ -254,6 +278,14 @@
         (svref (literal-ctype-vector *interned-fun-types*) n)
         (%make-fun-type required optional rest keyp keywords
                         allowp wild-args returns))))
+
+;; This seems to be used only by cltl2, and within 'cross-type',
+;; where it is never used, which makes sense, since pretty much we
+;; never want this object, but instead the classoid FUNCTION
+;; if we know nothing about a function's signature.
+;; Maybe this should not exist unless cltl2 is loaded???
+(defvar *universal-fun-type*
+  (make-fun-type :wild-args t :returns *wild-type*))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
 ;;; "type specifier", which is only meaningful in function argument

@@ -1146,35 +1146,6 @@
 
 ;;;; built-in types
 
-;; This is used when parsing (SATISFIES KEYWORDP)
-;; so that simplifications can be made when computing intersections,
-;; without which we would see this kind of "empty-type in disguise"
-;;   (AND (SATISFIES KEYWORDP) CONS)
-;; This isn't *keyword-type* because KEYWORD is implemented
-;; as the intersection of SYMBOL and (SATISFIES KEYWORDP)
-;; We could also intern the KEYWORD type but that would require
-;; hacking the INTERSECTION logic.
-(defglobal *satisfies-keywordp-type* -1)
-
-;; Here too I discovered more than 1000 instances in a particular
-;; Lisp image, when really this is *EMPTY-TYPE*.
-;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*)))
-(defglobal *fun-name-type* -1)
-
-;; !LATE-TYPE-COLD-INIT can't be GCd - there are lambdas in the toplevel code
-;; component that leak out and persist - but everything below is GCable.
-;; This leads to about 20KB of extra code being retained on x86-64.
-;; An educated guess is that DEFINE-SUPERCLASSES is responsible for the problem.
-(defun !late-type-cold-init2 ()
- (setf *satisfies-keywordp-type*
-       (mark-ctype-interned (%make-hairy-type '(satisfies keywordp))))
- (setf *fun-name-type*
-       (mark-ctype-interned (%make-hairy-type '(satisfies legal-fun-name-p))))
- ;; This is not an important type- no attempt is made to return exactly this
- ;; object when parsing FUNCTION. In fact we return the classoid instead
- (setf *universal-fun-type*
-       (make-fun-type :wild-args t :returns *wild-type*)))
-
 (!define-type-method (named :simple-=) (type1 type2)
   ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (eq type1 type2) t))
@@ -1481,7 +1452,7 @@
                      (type1 type2)
  (acond ((type= type1 type2)
          type1)
-        ((eq type2 *satisfies-keywordp-type*)
+        ((eq type2 (literal-ctype *satisfies-keywordp-type*))
          ;; (AND (MEMBER A) (SATISFIES KEYWORDP)) is possibly non-empty
          ;; if A is re-homed as :A. However as a special case that really
          ;; does occur, (AND (MEMBER NIL) (SATISFIES KEYWORDP))
@@ -1491,7 +1462,7 @@
              (multiple-value-bind (answer certain)
                  (types-equal-or-intersect type1 (specifier-type 'symbol))
                (and (not answer) certain *empty-type*))))
-        ((eq type2 *fun-name-type*)
+        ((eq type2 (literal-ctype *fun-name-type*))
          (multiple-value-bind (answer certain)
              (types-equal-or-intersect type1 (specifier-type 'symbol))
            (and (not answer)
@@ -1526,8 +1497,8 @@
            :format-control "The SATISFIES predicate name is not a symbol: ~S"
            :format-arguments (list predicate-name)))
   (case predicate-name
-   (keywordp *satisfies-keywordp-type*)
-   (legal-fun-name-p *fun-name-type*)
+   (keywordp (literal-ctype *satisfies-keywordp-type*))
+   (legal-fun-name-p (literal-ctype *fun-name-type*))
    (t (%make-hairy-type whole))))
 
 ;;;; negation types
@@ -3995,7 +3966,5 @@ used for a COMPLEX component.~:@>"
    over under))
 
 (!defun-from-collected-cold-init-forms !late-type-cold-init)
-
-#-sb-xc (!late-type-cold-init2)
 
 (/show0 "late-type.lisp end of file")
