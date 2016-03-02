@@ -135,10 +135,10 @@
              (if (typep type '(cons (eql function))) ; sanity test
                  (try-cache type)
                  (classoid-of x)))))
-      (symbol (if x (try-cache x) *null-type*))
+      (symbol (if x (try-cache x) (specifier-type 'null)))
       (number (try-cache x))
       (array (ctype-of-array x))
-      (cons *cons-t-t-type*)
+      (cons (specifier-type 'cons))
       ;; This makes no distinction for BASE/EXTENDED-CHAR. Should it?
       (character (specifier-type 'character))
       #!+sb-simd-pack

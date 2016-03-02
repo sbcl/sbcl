@@ -530,29 +530,8 @@
       (%make-array-type dimensions
                         complexp element-type specialized-element-type)))
 
-;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
-;;; bother with this at this level because MEMBER types are fairly
-;;; important and union and intersection are well defined.
-(defstruct (member-type (:include ctype
-                                  (class-info (type-class-or-lose 'member)))
-                        (:copier nil)
-                        (:constructor %make-member-type (xset fp-zeroes))
-                        #-sb-xc-host (:pure nil))
-  (xset (missing-arg) :type xset :read-only t)
-  (fp-zeroes (missing-arg) :type list :read-only t))
-
-(defglobal *null-type* -1)    ; = (MEMBER NIL)
-(defglobal *eql-t-type* -1)   ; = (MEMBER T)
-(defglobal *boolean-type* -1) ; = (MEMBER T NIL)
-#+sb-xc (declaim (type ctype *null-type*))
-
-(defun !intern-important-member-type-instances ()
-  (flet ((make-it (list)
-           (mark-ctype-interned
-            (%make-member-type (xset-from-list list) nil))))
-    (setf *null-type* (make-it '(nil))
-          *eql-t-type* (make-it '(t))
-          *boolean-type* (make-it '(t nil)))))
+(!define-type-class member :enumerable t
+                    :might-contain-other-types nil)
 
 (declaim (ftype (sfunction (xset list) ctype) make-member-type))
 (defun member-type-from-list (members)
@@ -592,16 +571,20 @@
     (let ((member-type
            (block nil
              (unless unpaired
-               (when (singleton-p (xset-data xset))
-                 (case (first (xset-data xset))
-                   ((nil) (return *null-type*))
-                   ((t) (return *eql-t-type*))))
-               ;; Semantically this is fine - XSETs
-               ;; are not order-preserving except by accident
-               ;; (when not represented as a hash-table).
-               (when (or (equal (xset-data xset) '(t nil))
-                         (equal (xset-data xset) '(nil t)))
-                 (return *boolean-type*)))
+               (macrolet ((member-type (&rest elts)
+                            `(literal-ctype
+                              (%make-member-type (xset-from-list ',elts) nil)
+                              (member ,@elts))))
+                 (let ((elts (xset-data xset)))
+                   (when (singleton-p elts)
+                     (case (first elts)
+                       ((nil) (return (member-type nil)))
+                       ((t) (return (member-type t)))))
+                   (when (or (equal elts '(t nil)) (equal elts '(nil t)))
+                     ;; Semantically this is fine - XSETs
+                     ;; are not order-preserving except by accident
+                     ;; (when not represented as a hash-table).
+                     (return (member-type t nil))))))
              (when (or unpaired (not (xset-empty-p xset)))
                (let ((result (%make-member-type xset unpaired)))
                  (setf (type-hash-value result)
@@ -654,15 +637,7 @@
       *universal-type*
       type))
 
-;; The function caches work significantly better when there
-;; is a unique object that stands for the specifier (CONS T T).
-(defglobal *cons-t-t-type* -1)
-#+sb-xc (declaim (type ctype *cons-t-t-type*))
-
-(defun !intern-important-cons-type-instances ()
-  (setf *cons-t-t-type*
-        (mark-ctype-interned
-         (%make-cons-type *universal-type* *universal-type*))))
+(!define-type-class cons :enumerable nil :might-contain-other-types nil)
 
 #+sb-xc-host
 (declaim (ftype (sfunction (ctype ctype) (values t t)) type=))
@@ -676,7 +651,8 @@
         ;; but it improves the hit rate in the function caches.
         ((and (type= car-type *universal-type*)
               (type= cdr-type *universal-type*))
-         *cons-t-t-type*)
+         (literal-ctype (%make-cons-type *universal-type* *universal-type*)
+                        cons))
         (t
          (%make-cons-type car-type cdr-type))))
 
@@ -943,6 +919,11 @@ expansion happened."
             (every (lambda (x) (recurse (key-info-type x)))
                    (args-type-keywords ctype))
             (if (fun-type-p ctype) (recurse (fun-type-returns ctype)) t)))
+      (cons-type (and (recurse (cons-type-car-type ctype))
+                      (recurse (cons-type-cdr-type ctype))))
+      (member-type
+       (and (listp (xset-data (member-type-xset ctype))) ; can't dump hashtable
+            (not (member-type-fp-zeroes ctype)))) ; nor floats
       (numeric-type
        ;; Floating-point constants are not dumpable. (except maybe +0.0)
        (if (or (typep (numeric-type-low ctype) '(or float (cons float)))

@@ -538,6 +538,17 @@
                        (:copier nil))
   (name nil :type symbol :read-only t))
 
+;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
+;;; bother with this at this level because MEMBER types are fairly
+;;; important and union and intersection are well defined.
+(defstruct (member-type (:include ctype
+                                  (class-info (type-class-or-lose 'member)))
+                        (:copier nil)
+                        (:constructor %make-member-type (xset fp-zeroes))
+                        #-sb-xc-host (:pure nil))
+  (xset nil :type xset :read-only t)
+  (fp-zeroes nil :type list :read-only t))
+
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype

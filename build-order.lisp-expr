@@ -165,6 +165,7 @@
 
  ("src/code/funutils" :not-host)
 
+ ("src/code/xset") ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline
  ;; later. (Avoiding full calls increases efficiency)
@@ -317,7 +318,6 @@
 
  ;; needed by "compiler/vop"
  ("src/compiler/sset")
- ("src/code/xset") ; for representation of MEMBER type
  ("src/code/early-type")
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"

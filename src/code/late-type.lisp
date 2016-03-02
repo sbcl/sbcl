@@ -1166,8 +1166,6 @@
 ;; This leads to about 20KB of extra code being retained on x86-64.
 ;; An educated guess is that DEFINE-SUPERCLASSES is responsible for the problem.
 (defun !late-type-cold-init2 ()
- (!intern-important-member-type-instances)
- (!intern-important-cons-type-instances)
  (setf *satisfies-keywordp-type*
        (mark-ctype-interned (%make-hairy-type '(satisfies keywordp))))
  (setf *fun-name-type*
@@ -1488,7 +1486,7 @@
          ;; if A is re-homed as :A. However as a special case that really
          ;; does occur, (AND (MEMBER NIL) (SATISFIES KEYWORDP))
          ;; is empty because of the illegality of changing NIL's package.
-         (if (eq type1 *null-type*)
+         (if (eq type1 (specifier-type 'null))
              *empty-type*
              (multiple-value-bind (answer certain)
                  (types-equal-or-intersect type1 (specifier-type 'symbol))
@@ -2843,9 +2841,6 @@ used for a COMPLEX component.~:@>"
 
 ;;;; MEMBER types
 
-(!define-type-class member :enumerable t
-                    :might-contain-other-types nil)
-
 (!define-type-method (member :negate) (type)
   (let ((xset (member-type-xset type))
         (fp-zeroes (member-type-fp-zeroes type)))
@@ -3305,8 +3300,6 @@ used for a COMPLEX component.~:@>"
         type)))
 
 ;;;; CONS types
-
-(!define-type-class cons :enumerable nil :might-contain-other-types nil)
 
 (!def-type-translator cons ((:context context)
                             &optional (car-type-spec '*) (cdr-type-spec '*))
