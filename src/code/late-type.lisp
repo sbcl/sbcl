@@ -203,9 +203,6 @@
 (!define-type-method (values :simple-=) (type1 type2)
   (type=-args type1 type2))
 
-(!define-type-class function :enumerable nil
-                    :might-contain-other-types nil)
-
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
@@ -1169,7 +1166,6 @@
 ;; This leads to about 20KB of extra code being retained on x86-64.
 ;; An educated guess is that DEFINE-SUPERCLASSES is responsible for the problem.
 (defun !late-type-cold-init2 ()
- (!intern-important-fun-type-instances)
  (!intern-important-member-type-instances)
  (!intern-important-cons-type-instances)
  (setf *satisfies-keywordp-type*

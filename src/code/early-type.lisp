@@ -230,19 +230,16 @@
 (!define-type-class values :enumerable nil
                     :might-contain-other-types nil)
 
-;; Without this canonicalization step, I found >350 different
-;; (FUNCTION (T) *) representations in a sample build.
-(declaim (type (simple-vector 4) *interned-fun-type-instances*))
-(defglobal *interned-fun-types* (make-array 4))
-(defun !intern-important-fun-type-instances ()
-  (setq *interned-fun-types* (make-array 4))
-  (let (required)
-    (dotimes (i 4)
-      (when (plusp i)
-        (push *universal-type* required))
-      (setf (svref *interned-fun-types* i)
-            (mark-ctype-interned
-             (%make-fun-type required nil nil nil nil nil nil *wild-type*))))))
+(!define-type-class function :enumerable nil
+                    :might-contain-other-types nil)
+
+#+sb-xc-host
+(defvar *interned-fun-types*
+  (flet ((fun-type (n)
+           (mark-ctype-interned
+            (%make-fun-type (make-list n :initial-element *universal-type*)
+                            nil nil nil nil nil nil *wild-type*))))
+    (vector (fun-type 0) (fun-type 1) (fun-type 2) (fun-type 3))))
 
 (defun make-fun-type (&key required optional rest
                            keyp keywords allowp
@@ -253,8 +250,8 @@
              (not optional) (not rest) (not keyp)
              (not keywords) (not allowp) (not wild-args)
              (eq returns *wild-type*)
-             (every (lambda (x) (eq x *universal-type*)) required))
-        (svref *interned-fun-types* n)
+             (not (find *universal-type* required :test #'neq)))
+        (svref (literal-ctype-vector *interned-fun-types*) n)
         (%make-fun-type required optional rest keyp keywords
                         allowp wild-args returns))))
 
@@ -937,14 +934,23 @@ expansion happened."
       (values nil t)))
 
 (defun cold-dumpable-type-p (ctype)
-  (typecase ctype
-    (character-set-type t)
-    (numeric-type
-     ;; Floating-point constants are not dumpable. (except maybe +0.0)
-     (if (or (typep (numeric-type-low ctype) '(or float (cons float)))
-             (typep (numeric-type-high ctype) '(or float (cons float))))
-         nil
-         t))))
+  (named-let recurse ((ctype ctype))
+    (typecase ctype
+      (args-type
+       (and (every #'recurse (args-type-required ctype))
+            (every #'recurse (args-type-optional ctype))
+            (acond ((args-type-rest ctype) (recurse it)) (t))
+            (every (lambda (x) (recurse (key-info-type x)))
+                   (args-type-keywords ctype))
+            (if (fun-type-p ctype) (recurse (fun-type-returns ctype)) t)))
+      (numeric-type
+       ;; Floating-point constants are not dumpable. (except maybe +0.0)
+       (if (or (typep (numeric-type-low ctype) '(or float (cons float)))
+               (typep (numeric-type-high ctype) '(or float (cons float))))
+           nil
+           t))
+      ;; HAIRY is just an s-expression, so it's dumpable
+      ((or named-type character-set-type hairy-type) t))))
 
 (setf (get '!specifier-type :sb-cold-funcall-handler/for-value)
       (lambda (arg)
