@@ -201,7 +201,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 
 ;; For macros this seems fair enough, but for inline functions it could
 ;; be considered undesirable on the grounds that enabling/disabling inlining
-;; should not change visible behavior. Other then working harder to figure
+;; should not change visible behavior. Other than working harder to figure
 ;; out where we are in inlined code (which may not even be feasible),
 ;; a viable remedy is that all inlineable functions should have their stored
 ;; representation not contain any macros, i.e. macros could be pre-expanded,

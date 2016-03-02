@@ -361,7 +361,7 @@ guaranteed to be collected."
 (defun unsafe-clear-roots (gen)
   #!-gencgc (declare (ignore gen))
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
-  ;; as having these cons more then we have space left leads to huge
+  ;; as having these cons more than we have space left leads to huge
   ;; badness.
   (scrub-control-stack)
   ;; Power cache of the bignum printer: drops overly large bignums and

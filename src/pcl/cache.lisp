@@ -362,7 +362,7 @@
                       ;; doing real work. 50% because if we drop too
                       ;; few we need to do this almost right away
                       ;; again, and if we drop too many, we need to
-                      ;; recompute more then we'd like.
+                      ;; recompute more than we'd like.
                       ;; _Experimentally_ 50% seems to perform the
                       ;; best, but it would be nice to have a proper
                       ;; analysis...

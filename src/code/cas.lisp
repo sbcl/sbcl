@@ -212,7 +212,7 @@ whose CAR is one of the following:
 
 or the name of a DEFSTRUCT created accessor for a slot whose declared type is
 either FIXNUM or T. Results are unspecified if the slot has a declared type
-other then FIXNUM or T.
+other than FIXNUM or T.
 
 In case of SLOT-VALUE, if the slot is unbound, SLOT-UNBOUND is called unless
 OLD is EQ to SB-PCL:+SLOT-UNBOUND+ in which case SB-PCL:+SLOT-UNBOUND+ is

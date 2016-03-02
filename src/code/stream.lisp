@@ -1368,7 +1368,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (setf (string-output-stream-buffer stream)
         (or (pop (string-output-stream-next stream))
             ;; FIXME: This would be the correct place to detect that
-            ;; more then FIXNUM characters are being written to the
+            ;; more than FIXNUM characters are being written to the
             ;; stream, and do something about it.
             (make-string size))))
 
