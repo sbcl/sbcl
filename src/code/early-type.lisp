@@ -951,6 +951,9 @@ expansion happened."
             (every (lambda (x) (recurse (key-info-type x)))
                    (args-type-keywords ctype))
             (if (fun-type-p ctype) (recurse (fun-type-returns ctype)) t)))
+      (compound-type (every #'recurse (compound-type-types ctype)))
+      (negation-type (recurse (negation-type-type ctype)))
+      (array-type (recurse (array-type-element-type ctype)))
       (cons-type (and (recurse (cons-type-car-type ctype))
                       (recurse (cons-type-cdr-type ctype))))
       (member-type
@@ -962,8 +965,10 @@ expansion happened."
                (typep (numeric-type-high ctype) '(or float (cons float))))
            nil
            t))
-      ;; HAIRY is just an s-expression, so it's dumpable
-      ((or named-type character-set-type hairy-type) t))))
+      (classoid nil)
+      ;; HAIRY is just an s-expression, so it's dumpable. Same for simd-pack
+      ((or named-type character-set-type hairy-type #!+sb-simd-pack simd-pack-type)
+       t))))
 
 (setf (get '!specifier-type :sb-cold-funcall-handler/for-value)
       (lambda (arg)

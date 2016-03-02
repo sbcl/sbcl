@@ -1114,9 +1114,7 @@ core and return a descriptor to it."
           (gethash name *cold-layouts*) result)))
 
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
-;;; in the cold core. Presently this is used only for NAMED-TYPE,
-;;; but the code is capable of dumping more complex structure so that
-;;; things like (SPECIFIER-TYPE 'LIST) can be dump as constants.
+;;; in the cold core.
 (defvar *ctype-cache*)
 (defun ctype-to-core (specifier obj)
   (declare (type ctype obj))
