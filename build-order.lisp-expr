@@ -165,6 +165,7 @@
 
  ("src/code/funutils" :not-host)
 
+ ("src/code/maphash" :not-host :slam-forcibly)
  ("src/code/xset") ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline
@@ -198,7 +199,6 @@
  ("src/code/cold-error"  :not-host)
  ("src/code/fdefinition" :not-host)
 
- ("src/code/maphash" :not-host :slam-forcibly)
  ("src/code/pred" :not-host)
 
  ("src/compiler/generic/vm-array")
