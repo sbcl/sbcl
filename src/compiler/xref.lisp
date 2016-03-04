@@ -11,7 +11,7 @@
 
 (in-package "SB!C")
 
-(defvar *xref-kinds* '(:binds :calls :sets :references :macroexpands))
+(defglobal *xref-kinds* '(:binds :calls :sets :references :macroexpands))
 
 (defun record-component-xrefs (component)
   (declare (type component component))
@@ -160,12 +160,10 @@
 
 (defun record-xref (kind what context node path)
   (unless (internal-name-p what)
-    (let ((path (reverse
-                 (source-path-original-source
-                  (or path
-                      (node-source-path node))))))
-      (push (list what path)
-            (getf (functional-xref context) kind)))))
+    (push (cons what
+                (source-path-form-number (or path
+                                             (node-source-path node))))
+          (getf (functional-xref context) kind))))
 
 (defun record-macroexpansion (what block path)
   (unless (internal-name-p what)
@@ -184,9 +182,14 @@
             for i from 0
             for values = (remove-duplicates (getf xref-data key)
                                             :test #'equal)
-            for flattened = (reduce #'append values :from-end t)
-            collect (setf (aref array i)
-                          (when flattened
-                            (make-array (length flattened)
-                                        :initial-contents flattened))))
+            do
+            (setf (aref array i)
+                  (when values
+                    (let* ((length (* (length values) 2))
+                           (data (make-array length)))
+                      (loop for i below length by 2
+                            for (name . number) in values
+                            do (setf (aref data i) name
+                                     (aref data (1+ i)) number))
+                      data))))
       array)))

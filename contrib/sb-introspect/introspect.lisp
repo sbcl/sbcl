@@ -654,14 +654,14 @@ value."
                ;; Loop through the name/path xref entries in the table
                (loop for i from 0 below (length array) by 2
                      for xref-name = (aref array i)
-                     for xref-path = (aref array (1+ i))
+                     for xref-form-number = (aref array (+ i 1))
                      do (when (equal xref-name wanted-name)
                           (let ((source-location
                                   (find-function-definition-source simple-fun)))
                             ;; Use the more accurate source path from
                             ;; the xref entry.
-                            (setf (definition-source-form-path source-location)
-                                  xref-path)
+                            (setf (definition-source-form-number source-location)
+                                  xref-form-number)
                             (push (cons info-name source-location)
                                   ret)))))))
       (call-with-each-global-functoid
