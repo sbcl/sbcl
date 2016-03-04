@@ -246,11 +246,6 @@
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
-  ;; the source path root number of the first form read from this
-  ;; source (i.e. the total number of forms converted previously in
-  ;; this compilation).  (Note: this will always be 0 so long as the
-  ;; SOURCE-INFO structure has exactly one FILE-INFO.)
-  (source-root 0 :type index)
   ;; The FILE-POSITIONs of the truly top level forms read from this
   ;; file (if applicable). The vector element type will be chosen to
   ;; hold the largest element.
@@ -333,10 +328,6 @@
   (untruename nil :type (or pathname null))
   ;; the file's write date (if relevant)
   (write-date nil :type (or unsigned-byte null))
-  ;; the source path root number of the first form in this file (i.e.
-  ;; the total number of forms converted previously in this
-  ;; compilation)
-  (source-root 0 :type unsigned-byte)
   ;; parallel vectors containing the forms read out of the file and
   ;; the file positions that reading of each form started at (i.e. the
   ;; end of the previous form)

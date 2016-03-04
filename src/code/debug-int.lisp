@@ -481,17 +481,6 @@
   (kind :unparsed :type (or (member :unparsed) sb!c::location-kind))
   (step-info :unparsed :type (or (member :unparsed :foo) simple-string)))
 
-;;;; DEBUG-SOURCEs
-
-;;; Return the number of top level forms processed by the compiler
-;;; before compiling this source. If this source is uncompiled, this
-;;; is zero. This may be zero even if the source is compiled since the
-;;; first form in the first file compiled in one compilation, for
-;;; example, must have a root number of zero -- the compiler saw no
-;;; other top level forms before it.
-(defun debug-source-root-number (debug-source)
-  (sb!c::debug-source-source-root debug-source))
-
 ;;;; frames
 
 ;;; This is used in FIND-ESCAPED-FRAME and with the bogus components
@@ -2648,12 +2637,10 @@ register."
 (defun get-file-toplevel-form (location)
   (let* ((d-source (code-location-debug-source location))
          (tlf-offset (code-location-toplevel-form-offset location))
-         (local-tlf-offset (- tlf-offset
-                              (debug-source-root-number d-source)))
          (char-offset
           (aref (or (sb!di:debug-source-start-positions d-source)
                     (error "no start positions map"))
-                local-tlf-offset))
+                tlf-offset))
          (namestring (debug-source-namestring d-source)))
     ;; FIXME: External format?
     (with-open-file (f namestring :if-does-not-exist nil)
@@ -2667,7 +2654,7 @@ register."
                           ; Using form offset instead of character position.~%"
                          namestring)
                  (let ((*read-suppress* t))
-                   (loop repeat local-tlf-offset
+                   (loop repeat tlf-offset
                          do (read f)))))
           (read f))))))
 

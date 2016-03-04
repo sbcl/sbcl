@@ -245,7 +245,6 @@
                           (file-info-name file-info))
                       file-info))
      :created (file-info-write-date file-info)
-     :source-root (file-info-source-root file-info)
      :start-positions (coerce-to-smallest-eltype
                        (file-info-positions file-info))
 

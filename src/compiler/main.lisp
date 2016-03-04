@@ -950,8 +950,7 @@ necessary, since type inference may take arbitrarily long to converge.")
       (funcall function form
                :current-index
                (let* ((forms (file-info-forms file-info))
-                      (current-idx (+ (fill-pointer forms)
-                                      (file-info-source-root file-info))))
+                      (current-idx (fill-pointer forms)))
                  (vector-push-extend form forms)
                  (vector-push-extend pos (file-info-positions file-info))
                  current-idx))
@@ -991,8 +990,7 @@ necessary, since type inference may take arbitrarily long to converge.")
            (form
             `(write-string
               ,(format nil "Completed TLFs: ~A~%" (file-info-name file-info))))
-           (index
-            (+ (fill-pointer forms) (file-info-source-root file-info))))
+           (index (fill-pointer forms)))
       (with-source-paths
         (find-source-paths form index)
         (process-toplevel-form
