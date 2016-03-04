@@ -94,7 +94,7 @@
           (let* ((name (leaf-debug-name leaf)))
             (case (global-var-kind leaf)
               ;; Reading a special
-              (:special
+              ((:special :global)
                (record-xref :references name context node nil))
               ;; Calling a function
               (:global-function
@@ -110,9 +110,9 @@
           (record-xref :references (ref-%source-name node) context node nil)))))
     ;; Setting a special variable
     (cset
-     (let* ((var (set-var node)))
+     (let ((var (set-var node)))
        (when (and (global-var-p var)
-                  (eq :special (global-var-kind var)))
+                  (memq (global-var-kind var) '(:special :global)))
          (record-xref :sets
                       (leaf-debug-name var)
                       context

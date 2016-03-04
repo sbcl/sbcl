@@ -127,6 +127,14 @@
 (defun xref/14 ()
   *a*)
 
+(sb-ext:defglobal **global** 31)
+
+(defun xref/15 ()
+  **global**)
+
+(defun xref/16 (x)
+  (setf **global** x))
+
 ;; calling a function in a macro body
 (defmacro macro/1 ()
   (when nil
