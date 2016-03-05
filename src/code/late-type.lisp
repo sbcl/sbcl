@@ -102,15 +102,19 @@
        ;; explaining to us mere mortals how it works...
        (and (sb!xc:typep type2 'classoid)
             (dolist (x info nil)
-              (when (or (not (cdr x))
-                        (csubtypep type1 (specifier-type (cdr x))))
+             (let ((guard (cdr x)))
+              (when (or (not guard)
+                        (csubtypep type1 (if (%instancep guard)
+                                             guard
+                                             (setf (cdr x)
+                                                   (specifier-type guard)))))
                 (return
                  (or (eq type2 (car x))
                      (let ((inherits (layout-inherits
                                       (classoid-layout (car x)))))
                        (dotimes (i (length inherits) nil)
                          (when (eq type2 (layout-classoid (svref inherits i)))
-                           (return t)))))))))
+                           (return t))))))))))
        t)))
 
 ;;; This function takes a list of specs, each of the form
@@ -125,23 +129,24 @@
 ;;;    G0,(and G1 (not G0)), (and G2 (not (or G0 G1))).
 ;;;
 ;;; WHEN controls when the forms are executed.
-(defmacro !define-superclasses (type-class-name specs when)
-  (with-unique-names (type-class info)
-    `(,when
-       (let ((,type-class (type-class-or-lose ',type-class-name))
-             (,info (mapcar (lambda (spec)
-                              (destructuring-bind
-                                  (super &optional guard)
-                                  spec
-                                (cons (find-classoid super) guard)))
-                            ',specs)))
-         (setf (type-class-complex-subtypep-arg1 ,type-class)
-               (lambda (type1 type2)
-                 (has-superclasses-complex-subtypep-arg1 type1 type2 ,info)))
-         (setf (type-class-complex-subtypep-arg2 ,type-class)
+(defmacro !define-superclasses (type-class-name specs progn-oid)
+  (let ((defun-name (symbolicate type-class-name "-COMPLEX-SUBTYPEP-ARG1")))
+    `(progn
+       (defun ,defun-name (type1 type2)
+         (has-superclasses-complex-subtypep-arg1
+          type1 type2
+          (load-time-value
+           (list ,@(mapcar (lambda (spec)
+                             (destructuring-bind (super &optional guard) spec
+                               `(cons (find-classoid ',super) ',guard)))
+                           specs)) #-sb-xc-host t)))
+       (,progn-oid
+        (let ((type-class (type-class-or-lose ',type-class-name)))
+         (setf (type-class-complex-subtypep-arg1 type-class) #',defun-name)
+         (setf (type-class-complex-subtypep-arg2 type-class)
                #'delegate-complex-subtypep-arg2)
-         (setf (type-class-complex-intersection2 ,type-class)
-               #'delegate-complex-intersection2)))))
+         (setf (type-class-complex-intersection2 type-class)
+               #'delegate-complex-intersection2))))))
 
 ;;;; FUNCTION and VALUES types
 ;;;;
@@ -2584,9 +2589,7 @@ used for a COMPLEX component.~:@>"
                           (array-type-specialized-element-type type2))
                    t)))))
 
-(!define-superclasses array
-  ((vector vector) (array))
-  !cold-init-forms)
+(!define-superclasses array ((vector vector) (array)) !cold-init-forms)
 
 (defun array-types-intersect (type1 type2)
   (declare (type array-type type1 type2))
