@@ -349,11 +349,16 @@
 (assert (not (type= (specifier-type '(function (t) (values &optional)))
                     (specifier-type '(function (t) (values))))))
 
-;; Assert that INDEX is an interned numeric type by parsing it twice,
+;; Assert that these types are interned by parsing each twice,
 ;; dropping the specifier-type cache in between.
-(let ((a (specifier-type 'index)))
-  (drop-all-hash-caches)
-  (let ((b (specifier-type 'index)))
-    (assert (eq a b))))
+(dolist (spec '(index cons null boolean character base-char extended-char))
+  (let ((a (specifier-type spec)))
+    (drop-all-hash-caches)
+    (let ((b (specifier-type spec)))
+      (assert (eq a b)))))
+(drop-all-hash-caches)
+;; BOOLEAN's deftype lists the members as (T NIL),
+;; but it should also be EQ to (MEMBER NIL T)
+(assert (eq (specifier-type '(member nil t)) (specifier-type 'boolean)))
 
 (/show "done with tests/type.before-xc.lisp")

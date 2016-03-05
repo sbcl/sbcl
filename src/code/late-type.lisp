@@ -2837,9 +2837,9 @@ used for a COMPLEX component.~:@>"
         (make-negation-type type))))
 
 (!define-type-method (member :unparse) (type)
-  (let ((members (member-type-members type)))
-    (cond ((equal members '(nil)) 'null)
-          (t `(member ,@members)))))
+  (cond ((eq type (specifier-type 'null)) 'null) ; NULL type is EQ-comparable
+        ((eq type (specifier-type 'boolean)) 'boolean) ; so is BOOLEAN
+        (t `(member ,@(member-type-members type)))))
 
 (!define-type-method (member :singleton-p) (type)
   (if (eql 1 (member-type-size type))
@@ -3305,12 +3305,10 @@ used for a COMPLEX component.~:@>"
          (t (bug "Weird CONS type ~S" type))))))
 
 (!define-type-method (cons :unparse) (type)
-  (let ((car-eltype (type-specifier (cons-type-car-type type)))
-        (cdr-eltype (type-specifier (cons-type-cdr-type type))))
-    (if (and (member car-eltype '(t *))
-             (member cdr-eltype '(t *)))
-        'cons
-        `(cons ,car-eltype ,cdr-eltype))))
+  (if (eq type (specifier-type 'cons))
+      'cons
+      `(cons ,(type-specifier (cons-type-car-type type))
+             ,(type-specifier (cons-type-cdr-type type)))))
 
 (!define-type-method (cons :simple-=) (type1 type2)
   (declare (type cons-type type1 type2))
@@ -3451,9 +3449,10 @@ used for a COMPLEX component.~:@>"
 
 (!define-type-method (character-set :unparse) (type)
   (cond
-    ((type= type (specifier-type 'character)) 'character)
-    ((type= type (specifier-type 'base-char)) 'base-char)
-    ((type= type (specifier-type 'extended-char)) 'extended-char)
+    ((eq type (specifier-type 'character)) 'character)
+    ((eq type (specifier-type 'base-char)) 'base-char)
+    ((eq type (specifier-type 'extended-char)) 'extended-char)
+    ;; standard-char is not an interned type
     ((type= type (specifier-type 'standard-char)) 'standard-char)
     (t
      ;; Unparse into either MEMBER or CHARACTER-SET. We use MEMBER if there
