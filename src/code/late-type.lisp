@@ -1886,39 +1886,39 @@
              (or (eql low-value high-bound)
                  (and (eql low-value
                            (load-time-value (make-unportable-float
-                                             :single-float-negative-zero)))
+                                             :single-float-negative-zero) t))
                       (eql high-bound 0f0))
                  (and (eql low-value 0f0)
                       (eql high-bound
                            (load-time-value (make-unportable-float
-                                             :single-float-negative-zero))))
+                                             :single-float-negative-zero) t)))
                  (and (eql low-value
                            (load-time-value (make-unportable-float
-                                             :double-float-negative-zero)))
+                                             :double-float-negative-zero) t))
                       (eql high-bound 0d0))
                  (and (eql low-value 0d0)
                       (eql high-bound
                            (load-time-value (make-unportable-float
-                                             :double-float-negative-zero)))))))
+                                             :double-float-negative-zero) t))))))
           ((consp high-bound)
            (let ((high-value (car high-bound)))
              (or (eql high-value low-bound)
                  (and (eql high-value
                            (load-time-value (make-unportable-float
-                                             :single-float-negative-zero)))
+                                             :single-float-negative-zero) t))
                       (eql low-bound 0f0))
                  (and (eql high-value 0f0)
                       (eql low-bound
                            (load-time-value (make-unportable-float
-                                             :single-float-negative-zero))))
+                                             :single-float-negative-zero) t)))
                  (and (eql high-value
                            (load-time-value (make-unportable-float
-                                             :double-float-negative-zero)))
+                                             :double-float-negative-zero) t))
                       (eql low-bound 0d0))
                  (and (eql high-value 0d0)
                       (eql low-bound
                            (load-time-value (make-unportable-float
-                                             :double-float-negative-zero)))))))
+                                             :double-float-negative-zero) t))))))
           ((and (eq (numeric-type-class low) 'integer)
                 (eq (numeric-type-class high) 'integer))
            (eql (1+ low-bound) high-bound))
@@ -2156,8 +2156,8 @@ used for a COMPLEX component.~:@>"
   #+sb-xc-host (declare (ignore upperp))
   (let #+sb-xc-host ()
        #-sb-xc-host
-       ((nl (load-time-value (symbol-value 'sb!xc:most-negative-long-float)))
-        (pl (load-time-value (symbol-value 'sb!xc:most-positive-long-float))))
+       ((nl (load-time-value (symbol-value 'sb!xc:most-negative-long-float) t))
+        (pl (load-time-value (symbol-value 'sb!xc:most-positive-long-float) t)))
     (let ((nbound (if (consp bound) (car bound) bound))
           (consp (consp bound)))
       (ecase type
@@ -2186,11 +2186,10 @@ used for a COMPLEX component.~:@>"
   #+sb-xc-host (declare (ignore upperp))
   (let #+sb-xc-host ()
        #-sb-xc-host
-       ((nd (load-time-value (symbol-value 'sb!xc:most-negative-double-float)))
-        (pd (load-time-value (symbol-value 'sb!xc:most-positive-double-float)))
-        (ns (load-time-value (symbol-value 'sb!xc:most-negative-single-float)))
-        (ps (load-time-value
-             (symbol-value 'sb!xc:most-positive-single-float))))
+       ((nd (load-time-value (symbol-value 'sb!xc:most-negative-double-float) t))
+        (pd (load-time-value (symbol-value 'sb!xc:most-positive-double-float) t))
+        (ns (load-time-value (symbol-value 'sb!xc:most-negative-single-float) t))
+        (ps (load-time-value (symbol-value 'sb!xc:most-positive-single-float) t)))
     (let ((nbound (if (consp bound) (car bound) bound))
           (consp (consp bound)))
       (ecase type
