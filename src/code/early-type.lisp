@@ -337,13 +337,6 @@
 ;;; for figuring out the right value so that callers don't have to.
 (defun make-numeric-type (&key class format (complexp :real) low high
                                enumerable)
-  ;; if interval is empty
-  (if (and low
-           high
-           (if (or (consp low) (consp high)) ; if either bound is exclusive
-               (>= (type-bound-number low) (type-bound-number high))
-               (> low high)))
-      (return-from make-numeric-type *empty-type*))
   (multiple-value-bind (low high)
       (case class
         (integer
@@ -354,6 +347,12 @@
         (t
              ;; no canonicalization necessary
          (values low high)))
+    ;; if interval is empty
+    (when (and low high
+               (if (or (consp low) (consp high)) ; if either bound is exclusive
+                   (>= (type-bound-number low) (type-bound-number high))
+                   (> low high)))
+      (return-from make-numeric-type *empty-type*))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
         ;; Either lookup the canonical interned object for

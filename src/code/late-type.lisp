@@ -2085,44 +2085,29 @@ used for a COMPLEX component.~:@>"
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
 ;;; member of TYPE or a one-element list of a member of TYPE.
-#!-sb-fluid (declaim (inline canonicalized-bound))
-(defun canonicalized-bound (bound type)
+;;; This is not necessarily the canonical bound. An integer bound
+;;; should always be an atom, which we'll enforce later if needed.
+#!-sb-fluid (declaim (inline valid-bound))
+(defun valid-bound (bound type)
   (cond ((eq bound '*) nil)
-        ((or (sb!xc:typep bound type)
-             (and (consp bound)
-                  (sb!xc:typep (car bound) type)
-                  (null (cdr bound))))
-          bound)
+        ((sb!xc:typep (if (singleton-p bound) (car bound) bound) type) bound)
         (t
-         (error "Bound is not ~S, a ~S or a list of a ~S: ~S"
-                '*
-                type
-                type
-                bound))))
+         (error "Bound is not * or ~A ~S or list of one ~:*~S: ~S"
+                (if (eq type 'integer) "an" "a") type bound))))
 
 (!def-type-translator integer (&optional (low '*) (high '*))
-  (let* ((l (canonicalized-bound low 'integer))
-         (lb (if (consp l) (1+ (car l)) l))
-         (h (canonicalized-bound high 'integer))
-         (hb (if (consp h) (1- (car h)) h)))
-    (if (and hb lb (< hb lb))
-        *empty-type*
-      (make-numeric-type :class 'integer
-                         :complexp :real
-                         :enumerable (not (null (and l h)))
-                         :low lb
-                         :high hb))))
+  (let ((lb (valid-bound low 'integer))
+        (hb (valid-bound high 'integer)))
+    (make-numeric-type :class 'integer :complexp :real
+                       :enumerable (not (null (and lb hb)))
+                       :low lb :high hb)))
 
 (defmacro !def-bounded-type (type class format)
   `(!def-type-translator ,type (&optional (low '*) (high '*))
-     (let ((lb (canonicalized-bound low ',type))
-           (hb (canonicalized-bound high ',type)))
-       (if (not (numeric-bound-test* lb hb <= <))
-           *empty-type*
-         (make-numeric-type :class ',class
-                            :format ',format
-                            :low lb
-                            :high hb)))))
+     (let ((lb (valid-bound low ',type))
+           (hb (valid-bound high ',type)))
+       (make-numeric-type :class ',class :format ',format
+                          :low lb :high hb))))
 
 (!def-bounded-type rational rational nil)
 
@@ -2239,14 +2224,9 @@ used for a COMPLEX component.~:@>"
                       ,(coerced-float-bound high 'double-float t))
         #!+long-float ,(error "stub: no long float support yet"))))
 
-(defmacro !define-float-format (f)
-  `(!def-bounded-type ,f float ,f))
-
-;; (!define-float-format short-float) ; it's a DEFTYPE
-(!define-float-format single-float)
-(!define-float-format double-float)
-;; long-float support is dead.
-;; (!define-float-format long-float) ; also a DEFTYPE
+(macrolet ((define-float-format (f) `(!def-bounded-type ,f float ,f)))
+  (define-float-format single-float)
+  (define-float-format double-float))
 
 (defun numeric-types-intersect (type1 type2)
   (declare (type numeric-type type1 type2))

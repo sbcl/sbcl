@@ -639,3 +639,7 @@
         (if (typep c 'sb-kernel:built-in-classoid)
             (assert (eq (sb-int:info :type :kind s) :primitive))
             (assert (eq (sb-int:info :type :kind s) :instance)))))))
+
+(test-util:with-test (:name :make-numeric-type)
+  (assert (eq (make-numeric-type :class 'integer :low '(4) :high '(5))
+              *empty-type*)))
