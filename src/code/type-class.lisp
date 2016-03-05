@@ -411,17 +411,18 @@
          (lexpr (make-macro-lambda nil lambda-list stuff nil nil
                                    :accessor (if allow-atom 'identity 'cdr)
                                    :environment nil))
-         (ll-decl (third lexpr)))
+         (ll-decl (third lexpr))
+         (defun-name (symbolicate "PARSE-<" name ">")))
     (aver (and (eq (car ll-decl) 'declare) (caadr ll-decl) 'sb!c::lambda-list))
-    `(!cold-init-forms
-      (setf (info :type :expander ',name)
-            (list
-             (named-lambda ,(format nil "~A-TYPE-PARSE" name) (,context spec)
-              ,ll-decl
-              ,@(unless context-var-p `((declare (ignore ,context))))
-              ,(if allow-atom
-                   `(,lexpr (and (listp spec) (cdr spec)))
-                   `(if (listp spec) (,lexpr spec)))))))))
+    `(progn
+       (defun ,defun-name (,context spec)
+         ,ll-decl
+         ,@(unless context-var-p `((declare (ignore ,context))))
+         ,(if allow-atom
+              `(,lexpr (and (listp spec) (cdr spec)))
+              `(if (listp spec) (,lexpr spec))))
+       (!cold-init-forms
+        (setf (info :type :expander ',name) (list #',defun-name))))))
 
 ;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the
 ;;; same class, invoke the simple method. Otherwise, invoke any
