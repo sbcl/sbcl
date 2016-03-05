@@ -1006,4 +1006,8 @@
   (assert (eq (sb-kernel:specifier-type 'fruitbat)
               (sb-kernel:find-classoid 'hash-table))))
 
+(deftype foofa () 'single-float)
+(with-test (:name :redefine-deftype-to-defstruct)
+  (defstruct foofa (a nil :type foofa)))
+
 ;;; success

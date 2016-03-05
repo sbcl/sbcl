@@ -411,6 +411,8 @@
                              (array-dimensions obj))))
                (values t t)
                (values nil t)))
+        ((and (structure-classoid-p ctype) (symbolp obj))
+         (values nil t))
         (t
          (let ( ;; the Common Lisp type specifier corresponding to CTYPE
                (type (type-specifier ctype)))

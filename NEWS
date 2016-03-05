@@ -2,6 +2,8 @@
 
 changes relative to sbcl-1.3.3:
   * bug fix: SB-EVAL does not signal an error for (THE KEYWORD :FOO)
+  * bug fix: a DEFTYPE name that is redefined into a DEFSTRUCT name
+    is less likely to cause confusion in the compiler.
   * enhancement: who-sets and who-references work on DEFGLOBAL. (lp#1552997)
 
 changes in sbcl-1.3.3 relative to sbcl-1.3.2:

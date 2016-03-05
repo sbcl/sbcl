@@ -217,16 +217,9 @@
 (declaim (inline !expander-for-defstruct))
 (defun !expander-for-defstruct (null-env-p name-and-options slot-descriptions
                                 expanding-into-code-for)
-  (let* ((dd (parse-defstruct null-env-p name-and-options slot-descriptions))
-         (name (dd-name dd))
-         (inherits
-          (if (dd-class-p dd)
-              #+sb-xc-host (!inherits-for-structure dd)
-              #-sb-xc-host
-              (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
-                                                        'structure-object))))
-                (concatenate 'simple-vector
-                             (layout-inherits super) (vector super)))))
+  (binding*
+        (((dd classoid inherits)
+          (parse-defstruct null-env-p name-and-options slot-descriptions))
          (boa-constructors (member-if #'listp (dd-constructors dd) :key #'cdr))
          (keyword-constructors (ldiff (dd-constructors dd) boa-constructors))
          (constructor-definitions
@@ -245,6 +238,7 @@
                      `(defun ,(car ctor)
                              ,@(structure-ctor-lambda-parts dd (cdr ctor))))
                    boa-constructors)))
+         (name (dd-name dd))
          (print-method
           (when (dd-print-option dd)
             (let* ((x (sb!xc:gensym "OBJECT"))
@@ -289,7 +283,7 @@
                   ,@(awhen (dd-predicate-name dd)
                       `((defun ,(dd-predicate-name dd) (object)
                           (typep object ',(dd-name dd)))))
-                  ,@(accessor-definitions dd))
+                  ,@(accessor-definitions dd classoid))
                  ;; This must be in the same lexical environment
                  ,@constructor-definitions
                  ,@print-method
@@ -666,16 +660,47 @@ unless :NAMED is also specified.")))
               (if (listp name-and-options)
                   (values (car name-and-options) (cdr name-and-options))
                   (values name-and-options nil)))
-             (result (make-defstruct-description null-env-p name)))
-    (parse-defstruct-options options result)
-    (when (dd-include result)
-      (frob-dd-inclusion-stuff result))
+             (dd (make-defstruct-description null-env-p name)))
+    (parse-defstruct-options options dd)
+    (when (dd-include dd)
+      (frob-dd-inclusion-stuff dd))
     (when (stringp (car slot-descriptions))
-      (setf (dd-doc result) (pop slot-descriptions)))
-    (dolist (slot-description slot-descriptions)
-      (allocate-1-slot result (parse-1-dsd result slot-description)))
-    (determine-unsafe-slots result)
-    result))
+      (setf (dd-doc dd) (pop slot-descriptions)))
+    (let* ((inherits
+            (if (dd-class-p dd)
+                #+sb-xc-host (!inherits-for-structure dd)
+                #-sb-xc-host
+                (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
+                                                          'structure-object))))
+                  (concatenate 'simple-vector
+                               (layout-inherits super) (vector super)))))
+           (proto-classoid
+            (if (dd-class-p dd)
+                (let* ((classoid (make-structure-classoid :name (dd-name dd)))
+                       (layout (make-layout :classoid classoid :inherits inherits)))
+                  (setf (layout-invalid layout) nil
+                        (classoid-layout classoid) layout)
+                  classoid))))
+      ;; Bind *pending-defstruct-type* to this classoid, which fixes a problem
+      ;; when redefining a DEFTYPE which appeared to be a raw slot. e.g.
+      ;;   (DEFTYPE X () 'SINGLE-FLOAT) and later (DEFSTRUCT X (A 0 :TYPE X)).
+      ;; This is probably undefined behavior, but at least we'll not crash.
+      ;; Also make self-referential definitions not signal PARSE-UNKNOWN-TYPE
+      ;; on slots whose :TYPE option allows an instance of itself
+      (flet ((parse-slots ()
+               (dolist (slot-description slot-descriptions)
+                 (allocate-1-slot dd (parse-1-dsd dd slot-description)))))
+        (if (dd-class-p dd)
+            (progn
+              (when (info :type :kind name)
+                ;; It could be buried anywhere in a complicated type expression.
+                ;; There's no way to clear selectively, so just flush the cache.
+                (values-specifier-type-cache-clear))
+              (let ((*pending-defstruct-type* proto-classoid))
+                (parse-slots)))
+            (parse-slots)))
+      (determine-unsafe-slots dd)
+      (values dd proto-classoid inherits))))
 
 ;;;; stuff to parse slot descriptions
 
@@ -1671,7 +1696,7 @@ or they must be declared locally notinline at each call site.~@:>")
                    (if (eq type t) initform `(the ,type ,initform)))))
            (dd-slots dd)))))))
 
-(defun accessor-definitions (dd)
+(defun accessor-definitions (dd *pending-defstruct-type*)
   (loop for dsd in (dd-slots dd)
         for accessor-name = (dsd-accessor-name dsd)
         unless (accessor-inherited-data accessor-name dd)

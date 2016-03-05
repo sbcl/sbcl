@@ -757,6 +757,9 @@
   ((orig equal-but-no-car-recursion)) ()
   :hash-function #'sxhash :hash-bits 10)
 
+(defvar *pending-defstruct-type*)
+(declaim (type classoid *pending-defstruct-type*))
+
 ;;; The recursive ("-R" suffixed) entry point for this function
 ;;; should be used for each nested parser invocation.
 (defun values-specifier-type-r (context type-specifier)
@@ -812,6 +815,13 @@
                 ;; If spec is non-atomic, the :BUILTIN value is inapplicable.
                 ;; There used to be compound builtins, but not any more.
                 (when builtin (return builtin))
+                ;; Any spec that apparently refers to a defstruct form
+                ;; that's being macroexpanded should refer to that type.
+                (when (boundp '*pending-defstruct-type*)
+                  (let ((classoid *pending-defstruct-type*))
+                    (when (eq (classoid-name classoid) spec)
+                      (setf (cdr context) nil) ; don't cache
+                      (return classoid))))
                 (case (info :type :kind spec)
                   (:instance (return (find-classoid spec)))
                   (:forthcoming-defclass-type (go unknown))))
