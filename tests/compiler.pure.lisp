@@ -3832,10 +3832,7 @@
 
 (with-test (:name :bug-384892)
   (assert (equal
-           ;; The assertion that BOOLEAN becomes (MEMBER T NIL)
-           ;; is slightly brittle, but the rest of the
-           ;; assertion is ok.
-           '(function (fixnum fixnum &key (:k1 (member t nil)))
+           '(function (fixnum fixnum &key (:k1 boolean))
              (values (member t) &optional))
            (sb-kernel:%simple-fun-type
             (checked-compile `(lambda (x y &key k1)
