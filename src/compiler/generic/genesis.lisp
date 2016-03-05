@@ -442,8 +442,7 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(declaim (special *!cold-toplevels* *!cold-setf-macros*
-                  *!cold-defconstants* *!cold-defuns*))
+(declaim (special *!cold-toplevels* *!cold-defconstants* *!cold-defuns*))
 
 ;;; the head of a list of DEBUG-SOURCEs which need to be patched when
 ;;; the cold core starts up
@@ -2715,8 +2714,6 @@ core and return a descriptor to it."
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
-            (sb!impl::%defsetf
-             (push (list-to-core args) *!cold-setf-macros*))
             (sb!c::%defconstant
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
@@ -3779,7 +3776,6 @@ initially undefined function references:~2%")
            (*ctype-cache* (make-hash-table :test 'equal))
            (*!cold-defconstants* nil)
            (*!cold-defuns* nil)
-           (*!cold-setf-macros* nil)
            (*!cold-toplevels* nil)
            (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
@@ -3836,16 +3832,13 @@ initially undefined function references:~2%")
                    (layout (gethash name *cold-layouts*)))
               (aver layout)
               (write-slots layout *host-layout-of-layout* :info dd))))
-        (format t "~&; SB!Loader: (~D+~D+~D+~D+~D) ~
- structs/consts/funs/setf-macros/other~%"
+        (format t "~&; SB!Loader: (~D+~D+~D+~D) structs/consts/funs/other~%"
                 (length *known-structure-classoids*)
                 (length *!cold-defconstants*)
                 (length *!cold-defuns*)
-                (length *!cold-setf-macros*)
                 (length *!cold-toplevels*)))
 
-      (dolist (symbol '(*!cold-defconstants* *!cold-defuns*
-                        *!cold-setf-macros* *!cold-toplevels*))
+      (dolist (symbol '(*!cold-defconstants* *!cold-defuns* *!cold-toplevels*))
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 

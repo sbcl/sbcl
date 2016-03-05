@@ -463,14 +463,6 @@
     (when doc
       (setf (fdocumentation name 'setf) doc))
     name))
-(defun !quietly-defsetf (&rest args)
-  ;; Because !QUIETLY-DEFSETF calls occur before any condition classoids
-  ;; have been installed, HANDLER-BIND would lead to infinite regress.
-  ;; The only thing we can do to avoid that is: nothing at all.
-  #-sb-xc-host (encapsulate 'style-warn '!bootstrap
-                            (lambda (&rest l) (declare (ignore l))))
-  (apply #'%defsetf args)
-  #-sb-xc-host (unencapsulate 'style-warn '!bootstrap))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
   #!+sb-doc

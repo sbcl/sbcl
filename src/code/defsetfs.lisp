@@ -93,9 +93,9 @@
                        (%cxr-setf-expander
                         '(,(symbolicate "C" (subseq string 2)))
                         ',(symbolicate "%RPLAC" (subseq string 1 2)))))
-                  (!quietly-defsetf ',name closure nil)
+                  (%defsetf ',name closure nil)
                   ,@(when alias
-                      `((!quietly-defsetf ',alias closure nil)))))))
+                      `((%defsetf ',alias closure nil)))))))
   ;; Rather than expand into a DEFINE-SETF-EXPANDER, install a single closure
   ;; as the expander and capture just enough to distinguish the variations.
   (def caar)
@@ -130,8 +130,7 @@
 ;; FIFTH through TENTH
 (macrolet ((def (name subform)
              `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (!quietly-defsetf ',name (%cxr-setf-expander ',subform '%rplaca)
-                                  nil))))
+                (%defsetf ',name (%cxr-setf-expander ',subform '%rplaca) nil))))
   (def fifth   (nthcdr 4)) ; or CDDDDR
   (def sixth   (nthcdr 5))
   (def seventh (nthcdr 6))
@@ -146,7 +145,7 @@
 ;; (NTHCDR ...) is a subform of the CAR expression, and so must be
 ;; bound to a temporary variable.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (!quietly-defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca) nil))
+  (%defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca) nil))
 
 (defsetf elt %setelt)
 (defsetf row-major-aref %set-row-major-aref)

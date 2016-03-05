@@ -120,6 +120,41 @@
        (/primitive-print ,(symbol-name name))
        (,name))))
 
+(defun !encapsulate-stuff-for-cold-init (&aux names)
+  (flet ((encapsulate-1 (name handler)
+           (encapsulate name '!cold-init handler)
+           (push name names)))
+    (encapsulate-1 '%failed-aver
+                   (lambda (f expr)
+                     ;; output the message before signaling error,
+                     ;; as it may be this is too early in the cold init.
+                     (fresh-line)
+                     (write-line "failed AVER:")
+                     (write expr)
+                     (terpri)
+                     (funcall f expr)))
+    
+    (encapsulate-1
+     'find-package
+     (lambda (f designator)
+       (cond ((packagep designator) designator)
+             (t (funcall f (let ((s (string designator)))
+                             (if (eql (mismatch s "SB!") 3)
+                                 (concatenate 'string "SB-" (subseq s 3))
+                                 s)))))))
+
+    ;; %DEFSETF ',FN warns when #'(SETF fn) also has a function binding.
+    ;; There's no way to suppress that warning in cold-init.
+    ;; HANDLER-BIND can't be used, since condition classoids don't exist yet.
+    (encapsulate-1
+     '%defsetf
+     (lambda (f &rest args)
+       (encapsulate 'style-warn '!cold-init ; Make STYLE-WARN into a no-op.
+                    (lambda (&rest l) (declare (ignore l))))
+       (apply f args)
+       (unencapsulate 'style-warn '!cold-init)))) ; Now fatal again.
+  names)
+
 ;;; called when a cold system starts up
 (defun !cold-init ()
   #!+sb-doc "Give the world a shove and hope it spins."
@@ -204,8 +239,6 @@
       (setf (info :variable :kind name) :constant)
       (when source-loc (setf (info :source-location :constant name) source-loc))
       (when docstring (setf (fdocumentation name 'variable) docstring))))
-  (dolist (x *!cold-setf-macros*)
-    (apply #'!quietly-defsetf x))
   (dolist (x *!cold-defuns*)
     (destructuring-bind (name . inline-expansion) x
       (!%quietly-defun name inline-expansion)))
@@ -218,25 +251,8 @@
   (progn (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
          (terpri))
 
-  (encapsulate
-     'find-package '!bootstrap
-     (lambda (f designator)
-       (cond ((packagep designator) designator)
-             (t (funcall f (let ((s (string designator)))
-                             (if (eql (mismatch s "SB!") 3)
-                                 (concatenate 'string "SB-" (subseq s 3))
-                                 s)))))))
-  (encapsulate '%failed-aver '!bootstrap
-               (lambda (f expr)
-                   ;; output the message before signaling error,
-                   ;; as it may be this is too early in the cold init.
-                   (fresh-line)
-                   (write-line "failed AVER:")
-                   (write expr)
-                   (terpri)
-                   (funcall f expr)))
-
-  (loop for index-in-cold-toplevels from 0
+  (loop with wrapped-functions = (!encapsulate-stuff-for-cold-init)
+        for index-in-cold-toplevels from 0
         for toplevel-thing in (prog1 *!cold-toplevels*
                                 (makunbound '*!cold-toplevels*))
         do
@@ -258,10 +274,9 @@
         ((cons (eql defstruct))
          (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
         (t
-         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*"))))
+         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))
+        finally (dolist (f wrapped-functions) (unencapsulate f '!cold-init)))
   (/show0 "done with loop over cold toplevel forms and fixups")
-  (unencapsulate '%failed-aver '!bootstrap)
-  (unencapsulate 'find-package '!bootstrap)
 
   (show-and-call time-reinit)
 
