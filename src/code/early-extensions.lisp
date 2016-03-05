@@ -278,7 +278,7 @@
 ;;; INITIAL-VALUE is supplied for COLLECT, the stuff will be RPLACD'd
 ;;; onto the end. Note that FUNCTION may be anything that can appear
 ;;; in the functional position, including macros and lambdas.
-(defmacro collect (collections &body body)
+(def!macro collect (collections &body body)
   (let ((macros ())
         (binds ())
         (ignores ()))

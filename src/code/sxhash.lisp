@@ -12,8 +12,6 @@
 
 (in-package "SB!C")
 
-(sb!xc:define-modify-macro mixf (y) mix)
-
 ;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
 ;;; order to avoid boxing.
 (deftransform sxhash ((x) (single-float))
