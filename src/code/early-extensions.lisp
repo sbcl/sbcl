@@ -241,19 +241,11 @@
 ;;;;
 ;;;; comment from CMU CL: "the ultimate collection macro..."
 
-;;; helper functions for COLLECT, which become the expanders of the
-;;; MACROLET definitions created by COLLECT
-;;;
-;;; COLLECT-NORMAL-EXPANDER handles normal collection macros.
-;;;
-;;; COLLECT-LIST-EXPANDER handles the list collection case. N-TAIL
-;;; is the pointer to the current tail of the list, or NIL if the list
-;;; is empty.
+;;; helper function for COLLECT, which becomes the expander of the
+;;; MACROLET definitions created by COLLECT if collecting a list.
+;;; N-TAIL is the pointer to the current tail of the list,  or NIL
+;;; if the list is empty.
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun collect-normal-expander (n-value fun forms)
-    `(progn
-       ,@(mapcar (lambda (form) `(setq ,n-value (,fun ,form ,n-value))) forms)
-       ,n-value))
   (defun collect-list-expander (n-value n-tail forms)
     (let ((n-res (gensym)))
       `(progn
@@ -291,29 +283,23 @@
         (binds ())
         (ignores ()))
     (dolist (spec collections)
-      (unless (proper-list-of-length-p spec 1 3)
-        (error "malformed collection specifier: ~S" spec))
-      (let* ((name (first spec))
-             (default (second spec))
-             (kind (or (third spec) 'collect))
-             (n-value (gensym (concatenate 'string
-                                           (symbol-name name)
-                                           "-N-VALUE-"))))
+      (destructuring-bind (name &optional default collector
+                                &aux (n-value (copy-symbol name))) spec
         (push `(,n-value ,default) binds)
-        (if (eq kind 'collect)
-          (let ((n-tail (gensym (concatenate 'string
-                                             (symbol-name name)
-                                             "-N-TAIL-"))))
-            (push n-tail ignores)
-            (if default
-              (push `(,n-tail (last ,n-value)) binds)
-              (push n-tail binds))
-            (push `(,name (&rest args)
-                     (collect-list-expander ',n-value ',n-tail args))
-                  macros))
-          (push `(,name (&rest args)
-                   (collect-normal-expander ',n-value ',kind args))
-                macros))))
+        (let ((macro-body
+               (if (or (null collector) (eq collector 'collect))
+                   (let ((n-tail
+                          (make-symbol
+                           (concatenate 'string (symbol-name name) "-TAIL"))))
+                     (push n-tail ignores)
+                     (push `(,n-tail ,(if default `(last ,n-value))) binds)
+                     `(collect-list-expander ',n-value ',n-tail args))
+                   ``(progn
+                       ,@(mapcar (lambda (x)
+                                   `(setq ,',n-value (,',collector ,x ,',n-value)))
+                                 args)
+                       ,',n-value))))
+          (push `(,name (&rest args) ,macro-body) macros))))
     `(macrolet ,macros
        (let* ,(nreverse binds)
          ;; Even if the user reads each collection result,
