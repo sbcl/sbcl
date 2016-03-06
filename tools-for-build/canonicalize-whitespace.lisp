@@ -22,11 +22,16 @@
     (flet ((remove-trailing-whitespace (line)
              (let ((non-ws-position (position-if-not #'whitespace-p line
                                                      :from-end t)))
-               (unless (and non-ws-position
-                            (< non-ws-position (1- (length line))))
-                 (return-from remove-trailing-whitespace line))
-               (setq change-p t)
-               (subseq line 0 (1+ non-ws-position))))
+               (cond
+                 ((not non-ws-position)
+                  (unless (zerop (length line))
+                    (setq change-p t))
+                  "")
+                 ((< non-ws-position (1- (length line)))
+                  (setq change-p t)
+                  (subseq line 0 (1+ non-ws-position)))
+                 (t
+                  line))))
            (remove-tabs (line)
              (unless (find #\Tab line :test #'char=)
                (return-from remove-tabs line))
