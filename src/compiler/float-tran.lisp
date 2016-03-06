@@ -315,10 +315,10 @@
                            :high new-hi)))))
 (defoptimizer (scale-single-float derive-type) ((f ex))
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       #'scale-single-float t))
+                       #'scale-single-float))
 (defoptimizer (scale-double-float derive-type) ((f ex))
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       #'scale-double-float t))
+                       #'scale-double-float))
 
 ;;; DEFOPTIMIZERs for %SINGLE-FLOAT and %DOUBLE-FLOAT. This makes the
 ;;; FLOAT function return the correct ranges if the input has some

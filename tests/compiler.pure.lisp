@@ -4077,19 +4077,21 @@
                    (sb-kernel:%simple-fun-type f)))))
 
 (with-test (:name (:bug-793771 *))
-  (let ((f (compile nil `(lambda (x)
-                            (declare (type (single-float (0.0)) x))
-                           (* x 0.1)))))
+  (let ((f (checked-compile
+            `(lambda (x)
+               (declare (type (single-float (0.0)) x))
+               (* x 0.1)))))
     (assert (equal `(function ((single-float (0.0)))
-                              (values (or (member 0.0) (single-float (0.0))) &optional))
+                              (values (single-float 0.0) &optional))
                    (sb-kernel:%simple-fun-type f)))))
 
 (with-test (:name (:bug-793771 /))
-  (let ((f (compile nil `(lambda (x)
-                            (declare (type (single-float (0.0)) x))
-                           (/ x 3.0)))))
+  (let ((f (checked-compile
+            `(lambda (x)
+               (declare (type (single-float (0.0)) x))
+               (/ x 3.0)))))
     (assert (equal `(function ((single-float (0.0)))
-                              (values (or (member 0.0) (single-float (0.0))) &optional))
+                              (values (single-float 0.0) &optional))
                    (sb-kernel:%simple-fun-type f)))))
 
 (with-test (:name (:bug-486812 single-float))

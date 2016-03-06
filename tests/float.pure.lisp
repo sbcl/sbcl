@@ -398,12 +398,20 @@
 ;; visible as a QNaN in the imaginary part when next using the register
 ;; in a (COMPLEX SINGLE-FLOAT) operation.
 (with-test (:name :make-single-float-clear-imagpart)
-  (let ((f (compile nil
-                    '(lambda (x)
-                       (declare (optimize speed))
-                       (= #c(1.0f0 2.0f0)
-                          (+ #c(3.0f0 2.0f0)
-                             (sb-kernel:make-single-float x))))))
+  (let ((f (checked-compile
+            '(lambda (x)
+              (declare (optimize speed))
+              (= #c(1.0f0 2.0f0)
+               (+ #c(3.0f0 2.0f0)
+                (sb-kernel:make-single-float x))))))
         (bits (sb-kernel:single-float-bits -2.0f0)))
     (assert (< bits 0))         ; Make sure the test is fit for purpose.
     (assert (funcall f bits))))
+
+(with-test (:name :negative-zero-derivation)
+  (assert (not
+           (funcall (checked-compile
+                     '(lambda (exponent)
+                       (declare ((integer 0 1) exponent))
+                       (eql 0d0 (scale-float -0.0d0 exponent))))
+                    0))))

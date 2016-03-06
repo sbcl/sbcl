@@ -321,26 +321,26 @@
                              (if same-leaf
                                  (specifier-type '(eql 0))
                                  (logand-derive-type-aux
-                                  (lognot-derive-type-aux x) y nil)))
+                                  (lognot-derive-type-aux x) y)))
                        #'logandc1))
 (defoptimizer (logandc2 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql 0))
                                  (logand-derive-type-aux
-                                  x (lognot-derive-type-aux y) nil)))
+                                  x (lognot-derive-type-aux y))))
                        #'logandc2))
 (defoptimizer (logorc1 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql -1))
                                  (logior-derive-type-aux
-                                  (lognot-derive-type-aux x) y nil)))
+                                  (lognot-derive-type-aux x) y)))
                        #'logorc1))
 (defoptimizer (logorc2 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql -1))
                                  (logior-derive-type-aux
-                                  x (lognot-derive-type-aux y) nil)))
+                                  x (lognot-derive-type-aux y))))
                        #'logorc2))
