@@ -1077,13 +1077,8 @@
 
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
 ;;; DEFTRANSFORMs and DEFUNs.
-(def!macro %with-array-data-macro (array
-                                   start
-                                   end
-                                   &key
-                                   (element-type '*)
-                                   check-bounds
-                                   check-fill-pointer)
+(sb!xc:defmacro %with-array-data-macro
+    (array start end &key (element-type '*) check-bounds check-fill-pointer)
   (with-unique-names (size defaulted-end data cumulative-offset)
     `(let* ((,size ,(if check-fill-pointer
                         `(length ,array)
