@@ -659,7 +659,7 @@ standard Lisp readtable when NIL."
 ;;;; READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST, and READ
 
 ;;; A list for #=, used to keep track of objects with labels assigned that
-;;; have been completely read. Each entry is a SHARP-TAG object.
+;;; have been completely read. Each entry is a SHARP-EQUAL-WRAPPER object.
 ;;;
 ;;; KLUDGE: Should this really be a list? It seems as though users
 ;;; could reasonably expect N log N performance for large datasets.

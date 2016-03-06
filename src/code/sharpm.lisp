@@ -239,22 +239,22 @@
 
 ;;;; reading circular data: the #= and ## readmacros
 
-(defconstant +sharp-marker+ '+sharp-marker+)
+(defconstant +sharp-equal-marker+ '+sharp-equal-marker+)
 
-(defstruct (sharp-tag
-            (:constructor make-sharp-tag (label))
+(defstruct (sharp-equal-wrapper
+            (:constructor make-sharp-equal-wrapper (label))
             (:copier nil))
   (label nil :read-only t)
-  (value +sharp-marker+))
-(declaim (freeze-type sharp-tag))
+  (value +sharp-equal-marker+))
+(declaim (freeze-type sharp-equal-wrapper))
 
 ;; This function is kind of like NSUBLIS, but checks for circularities and
 ;; substitutes in arrays and structures as well as lists. The first arg is an
 ;; alist of the things to be replaced assoc'd with the things to replace them.
 (defun circle-subst (circle-table tree)
-  (cond ((and (sharp-tag-p tree)
-              (not (eq (sharp-tag-value tree) +sharp-marker+)))
-         (sharp-tag-value tree))
+  (cond ((and (sharp-equal-wrapper-p tree)
+              (not (eq (sharp-equal-wrapper-value tree) +sharp-equal-marker+)))
+         (sharp-equal-wrapper-value tree))
         ((null (gethash tree circle-table))
          (setf (gethash tree circle-table) t)
          (cond ((consp tree)
@@ -292,50 +292,51 @@
         (t tree)))
 
 ;;; Sharp-equal works as follows.
-;;; When creating a new label a SHARP-TAG is pushed onto
-;;; *SHARP-EQUAL* with the value slot being +sharp-marker+.
-;;; When #x# looks up the label and sharp-tag-value is +sharp-marker+
-;;; it leaves the tag, otherwise it uses the value.
-;;; After reading the object the sharp-tag-value is set to the object
-;;; and CIRCLE-SUBST replaces all the sharp-tags with the already read
-;;; values.
+;;; When creating a new label a SHARP-EQUAL-WRAPPER is pushed onto
+;;; *SHARP-EQUAL* with the value slot being +SHARP-EQUAL-MARKER+.
+;;; When #x# looks up the label and SHARP-EQUAL-WRAPPER-VALUE is
+;;; +SHARP-EQUAL-MARKER+ it leaves the wrapper, otherwise it uses the
+;;; value.
+;;; After reading the object the sharp-equal-wrapper-value is set to
+;;; the object and CIRCLE-SUBST replaces all the sharp-equal-wrappers
+;;; with the already read values.
 (defun sharp-equal (stream ignore label)
   (declare (ignore ignore))
   (when *read-suppress* (return-from sharp-equal (values)))
   (unless label
-    (simple-reader-error stream "missing label for #=" label))
-  (when (find label *sharp-equal* :key #'sharp-tag-label)
-    (simple-reader-error stream "multiply defined label: #~D=" label))
-  (let* ((tag (make-sharp-tag label))
+    (simple-reader-error stream "Missing label for #="))
+  (when (find label *sharp-equal* :key #'sharp-equal-wrapper-label)
+    (simple-reader-error stream "Multiply defined label: #~D=" label))
+  (let* ((wrapper (make-sharp-equal-wrapper label))
          (obj (progn
-                (push tag *sharp-equal*)
+                (push wrapper *sharp-equal*)
                 (read stream t nil t))))
-    (when (eq obj tag)
+    (when (eq obj wrapper)
       (simple-reader-error stream
-                           "must tag something more than just #~D#"
+                           "Must label something more than just #~D#"
                            label))
-    (setf (sharp-tag-value tag) obj)
+    (setf (sharp-equal-wrapper-value wrapper) obj)
     (circle-subst (make-hash-table :test 'eq) obj)))
 
 (defun sharp-sharp (stream ignore label)
   (declare (ignore ignore))
   (when *read-suppress* (return-from sharp-sharp nil))
   (unless label
-    (simple-reader-error stream "missing label for ##" label))
+    (simple-reader-error stream "Missing label for ##"))
   ;; Has this label been defined previously? (Don't read
   ;; ANSI "2.4.8.15 Sharpsign Equal-Sign" and worry that
   ;; it requires you to implement forward references,
   ;; because forward references are disallowed in
   ;; "2.4.8.16 Sharpsign Sharpsign".)
-  (let ((entry (find label *sharp-equal* :key #'sharp-tag-label)))
+  (let ((entry (find label *sharp-equal* :key #'sharp-equal-wrapper-label)))
     (cond ((not entry)
            (simple-reader-error stream
-                                "reference to undefined label #~D#"
+                                "Reference to undefined label #~D#"
                                 label))
-          ((eq (sharp-tag-value entry) +sharp-marker+)
+          ((eq (sharp-equal-wrapper-value entry) +sharp-equal-marker+)
            entry)
           (t
-           (sharp-tag-value entry)))))
+           (sharp-equal-wrapper-value entry)))))
 
 ;;;; conditional compilation: the #+ and #- readmacros
 
