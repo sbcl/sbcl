@@ -44,7 +44,7 @@ Add it as a component in your system. e.g.
             (:use :cl :asdf :sb-grovel :sb-alien))
 
 (in-package :example-package.system)
-            
+
 (defsystem example-system
     :depends-on (sb-grovel)
     :components

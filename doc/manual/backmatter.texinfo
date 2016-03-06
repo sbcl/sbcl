@@ -7,13 +7,13 @@
 @node Function Index
 @comment  node-name,  next,  previous,  up
 @appendix Function Index
-     
+
 @printindex fn
 
 @node Variable Index
 @comment  node-name,  next,  previous,  up
 @appendix Variable Index
-     
+
 @printindex vr
 
 @node Type Index

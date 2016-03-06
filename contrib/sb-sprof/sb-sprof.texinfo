@@ -57,7 +57,7 @@ during
                           :loop t
                           :show-progress t)
   (cpu-test 24))
-  
+
 ;;;; Allocation profiling
 
 (defun foo (&rest args)
@@ -152,7 +152,7 @@ depth of more than two levels is only supported on x86 and x86-64.
 @include var-sb-sprof-star-max-samples-star.texinfo
 
 @include var-sb-sprof-star-sample-interval-star.texinfo
-   
+
 @subsection Credits
 
 @code{sb-sprof} is an SBCL port, with enhancements, of Gerd

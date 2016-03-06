@@ -526,7 +526,7 @@ variable definitions, each of the form
 The names of the variables are established as symbol-macros; the
 bindings have lexical scope, and may be assigned with @code{setq} or
 @code{setf}.
- 
+
 The @code{with-alien} macro also establishes a new scope for named
 structures and unions.  Any @var{type} specified for a variable may
 contain named structure or union types with the slots specified.
@@ -578,7 +578,7 @@ of the declared @code{type}. Someday, they may well be implemented
 using the @acronym{ANSI} @code{define-symbol-macro} mechanism, but as
 of SBCL 0.7.5, they are still implemented using an older more-or-less
 parallel mechanism inherited from CMUCL.
-  
+
 For example, to access a C-level counter @var{foo}, one could write
 
 @lisp
@@ -733,7 +733,7 @@ primitive: @var{alien-function} is called with the supplied
 The @var{alien-function} is an arbitrary run-time expression; to refer
 to a constant function, use @code{extern-alien} or a value defined by
 @code{define-alien-routine}.
-  
+
 The type of @code{alien-function} must be @code{(alien (function
 ...))}  or @code{(alien (* (function ...)))}.  The function type is
 used to determine how to call the function (as though it was declared
@@ -1076,7 +1076,7 @@ struct c_struct
   int x;
   char *s;
 @};
- 
+
 struct c_struct *c_function (i, s, r, a)
     int i;
     char *s;
@@ -1085,7 +1085,7 @@ struct c_struct *c_function (i, s, r, a)
 @{
   int j;
   struct c_struct *r2;
- 
+
   printf("i = %d\n", i);
   printf("s = %s\n", s);
   printf("r->x = %d\n", r->x);

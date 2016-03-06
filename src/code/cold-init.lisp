@@ -133,7 +133,7 @@
                      (write expr)
                      (terpri)
                      (funcall f expr)))
-    
+
     (encapsulate-1
      'find-package
      (lambda (f designator)

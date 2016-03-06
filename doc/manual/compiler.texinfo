@@ -317,7 +317,7 @@ much of the second message as in common with the first. For example:
 ;
 ; caught STYLE-WARNING:
 ;   undefined function: PLOQ
- 
+
 ; ==>
 ;   (ROQ (PLOQ (+ Y 3)))
 ;
@@ -668,7 +668,7 @@ macro back to a function and declare it inline.
 
 Some more subtle problems are caused by incorrect declarations that
 can't be detected at compile time.  Consider this code:
-  
+
 @lisp
 (do ((pos 0 (position #\a string :start (1+ pos))))
   ((null pos))
