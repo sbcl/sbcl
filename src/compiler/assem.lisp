@@ -1171,78 +1171,59 @@
 ;;; interface to **CURRENT-SEGMENT**, we don't have to worry about the
 ;;; special value becomming out of sync with the lexical value. Unless
 ;;; some bozo closes over it, but nobody does anything like that...
-;;;
-;;; FIXME: The way this macro uses MACROEXPAND internally breaks my
-;;; old assumptions about macros which are needed both in the host and
-;;; the target.  The quick and dirty "solution" here is to
-;;; use cut and paste to duplicate the defmacro in a
-;;; (SB!INT:DEF!MACRO FOO (..) .. CL:MACROEXPAND ..) #+SB-XC-HOST
-;;; (DEFMACRO FOO (..) .. SB!XC:MACROEXPAND ..) idiom. This is
-;;; disgusting and unmaintainable, and there are obviously better
-;;; solutions and maybe even good solutions, but I'm disinclined to
-;;; hunt for good solutions until the system works and I can test them
-;;; in isolation.
-;;;
-;;; The above comment remains true, except that instead of a cut-and-paste
-;;; copy we now have a macrolet. This is charitably called progress.
-;;; -- NS 2008-09-19
-(macrolet
-    ((def (defmacro macroexpand)
-       `(,defmacro assemble ((&optional segment vop &key labels) &body body
-                             &environment env)
-          #!+sb-doc
-          "Execute BODY (as a progn) with SEGMENT as the current segment."
-          (flet ((label-name-p (thing)
-                   (and thing (symbolp thing))))
-            (let* ((seg-var (gensym "SEGMENT-"))
-                   (vop-var (gensym "VOP-"))
-                   (visible-labels (remove-if-not #'label-name-p body))
-                   (inherited-labels
-                    (multiple-value-bind (expansion expanded)
-                        (,macroexpand '..inherited-labels.. env)
-                      (if expanded (copy-list expansion) nil)))
-                   (new-labels
-                    (sort (append labels
-                                  (set-difference visible-labels
-                                                  inherited-labels))
-                          #'string<))
-                   (nested-labels
-                    (sort (set-difference (append inherited-labels new-labels)
-                                          visible-labels)
-                          #'string<)))
-              (when (intersection labels inherited-labels)
-                (error "duplicate nested labels: ~S"
-                       (intersection labels inherited-labels)))
-              `(let* ((,seg-var ,(or segment '(%%current-segment%%)))
-                      (,vop-var ,(or vop '(%%current-vop%%)))
-                      ,@(when segment
-                              `((**current-segment** ,seg-var)))
-                      ,@(when vop
-                              `((**current-vop** ,vop-var)))
-                      ,@(mapcar (lambda (name)
-                                  `(,name (gen-label)))
-                                new-labels))
-                 (declare (ignorable ,vop-var ,seg-var)
-                          ;; Must be done so that contribs and user code doing
-                          ;; low-level stuff don't need to worry about this.
-                          (disable-package-locks %%current-segment%% %%current-vop%%))
-                 (macrolet ((%%current-segment%% () ',seg-var)
-                            (%%current-vop%% () ',vop-var))
-                   ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
-                   ;; can't deal with this declaration, so disable it on host.
-                   ;; Ditto for later ENABLE-PACKAGE-LOCKS %%C-S%% declaration.
-                   #-sb-xc-host
-                   (declare (enable-package-locks %%current-segment%% %%current-vop%%))
-                   (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-                                             `((..inherited-labels.. ,nested-labels))))
-                     ,@(mapcar (lambda (form)
-                                 (if (label-name-p form)
-                                     `(emit-label ,form)
-                                     form))
-                               body)))))))))
-  (def sb!int:def!macro macroexpand)
-  #+sb-xc-host
-  (def sb!xc:defmacro %macroexpand))
+(defmacro assemble ((&optional segment vop &key labels) &body body
+                    &environment env)
+  #!+sb-doc
+  "Execute BODY (as a progn) with SEGMENT as the current segment."
+  (flet ((label-name-p (thing)
+           (and thing (symbolp thing))))
+    (let* ((seg-var (gensym "SEGMENT-"))
+           (vop-var (gensym "VOP-"))
+           (visible-labels (remove-if-not #'label-name-p body))
+           (inherited-labels
+            (multiple-value-bind (expansion expanded)
+                (#+sb-xc-host cl:macroexpand
+                 #-sb-xc-host %macroexpand '..inherited-labels.. env)
+              (if expanded (copy-list expansion) nil)))
+           (new-labels
+            (sort (append labels
+                          (set-difference visible-labels
+                                          inherited-labels))
+                  #'string<))
+           (nested-labels
+            (sort (set-difference (append inherited-labels new-labels)
+                                  visible-labels)
+                  #'string<)))
+      (when (intersection labels inherited-labels)
+        (error "duplicate nested labels: ~S"
+               (intersection labels inherited-labels)))
+      `(let* ((,seg-var ,(or segment '(%%current-segment%%)))
+              (,vop-var ,(or vop '(%%current-vop%%)))
+              ,@(when segment
+                      `((**current-segment** ,seg-var)))
+              ,@(when vop
+                      `((**current-vop** ,vop-var)))
+              ,@(mapcar (lambda (name)
+                          `(,name (gen-label)))
+                        new-labels))
+         (declare (ignorable ,vop-var ,seg-var)
+                  ;; Must be done so that contribs and user code doing
+                  ;; low-level stuff don't need to worry about this.
+                  (disable-package-locks %%current-segment%% %%current-vop%%))
+         (macrolet ((%%current-segment%% () ',seg-var)
+                    (%%current-vop%% () ',vop-var))
+           ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
+           ;; can't deal with this declaration, so disable it on host.
+           ;; Ditto for later ENABLE-PACKAGE-LOCKS %%C-S%% declaration.
+           #-sb-xc-host
+           (declare (enable-package-locks %%current-segment%% %%current-vop%%))
+           (symbol-macrolet (,@(when (or inherited-labels nested-labels)
+                                     `((..inherited-labels.. ,nested-labels))))
+             ,@(mapcar (lambda (form)
+                         (if (label-name-p form)
+                             `(emit-label ,form)
+                             form))
+                       body)))))))
 
 (defun inst-emitter-symbol (symbol &optional create)
   (values (funcall (if create 'intern 'find-symbol)
