@@ -2700,23 +2700,24 @@ register."
       (dolist (bind (binds))
         (let ((name (first bind))
               (var (third bind)))
-          (ecase (second bind)
-            (:valid
-             (specs `(,name (debug-var-value ',var ,n-frame))))
-            (:more
-             (let ((count-var (fourth bind)))
-               (specs `(,name (multiple-value-list
-                               (sb!c:%more-arg-values (debug-var-value ',var ,n-frame)
-                                                      0
-                                                      (debug-var-value ',count-var ,n-frame)))))))
-            (:unknown
-             (specs `(,name (debug-signal 'invalid-value
-                                          :debug-var ',var
-                                          :frame ,n-frame))))
-            (:ambiguous
-             (specs `(,name (debug-signal 'ambiguous-var-name
-                                          :name ',name
-                                          :frame ,n-frame)))))))
+          (unless (eq (info :variable :kind name) :special)
+            (ecase (second bind)
+              (:valid
+               (specs `(,name (debug-var-value ',var ,n-frame))))
+              (:more
+               (let ((count-var (fourth bind)))
+                 (specs `(,name (multiple-value-list
+                                 (sb!c:%more-arg-values (debug-var-value ',var ,n-frame)
+                                                        0
+                                                        (debug-var-value ',count-var ,n-frame)))))))
+              (:unknown
+               (specs `(,name (debug-signal 'invalid-value
+                                            :debug-var ',var
+                                            :frame ,n-frame))))
+              (:ambiguous
+               (specs `(,name (debug-signal 'ambiguous-var-name
+                                            :name ',name
+                                            :frame ,n-frame))))))))
       (let ((res (coerce `(lambda (,n-frame)
                             (declare (ignorable ,n-frame))
                             (symbol-macrolet ,(specs) ,form))
