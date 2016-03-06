@@ -83,14 +83,9 @@
         (t
          (fun-name (fdefinition name)))))
 
-(defun ignore-nil-doc (type)
-  (style-warn "Ignoring doc-type ~a for ~a."
-              type nil))
-
 (defun set-function-name-documentation (name documentation)
-  (cond ((not name)
-         (ignore-nil-doc 'function))
-        ((not (legal-fun-name-p name))
+  (aver name)
+  (cond ((not (legal-fun-name-p name))
          nil)
         ((not (equal (real-function-name name) name))
          (setf (random-documentation name 'function) documentation))
@@ -102,6 +97,10 @@
   documentation)
 
 ;;; Generic behavior
+
+(defmethod (setf documentation) :around (new-value (x (eql nil)) doc-type)
+  (style-warn "Ignoring doc-type ~a for ~a." doc-type nil)
+  new-value)
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
 (defmethod documentation (object doc-type)
@@ -216,19 +215,11 @@
   (set-function-name-documentation x new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
-  (cond (x
-         (awhen (compiler-macro-function x)
-           (setf (documentation it t) new-value)))
-        (t
-         (ignore-nil-doc 'compiler-macro)
-         new-value)))
+  (awhen (compiler-macro-function x)
+    (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
-  (cond (x
-         (setf (fdocumentation x 'setf) new-value))
-        (t
-         (ignore-nil-doc 'setf)
-         new-value)))
+  (setf (fdocumentation x 'setf) new-value))
 
 ;;; method combinations
 (defmethod documentation ((x method-combination) (doc-type (eql 't)))
@@ -251,11 +242,7 @@
 
 (defmethod (setf documentation)
     (new-value (x symbol) (doc-type (eql 'method-combination)))
-  (cond (x
-         (setf (random-documentation x 'method-combination) new-value))
-        (t
-         (ignore-nil-doc 'method-combination)
-         new-value)))
+  (setf (random-documentation x 'method-combination) new-value))
 
 ;;; methods
 (defmethod documentation ((x standard-method) (doc-type (eql 't)))
@@ -354,11 +341,7 @@
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'structure)))
-  (cond (x
-         (setf (fdocumentation x 'structure) new-value))
-        (t
-         (ignore-nil-doc 'structure)
-         new-value)))
+  (setf (fdocumentation x 'structure) new-value))
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
@@ -367,11 +350,7 @@
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'variable)))
-  (cond (x
-         (setf (fdocumentation x 'variable) new-value))
-        (t
-         (ignore-nil-doc 'variable)
-         new-value)))
+  (setf (fdocumentation x 'variable) new-value))
 
 ;;; extra-standard methods, for getting at slot documentation
 (defmethod documentation ((slotd standard-slot-definition) (doc-type (eql 't)))
