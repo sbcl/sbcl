@@ -658,15 +658,15 @@ standard Lisp readtable when NIL."
 
 ;;;; READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST, and READ
 
-;;; an alist for #=, used to keep track of objects with labels assigned that
-;;; have been completely read. Each entry is (integer-tag gensym-tag value).
+;;; A list for #=, used to keep track of objects with labels assigned that
+;;; have been completely read. Each entry is a SHARP-TAG object.
 ;;;
-;;; KLUDGE: Should this really be an alist? It seems as though users
+;;; KLUDGE: Should this really be a list? It seems as though users
 ;;; could reasonably expect N log N performance for large datasets.
 ;;; On the other hand, it's probably very very seldom a problem in practice.
-;;; On the third hand, it might be just as easy to use a hash table
-;;; as an alist, so maybe we should. -- WHN 19991202
-(defvar *sharp-equal-alist* ())
+;;; On the third hand, it might be just as easy to use a hash table,
+;;; so maybe we should. -- WHN 19991202
+(defvar *sharp-equal* ())
 
 (declaim (ftype (sfunction (t t) (values bit t)) read-maybe-nothing))
 
@@ -704,7 +704,7 @@ standard Lisp readtable when NIL."
                     (when tracking-p
                       (funcall (form-tracking-stream-observer stream)
                                :reset nil nil))))))))
-      (let ((*sharp-equal-alist* nil))
+      (let ((*sharp-equal* nil))
         (with-read-buffer ()
           (%read-preserving-whitespace stream eof-error-p eof-value t)))))
 
