@@ -88,9 +88,10 @@
 ;;; Run the cross-compiler to produce cold fasl files.
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
-(setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
-      (sb!int:info :function :macro-function 'sb!int:quasiquote)
-      (cl:macro-function 'sb!int:quasiquote))
+(setf (sb-xc:macro-function 'sb!int:quasiquote)
+      (lambda (form env)
+        (the sb!kernel:lexenv-designator env)
+        (sb!impl::expand-quasiquote (second form) t)))
 (setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
 (sb-xc:with-compilation-unit ()
   (load "src/cold/compile-cold-sbcl.lisp"))
