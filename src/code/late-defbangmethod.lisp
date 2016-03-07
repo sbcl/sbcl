@@ -12,5 +12,5 @@
 ;;; DEF!METHOD = cold DEFMETHOD, a version of DEFMETHOD which, when used
 ;;; before real CLOS DEFMETHOD is available, saves up its definition to be
 ;;; executed later when CLOS is available
-(defmacro-mundanely def!method (&rest args)
+(sb!xc:defmacro def!method (&rest args)
   `(push (cons (sb!c:source-location) ',args) *delayed-def!method-args*))

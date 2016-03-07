@@ -493,8 +493,7 @@ process to continue normally."
     ;;    DEF!TYPE DEF!CONSTANT DEF!MACRO DEF!STRUCT
     ;; does not work, they stick around as uninterned symbols.
     ;; Some other macros must expand into them. Ugh.
-    (dolist (s '(defenum defmacro-mundanely defun-cached
-                 with-globaldb-name
+    (dolist (s '(defenum defun-cached with-globaldb-name
                  .
                  #!+sb-show ()
                  #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow

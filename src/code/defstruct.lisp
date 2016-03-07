@@ -103,7 +103,7 @@
 
 ;;; re. %DELAYED-GET-COMPILER-LAYOUT and COMPILE-TIME-FIND-LAYOUT, above..
 ;;;
-;;; FIXME: Perhaps both should be defined with DEFMACRO-MUNDANELY?
+;;; FIXME: Perhaps both should be defined with SB!XC:DEFMACRO?
 ;;; FIXME: Do we really need both? If so, their names and implementations
 ;;; should probably be tweaked to be more parallel.
 

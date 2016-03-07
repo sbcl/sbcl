@@ -24,7 +24,7 @@
 ;;;
 ;;; ASSERT-ERROR isn't defined until a later file because it uses the
 ;;; macro RESTART-CASE, which isn't defined until a later file.
-(defmacro-mundanely assert (test-form &optional places datum &rest arguments
+(sb!xc:defmacro assert (test-form &optional places datum &rest arguments
                             &environment env)
   #!+sb-doc
   "Signals an error if the value of TEST-FORM is NIL. Returns NIL.
@@ -114,7 +114,7 @@
 ;;;
 ;;; CHECK-TYPE-ERROR isn't defined until a later file because it uses
 ;;; the macro RESTART-CASE, which isn't defined until a later file.
-(defmacro-mundanely check-type (place type &optional type-string
+(sb!xc:defmacro check-type (place type &optional type-string
                                 &environment env)
   #!+sb-doc
   "Signal a restartable error of type TYPE-ERROR if the value of PLACE
@@ -144,7 +144,7 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; DEFINE-SYMBOL-MACRO
 
-(defmacro-mundanely define-symbol-macro (name expansion)
+(sb!xc:defmacro define-symbol-macro (name expansion)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
     (sb!c::%define-symbol-macro ',name ',expansion (sb!c:source-location))))
 
@@ -176,7 +176,7 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; DEFINE-COMPILER-MACRO
 
-(defmacro-mundanely define-compiler-macro (name lambda-list &body body)
+(sb!xc:defmacro define-compiler-macro (name lambda-list &body body)
   #!+sb-doc
   "Define a compiler-macro for NAME."
   (legal-fun-name-or-type-error name)
@@ -366,14 +366,14 @@ invoked. In that case it will store into PLACE and start over."
                 `((t (case-failure ',name ,keyform-value ',keys))))))))
 ) ; EVAL-WHEN
 
-(defmacro-mundanely case (keyform &body cases)
+(sb!xc:defmacro case (keyform &body cases)
   #!+sb-doc
   "CASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If a singleton key is T then the clause is a default clause."
   (case-body 'case keyform cases t 'eql nil nil nil))
 
-(defmacro-mundanely ccase (keyform &body cases)
+(sb!xc:defmacro ccase (keyform &body cases)
   #!+sb-doc
   "CCASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
@@ -381,28 +381,28 @@ invoked. In that case it will store into PLACE and start over."
   signalled."
   (case-body 'ccase keyform cases t 'eql t t t))
 
-(defmacro-mundanely ecase (keyform &body cases)
+(sb!xc:defmacro ecase (keyform &body cases)
   #!+sb-doc
   "ECASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then an error is signalled."
   (case-body 'ecase keyform cases t 'eql t nil t))
 
-(defmacro-mundanely typecase (keyform &body cases)
+(sb!xc:defmacro typecase (keyform &body cases)
   #!+sb-doc
   "TYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true."
   (case-body 'typecase keyform cases nil 'typep nil nil nil))
 
-(defmacro-mundanely ctypecase (keyform &body cases)
+(sb!xc:defmacro ctypecase (keyform &body cases)
   #!+sb-doc
   "CTYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then a correctable error is signalled."
   (case-body 'ctypecase keyform cases nil 'typep t t t))
 
-(defmacro-mundanely etypecase (keyform &body cases)
+(sb!xc:defmacro etypecase (keyform &body cases)
   #!+sb-doc
   "ETYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
@@ -413,7 +413,7 @@ invoked. In that case it will store into PLACE and start over."
 ;;; correct one based on the value of VAR. This was originally used
 ;;; only for strings, hence the name. Renaming it to something more
 ;;; generic might not be a bad idea.
-(defmacro-mundanely string-dispatch ((&rest types) var &body body)
+(sb!xc:defmacro string-dispatch ((&rest types) var &body body)
   (let ((fun (sb!xc:gensym "STRING-DISPATCH-FUN")))
     `(flet ((,fun (,var)
               ,@body))
@@ -426,7 +426,7 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; WITH-FOO i/o-related macros
 
-(defmacro-mundanely with-open-stream ((var stream) &body forms-decls)
+(sb!xc:defmacro with-open-stream ((var stream) &body forms-decls)
   (multiple-value-bind (forms decls) (parse-body forms-decls nil)
     (let ((abortp (gensym)))
       `(let ((,var ,stream)
@@ -439,12 +439,12 @@ invoked. In that case it will store into PLACE and start over."
            (when ,var
              (close ,var :abort ,abortp)))))))
 
-(defmacro-mundanely with-open-file ((stream filespec &rest options)
+(sb!xc:defmacro with-open-file ((stream filespec &rest options)
                                     &body body)
   `(with-open-stream (,stream (open ,filespec ,@options))
      ,@body))
 
-(defmacro-mundanely with-input-from-string ((var string &key index start end)
+(sb!xc:defmacro with-input-from-string ((var string &key index start end)
                                             &body forms-decls)
   (multiple-value-bind (forms decls) (parse-body forms-decls nil)
     `(let ((,var
@@ -463,7 +463,7 @@ invoked. In that case it will store into PLACE and start over."
            ,@(when index
                `((setf ,index (string-input-stream-current ,var))))))))
 
-(defmacro-mundanely with-output-to-string
+(sb!xc:defmacro with-output-to-string
     ((var &optional string &key (element-type ''character))
      &body forms-decls)
   (multiple-value-bind (forms decls) (parse-body forms-decls nil)
@@ -492,7 +492,7 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; miscellaneous macros
 
-(defmacro-mundanely nth-value (n form &environment env)
+(sb!xc:defmacro nth-value (n form &environment env)
   #!+sb-doc
   "Evaluate FORM and return the Nth value (zero based)
  without consing a temporary list of values."
@@ -518,7 +518,7 @@ invoked. In that case it will store into PLACE and start over."
              (lambda (n &rest list) (nth (truly-the index n) list))
            (the index ,n) ,form))))
 
-(defmacro-mundanely declaim (&rest specs)
+(sb!xc:defmacro declaim (&rest specs)
   #!+sb-doc
   "DECLAIM Declaration*
   Do a declaration or declarations for the global environment."
@@ -530,7 +530,7 @@ invoked. In that case it will store into PLACE and start over."
 ;; Avoid unknown return values in emitted code for PRINT-UNREADABLE-OBJECT
 (declaim (ftype (sfunction (t t t t &optional t) null)
                 %print-unreadable-object))
-(defmacro-mundanely print-unreadable-object ((object stream &key type identity)
+(sb!xc:defmacro print-unreadable-object ((object stream &key type identity)
                                              &body body)
   #!+sb-doc
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
@@ -543,7 +543,7 @@ invoked. In that case it will store into PLACE and start over."
           `(dx-flet ((,fun () ,@body)) (,@call #',fun)))
         call)))
 
-(defmacro-mundanely ignore-errors (&rest forms)
+(sb!xc:defmacro ignore-errors (&rest forms)
   #!+sb-doc
   "Execute FORMS handling ERROR conditions, returning the result of the last
   form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."

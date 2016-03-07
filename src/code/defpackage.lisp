@@ -29,7 +29,7 @@
 
 ;; "mundanely" because this macro can't work (never has, never will)
 ;; until the target system is fully operational.
-(defmacro-mundanely defpackage (package &rest options)
+(sb!xc:defmacro defpackage (package &rest options)
   #!+sb-doc
   #.(format nil
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the

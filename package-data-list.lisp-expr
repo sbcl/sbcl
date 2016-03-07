@@ -1096,7 +1096,6 @@ possibly temporarily, because it might be used internally."
 
                ;; other variations on DEFFOO stuff useful for bootstrapping
                ;; and cross-compiling
-               "DEFMACRO-MUNDANELY"
                "DEFCONSTANT-EQX"
                "DEFINE-UNSUPPORTED-FUN"
 

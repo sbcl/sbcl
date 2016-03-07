@@ -277,7 +277,7 @@
      (values `(write-string ,directive stream)
              more-directives))))
 
-(defmacro-mundanely expander-next-arg (string offset)
+(sb!xc:defmacro expander-next-arg (string offset)
   `(if args
        (pop args)
        (error 'format-error

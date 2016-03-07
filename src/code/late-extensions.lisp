@@ -96,7 +96,7 @@
 
 ;;;; DEFGLOBAL
 
-(defmacro-mundanely defglobal (name value &optional (doc nil docp))
+(sb!xc:defmacro defglobal (name value &optional (doc nil docp))
   #!+sb-doc
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
 and assigned to NAME both at compile- and load-time, but only if NAME is not
@@ -117,7 +117,7 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
          (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
                      (sb!c:source-location))))))
 
-(defmacro-mundanely define-load-time-global (name value &optional (doc nil docp))
+(sb!xc:defmacro define-load-time-global (name value &optional (doc nil docp))
   #!+sb-doc
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
 and assigned to NAME at load-time, but only if NAME is not already bound.

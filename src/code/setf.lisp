@@ -149,7 +149,7 @@
                          (list form)))
                    forms)))
 
-  (defmacro-mundanely setf (&whole form &rest args &environment env)
+  (sb!xc:defmacro setf (&whole form &rest args &environment env)
   #!+sb-doc
   "Takes pairs of arguments like SETQ. The first is a place and the second
   is the value that is supposed to go into that place. Returns the last
@@ -181,7 +181,7 @@
 
   ;; various SETF-related macros
 
-  (defmacro-mundanely shiftf (&whole form &rest args &environment env)
+  (sb!xc:defmacro shiftf (&whole form &rest args &environment env)
   #!+sb-doc
   "One or more SETF-style place expressions, followed by a single
    value expression. Evaluates all of the expressions in turn, then
@@ -245,7 +245,7 @@
                                            setters)))
              `(,@setters nil))))
 
-  (defmacro-mundanely psetf (&rest pairs &environment env)
+  (sb!xc:defmacro psetf (&rest pairs &environment env)
   #!+sb-doc
   "This is to SETF as PSETQ is to SETQ. Args are alternating place
   expressions and values to go into those places. All of the subforms and
@@ -253,7 +253,7 @@
   updated. Returns NIL."
     (expand pairs env 'psetf 'setf))
 
-  (defmacro-mundanely psetq (&rest pairs &environment env)
+  (sb!xc:defmacro psetq (&rest pairs &environment env)
   #!+sb-doc
   "PSETQ {var value}*
    Set the variables to the values, like SETQ, except that assignments
@@ -266,7 +266,7 @@
 ;;; definition in the cross-compiler itself, so that after that, any
 ;;; ROTATEF operations can no longer be compiled, because
 ;;; GET-SETF-EXPANSION is called instead of SB!XC:GET-SETF-EXPANSION.
-(defmacro-mundanely rotatef (&rest args &environment env)
+(sb!xc:defmacro rotatef (&rest args &environment env)
   #!+sb-doc
   "Takes any number of SETF-style place expressions. Evaluates all of the
    expressions in turn, then assigns to each place the value of the form to
@@ -291,7 +291,7 @@
         `(let* ,(reduce #'append(let*-bindings))
            ,@(thunk (mv-bindings) (cdr (getters))))))))
 
-(defmacro-mundanely push (obj place &environment env)
+(sb!xc:defmacro push (obj place &environment env)
   #!+sb-doc
   "Takes an object and a location holding a list. Conses the object onto
   the list, returning the modified list. OBJ is evaluated before PLACE."
@@ -302,7 +302,7 @@
   ;; - At least two produce an incorrect expansion that doesn't even work.
   (expand-rmw-macro 'cons (list obj) place '() nil env '(item)))
 
-(defmacro-mundanely pushnew (obj place &rest keys &environment env)
+(sb!xc:defmacro pushnew (obj place &rest keys &environment env)
   #!+sb-doc
   "Takes an object and a location holding a list. If the object is
   already in the list, does nothing; otherwise, conses the object onto
@@ -314,7 +314,7 @@
   ;; The spec only mentions that ITEM is eval'd before PLACE.
   (expand-rmw-macro 'adjoin (list obj) place keys nil env '(item)))
 
-(defmacro-mundanely pop (place &environment env)
+(sb!xc:defmacro pop (place &environment env)
   #!+sb-doc
   "The argument is a location holding a list. Pops one item off the front
   of the list and returns it."
@@ -332,7 +332,7 @@
              ,setter
              ,ret)))))
 
-(defmacro-mundanely remf (place indicator &environment env)
+(sb!xc:defmacro remf (place indicator &environment env)
   #!+sb-doc
   "Place may be any place expression acceptable to SETF, and is expected
   to hold a property list or (). This list is destructively altered to
@@ -386,13 +386,13 @@
                        (,(car newval) (,operator ,delta ,getter))
                        ,@(cdr newval))
                   ,setter)))))
-  (defmacro-mundanely incf (place &optional (delta 1) &environment env)
+  (sb!xc:defmacro incf (place &optional (delta 1) &environment env)
   #!+sb-doc
   "The first argument is some location holding a number. This number is
   incremented by the second argument, DELTA, which defaults to 1."
     (expand place delta env '+))
 
-  (defmacro-mundanely decf (place &optional (delta 1) &environment env)
+  (sb!xc:defmacro decf (place &optional (delta 1) &environment env)
   #!+sb-doc
   "The first argument is some location holding a number. This number is
   decremented by the second argument, DELTA, which defaults to 1."

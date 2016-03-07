@@ -105,7 +105,7 @@
 ;; the generational garbage collector needs to know it.
 (defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
 
-(defmacro-mundanely with-locked-hash-table ((hash-table) &body body)
+(sb!xc:defmacro with-locked-hash-table ((hash-table) &body body)
   #!+sb-doc
   "Limits concurrent accesses to HASH-TABLE for the duration of BODY.
 If HASH-TABLE is synchronized, BODY will execute with exclusive
@@ -119,7 +119,7 @@ unspecified."
   `(sb!thread::with-recursive-lock ((hash-table-lock ,hash-table))
      ,@body))
 
-(defmacro-mundanely with-locked-system-table ((hash-table) &body body)
+(sb!xc:defmacro with-locked-system-table ((hash-table) &body body)
   `(sb!thread::with-recursive-system-lock
        ((hash-table-lock ,hash-table))
      ,@body))

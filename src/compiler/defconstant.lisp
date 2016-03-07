@@ -125,9 +125,9 @@
     ;; the symbols which ANSI requires to be exported from CL. * Make a
     ;; nickname SB!CL which behaves like SB!XC. * Go through the
     ;; loaded-on-the-host code making every target definition be in SB-CL.
-    ;; E.g. DEFMACRO-MUNDANELY DEFCONSTANT becomes DEFMACRO-MUNDANELY
-    ;; SB!CL:DEFCONSTANT. * Make IN-TARGET-COMPILATION-MODE do UNUSE-PACKAGE
-    ;; CL and USE-PACKAGE SB-CL in each of the target packages (then undo it
+    ;; E.g. SB!XC:DEFMACRO DEFCONSTANT becomes SB!XC:DEFMACRO SB!CL:DEFCONSTANT.
+    ;; * Make IN-TARGET-COMPILATION-MODE do UNUSE-PACKAGE CL and
+    ;; USE-PACKAGE SB-CL in each of the target packages (then undo it
     ;; on exit). * Make the cross-compiler's implementation of EVAL-WHEN
     ;; (:COMPILE-TOPLEVEL) do UNCROSS. (This may not require any change.) *
     ;; Hack GENESIS as necessary so that it outputs SB-CL stuff as COMMON-LISP

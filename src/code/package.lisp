@@ -115,7 +115,7 @@
                         (tagbody ,@forms (go ,next))
                         (return ,result-form))))))))))
 
-(defmacro-mundanely do-symbols ((var &optional
+(sb!xc:defmacro do-symbols ((var &optional
                                      (package '*package*)
                                      result-form)
                                 &body body-decls)
@@ -127,7 +127,7 @@
                      :internal :external :inherited)
                    var body-decls result-form))
 
-(defmacro-mundanely do-external-symbols ((var &optional
+(sb!xc:defmacro do-external-symbols ((var &optional
                                               (package '*package*)
                                               result-form)
                                          &body body-decls)
@@ -138,7 +138,7 @@
   (expand-iterator `((find-undeleted-package-or-lose ,package) :external)
                    var body-decls result-form))
 
-(defmacro-mundanely do-all-symbols ((var &optional
+(sb!xc:defmacro do-all-symbols ((var &optional
                                          result-form)
                                     &body body-decls)
   #!+sb-doc
@@ -151,7 +151,7 @@
 
 ;;;; WITH-PACKAGE-ITERATOR
 
-(defmacro-mundanely with-package-iterator ((mname package-list
+(sb!xc:defmacro with-package-iterator ((mname package-list
                                                   &rest symbol-types)
                                            &body body)
   #!+sb-doc
@@ -186,7 +186,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
                                 (car (truly-the list ,pkglist))))))
              ,@body))))))
 
-(defmacro-mundanely with-package-graph ((&key) &body forms)
+(sb!xc:defmacro with-package-graph ((&key) &body forms)
   `(flet ((thunk () ,@forms))
      (declare (dynamic-extent #'thunk))
      (call-with-package-graph #'thunk)))

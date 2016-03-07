@@ -55,7 +55,7 @@
   ;; and getting all confused. Using an ordinary assignment (and not
   ;; any special forms like DEFMACRO) guarantees that there are no
   ;; effects at compile time.
-  #+sb-xc `(defmacro-mundanely ,name ,@rest))
+  #+sb-xc `(sb!xc:defmacro ,name ,@rest))
 
 #+sb-xc-host
 (defun force-delayed-def!macros ()
