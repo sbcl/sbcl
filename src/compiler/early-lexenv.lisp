@@ -146,6 +146,10 @@
 ;;; "environment objects" (of the ANSI glossary)
 (deftype lexenv-designator () '(or abstract-lexenv null))
 
+;;; Don't inline this - ABSTRACT-LEXENV would need to use DEF!STRUCT but can't.
+;;; Macroexpansion speed is not hampered by doing one type-checking call.
+(defun ensure-lexenv (x) (the lexenv-designator x))
+
 (defvar *policy*)
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))
