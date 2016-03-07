@@ -7,6 +7,8 @@ changes relative to sbcl-1.3.3:
   * bug fix: DOCUMENTATION works as intended for classes with non-standard
     metaclasses
   * enhancement: who-sets and who-references work on DEFGLOBAL. (lp#1552997)
+  * enhancement: macroexpander functions require that their second argument
+    be of type SB-KERNEL:LEXENV-DESIGNATOR.
 
 changes in sbcl-1.3.3 relative to sbcl-1.3.2:
   * enhancement: warn about argument mismatch for functions passed as
