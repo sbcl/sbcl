@@ -1082,18 +1082,15 @@
                ;; list again, that's when any warning(s) will be issued.
                :context :macro :silent t))
              ((outer-decls decls) (extract-var-decls decls (append env whole)))
+             (ll-env (when (eq envp t) (or env (list (make-symbol "ENV")))))
              ;; We want a hidden WHOLE arg for the lambda - not the user's -
              ;; in case one was present and declared IGNORE.
              ;; Conversely, if the user asks for &WHOLE, doesn't use it,
              ;; and doesn't declare it ignored, that deserves a warning.
              (ll-whole (make-symbol "EXPR"))
-             ;; Same for ENV arg
-             (ll-env (if (eq envp t) (make-symbol "ENV")))
              ;; Then bind the user's WHOLE from the lambda's.
              (ll-aux
-              (append (when env
-                        `((,(car env)
-                           ,(if ll-env `(if ,ll-env (ensure-lexenv ,ll-env))))))
+              (append (when (and (eq envp :ignore) env) `((,(car env) nil)))
                       (when whole `((,(car whole) ,ll-whole)))))
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
@@ -1111,8 +1108,7 @@
                                (car tail))))
           (append whole env (ds-lambda-list-variables parse nil)))
     (values `(,@(if lambda-name `(named-lambda ,lambda-name) '(lambda))
-                  (,ll-whole ,@(and ll-env (list ll-env))
-                             ,@(and ll-aux (cons '&aux ll-aux)))
+                  (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
               ,@(when (and docstring (eq doc-string-allowed :internal))
                   (prog1 (list docstring) (setq docstring nil)))
               ;; MACROLET doesn't produce an object capable of reflection,
@@ -1121,8 +1117,8 @@
                   ;; Normalize the lambda list by unparsing.
                   `((declare (lambda-list ,(unparse-ds-lambda-list parse)))))
               ,@(if outer-decls (list outer-decls))
+              ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
               ,@(sb!c:macro-policy-decls)
-              ,@(when (and ll-env (not env)) `((ensure-lexenv ,ll-env)))
               (,@(if kind
                      `(named-ds-bind ,(if (eq kind :special-form)
                                           `(:special-form . ,name)
