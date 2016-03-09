@@ -103,11 +103,7 @@
             (when (not seq)
               (return))
             ;(format t "~&~S~%" lambda-expr)
-            (multiple-value-bind (fun warnings-p failure-p)
-                (compile nil lambda-expr)
-              (when (or warnings-p failure-p)
-                (error "~@<failed compilation:~2I ~_LAMBDA-EXPR=~S ~_WARNINGS-P=~S ~_FAILURE-P=~S~:@>"
-                       lambda-expr warnings-p failure-p))
+            (let ((fun (checked-compile lambda-expr)))
               ;(format t "~&~S ~S~%~S~%~S ~S~%"
               ;        base-seq snippet seq-type declaredness optimization)
               ;(format t "~&(TYPEP SEQ 'SIMPLE-ARRAY)=~S~%"
@@ -269,8 +265,7 @@
 ;;; result type (BUGs 46a, 46b, 66)
 (with-test (:name :sequence-functions)
   (macrolet ((assert-type-error (form)
-               `(assert (typep (nth-value 1 (ignore-errors ,form))
-                               'type-error))))
+               `(assert-error ,form type-error)))
     (dolist (type-stub '((simple-vector)
                          (vector *)
                          (vector (signed-byte 8))
@@ -1129,7 +1124,7 @@
                             standard-dst
                             bashed-dst)
                     (return-from nil nil))))))))
-    (funcall (compile nil lambda-form))))
+    (funcall (checked-compile lambda-form))))
 
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (loop for i = 1 then (* i 2) do
@@ -1196,16 +1191,16 @@
   (let ((v (make-array size :element-type 'bit :initial-element 0)))
     (dolist (i set)
       (setf (bit v i) 1))
-    (dolist (f (list (compile nil
-                              `(lambda (b v s e fe)
-                                 (position b (the bit-vector v) :start s :end e :from-end fe)))
-                     (compile nil
-                              `(lambda (b v s e fe)
-                                 (assert (eql b 1))
-                                 (position 1 (the bit-vector v) :start s :end e :from-end fe)))
-                     (compile nil
-                              `(lambda (b v s e fe)
-                                 (position b (the vector v) :start s :end e :from-end fe)))))
+    (dolist (f (list (checked-compile
+                      `(lambda (b v s e fe)
+                         (position b (the bit-vector v) :start s :end e :from-end fe)))
+                     (checked-compile
+                      `(lambda (b v s e fe)
+                         (assert (eql b 1))
+                         (position 1 (the bit-vector v) :start s :end e :from-end fe)))
+                     (checked-compile
+                      `(lambda (b v s e fe)
+                         (position b (the vector v) :start s :end e :from-end fe)))))
       (let ((got (funcall f 1 v start end from-end)))
         (unless (eql res got)
           (cerror "Continue" "POSITION 1, Wanted ~S, got ~S.~%  size = ~S, set = ~S, from-end = ~S"
@@ -1214,16 +1209,16 @@
   (let ((v (make-array size :element-type 'bit :initial-element 1)))
     (dolist (i set)
       (setf (bit v i) 0))
-    (dolist (f (list (compile nil
-                              `(lambda (b v s e fe)
-                                 (position b (the bit-vector v) :start s :end e :from-end fe)))
-                     (compile nil
-                              `(lambda (b v s e fe)
-                                 (assert (eql b 0))
-                                 (position 0 (the bit-vector v) :start s :end e :from-end fe)))
-                     (compile nil
-                              `(lambda (b v s e fe)
-                                 (position b (the vector v) :start s :end e :from-end fe)))))
+    (dolist (f (list (checked-compile
+                      `(lambda (b v s e fe)
+                         (position b (the bit-vector v) :start s :end e :from-end fe)))
+                     (checked-compile
+                      `(lambda (b v s e fe)
+                         (assert (eql b 0))
+                         (position 0 (the bit-vector v) :start s :end e :from-end fe)))
+                     (checked-compile
+                      `(lambda (b v s e fe)
+                         (position b (the vector v) :start s :end e :from-end fe)))))
       (let ((got (funcall f 0 v start end from-end)))
         (unless (eql res got)
           (cerror "Continue" "POSITION 0, Wanted ~S, got ~S.~%  size = ~S, set = ~S, from-end = ~S"
@@ -1297,9 +1292,9 @@
 (defun opaque-id-again (x) x)
 (define-compiler-macro opaque-id-again (x) (incf *macro-invocations*) x)
 (with-test (:name :mapfoo-admits-compiler-macros)
-  (compile nil '(lambda (l) (mapcar #'opaque-id-again l)))
+  (checked-compile '(lambda (l) (mapcar #'opaque-id-again l)))
   (assert (= *macro-invocations* 1))
-  (compile nil '(lambda (l) (some #'opaque-id-again l)))
+  (checked-compile '(lambda (l) (some #'opaque-id-again l)))
   (assert (= *macro-invocations* 2)))
 
 ;;; success
