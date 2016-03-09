@@ -33,3 +33,18 @@
 (with-test (:name (make-sequence deftype :bug-1315846))
   (assert-error (make-sequence 'bug-1315846-sequence 10)
                 sequence::protocol-unimplemented))
+
+(defclass extended-sequence (sequence standard-object) ())
+
+(defmethod sequence:length ((sequence extended-sequence))
+  3)
+
+(defmethod sequence:make-sequence-like ((sequence extended-sequence) (length t)
+                                        &key &allow-other-keys)
+  (make-instance 'extended-sequence))
+
+(defmethod (setf sequence:elt) ((new-value t) (sequence extended-sequence) (index t))
+  new-value)
+
+(with-test (:name (make-sequence :type-specifier class))
+  (make-sequence (find-class 'extended-sequence) 3))

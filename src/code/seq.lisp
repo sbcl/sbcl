@@ -408,7 +408,9 @@
                       (make-array length :element-type etype)))))
              (t (sequence-type-too-hairy (type-specifier type)))))
           ((and (csubtypep type (specifier-type 'sequence))
-                (awhen (find-class adjusted-type nil)
+                (awhen (if (typep adjusted-type 'class)
+                           adjusted-type
+                           (find-class adjusted-type nil))
                   (let ((prototype (sb!mop:class-prototype
                                     (sb!pcl:ensure-class-finalized it))))
                    ;; This function has the EXPLICIT-CHECK declaration,
