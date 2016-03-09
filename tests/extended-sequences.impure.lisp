@@ -48,3 +48,6 @@
 
 (with-test (:name (make-sequence :type-specifier class))
   (make-sequence (find-class 'extended-sequence) 3))
+
+(with-test (:name (map make-sequence :result-creation))
+  (assert (typep (map 'extended-sequence #'1+ '(1 2 3)) 'extended-sequence)))

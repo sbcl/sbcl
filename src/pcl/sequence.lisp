@@ -435,10 +435,10 @@
       (%map-for-effect #'counting-visit sequences))
     ;; Map local function over SEQUENCES that steps through the result
     ;; sequence and stores results of applying FUNCTION.
-    (binding* ((result (make-sequence (class-of result-prototype) min-length))
+    (binding* ((result (sequence:make-sequence-like result-prototype min-length))
                ((state nil from-end step nil nil setelt)
                 (sequence:make-sequence-iterator result)))
-      (declare (type function state step setelt))
+      (declare (type function step setelt))
       (flet ((one-element (&rest args)
                (declare (truly-dynamic-extent args))
                (funcall setelt (apply function args) result state)
