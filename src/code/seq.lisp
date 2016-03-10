@@ -220,6 +220,24 @@
   `(error 'simple-program-error
           :format-control "~S is too hairy for sequence functions."
           :format-arguments (list ,type-spec)))
+
+(sb!xc:defmacro when-extended-sequence-type
+    ((type-specifier type
+      &key
+      (class (gensym "CLASS"))
+      (prototype (gensym "PROTOTYPE") prototypep))
+     &body body)
+  (once-only ((type-specifier type-specifier) (type type))
+    `(when (csubtypep ,type (specifier-type 'sequence))
+       (binding* ((,class (if (typep ,type-specifier 'class)
+                              ,type-specifier
+                              (find-class ,type-specifier nil))
+                          :exit-if-null)
+                  (,prototype (sb!mop:class-prototype
+                               (sb!pcl:ensure-class-finalized ,class))))
+         ,@(unless prototypep `((ignore ,prototype)))
+         ,@body))))
+
 ) ; EVAL-WHEN
 
 (defun is-a-valid-sequence-type-specifier-p (type)
@@ -343,12 +361,12 @@
                 (length sequence)
                 (sb!sequence:length sequence)))
 
-(defun make-sequence (type length &key (initial-element nil iep))
+(defun make-sequence (result-type length &key (initial-element nil iep))
   #!+sb-doc
-  "Return a sequence of the given TYPE and LENGTH, with elements initialized
-  to INITIAL-ELEMENT."
+  "Return a sequence of the given RESULT-TYPE and LENGTH, with
+  elements initialized to INITIAL-ELEMENT."
   (declare (index length) (explicit-check))
-  (let* ((expanded-type (typexpand type))
+  (let* ((expanded-type (typexpand result-type))
          (adjusted-type
           (typecase expanded-type
             (atom (cond
@@ -393,34 +411,28 @@
            (cond
              (;; is it immediately obvious what the result type is?
               (typep type 'array-type)
-              (progn
-                (aver (= (length (array-type-dimensions type)) 1))
-                (let* ((etype (type-specifier
-                               (array-type-specialized-element-type type)))
-                       (etype (if (eq etype '*) t etype))
-                       (type-length (car (array-type-dimensions type))))
-                  (unless (or (eq type-length '*)
-                              (= type-length length))
-                    (sequence-type-length-mismatch-error type length))
-                  (if iep
-                      (make-array length :element-type etype
-                                  :initial-element initial-element)
-                      (make-array length :element-type etype)))))
+              (aver (= (length (array-type-dimensions type)) 1))
+              (let* ((etype (type-specifier
+                             (array-type-specialized-element-type type)))
+                     (etype (if (eq etype '*) t etype))
+                     (type-length (car (array-type-dimensions type))))
+                (unless (or (eq type-length '*)
+                            (= type-length length))
+                  (sequence-type-length-mismatch-error type length))
+                (if iep
+                    (make-array length :element-type etype
+                                :initial-element initial-element)
+                    (make-array length :element-type etype))))
              (t (sequence-type-too-hairy (type-specifier type)))))
-          ((and (csubtypep type (specifier-type 'sequence))
-                (awhen (if (typep adjusted-type 'class)
-                           adjusted-type
-                           (find-class adjusted-type nil))
-                  (let ((prototype (sb!mop:class-prototype
-                                    (sb!pcl:ensure-class-finalized it))))
-                   ;; This function has the EXPLICIT-CHECK declaration,
-                   ;; so we manually assert that it returns a SEQUENCE.
-                   (the sequence
-                    (if iep
-                        (sb!sequence:make-sequence-like
-                         prototype length :initial-element initial-element)
-                        (sb!sequence:make-sequence-like
-                         prototype length)))))))
+          ((when-extended-sequence-type (expanded-type type :prototype prototype)
+             ;; This function has the EXPLICIT-CHECK declaration, so
+             ;; we manually assert that it returns a SEQUENCE.
+             (the sequence
+                  (if iep
+                      (sb!sequence:make-sequence-like
+                       prototype length :initial-element initial-element)
+                      (sb!sequence:make-sequence-like
+                       prototype length)))))
           (t (bad-sequence-type-error (type-specifier type))))))
 
 ;;;; SUBSEQ
@@ -828,7 +840,6 @@ many elements are copied."
     ;; and not a list or vector.
     (the extended-sequence (values (sb!sequence:nreverse sequence)))))
 
-;;;; CONCATENATE
 
 (defmacro sb!sequence:dosequence ((element sequence &optional return) &body body)
   #!+sb-doc
@@ -856,11 +867,13 @@ many elements are copied."
                       ,@forms))))))))))
 
 
-(defun concatenate (output-type-spec &rest sequences)
+;;;; CONCATENATE
+
+(defun concatenate (result-type &rest sequences)
   #!+sb-doc
   "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
-  specified OUTPUT-TYPE-SPEC."
+  specified RESULT-TYPE."
   (declare (explicit-check))
   (flet ((concat-to-list* (sequences)
            (let ((result (list nil)))
@@ -889,7 +902,7 @@ many elements are copied."
                (declare (fixnum length))
                (setq lengths (nconc lengths (list length)))
                (setq total-length (+ total-length length))))))
-    (let ((type (specifier-type output-type-spec)))
+    (let ((type (specifier-type result-type)))
       (cond
         ((csubtypep type (specifier-type 'list))
          (cond
@@ -914,18 +927,14 @@ many elements are copied."
                 (concat-to-list* sequences))))
            (t (sequence-type-too-hairy (type-specifier type)))))
         ((csubtypep type (specifier-type 'vector))
-         (concat-to-simple* output-type-spec sequences))
-        ((and (csubtypep type (specifier-type 'sequence))
-              (awhen (find-class output-type-spec nil)
-               ;; This function has the EXPLICIT-CHECK declaration,
-               ;; so we manually assert that it returns a SEQUENCE.
-               (the sequence
-                (apply #'sb!sequence:concatenate
-                       (sb!mop:class-prototype
-                        (sb!pcl:ensure-class-finalized it))
-                       sequences)))))
+         (concat-to-simple* result-type sequences))
+        ((when-extended-sequence-type (result-type type :prototype prototype)
+           ;; This function has the EXPLICIT-CHECK declaration,
+           ;; so we manually assert that it returns a SEQUENCE.
+           (the sequence
+                (apply #'sb!sequence:concatenate prototype sequences))))
         (t
-         (bad-sequence-type-error output-type-spec))))))
+         (bad-sequence-type-error result-type))))))
 
 ;;; Efficient out-of-line concatenate for strings. Compiler transforms
 ;;; CONCATENATE 'STRING &co into these.
@@ -1084,15 +1093,14 @@ many elements are copied."
                   (%map-to-list really-fun sequences))
                  ((csubtypep type (specifier-type 'vector))
                   (%map-to-vector result-type really-fun sequences))
-                 ((and (csubtypep type (specifier-type 'sequence))
-                       (awhen (find-class result-type nil)
-                         ;; This function has the EXPLICIT-CHECK declaration,
-                         ;; so we manually assert that it returns a SEQUENCE.
-                         (the sequence
-                              (apply #'sb!sequence:map
-                                     (sb!mop:class-prototype
-                                      (sb!pcl:ensure-class-finalized it))
-                                     really-fun sequences)))))
+                 ((when-extended-sequence-type
+                      (result-type type :prototype prototype)
+                    ;; This function has the EXPLICIT-CHECK
+                    ;; declaration, so we manually assert that it
+                    ;; returns a SEQUENCE.
+                    (the sequence
+                         (apply #'sb!sequence:map
+                                prototype really-fun sequences))))
                  (t
                   (bad-sequence-type-error result-type))))))
     ;; Handle some easy cases faster

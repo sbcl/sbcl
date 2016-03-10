@@ -56,8 +56,23 @@
 (defmethod (setf sequence:elt) ((new-value t) (sequence extended-sequence) (index t))
   new-value)
 
-(with-test (:name (make-sequence :type-specifier class))
-  (make-sequence (find-class 'extended-sequence) 3))
-
-(with-test (:name (map make-sequence :result-creation))
+(with-test (:name (map :result-creation))
   (assert (typep (map 'extended-sequence #'1+ '(1 2 3)) 'extended-sequence)))
+
+(with-test (:name (make-sequence :result-type class))
+  (assert (typep (make-sequence (find-class 'extended-sequence) 3)
+                 'extended-sequence)))
+
+(with-test (:name (map :result-type class))
+  (assert (typep (map (find-class 'extended-sequence)
+                      #'1+ '(1 2 3))
+                 'extended-sequence)))
+
+(with-test (:name (merge :result-type class))
+  (assert (typep (merge (find-class 'extended-sequence)
+                        (list 1 2 3) (list 4 5 6) #'<)
+                 'extended-sequence)))
+
+(with-test (:name (concatenate :result-type class))
+  (assert (typep (concatenate (find-class 'extended-sequence) '(1 2) '(3 4))
+                 'extended-sequence)))
