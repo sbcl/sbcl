@@ -443,7 +443,8 @@
              ;; - use the specialized reffer for inputs + output
              (merge-vectors vector-1 length-1 vector-2 length-2
                             result pred-fun key-fun aref))))
-      ((when-extended-sequence-type (result-type type :prototype prototype)
+      ((when-extended-sequence-type
+           (result-type type :expandedp nil :prototype prototype)
          ;; GF dispatch deals with the erroneous situation wherein
          ;; either of SEQUENCE1 or SEQUENCE2 is not a sequence.  Note
          ;; that the one builtin method optimizes for NIL as the key

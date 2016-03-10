@@ -40,8 +40,20 @@
 (deftype bug-1315846-sequence ()
   'bug-1315846-simple-sequence)
 
-(with-test (:name (make-sequence deftype :bug-1315846))
+(with-test (:name (make-sequence :result-type deftype :bug-1315846))
   (assert-error (make-sequence 'bug-1315846-sequence 10)
+                sequence::protocol-unimplemented))
+
+(with-test (:name (map :result-type deftype :bug-1315846))
+  (assert-error (map 'bug-1315846-sequence #'1+ '(1 2 3))
+                sequence::protocol-unimplemented))
+
+(with-test (:name (merge :result-type deftype :bug-1315846))
+  (assert-error (merge 'bug-1315846-sequence (list 1 2 3) (list 4 5 6) #'<)
+                sequence::protocol-unimplemented))
+
+(with-test (:name (concatenate :result-type deftype :bug-1315846))
+  (assert-error (concatenate 'bug-1315846-sequence '(1 2) '(3 4))
                 sequence::protocol-unimplemented))
 
 (defclass extended-sequence (sequence standard-object) ())

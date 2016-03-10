@@ -224,14 +224,19 @@
 (sb!xc:defmacro when-extended-sequence-type
     ((type-specifier type
       &key
+      expandedp
+      (expanded (gensym "EXPANDED"))
       (class (gensym "CLASS"))
       (prototype (gensym "PROTOTYPE") prototypep))
      &body body)
   (once-only ((type-specifier type-specifier) (type type))
     `(when (csubtypep ,type (specifier-type 'sequence))
-       (binding* ((,class (if (typep ,type-specifier 'class)
-                              ,type-specifier
-                              (find-class ,type-specifier nil))
+       (binding* ((,expanded ,(if expandedp
+                                  type-specifier
+                                  `(typexpand ,type-specifier)))
+                  (,class (if (typep ,expanded 'class)
+                              ,expanded
+                              (find-class ,expanded nil))
                           :exit-if-null)
                   (,prototype (sb!mop:class-prototype
                                (sb!pcl:ensure-class-finalized ,class))))
@@ -424,7 +429,8 @@
                                 :initial-element initial-element)
                     (make-array length :element-type etype))))
              (t (sequence-type-too-hairy (type-specifier type)))))
-          ((when-extended-sequence-type (expanded-type type :prototype prototype)
+          ((when-extended-sequence-type
+               (expanded-type type :expandedp t :prototype prototype)
              ;; This function has the EXPLICIT-CHECK declaration, so
              ;; we manually assert that it returns a SEQUENCE.
              (the sequence
@@ -928,7 +934,8 @@ many elements are copied."
            (t (sequence-type-too-hairy (type-specifier type)))))
         ((csubtypep type (specifier-type 'vector))
          (concat-to-simple* result-type sequences))
-        ((when-extended-sequence-type (result-type type :prototype prototype)
+        ((when-extended-sequence-type
+             (result-type type :expandedp nil :prototype prototype)
            ;; This function has the EXPLICIT-CHECK declaration,
            ;; so we manually assert that it returns a SEQUENCE.
            (the sequence
@@ -1094,7 +1101,7 @@ many elements are copied."
                  ((csubtypep type (specifier-type 'vector))
                   (%map-to-vector result-type really-fun sequences))
                  ((when-extended-sequence-type
-                      (result-type type :prototype prototype)
+                      (result-type type :expandedp nil :prototype prototype)
                     ;; This function has the EXPLICIT-CHECK
                     ;; declaration, so we manually assert that it
                     ;; returns a SEQUENCE.

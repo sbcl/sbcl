@@ -10,6 +10,8 @@ changes relative to sbcl-1.3.3:
     returns NIL in certain situations
   * bug fix: MAKE-SEQUENCE, MAP, CONCATENATE and MERGE accept class objects as
     result-type
+  * bug fix: MAKE-SEQUENCE, MAP, CONCATENATE and MERGE expand DEFTYPEs in
+    result-type
   * enhancement: who-sets and who-references work on DEFGLOBAL. (lp#1552997)
   * enhancement: CONSTANTP understands backquote.
     e.g. (CONSTANTP '`(0 (,CHAR-CODE-LIMIT))) => T
