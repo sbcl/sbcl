@@ -433,7 +433,7 @@
                (expanded-type type :expandedp t :prototype prototype)
              ;; This function has the EXPLICIT-CHECK declaration, so
              ;; we manually assert that it returns a SEQUENCE.
-             (the sequence
+             (the extended-sequence
                   (if iep
                       (sb!sequence:make-sequence-like
                        prototype length :initial-element initial-element)
@@ -938,7 +938,7 @@ many elements are copied."
              (result-type type :expandedp nil :prototype prototype)
            ;; This function has the EXPLICIT-CHECK declaration,
            ;; so we manually assert that it returns a SEQUENCE.
-           (the sequence
+           (the extended-sequence
                 (apply #'sb!sequence:concatenate prototype sequences))))
         (t
          (bad-sequence-type-error result-type))))))
@@ -1105,7 +1105,7 @@ many elements are copied."
                     ;; This function has the EXPLICIT-CHECK
                     ;; declaration, so we manually assert that it
                     ;; returns a SEQUENCE.
-                    (the sequence
+                    (the extended-sequence
                          (apply #'sb!sequence:map
                                 prototype really-fun sequences))))
                  (t

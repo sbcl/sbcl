@@ -445,10 +445,14 @@
                             result pred-fun key-fun aref))))
       ((when-extended-sequence-type
            (result-type type :expandedp nil :prototype prototype)
-         ;; GF dispatch deals with the erroneous situation wherein
-         ;; either of SEQUENCE1 or SEQUENCE2 is not a sequence.  Note
-         ;; that the one builtin method optimizes for NIL as the key
-         ;; fun, and we correctly preserve a NIL here.
-         (sb!sequence:merge
-          prototype sequence1 sequence2 pred-fun :key key-fun)))
+         ;; This function has the EXPLICIT-CHECK declaration, so we
+         ;; manually assert that it returns a SEQUENCE.
+         (the extended-sequence
+              ;; GF dispatch deals with the erroneous situation
+              ;; wherein either of SEQUENCE1 or SEQUENCE2 is not a
+              ;; sequence.  Note that the one builtin method optimizes
+              ;; for NIL as the key fun, and we correctly preserve a
+              ;; NIL here.
+              (sb!sequence:merge
+               prototype sequence1 sequence2 pred-fun :key key-fun))))
       (t (bad-sequence-type-error result-type)))))
