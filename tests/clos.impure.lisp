@@ -2490,3 +2490,12 @@
                   (defmethod function-keywords-test (&key a b)
                     (declare (ignore a b))))
                  '(:a :b))))
+
+(with-test (:name :superclass-finalization)
+  (let* ((class1 (gensym "CLASS1-"))
+         (class2 (gensym "CLASS2-")))
+    (eval `(defclass ,class1 () ()))
+    (eval `(defclass ,class2 (,class1) ()))
+    (let ((instance (make-instance class2)))
+      (sb-mop:finalize-inheritance (find-class class1))
+      (assert (not (sb-kernel:layout-invalid (sb-kernel:layout-of instance)))))))

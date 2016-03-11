@@ -1043,7 +1043,7 @@
   (multiple-value-bind (instance-slots class-slots custom-slots)
       (classify-slotds eslotds)
     (let* ((nslots (length instance-slots))
-           (owrapper (when (class-finalized-p class) (class-wrapper class)))
+           (owrapper (class-wrapper class))
            (nwrapper
              (cond ((null owrapper)
                     (make-wrapper nslots class))
