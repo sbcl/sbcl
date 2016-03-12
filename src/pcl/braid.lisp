@@ -206,7 +206,6 @@
                                   (t
                                    (!boot-make-wrapper (length slots) name))))
                    (proto nil))
-              (when (eq name t) (setq *the-wrapper-of-t* wrapper))
               (set (make-class-symbol name) class)
               (dolist (slot slots)
                 (unless (eq (getf slot :allocation :instance) :instance)
@@ -540,7 +539,6 @@
                (lclass (find-classoid name))
                (wrapper (classoid-layout lclass)))
           (set (get-built-in-class-symbol name) class)
-          (set (get-built-in-wrapper-symbol name) wrapper)
           (setf (classoid-pcl-class lclass) class)
 
           (!bootstrap-initialize-class 'built-in-class class

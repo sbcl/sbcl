@@ -73,11 +73,6 @@
   (format-symbol (load-time-value (find-package "SB!PCL") t)
                  "*THE-CLASS-~A*" (symbol-name class-name)))
 
-(defun make-wrapper-symbol (class-name)
-  ;; Reference a package that is now SB!PCL but later SB-PCL
-  (format-symbol (load-time-value (find-package "SB!PCL") t)
-                 "*THE-WRAPPER-~A*" (symbol-name class-name)))
-
 (defun condition-type-p (type)
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))
@@ -123,17 +118,6 @@
 
                   *the-eslotd-standard-class-slots*
                   *the-eslotd-funcallable-standard-class-slots*))
-
-(declaim (special *the-wrapper-of-t*
-                  *the-wrapper-of-vector* *the-wrapper-of-symbol*
-                  *the-wrapper-of-string* *the-wrapper-of-sequence*
-                  *the-wrapper-of-rational* *the-wrapper-of-ratio*
-                  *the-wrapper-of-number* *the-wrapper-of-null*
-                  *the-wrapper-of-list* *the-wrapper-of-integer*
-                  *the-wrapper-of-float* *the-wrapper-of-cons*
-                  *the-wrapper-of-complex* *the-wrapper-of-character*
-                  *the-wrapper-of-bit-vector* *the-wrapper-of-array*))
-
 ;;;; PCL instances
 
 (sb!kernel::!defstruct-with-alternate-metaclass standard-instance

@@ -188,12 +188,6 @@
       (let ((symbol (make-class-symbol class-name)))
         (push (list class-name symbol) *built-in-class-symbols*)
         symbol)))
-
-(defun get-built-in-wrapper-symbol (class-name)
-  (or (cadr (assq class-name *built-in-wrapper-symbols*))
-      (let ((symbol (make-wrapper-symbol class-name)))
-        (push (list class-name symbol) *built-in-wrapper-symbols*)
-        symbol)))
 
 (defvar *standard-method-combination*)
 
