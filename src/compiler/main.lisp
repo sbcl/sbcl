@@ -382,20 +382,18 @@ Examples:
   ;; since it's primarily a debugging tool, it's nicer to have
   ;; a wider unique scope by ID.
   `(let ((*compiler-ir-obj-map* (make-compiler-ir-obj-map)))
-       (unwind-protect
-            (let ((*warnings-p* nil)
-                  (*failure-p* nil))
-              (handler-bind ((compiler-error #'compiler-error-handler)
-                             (style-warning #'compiler-style-warning-handler)
-                             (warning #'compiler-warning-handler))
-                  (values (progn ,@body)
-                       *warnings-p*
-                       *failure-p*)))
-         (let ((map *compiler-ir-obj-map*))
-           (clrhash (objmap-obj-to-id map))
-           (fill (objmap-id-to-cont map) nil)
-           (fill (objmap-id-to-tn map) nil)
-           (fill (objmap-id-to-label map) nil)))))
+     (unwind-protect
+         (let ((*warnings-p* nil)
+               (*failure-p* nil))
+           (handler-bind ((compiler-error #'compiler-error-handler)
+                          (style-warning #'compiler-style-warning-handler)
+                          (warning #'compiler-warning-handler))
+             (values (progn ,@body) *warnings-p* *failure-p*)))
+       (let ((map *compiler-ir-obj-map*))
+         (clrhash (objmap-obj-to-id map))
+         (fill (objmap-id-to-cont map) nil)
+         (fill (objmap-id-to-tn map) nil)
+         (fill (objmap-id-to-label map) nil)))))
 
 ;;; THING is a kind of thing about which we'd like to issue a warning,
 ;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.
