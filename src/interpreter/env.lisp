@@ -29,14 +29,14 @@
 (macrolet ((def-subtype (type &optional more-slots)
              (let ((constructor (symbolicate "MAKE-" type)))
                `(progn
-                  (declaim (inline ,constructor))
                   (defstruct
                       (,type
                         (:include basic-env) (:copier nil)
                         (:constructor ,constructor
                          (parent payload symbols contour ,@more-slots)))
                     ,@more-slots)
-                  (declaim (freeze-type ,type))))))
+                  (declaim (freeze-type ,type))
+                  (declaim (inline ,constructor))))))
   (def-subtype function-env)
   (def-subtype var-env)
   (def-subtype macro-env)
