@@ -234,7 +234,7 @@ evaluated as a PROGN."
     (sb!c::note-name-defined name :function)
     name)
   ;; During cold-init we don't touch the fdefinition.
-  (defun !%quietly-defun (name inline-lambda)
+  (defun !%cold-defun (name inline-lambda)
     (sb!c:%compiler-defun name nil nil) ; makes :WHERE-FROM = :DEFINED
     (sb!c::%set-inline-expansion name nil inline-lambda)
     ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.

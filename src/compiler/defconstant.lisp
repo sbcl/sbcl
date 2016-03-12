@@ -44,15 +44,6 @@
                 about-to-modify-symbol-value))
 ;;; the guts of DEFCONSTANT
 
-;; Abridged version for cold-init: No warnings are allowed,
-;; but %DEFCONSTANT gets mad that *UNIVERSAL-TYPE* etc have earmuffs.
-#+sb-xc
-(defun sb!c::!%quietly-defconstant (name value source-location)
-  (when source-location
-    (setf (info :source-location :constant name) source-location))
-  (%set-symbol-value name value)
-  (setf (info :variable :kind name) :constant))
-
 (defun sb!c::%defconstant (name value source-location &optional (doc nil docp))
   #+sb-xc-host (declare (ignore doc docp))
   (unless (symbolp name)

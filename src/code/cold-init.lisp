@@ -143,17 +143,25 @@
                                  (concatenate 'string "SB-" (subseq s 3))
                                  s)))))))
 
-    ;; %DEFSETF ',FN warns when #'(SETF fn) also has a function binding.
-    ;; There's no way to suppress that warning in cold-init.
-    ;; HANDLER-BIND can't be used, since condition classoids don't exist yet.
-    (encapsulate-1
-     '%defsetf
-     (lambda (f &rest args)
-       (encapsulate 'style-warn '!cold-init ; Make STYLE-WARN into a no-op.
-                    (lambda (&rest l) (declare (ignore l))))
-       (apply f args)
-       (unencapsulate 'style-warn '!cold-init)))) ; Now fatal again.
+    ;; Wrap thing-defining-functions that style-warn sufficiently early
+    ;; that HANDLER-BIND can't be used to suppress the warning
+    ;; (since condition classoids don't exist yet).
+    (let ((warning-suppressor ; Make STYLE-WARN into a no-op.
+           (lambda (f &rest args)
+             (encapsulate 'style-warn '!cold-init (constantly nil))
+             (apply f args)
+             (unencapsulate 'style-warn '!cold-init)))) ; Restore it.
+      ;; %DEFCONSTANT complains about all named types because of earmuffs.
+      (encapsulate-1 'sb!c::%defconstant warning-suppressor)
+      ;; %DEFSETF ',FN warns when #'(SETF fn) also has a function binding.
+      (encapsulate-1 '%defsetf warning-suppressor)))
+
   names)
+
+(defmacro !with-init-wrappers (&rest forms)
+  `(let ((wrapped-functions (!encapsulate-stuff-for-cold-init)))
+     ,@forms
+     (dolist (f wrapped-functions) (unencapsulate f '!cold-init))))
 
 ;;; called when a cold system starts up
 (defun !cold-init ()
@@ -215,7 +223,7 @@
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
   (show-and-call !type-class-cold-init)
-  (show-and-call sb!kernel::!primordial-type-cold-init)
+  (!with-init-wrappers (show-and-call sb!kernel::!primordial-type-cold-init))
   (show-and-call !world-lock-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)
@@ -241,7 +249,7 @@
       (when docstring (setf (fdocumentation name 'variable) docstring))))
   (dolist (x *!cold-defuns*)
     (destructuring-bind (name . inline-expansion) x
-      (!%quietly-defun name inline-expansion)))
+      (!%cold-defun name inline-expansion)))
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
@@ -251,10 +259,10 @@
   (progn (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
          (terpri))
 
-  (loop with wrapped-functions = (!encapsulate-stuff-for-cold-init)
-        for index-in-cold-toplevels from 0
-        for toplevel-thing in (prog1 *!cold-toplevels*
-                                (makunbound '*!cold-toplevels*))
+  (!with-init-wrappers
+    (loop for index-in-cold-toplevels from 0
+          for toplevel-thing in (prog1 *!cold-toplevels*
+                                 (makunbound '*!cold-toplevels*))
         do
       #!+sb-show
       (when (zerop (mod index-in-cold-toplevels 1024))
@@ -274,8 +282,7 @@
         ((cons (eql defstruct))
          (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
         (t
-         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))
-        finally (dolist (f wrapped-functions) (unencapsulate f '!cold-init)))
+         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   (show-and-call time-reinit)

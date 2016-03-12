@@ -21,8 +21,8 @@
                       ;; Make it known as a constant in the cross-compiler.
                       (setf (info :variable :kind ',global-sym) :constant))
                (!cold-init-forms
-                #+sb-xc (sb!c::!%quietly-defconstant
-                         ',global-sym ,global-sym (sb!c::source-location))
+                #+sb-xc (sb!c::%defconstant ',global-sym ,global-sym
+                                            (sb!c::source-location))
                 (setf (info :type :builtin ',type) ,global-sym
                       (info :type :kind ',type) :primitive)))))
    ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
