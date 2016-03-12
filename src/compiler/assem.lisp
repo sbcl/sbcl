@@ -1468,14 +1468,6 @@
       (values `(,@required ,@(reconstruction) ,@(if rest `((values-list ,@rest))))
               (make-lambda-list llks nil required optional rest keys aux)))))
 
-(defun extract-nths (index glue list-of-lists-of-lists)
-  (mapcar (lambda (list-of-lists)
-            (cons glue
-                  (mapcar (lambda (list)
-                            (nth index list))
-                          list-of-lists)))
-          list-of-lists-of-lists))
-
 (defmacro define-instruction (name lambda-list &rest options)
   (binding* ((sym-name (symbol-name name))
              (defun-name (inst-emitter-symbol sym-name t))
