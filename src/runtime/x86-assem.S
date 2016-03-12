@@ -530,7 +530,12 @@ GNAME(undefined_tramp):
  * undefined-function trampoline. */
 
 /*
- * the closure trampoline
+ * the closure trampoline - entered when a global function is a closure
+ * and the function is called "by name" (normally, as when it is the
+ * head of a form) via an FDEFN. Register %EAX holds the fdefn address,
+ * but the simple-fun which underlies the closure expects %EAX to be the
+ * closure itself. So we grab the closure out of the fdefn pointed to,
+ * then jump to the simple-fun that the closure points to.
  */
 	.text
 	.align	align_16byte,0x90
@@ -539,12 +544,6 @@ GNAME(undefined_tramp):
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(closure_tramp):
 	movl	FDEFN_FUN_OFFSET(%eax),%eax
-	/* FIXME: The '*' after "jmp" in the next line is from PVE's
-	 * patch posted to the CMU CL mailing list Oct 6, 1999. It looks
-	 * reasonable, and it certainly seems as though if CMU CL needs it,
-	 * SBCL needs it too, but I haven't actually verified that it's
-	 * right. It would be good to find a way to force the flow of
-	 * control through here to test it. */
 	jmp	*CLOSURE_FUN_OFFSET(%eax)
 	SIZE(GNAME(closure_tramp))
 

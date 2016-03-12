@@ -387,7 +387,12 @@ GNAME(alloc_tramp):
 
 		
 /*
- * the closure trampoline
+ * the closure trampoline - entered when a global function is a closure
+ * and the function is called "by name" (normally, as when it is the
+ * head of a form) via an FDEFN. Register %RAX holds the fdefn address,
+ * but the simple-fun which underlies the closure expects %RAX to be the
+ * closure itself. So we grab the closure out of the fdefn pointed to,
+ * then jump to the simple-fun that the closure points to.
  */
 	.text
 	.align	align_16byte,0x90
@@ -395,12 +400,6 @@ GNAME(alloc_tramp):
 	TYPE(GNAME(closure_tramp))
 GNAME(closure_tramp):
 	mov	FDEFN_FUN_OFFSET(%rax),%rax
-	/* FIXME: The '*' after "jmp" in the next line is from PVE's
-	 * patch posted to the CMU CL mailing list Oct 6, 1999. It looks
-	 * reasonable, and it certainly seems as though if CMU CL needs it,
-	 * SBCL needs it too, but I haven't actually verified that it's
-	 * right. It would be good to find a way to force the flow of
-	 * control through here to test it. */
 	jmp	*CLOSURE_FUN_OFFSET(%rax)
 	SIZE(GNAME(closure_tramp))
 
