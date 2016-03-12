@@ -27,9 +27,10 @@
     ;; is free to :USE (PACKAGE-USE-LIST :CL-USER) anyway.:-|
     nil))
 
-;; "mundanely" because this macro can't work (never has, never will)
-;; until the target system is fully operational.
-(sb!xc:defmacro defpackage (package &rest options)
+;; this macro can't work (never has, never will) until the target system
+;; is fully operational, so push it down to non-toplevel.
+(let ()
+(defmacro defpackage (package &rest options)
   #!+sb-doc
   #.(format nil
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
@@ -161,6 +162,7 @@
                     ',lock (sb!c:source-location)
                     ,@(and doc
                            `(,doc))))))
+)
 
 (defun check-disjoint (&rest args)
   ;; An arg is (:key . set)
