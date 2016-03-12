@@ -256,24 +256,9 @@
       ((or number character function) (eql a b))
       (vector (and (vectorp b) (every #'recurse a b))))))
 
-(defstruct (arg (:copier nil)
-                (:predicate nil)
-                (:constructor %make-arg (name))
-                (:print-object
-                 (lambda (self stream)
-                   (if *print-readably*
-                       (call-next-method)
-                       (print-unreadable-object (self stream :type t)
-                         (format stream
-                                 "~A ~:[~;+~]~:S~@[=~S~]~@[ filt=~S~]~
-~@[ lbl=~S~]~@[ prt=~S~]"
-                                 (arg-name self)
-                                 (arg-sign-extend-p self)
-                                 (arg-fields self)
-                                 (arg-value self)
-                                 (arg-prefilter self)
-                                 (arg-use-label self)
-                                 (arg-printer self)))))))
+(defstruct (arg (:constructor %make-arg (name))
+                (:copier nil)
+                (:predicate nil))
   (name nil :type symbol)
   (fields nil :type list)
 
