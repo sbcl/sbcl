@@ -328,6 +328,9 @@
 (define-instruction-format (two-bytes 16 :default-printer '(:name))
   (op :fields (list (byte 8 0) (byte 8 8))))
 
+(define-instruction-format (three-bytes 24 :default-printer '(:name))
+  (op :fields (list (byte 8 0) (byte 8 8) (byte 8 16))))
+
 ;;; Same as simple, but with direction bit
 (define-instruction-format (simple-dir 8 :include simple)
   (op :field (byte 6 2))
@@ -2583,6 +2586,60 @@
   (:emitter
    (emit-byte segment #b00001111)
    (emit-byte segment #b00110001)))
+
+;;;; Intel TSX - some user library (STMX) used to define these,
+;;;; but it's not really supported and they actually belong here.
+
+(define-instruction-format
+    (xbegin 48 :default-printer '(:name :tab label))
+  (op :fields (list (byte 8 0) (byte 8 8)) :value '(#xc7 #xf8))
+  (label :field (byte 32 16) :type 'displacement))
+
+(define-instruction-format
+    (xabort 24 :default-printer '(:name :tab imm))
+  (op :fields (list (byte 8 0) (byte 8 8)) :value '(#xc6 #xf8))
+  (imm :field (byte 8 16)))
+
+(define-instruction xbegin (segment &optional where)
+  (:printer xbegin ())
+  (:emitter
+   (emit-byte segment #xc7)
+   (emit-byte segment #xf8)
+   (if where
+       ;; emit 32-bit, signed relative offset for where
+       (emit-dword-displacement-backpatch segment where)
+       ;; nowhere to jump: simply jump to the next instruction
+       (emit-skip segment 4 0))))
+
+(define-instruction xend (segment)
+  (:printer three-bytes ((op '(#x0f #x01 #xd5))))
+  (:emitter
+   (emit-byte segment #x0f)
+   (emit-byte segment #x01)
+   (emit-byte segment #xd5)))
+
+(define-instruction xabort (segment reason)
+  (:printer xabort ())
+  (:emitter
+   (aver (<= 0 reason #xff))
+   (emit-byte segment #xc6)
+   (emit-byte segment #xf8)
+   (emit-byte segment reason)))
+
+(define-instruction xtest (segment)
+  (:printer three-bytes ((op '(#x0f #x01 #xd6))))
+  (:emitter
+   (emit-byte segment #x0f)
+   (emit-byte segment #x01)
+   (emit-byte segment #xd6)))
+
+(define-instruction xacquire (segment) ;; same prefix byte as repne/repnz
+  (:emitter
+   (emit-byte segment #xf2)))
+
+(define-instruction xrelease (segment) ;; same prefix byte as rep/repe/repz
+  (:emitter
+   (emit-byte segment #xf3)))
 
 ;;;; Late VM definitions
 (defun canonicalize-inline-constant (constant)
