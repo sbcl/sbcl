@@ -126,7 +126,7 @@
 ;;; FIXME: there is no reason to expose two FUN-NAME readers,
 ;;; one that works for everything except generic, and one that always works.
 (defun fun-name (x)
-  (if (typep x 'generic-function)
+  (if (typep x 'standard-generic-function)
       (sb!mop:generic-function-name x)
       (%fun-name x)))
 
