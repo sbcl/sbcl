@@ -12,6 +12,15 @@
 
 (in-package "SB!IMPL")
 
+;;; an internal tag for marking empty slots, which needs to be defined
+;;; no later than the compiler-macro for MAPHASH.
+;;;
+;;; Note that as of version 0.pre7 there's a dependence in the
+;;; gencgc.c code on this value being a symbol. (This is only one of
+;;; several nasty dependencies between that code and this, alas.)
+;;; -- WHN 2001-08-17
+(defconstant +empty-ht-slot+ '%empty-ht-slot%)
+
 (define-compiler-macro maphash (&whole form function-designator hash-table
                                 &environment env)
   (when (sb!c:policy env (> space speed))

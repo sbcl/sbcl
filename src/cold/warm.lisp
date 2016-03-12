@@ -45,6 +45,20 @@
 
 (load "src/cold/muffler.lisp")
 
+(unless (member sb-int:+empty-ht-slot+ sb-vm::*static-symbols*)
+  ;; It doesn't "just work" to unintern the marker symbol, because then
+  ;; then compiler thinks that equivalence-as-constant for such symbol permits
+  ;; creation of new uninterned symbol at load-time, never mind that it was
+  ;; accessed by way of a named global constant. Changing +EMPTY-HT-SLOT+
+  ;; into a macro that explicitly calls LOAD-TIME-VALUE makes it work out.
+  ;; I didn't want to think about getting this right in cold-init though.
+  (setf (sb-int:info :variable :macro-expansion 'sb-int:+empty-ht-slot+)
+        '(load-time-value (symbol-global-value 'sb-int:+empty-ht-slot+) t))
+  ;; Sneaky! Now it's both a constant and a macro
+  (setf (sb-int:info :variable :kind 'sb-int:+empty-ht-slot+) :macro))
+
+(unintern sb-int:+empty-ht-slot+ (symbol-package sb-int:+empty-ht-slot+))
+
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
 ;;;

@@ -177,6 +177,9 @@
      ;; details.
      sb!alien::*enter-alien-callback*
 
+     ;; hash table empty cell marker
+     sb!impl::%empty-ht-slot%
+
      ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
      ;; common slot unbound check.
      ;;
