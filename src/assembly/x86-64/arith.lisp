@@ -11,6 +11,8 @@
 
 (in-package "SB!VM")
 
+#-sb-assembling ; avoid redefinition warning
+(progn
 (defun !both-fixnum-p (temp x y)
   (inst mov (reg-in-size temp :dword)
         (reg-in-size x :dword))
@@ -26,6 +28,7 @@
         (reg-in-size y :dword))
   (inst test (reg-in-size temp :byte)
         fixnum-tag-mask))
+)
 
 
 ;;;; addition, subtraction, and multiplication
@@ -346,6 +349,7 @@
     (inst shr result 56))
   (inst pop temp)) ; restore RAX
 
+#-sb-assembling ; avoid redefinition warning
 (defun emit-foreign-logbitp (index foreign-symbol temp-reg) ; result in Z flag
   (declare (ignorable temp-reg))
   (multiple-value-bind (byte bit) (floor index 8)
