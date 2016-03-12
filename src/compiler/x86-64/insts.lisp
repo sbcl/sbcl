@@ -268,7 +268,10 @@
                (let ((width (width-bits (inst-operand-size dstate))))
                  (when (= width 64)
                    (setf width 32))
-                 (read-signed-suffix width dstate))))
+                 (read-signed-suffix width dstate)))
+  :printer (lambda (value stream dstate)
+             (maybe-note-static-symbol value dstate)
+             (princ value stream)))
 
 (define-arg-type signed-imm-data/asm-routine
   :type 'signed-imm-data
