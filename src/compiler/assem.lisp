@@ -1230,14 +1230,14 @@
                    (string-downcase symbol)
                    *backend-instruction-set-package*)))
 
-(defmacro inst (&whole whole instruction &rest args &environment env)
+(defmacro inst (instruction &rest args &environment env)
   #!+sb-doc
   "Emit the specified instruction to the current segment."
   (let ((sym (inst-emitter-symbol instruction)))
-    ;; An ordinary style-warning will suffice to indicate a missing emitter.
-    ;; There's no need for an extra check.
-    (cond ((get sym :macro) (funcall sym (cdr whole) env))
-          (t `(,sym (%%current-segment%%) (%%current-vop%%) ,@args)))))
+    (if (#-sb-xc macro-function #+sb-xc sb!xc:macro-function sym env)
+        `(,sym ,@args)
+        ;; An ordinary style-warning suffices to indicate missing emitters.
+        `(,sym (%%current-segment%%) (%%current-vop%%) ,@args))))
 
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
 ;;; and %%CURRENT-VOP%% prevents this from being an ordinary function.
@@ -1598,9 +1598,4 @@
            (values))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
-  (let* ((namestring (symbol-name name))
-         (defun-name (inst-emitter-symbol namestring t)))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (setf (get ',defun-name :macro) t
-             (symbol-function ',defun-name)
-             ,(make-macro-lambda namestring lambda-list body 'inst name)))))
+  `(defmacro ,(inst-emitter-symbol (symbol-name name) t) ,lambda-list ,@body))
