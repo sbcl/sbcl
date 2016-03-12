@@ -184,13 +184,10 @@ evaluated as a PROGN."
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body t)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
-           (lambda-guts `(,lambda-list
-                          ,@(when doc (list doc))
-                          ,@decls
-                          (block ,(fun-name-block-name name)
-                            ,@forms)))
-           (lambda `(lambda ,@lambda-guts))
-           (named-lambda `(named-lambda ,name ,@lambda-guts))
+           (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
+           (lambda `(lambda ,lambda-list ,@lambda-guts))
+           (named-lambda `(named-lambda ,name ,lambda-list
+                            ,@(when doc (list doc)) ,@lambda-guts))
            (inline-thing
             (or (sb!kernel::defstruct-generated-defn-p name lambda-list body)
                 (when (inline-fun-name-p name)
