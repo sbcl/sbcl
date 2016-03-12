@@ -20,11 +20,6 @@
         name
         class)))
 
-(defun fun-name (x)
-  (if (typep x 'standard-generic-function)
-      (sb-pcl:generic-function-name x)
-      (%fun-name x)))
-
 ;;;; the ANSI interface to function names (and to other stuff too)
 ;;; Note: this function gets called by the compiler (as of 1.0.17.x,
 ;;; in MAYBE-INLINE-SYNTACTIC-CLOSURE), and so although ANSI says

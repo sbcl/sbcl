@@ -57,14 +57,6 @@
       (setf (slot-value x '%documentation) new-value)
       (setf (%fun-doc x) new-value)))
 
-;;; FIXME: There's already fun-name in code/describe.lisp, but it's
-;;; loaded after PCL, so it cannot be used, because we set
-;;; some documentation at the end of this file.
-(defun fun-name (x)
-  (if (typep x 'generic-function)
-      (sb-pcl:generic-function-name x)
-      (%fun-name x)))
-
 (defun real-function-name (name)
   ;; Resolve the actual name of the function named by NAME
   ;; e.g. (setf (name-function 'x) #'car)
@@ -81,7 +73,7 @@
                 (eq (car name) 'macro-function)
                 (cadr name))))
         (t
-         (fun-name (fdefinition name)))))
+         (sb-impl::fun-name (fdefinition name)))))
 
 (defun set-function-name-documentation (name documentation)
   (aver name)
@@ -150,7 +142,7 @@
                       doc-type)))
         (name (cond
                 ((typep x 'function)
-                 (fun-name x))
+                 (sb-impl::fun-name x))
                 ((typep x 'class)
                  (class-name x))
                 (t

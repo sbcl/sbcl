@@ -216,6 +216,7 @@
             sb!mop:class-prototype
             sb!mop:eql-specializer-object
             sb!mop:finalize-inheritance
+            sb!mop:generic-function-name
             sb!pcl::%force-cache-flushes
             sb!pcl::check-wrapper-validity
             sb!pcl::class-has-a-forward-referenced-superclass-p
