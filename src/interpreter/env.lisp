@@ -1092,7 +1092,11 @@
 ;;; Also the parts for sb-cltl2 are fairly odious.
 
 (defun lexenv-from-env (env &optional reason)
-  (%lexenv-from-env (make-hash-table :test 'eq) env reason))
+  (let ((lexenv (%lexenv-from-env (make-hash-table :test 'eq) env reason)))
+    (setf (sb-c::lexenv-%policy lexenv) (%policy (env-contour env))
+          (sb-c::lexenv-disabled-package-locks lexenv)
+          (env-disabled-package-locks env))
+    lexenv))
 
 (defun %lexenv-from-env (var-map env &optional reason)
   (let ((lexenv (acond ((env-parent env) (%lexenv-from-env var-map it reason))
@@ -1222,8 +1226,7 @@
         ;;
         (setf (sb-c::lexenv-vars lexenv) (nconc vars (sb-c::lexenv-vars lexenv))
               (sb-c::lexenv-funs lexenv) (nconc funs (sb-c::lexenv-funs lexenv))
-              (sb-c::lexenv-%policy lexenv) (%policy (env-contour env))
-              ;; FIXME: package locks, handled conditions
+              ;; FIXME: handled conditions
               )))
     lexenv))
 
