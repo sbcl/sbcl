@@ -69,3 +69,19 @@
       (print-unreadable-object (label stream :type t)
         (prin1 (sb!c:label-id label) stream))
       (format stream "L~D" (sb!c:label-id label))))
+
+(defmacro sb!vm::define-assembly-routine (name&options vars &body code)
+  (multiple-value-bind (name options)
+      (if (atom name&options)
+          (values name&options nil)
+          (values (car name&options) (cdr name&options)))
+    (let ((regs (mapcar (lambda (var) (apply #'sb!c::parse-reg-spec var))
+                        vars)))
+      (declare (special sb!c::*emit-assembly-code-not-vops-p*))
+      (if sb!c::*emit-assembly-code-not-vops-p*
+          (sb!c::emit-assemble name options regs code)
+          (sb!c::emit-assemble-vop name options regs)))))
+
+(defun unintern-init-only-stuff ()
+  ;; This macro can't be used in the target.
+  (unintern 'sb!vm::define-assembly-routine "SB-VM"))

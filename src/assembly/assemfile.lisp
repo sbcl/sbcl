@@ -22,7 +22,6 @@
 ;;; COMPILE-FILE, but in fact it's arguably more like LOAD, even down
 ;;; to the return convention. It LOADs a file, then writes out any
 ;;; assembly code created by the process.
-#+sb-xc-host
 (defun assemble-file (name
                       &key
                       (output-file (make-pathname :defaults name
@@ -214,14 +213,3 @@
                        #!-(or hppa alpha) `(move ,(reg-spec-name res)
                                                  ,(reg-spec-temp res)))
                      results))))))
-
-(def!macro define-assembly-routine (name&options vars &body code)
-  (multiple-value-bind (name options)
-      (if (atom name&options)
-          (values name&options nil)
-          (values (car name&options)
-                  (cdr name&options)))
-    (let ((regs (mapcar (lambda (var) (apply #'parse-reg-spec var)) vars)))
-      (if *emit-assembly-code-not-vops-p*
-          (emit-assemble name options regs code)
-          (emit-assemble-vop name options regs)))))
