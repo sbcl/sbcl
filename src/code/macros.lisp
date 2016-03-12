@@ -24,6 +24,12 @@
 ;;;
 ;;; ASSERT-ERROR isn't defined until a later file because it uses the
 ;;; macro RESTART-CASE, which isn't defined until a later file.
+;;;
+;;; Don't redefine this during make-host-2, because first of all
+;;; the cross-compiler has a usable definition, but also, with sb-fasteval
+;;; enabled, the new definition would cause the host to signal a
+;;; style-warning that it doesn't know SB!INTERPRETER::FIND-LEXICAL-FUN.
+(let ()
 (sb!xc:defmacro assert (test-form &optional places datum &rest arguments
                             &environment env)
   #!+sb-doc
@@ -62,6 +68,13 @@
                    (let* ((name (first test-form))
                           (global-fun-p
                            (eq (info :function :kind name) :function)))
+                     ;; FIXME: this is too much digging into compiler internals.
+                     ;; I think it's just trying to express
+                     ;;    (NOT (MACRO-FUNCTION NAME ENV))
+                     ;; and doing a very unclear job of it.
+                     ;; [If the thing is macro, we mustn't evaluate subforms
+                     ;; to try to show them in an assertion failure message,
+                     ;; because the macro might not evaluate all its arguments]
                      (when (typecase env
                              (sb!kernel:lexenv
                               (let ((f (cdr (assoc name (sb!c::lexenv-funs env)))))
@@ -92,6 +105,7 @@
                     places)
           (go :try)
         :done))))
+)
 
 (defun assert-prompt (name value)
   (cond ((y-or-n-p "The old value of ~S is ~S.~
