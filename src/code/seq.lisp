@@ -747,34 +747,13 @@ many elements are copied."
       (apply #'sb!sequence:replace sequence1 sequence2 args))))
 
 ;;;; REVERSE
-
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro vector-reverse (sequence)
-  `(let ((length (length ,sequence)))
-     (declare (fixnum length))
-     (do ((forward-index 0 (1+ forward-index))
-          (backward-index (1- length) (1- backward-index))
-          (new-sequence (%make-sequence-like sequence length)))
-         ((= forward-index length) new-sequence)
-       (declare (fixnum forward-index backward-index))
-       (setf (aref new-sequence forward-index)
-             (aref ,sequence backward-index)))))
-
-(sb!xc:defmacro list-reverse-macro (sequence)
-  `(do ((new-list ()))
-       ((endp ,sequence) new-list)
-     (push (pop ,sequence) new-list)))
-
-) ; EVAL-WHEN
-
 (defun reverse (sequence)
   #!+sb-doc
   "Return a new sequence containing the same elements but in reverse order."
   (declare (explicit-check))
   (seq-dispatch-checking sequence
-    (list-reverse* sequence)
-    (vector-reverse* sequence)
+    (list-reverse sequence)
+    (vector-reverse sequence)
     ;; The type deriver says that LIST => LIST and VECTOR => VECTOR
     ;; but does not claim to know anything about extended-sequences.
     ;; So this could theoretically return any subtype of SEQUENCE
@@ -784,43 +763,57 @@ many elements are copied."
     ;; reversed. [Is that too weird? Make this EXTENDED-SEQUENCE maybe?]
     (the consed-sequence (values (sb!sequence:reverse sequence)))))
 
-;;; internal frobs
+(defun list-reverse (list)
+  (do ((new-list ()))
+      ((endp list) new-list)
+    (push (pop list) new-list)))
 
-(defun list-reverse* (sequence)
-  (list-reverse-macro sequence))
-
-(defun vector-reverse* (sequence)
-  (vector-reverse sequence))
+(defun vector-reverse (vector)
+  (declare (vector vector))
+  (let ((length (length vector)))
+    (with-array-data ((vector vector) (start) (end)
+                      :check-fill-pointer t)
+      (declare (ignore start))
+      (let* ((new-vector (make-vector-like vector length))
+             (getter (the function (svref %%data-vector-reffers%%
+                                          (%other-pointer-widetag vector))))
+             (setter (the function (svref %%data-vector-setters%%
+                                          (%other-pointer-widetag new-vector)))))
+        (declare (fixnum length))
+        (do ((forward-index 0 (1+ forward-index))
+             (backward-index (1- end) (1- backward-index)))
+            ((= forward-index length))
+          (declare (fixnum forward-index backward-index))
+          (funcall setter new-vector forward-index
+                   (funcall getter vector backward-index)))
+        new-vector))))
 
 ;;;; NREVERSE
 
-(eval-when (:compile-toplevel :execute)
+(defun list-nreverse (list)
+  (do ((1st (cdr list) (if (endp 1st) 1st (cdr 1st)))
+       (2nd list 1st)
+       (3rd '() 2nd))
+      ((atom 2nd) 3rd)
+    (rplacd 2nd 3rd)))
 
-(sb!xc:defmacro vector-nreverse (sequence)
-  `(let ((length (length (the vector ,sequence))))
-     (when (>= length 2)
-       (do ((left-index 0 (1+ left-index))
-            (right-index (1- length) (1- right-index)))
-           ((<= right-index left-index))
-         (declare (type index left-index right-index))
-         (rotatef (aref ,sequence left-index)
-                  (aref ,sequence right-index))))
-     ,sequence))
-
-(sb!xc:defmacro list-nreverse-macro (list)
-  `(do ((1st (cdr ,list) (if (endp 1st) 1st (cdr 1st)))
-        (2nd ,list 1st)
-        (3rd '() 2nd))
-       ((atom 2nd) 3rd)
-     (rplacd 2nd 3rd)))
-
-) ; EVAL-WHEN
-
-(defun list-nreverse* (sequence)
-  (list-nreverse-macro sequence))
-
-(defun vector-nreverse* (sequence)
-  (vector-nreverse sequence))
+(defun vector-nreverse (vector)
+  (declare (vector vector))
+  (when (> (length vector) 1)
+    (with-array-data ((vector vector) (start) (end)
+                      :check-fill-pointer t)
+      (let* ((tag (%other-pointer-widetag vector))
+             (getter (the function (svref %%data-vector-reffers%% tag)))
+             (setter (the function (svref %%data-vector-setters%% tag))))
+        (do ((left-index start (1+ left-index))
+             (right-index (1- end) (1- right-index)))
+            ((<= right-index left-index))
+          (declare (type index left-index right-index))
+          (let ((left (funcall getter vector left-index))
+                (right (funcall getter vector right-index)))
+            (funcall setter vector left-index right)
+            (funcall setter vector right-index left))))))
+  vector)
 
 (defun nreverse (sequence)
   #!+sb-doc
@@ -828,8 +821,8 @@ many elements are copied."
    is destroyed."
   (declare (explicit-check))
   (seq-dispatch-checking sequence
-    (list-nreverse* sequence)
-    (vector-nreverse* sequence)
+    (list-nreverse sequence)
+    (vector-nreverse sequence)
     ;; The type deriver for this is 'result-type-first-arg',
     ;; meaning it should return definitely an EXTENDED-SEQUENCE
     ;; and not a list or vector.
