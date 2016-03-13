@@ -91,6 +91,7 @@
                   *the-class-slot-object*
                   *the-class-structure-object*
                   *the-class-standard-object*
+                  *the-class-function*
                   *the-class-funcallable-standard-object*
                   *the-class-class*
                   *the-class-generic-function*

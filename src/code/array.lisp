@@ -1067,11 +1067,12 @@ of specialized arrays is supported."
   (declare (explicit-check))
   (flet ((oops (x)
            (fill-pointer-error vector x)))
-    (if (array-has-fill-pointer-p vector)
-        (if (> new (%array-available-elements vector))
-            (oops new)
-            (setf (%array-fill-pointer vector) new))
-        (oops nil))))
+    (cond ((not (array-has-fill-pointer-p vector))
+           (oops nil))
+          ((> new (%array-available-elements vector))
+           (oops new))
+          (t
+            (setf (%array-fill-pointer vector) new)))))
 
 ;;; FIXME: It'd probably make sense to use a MACROLET to share the
 ;;; guts of VECTOR-PUSH between VECTOR-PUSH-EXTEND. Such a macro
@@ -1168,17 +1169,18 @@ of specialized arrays is supported."
                     (array-data (data-vector-from-inits
                                  dimensions array-size element-type nil nil
                                  initialize initial-data)))
-               (if (adjustable-array-p array)
-                   (set-array-header array array-data array-size
-                                 (get-new-fill-pointer array array-size
-                                                       fill-pointer)
-                                 0 dimensions nil nil)
-                   (if (array-header-p array)
-                       ;; simple multidimensional or single dimensional array
+               (cond ((adjustable-array-p array)
+                      (set-array-header array array-data array-size
+                                        (get-new-fill-pointer array array-size
+                                                              fill-pointer)
+                                        0 dimensions nil nil))
+                     ((array-header-p array)
+                      ;; simple multidimensional or single dimensional array
                        (make-array dimensions
                                    :element-type element-type
-                                   :initial-contents initial-contents)
-                       array-data))))
+                                   :initial-contents initial-contents))
+                     (t
+                      array-data))))
           (displaced-to
              ;; We already established that no INITIAL-CONTENTS was supplied.
              (unless (or (eql element-type (array-element-type displaced-to))
@@ -1286,7 +1288,8 @@ of specialized arrays is supported."
      (when (> fill-pointer new-array-size)
        (error "can't supply a value for :FILL-POINTER (~S) that is larger ~
                    than the new length of the vector (~S)"
-              fill-pointer new-array-size)))))
+              fill-pointer new-array-size))
+     fill-pointer)))
 
 ;;; Destructively alter VECTOR, changing its length to NEW-LENGTH,
 ;;; which must be less than or equal to its current length. This can
@@ -1426,12 +1429,13 @@ function to be removed without further warning."
   ;; KLUDGE: Without TRULY-THE the system is not smart enough to figure out that
   ;; the return value is always of the known type.
   (truly-the (simple-array * (*))
-             (if (array-header-p array)
-                 (if (%array-displaced-p array)
-                     (error "~S cannot be used with displaced arrays. Use ~S instead."
-                            'array-storage-vector 'array-displacement)
-                     (%array-data-vector array))
-                 array)))
+             (cond ((not (array-header-p array))
+                    array)
+                   ((%array-displaced-p array)
+                    (error "~S cannot be used with displaced arrays. Use ~S instead."
+                           'array-storage-vector 'array-displacement))
+                   (t
+                    (%array-data-vector array)))))
 
 
 ;;;; ZAP-ARRAY-DATA for ADJUST-ARRAY
@@ -1454,12 +1458,12 @@ function to be removed without further warning."
          ;; INITIAL-ELEMENT-P are used when OLD-DATA and NEW-DATA are
          ;; EQ; in this case, a temporary must be used and filled
          ;; appropriately. specified initial-element.
-         (when initial-element-p
-           ;; FIXME: transforming this TYPEP to someting a bit faster
-           ;; would be a win...
-           (unless (typep initial-element element-type)
-             (error "~S can't be used to initialize an array of type ~S."
-                    initial-element element-type)))
+         ;; FIXME: transforming this TYPEP to someting a bit faster
+         ;; would be a win...
+         (unless (or (not initial-element-p)
+                     (typep initial-element element-type))
+           (error "~S can't be used to initialize an array of type ~S."
+                  initial-element element-type))
          (let ((temp (if initial-element-p
                          (make-array new-length :initial-element initial-element)
                          (make-array new-length))))

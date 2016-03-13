@@ -939,27 +939,27 @@
          (not (find-in-superclasses (find-class 'function) (list class))))))))
 
 (defun %update-cpl (class cpl)
-  (when (eq (class-of class) *the-class-standard-class*)
-    (when (find (find-class 'function) cpl)
-      (error 'cpl-protocol-violation :class class :cpl cpl)))
-  (when (eq (class-of class) *the-class-funcallable-standard-class*)
-    (unless (find (find-class 'function) cpl)
-      (error 'cpl-protocol-violation :class class :cpl cpl)))
-  (if (class-finalized-p class)
-      (unless (and (equal (class-precedence-list class) cpl)
+  (when (or (and
+             (eq (class-of class) *the-class-standard-class*)
+             (find *the-class-function* cpl))
+            (and (eq (class-of class) *the-class-funcallable-standard-class*)
+                 (not (and (find (find-class 'function) cpl)))))
+    (error 'cpl-protocol-violation :class class :cpl cpl))
+  (cond ((not (class-finalized-p class))
+         (setf (slot-value class '%class-precedence-list) cpl
+               (slot-value class 'cpl-available-p) t))
+        ((not (and (equal (class-precedence-list class) cpl)
                    (dolist (c cpl t)
                      (when (position :class (class-direct-slots c)
                                      :key #'slot-definition-allocation)
-                       (return nil))))
-        ;; comment from the old CMU CL sources:
-        ;;   Need to have the cpl setup before %update-lisp-class-layout
-        ;;   is called on CMU CL.
-        (setf (slot-value class '%class-precedence-list) cpl)
-        (setf (slot-value class 'cpl-available-p) t)
-        (%force-cache-flushes class))
-      (progn
-        (setf (slot-value class '%class-precedence-list) cpl)
-        (setf (slot-value class 'cpl-available-p) t)))
+                       (return nil)))))
+
+         ;; comment from the old CMU CL sources:
+         ;;   Need to have the cpl setup before %update-lisp-class-layout
+         ;;   is called on CMU CL.
+         (setf (slot-value class '%class-precedence-list) cpl
+               (slot-value class 'cpl-available-p) t)
+         (%force-cache-flushes class)))
   (update-class-can-precede-p cpl))
 
 (defun update-class-can-precede-p (cpl)

@@ -392,3 +392,8 @@
                    `(lambda ()
                       (adjust-array #(1 2 3) 3 :displaced-to #(4 5 6)))))
                  #(4 5 6))))
+
+(with-test (:name :adjust-array-fill-pointer)
+  (let ((array (make-array 10 :fill-pointer t)))
+    (assert (= (fill-pointer (adjust-array array 5 :fill-pointer 2))
+               2))))
