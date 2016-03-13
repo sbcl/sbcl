@@ -262,3 +262,14 @@
                       `(let ((it ,it)) (declare (ignorable it)) ,@body)
                       it)
                  (acond ,@rest)))))))
+
+;; This is not an 'extension', but is needed super early, so ....
+(defmacro sb!xc:defconstant (name value &optional (doc nil docp))
+  #!+sb-doc
+  "Define a global constant, saying that the value is constant and may be
+  compiled into code. If the variable already has a value, and this is not
+  EQL to the new value, the code is not portable (undefined behavior). The
+  third argument is an optional documentation string for the variable."
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (sb!c::%defconstant ',name ,value (sb!c:source-location)
+                         ,@(and docp `(',doc)))))

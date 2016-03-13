@@ -1091,6 +1091,7 @@ possibly temporarily, because it might be used internally."
                "!DEFGLOBAL" "!DEFPARAMETER" "!DEFVAR"
 
                ;; stuff for hinting to the compiler
+               "NAMED-DS-BIND"
                "NAMED-LAMBDA"
 
                ;; other variations on DEFFOO stuff useful for bootstrapping

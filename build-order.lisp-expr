@@ -95,10 +95,10 @@
  ("src/code/early-defbangmethod")
 
  ("src/code/defbangtype")
- ("src/code/defbangmacro")
  ("src/code/defbangconstant")
  ("src/code/early-constants") ; needs DEF!CONSTANT
 
+ ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/compiler/early-lexenv")
  ("src/compiler/early-globaldb")
  ("src/compiler/early-constantp")
@@ -130,9 +130,7 @@
  ("src/code/condition-boot" :not-host)
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/parse-lambda-list")
- ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
- ("src/code/early-alieneval")  ; for funs and vars needed at build and run time
 
  ("src/code/specializable-array")
 
@@ -171,6 +169,7 @@
  ;; accessors and inline functions defined here can be compiled inline
  ;; later. (Avoiding full calls increases efficiency)
  ("src/code/type-class")
+ ("src/code/early-alieneval")  ; for funs and vars needed at build and run time
 
  ("src/code/cas" :not-host)
  ("src/compiler/early-c")
@@ -344,7 +343,7 @@
 
  ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro")
- ("src/code/force-delayed-defbangmacros")
+ ("src/code/destructuring-bind")
 
  ;; for e.g. !DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
@@ -754,7 +753,6 @@
  ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
  ;; for them
  ("src/code/defboot")
- ("src/code/destructuring-bind")
  ("src/code/setf")
  ("src/code/macros")
  ("src/code/loop")

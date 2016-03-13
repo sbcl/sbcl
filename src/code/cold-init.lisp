@@ -497,7 +497,7 @@ process to continue normally."
 (defun unintern-init-only-stuff ()
   (let ((this-package (find-package "SB-INT")))
     ;; For some reason uninterning these:
-    ;;    DEF!TYPE DEF!CONSTANT DEF!MACRO DEF!STRUCT
+    ;;    DEF!TYPE DEF!CONSTANT DEF!STRUCT
     ;; does not work, they stick around as uninterned symbols.
     ;; Some other macros must expand into them. Ugh.
     (dolist (s '(defenum defun-cached with-globaldb-name

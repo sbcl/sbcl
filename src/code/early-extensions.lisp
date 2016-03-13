@@ -278,7 +278,7 @@
 ;;; INITIAL-VALUE is supplied for COLLECT, the stuff will be RPLACD'd
 ;;; onto the end. Note that FUNCTION may be anything that can appear
 ;;; in the functional position, including macros and lambdas.
-(def!macro collect (collections &body body)
+(defmacro collect (collections &body body)
   (let ((macros ())
         (binds ())
         (ignores ()))
@@ -468,7 +468,7 @@
 ;;; Of course, since some other host Lisps don't seem to think that's
 ;;; acceptable syntax anyway, you're pretty much prevented from writing it.
 ;;;
-(def!macro binding* ((&rest clauses) &body body)
+(defmacro binding* ((&rest clauses) &body body)
   (unless clauses ; wrap in LET to preserve non-toplevelness
     (return-from binding* `(let () ,@body)))
   (multiple-value-bind (body decls) (parse-body body nil)

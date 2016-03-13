@@ -12,8 +12,8 @@
 ;;;; the DEF!CONSTANT macro
 
 ;;; FIXME: This code was created by cut-and-paste from the
-;;; corresponding code for DEF!TYPE. DEF!CONSTANT, DEF!TYPE and
-;;; DEF!MACRO are currently very parallel, and if we ever manage to
+;;; corresponding code for DEF!TYPE. DEF!CONSTANT and DEF!TYPE
+;;; are currently very parallel, and if we ever manage to
 ;;; rationalize the use of UNCROSS in the cross-compiler, they should
 ;;; become completely parallel, at which time they should be merged to
 ;;; eliminate the duplicate code.
@@ -98,4 +98,3 @@
                               expr)
                          (sb!c:source-location)
                          ,@(when doc (list doc)))))
-

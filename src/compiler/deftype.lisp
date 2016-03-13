@@ -27,7 +27,11 @@
      `(type-expander ,name))))
 
 ;; Can't have a function called SIMPLE-TYPE-ERROR or TYPE-ERROR...
-(declaim (ftype (sfunction (t t t &rest t) nil) bad-type))
+;; FUNCTION returning NIL is as good as SFUNCTION returning NIL,
+;; so we don't care that this can't use (FTYPE (SFUNCTION ...)).
+;; But do we really need this? It's not highly useful.
+(declaim (ftype (function (t t t &rest t) #+(and sb-xc-host ccl) *
+                                          #-(and sb-xc-host ccl) nil) bad-type))
 (defun bad-type (datum type control &rest arguments)
   (error 'simple-type-error
          :datum datum
@@ -36,11 +40,14 @@
          :format-arguments arguments))
 
 (defvar !*xc-processed-deftypes* nil)
-(def!macro sb!xc:deftype (&whole form name lambda-list &body body
-                          &environment env)
+(defmacro sb!xc:deftype (&whole form name lambda-list &body body
+                         &environment env)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
+  ;; In SBCL it's a warning that these aren't inlined unless so declared.
+  ;; But in CCL it's an error to declare an unknown function notinline.
+  #+(or sb-xc (not ccl)) (declare (notinline sb!xc:constantp constant-form-value))
   (unless (symbolp name)
     (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
               form))

@@ -1142,7 +1142,7 @@
     #+sb-xc-host
     (let ((compname (component-name (node-component node))))
       ;; Don't care too much about macro performance.
-      (unless (and (stringp compname) (string/= compname "DEF!MACRO"))
+      (unless (and (stringp compname) (string/= compname "DEFMACRO"))
         ;; Catch FOO and (SETF FOO) both.
         (let ((stem (if (atom fname) fname (second fname))))
           (when (member stem

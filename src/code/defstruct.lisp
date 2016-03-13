@@ -1915,11 +1915,9 @@ or they must be declared locally notinline at each call site.~@:>")
              `(defun ,predicate (,object-gensym)
                 (typep ,object-gensym ',class-name)))
 
-         ;; Usually we AVER instead of ASSERT, but one alternate-metaclass
-         ;; structure definition is cross-compiled before AVER is a known macro.
-         ;; It could be a def!macro perhaps, but ASSERT works just fine here
-         ;; without adding to image size, since these toplevel forms
-         ;; belong to code that is discarded after cold-init.
+         ;; Usually we AVER instead of ASSERT, but AVER isn't defined yet.
+         ;; A naive reading of 'build-order' suggests it is,
+         ;; but due to def!struct delay voodoo, it isn't.
          (assert (null (symbol-value '*defstruct-hooks*)))))))
 
 ;;;; finalizing bootstrapping

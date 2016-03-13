@@ -252,7 +252,7 @@ return NIL. Can be set with SETF when ENV is NIL."
 ;;; should add some code to monitor this and make sure that nothing is
 ;;; unintentionally being sent to never never land this way.
 ;;; FIXME: Rename FDOCUMENTATION to BDOCUMENTATION, by analogy with
-;;; DEF!STRUCT and DEF!MACRO and so forth. And consider simply saving
+;;; DEF!STRUCT and so forth. And consider simply saving
 ;;; all the BDOCUMENTATION entries in a *BDOCUMENTATION* hash table
 ;;; and slamming them into PCL once PCL gets going.
 (defun (setf fdocumentation) (string name doc-type)

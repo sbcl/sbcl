@@ -1036,16 +1036,6 @@
            ;; Typecheck the next cell so that calling code doesn't get an atom.
            (return (the cons (cdr plist)))))))
 
-;;; This is a variant of destructuring-bind that provides the name
-;;; of the containing construct in generated error messages.
-(def!macro named-ds-bind (context lambda-list data &body body &environment env)
-  (declare (ignorable env))
-  `(binding* ,(expand-ds-bind lambda-list data t nil context
-                              (and (eq (car context) :macro)
-                                   (eq (cddr context) 'deftype)
-                                   ''*))
-     ,@body))
-
 ;;; Make a lambda expression that receives an s-expression, destructures it
 ;;; according to LAMBDA-LIST, and executes BODY.
 ;;; NAME and KIND provide error-reporting context.

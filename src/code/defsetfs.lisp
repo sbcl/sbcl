@@ -239,23 +239,23 @@
               `(getf ,get ,@call-args))))
 
 (define-setf-expander values (&rest places &environment env)
-  (collect ((setters) (getters))
-    (let ((all-dummies '())
-          (all-vals '())
-          (newvals '()))
-      (dolist (place places)
-        (multiple-value-bind (dummies vals newval setter getter)
-            (sb!xc:get-setf-expansion place env)
-          ;; ANSI 5.1.2.3 explains this logic quite precisely.  --
-          ;; CSR, 2004-06-29
-          (setq all-dummies (append all-dummies dummies (cdr newval))
-                all-vals (append all-vals vals
-                                 (mapcar (constantly nil) (cdr newval)))
-                newvals (append newvals (list (car newval))))
-          (setters setter)
-          (getters getter)))
-      (values all-dummies all-vals newvals
-              `(values ,@(setters)) `(values ,@(getters))))))
+  ;; KLUDGE: don't use COLLECT - it gets defined later.
+  ;; It could be potentially be defined earlier if it were important,
+  ;; but sidestepping it this one time wasn't so difficult.
+  (let (all-dummies all-vals newvals setters getters)
+    (dolist (place places)
+      (multiple-value-bind (dummies vals newval setter getter)
+          (sb!xc:get-setf-expansion place env)
+        ;; ANSI 5.1.2.3 explains this logic quite precisely.  --
+        ;; CSR, 2004-06-29
+        (setq all-dummies (append all-dummies dummies (cdr newval))
+              all-vals (append all-vals vals
+                               (mapcar (constantly nil) (cdr newval)))
+              newvals (append newvals (list (car newval))))
+        (push setter setters)
+        (push getter getters)))
+    (values all-dummies all-vals newvals
+            `(values ,@(nreverse setters)) `(values ,@(nreverse getters)))))
 
 ;;; CMU CL had a comment here that:
 ;;;   Evil hack invented by the gnomes of Vassar Street (though not as evil as
