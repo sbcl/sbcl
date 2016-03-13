@@ -76,7 +76,7 @@
 (let ((fname "alien-bug-2004-10-11.tmp.lisp"))
   (unwind-protect
        (progn
-         (with-open-file (f fname :direction :output)
+         (with-open-file (f fname :direction :output :if-exists :supersede)
            (mapc (lambda (form) (print form f))
                  '((defpackage :alien-bug
                      (:use :cl :sb-alien))
