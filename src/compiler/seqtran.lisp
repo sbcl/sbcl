@@ -1917,3 +1917,15 @@
       `(lambda ,gensyms
          (declare (ignore ,@ignored))
          (append ,@arguments)))))
+
+(deftransform reverse ((sequence) (vector) * :important nil)
+  `(sb!impl::vector-reverse sequence))
+
+(deftransform reverse ((sequence) (list) * :important nil)
+  `(sb!impl::list-reverse sequence))
+
+(deftransform nreverse ((sequence) (vector) * :important nil)
+  `(sb!impl::vector-nreverse sequence))
+
+(deftransform nreverse ((sequence) (list) * :important nil)
+  `(sb!impl::list-nreverse sequence))
