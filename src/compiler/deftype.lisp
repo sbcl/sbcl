@@ -53,8 +53,6 @@
               form))
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body t)
-        ;; FIXME: CONSTANTP would need to understand backquote a little better
-        ;; to be of any help in expressions such as `(integer 1 ,max-foo).
         (acond ((and (not lambda-list) (not decls)
                     (let ((expr `(progn ,@forms)))
                       ;; While CONSTANTP works early, %MACROEXPAND does not,

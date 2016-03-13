@@ -14,6 +14,10 @@
 (!defvar *special-constant-variables* nil)
 
 (defun %constantp (form environment envp)
+  ;; Pick off quasiquote prior to macroexpansion.
+  (when (typep form '(cons (eql quasiquote) (cons t null)))
+    (return-from %constantp
+      (constant-quasiquote-form-p (cadr form) environment envp)))
   (let ((form (if envp
                   (%macroexpand form environment)
                   form)))
@@ -30,8 +34,21 @@
              answer)))
       (t t))))
 
+(defun constant-quasiquote-form-p (expr environment envp)
+  ;; This is an utter cinch because we haven't macroexpanded.
+  ;; Parse just enough to recognize (DEFTYPE <T2> () (<T1> ,THING)) etc.
+  (named-let recurse ((expr expr))
+    (cond ((atom expr)
+           (cond ((comma-p expr)
+                  (%constantp (comma-expr expr) environment envp))
+                 ((simple-vector-p expr) (every #'recurse expr))
+                 (t)))
+          ((eql (car expr) 'quasiquote) nil) ; give up
+          (t (and (recurse (car expr)) (recurse (cdr expr)))))))
+
 (defun %constant-form-value (form environment envp)
-  (let ((form (if envp
+  (let ((form (if (or envp
+                      (typep form '(cons (eql quasiquote) (cons t null))))
                   (%macroexpand form environment)
                   form)))
     (typecase form
