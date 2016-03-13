@@ -603,6 +603,8 @@ of specialized arrays is supported."
 (macrolet ((def (name table-name)
              `(progn
                 (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)))
+                (declaim (type (simple-array function (,(1+ sb!vm:widetag-mask)))
+                               ,table-name))
                 (defmacro ,name (array-var)
                   `(the function
                      (let ((tag 0))
