@@ -8,33 +8,39 @@
 ;;;; DEFCAS, and #'(CAS ...) functions -- making things mostly isomorphic with
 ;;;; SETF.
 
-;;; This is what it all comes down to.
-(defmacro cas (place old new &environment env)
-  #!+sb-doc
-  "Synonym for COMPARE-AND-SWAP.
-
-Additionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
-define CAS-functions analogously to SETF-functions:
-
-  (defvar *foo* nil)
-
-  (defun (cas foo) (old new)
-    (cas (symbol-value '*foo*) old new))
-
-First argument of a CAS function is the expected old value, and the second
-argument of is the new value. Note that the system provides no automatic
-atomicity for CAS functions, nor can it verify that they are atomic: it is up
-to the implementor of a CAS function to ensure its atomicity.
-
-EXPERIMENTAL: Interface subject to change."
-  (multiple-value-bind (temps place-args old-temp new-temp cas-form)
-      (get-cas-expansion place env)
-    `(let* (,@(mapcar #'list temps place-args)
-            (,old-temp ,old)
-            (,new-temp ,new))
-       ,cas-form)))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
+(defun expand-structure-slot-cas (info name place)
+  (let* ((dd (car info))
+         (structure (dd-name dd))
+         (slotd (cdr info))
+         (index (dsd-index slotd))
+         (type (dsd-type slotd))
+         (casser
+          (case (dsd-raw-type slotd)
+            ((t) '%instance-cas)
+            #!+(or x86 x86-64)
+            ((word) '%raw-instance-cas/word))))
+    (unless casser
+      (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
+                for a typed slot: ~S"
+             place))
+    (when (dsd-read-only slotd)
+      (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
+                for a read-only slot: ~S"
+             place))
+    (destructuring-bind (op arg) place
+      (aver (eq op name))
+      (with-unique-names (instance old new)
+        (values (list instance)
+                (list `(the ,structure ,arg))
+                old
+                new
+                `(truly-the (values ,type &optional)
+                            (,casser ,instance ,index
+                             (the ,type ,old)
+                             (the ,type ,new)))
+                `(,op ,instance))))))
+
 (defun get-cas-expansion (place &optional environment)
   #!+sb-doc
   "Analogous to GET-SETF-EXPANSION. Returns the following six values:
@@ -113,38 +119,33 @@ EXPERIMENTAL: Interface subject to change."
                  (values vars vals old new
                          `(funcall #'(cas ,name) ,old ,new ,@args)
                          `(,name ,@args))))))))))
+)
 
-(defun expand-structure-slot-cas (info name place)
-  (let* ((dd (car info))
-         (structure (dd-name dd))
-         (slotd (cdr info))
-         (index (dsd-index slotd))
-         (type (dsd-type slotd))
-         (casser
-          (case (dsd-raw-type slotd)
-            ((t) '%instance-cas)
-            #!+(or x86 x86-64)
-            ((word) '%raw-instance-cas/word))))
-    (unless casser
-      (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
-                for a typed slot: ~S"
-             place))
-    (when (dsd-read-only slotd)
-      (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
-                for a read-only slot: ~S"
-             place))
-    (destructuring-bind (op arg) place
-      (aver (eq op name))
-      (with-unique-names (instance old new)
-        (values (list instance)
-                (list `(the ,structure ,arg))
-                old
-                new
-                `(truly-the (values ,type &optional)
-                            (,casser ,instance ,index
-                             (the ,type ,old)
-                             (the ,type ,new)))
-                `(,op ,instance)))))))
+;;; This is what it all comes down to.
+(defmacro cas (place old new &environment env)
+  #!+sb-doc
+  "Synonym for COMPARE-AND-SWAP.
+
+Additionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
+define CAS-functions analogously to SETF-functions:
+
+  (defvar *foo* nil)
+
+  (defun (cas foo) (old new)
+    (cas (symbol-value '*foo*) old new))
+
+First argument of a CAS function is the expected old value, and the second
+argument of is the new value. Note that the system provides no automatic
+atomicity for CAS functions, nor can it verify that they are atomic: it is up
+to the implementor of a CAS function to ensure its atomicity.
+
+EXPERIMENTAL: Interface subject to change."
+  (multiple-value-bind (temps place-args old-temp new-temp cas-form)
+      (get-cas-expansion place env)
+    `(let* (,@(mapcar #'list temps place-args)
+            (,old-temp ,old)
+            (,new-temp ,new))
+       ,cas-form)))
 
 (defmacro define-cas-expander (accessor lambda-list &body body)
   #!+sb-doc

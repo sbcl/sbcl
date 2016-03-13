@@ -70,7 +70,13 @@
         (prin1 (sb!c:label-id label) stream))
       (format stream "L~D" (sb!c:label-id label))))
 
-(defmacro sb!vm::define-assembly-routine (name&options vars &body code)
+;;; Not only can DEFINE-ASSEMBLY-ROUTINE not work in the target,
+;;; the cross-compiler never sees a DEFUN for any of the helper functions
+;;; that are called within, and therefore would issue "unknown function"
+;;; warnings. So we avoid letting it see a load-time definition of the macro.
+(eval-when (:compile-toplevel #-sb-xc :load-toplevel :execute)
+(#-sb-xc defmacro #+sb-xc sb!xc:defmacro sb!vm::define-assembly-routine
+    (name&options vars &body code)
   (multiple-value-bind (name options)
       (if (atom name&options)
           (values name&options nil)
@@ -80,8 +86,4 @@
       (declare (special sb!c::*emit-assembly-code-not-vops-p*))
       (if sb!c::*emit-assembly-code-not-vops-p*
           (sb!c::emit-assemble name options regs code)
-          (sb!c::emit-assemble-vop name options regs)))))
-
-(defun unintern-init-only-stuff ()
-  ;; This macro can't be used in the target.
-  (unintern 'sb!vm::define-assembly-routine "SB-VM"))
+          (sb!c::emit-assemble-vop name options regs))))))

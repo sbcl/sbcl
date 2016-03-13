@@ -211,6 +211,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; times as there are calls to the function - not very defensible
 ;; as a design choice, but just an accident of the particular implementation.
 ;;
+(let ()
 (defmacro compile-file-position (&whole this-form)
   #!+sb-doc
   "Return character position of this macro invocation or NIL if unavailable."
@@ -224,6 +225,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
   #!+sb-doc
   "Return line# and column# of this macro invocation as multiple values."
   (compute-compile-file-position this-form t))
+)
 
 (defun compute-compile-file-position (this-form as-line/col-p)
   (let (file-info stream charpos)

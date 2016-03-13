@@ -1053,6 +1053,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 
 ;;;; interface (not public, yet) for alien callbacks
 
+(let ()
 (defmacro alien-callback (specifier function &environment env)
   #!+sb-doc
   "Returns an alien-value with of alien ftype SPECIFIER, that can be passed to
@@ -1072,7 +1073,7 @@ one."
                                               ',(alien-callback-lisp-wrapper-lambda
                                                  specifier result-type argument-types env))))
                            ,call-type)
-      ',(parse-alien-type specifier env))))
+      ',(parse-alien-type specifier env)))))
 
 (defun alien-callback-p (alien)
   #!+sb-doc
@@ -1129,6 +1130,7 @@ callback signal an error."
 ;;;
 ;;; For lambdas that result in simple-funs we get the callback from
 ;;; the cache on subsequent calls.
+(let ()
 (defmacro alien-lambda (result-type typed-lambda-list &body forms)
   (multiple-value-bind (specifier lambda-list)
       (parse-callback-specification result-type typed-lambda-list)
@@ -1148,3 +1150,4 @@ the alien callback for that function with the given alien type."
     `(progn
        (defun ,name ,lambda-list ,@forms)
        (defparameter ,name (alien-callback ,specifier #',name)))))
+)
