@@ -182,7 +182,7 @@
   "Return a sequence of the same type as SEQUENCE and the given LENGTH."
   `(seq-dispatch ,sequence
      (make-list ,length)
-     (make-array ,length :element-type (array-element-type ,sequence))
+     (make-vector-like ,sequence ,length)
      (sb!sequence:make-sequence-like ,sequence ,length)))
 
 (sb!xc:defmacro bad-sequence-type-error (type-spec)
@@ -1939,73 +1939,88 @@ many elements are copied."
 ;;;; SUBSTITUTE
 
 (defun list-substitute* (pred new list start end count key test test-not old)
-  (declare (fixnum start end count))
+  (declare (fixnum start end count)
+           (type (or null function) key)
+           (optimize speed))
   (let* ((result (list nil))
+         (test (or test-not test))
+         (test-not (or test-not
+                       (eq pred 'if-not)))
          elt
          (splice result)
          (list list))      ; Get a local list for a stepper.
+    (declare (function test))
     (do ((index 0 (1+ index)))
         ((= index start))
       (declare (fixnum index))
-      (setq splice (cdr (rplacd splice (list (car list)))))
-      (setq list (cdr list)))
+      (setf splice (cdr (rplacd splice (list (car list))))
+            list (cdr list)))
     (do ((index start (1+ index)))
         ((or (= index end) (null list) (= count 0)))
       (declare (fixnum index))
-      (setq elt (car list))
-      (setq splice
+      (setf elt (car list)
+            splice
             (cdr (rplacd splice
                          (list
-                          (cond
-                           ((case pred
-                                   (normal
-                                    (if test-not
-                                        (not
-                                         (funcall test-not old (apply-key key elt)))
-                                        (funcall test old (apply-key key elt))))
-                                   (if (funcall test (apply-key key elt)))
-                                   (if-not (not (funcall test (apply-key key elt)))))
-                            (decf count)
-                            new)
-                                (t elt))))))
-      (setq list (cdr list)))
+                          (cond ((let* ((elt (apply-key key elt))
+                                        (value (if (eq pred 'normal)
+                                                   (funcall test old elt)
+                                                   (funcall test elt))))
+                                   (if test-not
+                                       (not value)
+                                       value))
+                                 (decf count)
+                                 new)
+                                (t elt)))))
+            list (cdr list)))
     (do ()
         ((null list))
-      (setq splice (cdr (rplacd splice (list (car list)))))
-      (setq list (cdr list)))
+      (setf splice (cdr (rplacd splice (list (car list))))
+            list (cdr list)))
     (cdr result)))
 
 ;;; Replace old with new in sequence moving from left to right by incrementer
 ;;; on each pass through the loop. Called by all three substitute functions.
 (defun vector-substitute* (pred new sequence incrementer left right length
                            start end count key test test-not old)
-  (declare (fixnum start count end incrementer right))
-  (let ((result (%make-sequence-like sequence length))
-        (index left))
-    (declare (fixnum index))
+  (declare (fixnum start count end incrementer right)
+           (type (or null function) key))
+  (let* ((result (make-vector-like sequence length))
+         (getter (the function (svref %%data-vector-reffers%%
+                                      (%other-pointer-widetag sequence))))
+         (setter (the function (svref %%data-vector-setters%%
+                                      (%other-pointer-widetag result))))
+         (test (or test-not test))
+         (test-not (or test-not
+                       (eq pred 'if-not)))
+         (index left))
+    (declare (fixnum index)
+             (function test))
     (do ()
         ((= index start))
-      (setf (aref result index) (aref sequence index))
-      (setq index (+ index incrementer)))
+      (funcall setter result index
+               (funcall getter sequence index))
+      (incf index incrementer))
     (do ((elt))
         ((or (= index end) (= count 0)))
-      (setq elt (aref sequence index))
-      (setf (aref result index)
-            (cond ((case pred
-                          (normal
-                            (if test-not
-                                (not (funcall test-not old (apply-key key elt)))
-                                (funcall test old (apply-key key elt))))
-                          (if (funcall test (apply-key key elt)))
-                          (if-not (not (funcall test (apply-key key elt)))))
-                   (setq count (1- count))
-                   new)
-                  (t elt)))
-      (setq index (+ index incrementer)))
+      (setf elt (funcall getter sequence index))
+      (funcall setter result index
+               (cond ((let* ((elt (apply-key key elt))
+                             (value (if (eq pred 'normal)
+                                        (funcall test old elt)
+                                        (funcall test elt))))
+                        (if test-not
+                            (not value)
+                            value))
+                      (decf count)
+                      new)
+                     (t elt)))
+      (incf index incrementer))
     (do ()
         ((= index right))
-      (setf (aref result index) (aref sequence index))
-      (setq index (+ index incrementer)))
+      (funcall setter result index
+               (funcall getter sequence index))
+      (incf index incrementer))
     result))
 
 (eval-when (:compile-toplevel :execute)
@@ -2114,30 +2129,41 @@ many elements are copied."
     (apply #'sb!sequence:nsubstitute new old sequence args)))
 
 (defun nlist-substitute* (new old sequence test test-not start end count key)
-  (declare (fixnum start count end))
-  (do ((list (nthcdr start sequence) (cdr list))
+  (declare (fixnum start count end)
+           (type (or null function) key))
+  (do ((test (or test-not test))
+       (list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
-    (declare (fixnum index))
-    (when (if test-not
-              (not (funcall test-not old (apply-key key (car list))))
-              (funcall test old (apply-key key (car list))))
-      (rplaca list new)
-      (setq count (1- count)))))
+    (declare (fixnum index)
+             (function test))
+    (let ((value (funcall test old (apply-key key (car list)))))
+     (when (if test-not
+               (not value)
+               value)
+       (rplaca list new)
+       (decf count)))))
 
 (defun nvector-substitute* (new old sequence incrementer
                             test test-not start end count key)
-  (declare (fixnum start incrementer count end))
-  (do ((index start (+ index incrementer)))
-      ((or (= index end) (= count 0)) sequence)
-    (declare (fixnum index))
-    (when (if test-not
-              (not (funcall test-not
-                            old
-                            (apply-key key (aref sequence index))))
-              (funcall test old (apply-key key (aref sequence index))))
-      (setf (aref sequence index) new)
-      (setq count (1- count)))))
+  (declare (fixnum start count end)
+           (type (integer -1 1) incrementer)
+           (type (or null function) key))
+  (let* ((test (or test-not test))
+         (tag (%other-pointer-widetag sequence))
+         (getter (the function (svref %%data-vector-reffers%% tag)))
+         (setter (the function (svref %%data-vector-setters%% tag))))
+    (declare (function test))
+    (do ((index start (+ index incrementer)))
+        ((or (= index end) (= count 0)) sequence)
+      (declare (fixnum index))
+      (let* ((value (apply-key key (funcall getter sequence index)))
+             (test (and (funcall test old value) 0)))
+        (when (if test-not
+                  (not test)
+                  test)
+          (funcall setter sequence index new)
+          (decf count))))))
 
 ;;;; NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT
 
@@ -2168,24 +2194,32 @@ many elements are copied."
     (apply #'sb!sequence:nsubstitute-if new predicate sequence args)))
 
 (defun nlist-substitute-if* (new test sequence start end count key)
-  (declare (type fixnum end)
+  (declare (type fixnum start end count)
+           (type (or null function) key)
            (type function test)) ; coercion is done by caller
   (do ((list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
+    (declare (fixnum index))
     (when (funcall test (apply-key key (car list)))
       (rplaca list new)
-      (setq count (1- count)))))
+      (decf count))))
 
 (defun nvector-substitute-if* (new test sequence incrementer
                                start end count key)
-  (declare (type fixnum end)
+  (declare (type fixnum end count)
+           (type (integer -1 1) incrementer)
+           (type (or null function) key)
            (type function test)) ; coercion is done by caller
-  (do ((index start (+ index incrementer)))
-      ((or (= index end) (= count 0)) sequence)
-    (when (funcall test (apply-key key (aref sequence index)))
-      (setf (aref sequence index) new)
-      (setq count (1- count)))))
+  (let* ((tag (%other-pointer-widetag sequence))
+         (getter (the function (svref %%data-vector-reffers%% tag)))
+         (setter (the function (svref %%data-vector-setters%% tag))))
+    (do ((index start (+ index incrementer)))
+        ((or (= index end) (= count 0)) sequence)
+      (declare (fixnum index))
+      (when (funcall test (apply-key key (funcall getter sequence index)))
+        (funcall setter sequence index new)
+        (decf count)))))
 
 (define-sequence-traverser nsubstitute-if-not
     (new predicate sequence &rest args &key from-end start end count key)
@@ -2214,24 +2248,32 @@ many elements are copied."
     (apply #'sb!sequence:nsubstitute-if-not new predicate sequence args)))
 
 (defun nlist-substitute-if-not* (new test sequence start end count key)
-  (declare (type fixnum end)
-           (type function test)) ; coercion is done by caller
+  (declare (type fixnum start end count)
+           (type (or null function) key)
+           (type function test))        ; coercion is done by caller
   (do ((list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
+    (declare (fixnum index))
     (when (not (funcall test (apply-key key (car list))))
       (rplaca list new)
       (decf count))))
 
 (defun nvector-substitute-if-not* (new test sequence incrementer
                                    start end count key)
-  (declare (type fixnum end)
-           (type function test)) ; coercion is done by caller
-  (do ((index start (+ index incrementer)))
-      ((or (= index end) (= count 0)) sequence)
-    (when (not (funcall test (apply-key key (aref sequence index))))
-      (setf (aref sequence index) new)
-      (decf count))))
+  (declare (type fixnum end count)
+           (type (integer -1 1) incrementer)
+           (type (or null function) key)
+           (type function test))        ; coercion is done by caller
+  (let* ((tag (%other-pointer-widetag sequence))
+         (getter (the function (svref %%data-vector-reffers%% tag)))
+         (setter (the function (svref %%data-vector-setters%% tag))))
+    (do ((index start (+ index incrementer)))
+        ((or (= index end) (= count 0)) sequence)
+      (declare (fixnum index))
+      (when (not (funcall test (apply-key key (funcall getter sequence index))))
+        (funcall setter sequence index new)
+        (decf count)))))
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 

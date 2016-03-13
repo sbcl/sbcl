@@ -364,6 +364,10 @@
     (let ((widetag (%other-pointer-widetag array)))
       (make-case))))
 
+(defun make-vector-like (vector length)
+  (let ((widetag (array-underlying-widetag vector)))
+    (%make-array length widetag (aref %%simple-array-n-bits%% widetag))))
+
 ;; Complain in various ways about wrong :INITIAL-foo arguments,
 ;; returning the two initialization arguments needed for DATA-VECTOR-FROM-INITS.
 (defun validate-array-initargs (element-p element contents-p contents displaced)
