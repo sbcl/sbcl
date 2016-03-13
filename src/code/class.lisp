@@ -1223,16 +1223,25 @@ between the ~A definition and the ~A definition"
       (let ((inherits-list (if (eq name t)
                                ()
                                (cons t (reverse inherits))))
-            (classoid (make-built-in-classoid
-                       :name name
-                       :translation (if trans-p :initializing nil)
-                       :direct-superclasses
-                       (if (eq name t)
-                           nil
-                           (mapcar #'find-classoid direct-superclasses)))))
-        (mark-ctype-interned classoid)
-        (setf (info :type :kind name) :primitive
-              (classoid-cell-classoid (find-classoid-cell name :create t)) classoid)
+            (classoid
+             (acond #+sb-xc ; genesis dumps some classoid literals
+                    ((find-classoid name nil)
+                     ;; Unseal it so that REGISTER-LAYOUT doesn't warn
+                     (setf (classoid-state it) nil)
+                     it)
+                    (t
+                     (setf (classoid-cell-classoid
+                            (find-classoid-cell name :create t))
+                           (mark-ctype-interned
+                            (make-built-in-classoid
+                             :name name
+                             :translation (if trans-p :initializing nil)
+                             :direct-superclasses
+                             (if (eq name t)
+                                 nil
+                                 (mapcar #'find-classoid
+                                         direct-superclasses)))))))))
+        (setf (info :type :kind name) :primitive)
         (unless trans-p
           (setf (info :type :builtin name) classoid))
         (let* ((inherits-vector

@@ -180,6 +180,7 @@
  ("src/compiler/info-vector")
  ("src/compiler/globaldb")
  ("src/code/primordial-type")
+ ("src/code/early-classoid")
 
  ("src/code/sysmacs" :not-host)
 
@@ -309,7 +310,6 @@
  ("src/compiler/macros")
 
  ("src/compiler/constantp")
- ("src/code/early-classoid")
  ("src/compiler/info-functions")
 
  ("src/compiler/generic/vm-macs")

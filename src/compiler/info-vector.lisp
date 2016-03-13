@@ -84,6 +84,14 @@
 
 (declaim (ftype (sfunction (t) (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
                 globaldb-sxhashoid))
+
+;;; In the host, we use the host's sxhash, but ensure that the result
+;;; is a target fixnum. The definition for the target occurs later, as it
+;;; relies on MIX, which is inlined.
+#+sb-xc-host
+(defun globaldb-sxhashoid (name)
+  (logand (sxhash name) sb!xc:most-positive-fixnum))
+
 (defstruct (info-hashtable (:conc-name info-env-))
   (storage (make-info-storage 30) :type simple-vector)
   (comparator #'equal :type function)

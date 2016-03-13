@@ -974,6 +974,7 @@ expansion happened."
                (typep (numeric-type-high ctype) '(or float (cons float))))
            nil
            t))
+      (built-in-classoid t)
       (classoid nil)
       ;; HAIRY is just an s-expression, so it's dumpable. Same for simd-pack
       ((or named-type character-set-type hairy-type #!+sb-simd-pack simd-pack-type)

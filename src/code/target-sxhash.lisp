@@ -452,3 +452,28 @@
                      (mixf result (number-psxhash (realpart key)))
                      (mixf result (number-psxhash (imagpart key)))
                      result))))))
+
+;;; Semantic equivalent of SXHASH, but better-behaved for function names.
+;;; It performs more work by not cutting off as soon in the CDR direction.
+;;; More work here equates to less work in the global hashtable.
+;;; To wit: (eq (sxhash '(foo a b c bar)) (sxhash '(foo a b c d))) => T
+;;; but the corresponding globaldb-sxhashoids differ.
+(defun sb!c::globaldb-sxhashoid (name)
+  (locally
+      (declare (optimize (safety 0))) ; after the argc check
+    ;; TRAVERSE will walk across more cons cells than RECURSE will descend.
+    ;; That's why this isn't just one self-recursive function.
+    (labels ((traverse (accumulator x length-limit)
+               (declare (fixnum length-limit))
+               (cond ((atom x) (mix (sxhash x) accumulator))
+                     ((zerop length-limit) accumulator)
+                     (t (traverse (mix (recurse (car x) 4) accumulator)
+                                  (cdr x) (1- length-limit)))))
+             (recurse (x depthoid) ; depthoid = a blend of level and length
+               (declare (fixnum depthoid))
+               (cond ((atom x) (sxhash x))
+                     ((zerop depthoid)
+                      #.(logand sb!xc:most-positive-fixnum #36Rglobaldbsxhashoid))
+                     (t (mix (recurse (car x) (1- depthoid))
+                             (recurse (cdr x) (1- depthoid)))))))
+      (traverse 0 name 10))))

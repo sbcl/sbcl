@@ -1115,32 +1115,70 @@ core and return a descriptor to it."
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
 ;;; in the cold core.
 (defvar *ctype-cache*)
+
+(defvar *ctype-nullified-slots* nil)
+(defvar *built-in-classoid-nullified-slots* nil)
+
+;; This function is memoized because it's essentially a constant,
+;; but *nil-descriptor* isn't initialized by the time it's defined.
+(defun get-exceptional-slots (obj-type)
+  (flet ((index (classoid-name slot-name)
+           (dsd-index (find slot-name
+                            (dd-slots (find-defstruct-description classoid-name))
+                            :key #'dsd-name))))
+    (case obj-type
+      (built-in-classoid
+       (or *built-in-classoid-nullified-slots*
+           (setq *built-in-classoid-nullified-slots*
+                 (append (get-exceptional-slots 'ctype)
+                         (list (cons (index 'built-in-classoid 'sb!kernel::subclasses)
+                                     *nil-descriptor*)
+                               (cons (index 'built-in-classoid 'layout)
+                                     *nil-descriptor*))))))
+      (t
+       (or *ctype-nullified-slots*
+           (setq *ctype-nullified-slots*
+                 (list (cons (index 'ctype 'sb!kernel::class-info)
+                             *nil-descriptor*))))))))
+
 (defun ctype-to-core (specifier obj)
   (declare (type ctype obj))
-  ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
-  (or (gethash specifier *ctype-cache*)
-      (let* ((class-info-slot
-              (dsd-index (find 'sb!kernel::class-info
-                               (dd-slots (find-defstruct-description 'ctype))
-                               :key #'dsd-name)))
-             (result
-              (ctype-to-core-helper
+  (if (classoid-p obj)
+      (let* ((cell (cold-find-classoid-cell (classoid-name obj) :create t))
+             (cold-classoid
+              (read-slot cell (find-layout 'sb!kernel::classoid-cell) :classoid)))
+        (unless (cold-null cold-classoid)
+          (return-from ctype-to-core cold-classoid)))
+      ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
+      ;; Don't check the cache for classoids though; that would be wrong.
+      ;; e.g. named-type T and classoid T both unparse to T.
+      (awhen (gethash specifier *ctype-cache*)
+        (return-from ctype-to-core it)))
+  (let ((result
+         (ctype-to-core-helper
                obj
                (lambda (obj)
                  (typecase obj
-                   (xset (ctype-to-core-helper obj nil))
+                   (xset (ctype-to-core-helper obj nil nil))
                    (ctype (ctype-to-core (type-specifier obj) obj))))
-               (cons class-info-slot *nil-descriptor*))))
-        (let ((type-class-vector
-               (cold-symbol-value 'sb!kernel::*type-classes*))
-              (index (position (sb!kernel::type-class-info obj)
-                               sb!kernel::*type-classes*)))
-          ;; Push this instance into the list of fixups for its type class
-          (cold-svset type-class-vector index
-                      (cold-cons result (cold-svref type-class-vector index))))
-        (setf (gethash specifier *ctype-cache*) result))))
+               (get-exceptional-slots (type-of obj)))))
+    (let ((type-class-vector
+           (cold-symbol-value 'sb!kernel::*type-classes*))
+          (index (position (sb!kernel::type-class-info obj)
+                           sb!kernel::*type-classes*)))
+      ;; Push this instance into the list of fixups for its type class
+      (cold-svset type-class-vector index
+                  (cold-cons result (cold-svref type-class-vector index))))
+    (if (classoid-p obj)
+        ;; Place this classoid into its clasoid-cell.
+        (let ((cell (cold-find-classoid-cell (classoid-name obj) :create t)))
+          (write-slots cell (find-layout 'sb!kernel::classoid-cell)
+                       :classoid result))
+        ;; Otherwise put it in the general cache
+        (setf (gethash specifier *ctype-cache*) result))
+    result))
 
-(defun ctype-to-core-helper (obj obj-to-core-helper &rest exceptional-slots)
+(defun ctype-to-core-helper (obj obj-to-core-helper exceptional-slots)
   (let* ((host-type (type-of obj))
          (target-layout (or (gethash host-type *cold-layouts*)
                             (error "No target layout for ~S" obj)))
@@ -1212,19 +1250,21 @@ core and return a descriptor to it."
             (error "Genesis could not find a target package named ~S" name))))
 
 (defvar *classoid-cells*)
+(defun cold-find-classoid-cell (name &key create)
+  (aver (eq create t))
+  (or (gethash name *classoid-cells*)
+      (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)) ; ok if nil
+            (host-layout (find-layout 'sb!kernel::classoid-cell)))
+        (setf (gethash name *classoid-cells*)
+              (write-slots (allocate-struct *dynamic* layout
+                                            (layout-length host-layout))
+                           host-layout
+                           :name name
+                           :pcl-class *nil-descriptor*
+                           :classoid *nil-descriptor*)))))
+
 (setf (get 'find-classoid-cell :sb-cold-funcall-handler/for-value)
-      (lambda (name &key create)
-        (aver (eq create t))
-        (or (gethash name *classoid-cells*)
-            (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*))
-                  (host-layout (find-layout 'sb!kernel::classoid-cell)))
-              (setf (gethash name *classoid-cells*)
-                    (write-slots (allocate-struct *dynamic* layout
-                                                  (layout-length host-layout))
-                                 host-layout
-                                 :name name
-                                 :pcl-class *nil-descriptor*
-                                 :classoid *nil-descriptor*))))))
+      #'cold-find-classoid-cell)
 
 ;;; a map from descriptors to symbols, so that we can back up. The key
 ;;; is the address in the target core.
