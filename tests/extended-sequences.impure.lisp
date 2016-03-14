@@ -17,6 +17,16 @@
 (load "test-util.lisp")
 (load "assertoid.lisp")
 
+(with-test (:name (sb-kernel:extended-sequence subtypep :relations))
+  (flet ((test-case (type1 type2)
+           (assert (equal '(nil t)
+                          (multiple-value-list (subtypep type1 type2))))))
+    (subtypep 'sb-kernel:extended-sequence 'sb-kernel:instance)
+    (subtypep 'sb-kernel:instance 'sb-kernel:extended-sequence)
+
+    (subtypep 'sb-kernel:extended-sequence 'sb-kernel:funcallable-instance)
+    (subtypep 'sb-kernel:funcallable-instance 'sb-kernel:extended-sequence)))
+
 ;;; For the following situation:
 ;;; - result type is a type specifier designating a DEFTYPEd type
 ;;; - the type expands to a the name of a user-defined sequence class

@@ -1305,6 +1305,19 @@
          ;; rewrite it so that it's clearer.
          (values nil t))))
 
+(!define-type-method (named :simple-intersection2) (type1 type2)
+  (cond
+    ((and (eq type1 *extended-sequence-type*)
+          (or (eq type2 *instance-type*)
+              (eq type2 *funcallable-instance-type*)))
+     nil)
+    ((and (or (eq type1 *instance-type*)
+              (eq type1 *funcallable-instance-type*))
+          (eq type2 *extended-sequence-type*))
+     nil)
+    (t
+     (hierarchical-intersection2 type1 type2))))
+
 (!define-type-method (named :complex-intersection2) (type1 type2)
   ;; FIXME: This assertion failed when I added it in sbcl-0.6.11.13.
   ;; Perhaps when bug 85 is fixed it can be reenabled.
