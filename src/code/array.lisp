@@ -630,6 +630,7 @@ of specialized arrays is supported."
                          (,end)
                          :check-fill-pointer t)
          (let ((,ref (%find-data-vector-reffer ,vec)))
+           (declare (function ,ref))
            (do ((,index ,start (1+ ,index)))
                ((>= ,index ,end)
                 (let ((,elt nil))

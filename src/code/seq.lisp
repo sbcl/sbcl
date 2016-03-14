@@ -843,6 +843,7 @@ many elements are copied."
              (do-vector-data (,element ,sequence ,return) ,@body)
              (multiple-value-bind (,state ,limit ,from-end ,step ,endp ,elt)
                  (sb!sequence:make-sequence-iterator ,sequence)
+               (declare (function ,step ,endp ,elt))
                (do ((,state ,state (funcall ,step ,sequence ,state ,from-end)))
                    ((funcall ,endp ,sequence ,state ,limit ,from-end)
                     (let ((,element nil))
