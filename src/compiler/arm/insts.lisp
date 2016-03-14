@@ -21,8 +21,6 @@
   (import '(sb!vm::nil-value sb!vm::registers sb!vm::null-tn sb!vm::null-offset
             sb!vm::pc-tn sb!vm::pc-offset sb!vm::code-offset)))
 
-(!begin-instruction-definitions)
-
 (setf *disassem-inst-alignment-bytes* 4)
 
 

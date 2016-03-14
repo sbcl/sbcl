@@ -21,8 +21,6 @@
             sb!vm::zero
             sb!vm::lip-tn sb!vm::zero-tn)))
 
-(!begin-instruction-definitions)
-
 (setf *assem-scheduler-p* t)
 (setf *assem-max-locations* 68)
 

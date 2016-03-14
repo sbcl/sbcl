@@ -236,8 +236,6 @@
   (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
   (subspace (missing-arg) :type (or inst-space instruction)))
 
-(defmacro !begin-instruction-definitions () nil) ; FIXME: remove
-
 ;;; FIXME: If we we interned the temp vars,
 ;;; and wouldn't use symbols qua strings, then this would reduce to EQUAL.
 (defun equal-mod-gensyms (a b)

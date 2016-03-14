@@ -27,8 +27,6 @@
             sb!vm::complex-single-reg sb!vm::complex-double-reg
             sb!vm::tmp-tn sb!vm::zr-tn sb!vm::nsp-offset)))
 
-(!begin-instruction-definitions)
-
 (setf *disassem-inst-alignment-bytes* 4)
 
 

@@ -22,8 +22,6 @@
             sb!vm::frame-byte-offset
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
-(!begin-instruction-definitions)
-
 (setf *disassem-inst-alignment-bytes* 1)
 
 (deftype reg () '(unsigned-byte 3))

@@ -24,8 +24,6 @@
             sb!vm::zero-tn
             sb!vm::zero-offset sb!vm::null-offset sb!vm::alloc-offset)))
 
-(!begin-instruction-definitions)
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf *assem-scheduler-p* t)
   (setf *assem-max-locations* 100))
