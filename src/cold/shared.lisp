@@ -344,7 +344,11 @@
          ;; -- WHN 19990815
          (src (stem-source-path stem))
          (obj (stem-object-path stem flags mode))
-         (tmp-obj (concatenate 'string obj "-tmp"))
+         ;; Compile-for-effect happens simultaneously with a forked compile,
+         ;; so we need the for-effect output not to stomp on the real output.
+         (tmp-obj
+          (concatenate 'string obj
+                       (if *compile-for-effect-only* "-scratch" "-tmp")))
 
          (compile-file (ecase mode
                          (:host-compile #'compile-file)
@@ -361,7 +365,7 @@
     ;; delete any preexisting object file in order to avoid confusing
     ;; ourselves later should we happen to bail out of compilation
     ;; with an error.
-    (when (probe-file obj)
+    (when (and (not *compile-for-effect-only*) (probe-file obj))
       (delete-file obj))
 
     ;; Original comment:
@@ -432,11 +436,10 @@
 
     ;; If we get to here, compilation succeeded, so it's OK to rename
     ;; the temporary output file to the permanent object file.
-    ;; ASSEMBLE-FILE produces no output in the preload pass.
-    ;; (The compiler produces an empty file.)
-    (if (and *compile-for-effect-only* (search "/assembly/" obj))
-        nil
-        (rename-file-a-la-unix tmp-obj obj))
+    (cond ((not *compile-for-effect-only*)
+           (rename-file-a-la-unix tmp-obj obj))
+          ((probe-file tmp-obj)
+           (delete-file tmp-obj))) ; clean up the trash
 
     ;; nice friendly traditional return value
     (pathname obj)))

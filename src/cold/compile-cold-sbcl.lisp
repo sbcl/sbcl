@@ -44,30 +44,23 @@
               (sb-sys:os-exit 0))
             (push pid subprocess-list))
           (incf subprocess-count)
+          ;; Cause the compile-time effects from this file
+          ;; to appear in subsequently forked children.
+          (let ((*compile-for-effect-only* t))
+            (target-compile-stem stem flags))
           (push (stem-object-path stem flags :target-compile)
                 reversed-target-object-file-names)))
       (loop (if (plusp subprocess-count) (wait) (return)))
       (nreverse reversed-target-object-file-names))))
 
 ;;; Actually compile
-(if *make-host-2-parallel*
-    (let ((i 0)
-          (start (get-internal-real-time)))
-      (do-stems-and-flags (stem flags)
-        (unless (position :not-target flags)
-          (let ((*compile-for-effect-only* t))
-            (incf i)
-            (target-compile-stem stem flags))))
-      (format t "~&Preloaded ~D files in ~D msec~%" i
-              (- (get-internal-real-time) start))
-      (setf *target-object-file-names*
-            (parallel-compile *make-host-2-parallel*)))
-    (let ((reversed-target-object-file-names nil))
-      (do-stems-and-flags (stem flags)
-        (unless (position :not-target flags)
-          (push (target-compile-stem stem flags)
-                reversed-target-object-file-names)
-          #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
-      (setf *target-object-file-names*
+(setf *target-object-file-names*
+      (if *make-host-2-parallel*
+          (parallel-compile *make-host-2-parallel*)
+          (let ((reversed-target-object-file-names nil))
+            (do-stems-and-flags (stem flags)
+              (unless (position :not-target flags)
+                (push (target-compile-stem stem flags)
+                      reversed-target-object-file-names)
+                #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
             (nreverse reversed-target-object-file-names))))
-
