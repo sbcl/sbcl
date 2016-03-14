@@ -197,7 +197,6 @@
 ;; it. In particular, this must fail: (SETF (GET 'SYM 'IND (ERROR "Foo")) 3).
 
 (defsetf get (symbol indicator &optional default &environment e) (newval)
-  (declare (notinline sb!xc:constantp)) ; can't
   (let ((constp (sb!xc:constantp default e)))
     ;; always reference default's temp var to "use" it
     `(%put ,symbol ,indicator ,(if constp newval `(progn ,default ,newval)))))
@@ -205,7 +204,6 @@
 ;; A possible optimization for read/modify/write of GETHASH
 ;; would be to predetermine the vector element where the key/value pair goes.
 (defsetf gethash (key hashtable &optional default &environment e) (newval)
-  (declare (notinline sb!xc:constantp)) ; can't
   (let ((constp (sb!xc:constantp default e)))
     ;; always reference default's temp var to "use" it
     `(%puthash ,key ,hashtable ,(if constp newval `(progn ,default ,newval)))))

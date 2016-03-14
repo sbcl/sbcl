@@ -11,6 +11,10 @@
 
 (in-package "SB!C")
 
+;;; Subtypes of this show up as the environment argument to inquiry functions.
+(defstruct (abstract-lexenv
+             (:constructor nil) (:copier nil) (:predicate nil)))
+
 #!-sb-fluid (declaim (inline sb!xc:constantp))
 (defun sb!xc:constantp (form &optional (environment nil envp))
   #!+sb-doc

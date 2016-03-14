@@ -45,9 +45,6 @@
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
-  ;; In SBCL it's a warning that these aren't inlined unless so declared.
-  ;; But in CCL it's an error to declare an unknown function notinline.
-  #+(or sb-xc (not ccl)) (declare (notinline sb!xc:constantp constant-form-value))
   (unless (symbolp name)
     (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
               form))

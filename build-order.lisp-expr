@@ -42,6 +42,7 @@
 
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
+ ("src/compiler/early-constantp")
  ("src/code/defsetfs" :not-host)
 
  ;; Things like DX-FLET and AWHEN are available for use in both the host
@@ -101,7 +102,6 @@
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/compiler/early-lexenv")
  ("src/compiler/early-globaldb")
- ("src/compiler/early-constantp")
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names")
