@@ -365,8 +365,7 @@
       (make-case))))
 
 (defun make-vector-like (vector length)
-  (let ((widetag (array-underlying-widetag vector)))
-    (%make-array length widetag (aref %%simple-array-n-bits%% widetag))))
+  (allocate-vector-with-widetag (array-underlying-widetag vector) length))
 
 ;; Complain in various ways about wrong :INITIAL-foo arguments,
 ;; returning the two initialization arguments needed for DATA-VECTOR-FROM-INITS.
