@@ -526,20 +526,15 @@
 ;;; the correct offset into the pv.
 ;;;
 ;;; But first, oh but first, we sort <slots> a bit so that for each
-;;; argument we have the slots in alphabetical order. This
-;;; canonicalizes the PV-TABLE's a bit and will hopefully lead to
-;;; having fewer PV's floating around. Even if the gain is only
-;;; modest, it costs nothing.
+;;; argument we have the slots in an order defined by
+;;; SYMBOL-OR-CONS-LESSP. This canonicalizes the PV-TABLEs a bit and
+;;; will hopefully lead to having fewer PVs floating around. Even if
+;;; the gain is only modest, it costs nothing.
 (defun slot-name-lists-from-slots (slots)
-  (let ((slots (mutate-slots slots)))
-    (let* ((slot-name-lists
-            (mapcar (lambda (parameter-entry)
-                      (cons nil (mapcar #'car (cdr parameter-entry))))
-                    slots)))
-      (mapcar (lambda (r+snl)
-                (when (or (car r+snl) (cdr r+snl))
-                  r+snl))
-              slot-name-lists))))
+  (mapcar (lambda (parameter-entry)
+            (when (cdr parameter-entry)
+              (cons nil (mapcar #'car (cdr parameter-entry)))))
+          (mutate-slots slots)))
 
 (defun mutate-slots (slots)
   (let ((sorted-slots (sort-slots slots))
@@ -553,34 +548,10 @@
         (incf pv-offset)))
     sorted-slots))
 
-(defun symbol-pkg-name (sym)
-  (let ((pkg (symbol-package sym)))
-    (if pkg (package-name pkg) "")))
-
-;;; FIXME: Because of the existence of UNINTERN and RENAME-PACKAGE,
-;;; the part of this ordering which is based on SYMBOL-PKG-NAME is not
-;;; stable. This ordering is only used in to
-;;; SLOT-NAME-LISTS-FROM-SLOTS, where it serves to "canonicalize the
-;;; PV-TABLE's a bit and will hopefully lead to having fewer PV's
-;;; floating around", so it sounds as though the instability won't
-;;; actually lead to bugs, just small inefficiency. But still, it
-;;; would be better to reimplement this function as a comparison based
-;;; on SYMBOL-HASH:
-;;;   * stable comparison
-;;;   * smaller code (here, and in being able to discard SYMBOL-PKG-NAME)
-;;;   * faster code.
-(defun symbol-lessp (a b)
-  (if (eq (symbol-package a)
-          (symbol-package b))
-      (string-lessp (symbol-name a)
-                    (symbol-name b))
-      (string-lessp (symbol-pkg-name a)
-                    (symbol-pkg-name b))))
-
 (defun symbol-or-cons-lessp (a b)
   (etypecase a
     (symbol (etypecase b
-              (symbol (symbol-lessp a b))
+              (symbol (< (symbol-hash a) (symbol-hash b)))
               (cons t)))
     (cons   (etypecase b
               (symbol nil)
@@ -590,10 +561,8 @@
 
 (defun sort-slots (slots)
   (mapcar (lambda (parameter-entry)
-            (cons (car parameter-entry)
-                  (sort (cdr parameter-entry)   ;slot entries
-                        #'symbol-or-cons-lessp
-                        :key #'car)))
+            (destructuring-bind (name . entries) parameter-entry
+              (cons name (sort entries #'symbol-or-cons-lessp :key #'car))))
           slots))
 
 
