@@ -25,11 +25,6 @@
 ;;; ASSERT-ERROR isn't defined until a later file because it uses the
 ;;; macro RESTART-CASE, which isn't defined until a later file.
 ;;;
-;;; Don't redefine this during make-host-2, because first of all
-;;; the cross-compiler has a usable definition, but also, with sb-fasteval
-;;; enabled, the new definition would cause the host to signal a
-;;; style-warning that it doesn't know SB!INTERPRETER::FIND-LEXICAL-FUN.
-(let ()
 (sb!xc:defmacro assert (test-form &optional places datum &rest arguments
                             &environment env)
   #!+sb-doc
@@ -51,61 +46,42 @@
    CL:OR, CL:AND, etc.) the results of evaluating the ARGs will be
    included in the error report if the assertion fails."
   (collect ((bindings) (infos))
-    (let ((new-test
-            (flet ((process-place (place)
-                     (if (sb!xc:constantp place env)
-                         place
-                         (with-unique-names (temp)
-                           (bindings `(,temp ,place))
-                           (infos `(list ',place ,temp))
-                           temp))))
-              (cond
-                ;; TEST-FORM looks like a function call. We do not
-                ;; attempt this if TEST-FORM is the application of a
-                ;; special operator because of argument evaluation
-                ;; order issues.
-               ((when (typep test-form '(cons symbol list))
-                   (let* ((name (first test-form))
-                          (global-fun-p
-                           (eq (info :function :kind name) :function)))
-                     ;; FIXME: this is too much digging into compiler internals.
-                     ;; I think it's just trying to express
-                     ;;    (NOT (MACRO-FUNCTION NAME ENV))
-                     ;; and doing a very unclear job of it.
-                     ;; [If the thing is macro, we mustn't evaluate subforms
-                     ;; to try to show them in an assertion failure message,
-                     ;; because the macro might not evaluate all its arguments]
-                     (when (typecase env
-                             (sb!kernel:lexenv
-                              (let ((f (cdr (assoc name (sb!c::lexenv-funs env)))))
-                                (if (not f) global-fun-p (sb!c::functional-p f))))
-                             #!+(and sb-fasteval (host-feature sb-xc))
-                             (sb!interpreter:basic-env
-                              (let ((kind
-                                     (sb!interpreter::find-lexical-fun env name)))
-                                (if (null kind) global-fun-p (eq kind :function))))
-                             (null global-fun-p))
-                       `(,name ,@(mapcar #'process-place (rest test-form)))))))
-                ;; For all other cases, just evaluate TEST-FORM and do
-                ;; not report any details if the assertion fails.
-                (t
-                 test-form)))))
+    (let* ((func (if (listp test-form) (car test-form)))
+           (new-test
+            (if (and (typep func '(and symbol (not null)))
+                     (not (sb!xc:macro-function func env))
+                     (not (sb!xc:special-operator-p func))
+                     (proper-list-p (cdr test-form)))
+                ;; TEST-FORM is a function call. We do not attempt this
+                ;; if TEST-FORM is a macro invocation or special form.
+                `(,func ,@(mapcar (lambda (place)
+                                    (if (sb!xc:constantp place env)
+                                        place
+                                        (with-unique-names (temp)
+                                          (bindings `(,temp ,place))
+                                          (infos `(list ',place ,temp))
+                                          temp)))
+                                  (rest test-form)))
+                ;; For all other cases, just evaluate TEST-FORM
+                ;; and don't report any details if the assertion fails.
+                test-form))
+           (try '#:try)
+           (done  '#:done))
       ;; If TEST-FORM, potentially using values from BINDINGS, does not
       ;; hold, enter a loop which reports the assertion error,
       ;; potentially changes PLACES, and retries TEST-FORM.
       `(tagbody
-        :try
+        ,try
           (let ,(bindings)
             (when ,new-test
-              (go :done))
+              (go ,done))
             (assert-error ',test-form (list ,@(infos))
                           ',places ,datum ,@arguments))
           ,@(mapcar (lambda (place)
                       `(setf ,place (assert-prompt ',place ,place)))
                     places)
-          (go :try)
-        :done))))
-)
+          (go ,try)
+        ,done))))
 
 (defun assert-prompt (name value)
   (cond ((y-or-n-p "The old value of ~S is ~S.~
