@@ -30,15 +30,16 @@
 
 ;;;; MULTIPLE-VALUE-FOO
 
-(defun list-of-symbols-p (x)
-  (and (listp x)
-       (every #'symbolp x)))
+(flet ((validate-vars (vars)
+         (unless (and (listp vars) (every #'symbolp vars))
+           (error "Vars is not a list of symbols: ~S" vars))))
 
 (sb!xc:defmacro multiple-value-bind (vars value-form &body body)
-  (if (list-of-symbols-p vars)
-    ;; It's unclear why it would be important to special-case the LENGTH=1 case
-    ;; at this level, but the CMU CL code did it, so.. -- WHN 19990411
-    (if (= (length vars) 1)
+  (validate-vars vars)
+  (if (= (length vars) 1)
+      ;; Not only does it look nicer to reduce to LET in this special case,
+      ;; if might produce better code or at least compile quicker.
+      ;; Certainly for the evaluator it's preferable.
       `(let ((,(car vars) ,value-form))
          ,@body)
       (let ((ignore (sb!xc:gensym)))
@@ -46,19 +47,17 @@
                                          &rest ,ignore)
                                   (declare (ignore ,ignore))
                                   ,@body)
-                              ,value-form)))
-    (error "Vars is not a list of symbols: ~S" vars)))
+                              ,value-form))))
 
 (sb!xc:defmacro multiple-value-setq (vars value-form)
-  (unless (list-of-symbols-p vars)
-    (error "Vars is not a list of symbols: ~S" vars))
+  (validate-vars vars)
   ;; MULTIPLE-VALUE-SETQ is required to always return just the primary
   ;; value of the value-from, even if there are no vars. (SETF VALUES)
   ;; in turn is required to return as many values as there are
   ;; value-places, hence this:
   (if vars
       `(values (setf (values ,@vars) ,value-form))
-      `(values ,value-form)))
+      `(values ,value-form))))
 
 (sb!xc:defmacro multiple-value-list (value-form)
   `(multiple-value-call #'list ,value-form))
