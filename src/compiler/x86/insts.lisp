@@ -1652,6 +1652,19 @@
 
 ;;;; control transfer
 
+(defun emit-byte-displacement-backpatch (segment target)
+  (emit-back-patch segment 1
+                   (lambda (segment posn)
+                     (emit-byte segment
+                                (the (signed-byte 8)
+                                  (- (label-position target) (1+ posn)))))))
+
+(defun emit-dword-displacement-backpatch (segment target)
+  (emit-back-patch segment 4
+                   (lambda (segment posn)
+                     (emit-dword segment (- (label-position target)
+                                            (+ 4 posn))))))
+
 (define-instruction call (segment where)
   (:printer near-jump ((op #b11101000)))
   (:printer reg/mem ((op '(#b1111111 #b010)) (width 1)))
@@ -1659,26 +1672,13 @@
    (typecase where
      (label
       (emit-byte segment #b11101000)
-      (emit-back-patch segment
-                       4
-                       (lambda (segment posn)
-                         (emit-dword segment
-                                     (- (label-position where)
-                                        (+ posn 4))))))
+      (emit-dword-displacement-backpatch segment where))
      (fixup
       (emit-byte segment #b11101000)
       (emit-relative-fixup segment where))
      (t
       (emit-byte segment #b11111111)
       (emit-ea segment where #b010)))))
-
-(defun emit-byte-displacement-backpatch (segment target)
-  (emit-back-patch segment
-                   1
-                   (lambda (segment posn)
-                     (let ((disp (- (label-position target) (1+ posn))))
-                       (aver (<= -128 disp 127))
-                       (emit-byte segment disp)))))
 
 (define-instruction jmp (segment cond &optional where)
   ;; conditional jumps
