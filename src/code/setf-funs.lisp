@@ -10,41 +10,44 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (eval-when (:compile-toplevel :execute)
 
 (defun compute-one-setter (name type)
-  (let* ((args (second type))
-         (res (type-specifier
-               (single-value-type
-                (values-specifier-type (third type)))))
-         (arglist (make-gensym-list (1+ (length args)))))
+  (let ((args (second type)))
     (cond
-     ((null (intersection args sb!xc:lambda-list-keywords))
-      `(defun (setf ,name) ,arglist
-         (declare ,@(mapcar (lambda (arg type)
-                              `(type ,type ,arg))
-                            arglist
-                            (cons res args)))
-         (setf (,name ,@(rest arglist)) ,(first arglist))))
+     ((null (intersection args lambda-list-keywords))
+      (let ((res (type-specifier
+                  (single-value-type
+                   (values-specifier-type (third type)))))
+            (arglist (cons 'newval (sb-kernel:%fun-lambda-list
+                                    (symbol-function name)))))
+        `(locally
+          (declare (muffle-conditions
+                    ;; Expect SETF macro + function warnings.
+                    (and style-warning
+                         ;; Expect none of these,
+                         ;; but just to make sure, show them.
+                         (not sb-c:inlining-dependency-failure))))
+          (defun (setf ,name) ,arglist
+            (declare ,@(mapcar (lambda (arg type) `(type ,type ,arg))
+                               arglist (cons res args)))
+            (setf (,name ,@(rest arglist)) ,(first arglist))))))
      (t
       (warn "hairy SETF expander for function ~S" name)
       nil))))
 
-;;; FIXME: should probably become MACROLET
-;;; [But can't until we fix the "lexical environment too hairy" warning.
-;;;  And this environment isn't too hairy so it's especially annoying]
-(sb!xc:defmacro define-setters (packages &rest ignore)
+;;; FIXME: should probably become MACROLET, but inline functions
+;;; within a macrolet capture the whole macrolet, which is dumb.
+(defmacro define-setters (packages &rest ignore)
   (collect ((res))
     (dolist (pkg packages)
       (do-external-symbols (sym pkg)
         (when (and (fboundp sym)
                    (eq (info :function :kind sym) :function)
-                   (or (info :setf :inverse sym)
-                       (info :setf :expander sym))
-                   ;; Use STRING= because (NEQ 'LDB 'SB!XC:LDB) etc.
-                   (not (member sym ignore :test #'string=)))
+                   (info :setf :expander sym)
+                   (not (memq sym ignore)))
           (res sym))))
     `(progn
       ,@(mapcan
@@ -52,7 +55,7 @@
            (let ((type (type-specifier (proclaimed-ftype sym))))
              (aver (consp type))
              (list
-              #!-sb-fluid `(declaim (inline (setf ,sym)))
+              #-sb-fluid `(declaim (inline (setf ,sym)))
               (compute-one-setter sym type))))
          (sort (res) #'string<)))))
 

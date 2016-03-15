@@ -293,8 +293,6 @@
  ("src/code/time"  :not-host)
  ("src/code/final" :not-host)
 
- ("src/code/setf-funs" :not-host)
-
  ("src/code/stubs" :not-host)
 
  ("src/code/exhaust" :not-host)

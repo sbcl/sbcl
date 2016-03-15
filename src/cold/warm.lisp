@@ -132,7 +132,8 @@
                 "SRC;PCL;PRECOM1"
                 "SRC;PCL;PRECOM2"))
       (other-srcs
-              '(;; miscellaneous functionality which depends on CLOS
+              '("SRC;CODE;SETF-FUNS"
+                ;; miscellaneous functionality which depends on CLOS
                 "SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS"
                 "SRC;CODE;LATE-CONDITION"
 
