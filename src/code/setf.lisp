@@ -261,11 +261,6 @@
    forms have been evaluated."
     (expand pairs env 'psetq 'setq))))
 
-;;; FIXME: the following claim could not possibly be true, could it?
-;;; FIXME: Compiling this definition of ROTATEF apparently blows away the
-;;; definition in the cross-compiler itself, so that after that, any
-;;; ROTATEF operations can no longer be compiled, because
-;;; GET-SETF-EXPANSION is called instead of SB!XC:GET-SETF-EXPANSION.
 (sb!xc:defmacro rotatef (&rest args &environment env)
   #!+sb-doc
   "Takes any number of SETF-style place expressions. Evaluates all of the
@@ -288,7 +283,7 @@
                      `((multiple-value-bind ,(car mv-bindings) ,(car getters)
                          ,@(thunk (cdr mv-bindings) (cdr getters))))
                      (setters))))
-        `(let* ,(reduce #'append(let*-bindings))
+        `(let* ,(reduce #'append (let*-bindings))
            ,@(thunk (mv-bindings) (cdr (getters))))))))
 
 (sb!xc:defmacro push (obj place &environment env)
