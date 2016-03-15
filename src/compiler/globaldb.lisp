@@ -552,10 +552,9 @@
 (define-info-type (:alien-type :enum) :type-spec (or alien-type null))
 
 ;;;; ":SETF" subsection - Data pertaining to expansion of the omnipotent macro.
-(define-info-type (:setf :inverse) :type-spec (or symbol null))
 (define-info-type (:setf :documentation) :type-spec (or string null))
 (define-info-type (:setf :expander)
-    :type-spec (or function (cons integer function) null))
+    :type-spec (or symbol function (cons integer function) null))
 
 ;;;; ":CAS" subsection - Like SETF but there are no "inverses", just expanders
 (define-info-type (:cas :expander) :type-spec (or function null))

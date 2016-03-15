@@ -93,9 +93,8 @@
                        (%cxr-setf-expander
                         '(,(symbolicate "C" (subseq string 2)))
                         ',(symbolicate "%RPLAC" (subseq string 1 2)))))
-                  (%defsetf ',name closure nil)
-                  ,@(when alias
-                      `((%defsetf ',alias closure nil)))))))
+                  (%defsetf ',name closure)
+                  ,@(when alias `((%defsetf ',alias closure)))))))
   ;; Rather than expand into a DEFINE-SETF-EXPANDER, install a single closure
   ;; as the expander and capture just enough to distinguish the variations.
   (def caar)
@@ -130,7 +129,7 @@
 ;; FIFTH through TENTH
 (macrolet ((def (name subform)
              `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (%defsetf ',name (%cxr-setf-expander ',subform '%rplaca) nil))))
+                (%defsetf ',name (%cxr-setf-expander ',subform '%rplaca)))))
   (def fifth   (nthcdr 4)) ; or CDDDDR
   (def sixth   (nthcdr 5))
   (def seventh (nthcdr 6))
@@ -145,7 +144,7 @@
 ;; (NTHCDR ...) is a subform of the CAR expression, and so must be
 ;; bound to a temporary variable.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (%defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca) nil))
+  (%defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca)))
 
 (defsetf elt %setelt)
 (defsetf row-major-aref %set-row-major-aref)
@@ -333,9 +332,9 @@ place with bits from the low-order end of the new value."
 
 (locally (declare (notinline info)) ; can't inline
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (%defsetf 'truly-the (info :setf :expander 'the) nil nil)
+  (%defsetf 'truly-the (info :setf :expander 'the))
 
-  (%defsetf 'mask-field (info :setf :expander 'ldb) nil
+  (%defsetf 'mask-field (info :setf :expander 'ldb)
   #!+sb-doc
   "The first argument is a byte specifier. The second is any place form
 acceptable to SETF. Replaces the specified byte of the number in this place
@@ -346,4 +345,4 @@ with bits from the corresponding position in the new value.")
 ;;; so that result = (in & ~mask) | (flag ? mask : 0)
 ;;; Additionally (setf (logbitp N x) t) is extremely stupid- it first clears
 ;;; and then sets the bit, though it does manage to pre-shift the constants.
-   (%defsetf 'logbitp (info :setf :expander 'ldb) nil nil)))
+   (%defsetf 'logbitp (info :setf :expander 'ldb))))

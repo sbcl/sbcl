@@ -88,7 +88,7 @@
   #+sb-xc-host (declare (ignore name))
   #-sb-xc-host
   (let ((stem (second name)))
-    (when (or (info :setf :inverse stem) (info :setf :expander stem))
+    (when (info :setf :expander stem)
       (compiler-style-warn
          "defining function ~S when ~S already has a SETF macro"
          name stem)))

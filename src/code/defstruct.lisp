@@ -1043,7 +1043,7 @@ unless :NAMED is also specified.")))
                 place
                 `(,(if (dsd-safe-p dsd) 'truly-the 'the) ,type-spec ,place)))
           (when (singleton-p (cdr args))
-            (let ((inverse (info :setf :inverse (car place))))
+            (let ((inverse (info :setf :expander (car place))))
               (flet ((check (newval)
                        (if (eq type-spec t) newval `(the ,type-spec ,newval))))
                 (ecase function

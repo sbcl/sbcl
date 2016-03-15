@@ -307,8 +307,7 @@ If an unsupported TYPE is requested, the function will return NIL.
         (when (and (consp name)
                    (eq (car name) 'setf))
           (setf name (cadr name)))
-        (let ((expander (or (sb-int:info :setf :inverse name)
-                            (sb-int:info :setf :expander name))))
+        (let ((expander (sb-int:info :setf :expander name)))
           (when expander
             (find-definition-source
              (cond ((symbolp expander) (symbol-function expander))

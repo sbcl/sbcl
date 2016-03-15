@@ -72,15 +72,16 @@
                            `(,fun ,@args)))))
           ;; Local functions inhibit global SETF methods.
           (unless (sb!c::fun-locally-defined-p fun environment)
-            (acond ((info :setf :inverse fun)
+            (acond ((info :setf :expander fun)
                     (return-from sb!xc:get-setf-expansion
-                      (expand `(,it) (lambda (new args) `(,@args ,new)))))
-                   ((info :setf :expander fun)
-                    (return-from sb!xc:get-setf-expansion
-                      (if (consp it)
-                          (make-setf-quintuple form environment
-                                               (car it) (cdr it))
-                          (funcall it form environment))))
+                      (cond ((functionp it) ; DEFINE-SETF-EXPANDER
+                             (funcall it form environment))
+                            ((listp it) ; long DEFSETF
+                             (make-setf-quintuple form environment
+                                                  (car it) (cdr it)))
+                            (t ; short DEFSETF
+                             (expand `(,it)
+                                     (lambda (new args) `(,@args ,new)))))))
                    ((transformable-struct-setf-p form environment)
                     (let ((instance (make-symbol "OBJ")))
                       (return-from sb!xc:get-setf-expansion
@@ -106,9 +107,7 @@
 ;; expands to a "mundane" lexical or special variable.
 (defun macroexpand-for-setf (place environment)
   (loop
-     (when (and (listp place)
-                (let ((op (car place)))
-                  (or (info :setf :expander op) (info :setf :inverse op))))
+     (when (and (listp place) (info :setf :expander (car place)))
        (return place))
      (multiple-value-bind (expansion macro-p) (%macroexpand-1 place environment)
        (if macro-p
@@ -160,15 +159,19 @@
     (destructuring-bind (place value-form . more) args
       (when more
         (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
-      (when (symbolp (setq place (macroexpand-for-setf place env)))
+      (when (atom (setq place (macroexpand-for-setf place env)))
         (return-from setf `(setq ,place ,value-form)))
 
       (let ((fun (car place)))
         (when (and (symbolp fun)
                    ;; Local definition of FUN precludes global knowledge.
                    (not (sb!c::fun-locally-defined-p fun env)))
-          (awhen (info :setf :inverse fun)
-            (return-from setf `(,it ,@(cdr place) ,value-form)))
+          (let ((inverse (info :setf :expander fun)))
+            ;; NIL is not a valid setf inverse name, for two reasons:
+            ;;  1. you can't define a function named NIL,
+            ;;  2. (DEFSETF THING () ...) is the long form DEFSETF syntax.
+            (when (typep inverse '(and symbol (not null)))
+              (return-from setf `(,inverse ,@(cdr place) ,value-form))))
           (awhen (transformable-struct-setf-p place env)
             (return-from setf
               (slot-access-transform
@@ -417,7 +420,7 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
-  (defun %defsetf (name expander inverse &optional doc)
+  (defun %defsetf (name expander &optional doc)
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
     (let ((setf-fn-name `(setf ,name)))
@@ -446,12 +449,7 @@
            ;; The user can declare an FTYPE if both things are intentional.
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
-    (when inverse
-      (clear-info :setf :expander name)
-      (setf (info :setf :inverse name) inverse))
-    (when expander
-      (clear-info :setf :inverse name)
-      (setf (info :setf :expander name) expander))
+    (setf (info :setf :expander name) expander)
     (when doc
       (setf (fdocumentation name 'setf) doc))
     name))
@@ -466,7 +464,7 @@
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
-        (%defsetf ',access-fn nil ',(car rest) ,@(cdr rest))))
+        (%defsetf ',access-fn ',(car rest) ,@(cdr rest))))
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest stores) &body body) rest
        (binding* (((llks req opt rest key aux env)
@@ -494,7 +492,7 @@
                               (apply (lambda ,lambda-list
                                        ,@inner-decls (block ,access-fn ,@forms))
                                      ,subforms)))
-                      nil ,@(and doc `(,doc)))))))
+                      ,@(and doc `(,doc)))))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
@@ -605,5 +603,5 @@
                          'sb!xc:define-setf-expander access-fn
                          :doc-string-allowed :external)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%defsetf ',access-fn ,def nil ,@(and doc `(,doc))))))
+       (%defsetf ',access-fn ,def ,@(and doc `(,doc))))))
 
