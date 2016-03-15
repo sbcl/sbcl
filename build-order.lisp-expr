@@ -257,6 +257,7 @@
  #!+arm   ("src/code/arm-vm" :not-host)
  #!+arm64 ("src/code/arm64-vm" :not-host)
 
+ ("src/code/signal" :not-host)
  #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
  #!+win32 ("src/code/target-exception" :not-host)
 
@@ -761,7 +762,6 @@
 
  ("src/code/late-format") ; needs SB!XC:DEFMACRO
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
- ("src/code/signal")
  ("src/code/late-defbangmethod")
  ("src/code/late-cas" :not-host)
 
