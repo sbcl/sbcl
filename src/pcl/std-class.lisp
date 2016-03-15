@@ -1045,11 +1045,13 @@
     (let* ((nslots (length instance-slots))
            (owrapper (class-wrapper class))
            (nwrapper
-             (cond ((null owrapper)
-                    (make-wrapper nslots class))
-                   ((slot-layouts-compatible-p (layout-slot-list owrapper)
-                                               instance-slots class-slots custom-slots)
+             (cond ((and owrapper
+                         (slot-layouts-compatible-p (layout-slot-list owrapper)
+                                                    instance-slots class-slots custom-slots))
                     owrapper)
+                   ((or (not owrapper)
+                        (not (class-finalized-p class)))
+                    (make-wrapper nslots class))
                    (t
                     ;; This will initialize the new wrapper to have the
                     ;; same state as the old wrapper. We will then have
