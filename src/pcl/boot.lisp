@@ -306,6 +306,14 @@ generic function lambda list ~S~:>"
       ;; no defaults or supplied-p vars allowed for &OPTIONAL or &KEY
       (verify-each-atom-or-singleton '&optional optional)
       (verify-each-atom-or-singleton '&key keys))))
+
+(defun check-method-lambda (method-lambda context)
+  (unless (typep method-lambda '(cons (eql lambda)))
+    (error "~@<The METHOD-LAMBDA argument to ~
+            ~/sb-impl:print-symbol-with-prefix/, ~S, is not a lambda ~
+            form.~@:>"
+           context method-lambda))
+  method-lambda)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (fmakunbound 'defmethod))
@@ -551,11 +559,7 @@ generic function lambda list ~S~:>"
 (defun real-make-method-initargs-form (proto-gf proto-method
                                        method-lambda initargs env)
   (declare (ignore proto-gf proto-method))
-  (unless (and (consp method-lambda)
-               (eq (car method-lambda) 'lambda))
-    (error "The METHOD-LAMBDA argument to MAKE-METHOD-FUNCTION, ~S, ~
-            is not a lambda form."
-           method-lambda))
+  (check-method-lambda method-lambda 'make-method-initargs)
   (make-method-initargs-form-internal method-lambda initargs env))
 
 (unless (fboundp 'make-method-initargs-form)
@@ -563,9 +567,9 @@ generic function lambda list ~S~:>"
         (symbol-function 'real-make-method-initargs-form)))
 
 ;;; When bootstrapping PCL MAKE-METHOD-LAMBDA starts out as a regular
-;;; functions: REAL-MAKE-METHOD-LAMBDA set to the fdefinition of
-;;; MAKE-METHOD-LAMBDA. Once generic functions are born, the
-;;; REAL-MAKE-METHOD lambda is used as the body of the default method.
+;;; function: REAL-MAKE-METHOD-LAMBDA set to the fdefinition of
+;;; MAKE-METHOD-LAMBDA. Once generic functions are born,
+;;; REAL-MAKE-METHOD-LAMBDA is used to implement the default method.
 ;;; MAKE-METHOD-LAMBDA-INTERNAL is split out into a separate function
 ;;; so that changing it in a live image is easy, and changes actually
 ;;; take effect.
@@ -584,10 +588,7 @@ generic function lambda list ~S~:>"
 
 (defun make-method-lambda-internal (proto-gf proto-method method-lambda env)
   (declare (ignore proto-gf proto-method))
-  (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
-    (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
-            is not a lambda form."
-           method-lambda))
+  (check-method-lambda method-lambda 'make-method-lambda)
   (multiple-value-bind (real-body declarations documentation)
       (parse-body (cddr method-lambda) t)
     ;; We have the %METHOD-NAME declaration in the place where we expect it only
