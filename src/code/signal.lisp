@@ -65,7 +65,7 @@
 ;;; still on the stack.
 (!defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
 
-(sb!xc:defmacro without-interrupts (&body body)
+(defmacro without-interrupts (&body body)
   #!+sb-doc
   "Executes BODY with all deferrable interrupts disabled. Deferrable
 interrupts arriving during execution of the BODY take effect after BODY has
@@ -151,7 +151,7 @@ WITHOUT-INTERRUPTS in:
                (receive-pending-interrupt)))
            (,without-interrupts-body)))))
 
-(sb!xc:defmacro with-interrupts (&body body)
+(defmacro with-interrupts (&body body)
   #!+sb-doc
   "Executes BODY with deferrable interrupts conditionally enabled. If there
 are pending interrupts they take effect prior to executing BODY.
@@ -190,7 +190,6 @@ by ALLOW-WITH-INTERRUPTS."
 ;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is
 ;;; false, *ALLOW-WITH-INTERRUPTS* is true and deferrable signals are
 ;;; unblocked.
-#-sb-xc-host
 (defun %check-interrupts ()
   ;; Here we check for pending interrupts first, because reading a
   ;; special is faster then binding it!

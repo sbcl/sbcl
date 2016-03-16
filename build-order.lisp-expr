@@ -177,6 +177,7 @@
  ("src/pcl/slot-name") ; for calls from 'info-vector'
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
  ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
+ ("src/code/signal" :not-host)
  ("src/compiler/info-vector")
  ("src/compiler/globaldb")
  ("src/code/primordial-type")
@@ -257,7 +258,6 @@
  #!+arm   ("src/code/arm-vm" :not-host)
  #!+arm64 ("src/code/arm64-vm" :not-host)
 
- ("src/code/signal" :not-host)
  #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
  #!+win32 ("src/code/target-exception" :not-host)
 
