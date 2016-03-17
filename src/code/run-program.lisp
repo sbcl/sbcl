@@ -805,13 +805,13 @@ Users Manual for details about the PROCESS structure.
                       `(multiple-value-bind (,fd ,stream)
                            ,(ecase which
                               ((:input :output)
-                               `(get-descriptor-for ,@args))
+                               `(get-descriptor-for ,which ,@args))
                               (:error
                                `(if (eq ,(first args) :output)
                                     ;; kludge: we expand into
                                     ;; hard-coded symbols here.
                                     (values stdout output-stream)
-                                    (get-descriptor-for ,@args))))
+                                    (get-descriptor-for ,which ,@args))))
                          (unless ,fd
                            (return-from run-program))
                          ,@body))
@@ -1042,8 +1042,7 @@ Users Manual for details about the PROCESS structure.
 ;;; Find a file descriptor to use for object given the direction.
 ;;; Returns the descriptor. If object is :STREAM, returns the created
 ;;; stream as the second value.
-(defun get-descriptor-for (object
-                           cookie
+(defun get-descriptor-for (argument object cookie
                            &rest keys
                            &key direction (external-format :default) wait
                            &allow-other-keys)
@@ -1054,20 +1053,22 @@ Users Manual for details about the PROCESS structure.
   ;; user-defined stream classes, we can end up trying to copy
   ;; arbitrarily much data into the temp file, and so are liable to
   ;; run afoul of disk quotas or to choke on small /tmp file systems.
-  (flet ((make-temp-fd ()
-           (multiple-value-bind (fd name/errno)
-               (sb-unix:sb-mkstemp (format nil "~a/.run-program-XXXXXX"
-                                           (get-temporary-directory))
-                                   #o0600)
-             (unless fd
-               (error "could not open a temporary file: ~A"
-                      (strerror name/errno)))
-             ;; Can't unlink an open file on Windows
-             #-win32
-             (unless (sb-unix:unix-unlink name/errno)
-               (sb-unix:unix-close fd)
-               (error "failed to unlink ~A" name/errno))
-             fd)))
+  (labels ((fail (format &rest arguments)
+             (error "~s error processing ~s argument:~% ~?" 'run-program argument format arguments))
+           (make-temp-fd ()
+             (multiple-value-bind (fd name/errno)
+                 (sb-unix:sb-mkstemp (format nil "~a/.run-program-XXXXXX"
+                                             (get-temporary-directory))
+                                     #o0600)
+               (unless fd
+                 (fail "could not open a temporary file: ~A"
+                       (strerror name/errno)))
+               ;; Can't unlink an open file on Windows
+               #-win32
+               (unless (sb-unix:unix-unlink name/errno)
+                 (sb-unix:unix-close fd)
+                 (fail "failed to unlink ~A" name/errno))
+               fd)))
     (let ((dev-null #.(coerce #-win32 "/dev/null" #+win32 "nul" 'base-string)))
       (cond ((eq object t)
              ;; No new descriptor is needed.
@@ -1085,8 +1086,8 @@ Users Manual for details about the PROCESS structure.
                                       (t sb-unix:o_rdwr))
                                     #o666)
                (unless fd
-                 (error "~@<couldn't open ~S: ~2I~_~A~:>"
-                        dev-null (strerror errno)))
+                 (fail "~@<couldn't open ~S: ~2I~_~A~:>"
+                       dev-null (strerror errno)))
                #+win32
                (setf (sb-win32::inheritable-handle-p fd) t)
                (push fd *close-in-parent*)
@@ -1094,7 +1095,7 @@ Users Manual for details about the PROCESS structure.
             ((eq object :stream)
              (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
                (unless read-fd
-                 (error "couldn't create pipe: ~A" (strerror write-fd)))
+                 (fail "couldn't create pipe: ~A" (strerror write-fd)))
                #+win32
                (setf (sb-win32::inheritable-handle-p read-fd)
                      (eq direction :input)
@@ -1120,7 +1121,7 @@ Users Manual for details about the PROCESS structure.
                  (t
                     (sb-unix:unix-close read-fd)
                     (sb-unix:unix-close write-fd)
-                    (error "Direction must be either :INPUT or :OUTPUT, not ~S."
+                    (fail "Direction must be either :INPUT or :OUTPUT, not ~S."
                            direction)))))
             ((or (pathnamep object) (stringp object))
              ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
@@ -1136,8 +1137,8 @@ Users Manual for details about the PROCESS structure.
                           (push fd *close-in-parent*)
                           (values fd nil))
                          (t
-                          (error "couldn't duplicate file descriptor: ~A"
-                                 (strerror errno))))))))
+                          (fail "couldn't duplicate file descriptor: ~A"
+                                (strerror errno))))))))
           ((streamp object)
            (ecase direction
              (:input
@@ -1225,11 +1226,11 @@ Users Manual for details about the PROCESS structure.
                 (multiple-value-bind (read-fd write-fd)
                     (sb-unix:unix-pipe)
                   (unless read-fd
-                    (error "couldn't create pipe: ~S" (strerror write-fd)))
+                    (fail "couldn't create pipe: ~S" (strerror write-fd)))
                   (copy-descriptor-to-stream read-fd object cookie
                                              external-format)
                   (push read-fd *close-on-error*)
                   (push write-fd *close-in-parent*)
-                  (return (values write-fd nil)))))
-             (t
-              (error "invalid option to RUN-PROGRAM: ~S" object))))))))
+                  (return (values write-fd nil)))))))
+          (t
+           (fail "invalid option: ~S" object))))))

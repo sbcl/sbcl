@@ -344,3 +344,12 @@
                       #+win32 '("/c" "cd")
                       :directory nil
                       :search t))
+
+(with-test (:name (:run-program :bad-options))
+  (assert-error
+   (sb-ext:run-program #-win32 "/bin/sh"
+                       #-win32 '("-c" "pwd")
+                       #+win32 "cmd.exe"
+                       #+win32 '("/c" "cd")
+                       :search t
+                       :output :bad)))
