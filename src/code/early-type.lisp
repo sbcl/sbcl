@@ -875,6 +875,18 @@
   (dx-let ((context (cons type-specifier t)))
     (specifier-type-r context type-specifier)))
 
+;;; Parse TYPE-SPECIFIER, returning NIL if any sub-part of it is unknown
+(defun type-or-nil-if-unknown (type-specifier &optional allow-values)
+  (dx-let ((context (cons type-specifier t)))
+    (let ((result (values-specifier-type-r context type-specifier)))
+      (when (and (not allow-values) (values-type-p result))
+        (error "VALUES type illegal in this context:~%  ~S" type-specifier))
+      ;; If it was non-cacheable, either it contained a deprecated type
+      ;; or unknown type, or was a pending defstruct definition.
+      (if (and (not (cdr context)) (contains-unknown-type-p result))
+          nil
+          result))))
+
 (defun single-value-specifier-type-r (context x)
   (if (eq x '*) *universal-type* (specifier-type-r context x)))
 (defun single-value-specifier-type (x)

@@ -64,7 +64,15 @@
    (negation-type (contains-unknown-type-p (negation-type-type ctype)))
    (cons-type (or (contains-unknown-type-p (cons-type-car-type ctype))
                   (contains-unknown-type-p (cons-type-cdr-type ctype))))
-   (array-type (contains-unknown-type-p (array-type-element-type ctype)))))
+   (array-type (contains-unknown-type-p (array-type-element-type ctype)))
+   (args-type
+    (or (some #'contains-unknown-type-p (args-type-required ctype))
+        (some #'contains-unknown-type-p (args-type-optional ctype))
+        (acond ((args-type-rest ctype) (contains-unknown-type-p it)))
+        (some (lambda (x) (contains-unknown-type-p (key-info-type x)))
+              (args-type-keywords ctype))
+        (and (fun-type-p ctype)
+             (contains-unknown-type-p (fun-type-returns ctype)))))))
 
 ;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but report that (SATISFIES F)
 ;; is not a testable type unless F is currently bound.

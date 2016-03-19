@@ -131,17 +131,13 @@
    with the specifier :ELEMENT-TYPE Spec."
   (declare (type lexenv-designator environment) (ignore environment))
   (declare (explicit-check))
-  (handler-case
-      ;; Can't rely on SPECIFIER-TYPE to signal PARSE-UNKNOWN-TYPE in
-      ;; the case of (AND KNOWN UNKNOWN), since the result of the
-      ;; outter call to SPECIFIER-TYPE can be cached by the code that
-      ;; doesn't catch PARSE-UNKNOWN-TYPE signal.
-      (let ((type (specifier-type spec)))
-        (if (contains-unknown-type-p type)
-            (error "Undefined type: ~S" spec)
-            (type-specifier (%upgraded-array-element-type type))))
-    (parse-unknown-type (c)
-      (error "Undefined type: ~S" (parse-unknown-type-specifier c)))))
+  (let ((type (type-or-nil-if-unknown spec)))
+    (cond ((not type)
+           ;; What about a FUNCTION-TYPE - would (FUNCTION (UNKNOWN) UNKNOWN)
+           ;; upgrade to T? Well, it's still ok to say it's an error.
+           (error "Undefined type: ~S" spec))
+          (t
+           (type-specifier (%upgraded-array-element-type type))))))
 
 (defun sb!xc:upgraded-complex-part-type (spec &optional environment)
   #!+sb-doc
@@ -149,10 +145,10 @@
    can hold parts of type SPEC."
   (declare (type lexenv-designator environment) (ignore environment))
   (declare (explicit-check))
-  (let ((type (specifier-type spec)))
+  (let ((type (type-or-nil-if-unknown spec)))
     (cond
       ((eq type *empty-type*) nil)
-      ((unknown-type-p type) (error "undefined type: ~S" spec))
+      ((not type) (error "Undefined type: ~S" spec))
       (t
        (let ((ctype (specifier-type `(complex ,spec))))
          (cond

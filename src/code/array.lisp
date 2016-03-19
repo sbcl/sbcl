@@ -274,12 +274,11 @@
            (result sb!vm:simple-array-nil-widetag))
           (t
            (block nil
-             (let ((ctype
-                     (handler-case (specifier-type type)
-                       (parse-unknown-type ()
-                         (return (result sb!vm:simple-vector-widetag))))))
+             (let ((ctype (type-or-nil-if-unknown type)))
+               (unless ctype
+                 (return (result sb!vm:simple-vector-widetag)))
                (typecase ctype
-                 (union-type ; FIXME: forward ref
+                 (union-type
                   (let ((types (union-type-types ctype)))
                     (cond ((not (every #'numeric-type-p types))
                            (result sb!vm:simple-vector-widetag))
@@ -296,7 +295,7 @@
                            (result sb!vm:simple-array-long-float-widetag))
                           (t
                            (result sb!vm:simple-vector-widetag)))))
-                 (character-set-type ; FIXME: forward ref
+                 (character-set-type
                   #!-sb-unicode (result sb!vm:simple-base-string-widetag)
                   #!+sb-unicode
                   (if (loop for (start . end)

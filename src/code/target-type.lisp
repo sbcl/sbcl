@@ -252,6 +252,7 @@ Examples:
 
 Experimental."
   (declare (ignore env))
-  (handler-case (prog1 t (values-specifier-type type-specifier))
-    (parse-unknown-type () nil)
-    (error () nil)))
+  ;; We don't even care if the spec is parseable -
+  ;; just deem it invalid.
+  (not (null (ignore-errors
+               (type-or-nil-if-unknown type-specifier t)))))
