@@ -47,58 +47,68 @@
 ;;; and an accessing function.
 (declaim (ftype (function (t &optional lexenv-designator))
                 sb!xc:get-setf-expansion))
-(defun sb!xc:get-setf-expansion (form &optional environment
-                                      ;; Assume we'll need one store temp.
-                                      ;; That's the expected thing.
-                                      &aux (store (sb!xc:gensym "NEW")))
+(defun sb!xc:get-setf-expansion (form &optional environment)
   #!+sb-doc
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
-  (if (symbolp form)
-      (multiple-value-bind (expansion expanded)
-          (sb!xc:macroexpand-1 form environment)
-        (if expanded
-            (sb!xc:get-setf-expansion expansion environment)
-            (values nil nil (list store) `(setq ,form ,store) form)))
-      (let ((fun (car form)))
-        (flet ((expand (call arg-maker)
-                 ;; Produce the expansion of a SETF form that calls either
-                 ;; #'(SETF name) or an inverse given by short form DEFSETF.
-                 (multiple-value-bind (temp-vars temp-vals args)
-                     (collect-setf-temps (cdr form) environment nil)
-                   (values temp-vars temp-vals (list store)
-                           `(,.call ,@(funcall arg-maker store args))
-                           `(,fun ,@args)))))
-          ;; Local functions inhibit global SETF methods.
-          (unless (sb!c::fun-locally-defined-p fun environment)
-            (acond ((info :setf :expander fun)
-                    (return-from sb!xc:get-setf-expansion
-                      (cond ((functionp it) ; DEFINE-SETF-EXPANDER
-                             (funcall it form environment))
-                            ((listp it) ; long DEFSETF
-                             (make-setf-quintuple form environment
-                                                  (car it) (cdr it)))
-                            (t ; short DEFSETF
-                             (expand `(,it)
-                                     (lambda (new args) `(,@args ,new)))))))
-                   ((transformable-struct-setf-p form environment)
-                    (let ((instance (make-symbol "OBJ")))
-                      (return-from sb!xc:get-setf-expansion
-                        (values (list instance)
-                                (list (cadr form))
-                                (list store)
-                                (slot-access-transform
-                                 :setf (list instance store) it)
-                                (slot-access-transform
-                                 :read (list instance) it)))))))
-          ;; When NAME is a macro, retry from the top.
-          ;; Otherwise default to the function named `(SETF ,name).
+  (named-let retry ((form form))
+    (labels ((newvals (count)
+               (let ((sb!xc:*gensym-counter* 1))
+                 (make-gensym-list count "NEW")))
+             ;; Produce the expansion of a SETF form that calls either
+             ;; #'(SETF name) or an inverse given by short form DEFSETF.
+             (call (call arg-maker &aux (vals (newvals 1)))
+               (multiple-value-bind (temp-vars temp-vals args)
+                   (collect-setf-temps (cdr form) environment nil)
+                 (values temp-vars temp-vals vals
+                         `(,.call ,@(funcall arg-maker (car vals) args))
+                         `(,(car form) ,@args)))))
+      (declare (ftype (function (t) list) newvals))
+      (if (atom form)
           (multiple-value-bind (expansion expanded)
-              (%macroexpand-1 form environment)
+              ;; Previously this called %MACROEXPAND, but the two operations
+              ;; are equivalent on atoms, so do the one that is "less".
+              (sb!xc:macroexpand-1 form environment)
             (if expanded
-                (sb!xc:get-setf-expansion expansion environment)
-                (expand `(funcall #'(setf ,fun)) #'cons)))))))
+                (retry expansion)
+                (let ((vals (newvals 1)))
+                  (values nil nil vals `(setq ,form ,(car vals)) form))))
+          (let ((fname (car form)))
+            ;; Local functions inhibit global SETF methods.
+            (unless (sb!c::fun-locally-defined-p fname environment)
+              (awhen (info :setf :expander fname)
+                (return-from retry
+                  (typecase it
+                    (symbol ; short DEFSETF
+                     (call `(,it) (lambda (new args) `(,@args ,new))))
+                    (list   ; long DEFSETF
+                     (binding* ((newvals (newvals (car it)))
+                                (expander (the function (cdr it)))
+                                ((tempvars tempvals call-args)
+                                 (collect-setf-temps
+                                  (cdr form) environment
+                                  ;; NAME-HINTS affect aesthetics only
+                                  (or #+sb-xc (%fun-lambda-list expander)))))
+                       (values tempvars tempvals newvals
+                               (apply expander call-args environment newvals)
+                               `(,fname ,@call-args))))
+                    ;; DEFINE-SETF-EXPANDER
+                    (function (funcall it form environment)))))
+              (awhen (transformable-struct-setf-p form environment)
+                (let ((instance (make-symbol "OBJ"))
+                      (vals (newvals 1)))
+                  (return-from retry
+                    (values (list instance) (list (cadr form)) vals
+                            (slot-access-transform
+                             :setf (list instance (car vals)) it)
+                            (slot-access-transform
+                             :read (list instance) it))))))
+            (multiple-value-bind (expansion expanded)
+                (%macroexpand-1 form environment)
+              (if expanded
+                  (retry expansion) ; if a macro, we start over
+                  (call `(funcall #'(setf ,fname)) #'cons))))))))
 
 ;; Expand PLACE until it is a form that SETF might know something about.
 ;; Macros are expanded only when no SETF expander (or inverse) exists.
@@ -454,6 +464,9 @@
       (setf (fdocumentation name 'setf) doc))
     name))
 
+;;; This is pretty broken if there are keyword arguments (lp#1452947)
+;;; but the bug seems to be due to irreconcilable problems in the spec.
+;;; Everybody seems to interpret the spec the way we do though.
 (sb!xc:defmacro sb!xc:defsetf (access-fn &rest rest)
   #!+sb-doc
   "Associates a SETF update function or macro with the specified access
@@ -527,21 +540,6 @@
                                 (temp-vals form)
                                 temp)))
           (setq bit (ash bit 1)))))))
-
-;; Return the 5-part expansion of a SETF form defined by the long form
-;; of DEFSETF.
-;; FIXME: totally broken if there are keyword arguments. lp#1452947
-(defun make-setf-quintuple (access-form environment num-store-vars expander)
-    (declare (type function expander))
-    (multiple-value-bind (temp-vars temp-vals call-arguments)
-        ;; FORMALS affect aesthetics only, not behavior.
-        (let ((formals #-sb-xc-host (%fun-lambda-list expander)))
-          (collect-setf-temps (cdr access-form) environment formals))
-      (let ((stores (let ((sb!xc:*gensym-counter* 1))
-                      (make-gensym-list num-store-vars "NEW"))))
-        (values temp-vars temp-vals stores
-                (apply expander call-arguments environment stores)
-                `(,(car access-form) ,@call-arguments)))))
 
 ;; Expand a macro defined by DEFINE-MODIFY-MACRO.
 ;; The generated call resembles (FUNCTION <before-args> PLACE <after-args>)
