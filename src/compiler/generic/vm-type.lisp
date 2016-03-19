@@ -119,17 +119,11 @@
           ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
           (contains-unknown-type-p eltype))
       *wild-type*
-      (dolist (stype-name *specialized-array-element-types*
-                          *universal-type*)
-        ;; FIXME: Mightn't it be better to have
-        ;; *SPECIALIZED-ARRAY-ELEMENT-TYPES* be stored as precalculated
-        ;; SPECIFIER-TYPE results, instead of having to calculate
-        ;; them on the fly this way? (Call the new array
-        ;; *SPECIALIZED-ARRAY-ELEMENT-SPECIFIER-TYPES* or something..)
-        (let ((stype (specifier-type stype-name)))
-          (aver (not (unknown-type-p stype)))
-          (when (csubtypep eltype stype)
-            (return stype))))))
+      (dovector (stype
+                 (literal-ctype-vector *parsed-specialized-array-element-types*)
+                 *universal-type*)
+       (when (csubtypep eltype stype)
+         (return stype)))))
 
 (defun sb!xc:upgraded-array-element-type (spec &optional environment)
   #!+sb-doc

@@ -490,6 +490,7 @@
 ;; and 2 ctype objects for unknown-rank arrays, one each for simple
 ;; and maybe-simple. (Unknown rank, known-non-simple isn't important)
 #+sb-xc-host
+(progn
 (defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
              (setf (!ctype-saetp-index type) type-index)
@@ -542,6 +543,12 @@
            ((eql nil) *empty-type*))
          index array)
         (incf index)))))
+(defvar *parsed-specialized-array-element-types*
+  (let ((a (make-array (length *specialized-array-element-types*))))
+    (loop for i below (length a)
+          do (setf (aref a i) (array-type-specialized-element-type
+                               (aref *interned-array-types* (* i 5)))))
+    a)))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
