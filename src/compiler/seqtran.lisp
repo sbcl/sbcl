@@ -1355,13 +1355,8 @@
 ;;; in the right ballpark.
 (defvar *concatenate-open-code-limit* 129)
 
-(deftransform concatenate ((result-type &rest lvars)
-                           ((constant-arg
-                             (member string simple-string base-string simple-base-string))
-                            &rest sequence)
-                           * :node node)
-  (let ((vars (make-gensym-list (length lvars)))
-        (type (lvar-value result-type)))
+(defun string-concatenate-transform (node type lvars)
+  (let ((vars (make-gensym-list (length lvars))))
     (if (policy node (<= speed space))
         ;; Out-of-line
         (let ((constants-to-string
@@ -1451,6 +1446,69 @@
                                      (incf (truly-the index .pos.) (length ,var)))
                                 (setf constants nil)))))
                .string.))))))
+
+(defun vector-specifier-widetag (type)
+  ;; FIXME: This only accepts vectors without dimensions even though
+  ;; it's not that hard to support them for the concatenate transform,
+  ;; but it's probably not used often enough to bother.
+  (cond ((and (array-type-p type)
+              (equal (array-type-dimensions type) '(*)))
+         (let* ((el-ctype (array-type-element-type type))
+                (el-ctype (if (eq el-ctype *wild-type*)
+                              *universal-type*
+                              el-ctype))
+                (saetp (find-saetp-by-ctype el-ctype)))
+           (when saetp
+             (sb!vm:saetp-typecode saetp))))
+        ((and (union-type-p type)
+              (csubtypep type (specifier-type 'string))
+              (loop for type in (union-type-types type)
+                    always (equal (array-type-dimensions type) '(*))))
+         #!+sb-unicode
+         sb!vm:simple-character-string-widetag
+         #!-sb-unicode
+         sb!vm:simple-base-string-widetag)))
+
+(deftransform concatenate ((result-type &rest lvars)
+                           ((constant-arg t)
+                            &rest sequence)
+                           * :node node)
+  (let* ((type (ir1-transform-specifier-type (lvar-value result-type)))
+         (vector-widetag (vector-specifier-widetag type)))
+    (flet ((coerce-constants (vars type)
+             ;; Lists are faster to iterate over than vectors of
+             ;; unknown type.
+             (loop for var in vars
+                   for lvar in lvars
+                   collect (if (constant-lvar-p lvar)
+                               `',(coerce (lvar-value lvar) type)
+                               var))))
+
+      (cond ((type= type (specifier-type 'list))
+             (let ((vars (make-gensym-list (length lvars))))
+               `(lambda (type ,@vars)
+                  (declare (ignore type)
+                           (ignorable ,@vars))
+                  (%concatenate-to-list ,@(coerce-constants vars 'list)))))
+            ((not vector-widetag)
+             (give-up-ir1-transform))
+            ((= vector-widetag sb!vm:simple-base-string-widetag)
+             (string-concatenate-transform node 'simple-base-string lvars))
+            #!+sb-unicode
+            ((= vector-widetag sb!vm:simple-character-string-widetag)
+             (string-concatenate-transform node 'string lvars))
+            ;; FIXME: other vectors may use inlined expansion from
+            ;; STRING-CONCATENATE-TRANSFORM as well.
+            (t
+             (let ((vars (make-gensym-list (length lvars))))
+               `(lambda (type ,@vars)
+                  (declare (ignore type)
+                           (ignorable ,@vars))
+                  ,(if (= vector-widetag sb!vm:simple-vector-widetag)
+                       `(%concatenate-to-simple-vector
+                         ,@(coerce-constants vars 'vector))
+                       `(%concatenate-to-vector
+                         ,vector-widetag ,@(coerce-constants vars 'list))))))))))
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
