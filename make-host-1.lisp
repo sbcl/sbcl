@@ -28,8 +28,15 @@
     ;; unless outside a compilation unit. You find out about it only upon
     ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
     `(let (fail)
-       (handler-bind (((and warning (not style-warning))
-                       (lambda (c) (setq fail t))))
+       (handler-bind (((and simple-warning (not style-warning))
+                       (lambda (c)
+                         ;; hack for PPC. See 'build-order.lisp-expr'
+                         ;; Ignore the warning, and the warning about the warning.
+                         (unless (or (search "not allowed by the operand type"
+                                             (simple-condition-format-control c))
+                                     (search "ignoring FAILURE-P return"
+                                             (simple-condition-format-control c)))
+                           (setq fail t)))))
          (with-compilation-unit () ,@forms))
        (when fail
          (error "make-host-1 stopped due to unexpected WARNING.")))
