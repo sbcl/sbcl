@@ -1,27 +1,43 @@
 ;;; Do warm init without compiling files.
-(defvar *compile-files-p* nil)
-"about to LOAD warm.lisp (with *compile-files-p* = NIL)"
+(progn
+  (defvar *compile-files-p* nil)
+  "about to LOAD warm.lisp (with *compile-files-p* = NIL)")
 (let ((*print-length* 10)
       (*print-level* 5)
       (*print-circle* t))
-  (load "src/cold/warm.lisp"))
+  (load "src/cold/warm.lisp")
 
-(sb-disassem::!compile-inst-printers)
+  ;; Collapse identical FUN-INFOs
+  sb-int::
+  (let ((ht (make-hash-table :test 'equalp))
+        (old-count 0))
+    (sb-c::call-with-each-globaldb-name
+     (lambda (name)
+       (binding* ((info (info :function :info name) :exit-if-null)
+                  (shared-info (gethash info ht info)))
+         (incf old-count)
+         (if (eq info shared-info)
+             (setf (gethash info ht) info)
+           (setf (info :function :info name) shared-info)))))
+    (format t "~&FUN-INFO: Collapsed ~D -> ~D~%"
+            old-count (hash-table-count ht)))
 
-;;; Unintern no-longer-needed stuff before the possible PURIFY in
-;;; SAVE-LISP-AND-DIE.
-#-sb-fluid (sb-impl::!unintern-init-only-stuff)
+  (sb-disassem::!compile-inst-printers)
 
-;;; A symbol whose INFO slot underwent any kind of manipulation
-;;; such that it now has neither properties nor globaldb info,
-;;; can have the slot set back to NIL if it wasn't already.
-(do-all-symbols (symbol)
-  (when (and (sb-kernel:symbol-info symbol)
-             (null (sb-kernel:symbol-info-vector symbol))
-             (null (symbol-plist symbol)))
-    (setf (sb-kernel:symbol-info symbol) nil)))
+  ;; Unintern no-longer-needed stuff before the possible PURIFY in
+  ;; SAVE-LISP-AND-DIE.
+  #-sb-fluid (sb-impl::!unintern-init-only-stuff)
 
-"done with warm.lisp, about to GC :FULL T"
+  ;; A symbol whose INFO slot underwent any kind of manipulation
+  ;; such that it now has neither properties nor globaldb info,
+  ;; can have the slot set back to NIL if it wasn't already.
+  (do-all-symbols (symbol)
+    (when (and (sb-kernel:symbol-info symbol)
+               (null (sb-kernel:symbol-info-vector symbol))
+               (null (symbol-plist symbol)))
+      (setf (sb-kernel:symbol-info symbol) nil)))
+
+  "done with warm.lisp, about to GC :FULL T")
 (sb-ext:gc :full t)
 
 ;;; resetting compilation policy to neutral values in preparation for
