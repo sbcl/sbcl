@@ -8,24 +8,38 @@
 (progn (load "src/cold/shared.lisp")
        (load "tools-for-build/ldso-stubs.lisp"))
 (in-package "SB-COLD")
-(setf *host-obj-prefix* "obj/from-host/")
-(progn (load "src/cold/set-up-cold-packages.lisp")
-       (load "src/cold/defun-load-or-cload-xcompiler.lisp"))
+(progn
+  (setf *host-obj-prefix* "obj/from-host/")
+  (load "src/cold/set-up-cold-packages.lisp")
+  (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 
-(progn (set-dispatch-macro-character #\# #\+ #'she-reader)
-       (set-dispatch-macro-character #\# #\- #'she-reader))
+  ;; Supress function/macro redefinition warnings under clisp.
+  #+clisp (setf custom:*suppress-check-redefinition* t)
 
-;; Supress function/macro redefinition warnings under clisp.
-#+clisp
-(progn (setf custom:*suppress-check-redefinition* t)
-       ;; A compilation-unit seems to kill the compile. I'm not sure if it's
-       ;; running out of memory or what. I don't care to find out,
-       ;; but it's most definitely the cause of the breakage.
-       (defmacro maybe-with-compilation-unit (&body forms)
-         `(progn ,@forms)))
-#-clisp
-(defmacro maybe-with-compilation-unit (&body forms)
-  `(with-compilation-unit () ,@forms))
+  (defmacro maybe-with-compilation-unit (&body forms)
+    ;; A compilation-unit seems to kill the compile. I'm not sure if it's
+    ;; running out of memory or what. I don't care to find out,
+    ;; but it's most definitely the cause of the breakage.
+    #+clisp `(progn ,@forms)
+
+    #+sbcl
+    ;; Watch for deferred warnings under SBCL.
+    ;; UNDEFINED-VARIABLE does not cause COMPILE-FILE to return warnings-p
+    ;; unless outside a compilation unit. You find out about it only upon
+    ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
+    `(let (fail)
+       (handler-bind (((and warning (not style-warning))
+                       (lambda (c) (setq fail t))))
+         (with-compilation-unit () ,@forms))
+       (when fail
+         (error "make-host-1 stopped due to unexpected WARNING.")))
+
+    #-(or clisp sbcl) `(with-compilation-unit () ,@forms))
+
+  ;; Now we can set the #[+-] readers to our precautionary
+  ;; readers that prohibit use of ":sbcl" as the condition.
+  (set-dispatch-macro-character #\# #\+ #'she-reader)
+  (set-dispatch-macro-character #\# #\- #'she-reader))
 
 (maybe-with-compilation-unit
  (load-or-cload-xcompiler #'host-cload-stem)
