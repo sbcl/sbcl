@@ -880,16 +880,9 @@ many elements are copied."
   "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
   specified RESULT-TYPE."
-  (declare (explicit-check))
-  (flet ((concat-to-list* (sequences)
-           (let ((result (list nil)))
-             (do ((sequences sequences (cdr sequences))
-                  (splice result))
-                 ((null sequences) (cdr result))
-               (let ((sequence (car sequences)))
-                 (sb!sequence:dosequence (e sequence)
-                   (setq splice (cdr (rplacd splice (list e)))))))))
-         (concat-to-simple* (type-spec sequences)
+  (declare (explicit-check)
+           (dynamic-extent sequences))
+  (flet ((concat-to-simple* (type-spec sequences)
            (do ((seqs sequences (cdr seqs))
                 (total-length 0)
                 (lengths ()))
@@ -908,66 +901,104 @@ many elements are copied."
                (declare (fixnum length))
                (setq lengths (nconc lengths (list length)))
                (setq total-length (+ total-length length))))))
-    (let ((type (specifier-type result-type)))
-      (cond
-        ((csubtypep type (specifier-type 'list))
+    (case result-type
+      ;; Pick up some common cases first
+      (list
+       (apply #'%concatenate-to-list sequences))
+      ((vector simple-vector)
+       (apply #'%concatenate-to-simple-vector sequences))
+      #!+sb-unicode
+      ((string simple-string)
+       (apply #'%concatenate-to-string sequences))
+      ((simple-base-string #!-sb-unicode string #!-sb-unicode simple-string)
+       (apply #'%concatenate-to-base-string sequences))
+      (t
+       (let ((type (specifier-type result-type)))
          (cond
-           ((type= type (specifier-type 'list))
-            (concat-to-list* sequences))
-           ((eq type *empty-type*)
-            (bad-sequence-type-error nil))
-           ((type= type (specifier-type 'null))
-            (unless (every #'emptyp sequences)
-              (sequence-type-length-mismatch-error
-               type (reduce #'+ sequences :key #'length))) ; FIXME: circular list issues.
-            '())
-           ((cons-type-p type)
-            (multiple-value-bind (min exactp)
-                (sb!kernel::cons-type-length-info type)
-              (let ((length (reduce #'+ sequences :key #'length)))
-                (if exactp
-                    (unless (= length min)
-                      (sequence-type-length-mismatch-error type length))
-                    (unless (>= length min)
-                      (sequence-type-length-mismatch-error type length)))
-                (concat-to-list* sequences))))
-           (t (sequence-type-too-hairy (type-specifier type)))))
-        ((csubtypep type (specifier-type 'vector))
-         (concat-to-simple* result-type sequences))
-        ((when-extended-sequence-type
-             (result-type type :expandedp nil :prototype prototype)
-           ;; This function has the EXPLICIT-CHECK declaration,
-           ;; so we manually assert that it returns a SEQUENCE.
-           (the extended-sequence
-                (apply #'sb!sequence:concatenate prototype sequences))))
-        (t
-         (bad-sequence-type-error result-type))))))
+           ((csubtypep type (specifier-type 'list))
+            (cond
+              ((type= type (specifier-type 'list))
+               (apply #'%concatenate-to-list sequences))
+              ((eq type *empty-type*)
+               (bad-sequence-type-error nil))
+              ((type= type (specifier-type 'null))
+               (unless (every #'emptyp sequences)
+                 (sequence-type-length-mismatch-error
+                  type (reduce #'+ sequences :key #'length))) ; FIXME: circular list issues.
+               '())
+              ((cons-type-p type)
+               (multiple-value-bind (min exactp)
+                   (sb!kernel::cons-type-length-info type)
+                 (let ((length (reduce #'+ sequences :key #'length)))
+                   (if exactp
+                       (unless (= length min)
+                         (sequence-type-length-mismatch-error type length))
+                       (unless (>= length min)
+                         (sequence-type-length-mismatch-error type length)))
+                   (apply #'%concatenate-to-list sequences))))
+              (t (sequence-type-too-hairy (type-specifier type)))))
+           ((csubtypep type (specifier-type 'vector))
+            (concat-to-simple* result-type sequences))
+           ((when-extended-sequence-type
+                (result-type type :expandedp nil :prototype prototype)
+              ;; This function has the EXPLICIT-CHECK declaration,
+              ;; so we manually assert that it returns a SEQUENCE.
+              (the extended-sequence
+                   (apply #'sb!sequence:concatenate prototype sequences))))
+           (t
+            (bad-sequence-type-error result-type))))))))
 
 ;;; Efficient out-of-line concatenate for strings. Compiler transforms
 ;;; CONCATENATE 'STRING &co into these.
-(macrolet ((def (name element-type)
+(macrolet ((def (name element-type &rest dispatch)
              `(defun ,name (&rest sequences)
                 (declare (explicit-check)
-                         (optimize (sb-c::insert-array-bounds-checks 0)))
+                         (optimize (sb!c::insert-array-bounds-checks 0)))
                 (let ((length 0))
                   (declare (index length))
-                  (do-rest-arg ((seq) sequences) sequences
+                  (do-rest-arg ((seq) sequences)
                     (incf length (length seq)))
                   (let ((result (make-array length :element-type ',element-type))
                         (start 0))
                     (declare (index start))
-                    (do-rest-arg ((seq) sequences) sequences
-                      (string-dispatch ((simple-array character (*))
-                                        (simple-array base-char (*))
-                                        t)
+                    (do-rest-arg ((seq) sequences)
+                      (string-dispatch (,@dispatch t)
                                        seq
-                                       (let ((length (length seq)))
-                                         (replace result seq :start1 start)
-                                         (incf start length))))
+                        (let ((length (length seq)))
+                          (replace result seq :start1 start)
+                          (incf start length))))
                     result)))))
-  (def %concatenate-to-string character)
-  (def %concatenate-to-base-string base-char))
+  #!+sb-unicode
+  (def %concatenate-to-string character
+    (simple-array character (*)) (simple-array base-char (*)))
+  (def %concatenate-to-base-string base-char
+    (simple-array base-char (*)) #!+sb-unicode (simple-array character (*)))
+  (def %concatenate-to-simple-vector t simple-vector))
 
+(defun %concatenate-to-list (&rest sequences)
+  (declare (explicit-check))
+  (let* ((result (list nil))
+         (splice result))
+    (do-rest-arg ((sequence) sequences)
+      (sb!sequence:dosequence (e sequence)
+        (setf splice (cdr (rplacd splice (list e))))))
+    (cdr result)))
+
+(defun %concatenate-to-vector (widetag &rest sequences)
+  (declare (explicit-check))
+  (let ((length 0))
+    (declare (index length))
+    (do-rest-arg ((seq) sequences)
+      (incf length (length seq)))
+    (let ((result (allocate-vector-with-widetag widetag length))
+          (setter (the function (svref %%data-vector-setters%% widetag)))
+          (index 0))
+      (declare (index index))
+      (do-rest-arg ((seq) sequences)
+        (sb!sequence:dosequence (e seq)
+          (funcall setter result index e)
+          (incf index)))
+      result)))
 
 ;;;; MAP
 

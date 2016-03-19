@@ -516,6 +516,13 @@
   (flushable))
 (defknown %concatenate-to-base-string (&rest sequence) simple-base-string
   (flushable))
+(defknown %concatenate-to-list (&rest sequence) list
+    (flushable))
+(defknown %concatenate-to-simple-vector (&rest sequence) simple-vector
+  (flushable))
+(defknown %concatenate-to-vector ((unsigned-byte #.sb!vm:n-widetag-bits) &rest sequence)
+    vector
+  (flushable))
 
 (defknown map (type-specifier (callable &rest) sequence &rest sequence)
   consed-sequence (call)
