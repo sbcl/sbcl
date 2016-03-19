@@ -360,27 +360,15 @@ evaluated as a PROGN."
   allowing RETURN to be used as an alternate exit mechanism."
   (frob-do-body varlist endlist body 'let* 'setq 'do* nil)))
 
-;;; DOTIMES and DOLIST could be defined more concisely using
-;;; destructuring macro lambda lists or DESTRUCTURING-BIND, but then
-;;; it'd be tricky to use them before those things were defined.
-;;; They're used enough times before destructuring mechanisms are
-;;; defined that it looks as though it's worth just implementing them
-;;; ASAP, at the cost of being unable to use the standard
-;;; destructuring mechanisms.
 (sb!xc:defmacro dotimes ((var count &optional (result nil)) &body body)
-  (cond ((integerp count)
-        `(do ((,var 0 (1+ ,var)))
-             ((>= ,var ,count) ,result)
-           (declare (type unsigned-byte ,var))
-           ,@body))
-        (t
-         (let ((c (gensym "COUNT")))
-           `(do ((,var 0 (1+ ,var))
-                 (,c ,count))
-                ((>= ,var ,c) ,result)
-              (declare (type unsigned-byte ,var)
-                       (type integer ,c))
-              ,@body)))))
+  ;; A nice optimization would be that if VAR is never referenced,
+  ;; it's slightly more efficient to count backwards, but that's tricky.
+  (let ((c (if (integerp count) count (sb!xc:gensym))))
+    `(do ((,var 0 (1+ ,var))
+          ,@(if (symbolp c) `((,c (the integer ,count)))))
+         ((>= ,var ,c) ,result)
+       (declare (type unsigned-byte ,var))
+       ,@body)))
 
 (sb!xc:defmacro dolist ((var list &optional (result nil)) &body body &environment env)
   ;; We repeatedly bind the var instead of setting it so that we never
