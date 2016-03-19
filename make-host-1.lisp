@@ -61,7 +61,9 @@
 ;; When building on a slow host using a slow Lisp,
 ;; the wait time in slurp-ucd seems interminable - over a minute.
 ;; Compiling seems to help a bit, but maybe it's my imagination.
- (load (compile-file "tools-for-build/ucd.lisp"))
+ (let ((object (compile-file "tools-for-build/ucd.lisp")))
+   (load object)
+   (delete-file object))
 
 ;;; Generate character database tables.
  (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
