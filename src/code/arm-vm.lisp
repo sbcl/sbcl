@@ -44,6 +44,16 @@
   (setf (deref (context-register-addr context index))
         new))
 
+(defun context-float-register (context index format)
+  (declare (ignorable context index))
+  (warn "stub CONTEXT-FLOAT-REGISTER")
+  (coerce 0 format))
+
+(defun %set-context-float-register (context index format new-value)
+  (declare (ignore context index))
+  (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
+  (coerce new-value format))
+
 (defun context-pc (context)
   (int-sap (context-register context pc-offset)))
 

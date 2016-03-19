@@ -155,6 +155,7 @@
                (ref-name set-name sc type size &key signed use-lip)
                (let ((ref-name-c (symbolicate ref-name "-C"))
                      (set-name-c (symbolicate set-name "-C")))
+                 (declare (ignorable ref-name-c set-name-c))
                  `(progn
                    (define-vop (,ref-name)
                        (:translate ,ref-name)
