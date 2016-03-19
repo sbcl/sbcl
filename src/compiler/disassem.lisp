@@ -235,24 +235,6 @@
                               (:copier nil))
   (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
   (subspace (missing-arg) :type (or inst-space instruction)))
-
-;;; FIXME: If we we interned the temp vars,
-;;; and wouldn't use symbols qua strings, then this would reduce to EQUAL.
-(defun equal-mod-gensyms (a b)
-  (named-let recurse ((a a) (b b))
-    (etypecase a
-      (null (null b))
-      (list (and (listp b) (recurse (car a) (car b)) (recurse (cdr a) (cdr b))))
-      (symbol (or (eq a b)
-                  (and (symbolp b)
-                       (not (symbol-package a))
-                       (not (symbol-package b))
-                       ;; If "strings", then comparison by STRING= is right,
-                       ;; and if lexical vars, it's also right because
-                       ;; we never rebind a given temp within a function.
-                       (string= a b))))
-      ((or number character function) (eql a b))
-      (vector (and (vectorp b) (every #'recurse a b))))))
 
 (defstruct (arg (:constructor %make-arg (name))
                 (:copier nil)
@@ -427,6 +409,7 @@
                                 (arg (find ',(car arg-spec) format-args
                                            :key #'arg-name))
                                 (funstate (make-funstate format-args))
+                                (*!temp-var-counter* 0)
                                 (expr (arg-value-form arg funstate :numeric)))
                            `(let* ,(make-arg-temp-bindings funstate) ,expr))))
                     (reader)))))))
@@ -534,23 +517,28 @@
 ;;; :FILTERED, :NUMERIC, and :FINAL. Each rendering depends on the preceding
 ;;; one, so asking for :FINAL will implicitly compute all renderings.
 (defun gen-arg-forms (arg rendering funstate)
-  (let* ((arg-cell (assq arg funstate))
-         (rendering-temps (cdr (assq rendering (cdr arg-cell))))
-         (vars (car rendering-temps))
-         (forms (cdr rendering-temps)))
-    (unless forms
-      (multiple-value-bind (new-forms single-value-p)
-          (%gen-arg-forms arg rendering funstate)
-        (setq forms new-forms
-              vars (cond ((or single-value-p (atom forms))
-                          (if (symbolp forms) vars (sb!xc:gensym "_")))
-                         ((every #'symbolp forms)
-                          ;; just use the same as the forms
-                          nil)
-                         (t
-                          (make-gensym-list (length forms) "_"))))
-        (push (list* rendering vars forms) (cdr arg-cell))))
-    (or vars forms)))
+  (labels ((tempvars (n)
+             (if (plusp n)
+                 (cons (intern (format nil ".T~D" (incf *!temp-var-counter*))
+                               (load-time-value (find-package "SB!DISASSEM")))
+                       (tempvars (1- n))))))
+    (let* ((arg-cell (assq arg funstate))
+           (rendering-temps (cdr (assq rendering (cdr arg-cell))))
+           (vars (car rendering-temps))
+           (forms (cdr rendering-temps)))
+      (unless forms
+        (multiple-value-bind (new-forms single-value-p)
+            (%gen-arg-forms arg rendering funstate)
+          (setq forms new-forms
+                vars (cond ((or single-value-p (atom forms))
+                            (if (symbolp forms) vars (car (tempvars 1))))
+                           ((every #'symbolp forms)
+                            ;; just use the same as the forms
+                            nil)
+                           (t
+                            (tempvars (length forms)))))
+          (push (list* rendering vars forms) (cdr arg-cell))))
+      (or vars forms))))
 
 (defun maybe-listify (forms)
   (cond ((atom forms)
@@ -643,15 +631,16 @@
            `((lookup-label ,(maybe-listify numeric-forms)))
            numeric-forms)))))
 
+(defvar *!temp-var-counter*)
 (defun find-printer-fun (printer-source args cache *current-instruction-flavor*)
   (let* ((source (preprocess-printer printer-source args))
          (funstate (make-funstate args))
-         (forms (let ((sb!xc:*gensym-counter* 0))
+         (forms (let ((*!temp-var-counter* 0))
                   (compile-printer-list source funstate)))
          (bindings (make-arg-temp-bindings funstate))
          (guts `(let* ,bindings ,@forms))
          (sub-table (assq :printer cache)))
-    (or (cdr (assoc guts (cdr sub-table) :test #'equal-mod-gensyms))
+    (or (cdr (assoc guts (cdr sub-table) :test #'equal))
         (let ((template
      '(lambda (chunk inst stream dstate
                &aux (chunk (truly-the dchunk chunk))
@@ -845,24 +834,7 @@
       (return choice))))
 
 (defun compile-printer-list (sources funstate)
-  (unless (null sources)
-    ;; Coalesce adjacent symbols/strings, and convert to strings if possible,
-    ;; since they require less consing to write.
-    (do ((el (car sources) (car sources))
-         (names nil (cons (strip-quote el) names)))
-        ((not (string-or-qsym-p el))
-         (when names
-           ;; concatenate adjacent strings and symbols
-           (let ((string
-                  (apply #'concatenate
-                         'string
-                         (mapcar #'string (nreverse names)))))
-             ;; WTF? Everything else using INST-PRINT-NAME writes a string.
-             (push (if (some #'alpha-char-p string)
-                       `',(make-symbol string) ; Preserve casifying output.
-                       string)
-                   sources))))
-      (pop sources))
+  (when sources
     (cons (compile-printer-body (car sources) funstate)
           (compile-printer-list (cdr sources) funstate))))
 
@@ -935,18 +907,6 @@
        `(,(if (arg-use-label arg) 'local-princ16 'local-princ)
          ,(arg-value-form arg funstate))))))
 
-(defun string-or-qsym-p (thing)
-  (or (stringp thing)
-      (and (consp thing)
-           (eq (car thing) 'quote)
-           (or (stringp (cadr thing))
-               (symbolp (cadr thing))))))
-
-(defun strip-quote (thing)
-  (if (and (consp thing) (eq (car thing) 'quote))
-      (cadr thing)
-      thing))
-
 (defun compare-fields-form (val-form-1 val-form-2)
   (flet ((listify-fields (fields)
            (cond ((symbolp fields) fields)

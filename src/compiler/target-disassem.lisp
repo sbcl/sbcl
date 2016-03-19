@@ -763,7 +763,10 @@
       (awhen (get symbol 'instruction-flavors)
         (setf (get symbol 'instruction-flavors)
               (collect-inst-variants
-               (string-upcase symbol) package it cache))))))
+               (string-upcase symbol) package it cache))))
+    (apply 'format t
+           "~&Disassembler: ~D printers, ~D prefilters, ~D labelers~%"
+           (mapcar (lambda (x) (length (cdr x))) cache))))
 
 ;;; Get the instruction-space, creating it if necessary.
 (defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)
@@ -2153,12 +2156,11 @@
                compare-fields-form compile-inst-printer compile-print
                compile-printer-body compile-printer-list compile-test
                correct-dchunk-bytespec-for-endianness
-               define-arg-type define-instruction-format equal-mod-gensyms
+               define-arg-type define-instruction-format
                find-first-field-name find-printer-fun format-or-lose
                gen-arg-forms make-arg-temp-bindings make-funstate massage-arg
                maybe-listify modify-arg pd-error pick-printer-choice
                preprocess-chooses preprocess-conditionals preprocess-printer
-               preprocess-test sharing-cons sharing-mapcar
-               string-or-qsym-p strip-quote))
+               preprocess-test sharing-cons sharing-mapcar))
     (fmakunbound s)
     (unintern s 'sb-disassem)))
