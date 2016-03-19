@@ -516,6 +516,7 @@
 ;;; RENDERING style, which is one of :RAW, :SIGN-EXTENDED,
 ;;; :FILTERED, :NUMERIC, and :FINAL. Each rendering depends on the preceding
 ;;; one, so asking for :FINAL will implicitly compute all renderings.
+(defvar *!temp-var-counter*)
 (defun gen-arg-forms (arg rendering funstate)
   (labels ((tempvars (n)
              (if (plusp n)
@@ -631,7 +632,6 @@
            `((lookup-label ,(maybe-listify numeric-forms)))
            numeric-forms)))))
 
-(defvar *!temp-var-counter*)
 (defun find-printer-fun (printer-source args cache *current-instruction-flavor*)
   (let* ((source (preprocess-printer printer-source args))
          (funstate (make-funstate args))
