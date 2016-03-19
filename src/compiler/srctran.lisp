@@ -4518,27 +4518,47 @@
       (give-up-ir1-transform))
     (let ((arg-names (make-gensym-list (length args))))
       `(lambda (stream control ,@arg-names)
-         (declare (ignore stream control))
+         (declare (ignore stream control)
+                  (ignorable ,@arg-names))
          (concatenate
           'string
-          ,@(loop for directive in tokenized
-                  for char = (and (not (stringp directive))
-                                  (sb!format::format-directive-character directive))
-                  when
-                  (cond ((not char)
-                         directive)
-                        ((char-equal char #\a)
-                         (pop arg-names))
-                        (t
-                         (let ((n (or (cdar (sb!format::format-directive-params directive))
-                                      1)))
-                           (and (plusp n)
-                                (make-string n
-                                             :initial-element
-                                             (if (eql char #\%)
-                                                 #\Newline
-                                                 char))))))
-                  collect it))))))
+          ,@(let ((strings
+                    (loop for (directive rest) on tokenized
+                          for char = (and (not (stringp directive))
+                                          (sb!format::format-directive-character directive))
+                          when
+                          (cond ((not char)
+                                 directive)
+                                ((char-equal char #\a)
+                                 (let ((arg (pop args))
+                                       (arg-name (pop arg-names)))
+                                   (if
+                                    (constant-lvar-p arg)
+                                    (lvar-value arg)
+                                    arg-name)))
+                                (t
+                                 (let ((n (or (cdar (sb!format::format-directive-params directive))
+                                              1)))
+                                   (and (plusp n)
+                                        (make-string n
+                                                     :initial-element
+                                                     (if (eql char #\%)
+                                                         #\Newline
+                                                         char))))))
+                          collect it)))
+              ;; Join adjacent constant strings
+              (loop with concat
+                    for (string . rest) on strings
+                    when (stringp string)
+                    do (setf concat
+                             (if concat
+                                 (concatenate 'string concat string)
+                                 string))
+                    else
+                    when concat collect (shiftf concat nil) end
+                    and collect string
+                    when (and concat (not rest))
+                    collect concat)))))))
 
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)
