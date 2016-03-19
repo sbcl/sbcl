@@ -85,8 +85,7 @@
                   offset-iter)))))))
 
 ;;; Return true if TN has a conflict in SC at the specified offset.
-(declaim (ftype (function (tn sc index) (values (or null index) &optional))
-                conflicts-in-sc))
+(declaim (ftype (sfunction (tn sc index) (or null index)) conflicts-in-sc))
 (defun conflicts-in-sc (tn sc offset)
   (declare (type tn tn) (type sc sc) (type index offset))
   (offset-conflicts-in-sb tn (sc-sb sc) offset

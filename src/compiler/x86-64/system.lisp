@@ -459,11 +459,11 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 ;;;;
 
-(defknown %cons-cas-pair (cons t t t t) (values t t &optional))
+(defknown %cons-cas-pair (cons t t t t) (values t t))
 ;; These unsafely permits cmpxchg on any kind of vector, boxed or unboxed
 ;; and the same goes for instances.
-(defknown %vector-cas-pair (simple-array index t t t t) (values t t &optional))
-(defknown %instance-cas-pair (instance index t t t t) (values t t &optional))
+(defknown %vector-cas-pair (simple-array index t t t t) (values t t))
+(defknown %instance-cas-pair (instance index t t t t) (values t t))
 
 ;; 32-bit register names here are not an accident - it's a deliberate attempt
 ;; to keep this exactly in sync with 32-bit code in the hope that somebody

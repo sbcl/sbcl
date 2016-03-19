@@ -243,8 +243,7 @@
        `(flet ((constantp* (x) (%constantp x environment envp))
                (constant-form-value* (x) (%constant-form-value x environment envp)))
           (declare (optimize speed) (ignorable #'constantp*)
-                   (ftype (function (t) (values t &optional)) ; avoid "unknown values"
-                          constantp* constant-form-value*))
+                   (ftype (sfunction (t) t) constantp* constant-form-value*))
           (let ((args (cdr (truly-the list form))))
             (case (car form)
               ,@(map 'list

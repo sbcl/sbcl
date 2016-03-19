@@ -84,6 +84,7 @@
 
 (/show0 "backq.lisp 83")
 
+;; KLUDGE: 'sfunction' is not a defined type yet.
 (declaim (ftype (function (t fixnum boolean) (values t t &optional))
                 qq-template-to-sexpr qq-template-1))
 

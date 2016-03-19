@@ -29,7 +29,7 @@
       (declare (ignore indicator))
       (values value (not (null foundp))))))
 
-(declaim (ftype (function (symbol t &optional t t) (values null &optional))
+(declaim (ftype (sfunction (symbol t &optional t t) null)
                 about-to-modify-symbol-value))
 ;;; the guts of DEFCONSTANT
 

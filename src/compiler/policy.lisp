@@ -235,7 +235,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;;; Forward declaration of %COERCE-TO-POLICY.
 ;;; Definition is in 'node' so that FUNCTIONAL and NODE types are defined.
 ;;; Arg is declared of type T because the function explicitly checks it.
-(declaim (ftype (function (t) (values policy &optional)) %coerce-to-policy))
+(declaim (ftype (sfunction (t) policy) %coerce-to-policy))
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;

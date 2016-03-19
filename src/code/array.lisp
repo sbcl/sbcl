@@ -1412,8 +1412,7 @@ of specialized arrays is supported."
     array))
 
 ;;; User visible extension
-(declaim (ftype (function (array) (values (simple-array * (*)) &optional))
-                array-storage-vector))
+(declaim (ftype (sfunction (array) (simple-array * (*))) array-storage-vector))
 (defun array-storage-vector (array)
   #!+sb-doc
   "Returns the underlying storage vector of ARRAY, which must be a non-displaced array.

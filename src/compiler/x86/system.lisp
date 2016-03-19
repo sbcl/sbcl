@@ -446,11 +446,11 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 ;;;;
 
-(defknown %cons-cas-pair (cons t t t t) (values t t &optional))
+(defknown %cons-cas-pair (cons t t t t) (values t t))
 ;; These unsafely permits cmpxchg on any kind of vector, boxed or unboxed
 ;; and the same goes for instances.
-(defknown %vector-cas-pair (simple-array index t t t t) (values t t &optional))
-(defknown %instance-cas-pair (instance index t t t t) (values t t &optional))
+(defknown %vector-cas-pair (simple-array index t t t t) (values t t))
+(defknown %instance-cas-pair (instance index t t t t) (values t t))
 
 (macrolet
     ((define-cmpxchg-vop (name memory-operand more-stuff &optional index-arg)

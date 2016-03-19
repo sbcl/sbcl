@@ -15,15 +15,28 @@
 ;;; but such nuance isn't hugely important.
 (in-package "SB!C")
 
-(declaim (ftype (function (t t t) (values t t &optional)) info)
-         (ftype (function (t t t) (values t &optional)) clear-info)
-         (ftype (function (t t t t) (values t &optional)) (setf info)))
+;;; Similar to FUNCTION, but the result type is "exactly" specified:
+;;; if it is an object type, then the function returns exactly one
+;;; value, if it is a short form of VALUES, then this short form
+;;; specifies the exact number of values.
+(def!type sfunction (args &optional result)
+  (let ((result (cond ((eq result '*) '*)
+                      ((or (atom result)
+                           (not (eq (car result) 'values)))
+                       `(values ,result &optional))
+                      ((intersection (cdr result) sb!xc:lambda-list-keywords)
+                       result)
+                      (t `(values ,@(cdr result) &optional)))))
+    `(function ,args ,result)))
+
+(declaim (ftype (sfunction (t t t) (values t t)) info)
+         (ftype (sfunction (t t t) t) clear-info)
+         (ftype (sfunction (t t t t) t) (setf info)))
 
 ;;; (:FUNCTION :TYPE) information is extracted through a wrapper.
 ;;; The globaldb representation is not necessarily literally a CTYPE.
 #-sb-xc-host
-(declaim (ftype (function (t) (values ctype boolean &optional))
-                proclaimed-ftype))
+(declaim (ftype (sfunction (t) (values ctype boolean)) proclaimed-ftype))
 
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]

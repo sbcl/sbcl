@@ -59,8 +59,6 @@
 
 ;;; Return a list of N gensyms. (This is a common suboperation in
 ;;; macros and other code-manipulating code.)
-(declaim (ftype (function (unsigned-byte &optional t) (values list &optional))
-                make-gensym-list))
 (defun make-gensym-list (n &optional name)
   (let ((arg (if name (string name) "G")))
     (loop repeat n collect (sb!xc:gensym arg))))

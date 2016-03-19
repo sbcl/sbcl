@@ -260,7 +260,7 @@
                   (return-from probe-cache (values t value)))
               :miss
                 (return-from probe-line (next-cache-index mask base line-size)))))
-      (declare (ftype (function (index) (values index &optional)) probe-line))
+      (declare (ftype (sfunction (index) index) probe-line))
       (let ((index (compute-cache-index cache layouts)))
         (when index
           (loop repeat (1+ (cache-depth cache))

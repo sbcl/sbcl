@@ -16,8 +16,7 @@
 
 (in-package "SB!C")
 
-(declaim (ftype (function (fixnum fixnum) (values code-component &optional))
-                allocate-code-object))
+(declaim (ftype (sfunction (fixnum fixnum) code-component) allocate-code-object))
 (defun allocate-code-object (boxed unboxed)
   #!+gencgc
   (without-gcing
