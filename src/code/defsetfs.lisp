@@ -271,17 +271,16 @@
 ;;; "5.1.2.5 APPLY Forms as Places" in the ANSI spec. I haven't actually
 ;;; verified that this code has any correspondence to that code, but at least
 ;;; ANSI has some place for SETF APPLY. -- WHN 19990604
-(define-setf-expander apply (functionoid &rest args)
+(define-setf-expander apply (functionoid &rest args &environment env)
   ;; Technically (per CLHS) this only must allow AREF,BIT,SBIT
   ;; but there's not much danger in allowing other stuff.
   (unless (typep functionoid '(cons (eql function) (cons symbol null)))
     (error "SETF of APPLY is only defined for function args like #'SYMBOL."))
-  (let ((function (second functionoid))
-        (new-var (gensym))
-        (vars (make-gensym-list (length args))))
-    (values vars args (list new-var)
-            `(apply #'(setf ,function) ,new-var ,@vars)
-            `(apply #',function ,@vars))))
+  (multiple-value-bind (vars vals args) (collect-setf-temps args env nil)
+    (let ((new-var (copy-symbol 'new)))
+      (values vars vals (list new-var)
+              `(apply #'(setf ,(cadr functionoid)) ,new-var ,@args)
+              `(apply ,functionoid ,@args)))))
 
 ;;; Perform expansion of SETF on LDB, MASK-FIELD, or LOGBITP.
 ;;; It is preferable to destructure the BYTE form and bind temp vars to its
