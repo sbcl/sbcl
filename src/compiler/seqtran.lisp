@@ -1364,13 +1364,23 @@
         (type (lvar-value result-type)))
     (if (policy node (<= speed space))
         ;; Out-of-line
-        `(lambda (.dummy. ,@vars)
-           (declare (ignore .dummy.))
-           ,(ecase type
-              ((string simple-string)
-               `(%concatenate-to-string ,@vars))
-              ((base-string simple-base-string)
-               `(%concatenate-to-base-string ,@vars))))
+        (let ((constants-to-string
+                ;; Strings are handled more efficiently by
+                ;; %concatenate-to-* functions
+                (loop for var in vars
+                      for lvar in lvars
+                      collect (if (and (constant-lvar-p lvar)
+                                       (every #'characterp (lvar-value lvar)))
+                                  (coerce (lvar-value lvar) 'string)
+                                  var))))
+          `(lambda (.dummy. ,@vars)
+             (declare (ignore .dummy.)
+                      (ignorable ,@vars))
+             ,(ecase type
+                ((string simple-string)
+                 `(%concatenate-to-string ,@constants-to-string))
+                ((base-string simple-base-string)
+                 `(%concatenate-to-base-string ,@constants-to-string)))))
         ;; Inline
         (let* ((element-type (ecase type
                                ((string simple-string) 'character)
@@ -1392,7 +1402,7 @@
                (non-constant-start
                  (loop for value in lvar-values
                        while (and (stringp value)
-                                    (< (length value) *concatenate-open-code-limit*))
+                                  (< (length value) *concatenate-open-code-limit*))
                        sum (length value))))
           `(lambda (.dummy. ,@vars)
              (declare (ignore .dummy.)
