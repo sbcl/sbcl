@@ -146,16 +146,17 @@
     ;; Wrap thing-defining-functions that style-warn sufficiently early
     ;; that HANDLER-BIND can't be used to suppress the warning
     ;; (since condition classoids don't exist yet).
-    (let ((warning-suppressor ; Make STYLE-WARN into a no-op.
-           (lambda (f &rest args)
-             (encapsulate 'style-warn '!cold-init (constantly nil))
-             (apply f args)
-             (unencapsulate 'style-warn '!cold-init)))) ; Restore it.
+    (flet ((warning-suppressor (signaler)
+             (lambda (f &rest args)
+               (encapsulate signaler '!cold-init (constantly nil))
+               (apply f args)
+               (unencapsulate signaler '!cold-init)))) ; Restore it.
+      ;; %DEFUN complains about everything being redefined
+      (encapsulate-1 '%defun (warning-suppressor 'warn))
       ;; %DEFCONSTANT complains about all named types because of earmuffs.
-      (encapsulate-1 'sb!c::%defconstant warning-suppressor)
+      (encapsulate-1 'sb!c::%defconstant (warning-suppressor 'style-warn))
       ;; %DEFSETF ',FN warns when #'(SETF fn) also has a function binding.
-      (encapsulate-1 '%defsetf warning-suppressor)))
-
+      (encapsulate-1 '%defsetf (warning-suppressor 'style-warn))))
   names)
 
 (defmacro !with-init-wrappers (&rest forms)
@@ -247,9 +248,10 @@
       (setf (info :variable :kind name) :constant)
       (when source-loc (setf (info :source-location :constant name) source-loc))
       (when docstring (setf (fdocumentation name 'variable) docstring))))
-  (dolist (x *!cold-defuns*)
-    (destructuring-bind (name . inline-expansion) x
-      (!%cold-defun name inline-expansion)))
+  (!with-init-wrappers
+   (dolist (x *!cold-defuns*)
+     (destructuring-bind (name . inline-expansion) x
+       (%defun name (fdefinition name) nil inline-expansion))))
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?

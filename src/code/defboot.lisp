@@ -215,29 +215,22 @@ evaluated as a PROGN."
                ',name))))))
 
 #-sb-xc-host
-(progn
-  (defun %defun (name def source-location &optional inline-lambda)
-    (declare (type function def))
-    ;; should've been checked by DEFMACRO DEFUN
-    (aver (legal-fun-name-p name))
-    (sb!c:%compiler-defun name inline-lambda nil)
-    (when (fboundp name)
-      (warn 'redefinition-with-defun
-            :name name :new-function def :new-location source-location))
-    (setf (sb!xc:fdefinition name) def)
+(defun %defun (name def source-location &optional inline-lambda)
+  (declare (type function def))
+  ;; should've been checked by DEFMACRO DEFUN
+  (aver (legal-fun-name-p name))
+  (sb!c:%compiler-defun name inline-lambda nil)
+  (when (fboundp name)
+    (warn 'redefinition-with-defun
+          :name name :new-function def :new-location source-location))
+  (setf (sb!xc:fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF
   ;; FDEFINITION) do the load-time package lock checking before
   ;; we frob any existing inline expansions.
-    (sb!c::%set-inline-expansion name nil inline-lambda)
-    (sb!c::note-name-defined name :function)
-    name)
-  ;; During cold-init we don't touch the fdefinition.
-  (defun !%cold-defun (name inline-lambda)
-    (sb!c:%compiler-defun name nil nil) ; makes :WHERE-FROM = :DEFINED
-    (sb!c::%set-inline-expansion name nil inline-lambda)
-    ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.
-    ))
+  (sb!c::%set-inline-expansion name nil inline-lambda)
+  (sb!c::note-name-defined name :function)
+  name)
 
 ;;;; DEFVAR and DEFPARAMETER
 
