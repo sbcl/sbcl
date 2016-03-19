@@ -309,7 +309,7 @@
   ;; twiddling to determine how much alignment we need.  Why, oh why
   ;; can't we have something like the :ARG-TN methods for all of this
   ;; mess?  -- AB, 2015-Nov-02
-  (let* ((parsed-type (sb!alien::parse-alien-type type (make-null-lexenv)))
+  (let* ((parsed-type (parse-alien-type type nil))
          (alignment-bits (sb!alien::alien-type-alignment parsed-type))
          (alignment-bytes (truncate alignment-bits n-byte-bits))
          ;; OFFSET is at least 32-bit aligned, we're trying to pick

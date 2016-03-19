@@ -248,8 +248,7 @@
                            (incf stack))
                        (new-args 0)
                        (new-arg-types (parse-alien-type
-                                       '(unsigned 32)
-                                       (make-null-lexenv))))
+                                       '(unsigned 32) nil)))
                      (if (< gprs 8)
                          (incf gprs 2)
                          (incf stack 2))
@@ -257,14 +256,11 @@
                      (new-args `(logand ,arg #xffffffff))
                      (if (alien-integer-type-signed type)
                          (new-arg-types (parse-alien-type
-                                         '(signed 32)
-                                         (make-null-lexenv)))
+                                         '(signed 32) nil))
                          (new-arg-types (parse-alien-type
-                                         '(unsigned 32)
-                                         (make-null-lexenv))))
+                                         '(unsigned 32) nil)))
                      (new-arg-types (parse-alien-type
-                                     '(unsigned 32)
-                                     (make-null-lexenv))))
+                                     '(unsigned 32) nil)))
                     ((alien-single-float-type-p type)
                      (if (< fprs 8)
                          (incf fprs)
@@ -293,7 +289,7 @@
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
                                       '(values (unsigned 32) (unsigned 32)))
-                                  (make-null-lexenv)))))
+                                  nil))))
                           `(lambda (function type ,@(lambda-vars))
                             (declare (ignore type))
                             (multiple-value-bind (high low)
@@ -340,9 +336,9 @@
                             (new-args `(ash ,arg -32))
                             (new-args `(logand ,arg #xffffffff))
                             (if (alien-integer-type-signed type)
-                                (new-arg-types (parse-alien-type '(signed 32) (make-null-lexenv)))
-                                (new-arg-types (parse-alien-type '(unsigned 32) (make-null-lexenv))))
-                            (new-arg-types (parse-alien-type '(unsigned 32) (make-null-lexenv))))
+                                (new-arg-types (parse-alien-type '(signed 32) nil))
+                                (new-arg-types (parse-alien-type '(unsigned 32) nil)))
+                            (new-arg-types (parse-alien-type '(unsigned 32) nil)))
                            (t
                             (new-args arg)
                             (new-arg-types type)))))
@@ -354,7 +350,7 @@
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
                                       '(values (unsigned 32) (unsigned 32)))
-                                  (make-null-lexenv)))))
+                                  nil))))
                           `(lambda (function type ,@(lambda-vars))
                             (declare (ignore type))
                             (multiple-value-bind (high low)
@@ -462,8 +458,7 @@
 #-sb-xc-host
 (progn
   (defun alien-callback-accessor-form (type sap offset)
-    (let ((parsed-type
-           (sb!alien::parse-alien-type type (make-null-lexenv))))
+    (let ((parsed-type (parse-alien-type type nil)))
       (cond ((sb!alien::alien-integer-type-p parsed-type)
              ;; Unaligned access is slower, but possible, so this is nice and
              ;; simple. Also, we're a big-endian machine, so we need to get
