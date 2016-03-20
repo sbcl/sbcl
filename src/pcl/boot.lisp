@@ -92,58 +92,99 @@ bootstrapping.
 ;;; to convert the few functions in the bootstrap which are supposed
 ;;; to be generic functions but can't be early on.
 ;;;
-;;; each entry is a list of name and lambda-list, class names as
-;;; specializers, and method body function name.
+;;; each entry is a list of the form
+;;;
+;;;   (GENERIC-FUNCTION-NAME METHOD-COMBINATION-NAME METHODS)
+;;;
+;;; where methods is a list of lists of the form
+;;;
+;;;   (LAMBDA-LIST SPECIALIZERS QUALIFIERS METHOD-BODY-FUNCTION-NAME)
+;;;
+;;;,where SPECIALIZERS is a list of class names.
 (defvar *!generic-function-fixups*
   '((add-method
+     standard
      ((generic-function method)
       (standard-generic-function method)
+      ()
       real-add-method))
+
     (remove-method
+     standard
      ((generic-function method)
       (standard-generic-function method)
+      ()
       real-remove-method))
+
     (get-method
+     standard
      ((generic-function qualifiers specializers &optional (errorp t))
       (standard-generic-function t t)
+      ()
       real-get-method))
+
     (ensure-generic-function-using-class
+     standard
      ((generic-function fun-name
                         &key generic-function-class environment
                         &allow-other-keys)
       (generic-function t)
+      ()
       real-ensure-gf-using-class--generic-function)
      ((generic-function fun-name
                         &key generic-function-class environment
                         &allow-other-keys)
       (null t)
+      ()
       real-ensure-gf-using-class--null))
+
     (make-method-lambda
+     standard
      ((proto-generic-function proto-method lambda-expression environment)
       (standard-generic-function standard-method t t)
+      ()
       real-make-method-lambda))
+
     (make-method-specializers-form
+     standard
      ((proto-generic-function proto-method specializer-names environment)
       (standard-generic-function standard-method t t)
+      ()
       real-make-method-specializers-form))
+
     (parse-specializer-using-class
+     standard
      ((generic-function specializer)
       (standard-generic-function t)
+      ()
       real-parse-specializer-using-class))
+
     (unparse-specializer-using-class
+     standard
      ((generic-function specializer)
       (standard-generic-function t)
+      ()
       real-unparse-specializer-using-class))
+
     (make-method-initargs-form
+     standard
      ((proto-generic-function proto-method
                               lambda-expression
                               lambda-list environment)
       (standard-generic-function standard-method t t t)
+      ()
       real-make-method-initargs-form))
+
     (compute-effective-method
+     standard
      ((generic-function combin applicable-methods)
       (generic-function standard-method-combination t)
-      standard-compute-effective-method))))
+      ()
+      standard-compute-effective-method)
+     ((generic-function combin applicable-methods)
+      (generic-function short-method-combination t)
+      ()
+      short-compute-effective-method))))
 
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
@@ -2538,33 +2579,30 @@ generic function lambda list ~S~:>"
       (/show fn)
       (setf (gdefinition (car fn)) (fdefinition (caddr fn))))
 
-    (dolist (fixup *!generic-function-fixups*)
-      (/show fixup)
-      (let* ((fspec (car fixup))
-             (gf (gdefinition fspec))
-             (methods (mapcar (lambda (method)
-                                (let* ((lambda-list (first method))
-                                       (specializers (mapcar #'find-class (second method)))
-                                       (method-fn-name (third method))
-                                       (fn-name (or method-fn-name fspec))
-                                       (fn (fdefinition fn-name))
-                                       (initargs
-                                        (list :function
-                                              (set-fun-name
-                                               (early-gf-primary-slow-method-fn fn)
-                                               `(call ,fn-name)))))
-                                  (declare (type function fn))
-                                  (make-a-method 'standard-method
-                                                 ()
-                                                 lambda-list
-                                                 specializers
-                                                 initargs
-                                                 nil)))
-                              (cdr fixup))))
-        (setf (generic-function-method-class gf) *the-class-standard-method*)
-        (setf (generic-function-method-combination gf)
-              *standard-method-combination*)
-        (set-methods gf methods))))
+    (loop for (fspec method-combination . methods) in *!generic-function-fixups*
+       for gf = (gdefinition fspec) do
+       (flet ((make-method (spec)
+                (destructuring-bind
+                      (lambda-list specializers qualifiers fun-name) spec
+                  (let* ((specializers (mapcar #'find-class specializers))
+                         (fun-name (or fun-name fspec))
+                         (fun (fdefinition fun-name))
+                         (initargs (list :function
+                                         (set-fun-name
+                                          (early-gf-primary-slow-method-fn fun)
+                                          `(call ,fun-name)))))
+                    (declare (type function fun))
+                    (make-a-method
+                     'standard-method
+                     qualifiers lambda-list specializers initargs nil)))))
+         (setf (generic-function-method-class gf)
+               *the-class-standard-method*
+               (generic-function-method-combination gf)
+               (ecase method-combination
+                 (standard *standard-method-combination*)
+                 (or *or-method-combination*)))
+         (set-methods gf (mapcar #'make-method methods)))))
+
   (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
 ;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument

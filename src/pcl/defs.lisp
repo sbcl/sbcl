@@ -190,6 +190,7 @@
         symbol)))
 
 (defvar *standard-method-combination*)
+(defvar *or-method-combination*)
 
 (defun plist-value (object name)
   (getf (object-plist object) name))

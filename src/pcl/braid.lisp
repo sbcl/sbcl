@@ -257,21 +257,32 @@
                     (symbol-value (make-class-symbol name)))
                   *standard-method-class-names*))
 
-    (let* ((smc-class (find-class 'standard-method-combination))
-           (smc-wrapper (!bootstrap-get-slot 'standard-class
-                                             smc-class
-                                             'wrapper))
-           (smc (allocate-standard-instance smc-wrapper)))
-      (flet ((set-slot (name value)
-               (!bootstrap-set-slot 'standard-method-combination
-                                    smc
-                                    name
-                                    value)))
-        (set-slot 'source nil)
-        (set-slot 'type-name 'standard)
-        (set-slot '%documentation "The standard method combination.")
-        (set-slot 'options ()))
-      (setq *standard-method-combination* smc))))
+    (flet ((make-method-combination (class-name)
+             (let* ((class (find-class class-name))
+                    (wrapper (!bootstrap-get-slot
+                              'standard-class class 'wrapper))
+                    (instance (allocate-standard-instance wrapper)))
+               (flet ((set-slot (name value)
+                        (!bootstrap-set-slot class-name instance name value)))
+                 (values instance #'set-slot)))))
+      ;; Create the STANDARD method combination object.
+      (multiple-value-bind (method-combination set-slot)
+          (make-method-combination 'standard-method-combination)
+        (funcall set-slot 'source nil)
+        (funcall set-slot 'type-name 'standard)
+        (funcall set-slot 'options '())
+        (funcall set-slot '%documentation "The standard method combination.")
+        (setq *standard-method-combination* method-combination))
+      ;; Create the OR method combination object.
+      (multiple-value-bind (method-combination set-slot)
+          (make-method-combination 'short-method-combination)
+        (funcall set-slot 'source 'nil)
+        (funcall set-slot 'type-name 'or)
+        (funcall set-slot 'operator 'or)
+        (funcall set-slot 'identity-with-one-argument t)
+        (funcall set-slot '%documentation nil)
+        (funcall set-slot 'options '(:most-specific-first))
+        (setq *or-method-combination* method-combination)))))
 
 ;;; Initialize a class metaobject.
 (defun !bootstrap-initialize-class

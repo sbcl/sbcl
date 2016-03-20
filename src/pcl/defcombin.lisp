@@ -118,71 +118,6 @@
                  :definition-source method
                  :documentation doc))
 
-(defmethod compute-effective-method ((generic-function generic-function)
-                                     (combin short-method-combination)
-                                     applicable-methods)
-  (let ((type-name (method-combination-type-name combin))
-        (operator (short-combination-operator combin))
-        (ioa (short-combination-identity-with-one-argument combin))
-        (order (car (method-combination-options combin)))
-        (around ())
-        (primary ()))
-    (flet ((invalid (gf combin m)
-             (return-from compute-effective-method
-               `(%invalid-qualifiers ',gf ',combin ',m))))
-      (dolist (m applicable-methods)
-        (let ((qualifiers (method-qualifiers m)))
-          (cond ((null qualifiers) (invalid generic-function combin m))
-                ((cdr qualifiers) (invalid generic-function combin m))
-                ((eq (car qualifiers) :around)
-                 (push m around))
-                ((eq (car qualifiers) type-name)
-                 (push m primary))
-                (t (invalid generic-function combin m))))))
-    (setq around (nreverse around))
-    (ecase order
-      (:most-specific-last) ; nothing to be done, already in correct order
-      (:most-specific-first
-       (setq primary (nreverse primary))))
-    (let ((main-method
-            (if (and (null (cdr primary))
-                     (not (null ioa)))
-                `(call-method ,(car primary) ())
-                `(,operator ,@(mapcar (lambda (m) `(call-method ,m ()))
-                                      primary)))))
-      (cond ((null primary)
-             ;; As of sbcl-0.8.0.80 we don't seem to need to need
-             ;; to do anything messy like
-             ;;        `(APPLY (FUNCTION (IF AROUND
-             ;;                              'NO-PRIMARY-METHOD
-             ;;                              'NO-APPLICABLE-METHOD)
-             ;;                           ',GENERIC-FUNCTION
-             ;;                           .ARGS.)
-             ;; here because (for reasons I don't understand at the
-             ;; moment -- WHN) control will never reach here if there
-             ;; are no applicable methods, but instead end up
-             ;; in NO-APPLICABLE-METHODS first.
-             ;;
-             ;; FIXME: The way that we arrange for .ARGS. to be bound
-             ;; here seems weird. We rely on EXPAND-EFFECTIVE-METHOD-FUNCTION
-             ;; recognizing any form whose operator is %NO-PRIMARY-METHOD
-             ;; as magical, and carefully surrounding it with a
-             ;; LAMBDA form which binds .ARGS. But...
-             ;;   1. That seems fragile, because the magicalness of
-             ;;      %NO-PRIMARY-METHOD forms is scattered around
-             ;;      the system. So it could easily be broken by
-             ;;      locally-plausible maintenance changes like,
-             ;;      e.g., using the APPLY expression above.
-             ;;   2. That seems buggy w.r.t. to MOPpish tricks in
-             ;;      user code, e.g.
-             ;;         (DEFMETHOD COMPUTE-EFFECTIVE-METHOD :AROUND (...)
-             ;;           `(PROGN ,(CALL-NEXT-METHOD) (INCF *MY-CTR*)))
-             `(%no-primary-method ',generic-function .args.))
-            ((null around) main-method)
-            (t
-             `(call-method ,(car around)
-                           (,@(cdr around) (make-method ,main-method))))))))
-
 (defmethod invalid-qualifiers ((gf generic-function)
                                (combin short-method-combination)
                                method)
@@ -545,4 +480,3 @@
             (return (nconc (frob required nr nreq)
                            (frob optional no nopt)
                            values)))))
-
