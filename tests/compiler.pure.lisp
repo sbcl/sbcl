@@ -3547,9 +3547,9 @@
              (assert (equal (apply #'concatenate type args)
                             res))
              (assert (typep res type)))))
-    #-sb-unicode
+    #+sb-unicode
     (test 'string "%CONCATENATE-TO-STRING")
-    #-sb-unicode
+    #+sb-unicode
     (test 'simple-string "%CONCATENATE-TO-STRING")
     (test 'base-string "%CONCATENATE-TO-BASE-STRING")
     (test 'simple-base-string "%CONCATENATE-TO-BASE-STRING")))
