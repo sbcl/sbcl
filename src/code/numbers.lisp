@@ -1037,7 +1037,7 @@ the first."
        #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
   (def lognor t lognor
        (lambda (x y) (lognot (bignum-logical-ior x y)))
-       #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
+       #!+sb-doc "Complement the logical OR of INTEGER1 and INTEGER2.")
   ;; ... but BIGNUM-LOGICAL-NOT on a bignum will always return a bignum
   (def logandc1 t logandc1
        (lambda (x y) (bignum-logical-and (bignum-logical-not x) y))
