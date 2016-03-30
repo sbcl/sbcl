@@ -15,13 +15,9 @@
     (variable
      (typecase x
        (symbol (values (info :variable :documentation x)))))
-    ;; FUNCTION is not used at the momemnt, just here for symmetry.
     (function
-     (cond ((functionp x)
-            (%fun-doc x))
-           ((and (legal-fun-name-p x) (fboundp x))
-            (%fun-doc (or (and (symbolp x) (macro-function x))
-                          (fdefinition x))))))
+     ;; Unused
+     (error "FUNCTION doc-type is not supported."))
     (structure
      (typecase x
        (symbol (cond
@@ -57,29 +53,11 @@
       (setf (slot-value x '%documentation) new-value)
       (setf (%fun-doc x) new-value)))
 
-(defun real-function-name (name)
-  ;; Resolve the actual name of the function named by NAME
-  ;; e.g. (setf (name-function 'x) #'car)
-  ;; (real-function-name 'x) => CAR
-  (cond ((not (fboundp name))
-         nil)
-        ((and (symbolp name)
-              (special-operator-p name))
-         (%fun-name (fdefinition name)))
-        ((and (symbolp name)
-              (macro-function name))
-         (let ((name (%fun-name (macro-function name))))
-           (and (consp name)
-                (eq (car name) 'macro-function)
-                (cadr name))))
-        (t
-         (sb-impl::fun-name (fdefinition name)))))
-
 (defun set-function-name-documentation (name documentation)
   (aver name)
   (cond ((not (legal-fun-name-p name))
          nil)
-        ((not (equal (real-function-name name) name))
+        ((not (equal (sb-c::real-function-name name) name))
          (setf (random-documentation name 'function) documentation))
         (t
          (setf (fun-doc (or (and (symbolp name)

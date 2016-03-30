@@ -77,7 +77,7 @@
 ;; but it's an absolutely terrible test, because it is nothing more
 ;; than a change detector. There are two possible improvements:
 ;; 1. eliminate the change-detection nature of the test by documenting
-;;    all functions in CL, so that the magic constant 605 goes away.
+;;    all functions in CL, so that the magic constant goes away.
 ;;    This would still be an indirect test.
 ;; 2. stop littering up the source code with #!+sb-doc,
 ;;    always write docstrings, and have 'make-target-2-load.lisp' remove them
@@ -90,7 +90,7 @@
       (if (fboundp s)
           (when (documentation s 'function)
             (incf n))))
-    (assert (= n 605))))
+    (assert (= n 593))))
 
 ;;; DECLARE should not be a special operator
 (with-test (:name (declare :not special-operator-p))

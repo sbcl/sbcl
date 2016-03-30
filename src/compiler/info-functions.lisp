@@ -291,11 +291,32 @@ return NIL. Can be set with SETF when ENV is NIL."
            ;; CLHS says regarding DEFUN:
            ;; " Documentation is attached as a documentation string to
            ;;   /name/ (as kind function) and to the /function object/."
-           (when (legal-fun-name-p name)
-             (setf (%fun-doc (fdefinition name)) string)))
+           (cond ((not (legal-fun-name-p name)))
+                 ((not (equal (real-function-name name) name))
+                  (setf (random-documentation name 'function) string))
+                 (t
+                  (setf (%fun-doc (fdefinition name)) string))))
           ((typep name '(or symbol cons))
            (setf (random-documentation name doc-type) string))))
   string)
+
+(defun real-function-name (name)
+  ;; Resolve the actual name of the function named by NAME
+  ;; e.g. (setf (name-function 'x) #'car)
+  ;; (real-function-name 'x) => CAR
+  (cond ((not (fboundp name))
+         nil)
+        ((and (symbolp name)
+              (special-operator-p name))
+         (%fun-name (fdefinition name)))
+        ((and (symbolp name)
+              (macro-function name))
+         (let ((name (%fun-name (macro-function name))))
+           (and (consp name)
+                (eq (car name) 'macro-function)
+                (cadr name))))
+        (t
+         (sb!impl::fun-name (fdefinition name)))))
 
 #-sb-xc-host
 (defun random-documentation (name type)
