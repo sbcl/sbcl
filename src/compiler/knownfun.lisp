@@ -199,14 +199,21 @@
                 `(simple-array character ,@(if size (list size) '((*)))))))
             (t
              (let ((ctype (careful-specifier-type specifier)))
-               (if (and (array-type-p ctype)
-                        (eq (array-type-specialized-element-type ctype)
-                            *wild-type*))
-                   (make-array-type (array-type-dimensions ctype)
-                    :complexp (array-type-complexp ctype)
-                    :element-type *universal-type*
-                    :specialized-element-type *universal-type*)
-                   ctype)))))))))
+               (cond ((not (array-type-p ctype))
+                      ctype)
+                     ((unknown-type-p (array-type-element-type ctype))
+                      (make-array-type (array-type-dimensions ctype)
+                                       :complexp (array-type-complexp ctype)
+                                       :element-type *wild-type*
+                                       :specialized-element-type *wild-type*))
+                     ((eq (array-type-specialized-element-type ctype)
+                          *wild-type*)
+                      (make-array-type (array-type-dimensions ctype)
+                                       :complexp (array-type-complexp ctype)
+                                       :element-type *universal-type*
+                                       :specialized-element-type *universal-type*))
+                     (t
+                      ctype))))))))))
 
 (defun remove-non-constants-and-nils (fun)
   (lambda (list)

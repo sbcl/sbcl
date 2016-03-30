@@ -2696,3 +2696,13 @@
   (let ((name `(setf ,(gensym))))
     (assert (equal (eval `(defun ,name ()))
                    name))))
+
+(with-test (:name :make-sequence-unknown)
+  (let ((fun (checked-compile
+              `(lambda (x)
+                 (let ((vector (make-sequence '(simple-array make-sequence-unknown (*)) 10)))
+                   (setf (aref vector 0) x)
+                   vector))
+              :allow-style-warnings t)))
+    (deftype make-sequence-unknown () 'fixnum)
+    (assert-error (funcall fun 'abc) type-error)))
