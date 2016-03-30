@@ -286,11 +286,11 @@
              (defaulting-done (gen-label))
              (default-stack-slots (gen-label)))
          (note-this-location vop :unknown-return)
+         (inst mov rax-tn nil-value)
          ;; Branch off to the MV case.
          (inst jmp :c regs-defaulted)
          ;; Do the single value case.
          ;; Default the register args
-         (inst mov rax-tn nil-value)
          (do ((i 1 (1+ i))
               (val (tn-ref-across values) (tn-ref-across val)))
              ((= i (min nvals register-arg-count)))
@@ -300,7 +300,6 @@
          (move rbx-tn rsp-tn)
          (inst jmp default-stack-slots)
          (emit-label regs-defaulted)
-         (inst mov rax-tn nil-value)
          (collect ((defaults))
            (do ((i register-arg-count (1+ i))
                 (val (do ((i 0 (1+ i))
