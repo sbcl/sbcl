@@ -84,3 +84,7 @@
           (x sb-alien:system-area-pointer)))
 
 (sb-alien:define-alien-variable ("errno" test-alien-var) sb-alien:int)
+
+(define-condition test-condition (error)
+  ((a :reader condition-slot-reader
+      :writer condition-slot-writer)))

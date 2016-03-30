@@ -36,15 +36,17 @@
               (standard-method-function
                (lambda (condition)
                  (condition-reader-function condition slot-name)))
-            (add-method gf
-                        (apply #'make-instance
+          (let ((method (apply #'make-instance
                                'standard-method
                                :specializers (list (find-class condition))
                                :lambda-list '(condition)
                                :function method-fun
                                initargs)))
-        (eval `(defmethod ,name ((condition ,condition))
-                 (condition-reader-function condition ',slot-name))))))
+            (add-method gf method)
+            method))
+        (eval
+         `(defmethod ,name ((condition ,condition))
+            (condition-reader-function condition ',slot-name))))))
 
 (defun install-condition-slot-writer (name condition slot-name)
   (let ((gf (if (fboundp name)
@@ -57,13 +59,15 @@
               (standard-method-function
                (lambda (new-value condition)
                  (condition-writer-function condition new-value slot-name)))
-            (add-method gf
-                        (apply #'make-instance
+          (let ((method (apply #'make-instance
                                'standard-method
                                :specializers (list (find-class t)
                                                    (find-class condition))
                                :lambda-list '(new-value condition)
                                :function method-fun
                                initargs)))
-        (eval `(defmethod ,name (new-value (condition ,condition))
-           (condition-writer-function condition new-value ',slot-name))))))
+            (add-method gf method)
+            method))
+        (eval
+         `(defmethod ,name (new-value (condition ,condition))
+            (condition-writer-function condition new-value ',slot-name))))))

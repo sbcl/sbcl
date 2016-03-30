@@ -620,3 +620,11 @@
 (deftest alien-variable
   (matchp-name :variable 'cl-user::test-alien-var 32)
   t)
+
+(deftest condition-slot-reader
+  (matchp-name :method 'cl-user::condition-slot-reader 33)
+  t)
+
+(deftest condition-slot-writer
+  (matchp-name :method 'cl-user::condition-slot-writer 33)
+  t)

@@ -560,17 +560,23 @@
 (defmethod reinitialize-instance :after ((class condition-class) &key)
   (let* ((name (class-name class))
          (classoid (find-classoid name))
-         (slots (condition-classoid-slots classoid)))
+         (slots (condition-classoid-slots classoid))
+         (source (sb-kernel::layout-source-location (classoid-layout classoid))))
     ;; to balance the REMOVE-SLOT-ACCESSORS call in
     ;; REINITIALIZE-INSTANCE :BEFORE (SLOT-CLASS).
-    (dolist (slot slots)
-      (let ((slot-name (condition-slot-name slot)))
-        (dolist (reader (condition-slot-readers slot))
-          ;; FIXME: see comment in SHARED-INITIALIZE :AFTER
-          ;; (CONDITION-CLASS T), below.  -- CSR, 2005-11-18
-          (sb-kernel::install-condition-slot-reader reader name slot-name))
-        (dolist (writer (condition-slot-writers slot))
-          (sb-kernel::install-condition-slot-writer writer name slot-name))))))
+    (flet ((add-source-location (method)
+             (when source
+               (setf (slot-value method 'source) source))))
+     (dolist (slot slots)
+       (let ((slot-name (condition-slot-name slot)))
+         (dolist (reader (condition-slot-readers slot))
+           ;; FIXME: see comment in SHARED-INITIALIZE :AFTER
+           ;; (CONDITION-CLASS T), below.  -- CSR, 2005-11-18
+           (add-source-location
+            (sb-kernel::install-condition-slot-reader reader name slot-name)))
+         (dolist (writer (condition-slot-writers slot))
+           (add-source-location
+            (sb-kernel::install-condition-slot-writer writer name slot-name))))))))
 
 (defmethod shared-initialize :after ((class condition-class) slot-names
                                      &key direct-slots direct-superclasses)
