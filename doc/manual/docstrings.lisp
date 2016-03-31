@@ -869,7 +869,7 @@ package, as well as for the package itself."
   (format *texinfo-output* "~
 @iftex
 @macro ~A{name}
-{@smallertt@phantom{concurrency:}~@[@llap{~(~A~):}~]}\\name\\
+{\\\\smallertt\\\\phantom{concurrency:}~@[\\\\llap{~(~A~):}~]}\\name\\
 @end macro
 @end iftex
 @ifinfo

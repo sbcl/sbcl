@@ -8,7 +8,7 @@
 \long\def\dashphelper#1\dashphelper{
   \ifx\dashphelper\next\dashfalse\else\dashtrue\fi
 }
-\def\lw#1{\leavevmode\dashp{#1}\ifdash#1\else\hbox{#1}\fi}
+\def\llw#1{\leavevmode\dashp{#1}\ifdash#1\else\hbox{#1}\fi}
 @end tex
 @end iftex
 
@@ -17,9 +17,7 @@
 @c necessary to prevent treating the newline as a space.
 @iftex
 @macro lw{word}
-@tex
-\\lw{\word\}%
-@end tex
+\\llw{\word\}%
 @end macro
 @end iftex
 @ifnottex
