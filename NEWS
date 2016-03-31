@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.3.3:
+changes in sbcl-1.3.4 relative to sbcl-1.3.3:
   * enhancement: who-sets and who-references work on DEFGLOBAL. (lp#1552997)
   * enhancement: CONSTANTP understands backquote.
     e.g. (CONSTANTP '`(0 (,CHAR-CODE-LIMIT))) => T
