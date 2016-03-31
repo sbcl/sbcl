@@ -299,8 +299,8 @@
 
     ;; ftype
     ;;
-    ;; The interpreter doesn't do anything with ftype declarations
-    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+    ;; The legacy interpreter doesn't do anything with ftype declarations
+    #+(or :sb-fasteval (not :interpreter))
     (test:function . (locally
                          (declare (ftype function test:function))
                        (cons t t)))
@@ -308,7 +308,7 @@
     ;; type
     ;;
     ;; Nor with type declarations
-    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+    #+(or :sb-fasteval (not :interpreter))
     (test:num . (locally
                     (declare (type fixnum test:num))
                   (cons t t)))
@@ -319,7 +319,7 @@
                         (cons t t)))
 
     ;; declare ftype
-    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+    #+(or :sb-fasteval (not :interpreter))
     (test:numfun . (locally
                        (declare (ftype (function (fixnum) fixnum) test:numfun))
                      (cons t t)))))
@@ -492,7 +492,8 @@
   test:*special*)
 (assert (eq *terminal-io* (pcl-type-declaration-method-bug *terminal-io*)))
 
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+;; Interpreters don't walk into a method body until it's executed.
+#-:interpreter
 (assert-error
  (eval
   '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))

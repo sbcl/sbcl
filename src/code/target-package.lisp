@@ -256,12 +256,20 @@ error if any of PACKAGES is not a valid package designator."
        (or (eq :invalid *ignored-package-locks*)
            (not (member package *ignored-package-locks*)))
        ;; declarations for symbols
-       (not (and symbolp (member symbol (disabled-package-locks))))))
+       (not (and symbolp (lexically-unlocked-symbol-p symbol)))))
 
-(defun disabled-package-locks ()
-  (if (boundp 'sb!c::*lexenv*)
-      (sb!c::lexenv-disabled-package-locks sb!c::*lexenv*)
-      sb!c::*disabled-package-locks*))
+(defun lexically-unlocked-symbol-p (symbol)
+  (member symbol
+          (if (boundp 'sb!c::*lexenv*)
+              (let ((list (sb!c::lexenv-disabled-package-locks sb!c::*lexenv*)))
+                ;; The so-called LIST might be an interpreter env.
+                #!+sb-fasteval
+                (unless (listp list)
+                  (return-from lexically-unlocked-symbol-p
+                    (sb!interpreter::lexically-unlocked-symbol-p
+                     symbol list)))
+                list)
+              sb!c::*disabled-package-locks*)))
 
 ) ; progn
 
@@ -297,6 +305,11 @@ error if any of PACKAGES is not a valid package designator."
   #!+sb-package-locks
   (let* ((symbol (etypecase name
                    (symbol name)
+                   ;; Istm that the right way to declare that you want to allow
+                   ;; overriding the lock on (SETF X) is to list (SETF X) in
+                   ;; the declaration, not expect that X means itself and SETF.
+                   ;; Worse still, the syntax ({ENABLE|DISABLE}-..-locks (SETF X))
+                   ;; is broken, and yet we make no indication of it.
                    ((cons (eql setf) cons) (second name))
                    ;; Skip lists of length 1, single conses and
                    ;; (class-predicate foo), etc.  FIXME: MOP and
@@ -1724,6 +1737,9 @@ PACKAGE."
                   (lambda (condition)
                     (ecase context
                       (:compile
+                       ;; FIXME: Code containing a lexically impermissible
+                       ;; violation causes both a warning AND an error.
+                       ;; The warning is enough. It's ugly that both happen.
                        (warn "Compile-time package lock violation:~%  ~A"
                              condition)
                        (sb!c:compiler-error condition))

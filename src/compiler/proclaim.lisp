@@ -80,6 +80,8 @@
   (destructuring-bind (decl &rest names) spec
     (ecase decl
       (disable-package-locks
+       ;; Why are we using EQUAL here if the only way to disable the
+       ;; lock on (SETF CAR) is to list the name CAR and not (SETF CAR)?
        (union old names :test #'equal))
       (enable-package-locks
        (set-difference old names :test #'equal)))))

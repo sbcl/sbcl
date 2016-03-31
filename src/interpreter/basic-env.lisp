@@ -20,10 +20,6 @@
                        (:constructor make-decl-scope (declarations %policy))
                        (:copier nil))
   (declarations (missing-arg) :type list :read-only t) ; in their original form
-  ;; lexically disabled package locks (list of symbols).
-  ;: Genesis doesn't know how to create shadowing symbols,
-  ;; and LEXENV names its slot DISABLED-PACKAGE-LOCKS.
-  (%disabled-package-locks :uncomputed)
   ;; lexical policy. Don't read directly. Use ENV-POLICY instead.
   (%policy nil :type sb!c::policy :read-only t)
 

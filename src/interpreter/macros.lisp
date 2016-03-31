@@ -176,23 +176,22 @@
        (%enforce-types typechecks ,env))))
 
 ;;; When the evaluator preprocesses a form that interacts with package locking,
-;;; we convert the declarations to the format that a LEXENV expects.
-;;; FIXME: it would be more efficient to change the package-lock tests
-;;; to understand either a compiler LEXENV or an interpreter ENV.
-;;; The main difficulty is that *LEXENV* can't be bound to an interpreter env.
+;;; we bind *LEXENV* to a dynamic-extent LEXENV pointing to an interpreter env.
 (defmacro with-package-lock-context ((env-var) &body body)
   ;; PROGRAM-ASSERT-SYMBOL-HOME-PACKAGE-UNLOCKED can signal EVAL-ERROR,
   ;; and it's the only thing that can, so this is the only place
   ;; that we need to handle that condition.
-  `(handler-case
-       (let ((sb-c:*lexenv*
-              (sb-c::make-lexenv :disabled-package-locks
-                                 (env-disabled-package-locks ,env-var)
-                                 :default (sb-kernel:make-null-lexenv))))
-         ,@body)
-     (sb-impl::eval-error (condition)
-       ;; Just pull the original condition out and signal that.
-       (error (encapsulated-condition condition)))))
+  (let ((env (copy-symbol 'env)))
+    `(handler-case
+      (let ((,env ,env-var))
+        (declare (inline sb-c::make-package-lock-lexenv))
+        (dx-let ((compiler-lexenv (sb-c::make-package-lock-lexenv
+                                   ,env (env-policy ,env))))
+          (let ((sb-c:*lexenv* compiler-lexenv))
+            ,@body)))
+      (sb-impl::eval-error (condition)
+        ;; Just pull the original condition out and signal that.
+        (error (encapsulated-condition condition))))))
 
 ;;; Wrap SB-C:POLICY changing its accessor to convert to a policy.
 ;;; The default of %COERCE-TO-POLICY is wrong for the interpreter -

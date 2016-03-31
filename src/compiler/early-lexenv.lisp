@@ -78,6 +78,9 @@
                       (write-string "NULL-LEXENV" stream))
                     (default-structure-print lexenv stream depth))))
              (:constructor make-null-lexenv ())
+             (:constructor make-package-lock-lexenv
+                           (disabled-package-locks %policy
+                            &aux (handled-conditions nil)))
              (:constructor internal-make-lexenv
                            (funs vars blocks tags
                             type-restrictions

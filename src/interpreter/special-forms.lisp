@@ -808,6 +808,8 @@
               `((when (singleton-p bindings)
                   (return-from let*
                    (funcall *let-processor* `(,bindings ,@body) env)))))
+          ;; FIXME: aren't MAKE-LET*-FRAME and MAKE-LET-FRAME essentially
+          ;; the same now?
           (let ((frame (parse-let ',(symbolicate "MAKE-" operator "-FRAME")
                                   env bindings body ,transform-specials)))
             (let ((values (frame-values frame)))
@@ -941,6 +943,93 @@
 
 ;;;; FLET and LABELS
 
+(define-load-time-global *last-toplevel-env*
+  (make-basic-env nil nil nil (make-decl-scope nil sb-c::**baseline-policy**)))
+
+(declaim (inline disabled-locks))
+;;; Pull out LIST from `((DECLARE (DISABLE-PACKAGE-LOCKS ,@LIST)))
+(defun disabled-locks (decls) (cdadar decls))
+
+;;; Immediate mode FUNCTION when evaluated captures the globally
+;;; disabled package-locks, so this works:
+;;;   * (declaim (disable-package-locks read-byte))
+;;;   * (defun foo () (flet ((read-byte () 42)) (read-byte)))
+;;;   * (declaim (enable-package-locks read-byte))
+;;;   * (something-that-calls-foo)
+;;; And conversely the lambda should not observe subsequent
+;;; changes that globally unlock a symbol.
+(defun capture-toplevel-env ()
+  (let* ((disabled-locks sb-c::*disabled-package-locks*)
+         (policy sb-c::*policy*)
+         ;; Multiple threads can harmlessly share this global variable.
+         ;; At worst, a new environment is consed every time through here.
+         (last-env *last-toplevel-env*)
+         (contour (env-contour last-env)))
+    ;; The toplevel environment changes only when the user declaims
+    ;; optimization settings or enables/disables per-symbol package-locks.
+    (unless (and (sb-c::policy= (%policy contour) policy)
+                 (equal (disabled-locks (declarations contour))
+                        disabled-locks))
+      (let ((decls
+             (if disabled-locks
+                 `((declare (disable-package-locks ,@disabled-locks))))))
+        (setq last-env (make-basic-env
+                        nil nil nil (make-decl-scope decls policy)))
+        ;; Ensure all accessible parts of the new BASIC-ENV
+        ;; are flushed to memory before publishing shared variable.
+        (sb-thread:barrier (:write))
+        (setq *last-toplevel-env* last-env)))
+    last-env))
+
+;;; We have to do some shenanigans with lexical environments that are non-null
+;;; but have not captured the toplevel disabled package lock state.
+;;; Continuing the example above, suppose we have:
+;;;  (locally (declare (special ...)) (lambda () (flet ((read-byte ...)))))
+;;; This lambda has a non-null environment due to the LOCALLY form.
+;;; On account of the interpreter's laziness, it does not decide up front about
+;;; whether the lexical binding of #'READ-BYTE is permitted. But to be consistent
+;;; with the compiler, it should act like it decides now. To do that, we inject
+;;; globally disabled package-locks as if they appeared in a *nested* environment,
+;;; carefully ignoring anything global shadowed by a contrary lexical declaration.
+;;; The compiler does not have this problem, because compilation isn't lazy.
+(defun capture-disabled-package-locks (env)
+  (let* ((decls (declarations (env-contour (capture-toplevel-env))))
+         (proclaimed-disabled-locks (disabled-locks decls)))
+    (when proclaimed-disabled-locks ; usually false
+      (let ((decls
+             (if (every (lambda (name) (lexically-unlocked-symbol-p name env))
+                        proclaimed-disabled-locks)
+                 ;; No local declaration prevailed over the global,
+                 ;; so capture the global list. This is fine even if it
+                 ;; contains a name that is redundant with an explicit
+                 ;; lexically declared unlock. It avoids some consing.
+                 decls
+                 (let (new-list) ; XXX: This code is untested!
+                   (dolist (name proclaimed-disabled-locks)
+                     (when (lexically-unlocked-symbol-p name env)
+                       ;; *assume* it was because of the global unlock,
+                       ;; which is to say, it might be redundant with,
+                       ;; a local unlock but at least it wasn't shadowed
+                       ;; by an explicitly declared lexical re-lock.
+                       (push name new-list)))
+                   (when new-list
+                     `((declare (disable-package-locks ,@new-list))))))))
+        (when decls
+          (return-from capture-disabled-package-locks
+            (make-basic-env env nil nil
+                            (make-decl-scope decls (env-policy env)))))))
+    ;; There were no applicable global unlocks, meaning either the list
+    ;; was empty, or everything in it was shadowed by a lexical lock.
+    env))
+
+(defun capture-toplevel-stuff (env)
+  (labels ((captured-p (env) ; true if there is already an ancestor lambda
+             (acond ((lambda-env-p env) t)
+                    ((env-parent env) (captured-p it)))))
+    (cond ((null env) (capture-toplevel-env))
+          ((captured-p env) env)
+          (t (capture-disabled-package-locks env)))))
+
 (defun digest-local-fns (env kind bindings body) ; KIND is FLET or LABELS
   (flet ((proto-functionize (def)
            (with-subforms (name lambda-list &body body) def
@@ -991,7 +1080,7 @@
                            forms env))))
 
 ;;; There's an improvement that could be made - unless a function name
-;;; appears as the operatnd to FUNCTION, all internals call could use
+;;; appears as the operand to FUNCTION, all internals call could use
 ;;; different convention for function application which avoids consing
 ;;; a funcallable instance. But you can't now that without walking into the
 ;;; body, which means you lose the otherwise nice laziness aspect.
@@ -1001,7 +1090,8 @@
                 (cond ((not defs) (digest-locally env body))
                       ((not body) (return-constant nil))
                       (t
-                       (let ((frame (digest-local-fns env ',operator defs body)))
+                       (let* ((env (capture-toplevel-stuff env))
+                              (frame (digest-local-fns env ',operator defs body)))
                          (if (must-freeze-p env)
                              (handler-guts (freeze-env env))
                              (handler-guts env))))))))
@@ -1049,13 +1139,11 @@
     ;; again it's sad that I can't wrap code around both modes
     :immediate (env)
     (if (and (listp name) (memq (car name) '(named-lambda lambda)))
-        ;; Defining a function at toplevel (as is almost always the case)
-        ;; needs to capture the current global policy.
-        (enclose (make-proto-fn name (not (null env)))
-                 ;; No parent, no payload, no symbols, no declarations.
-                 (or env (make-basic-env nil nil nil
-                                         (make-decl-scope nil sb-c::*policy*)))
-                 nil)
+        (progn
+          (aver (not (must-freeze-p env)))
+          (enclose (make-proto-fn name (not (null env)))
+                   (capture-toplevel-stuff env)
+                   nil))
         ;; immediate mode calls FDEFINITION as needed, so wil err as it should.
         (multiple-value-bind (definition macro-p) (get-function name env)
           (if macro-p (not-a-function name) definition)))

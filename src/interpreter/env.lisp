@@ -259,32 +259,36 @@
       (truly-the index (+ (lambda-frame-min-args frame)
                           (lambda-frame-n-optional frame)))))
 
-;;; Computation of package locks is done lazily and usually memoized,
-;;; but not not memoized if the env is mutable.
-;;; This is not as critical to performance as an efficient implementation
-;;; of ENV-POLICY so we don't memoize the "old" value. Computing it might
-;;; have to bubble up to the null lexenv. But that seems ok for two reasons:
-;;; - the only likely way that a closure would see a "wrong" value for this
-;;;   is if the special variable SB-C::*DISABLED-PACKAGE-LOCKS* were
-;;;   changed at an inopportune time. It doesn't seem worth worry about.
-;;; - even when unmemoized, this is only computed once per binding form,
-;;;   whereas a valid POLICY is required at each read or write of a lexical
-;;;   variable. So the binding forms scale much better - binding 20 variables
-;;;   only compute the package locks once, at parse time of the form.
-(defun env-disabled-package-locks (env)
-  (cond ((not env) sb-c::*disabled-package-locks*)
-        ((not (env-mutable-p env))
-         (let ((list (%disabled-package-locks (env-contour env))))
-           (when (eq list :uncomputed)
-             (setq list (env-disabled-package-locks (env-parent env)))
-             (do-decl-spec (declaration (env-declarations env))
-               (case (car declaration)
-                 ((disable-package-locks enable-package-locks)
-                  (setq list
-                        (sb-c::process-package-lock-decl declaration list)))))
-             (setf (%disabled-package-locks (env-contour env)) list))
-           list))
-        (t (env-disabled-package-locks (env-parent env)))))
+;;; Return T if the innermost package-lock-related declaration pertaining
+;;; to SYMBOL disables its package lock. Don't scan backwards through
+;;; a lambda frame. (See remarks at CAPTURE-TOPLEVEL-ENV)
+(defun lexically-unlocked-symbol-p (symbol env)
+  (named-let recurse ((env env) (globalp t))
+    (do-decl-spec (declaration
+                   (env-declarations env)
+                   (acond ((env-parent env)
+                           (recurse it (and globalp (not (lambda-env-p env)))))
+                          (globalp
+                           (member symbol sb-c::*disabled-package-locks*))))
+      ;; Ambigous case: both in the same decl list. Oh well...
+      (case (car declaration)
+        (disable-package-locks
+         (when (member symbol (cdr declaration)) (return t)))
+        (enable-package-locks
+         (when (member symbol (cdr declaration)) (return nil)))))))
+
+;;; Do like above, but materialize the complete list of unlocked symbols,
+;;; including those from sb-c::*disabled-package-locks* if applicable.
+(defun env-disabled-package-locks (env &aux list)
+  (named-let recurse ((env env) (globalp t))
+    (acond ((env-parent env)
+            (recurse it (and globalp (not (lambda-env-p env)))))
+           (globalp
+            (setq list (copy-list sb-c::*disabled-package-locks*))))
+    (do-decl-spec (declaration (env-declarations env))
+      (when (member (car declaration)
+                    '(disable-package-locks enable-package-locks))
+        (setq list (sb-c::process-package-lock-decl declaration list))))))
 
 ;;; Return the declarations which are currently effective in ENV.
 ;;; If ENV is a sequential binding environment which has not reached
@@ -830,15 +834,20 @@
 (defun process-typedecls (decl-scope env n-var-bindings symbols
                           &aux new-restrictions)
   ;; First compute the effective set of type restrictions.
-  (do-decl-spec (decl (declarations decl-scope))
-    (when (eq (applies-to-variables-p decl) 'type)
-      (multiple-value-bind (type-spec names)
-          (if (eq (car decl) 'type)
-              (values (cadr decl) (cddr decl))
-              (values (car decl) (cdr decl)))
-        (let ((ctype (specifier-type type-spec)))
-          (unless (eq ctype *universal-type*)
-            (dolist (symbol names)
+  (with-package-lock-context (env)
+    (do-decl-spec (decl (declarations decl-scope))
+      (cond
+       ((eq (applies-to-variables-p decl) 'type)
+        (binding* (((type-spec names)
+                    (if (eq (car decl) 'type)
+                        (values (cadr decl) (cddr decl))
+                        (values (car decl) (cdr decl))))
+                   (ctype (specifier-type type-spec)))
+          (dolist (symbol names)
+            (when (and (symbolp symbol) (boundp symbol))
+              (program-assert-symbol-home-package-unlocked
+               :eval symbol "declaring the type of ~A"))
+            (unless (eq ctype *universal-type*)
               (multiple-value-bind (binding index)
                   (%find-position symbol symbols t 0 nil #'binding-symbol #'eq)
                 (if (and index (< index n-var-bindings))
@@ -870,7 +879,13 @@
                                  (new-type (type-intersection old-type ctype)))
                             (unless (type= old-type new-type)
                               (push (cons thing new-type)
-                                    new-restrictions)))))))))))))
+                                    new-restrictions)))))))))))
+       ((eq (car decl) 'ftype)
+        (dolist (name (cddr decl))
+          (when (and (legal-fun-name-p name) (fboundp name))
+            (program-assert-symbol-home-package-unlocked
+             :eval name "declaring the ftype of ~A")))))))
+
   (setf (type-restrictions decl-scope) new-restrictions)
   ;; Done computing effective restrictions.
   ;; If the enclosing policy - not the new policy - demands typechecks,
@@ -952,34 +967,39 @@
                :format-control
                "~@<Lexical environment is too complex to evaluate in: ~S~:@>"
                :format-arguments (list lexenv)))
-      (let ((macro-env
-             ;; Macros in an interpreter environment must look like interpreted
-             ;; functions due to use of FUN-NAME to extract their name as a key
-             ;; rather than also needing an alist mapping names to objects.
-             ;; For each compiled expander, wrap it in a trivial interpreted fun.
-             (make-macro-env
-              nil
-              (map 'vector
-                   (lambda (cell)
-                     (let ((expander (cddr cell)))
-                       (if (interpreted-function-p expander)
-                           expander
-                           (make-function
-                            (%make-proto-fn `(macrolet ,(car cell)) '(form env)
-                                            nil ; decls
-                                            `((funcall ,expander form env)) nil)
-                            nil)))) ; environment for the interpreted fun
-                   (remove-if-not #'macro-p native-funs :key #'cdr))
-              nil ; no free specials vars
-              ;; FIXME: type-restrictions, package-locks, handled-conditions.
-              (make-decl-scope nil (sb-c::lexenv-policy lexenv)))))
-        (if native-vars
-            (make-symbol-macro-env macro-env
-                                   (map 'vector #'cddr native-vars)
-                                   (map 'vector #'car native-vars)
-                                   (make-decl-scope
-                                    nil (sb-c::lexenv-policy lexenv)))
-            macro-env)))))
+      (let* ((disabled-package-locks
+              `((declare (disabled-package-locks
+                          ,@(sb-c::lexenv-disabled-package-locks lexenv)))))
+             (macro-env
+              ;; Macros in an interpreter environment must look like interpreted
+              ;; functions due to use of FUN-NAME to extract their name as a key
+              ;; rather than also needing an alist mapping names to objects.
+              ;; For each compiled expander, wrap it in a trivial interpreted fun.
+              (make-macro-env
+               nil
+               (map 'vector
+                    (lambda (cell)
+                      (let ((expander (cddr cell)))
+                        (if (interpreted-function-p expander)
+                            expander
+                            (make-function
+                             (%make-proto-fn `(macrolet ,(car cell)) '(form env)
+                                             nil ; decls
+                                             `((funcall ,expander form env)) nil)
+                             nil)))) ; environment for the interpreted fun
+                    (remove-if-not #'macro-p native-funs :key #'cdr))
+               nil ; no free specials vars
+               ;; FIXME: type-restrictions, handled-conditions.
+               (make-decl-scope (if native-vars nil disabled-package-locks)
+                                (sb-c::lexenv-policy lexenv)))))
+        (if (not native-vars)
+            macro-env
+            (make-symbol-macro-env
+             macro-env
+             (map 'vector #'cddr native-vars)
+             (map 'vector (lambda (x) (list (car x))) native-vars)
+             (make-decl-scope disabled-package-locks
+                              (sb-c::lexenv-policy lexenv))))))))
 
 ;;; Enclose PROTO-FN in the environment ENV.
 ;;; SEXPR is provided only because this is a HANDLER.
