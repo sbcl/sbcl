@@ -1326,11 +1326,9 @@ between the ~A definition and the ~A definition"
 #-sb-xc-host
 (defun %modify-classoid (classoid)
   (clear-type-caches)
-  (when (member (classoid-state classoid) '(:read-only :frozen))
+  (awhen (classoid-state classoid)
     ;; FIXME: This should probably be CERROR.
-    (warn "making ~(~A~) class ~S writable"
-          (classoid-state classoid)
-          (classoid-name classoid))
+    (warn "making ~(~A~) class ~S writable" it (classoid-name classoid))
     (setf (classoid-state classoid) nil)))
 
 ;;; Mark LAYOUT as invalid. Setting DEPTHOID -1 helps cause unsafe
