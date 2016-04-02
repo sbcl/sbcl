@@ -12,6 +12,19 @@
 
 (in-package "SB-KERNEL")
 
+;;; Fix unknown types in globaldb
+(let ((l nil))
+  (do-all-symbols (s)
+    (when (and (fboundp s) (not (macro-function s)))
+      (let ((ftype (info :function :type s)))
+        (when (contains-unknown-type-p ftype)
+          (setf (info :function :type s)
+                (specifier-type (type-specifier ftype)))
+          (push s l)))))
+  (let ((*print-pretty* nil)
+        (*print-length* nil))
+    (format t "~&; Fixed ftypes: ~S~%" (sort l #'string<))))
+
 (eval-when (:compile-toplevel :execute)
 
 (defun compute-one-setter (name type)
