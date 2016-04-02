@@ -952,37 +952,32 @@ standard Lisp readtable when NIL."
                  (or (plusp (fill-pointer (token-buf-escapes read-buffer)))
                      seen-multiple-escapes)
                  colon)))
-    (cond ((single-escape-p char rt)
-           ;; It can't be a number, even if it's 1\23.
-           ;; Read next char here, so it won't be casified.
-           (let ((nextchar (read-char stream nil +EOF+)))
-             (if (eq nextchar +EOF+)
-                 (reader-eof-error stream "after escape character")
-                 (ouch-read-buffer-escaped nextchar read-buffer))))
-          ((multiple-escape-p char rt)
-           (setq seen-multiple-escapes t)
-           ;; Read to next multiple-escape, escaping single chars
-           ;; along the way.
-           (loop
-             (let ((ch (read-char stream nil +EOF+)))
-               (cond
-                ((eq ch +EOF+)
-                 (reader-eof-error stream "inside extended token"))
-                ((multiple-escape-p ch rt) (return))
-                ((single-escape-p ch rt)
-                 (let ((nextchar (read-char stream nil +EOF+)))
-                   (if (eq nextchar +EOF+)
-                       (reader-eof-error stream "after escape character")
-                       (ouch-read-buffer-escaped nextchar read-buffer))))
-                (t
-                 (ouch-read-buffer-escaped ch read-buffer))))))
-          (t
-           (when (and (not colon) ; easiest test first
-                      (constituentp char rt)
-                      (eql (get-constituent-trait char)
-                           +char-attr-package-delimiter+))
-             (setq colon t))
-           (ouch-read-buffer char read-buffer)))))
+    (flet ((escape-1-char ()
+             ;; It can't be a number, even if it's 1\23.
+             ;; Read next char here, so it won't be casified.
+             (let ((nextchar (read-char stream nil +EOF+)))
+               (if (eq nextchar +EOF+)
+                   (reader-eof-error stream "after escape character")
+                   (ouch-read-buffer-escaped nextchar read-buffer)))))
+      (cond ((single-escape-p char rt) (escape-1-char))
+            ((multiple-escape-p char rt)
+             (setq seen-multiple-escapes t)
+             ;; Read to next multiple-escape, escaping single chars
+             ;; along the way.
+             (loop
+              (let ((ch (read-char stream nil +EOF+)))
+                (cond ((eq ch +EOF+)
+                       (reader-eof-error stream "inside extended token"))
+                      ((multiple-escape-p ch rt) (return))
+                      ((single-escape-p ch rt) (escape-1-char))
+                      (t (ouch-read-buffer-escaped ch read-buffer))))))
+            (t
+             (when (and (not colon) ; easiest test first
+                        (constituentp char rt)
+                        (eql (get-constituent-trait char)
+                             +char-attr-package-delimiter+))
+               (setq colon t))
+             (ouch-read-buffer char read-buffer))))))
 
 ;;;; character classes
 
