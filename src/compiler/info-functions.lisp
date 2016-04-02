@@ -300,6 +300,7 @@ return NIL. Can be set with SETF when ENV is NIL."
            (setf (random-documentation name doc-type) string))))
   string)
 
+#-sb-xc-host
 (defun real-function-name (name)
   ;; Resolve the actual name of the function named by NAME
   ;; e.g. (setf (name-function 'x) #'car)

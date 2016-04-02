@@ -27,7 +27,7 @@
     ;; UNDEFINED-VARIABLE does not cause COMPILE-FILE to return warnings-p
     ;; unless outside a compilation unit. You find out about it only upon
     ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
-    `(let (fail)
+    `(let (in-summary fail)
        (handler-bind (((and simple-warning (not style-warning))
                        (lambda (c)
                          ;; hack for PPC. See 'build-order.lisp-expr'
@@ -36,10 +36,22 @@
                                              (simple-condition-format-control c))
                                      (search "ignoring FAILURE-P return"
                                              (simple-condition-format-control c)))
-                           (setq fail t)))))
-         (with-compilation-unit () ,@forms))
+                           (setq fail 'warning))))
+                      ;; Prevent regressions on a couple platforms
+                      ;; that are known to build cleanly.
+                      #!+(or x86 x86-64)
+                      (sb-int:simple-style-warning
+                       (lambda (c)
+                         (when (and in-summary
+                                    (search "undefined"
+                                            (simple-condition-format-control c)))
+                           (unless (eq fail 'warning)
+                             (setq fail 'style-warning))))))
+         (with-compilation-unit ()
+           (multiple-value-prog1 (progn ,@forms) (setq in-summary t))))
        (when fail
-         (error "make-host-1 stopped due to unexpected WARNING.")))
+         (cerror "Proceed anyway"
+                 "make-host-1 stopped due to unexpected ~A." fail)))
 
     #-(or clisp sbcl) `(with-compilation-unit () ,@forms))
 
