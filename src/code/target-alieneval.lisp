@@ -208,10 +208,8 @@ This is SETFable."
 
 ;;;; runtime C values that don't correspond directly to Lisp types
 
-;;; Note: The DEFSTRUCT for ALIEN-VALUE lives in a separate file
-;;; 'cause it has to be real early in the cold-load order.
-#!-sb-fluid (declaim (freeze-type alien-value))
 (def!method print-object ((value alien-value) stream)
+  ;; Don't use ":TYPE T" here - TYPE-OF isn't what we want.
   (print-unreadable-object (value stream)
     ;; See identical kludge in host-alieneval.
     (let ((sb!pretty:*pprint-quote-with-syntactic-sugar* nil))
@@ -236,11 +234,6 @@ This is SETFable."
     (if (eq (compute-alien-rep-type alien-type) 'system-area-pointer)
         `(%sap-alien ,sap ',alien-type)
         (error "cannot make an alien of type ~S out of a SAP" type))))
-
-(defun %sap-alien (sap type)
-  (declare (type system-area-pointer sap)
-           (type alien-type type))
-  (make-alien-value :sap sap :type type))
 
 (defun alien-sap (alien)
   #!+sb-doc

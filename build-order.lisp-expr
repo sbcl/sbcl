@@ -158,7 +158,6 @@
 
  ("src/compiler/defconstant")
 
- ("src/code/early-defstructs" :not-host) ; gotta-be-first DEFSTRUCTs
  ("src/code/early-raw-slots")
 
  ("src/code/funutils" :not-host)

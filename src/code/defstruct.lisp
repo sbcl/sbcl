@@ -1938,15 +1938,6 @@ or they must be declared locally notinline at each call site.~@:>")
     (%compiler-set-up-layout dd)))
 #+sb-xc-host(!set-up-structure-object-class)
 
-;;; early structure predeclarations: Set up DD and LAYOUT for ordinary
-;;; (non-ALTERNATE-METACLASS) structures which are needed early.
-(dolist (args
-         '#.(sb-cold:read-from-file
-             "src/code/early-defstruct-args.lisp-expr"))
-  (let* ((dd (parse-defstruct t (first args) (rest args)))
-         (inherits (!inherits-for-structure dd)))
-    (%compiler-defstruct dd inherits)))
-
 (defun find-defstruct-description (name &optional (errorp t))
   (let* ((classoid (find-classoid name errorp))
          (info (and classoid

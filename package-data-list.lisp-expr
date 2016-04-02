@@ -138,7 +138,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "LOCAL-ALIEN-INFO" "LOCAL-ALIEN-INFO-FORCE-TO-MEMORY-P"
                "LOCAL-ALIEN-INFO-P" "LOCAL-ALIEN-INFO-TYPE"
                "MAKE-ALIEN-FUN-TYPE" "MAKE-ALIEN-POINTER-TYPE"
-               "MAKE-ALIEN-VALUE" "MAYBE-WITH-PINNED-OBJECTS"
+               "MAYBE-WITH-PINNED-OBJECTS"
                "MAKE-LOCAL-ALIEN" "NATURALIZE"
                "NOTE-LOCAL-ALIEN-TYPE"
                "PARSE-ALIEN-TYPE" "UNPARSE-ALIEN-TYPE"))
