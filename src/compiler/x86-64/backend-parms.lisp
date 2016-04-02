@@ -17,7 +17,7 @@
 
 ;;;; compiler constants
 
-(def!constant +backend-fasl-file-implementation+ :x86-64)
+(defconstant +backend-fasl-file-implementation+ :x86-64)
 
 (setf *backend-register-save-penalty* 3)
 
@@ -43,11 +43,11 @@
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
 ;;; the start of objects.
-(def!constant gencgc-alloc-granularity 0)
+(defconstant gencgc-alloc-granularity 0)
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
-(def!constant gencgc-release-granularity *backend-page-bytes*)
+(defconstant gencgc-release-granularity *backend-page-bytes*)
 
 #!+sb-safepoint
-(def!constant thread-saved-csp-offset
+(defconstant thread-saved-csp-offset
     (- (/ *backend-page-bytes* n-word-bytes)))

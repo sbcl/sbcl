@@ -38,12 +38,12 @@
 
 ;;; Default word size for the chip: if the operand size /= :dword
 ;;; we need to output #x66 (or REX) prefix
-(def!constant +default-operand-size+ :dword)
+(defconstant +default-operand-size+ :dword)
 
 ;;; The default address size for the chip. It could be overwritten
 ;;; to :dword with a #x67 prefix, but this is never needed by SBCL
 ;;; and thus not supported by this assembler/disassembler.
-(def!constant +default-address-size+ :qword)
+(defconstant +default-address-size+ :qword)
 
 (defun offset-next (value dstate)
   (declare (type integer value)
@@ -1362,7 +1362,7 @@
 
 ;;;; utilities
 
-(def!constant +operand-size-prefix-byte+ #b01100110)
+(defconstant +operand-size-prefix-byte+ #b01100110)
 
 (defun maybe-emit-operand-size-prefix (segment size)
   (unless (or (eq size :byte)

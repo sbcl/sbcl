@@ -25,71 +25,71 @@
 ;;;; machine architecture parameters
 
 ;;; the number of bits per word, where a word holds one lisp descriptor
-(def!constant n-word-bits 64)
+(defconstant n-word-bits 64)
 
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
-(def!constant n-machine-word-bits 64)
+(defconstant n-machine-word-bits 64)
 
 ;;; the number of bits per byte, where a byte is the smallest
 ;;; addressable object
-(def!constant n-byte-bits 8)
+(defconstant n-byte-bits 8)
 
 ;;; The minimum immediate offset in a memory-referencing instruction.
-(def!constant minimum-immediate-offset (- (expt 2 31)))
+(defconstant minimum-immediate-offset (- (expt 2 31)))
 
 ;;; The maximum immediate offset in a memory-referencing instruction.
-(def!constant maximum-immediate-offset (1- (expt 2 31)))
+(defconstant maximum-immediate-offset (1- (expt 2 31)))
 
-(def!constant float-sign-shift 31)
+(defconstant float-sign-shift 31)
 
 ;;; comment from CMU CL:
 ;;;   These values were taken from the alpha code. The values for
 ;;;   bias and exponent min/max are not the same as shown in the 486 book.
 ;;;   They may be correct for how Python uses them.
-(def!constant single-float-bias 126)    ; Intel says 127.
+(defconstant single-float-bias 126)    ; Intel says 127.
 (defconstant-eqx single-float-exponent-byte    (byte 8 23) #'equalp)
 (defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
 ;;; comment from CMU CL:
 ;;;   The 486 book shows the exponent range -126 to +127. The Lisp
 ;;;   code that uses these values seems to want already biased numbers.
-(def!constant single-float-normal-exponent-min 1)
-(def!constant single-float-normal-exponent-max 254)
-(def!constant single-float-hidden-bit (ash 1 23))
-(def!constant single-float-trapping-nan-bit (ash 1 22))
+(defconstant single-float-normal-exponent-min 1)
+(defconstant single-float-normal-exponent-max 254)
+(defconstant single-float-hidden-bit (ash 1 23))
+(defconstant single-float-trapping-nan-bit (ash 1 22))
 
-(def!constant double-float-bias 1022)
+(defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte    (byte 11 20) #'equalp)
 (defconstant-eqx double-float-significand-byte (byte 20 0)  #'equalp)
-(def!constant double-float-normal-exponent-min 1)
-(def!constant double-float-normal-exponent-max #x7FE)
-(def!constant double-float-hidden-bit (ash 1 20))
-(def!constant double-float-trapping-nan-bit (ash 1 19))
+(defconstant double-float-normal-exponent-min 1)
+(defconstant double-float-normal-exponent-max #x7FE)
+(defconstant double-float-hidden-bit (ash 1 20))
+(defconstant double-float-trapping-nan-bit (ash 1 19))
 
-(def!constant single-float-digits
+(defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
 
-(def!constant double-float-digits
+(defconstant double-float-digits
   (+ (byte-size double-float-significand-byte) 32 1))
 
 ;;; from AMD64 Architecture manual
-(def!constant float-invalid-trap-bit       (ash 1 0))
-(def!constant float-denormal-trap-bit       (ash 1 1))
-(def!constant float-divide-by-zero-trap-bit (ash 1 2))
-(def!constant float-overflow-trap-bit       (ash 1 3))
-(def!constant float-underflow-trap-bit      (ash 1 4))
-(def!constant float-inexact-trap-bit       (ash 1 5))
+(defconstant float-invalid-trap-bit       (ash 1 0))
+(defconstant float-denormal-trap-bit       (ash 1 1))
+(defconstant float-divide-by-zero-trap-bit (ash 1 2))
+(defconstant float-overflow-trap-bit       (ash 1 3))
+(defconstant float-underflow-trap-bit      (ash 1 4))
+(defconstant float-inexact-trap-bit       (ash 1 5))
 
-(def!constant float-round-to-nearest  0)
-(def!constant float-round-to-negative 1)
-(def!constant float-round-to-positive 2)
-(def!constant float-round-to-zero     3)
+(defconstant float-round-to-nearest  0)
+(defconstant float-round-to-negative 1)
+(defconstant float-round-to-positive 2)
+(defconstant float-round-to-zero     3)
 
 (defconstant-eqx float-rounding-mode     (byte 2 13) #'equalp)
 (defconstant-eqx float-sticky-bits       (byte 6  0) #'equalp)
 (defconstant-eqx float-traps-byte        (byte 6  7) #'equalp)
 (defconstant-eqx float-exceptions-byte   (byte 6  0) #'equalp)
-(def!constant float-fast-bit 0) ; no fast mode on x86-64
+(defconstant float-fast-bit 0) ; no fast mode on x86-64
 
 ;;;; description of the target address space
 
@@ -113,7 +113,7 @@
 
                      #!+win32 :alignment #!+win32 #x10000)
 
-(def!constant linkage-table-entry-size 16)
+(defconstant linkage-table-entry-size 16)
 
 
 ;;;; other miscellaneous constants

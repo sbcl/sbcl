@@ -27,7 +27,7 @@
                     ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
-                    (def!constant ,offset-sym ,offset))
+                    (defconstant ,offset-sym ,offset))
                   (setf (svref ,names-vector ,offset-sym)
                         ,(symbol-name name)))))
            ;; FIXME: It looks to me as though DEFREGSET should also
@@ -90,7 +90,7 @@
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
-  (def!constant  register-arg-count 3)
+  (defconstant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defparameter *register-arg-names* '(edx edi esi)))
@@ -132,7 +132,7 @@
                (constant-name (symbolicate sc-name "-SC-NUMBER")))
           (forms `(define-storage-class ,sc-name ,index
                     ,@(cdr class)))
-          (forms `(def!constant ,constant-name ,index))
+          (forms `(defconstant ,constant-name ,index))
           (incf index))))
     `(progn
        ,@(forms))))
@@ -407,12 +407,12 @@
 ;;; address is at EBP+4, the old control stack frame pointer is at
 ;;; EBP, the magic 3rd slot is at EBP-4. Then come the locals from
 ;;; EBP-8 on.
-(def!constant return-pc-save-offset 0)
-(def!constant ocfp-save-offset 1)
+(defconstant return-pc-save-offset 0)
+(defconstant ocfp-save-offset 1)
 ;;; Let SP be the stack pointer before CALLing, and FP is the frame
 ;;; pointer after the standard prologue. SP +
 ;;; FRAME-WORD-OFFSET(SP->FP-OFFSET + I) = FP + FRAME-WORD-OFFSET(I).
-(def!constant sp->fp-offset 2)
+(defconstant sp->fp-offset 2)
 
 (declaim (inline frame-word-offset))
 (defun frame-word-offset (index)
@@ -427,13 +427,13 @@
 ;;; them or flagging them with KLUDGE might be better than nothing.
 ;;;
 ;;; names of these things seem to have changed. these aliases by jrd
-(def!constant lra-save-offset return-pc-save-offset)
+(defconstant lra-save-offset return-pc-save-offset)
 
-(def!constant cfp-offset ebp-offset)    ; pfw - needed by stuff in /code
+(defconstant cfp-offset ebp-offset)    ; pfw - needed by stuff in /code
                                         ; related to signal context stuff
 
 ;;; This is used by the debugger.
-(def!constant single-value-return-byte-offset 2)
+(defconstant single-value-return-byte-offset 2)
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.

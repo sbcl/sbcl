@@ -26,7 +26,7 @@
 
 (deftype reg () '(unsigned-byte 3))
 
-(def!constant +default-operand-size+ :dword)
+(defconstant +default-operand-size+ :dword)
 
 (defun offset-next (value dstate)
   (declare (type integer value)
@@ -817,7 +817,7 @@
 
 ;;;; utilities
 
-(def!constant +operand-size-prefix-byte+ #b01100110)
+(defconstant +operand-size-prefix-byte+ #b01100110)
 
 (defun maybe-emit-operand-size-prefix (segment size)
   (unless (or (eq size :byte) (eq size +default-operand-size+))
