@@ -27,6 +27,67 @@
       (declare (special *symbol-values-for-genesis*)) ; non-toplevel DEFVAR
       (write *symbol-values-for-genesis* :stream f :readably t))))
 
+(when (make-host-1-parallelism)
+  (require :sb-posix))
+#+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
+(defun parallel-make-host-1 (max-jobs)
+  (let ((subprocess-count 0)
+        (subprocess-list nil))
+    (flet ((wait ()
+             (multiple-value-bind (pid status) (sb-posix:wait)
+               (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
+               (setq subprocess-list (delete pid subprocess-list)))
+             (decf subprocess-count)))
+      (do-stems-and-flags (stem flags)
+        (unless (position :not-host flags)
+          (when (>= subprocess-count max-jobs)
+            (wait))
+          (let ((pid (sb-posix:fork)))
+            (when (zerop pid)
+              (in-host-compilation-mode
+               (lambda () (compile-stem stem flags :host-compile)))
+              ;; FIXME: convey exit code based on COMPILE result.
+              (sb-sys:os-exit 0))
+            (push pid subprocess-list)
+            (incf subprocess-count)
+            ;; Do not wait for the compile to finish. Just load as source.
+            (let ((source (merge-pathnames (stem-remap-target stem)
+                                           (make-pathname :type "lisp"))))
+              (let ((sb-ext:*evaluator-mode* :interpret))
+                (in-host-compilation-mode
+                 (lambda ()
+                   (load source :verbose t :print nil))))))))
+      (loop (if (plusp subprocess-count) (wait) (return)))))
+
+  ;; We want to load compiled files, because that's what this function promises.
+  ;; Reloading is tricky because constructors for interned ctypes will construct
+  ;; new objects via their LOAD-TIME-VALUE forms, but globaldb already stored
+  ;; some objects from the interpreted pre-load.
+  ;; So wipe everything out that causes problems down the line.
+  ;; (Or perhaps we could make their effects idempotent)
+  (format t "~&; Parallel build: Clearing globaldb~%")
+  (do-all-symbols (s)
+    (when (get s :sb-xc-globaldb-info)
+      (remf (symbol-plist s) :sb-xc-globaldb-info)))
+  (fill (symbol-value 'sb!c::*info-types*) nil)
+  (clrhash (symbol-value 'sb!kernel::*def!struct-type-make-load-form-fun*))
+  (clrhash (symbol-value 'sb!kernel::*def!struct-supertype*))
+  (clrhash (symbol-value 'sb!kernel::*forward-referenced-layouts*))
+  (setf (symbol-value 'sb!kernel:*type-system-initialized*) nil)
+  (makunbound 'sb!c::*backend-primitive-type-names*)
+  (makunbound 'sb!c::*backend-primitive-type-aliases*)
+
+  (format t "~&; Parallel build: Reloading compilation artifacts~%")
+  ;; Now it works to load fasls.
+  (in-host-compilation-mode
+   (lambda ()
+     (handler-bind ((sb-kernel:redefinition-warning #'muffle-warning))
+       (do-stems-and-flags (stem flags)
+         (unless (position :not-host flags)
+           (load (stem-object-path stem flags :host-compile)
+                 :verbose t :print nil))))))
+  (format t "~&; Parallel build: Fasl loading complete~%"))
+
 ;;; Either load or compile-then-load the cross-compiler into the
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)
@@ -182,10 +243,13 @@
   ;; with the ordinary Lisp compiler, and this is intentional, in
   ;; order to make the compiler aware of the definitions of assembly
   ;; routines.
-  (do-stems-and-flags (stem flags)
-    (unless (find :not-host flags)
-      (funcall load-or-cload-stem stem flags)
-      #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
+  (if (and (make-host-1-parallelism)
+           (eq load-or-cload-stem #'host-cload-stem))
+      (parallel-make-host-1 (make-host-1-parallelism))
+      (do-stems-and-flags (stem flags)
+        (unless (find :not-host flags)
+          (funcall load-or-cload-stem stem flags)
+          #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*))))
 
   ;; If the cross-compilation host is SBCL itself, we can use the
   ;; PURIFY extension to freeze everything in place, reducing the

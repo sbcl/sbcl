@@ -362,7 +362,10 @@
                                 (,(!type-class-fun-slot name) parent))))))))
     #-sb-xc
     `(if (find ',name *type-classes* :key #'type-class-name)
-         (warn "Not redefining type-class ~S" ',name)
+         ;; Careful: type-classes are very complicated things to redefine.
+         ;; For the sake of parallelized make-host-1 we have to allow it
+         ;; not to be an error to get here, but we can't overwrite anything.
+         (style-warn "Not redefining type-class ~S" ',name)
          (vector-push-extend ,make-it *type-classes*))
     ;; The Nth entry in the array of classes contain a list of instances
     ;; of the type-class created by genesis that need patching.

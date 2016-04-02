@@ -39,7 +39,6 @@
          :format-control control
          :format-arguments arguments))
 
-(defvar !*xc-processed-deftypes* nil)
 (defmacro sb!xc:deftype (&whole form name lambda-list &body body
                          &environment env)
   #!+sb-doc
@@ -69,11 +68,6 @@
                                    :doc-string-allowed :external
                                    :environment :ignore))))
     `(progn
-       #+sb-xc-host
-       (eval-when (:compile-toplevel)
-         ;; This needs to be in the macroexpansion when building the xc,
-         ;; but not when running the xc. But it's harmless in the latter.
-         (pushnew ',name !*xc-processed-deftypes*))
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (%compiler-deftype ',name ,expander-form ,source-location-form
                             ,@(when doc `(,doc)))))))

@@ -437,8 +437,6 @@
 
  ("src/compiler/compiler-error")
 
- ("src/code/late-deftypes-for-target")
-
  ("src/code/type-init")
  ;; Now that the type system is initialized, fix up UNKNOWN types that
  ;; have crept in.

@@ -108,6 +108,11 @@
 
 (sb!xc:deftype simple-bit-vector (&optional size)
   `(simple-array bit (,size)))
+
+(sb!xc:deftype compiled-function ()
+  '(and function
+        #!+sb-fasteval (not sb!interpreter:interpreted-function)
+        #!+sb-eval (not sb!eval:interpreted-function)))
 
 ;;;; some private types that we use in defining the standard functions,
 ;;;; or implementing declarations in standard compiler transforms

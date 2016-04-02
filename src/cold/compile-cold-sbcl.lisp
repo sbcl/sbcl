@@ -16,15 +16,11 @@
 
 (defvar *target-object-file-names*)
 
-(defvar *make-host-2-parallel*
-  (or #+sbcl (let ((envvar (sb-ext:posix-getenv "SBCL_MAKE_PARALLEL")))
-               (when envvar (read-from-string envvar)))))
-
 ;;; Evaluate compile-time effects only
-(when *make-host-2-parallel*
+(when (make-host-2-parallelism)
   (require :sb-posix))
 #+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
-(defun parallel-compile (max-jobs)
+(defun parallel-make-host-2 (max-jobs)
   (let ((reversed-target-object-file-names nil)
         (subprocess-count 0)
         (subprocess-list nil))
@@ -55,8 +51,8 @@
 
 ;;; Actually compile
 (setf *target-object-file-names*
-      (if *make-host-2-parallel*
-          (parallel-compile *make-host-2-parallel*)
+      (if (make-host-2-parallelism)
+          (parallel-make-host-2 (make-host-2-parallelism))
           (let ((reversed-target-object-file-names nil))
             (do-stems-and-flags (stem flags)
               (unless (position :not-target flags)
