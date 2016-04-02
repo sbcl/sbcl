@@ -4,6 +4,7 @@
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-POSIX;"
   :components ((:file "defpackage")
+               (:file "strtod" :depends-on ("defpackage"))
                (:file "designator" :depends-on ("defpackage"))
                (:file "macros" :depends-on ("designator"))
                (:sb-grovel-constants-file "constants"
@@ -16,7 +17,8 @@
   :depends-on (sb-rt)
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-POSIX;"
-  :components ((:file "posix-tests"))
+  :components ((:file "libc-tests")
+               (:file "posix-tests"))
   :perform
   (test-op (o c)
     (funcall (intern "DO-TESTS" (find-package "SB-RT")))

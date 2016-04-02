@@ -1,5 +1,6 @@
 (defpackage :sb-posix (:use #:sb-alien #:cl)
   (:shadow abort close open ftruncate truncate time read write)
+  (:import-from #:sb-impl #:string-dispatch)
   (:export #:syscall-error #:syscall-errno #:syscall-name
 
            ;; types and type conversion
@@ -21,7 +22,11 @@
            #:termios-iflag #:termios-oflag #:termios-cflag
            #:termios-lflag #:termios-cc #:timeval-sec #:timeval-usec
            #:flock-type #:flock-whence #:flock-start #:flock-len
-           #:flock-pid))
+           #:flock-pid
+
+           ;; libc routines
+           #:strtod
+           ))
 
 #+win32
 (sb-alien:load-shared-object "msvcrt.dll")
