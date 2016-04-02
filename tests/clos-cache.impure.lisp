@@ -16,6 +16,15 @@
 
 (in-package "CLOS-CACHE-TEST")
 
+(test-util:with-test (:name :probe-cache-smoke-test)
+  (let ((layout
+         (sb-kernel::make-layout :clos-hash #xbadd00d
+                                 :classoid (sb-kernel::make-undefined-classoid 'x)))
+        (cache (sb-pcl::make-cache :key-count 1 :value t :size 10)))
+    (sb-pcl::try-update-cache cache (list layout) 'win)
+    (assert (eq (nth-value 1 (sb-pcl::probe-cache cache (list layout))) 'win))
+    (assert (eq (nth-value 1 (sb-pcl::probe-cache cache layout)) 'win))))
+
 ;;;; Make a GF, populate it with a ton of methods, and then hammer
 ;;;; it with multiple threads. On 1.0.6 this would have failed with
 ;;;; "NIL is not an SB-KERNEL:LAYOUT" pretty quickly.
