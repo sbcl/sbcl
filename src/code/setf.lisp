@@ -64,7 +64,7 @@
                  (values temp-vars temp-vals vals
                          `(,.call ,@(funcall arg-maker (car vals) args))
                          `(,(car form) ,@args)))))
-      (declare (ftype (function (t) list) newvals))
+      (declare (ftype (sfunction (t) list) newvals))
       (if (atom form)
           (multiple-value-bind (expansion expanded)
               ;; Previously this called %MACROEXPAND, but the two operations
