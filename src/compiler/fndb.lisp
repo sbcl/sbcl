@@ -1821,6 +1821,24 @@
 (defknown spin-loop-hint () (values)
     (always-translatable))
 
+;;;; Stream methods
+
+;;; Avoid a ton of FBOUNDP checks in the string stream constructors etc,
+;;; by wiring in the needed functions instead of dereferencing their fdefns.
+(defknown (ill-in ill-bin ill-out ill-bout
+           sb!impl::string-inch sb!impl::string-in-misc
+           sb!impl::string-ouch sb!impl::string-sout sb!impl::string-out-misc
+           sb!impl::fill-pointer-ouch sb!impl::fill-pointer-sout
+           sb!impl::fill-pointer-misc
+           sb!impl::case-frob-upcase-out sb!impl::case-frob-upcase-sout
+           sb!impl::case-frob-downcase-out sb!impl::case-frob-downcase-sout
+           sb!impl::case-frob-capitalize-out sb!impl::case-frob-capitalize-sout
+           sb!impl::case-frob-capitalize-first-out sb!impl::case-frob-capitalize-first-sout
+           sb!impl::case-frob-capitalize-aux-out sb!impl::case-frob-capitalize-aux-sout
+           sb!impl::case-frob-misc
+           sb!pretty::pretty-out sb!pretty::pretty-misc) * *)
+(defknown sb!pretty::pretty-sout * * (recursive))
+
 ;;;; PCL
 
 (defknown sb!pcl::pcl-instance-p (t) boolean
