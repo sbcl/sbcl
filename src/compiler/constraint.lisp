@@ -1030,7 +1030,6 @@
                   (block-in block)
                   (copy-conset (block-in block)))
               final-pass-p)))
-    (setf (block-gen block) gen)
     (multiple-value-bind (consequent-constraints alternative-constraints)
         (constraint-propagate-if block gen)
       (if consequent-constraints
@@ -1206,10 +1205,10 @@
 (defun constraint-propagate (component)
   (declare (type component component))
   (init-var-constraints component)
-
-  (unless (block-out (component-head component))
-    (setf (block-out (component-head component)) (make-conset)))
-
+  ;; Previous results can confuse propagation and may loop forever
+  (do-blocks (block component)
+    (setf (block-out block) nil))
+  (setf (block-out (component-head component)) (make-conset))
   (dolist (block (find-and-propagate-constraints component))
     (unless (block-delete-p block)
       (use-result-constraints block)))
