@@ -317,7 +317,6 @@
   ;; in copy propagation: list of killed TNs
   (kill nil)
   ;; other sets used in constraint propagation and/or copy propagation
-  (gen nil)
   (in nil)
   (out nil)
   ;; Set of all blocks that dominate this block. NIL is interpreted
