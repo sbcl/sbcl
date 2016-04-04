@@ -98,7 +98,7 @@
                        arg-tn)))))))
 
 (defun reads-within-block-p (tn block)
-  (do ((ref (tn-reads tn) (tn-ref-across ref)))
+  (do ((ref (tn-reads tn) (tn-ref-next ref)))
       ((null ref) t)
     (let ((vop (tn-ref-vop ref)))
       (unless (eq (ir2-block-block (vop-block vop)) block)
