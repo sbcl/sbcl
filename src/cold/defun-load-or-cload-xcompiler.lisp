@@ -245,7 +245,8 @@
   ;; routines.
   (if (and (make-host-1-parallelism)
            (eq load-or-cload-stem #'host-cload-stem))
-      (parallel-make-host-1 (make-host-1-parallelism))
+      (funcall 'parallel-make-host-1 ; avoid potential style-warning
+               (make-host-1-parallelism))
       (do-stems-and-flags (stem flags)
         (unless (find :not-host flags)
           (funcall load-or-cload-stem stem flags)
