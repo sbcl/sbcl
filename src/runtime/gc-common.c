@@ -692,7 +692,7 @@ boolean positive_bignum_logbitp(int index, struct bignum* bignum)
 // Helper function for stepping through the tagged slots of an instance in
 // scav_instance and verify_space (which, as it happens, is not useful).
 void
-instance_scan_interleaved(void (*proc)(),
+instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
                           lispobj *instance_ptr,
                           sword_t n_words,
                           lispobj *layout_obj)
