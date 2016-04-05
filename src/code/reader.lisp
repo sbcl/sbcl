@@ -893,32 +893,59 @@ standard Lisp readtable when NIL."
 
 (defun read-string (stream closech)
   ;; This accumulates chars until it sees same char that invoked it.
-  ;; For a very long string, this could end up bloating the read buffer.
+  ;; We avoid copying any given input character more than twice-
+  ;; once to a temp buffer and then to the result. In the worst case,
+  ;; we can waste space equal the unwasted space, if the final character
+  ;; causes allocation of a new buffer for just that character,
+  ;; because the buffer size is doubled each time it overflows.
+  ;; (Would be better to peek at the frc-buffer if the stream has one.)
+  ;; Scratch vectors are GC-able as soon as this function returns though.
   (declare (character closech))
-  (let ((stream (in-synonym-of stream))
-        (buf *read-buffer*)
-        (rt *readtable*)
-        ;; *read-suppress* => "... macros will not construct any new objects"
-        (suppress *read-suppress*))
-    (reset-read-buffer buf)
-    (macrolet ((scan (read-a-char eofp &optional finish)
-                 `(loop (let ((char ,read-a-char))
-                          (cond (,eofp (error 'end-of-file :stream stream))
-                                ((eql char closech)
-                                 (return ,finish))
-                                ((single-escape-p char rt)
-                                 (setq char ,read-a-char)
-                                 (when ,eofp
-                                   (error 'end-of-file :stream stream))))
+  (macrolet ((scan (read-a-char eofp &optional finish)
+               `(loop (let ((char ,read-a-char))
+                        (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                        (cond (,eofp (error 'end-of-file :stream stream))
+                              ((eql char closech)
+                               (return ,finish))
+                              ((single-escape-p char rt)
+                               (setq char ,read-a-char)
+                               (when ,eofp
+                                 (error 'end-of-file :stream stream))))
+                        (when (>= ptr lim)
                           (unless suppress
-                            (ouch-read-buffer (truly-the character char)
-                                              buf))))))
+                            (push buf chain)
+                            (setq lim (the index (ash lim 1))
+                                  buf (make-array lim :element-type 'character)))
+                          (setq ptr 0))
+                        (setf (schar buf ptr) (truly-the character char))
+                        (incf ptr)))))
+    (let* ((token-buf *read-buffer*)
+           (buf (token-buf-string token-buf))
+           (rt *readtable*)
+           (stream (in-synonym-of stream))
+           (suppress *read-suppress*)
+           (lim (length buf))
+           (ptr 0)
+           (chain))
+      (declare (type (simple-array character (*)) buf))
+      (reset-read-buffer token-buf)
       (if (ansi-stream-p stream)
           (prepare-for-fast-read-char stream
            (scan (fast-read-char t) nil (done-with-fast-read-char)))
-        ;; CLOS stream
-          (scan (read-char stream nil +EOF+) (eq char +EOF+))))
-    (if suppress "" (copy-token-buf-string buf))))
+          ;; CLOS stream
+          (scan (read-char stream nil +EOF+) (eq char +EOF+)))
+      (if suppress
+          ""
+          (let* ((sum (loop for buf in chain sum (length buf)))
+                 (result (make-array (+ sum ptr) :element-type 'character)))
+            (setq ptr sum)
+            ;; Now work backwards from the end
+            (replace result buf :start1 ptr)
+            (dolist (buf chain result)
+              (declare (type (simple-array character (*)) buf))
+              (let ((len (length buf)))
+                (decf ptr len)
+                (replace result buf :start1 ptr))))))))
 
 (defun read-right-paren (stream ignore)
   (declare (ignore ignore))
