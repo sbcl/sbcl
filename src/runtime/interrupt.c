@@ -1482,7 +1482,9 @@ arrange_return_to_c_function(os_context_t *context,
      * must obviously exist in reality.  That would be post_signal_tramp
      */
 
+#ifndef LISP_FEATURE_DARWIN
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
+#endif
 
 #if defined(LISP_FEATURE_DARWIN)
     u32 *register_save_area = (u32 *)os_validate(0, 0x40);
@@ -1619,7 +1621,9 @@ void
 arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    arrange_return_to_c_function(context, call_into_lisp_tramp, function);
+    arrange_return_to_c_function(context,
+                                 (call_into_lisp_lookalike)call_into_lisp_tramp,
+                                 function);
 #else
     arrange_return_to_c_function(context, call_into_lisp, function);
 #endif

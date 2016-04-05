@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 #include <mach/mach.h>
@@ -98,7 +99,7 @@ setup_mach_exception_handling_thread()
     pthread_create(&mach_exception_handling_thread,
                    &attr,
                    mach_exception_handler,
-                   (void*) mach_exception_handler_port_set);
+                   (void*)(long)mach_exception_handler_port_set);
     pthread_attr_destroy(&attr);
 
     return mach_exception_handling_thread;
@@ -222,8 +223,9 @@ mach_lisp_thread_destroy(struct thread *thread) {
     mach_port_deallocate(current_mach_task, port);
 
     ret = mach_port_destroy(current_mach_task, port);
-    ((struct exception_port_record*)port)->thread = NULL;
-    OSAtomicEnqueue(&free_records, (void*)port, offsetof(struct exception_port_record, next));
+    ((struct exception_port_record*)(long)port)->thread = NULL;
+    OSAtomicEnqueue(&free_records, (void*)(long)port,
+                    offsetof(struct exception_port_record, next));
 
     return ret;
 }

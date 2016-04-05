@@ -159,7 +159,7 @@ space_matches_p(lispobj obj, generation_index_t space,
     }
 }
 
-static boolean
+static boolean __attribute__((unused))
 from_space_p(lispobj obj)
 {
     extern boolean in_dontmove_nativeptr_p(page_index_t, lispobj*);

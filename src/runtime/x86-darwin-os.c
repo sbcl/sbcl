@@ -268,7 +268,7 @@ void call_handler_on_thread(mach_port_t thread,
                             x86_thread_state32_t *thread_state,
                             int signal,
                             siginfo_t *siginfo,
-                            void (*handler)(int, siginfo_t *, void *))
+                            void (*handler)(int, siginfo_t *, os_context_t *))
 {
     x86_thread_state32_t new_state;
     x86_thread_state32_t *save_thread_state;
@@ -352,7 +352,7 @@ void dump_context(x86_thread_state32_t *thread_state)
 void
 control_stack_exhausted_handler(int signal, siginfo_t *siginfo,
                                 os_context_t *context) {
-
+    extern void unblock_signals_in_context_and_maybe_warn(os_context_t*);
     unblock_signals_in_context_and_maybe_warn(context);
     arrange_return_to_lisp_function
         (context, StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
@@ -374,14 +374,9 @@ catch_exception_raise(mach_port_t exception_port,
 {
     x86_thread_state32_t thread_state;
     mach_msg_type_number_t state_count;
-    vm_address_t region_addr;
-    vm_size_t region_size;
-    vm_region_basic_info_data_t region_info;
-    mach_msg_type_number_t info_count;
-    mach_port_t region_name;
     void *addr = NULL;
     int signal = 0;
-    void (*handler)(int, siginfo_t *, void *) = NULL;
+    void (*handler)(int, siginfo_t *, os_context_t *) = NULL;
     siginfo_t siginfo;
     kern_return_t ret, dealloc_ret;
 

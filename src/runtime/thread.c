@@ -624,7 +624,7 @@ callback_wrapper_trampoline(
 }
 #endif /* LISP_FEATURE_SB_THREAD */
 
-static void
+static void __attribute__((unused))
 free_thread_struct(struct thread *th)
 {
 #if defined(LISP_FEATURE_WIN32)
