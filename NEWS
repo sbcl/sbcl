@@ -2,6 +2,7 @@
 
 changes relative to sbcl-1.3.4:
   * enhancement: the platform's strtod() is exposed as SB-POSIX:STRTOD
+  * bug fix: better wording in missed optimization note. (lp#1003265)
 
 changes in sbcl-1.3.4 relative to sbcl-1.3.3:
   * enhancement: who-sets and who-references work on DEFGLOBAL. (lp#1552997)

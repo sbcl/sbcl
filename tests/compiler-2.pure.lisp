@@ -123,3 +123,17 @@
 
 (with-test (:name :internal-name-p :skipped-on :sb-xref-for-internals)
   (assert (sb-c::internal-name-p 'sb-int:neq)))
+
+(with-test (:name :coerce-callable-to-fun-note)
+  (macrolet ((try (form what)
+               `(assert
+                 (search ,(format nil "~A is not known to be" what)
+                         (with-output-to-string (*error-output*)
+                           (compile nil '(lambda (x)
+                                           (declare (optimize speed))
+                                           (funcall ,form))))))))
+
+    (try (eval `(work-with ,x)) "callable expression")
+    (try x "X")
+    ;; For this I'd accept either Z or X in the message.
+    (try (progn (let ((z x)) (identity z))) "X")))

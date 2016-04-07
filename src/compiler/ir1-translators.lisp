@@ -592,6 +592,16 @@ be a lambda expression."
                  (values `(global-function ,cname) nil)
                  (values `(%coerce-callable-to-fun ,source) give-up)))))))
 
+(defun source-variable-or-else (lvar fallback)
+  (let ((uses (principal-lvar-use lvar)) leaf name)
+    (or (and (ref-p uses)
+             (leaf-has-source-name-p (setf leaf (ref-leaf uses)))
+             (symbolp (setf name (leaf-source-name leaf)))
+             ;; assume users don't hand-write gensyms
+             (symbol-package name)
+             name)
+        fallback)))
+
 (defun ensure-lvar-fun-form (lvar lvar-name &optional give-up)
   (aver (and lvar-name (symbolp lvar-name)))
   (if (csubtypep (lvar-type lvar) (specifier-type 'function))
@@ -600,7 +610,11 @@ be a lambda expression."
         (cond (cname
                `(global-function ,cname))
               (give-up
-               (give-up-ir1-transform "not known to be a function"))
+               (give-up-ir1-transform
+                ;; No ~S here because if fallback is shown, it wants no quotes.
+                "~A is not known to be a function"
+                ;; LVAR-NAME is not what to show - if only it were that easy.
+                (source-variable-or-else lvar "callable expression")))
               (t
                `(%coerce-callable-to-fun ,lvar-name))))))
 
