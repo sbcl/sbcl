@@ -15,26 +15,27 @@
 ;;; FIXME: should probably become conditional on #!+SB-SHOW
 ;;; FIXME: should be called DEBUG-PRINT or COLD-PRINT
 (define-vop (print)
-  (:args (object :scs (descriptor-reg any-reg)))
+  (:args (object :scs (descriptor-reg any-reg)
+                 :target rdi))
+  (:temporary (:sc unsigned-reg
+               :offset rdi-offset
+               :from :eval)
+              rdi)
   (:temporary (:sc unsigned-reg
                :offset rax-offset
                :target result
                :from :eval
                :to (:result 0))
               rax)
+  (:temporary (:sc unsigned-reg :offset r13-offset) r13)
   (:temporary (:sc unsigned-reg) call-target)
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:generator 100
-    (move rax object)
-    (inst push rbp-tn)
-    (inst mov rbp-tn rsp-tn)
-    (inst push rbp-tn)
+    (move rdi object)
+    (inst mov r13 rsp-tn)
     (inst and rsp-tn -16)
-    (storew rax rsp-tn)
-    (inst mov rax (make-fixup "debug_print" :foreign))
-    (inst mov call-target (make-fixup "call_into_c" :foreign))
+    (inst mov call-target (make-fixup "debug_print" :foreign))
     (inst call call-target)
-    (inst mov rsp-tn rbp-tn)
-    (inst pop rbp-tn)
+    (inst mov rsp-tn r13)
     (move result rax)))

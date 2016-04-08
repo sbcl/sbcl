@@ -90,40 +90,6 @@
 	.text
         .globl  GNAME(all_threads)
         
-	
-
-/* From lower to higher-numbered addresses, the stack contains 
- * return address, arg 0, arg 1, arg 2 ...
- * rax contains the address of the function to call
- * Lisp expects return value in rax, which is already consistent with C
- * XXXX correct floating point handling is unimplemented so far
- * Based on comments cleaned from x86-assem.S, we believe that 
- * Lisp is expecting us to preserve rsi, rdi, rsp (no idea about r8-15)
- */
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(call_into_c)
-	TYPE(GNAME(call_into_c))
-GNAME(call_into_c):
-	push	%rbp		# Save old frame pointer.
-	mov	%rsp,%rbp	# Establish new frame.
-
-	push	%rsi            # args are going in here
-	push	%rdi
-	mov	16(%rbp),%rdi
-	mov	24(%rbp),%rsi
-	mov	32(%rbp),%rdx
-	mov	40(%rbp),%rcx
-	mov	48(%rbp),%rcx
-	mov	56(%rbp),%r8
-	mov	64(%rbp),%r9
-	call	*%rax
-	mov	%rbp,%rsp
-	pop	%rbp
-	ret
-	SIZE(GNAME(call_into_c))
-
-
 	.text	
 	.globl  GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
