@@ -52,15 +52,27 @@
   (declare (type ir2-block 2block))
   (block-physenv (ir2-block-block 2block)))
 
+(defun make-lexenv-var-cache (lexenv)
+  (or (lexenv-var-cache lexenv)
+      (let ((cache (make-hash-table :test #'eq)))
+        (labels ((populate (lexenv)
+                   (loop for (nil . var) in (lexenv-vars lexenv)
+                         when (lambda-var-p var)
+                         do (setf (gethash var cache) t))
+                   (let* ((lambda (lexenv-lambda lexenv))
+                          (call-lexenv (and lambda
+                                            (lambda-call-lexenv lambda))))
+                     (cond ((not call-lexenv))
+                           ((lexenv-var-cache call-lexenv)
+                            (loop for var being the hash-key of (lexenv-var-cache call-lexenv)
+                                  do (setf (gethash var cache) t)))
+                           (t
+                            (populate call-lexenv))))))
+          (populate lexenv))
+        (setf (lexenv-var-cache lexenv) cache))))
+
 (defun leaf-visible-to-debugger-p (leaf node)
-  (or (rassoc leaf (lexenv-vars (node-lexenv node)))
-      (labels ((visible-in-call-lexenv (lambda)
-                 (when lambda
-                   (let ((call-lexenv (lambda-call-lexenv lambda)))
-                     (and call-lexenv
-                          (or (rassoc leaf (lexenv-vars call-lexenv))
-                              (visible-in-call-lexenv (lexenv-lambda call-lexenv))))))))
-        (visible-in-call-lexenv (lexenv-lambda (node-lexenv node))))))
+  (gethash leaf (make-lexenv-var-cache (node-lexenv node))))
 
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the

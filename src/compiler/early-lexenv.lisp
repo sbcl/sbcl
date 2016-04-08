@@ -134,7 +134,11 @@
   ;; are of the form (:declare name . value),
   ;; (:variable name key . value), or (:function name key . value)
   (user-data nil :type list)
-  parent)
+  parent
+  ;; Cache of all visible variables, including the ones coming from
+  ;; (call-lexenv lambda)
+  ;; Used for LEAF-VISIBLE-TO-DEBUGGER-P
+  (var-cache nil :type (or null hash-table)))
 
 ;;; the lexical environment we are currently converting in
 (defvar *lexenv*)
