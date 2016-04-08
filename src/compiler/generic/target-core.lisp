@@ -52,47 +52,48 @@
            (type index length)
            (list fixup-notes)
            (type core-object object))
-  (without-gcing
-    (let* ((2comp (component-info component))
-           (constants (ir2-component-constants 2comp))
-           (box-num (- (length constants) sb!vm:code-constants-offset))
-           (code-obj (allocate-code-object box-num length))
-           (fill-ptr (code-instructions code-obj)))
-      (declare (type index box-num length))
+  (let ((debug-info (debug-info-for-component component)))
+    ;; FIXME: use WITHOUT-GCING only for stuff that needs it.
+    (without-gcing
+      (let* ((2comp (component-info component))
+             (constants (ir2-component-constants 2comp))
+             (box-num (- (length constants) sb!vm:code-constants-offset))
+             (code-obj (allocate-code-object box-num length))
+             (fill-ptr (code-instructions code-obj)))
+        (declare (type index box-num length))
 
-      (let ((v (sb!assem:segment-contents-as-vector segment)))
-        (declare (type (simple-array sb!assem:assembly-unit 1) v))
-        (copy-byte-vector-to-system-area v fill-ptr)
-        (setf fill-ptr (sap+ fill-ptr (length v))))
+        (let ((v (sb!assem:segment-contents-as-vector segment)))
+          (declare (type (simple-array sb!assem:assembly-unit 1) v))
+          (copy-byte-vector-to-system-area v fill-ptr)
+          (setf fill-ptr (sap+ fill-ptr (length v))))
 
-      (do-core-fixups code-obj fixup-notes)
+        (do-core-fixups code-obj fixup-notes)
 
-      (dolist (entry (ir2-component-entries 2comp))
-        (make-fun-entry entry code-obj object))
+        (dolist (entry (ir2-component-entries 2comp))
+          (make-fun-entry entry code-obj object))
 
-      #!-(or x86 x86-64)
-      (sb!vm:sanctify-for-execution code-obj)
+        #!-(or x86 x86-64)
+        (sb!vm:sanctify-for-execution code-obj)
 
-      (let ((info (debug-info-for-component component)))
-        (push info (core-object-debug-info object))
-        (setf (%code-debug-info code-obj) info))
+        (push debug-info (core-object-debug-info object))
+        (setf (%code-debug-info code-obj) debug-info)
 
-      (do ((index sb!vm:code-constants-offset (1+ index)))
-          ((>= index (length constants)))
-        (let ((const (aref constants index)))
-          (etypecase const
-            (null)
-            (constant
-             (setf (code-header-ref code-obj index)
-                   (constant-value const)))
-            (list
-             (ecase (car const)
-               (:entry
-                (reference-core-fun code-obj index (cdr const) object))
-               (:fdefinition
-                (setf (code-header-ref code-obj index)
-                      (find-or-create-fdefn (cdr const))))
-               (:known-fun
-                (setf (code-header-ref code-obj index)
-                      (%coerce-name-to-fun (cdr const)))))))))))
+        (do ((index sb!vm:code-constants-offset (1+ index)))
+            ((>= index (length constants)))
+          (let ((const (aref constants index)))
+            (etypecase const
+              (null)
+              (constant
+               (setf (code-header-ref code-obj index)
+                     (constant-value const)))
+              (list
+               (ecase (car const)
+                 (:entry
+                  (reference-core-fun code-obj index (cdr const) object))
+                 (:fdefinition
+                  (setf (code-header-ref code-obj index)
+                        (find-or-create-fdefn (cdr const))))
+                 (:known-fun
+                  (setf (code-header-ref code-obj index)
+                        (%coerce-name-to-fun (cdr const))))))))))))
   (values))
