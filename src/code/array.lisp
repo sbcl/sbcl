@@ -50,7 +50,8 @@
 (defun check-bound (array bound index)
   (declare (type index bound)
            (fixnum index))
-  (%check-bound array bound index))
+  (%check-bound array bound index)
+  index)
 
 (defun %with-array-data/fp (array start end)
   (%with-array-data-macro array start end :check-bounds t :check-fill-pointer t))
