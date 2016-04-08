@@ -33,18 +33,18 @@
 #!+sb-show (defvar */show* t)
 
 #!+sb-show
-(defun cannot-/show (string)
+(defmacro cannot-/show (string)
   (declare (type simple-string string))
-  #+sb-xc-host (error "can't /SHOW: ~A" string)
+  (declare (notinline concatenate))
+  #+sb-xc-host `(error "can't /SHOW: ~A" ,string)
   ;; We end up in this situation when we execute /SHOW too early in
   ;; cold init. That happens to me often enough that it's really
   ;; annoying for it to cause a hard failure -- which at that point is
   ;; hard to recover from -- instead of just diagnostic output.
   #-sb-xc-host
-  (progn (%primitive print
-          (concatenate 'simple-base-string
-                       "/can't /SHOW:" (the simple-base-string string)))
-         t))
+  `(progn (%primitive print
+           ,(concatenate 'simple-base-string "/can't /SHOW:" string))
+          t))
 
 ;;; Should /SHOW output be suppressed at this point?
 ;;;
