@@ -456,7 +456,7 @@ main(int argc, char *argv[], char *envp[])
 #endif
 
     interrupt_init();
-    block_blockable_signals(0, 0);
+    block_blockable_signals(0);
 
     runtime_options = NULL;
 

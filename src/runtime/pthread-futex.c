@@ -242,7 +242,7 @@ again:
         timeout = &tv;
     }
 
-    block_deferrable_signals(0, &oldset);
+    block_deferrable_signals(&oldset);
 
     futex = futex_get(lock_word);
 
@@ -310,7 +310,7 @@ futex_wake(int *lock_word, int n)
     struct futex *futex;
     sigset_t oldset;
 
-    block_deferrable_signals(0, &oldset);
+    block_deferrable_signals(&oldset);
 
     futex = futex_get(lock_word);
 

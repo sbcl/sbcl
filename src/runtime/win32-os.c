@@ -221,7 +221,7 @@ const char * t_nil_s(lispobj symbol);
 unsigned long block_deferrables_and_return_mask()
 {
     sigset_t sset;
-    block_deferrable_signals(0, &sset);
+    block_deferrable_signals(&sset);
     return (unsigned long)sset;
 }
 
@@ -1143,7 +1143,7 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
 
     WITH_GC_AT_SAFEPOINTS_ONLY() {
 #if defined(LISP_FEATURE_SB_THREAD)
-        block_blockable_signals(0,&ctx->sigmask);
+        block_blockable_signals(&ctx->sigmask);
 #endif
         handle_trap(ctx, trap);
 #if defined(LISP_FEATURE_SB_THREAD)
@@ -1284,7 +1284,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
          * anyway. */
 
 #if defined(LISP_FEATURE_SB_THREAD)
-        block_blockable_signals(0,&ctx->sigmask);
+        block_blockable_signals(&ctx->sigmask);
 #endif
         fake_foreign_function_call(ctx);
 

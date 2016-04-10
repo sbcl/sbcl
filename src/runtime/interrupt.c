@@ -435,18 +435,18 @@ check_gc_signals_blocked_or_lose(sigset_t *sigset)
 #endif
 
 void
-block_deferrable_signals(sigset_t *where, sigset_t *old)
+block_deferrable_signals(sigset_t *old)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    block_signals(&deferrable_sigset, where, old);
+    block_signals(&deferrable_sigset, 0, old);
 #endif
 }
 
 void
-block_blockable_signals(sigset_t *where, sigset_t *old)
+block_blockable_signals(sigset_t *old)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    block_signals(&blockable_sigset, where, old);
+    block_signals(&blockable_sigset, 0, old);
 #endif
 }
 
@@ -527,7 +527,7 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
     sigset_t oldset;
     /* Obviously, this function is called when signals may not be
      * blocked. Let's make sure we are not interrupted. */
-    block_blockable_signals(0, &oldset);
+    block_blockable_signals(&oldset);
 #ifndef LISP_FEATURE_SB_THREAD
     /* With threads a SIG_STOP_FOR_GC and a normal GC may also want to
      * block. */
@@ -786,7 +786,7 @@ undo_fake_foreign_function_call(os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
     /* Block all blockable signals. */
-    block_blockable_signals(0, 0);
+    block_blockable_signals(0);
 
     foreign_function_call_active_p(thread) = 0;
 
@@ -2007,7 +2007,7 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
 
     FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
 
-    block_blockable_signals(0, &old);
+    block_blockable_signals(&old);
 
     FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%p\n",
            interrupt_low_level_handlers[signal]));

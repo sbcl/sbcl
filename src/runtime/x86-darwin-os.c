@@ -252,7 +252,7 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
        4) restore the sigmask */
     build_fake_signal_context(&context, thread_state, float_state);
 
-    block_blockable_signals(0, 0);
+    block_blockable_signals(0);
 
     handler(signal, siginfo, &context);
 

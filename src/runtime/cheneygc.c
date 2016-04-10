@@ -107,7 +107,7 @@ collect_garbage(generation_index_t ignore)
 
     /* it's possible that signals are blocked already if this was called
      * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
-    block_blockable_signals(0, &old);
+    block_blockable_signals(&old);
 
     current_static_space_free_pointer =
         (lispobj *) ((unsigned long)

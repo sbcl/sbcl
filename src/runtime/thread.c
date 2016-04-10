@@ -140,7 +140,7 @@ thread_state(struct thread *thread)
 {
     lispobj state;
     sigset_t old;
-    block_blockable_signals(NULL, &old);
+    block_blockable_signals(&old);
     os_sem_wait(thread->state_sem, "thread_state");
     state = thread->state;
     os_sem_post(thread->state_sem, "thread_state");
@@ -153,7 +153,7 @@ set_thread_state(struct thread *thread, lispobj state)
 {
     int i, waitcount = 0;
     sigset_t old;
-    block_blockable_signals(NULL, &old);
+    block_blockable_signals(&old);
     os_sem_wait(thread->state_sem, "set_thread_state");
     if (thread->state != state) {
         if ((STATE_STOPPED==state) ||
@@ -181,7 +181,7 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 {
     sigset_t old;
     os_sem_t *wait_sem;
-    block_blockable_signals(NULL, &old);
+    block_blockable_signals(&old);
   start:
     os_sem_wait(thread->state_sem, "wait_for_thread_state_change");
     if (thread->state == state) {
@@ -413,7 +413,7 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
      * non-safepoint versions of this code.  Can we unify this more?
      */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    block_blockable_signals(0, 0);
+    block_blockable_signals(0);
     gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
     gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
@@ -426,7 +426,7 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
     gc_assert(lock_ret == 0);
 #else
     /* Block GC */
-    block_blockable_signals(0, 0);
+    block_blockable_signals(0);
     set_thread_state(th, STATE_DEAD);
 
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
@@ -514,7 +514,7 @@ attach_os_thread(init_thread_data *scribble)
     odxprint(misc, "attach_os_thread: attaching to %p", os);
 
     struct thread *th = create_thread_struct(NIL);
-    block_deferrable_signals(0, &scribble->oldset);
+    block_deferrable_signals(&scribble->oldset);
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     /* We don't actually want a pthread_attr here, but rather than add
      * `if's to the post-mostem, let's just keep that code happy by
@@ -846,7 +846,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
-    block_deferrable_signals(0, &oldset);
+    block_deferrable_signals(&oldset);
 
 #ifdef LOCK_CREATE_THREAD
     retcode = pthread_mutex_lock(&create_thread_lock);
@@ -1080,7 +1080,7 @@ kill_safely(os_thread_t os_thread, int signal)
 
         /* pthread_kill is not async signal safe and we don't want to be
          * interrupted while holding the lock. */
-        block_deferrable_signals(0, &oldset);
+        block_deferrable_signals(&oldset);
         pthread_mutex_lock(&all_threads_lock);
         for (thread = all_threads; thread; thread = thread->next) {
             if (thread->os_thread == os_thread) {

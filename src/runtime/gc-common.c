@@ -2836,7 +2836,7 @@ maybe_gc(os_context_t *context)
         /* Otherwise done by undo_fake_foreign_function_call. And
          something later wants them to be blocked. What a nice
          interface.*/
-        block_blockable_signals(0, 0);
+        block_blockable_signals(0);
     }
 
     FSHOW((stderr, "/maybe_gc: returning\n"));
