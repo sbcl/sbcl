@@ -42,7 +42,6 @@ extern void check_gc_signals_unblocked_or_lose(sigset_t *sigset);
 
 extern void block_deferrable_signals(sigset_t *where, sigset_t *old);
 extern void block_blockable_signals(sigset_t *where, sigset_t *old);
-extern void block_gc_signals(sigset_t *where, sigset_t *old);
 
 extern void unblock_deferrable_signals(sigset_t *where, sigset_t *old);
 extern void unblock_blockable_signals(sigset_t *where, sigset_t *old);

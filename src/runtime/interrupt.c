@@ -450,16 +450,6 @@ block_blockable_signals(sigset_t *where, sigset_t *old)
 #endif
 }
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-void
-block_gc_signals(sigset_t *where, sigset_t *old)
-{
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    block_signals(&gc_sigset, where, old);
-#endif
-}
-#endif
-
 void
 unblock_deferrable_signals(sigset_t *where, sigset_t *old)
 {
