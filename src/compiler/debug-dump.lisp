@@ -64,7 +64,7 @@
                                             (lambda-call-lexenv lambda))))
                      (cond ((not call-lexenv))
                            ((lexenv-var-cache call-lexenv)
-                            (loop for var being the hash-key of (lexenv-var-cache call-lexenv)
+                            (loop for var being each hash-key of (lexenv-var-cache call-lexenv)
                                   do (setf (gethash var cache) t)))
                            (t
                             (populate call-lexenv))))))
