@@ -238,7 +238,7 @@
 (defun gspace-byte-address (gspace)
   (ash (gspace-word-address gspace) sb!vm:word-shift))
 
-(def!method print-object ((gspace gspace) stream)
+(cl:defmethod print-object ((gspace gspace) stream)
   (print-unreadable-object (gspace stream :type t)
     (format stream "~S" (gspace-name gspace))))
 
@@ -253,6 +253,7 @@
 
 ;;;; representation of descriptors
 
+(declaim (inline is-fixnum-lowtag))
 (defun is-fixnum-lowtag (lowtag)
   (zerop (logand lowtag sb!vm:fixnum-tag-mask)))
 
@@ -282,7 +283,12 @@
 (defun make-random-descriptor (bits)
   (make-descriptor (logand bits sb!ext:most-positive-word)))
 
-(def!method print-object ((des descriptor) stream)
+(declaim (inline descriptor-lowtag))
+(defun descriptor-lowtag (des)
+  "the lowtag bits for DES"
+  (logand (descriptor-bits des) sb!vm:lowtag-mask))
+
+(cl:defmethod print-object ((des descriptor) stream)
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
       (cond ((eq (descriptor-gspace des) :load-time-value)
@@ -326,22 +332,14 @@
                        gspace
                        old-free-word-index))))
 
-(defun descriptor-lowtag (des)
-  "the lowtag bits for DES"
-  (logand (descriptor-bits des) sb!vm:lowtag-mask))
-
 (defun descriptor-fixnum (des)
-  (let ((bits (descriptor-bits des)))
-    (if (logbitp (1- sb!vm:n-word-bits) bits)
-        ;; KLUDGE: The (- SB!VM:N-WORD-BITS 2) term here looks right to
-        ;; me, and it works, but in CMU CL it was (1- SB!VM:N-WORD-BITS),
-        ;; and although that doesn't make sense for me, or work for me,
-        ;; it's hard to see how it could have been wrong, since CMU CL
-        ;; genesis worked. It would be nice to understand how this came
-        ;; to be.. -- WHN 19990901
-        (logior (ash bits (- sb!vm:n-fixnum-tag-bits))
-                (ash -1 (1+ sb!vm:n-positive-fixnum-bits)))
-        (ash bits (- sb!vm:n-fixnum-tag-bits)))))
+  (unless (is-fixnum-lowtag (descriptor-lowtag des))
+    (error "descriptor-fixnum called on non-fixnum ~S" des))
+  (let* ((descriptor-bits (descriptor-bits des))
+         (bits (ash descriptor-bits (- sb!vm:n-fixnum-tag-bits))))
+    (if (logbitp (1- sb!vm:n-word-bits) descriptor-bits)
+        (logior bits (ash -1 (1+ sb!vm:n-positive-fixnum-bits)))
+        bits)))
 
 (defun descriptor-word-sized-integer (des)
   ;; Extract an (unsigned-byte 32), from either its fixnum or bignum
@@ -2485,12 +2483,12 @@ core and return a descriptor to it."
         (let ((old-length (descriptor-fixnum (get-slot :length)))
               (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
               (old-metadata
-               (descriptor-fixnum
+               (host-object-from-core
                 (get-slot #!-interleaved-raw-slots :n-untagged-slots
                           #!+interleaved-raw-slots :untagged-bitmap)))
               (length (descriptor-fixnum length-des))
               (depthoid (descriptor-fixnum depthoid-des))
-              (metadata (descriptor-fixnum metadata-des)))
+              (metadata (host-object-from-core metadata-des)))
           (unless (= length old-length)
             (error "cold loading a reference to class ~S when the compile~%~
                     time length was ~S and current length is ~S"
