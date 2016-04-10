@@ -6,6 +6,8 @@ changes relative to sbcl-1.3.4:
     (lp#1563355)
   * bug fix: better wording in missed optimization note. (lp#1003265)
   * bug fix: interpreted (CAS SVREF) was broken
+  * bug fix: support CLISP as build host for ARM (lp#1568256, thanks to Tomas
+    Hlavaty)
 
 changes in sbcl-1.3.4 relative to sbcl-1.3.3:
   * enhancement: who-sets and who-references work on DEFGLOBAL. (lp#1552997)
