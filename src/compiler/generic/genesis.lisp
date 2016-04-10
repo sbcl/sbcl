@@ -3438,7 +3438,7 @@ core and return a descriptor to it."
            (c-name (string-downcase (string designator)))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
-    (format t "    lispobj header;~%")
+    (format t "    lispobj header; // = word_0_~%")
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
     ;; classoid's expressly declared layout isn't renamed as a special-case.
     (format t "    lispobj _layout;~%")
@@ -3456,17 +3456,18 @@ core and return a descriptor to it."
       (dotimes (n (dd-raw-length dd))
         (format t "    lispobj raw~D;~%" (- (dd-raw-length dd) n 1))))
     #!+interleaved-raw-slots
-    (let ((index 1))
+    (let ((names ; round dd-length to odd so that total + header is even
+           (coerce (loop for i from 1 below (logior (dd-length dd) 1)
+                         collect (list (format nil "word_~D_" (1+ i))))
+                   'vector)))
       (dolist (slot (dd-slots dd))
-        (cond ((eq t (dsd-raw-type slot))
-               (loop while (< index (dsd-index slot))
-                     do
-                     (format t "    lispobj raw_slot_padding~A;~%" index)
-                     (incf index))
-               (format t "    lispobj ~A;~%" (cstring (dsd-name slot)))
-               (incf index))))
-      (unless (oddp (dd-length dd))
-        (format t "    lispobj end_padding;~%")))
+        (let ((cell (aref names (1- (dsd-index slot))))
+              (name (cstring (dsd-name slot))))
+          (if (eq (dsd-raw-type slot) t)
+              (rplaca cell name)
+              (rplacd cell name))))
+      (loop for slot across names
+            do (format t "    lispobj ~A;~@[ //~A~]~%" (car slot) (cdr slot))))
     (format t "};~2%")
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
 
