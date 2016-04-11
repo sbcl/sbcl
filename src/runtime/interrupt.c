@@ -463,14 +463,6 @@ unblock_deferrable_signals(sigset_t *where, sigset_t *old)
 #endif
 }
 
-void
-unblock_blockable_signals(sigset_t *where, sigset_t *old)
-{
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    unblock_signals(&blockable_sigset, where, old);
-#endif
-}
-
 #ifndef LISP_FEATURE_SB_SAFEPOINT
 void
 unblock_gc_signals(sigset_t *where, sigset_t *old)
