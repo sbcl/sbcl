@@ -1320,6 +1320,28 @@
            (sap (buffer-sap ibuf)))
       (declare (type index remaining-request head tail available))
       (declare (type index n-this-copy))
+      #!+cheneygc
+      ;; Prevent failure caused by memmove() hitting a write-protected page
+      ;; and the fault handler losing, since it thinks you're not in Lisp.
+      ;; This is wasteful, but better than being randomly broken (lp#1366263).
+      (when (> this-end this-start)
+        (typecase buffer
+          (system-area-pointer
+           (setf (sap-ref-8 buffer this-start) (sap-ref-8 buffer this-start)
+                 (sap-ref-8 buffer (1- this-end)) (sap-ref-8 buffer (1- this-end))))
+          ((simple-array (unsigned-byte 8) (*))
+           (setf (aref buffer this-start) (aref buffer this-start)
+                 (aref buffer (1- this-end)) (aref buffer (1- this-end))))
+          ((simple-array * (*))
+           ;; We might have an array of UNSIGNED-BYTE-32 here, but the
+           ;; bounding indices act as if it were UNSIGNED-BYTE-8.
+           ;; This is strange, and in direct contradiction to what %BYTE-BLT
+           ;; believes it accepts. i.e. according to the comments,
+           ;; it's for want of error checking that this works at all.
+           (with-pinned-objects (buffer)
+             (let ((sap (vector-sap buffer)))
+               (setf (sap-ref-8 sap this-start) (sap-ref-8 sap this-start)
+                     (sap-ref-8 sap (1- this-end)) (sap-ref-8 sap (1- this-end))))))))
       ;; Copy data from stream buffer into user's buffer.
       (%byte-blt sap head buffer this-start this-end)
       (incf (buffer-head ibuf) n-this-copy)
