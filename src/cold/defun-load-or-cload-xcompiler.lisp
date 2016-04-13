@@ -368,6 +368,7 @@
             sb!interpreter::flush-everything
             sb!interpreter::fun-lexically-notinline-p
             sb!interpreter:lexenv-from-env
+            sb!interpreter::lexically-unlocked-symbol-p
             sb!interpreter:list-locals
             sb!interpreter:prepare-for-compile
             sb!interpreter::reconstruct-syntactic-closure-env)
