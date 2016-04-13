@@ -541,7 +541,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "MAP-SEGMENT-INSTRUCTIONS"
                "SET-LOCATION-PRINTING-RANGE" "MAKE-VECTOR-SEGMENT"
                "ADD-OFFS-NOTE-HOOK" "ADD-OFFS-COMMENT-HOOK"
-               "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"))
+               "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"
+               "SNARF-ERROR-JUNK"))
 
    #!+sb-dyncount
    #s(sb-cold:package-data

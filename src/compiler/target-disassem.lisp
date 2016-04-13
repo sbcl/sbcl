@@ -2109,6 +2109,36 @@
     (incf (dstate-next-offs dstate)
           adjust)))
 
+;;; arm64 stores an error-number in the instruction bytes,
+;;; so can't easily share this code.
+;;; But probably we should just add the conditionalization in here.
+#!-arm64
+(defun snarf-error-junk (sap offset &optional length-only)
+  (let ((length (sb!sys:sap-ref-8 sap offset)))
+    (declare (type sb!sys:system-area-pointer sap)
+             (type (unsigned-byte 8) length))
+    (if length-only
+        (values 0 (1+ length) nil nil)
+        (let ((vector
+               (truly-the (simple-array (unsigned-byte 8) (*))
+                          (sb!sys:sap-ref-octets sap (1+ offset) length))))
+           (collect ((sc-offsets)
+                     (lengths))
+             (lengths 1)                ; the length byte
+             (let* ((index 0)
+                    (error-number (sb!c:read-var-integer vector index)))
+               (lengths index)
+               (loop
+                 (when (>= index length)
+                   (return))
+                 (let ((old-index index))
+                   (sc-offsets (sb!c:read-var-integer vector index))
+                   (lengths (- index old-index))))
+               (values error-number
+                       (1+ length)
+                       (sc-offsets)
+                       (lengths))))))))
+
 ;; A prefilter set is a list of vectors specifying bytes to extract
 ;; and a function to call on the extracted value(s).
 ;; EQUALP lists of vectors can be coalesced, since they're immutable.

@@ -124,6 +124,6 @@
     (declare (type system-area-pointer pc))
     (multiple-value-bind (error-number length sc-offsets)
         ;; KLUDGE: This exposure of the branch delay mechanism hurts.
-        (snarf-error-junk pc (if (logbitp 31 cause) 8 4))
+        (sb!disassem:snarf-error-junk pc (if (logbitp 31 cause) 8 4))
       (declare (ignore length))
       (values error-number sc-offsets))))
