@@ -291,20 +291,15 @@
 
 (macrolet
     ((define-raw-slot-vops (name ref-inst set-inst value-primtype value-sc
-                                 &key (width 1) use-lip (move-macro 'move))
+                                 &key use-lip (move-macro 'move))
        (labels ((emit-generator (instruction move-result)
-                  `((loadw offset object 0 instance-pointer-lowtag)
-                    (inst mov offset (lsr offset n-widetag-bits))
-                    (inst rsb offset index (lsl offset n-fixnum-tag-bits))
-                    (inst sub offset offset (+ (* (- ,width
-                                                     instance-slots-offset)
-                                                  n-word-bytes)
-                                               instance-pointer-lowtag))
-                    ,@(when use-lip
-                        '((inst add lip object offset)))
-                    (inst ,instruction value ,(if use-lip
-                                                  '(@ lip)
-                                                  '(@ object offset)))
+                  `((inst add offset index
+                          (- (* instance-slots-offset n-word-bytes)
+                             instance-pointer-lowtag))
+                    ,@(if use-lip
+                          `((inst add lip object offset)
+                            (inst ,instruction value (@ lip)))
+                          `((inst ,instruction value (@ object offset))))
                     ,@(when move-result
                         `((,move-macro result value))))))
          (let ((ref-vop (symbolicate "RAW-INSTANCE-REF/" name))
@@ -337,8 +332,8 @@
   (define-raw-slot-vops single flds fsts single-float single-reg
                         :use-lip t :move-macro move-single)
   (define-raw-slot-vops double fldd fstd double-float double-reg
-                        :use-lip t :width 2 :move-macro move-double)
+                        :use-lip t :move-macro move-double)
   (define-raw-slot-vops complex-single load-complex-single store-complex-single complex-single-float complex-single-reg
-                        :use-lip t :width 2 :move-macro move-complex-single)
+                        :use-lip t :move-macro move-complex-single)
   (define-raw-slot-vops complex-double load-complex-double store-complex-double complex-double-float complex-double-reg
-                        :use-lip t :width 4 :move-macro move-complex-double))
+                        :use-lip t :move-macro move-complex-double))

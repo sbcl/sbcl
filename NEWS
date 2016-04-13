@@ -4,6 +4,8 @@ changes relative to sbcl-1.3.4:
   * enhancement: the platform's strtod() is exposed as SB-POSIX:STRTOD
   * enhancement: speed up debug info creation for highly nested functions.
     (lp#1563355)
+  * enhancement: the interleaved structure slot optimization from
+    release 1.2.6 has been ported to 32-bit ARM.
   * bug fix: better wording in missed optimization note. (lp#1003265)
   * bug fix: interpreted (CAS SVREF) was broken
   * bug fix: support CLISP as build host for ARM (lp#1568256, thanks to Tomas

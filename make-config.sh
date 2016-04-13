@@ -730,7 +730,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     # As opposed to soft-float or FPA, we support VFP only (and
     # possibly VFPv2 and higher only), but we'll leave the obvious
     # hooks in for someone to add the support later.
-    printf ' :arm-vfp :arm-vfpv2' >> $ltf
+    printf ' :arm-vfp :arm-vfpv2 :interleaved-raw-slots' >> $ltf
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
