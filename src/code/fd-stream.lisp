@@ -2077,6 +2077,8 @@
      (finish-fd-stream-output fd-stream))
     (:element-type
      (fd-stream-element-type fd-stream))
+    (:element-mode
+     (fd-stream-element-mode fd-stream))
     (:external-format
      (fd-stream-external-format fd-stream))
     (:interactive-p

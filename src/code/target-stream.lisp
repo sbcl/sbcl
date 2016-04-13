@@ -126,7 +126,13 @@
        (let ((in-type (stream-element-type in))
              (out-type (stream-element-type out)))
          (if (equal in-type out-type)
-             in-type `(and ,in-type ,out-type))))
+             in-type
+             `(and ,in-type ,out-type))))
+      (:element-mode
+       (let ((in-mode (stream-element-mode in))
+             (out-mode (stream-element-mode out)))
+         (when (equal in-mode out-mode)
+           in-mode)))
       (:close
        (set-closed-flame stream))
       (:peek-char
@@ -171,4 +177,3 @@
            (if (ansi-stream-p out)
                (funcall (ansi-stream-misc out) out operation arg1 arg2)
                (stream-misc-dispatch out operation arg1 arg2)))))))
-

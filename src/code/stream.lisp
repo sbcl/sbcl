@@ -768,6 +768,9 @@
      (finish-output stream))
     (:element-type
      (stream-element-type stream))
+    (:element-mode
+     (stream-element-type-stream-element-mode
+      (stream-element-type stream)))
     (:stream-external-format
      (stream-external-format stream))
     (:interactive-p
@@ -845,6 +848,9 @@
          (if last
              (stream-element-type (car last))
              t)))
+      (:element-mode
+       (awhen (last streams)
+         (stream-element-mode (car it))))
       (:external-format
        (let ((last (last streams)))
          (if last
@@ -999,7 +1005,13 @@
        (let ((in-type (stream-element-type in))
              (out-type (stream-element-type out)))
          (if (equal in-type out-type)
-             in-type `(and ,in-type ,out-type))))
+             in-type
+             `(and ,in-type ,out-type))))
+      (:element-mode
+       (let ((in-mode (stream-element-mode in))
+             (out-mode (stream-element-mode out)))
+         (when (equal in-mode out-mode)
+           in-mode)))
       (:close
        (set-closed-flame stream))
       (t
@@ -1988,10 +2000,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 (defun stream-element-mode (stream)
   (declare (type stream stream))
-  (if (fd-stream-p stream)
-      (fd-stream-element-mode stream)
-      (stream-element-type-stream-element-mode
-       (stream-element-type stream))))
+  (cond
+    ((fd-stream-p stream)
+     (fd-stream-element-mode stream))
+    ((and (ansi-stream-p stream)
+          (funcall (ansi-stream-misc stream) stream :element-mode)))
+    (t
+     (stream-element-type-stream-element-mode
+      (stream-element-type stream)))))
 
 (defun stream-compute-io-function (stream
                                    stream-element-mode sequence-element-type
