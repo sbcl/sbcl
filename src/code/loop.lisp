@@ -268,6 +268,7 @@ code to be loaded.
   `(setf (gethash (symbol-name ,symbol) ,table) ,datum))
 
 (defstruct (loop-universe
+             (:constructor !make-loop-universe)
              (:copier nil)
              (:predicate nil))
   keywords             ; hash table, value = (fn-name . extra-data)
@@ -285,9 +286,9 @@ code to be loaded.
 ;;; loop. It gets bound on each invocation of LOOP.
 (defvar *loop-universe*)
 
-(defun make-standard-loop-universe (&key keywords for-keywords
-                                         iteration-keywords path-keywords
-                                         type-keywords type-symbols)
+(defun !make-standard-loop-universe (&key keywords for-keywords
+                                          iteration-keywords path-keywords
+                                          type-keywords type-symbols)
   (flet ((maketable (entries)
            (let* ((size (length entries))
                   (ht (make-hash-table :size (if (< size 10) 10 size)
@@ -295,7 +296,7 @@ code to be loaded.
              (dolist (x entries)
                (setf (gethash (symbol-name (car x)) ht) (cadr x)))
              ht)))
-    (make-loop-universe
+    (!make-loop-universe
       :keywords (maketable keywords)
       :for-keywords (maketable for-keywords)
       :iteration-keywords (maketable iteration-keywords)
@@ -1845,8 +1846,8 @@ code to be loaded.
 
 ;;;; ANSI LOOP
 
-(defun make-ansi-loop-universe ()
-  (let ((w (make-standard-loop-universe
+(defun !make-ansi-loop-universe ()
+  (let ((w (!make-standard-loop-universe
              :keywords '((named (loop-do-named))
                          (initially (loop-do-initially))
                          (finally (loop-do-finally))
@@ -1900,15 +1901,7 @@ code to be loaded.
                              (being (loop-for-being)))
              :iteration-keywords '((for (loop-do-for))
                                    (as (loop-do-for)))
-             :type-symbols '(array atom bignum bit bit-vector character
-                             compiled-function complex cons double-float
-                             fixnum float function hash-table integer
-                             keyword list long-float nil null number
-                             package pathname random-state ratio rational
-                             readtable sequence short-float simple-array
-                             simple-bit-vector simple-string simple-vector
-                             single-float standard-char stream string
-                             base-char symbol t vector)
+             :type-symbols sb!kernel::*!standard-type-names*
              :type-keywords nil)))
     (add-loop-path '(hash-key hash-keys) 'loop-hash-table-iteration-path w
                    :preposition-groups '((:of :in))
@@ -1938,7 +1931,7 @@ code to be loaded.
     w))
 
 (defparameter *loop-ansi-universe*
-  (make-ansi-loop-universe))
+  (!make-ansi-loop-universe))
 
 (defun loop-standard-expansion (keywords-and-forms environment universe)
   (if (and keywords-and-forms (symbolp (car keywords-and-forms)))
