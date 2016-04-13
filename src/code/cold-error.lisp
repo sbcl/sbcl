@@ -124,8 +124,10 @@
 (defmacro infinite-error-protect (&rest forms)
   `(let ((*current-error-depth* (infinite-error-protector)))
      (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
-     ;; arbitrary truncation
-     #!+sb-show (sb!debug:print-backtrace :count 8)
+     ;; This is almost totally unhelpful. Running with #!+sb-show does not mean
+     ;; that you care to see an additional 16K characters of output
+     ;; each time this macro is used when no error is actually happening.
+     #| #!+sb-show (sb!debug:print-backtrace :count 8) ; arbitrary truncation |#
      ,@forms))
 
 ;;; a helper function for INFINITE-ERROR-PROTECT
