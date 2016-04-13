@@ -149,24 +149,5 @@
 
 (defun get-setf-fun-name (name)
   `(setf ,name))
-
-;;;; support for useful hashing of PCL instances
-
-;; FIXME: do something address-based, so not to depend on the ordinary PRNG.
-;; Probably mix the object address with the output of a fast and simple LCG,
-;; as is done for CTYPEs.
-(defvar *instance-hash-code-random-state* (make-random-state))
-(defun get-instance-hash-code ()
-  ;; ANSI SXHASH wants us to make a good-faith effort to produce
-  ;; hash-codes that are well distributed within the range of
-  ;; non-negative fixnums, and this RANDOM operation does that, unlike
-  ;; the sbcl<=0.8.16 implementation of this operation as
-  ;; (INCF COUNTER).
-  ;;
-  ;; Hopefully there was no virtue to the old counter implementation
-  ;; that I am insufficiently insightful to insee. -- WHN 2004-10-28
-  (random most-positive-fixnum
-          *instance-hash-code-random-state*))
-
 
 (/show "finished with pcl/macros.lisp")

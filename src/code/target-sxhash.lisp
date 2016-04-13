@@ -173,12 +173,28 @@
 ;; simple cases
 (declaim (ftype (sfunction (integer) hash) sxhash-bignum))
 
+(defun new-instance-hash-code ()
+  ;; ANSI SXHASH wants us to make a good-faith effort to produce
+  ;; hash-codes that are well distributed within the range of
+  ;; non-negative fixnums, and this address-based operation does that.
+  ;; This is faster than calling RANDOM, and is random enough.
+  (loop
+   (let ((answer
+          (truly-the fixnum
+           (quasi-random-address-based-hash
+            (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte))
+                             t)
+            most-positive-fixnum))))
+     (when (plusp answer)
+       ;; Make sure we never return 0 (almost no chance of that anyway).
+       (return answer)))))
+
 (declaim (inline std-instance-hash))
 (defun std-instance-hash (instance)
   (let ((hash (%instance-ref instance sb!pcl::std-instance-hash-slot-index)))
     (if (not (eql hash 0))
         hash
-        (let ((new (sb!pcl::get-instance-hash-code)))
+        (let ((new (new-instance-hash-code)))
           ;; At most one thread will compute a random hash.
           ;; %INSTANCE-CAS is a full call if there is no vop for it.
           (let ((old (%instance-cas instance sb!pcl::std-instance-hash-slot-index

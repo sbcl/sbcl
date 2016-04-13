@@ -71,7 +71,7 @@
 (defun allocate-standard-funcallable-instance
     (wrapper &optional (slots-init nil slots-init-p))
   (let ((fin (%make-standard-funcallable-instance
-              nil (get-instance-hash-code))))
+              nil (sb-impl::new-instance-hash-code))))
     (set-funcallable-instance-function
      fin
      #'(lambda (&rest args)
