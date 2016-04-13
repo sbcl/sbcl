@@ -23,7 +23,7 @@
 (defun posn-column (posn stream)
   (declare (type posn posn) (type pretty-stream stream)
            (values posn))
-  (index-column (posn-index posn stream) stream))
+  (truly-the posn (index-column (posn-index posn stream) stream)))
 
 ;;; Is it OK to do pretty printing on this stream at this time?
 (defun print-pretty-on-stream-p (stream)
