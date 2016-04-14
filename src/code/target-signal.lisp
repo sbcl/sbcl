@@ -153,8 +153,10 @@
                                      synchronous)))
         (cond ((= result sig-dfl) :default)
               ((= result sig-ign) :ignore)
-              (t (the (or function fixnum)
-                   (sb!kernel:make-lisp-obj result))))))))
+              (t ;; MAKE-LISP-OBJ returns 2 values, which gets
+                 ;; "too complex to check". We don't want the second value.
+               (values (the (or function fixnum)
+                         (sb!kernel:make-lisp-obj result)))))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))
