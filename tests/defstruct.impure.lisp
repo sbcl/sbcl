@@ -1349,3 +1349,33 @@ redefinition."
                                     (x-y z)))
                     (make-x :y t))
            '(:X-Y #S(X :Y T)))))
+
+(in-package sb-kernel)
+
+;; The word order for halves of double-floats on 32-bit platforms
+;; should match the platform's native order.
+(defun compare-memory (obj1 obj1-word-ofs obj2 obj2-word-ofs n-words)
+  (with-pinned-objects (obj1 obj2)
+    (let ((sap1 (int-sap (- (get-lisp-obj-address obj1) (lowtag-of obj1))))
+          (sap2 (int-sap (- (get-lisp-obj-address obj2) (lowtag-of obj2)))))
+      (dotimes (i n-words)
+        (let ((w1 (sap-ref-32 sap1 (ash (+ obj1-word-ofs i) sb-vm:word-shift)))
+              (w2 (sap-ref-32 sap2 (ash (+ obj2-word-ofs i) sb-vm:word-shift))))
+          (assert (= w1 w2)))))))
+
+(defstruct struct-df (a pi :type double-float))
+(defvar *c* (complex (exp 1d0) pi))
+(defstruct struct-cdf (a *c* :type (complex double-float)))
+
+(defvar *adf* (make-array 1 :element-type 'double-float
+                            :initial-element pi))
+(defvar *acdf* (make-array 1 :element-type '(complex double-float)
+                             :initial-element *c*))
+
+(test-util:with-test (:name :dfloat-endianness
+                      :skipped-on '(not (or :mips :x86))) ; only tested on these
+  (compare-memory pi 2 *adf* 2 2) ; Array
+  (compare-memory pi 2 (make-struct-df) 2 2) ; Structure
+
+  (compare-memory *c* 2 *acdf* 2 4) ; Array
+  (compare-memory *c* 2 (make-struct-cdf) 2 4)) ; Structure

@@ -401,13 +401,13 @@
     (let ((immediate-offset (- (* instance-slots-offset n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
-        (:big-endian (inst lwc1 value lip immediate-offset))
-        (:little-endian (inst lwc1-odd value lip immediate-offset))))
+        (:big-endian (inst lwc1-odd value lip immediate-offset))
+        (:little-endian (inst lwc1 value lip immediate-offset))))
     (let ((immediate-offset (- (* (1+ instance-slots-offset) n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
-        (:big-endian (inst lwc1-odd value lip immediate-offset))
-        (:little-endian (inst lwc1 value lip immediate-offset))))))
+        (:big-endian (inst lwc1 value lip immediate-offset))
+        (:little-endian (inst lwc1-odd value lip immediate-offset))))))
 
 (define-vop (raw-instance-set/double)
   (:translate %raw-instance-set/double)
@@ -430,13 +430,13 @@
     (let ((immediate-offset (- (* instance-slots-offset n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
-        (:big-endian (inst swc1 value lip immediate-offset))
-        (:little-endian (inst swc1-odd value lip immediate-offset))))
+        (:big-endian (inst swc1-odd value lip immediate-offset))
+        (:little-endian (inst swc1 value lip immediate-offset))))
     (let ((immediate-offset (- (* (1+ instance-slots-offset) n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
-        (:big-endian (inst swc1-odd value lip immediate-offset))
-        (:little-endian (inst swc1 value lip immediate-offset))))
+        (:big-endian (inst swc1 value lip immediate-offset))
+        (:little-endian (inst swc1-odd value lip immediate-offset))))
     (unless (location= result value)
       (inst fmove :double result value))))
 
@@ -525,26 +525,37 @@
     (let ((immediate-offset (- (* instance-slots-offset n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
-        (:big-endian (inst lwc1
+        (:big-endian (inst lwc1-odd
                            (complex-double-reg-real-tn value)
                            lip
                            immediate-offset))
-        (:little-endian (inst lwc1-odd
+        (:little-endian (inst lwc1
                               (complex-double-reg-real-tn value)
                               lip
                               immediate-offset))))
     (let ((immediate-offset (- (* (1+ instance-slots-offset) n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
-        (:big-endian (inst lwc1-odd
+        (:big-endian (inst lwc1
                            (complex-double-reg-real-tn value)
                            lip
                            immediate-offset))
-        (:little-endian (inst lwc1
+        (:little-endian (inst lwc1-odd
                               (complex-double-reg-real-tn value)
                               lip
                               immediate-offset))))
     (let ((immediate-offset (- (* (+ instance-slots-offset 2) n-word-bytes)
+                               instance-pointer-lowtag)))
+      (ecase *backend-byte-order*
+        (:big-endian (inst lwc1-odd
+                           (complex-double-reg-imag-tn value)
+                           lip
+                           immediate-offset))
+        (:little-endian (inst lwc1
+                              (complex-double-reg-imag-tn value)
+                              lip
+                              immediate-offset))))
+    (let ((immediate-offset (- (* (+ instance-slots-offset 3) n-word-bytes)
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
         (:big-endian (inst lwc1
@@ -552,17 +563,6 @@
                            lip
                            immediate-offset))
         (:little-endian (inst lwc1-odd
-                              (complex-double-reg-imag-tn value)
-                              lip
-                              immediate-offset))))
-    (let ((immediate-offset (- (* (+ instance-slots-offset 3) n-word-bytes)
-                               instance-pointer-lowtag)))
-      (ecase *backend-byte-order*
-        (:big-endian (inst lwc1-odd
-                           (complex-double-reg-imag-tn value)
-                           lip
-                           immediate-offset))
-        (:little-endian (inst lwc1
                               (complex-double-reg-imag-tn value)
                               lip
                               immediate-offset))))))
@@ -590,22 +590,22 @@
       (let ((immediate-offset (- (* instance-slots-offset n-word-bytes)
                                  instance-pointer-lowtag)))
         (ecase *backend-byte-order*
-          (:big-endian (inst swc1
+          (:big-endian (inst swc1-odd
                              value-real
                              lip
                              immediate-offset))
-          (:little-endian (inst swc1-odd
+          (:little-endian (inst swc1
                                 value-real
                                 lip
                                 immediate-offset))))
       (let ((immediate-offset (- (* (1+ instance-slots-offset) n-word-bytes)
                                  instance-pointer-lowtag)))
         (ecase *backend-byte-order*
-          (:big-endian (inst swc1-odd
+          (:big-endian (inst swc1
                              value-real
                              lip
                              immediate-offset))
-          (:little-endian (inst swc1
+          (:little-endian (inst swc1-odd
                                 value-real
                                 lip
                                 immediate-offset))))
@@ -616,22 +616,22 @@
       (let ((immediate-offset (- (* (+ instance-slots-offset 2) n-word-bytes)
                                  instance-pointer-lowtag)))
         (ecase *backend-byte-order*
-          (:big-endian (inst swc1
+          (:big-endian (inst swc1-odd
                              value-imag
                              lip
                              immediate-offset))
-          (:little-endian (inst swc1-odd
+          (:little-endian (inst swc1
                                 value-imag
                                 lip
                                 immediate-offset))))
       (let ((immediate-offset (- (* (+ instance-slots-offset 3) n-word-bytes)
                                  instance-pointer-lowtag)))
         (ecase *backend-byte-order*
-          (:big-endian (inst swc1-odd
+          (:big-endian (inst swc1
                              value-imag
                              lip
                              immediate-offset))
-          (:little-endian (inst swc1
+          (:little-endian (inst swc1-odd
                                 value-imag
                                 lip
                                 immediate-offset))))
