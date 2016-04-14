@@ -72,37 +72,6 @@
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 
-(defmacro with-standard-io-syntax (&body body)
-  #!+sb-doc
-  "Bind the reader and printer control variables to values that enable READ
-   to reliably read the results of PRINT. These values are:
-
-         *PACKAGE*                        the COMMON-LISP-USER package
-         *PRINT-ARRAY*                    T
-         *PRINT-BASE*                     10
-         *PRINT-CASE*                     :UPCASE
-         *PRINT-CIRCLE*                   NIL
-         *PRINT-ESCAPE*                   T
-         *PRINT-GENSYM*                   T
-         *PRINT-LENGTH*                   NIL
-         *PRINT-LEVEL*                    NIL
-         *PRINT-LINES*                    NIL
-         *PRINT-MISER-WIDTH*              NIL
-         *PRINT-PPRINT-DISPATCH*          the standard pprint dispatch table
-         *PRINT-PRETTY*                   NIL
-         *PRINT-RADIX*                    NIL
-         *PRINT-READABLY*                 T
-         *PRINT-RIGHT-MARGIN*             NIL
-         *READ-BASE*                      10
-         *READ-DEFAULT-FLOAT-FORMAT*      SINGLE-FLOAT
-         *READ-EVAL*                      T
-         *READ-SUPPRESS*                  NIL
-         *READTABLE*                      the standard readtable
-  SB-EXT:*SUPPRESS-PRINT-ERRORS*          NIL
-"
-  `(%with-standard-io-syntax (lambda () ,@body)))
-
-(defglobal sb!pretty::*standard-pprint-dispatch-table* nil)
 ;; duplicate defglobal because this file is compiled before "reader"
 (defglobal *standard-readtable* nil)
 
@@ -313,9 +282,12 @@ variable: an unreadable object representing the error is printed instead.")
   ;; since the generic function should always receive a stream.
   (declare (explicit-check))
   (labels ((print-it (stream)
-             (if *print-pretty*
-                 (sb!pretty:output-pretty-object object stream)
-                 (output-ugly-object object stream)))
+             (multiple-value-bind (fun pretty)
+                 (and *print-pretty* (pprint-dispatch object))
+               (if pretty
+                   (sb!pretty::with-pretty-stream (stream)
+                     (funcall fun stream object))
+                   (output-ugly-object stream object))))
            (handle-it (stream)
              (if *suppress-print-errors*
                  (handler-bind ((condition
@@ -381,7 +353,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; except for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL,
 ;;; then the pretty printer will be used for any components of OBJECT,
 ;;; just not for OBJECT itself.
-(defun output-ugly-object (object stream)
+(defun output-ugly-object (stream object)
   (typecase object
     ;; KLUDGE: The TYPECASE approach here is non-ANSI; the ANSI definition of
     ;; PRINT-OBJECT says it provides printing and we're supposed to provide

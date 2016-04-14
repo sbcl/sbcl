@@ -277,7 +277,6 @@
  ("src/code/fd-stream"     :not-host)
  ("src/code/stream"        :not-host)
  ("src/code/symbol"        :not-host) ; uses STRING-OUTPUT-STREAM
- ("src/code/print"         :not-host)
  ("src/code/early-format")
  ("src/code/defpackage"    :not-host)
 
@@ -448,8 +447,6 @@
  ("src/code/hash-table")
  ("src/code/readtable")
  ("src/code/pathname")
- ("src/code/host-pprint")
- ("src/code/pprint" :not-host)
 
  ;; KLUDGE: Much stuff above here is the type system and/or the INFO
  ;; system, not really the compiler proper. It might be easier to
@@ -658,6 +655,9 @@
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
+ ("src/code/host-pprint") ; defines QUEUED-OP needed by 'pprint'
+ ("src/code/pprint" :not-host) ; defines WITH-PRETTY-STREAM needed by 'print'
+ ("src/code/print" :not-host)
  ("src/code/reader"            :not-host) ; needs "code/readtable"
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host) ; needs "code/pathname"

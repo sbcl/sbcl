@@ -709,6 +709,7 @@ line break."
 
 ;;;; pprint-dispatch tables
 
+(defglobal *standard-pprint-dispatch-table* nil)
 (defglobal *initial-pprint-dispatch-table* nil)
 
 (defstruct (pprint-dispatch-entry
@@ -804,9 +805,7 @@ line break."
               (return entry)))))
     (if entry
         (values (pprint-dispatch-entry-fun entry) t)
-        (values (lambda (stream object)
-                  (output-ugly-object object stream))
-                nil))))
+        (values #'output-ugly-object nil))))
 
 (defun assert-not-standard-pprint-dispatch-table (pprint-dispatch operation)
   (when (eq pprint-dispatch *standard-pprint-dispatch-table*)
@@ -889,7 +888,7 @@ line break."
 
 (defun pprint-array (stream array)
   (cond ((and (null *print-array*) (null *print-readably*))
-         (output-ugly-object array stream))
+         (output-ugly-object stream array))
         ((and *print-readably*
               (not (array-readably-printable-p array)))
          (if *read-eval*
@@ -1364,17 +1363,6 @@ line break."
                  (,flet-name stream)
                  (force-pretty-output stream)))))
        nil))))
-
-;;; OUTPUT-PRETTY-OBJECT is called by OUTPUT-OBJECT when
-;;; *PRINT-PRETTY* is true.
-(defun output-pretty-object (object stream)
-  (multiple-value-bind (fun pretty) (pprint-dispatch object)
-    (if pretty
-        (with-pretty-stream (stream)
-          (funcall fun stream object))
-        ;; No point in consing up a pretty stream if we are not using pretty
-        ;; printing the object after all.
-        (output-ugly-object object stream))))
 
 (defun call-logical-block-printer (proc stream prefix per-line-p suffix
                                    &optional (object nil obj-supplied-p))
