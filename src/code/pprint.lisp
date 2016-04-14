@@ -1235,7 +1235,7 @@ line break."
 ;;;        puts a newline in between INTO and COUNT.
 ;;;        It would be awesome to have code in common with the macro
 ;;;        the properly represents each clauses.
-(defvar *loop-seperating-clauses*
+(defglobal *loop-separating-clauses*
   '(:and
     :with :for
     :initially :finally
@@ -1262,7 +1262,7 @@ line break."
     (write-char #\space stream)
     (loop for thing = (pprint-pop)
           when (and (symbolp thing)
-                    (member thing  *loop-seperating-clauses* :test #'string=))
+                    (member thing  *loop-separating-clauses* :test #'string=))
           do (pprint-newline :mandatory stream)
           do (output-object thing stream)
           do (pprint-exit-if-list-exhausted)
