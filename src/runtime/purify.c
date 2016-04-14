@@ -815,9 +815,27 @@ pscav(lispobj *addr, long nwords, boolean constant)
                     struct instance *instance = (struct instance *) addr;
                     struct layout *layout
                         = (struct layout *) native_pointer(instance->slots[0]);
-                    long nuntagged = fixnum_value(layout->n_untagged_slots);
                     long nslots = HeaderValue(*addr);
+#ifndef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
+                    long nuntagged = fixnum_value(layout->n_untagged_slots);
                     pscav(addr + 1, nslots - nuntagged, constant);
+#else
+                    int index;
+                    if (layout->untagged_bitmap == 0) {
+                      pscav(addr + 1, nslots, constant);
+                    } else if (fixnump(layout->untagged_bitmap)) {
+                      unsigned long bitmap = fixnum_value(layout->untagged_bitmap);
+                      for (index = 0; index < nslots ; index++, bitmap >>= 1)
+                        if (!(bitmap & 1))
+                          pscav(addr + 1 + index, 1, constant);
+                    } else {
+                      struct bignum * bitmap;
+                      bitmap = (struct bignum*)native_pointer(layout->untagged_bitmap);
+                      for (index = 0; index < nslots ; index++)
+                        if (!positive_bignum_logbitp(index, bitmap))
+                          pscav(addr + 1 + index, 1, constant);
+                    }
+#endif
                     count = CEILING(1 + nslots, 2);
                 }
                 break;

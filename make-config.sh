@@ -665,7 +665,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :float-eql-vops :integer-eql-vop :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
-    printf ' :cheneygc :linkage-table' >> $ltf
+    printf ' :cheneygc :interleaved-raw-slots :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
