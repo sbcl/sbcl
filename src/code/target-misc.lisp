@@ -233,7 +233,7 @@
   #!+sb-doc
   "Return a string giving the name of the local machine."
   #!+win32 (sb!win32::get-computer-name)
-  #!-win32 (sb!unix:unix-gethostname))
+  #!-win32 (truly-the simple-string (sb!unix:unix-gethostname)))
 
 (defvar *machine-version*)
 

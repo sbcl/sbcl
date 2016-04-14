@@ -896,6 +896,8 @@ directory."
            (type (or index null) end)
            (type (or t null) junk-allowed)
            (values (or null pathname) (or null index)))
+  (declare (ftype (function * (values (or null pathname) (or null index)))
+                  %parse-native-namestring))
   (with-host (found-host host)
     (let ((defaults (etypecase defaults
                       (pathname
@@ -1338,7 +1340,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
 ;;; Given a logical host name or host, return a logical host, creating
 ;;; a new one if necessary.
 (defun intern-logical-host (thing)
-  (declare (values logical-host))
   (with-locked-system-table (*logical-hosts*)
     (or (find-logical-host thing nil)
         (let* ((name (logical-word-or-lose thing))
