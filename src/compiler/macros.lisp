@@ -113,7 +113,7 @@
        (lambda-whole (if whole (car whole) (make-symbol "FORM")))
        (lambda-env (if env (car env) (make-symbol "ENV")))
        (new-ll (if (or whole env) ; strip them out if present
-                   (make-lambda-list llks whole req opt rest keys aux)
+                   (make-lambda-list llks nil req opt rest keys aux)
                    lambda-list)) ; otherwise use the original list
        (args (make-symbol "ARGS")))
     `(setf (info :function :source-transform ',fun-name)
