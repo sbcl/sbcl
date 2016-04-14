@@ -1815,12 +1815,27 @@ core and return a descriptor to it."
                                 (cold-foreign-symbol-address "undefined_tramp"))))
           fdefn))))
 
-;;; Handle the at-cold-init-time, fset-for-static-linkage operation.
-;;; "static" is sort of a misnomer. It's just ordinary fdefinition linkage.
-(defun static-fset (cold-name defn)
-  (declare (type (or symbol descriptor) cold-name))
-  (let ((fdefn (cold-fdefinition-object cold-name t))
-        (type (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)))
+(defun cold-functionp (descriptor)
+  (eql (descriptor-lowtag descriptor) sb!vm:fun-pointer-lowtag))
+
+;;; Handle a DEFUN in cold-load.
+(defun cold-fset (name defn source-loc &optional inline-expansion)
+  ;; SOURCE-LOC can be ignored, because functions intrinsically store
+  ;; their location as part of the code component.
+  ;; The argument is supplied here only to provide context for
+  ;; a redefinition warning, which can't happen in cold load.
+  (declare (ignore source-loc))
+  (sb!int:binding* (((cold-name warm-name)
+                     ;; (SETF f) was descriptorized when dumped, symbols were not.
+                     (if (symbolp name)
+                         (values (cold-intern name) name)
+                         (values name (warm-fun-name name))))
+                    (fdefn (cold-fdefinition-object cold-name t))
+                    (type (logand (descriptor-bits (read-memory defn))
+                                  sb!vm:widetag-mask)))
+    (when (cold-functionp (cold-fdefn-fun fdefn))
+      (error "Duplicate DEFUN for ~S" warm-name))
+    (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (write-wordindexed fdefn
                        sb!vm:fdefn-raw-addr-slot
@@ -1842,30 +1857,6 @@ core and return a descriptor to it."
                           (make-random-descriptor
                            (cold-foreign-symbol-address "closure_tramp")))))
     fdefn))
-
-;;; the names of things which have had COLD-FSET used on them already
-;;; (used to make sure that we don't try to statically link a name to
-;;; more than one definition)
-(defparameter *cold-fset-warm-names*
-  (make-hash-table :test 'equal)) ; names can be conses, e.g. (SETF CAR)
-
-(defun cold-fset (name compiled-lambda source-loc &optional inline-expansion)
-  ;; SOURCE-LOC can be ignored, because functions intrinsically store
-  ;; their location as part of the code component.
-  ;; The argument is supplied here only to provide context for
-  ;; a redefinition warning, which can't happen in cold load.
-  (declare (ignore source-loc))
-  (multiple-value-bind (cold-name warm-name)
-      ;; (SETF f) was descriptorized when dumped, symbols were not,
-      ;; Figure out what kind of name we're looking at.
-      (if (symbolp name)
-          (values (cold-intern name) name)
-          (values name (warm-fun-name name)))
-    (when (gethash warm-name *cold-fset-warm-names*)
-      (error "duplicate COLD-FSET for ~S" warm-name))
-    (setf (gethash warm-name *cold-fset-warm-names*) t)
-    (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
-    (static-fset cold-name compiled-lambda)))
 
 (defun initialize-static-fns ()
   (let ((*cold-fdefn-gspace* *static*))
