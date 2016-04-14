@@ -734,6 +734,7 @@
 ;;; The way to fix that is to ensure that every defstruct has a zero-argument
 ;;; constructor made by the compiler and stashed in a random symbol.
 (defun make-defstruct-allocation-function (name class)
+  (declare (muffle-conditions code-deletion-note))
   ;; FIXME: Why don't we go class->layout->info == dd
   (let ((dd (find-defstruct-description name)))
     (ecase (dd-type dd)

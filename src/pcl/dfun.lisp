@@ -206,6 +206,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (compute-standard-slot-locations)))
 
 (defun standard-slot-value (object slot-name class)
+  (declare (notinline standard-instance-access
+                      funcallable-standard-instance-access))
   (let ((location (gethash (cons class slot-name) *standard-slot-locations*)))
     (if location
         (let ((value (if (funcallable-instance-p object)

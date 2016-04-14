@@ -218,6 +218,7 @@
 
 (defun expand-effective-method-function (gf effective-method &optional env)
   (declare (ignore env))
+  (declare (muffle-conditions code-deletion-note))
   (multiple-value-bind (nreq applyp)
       (get-generic-fun-info gf)
     (let ((ll (make-fast-method-call-lambda-list nreq applyp))

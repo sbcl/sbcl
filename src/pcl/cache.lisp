@@ -184,6 +184,7 @@
 ;;; number of keys and presence of values in the cache is known
 ;;; beforehand.
 (defun emit-cache-lookup (cache-var layout-vars miss-tag value-var)
+  (declare (muffle-conditions code-deletion-note))
   (with-unique-names (probe n-vector n-depth n-mask
                       MATCH-WRAPPERS EXIT-WITH-HIT)
     (let* ((num-keys (length layout-vars))
