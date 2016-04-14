@@ -717,7 +717,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :interleaved-raw-slots' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
-    printf ' :cheneygc' >> $ltf
+    printf ' :cheneygc :interleaved-raw-slots' >> $ltf
     printf ' :64-bit-registers' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :stack-allocatable-fixed-objects' >> $ltf

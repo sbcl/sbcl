@@ -219,10 +219,7 @@
                                     (:single
                                      '((inst lds result offset object)))
                                     (:double
-                                     '((inst ldt
-                                             result
-                                             (+ offset n-word-bytes)
-                                             object))))))
+                                     '((inst ldt result offset object))))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
