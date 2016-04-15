@@ -343,52 +343,53 @@ information.
 
 If EMERGENCY-BEST-EFFORT is true then try to print as much information as
 possible while navigating and ignoring possible errors."
-  (with-debug-io-syntax ()
-    (let ((*suppress-print-errors* (if (and emergency-best-effort
-                                            (not (subtypep 'serious-condition *suppress-print-errors*)))
-                                       'serious-condition
-                                       *suppress-print-errors*))
-          (frame-index start))
-      (labels
-          ((print-frame (frame stream)
-             (print-frame-call frame stream
-                               :number frame-index
-                               :method-frame-style method-frame-style
-                               :print-frame-source print-frame-source
-                               :emergency-best-effort emergency-best-effort))
-           (print-frame/normal (frame)
-             (print-frame frame stream))
-           (print-frame/emergency-best-effort (frame)
-             (with-open-stream (buffer (make-string-output-stream))
-               (handler-case
-                   (progn
-                     (fresh-line stream)
-                     (print-frame frame buffer)
-                     (write-string (get-output-stream-string buffer) stream))
-                 (serious-condition (error)
-                   (print-unreadable-object (error stream :type t)
-                     (format stream "while printing frame ~S. The partial output is: ~S"
-                             frame-index (get-output-stream-string buffer))))))))
-        (handler-bind
-            ((print-not-readable #'print-unreadably))
-          (fresh-line stream)
-          (when print-thread
-            (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
-          (map-backtrace (lambda (frame)
-                           (restart-case
-                               (if emergency-best-effort
-                                   (print-frame/emergency-best-effort frame)
-                                   (print-frame/normal frame))
-                             (skip-printing-frame ()
-                               :report (lambda (stream)
-                                         (format stream "Skip printing frame ~S" frame-index))
-                               (print-unreadable-object (frame stream :type t :identity t))))
-                           (incf frame-index))
-                         :from (backtrace-start-frame from)
-                         :start start
-                         :count count))))
-    (fresh-line stream)
-    (values)))
+  (let ((start-frame (backtrace-start-frame from)))
+    (with-debug-io-syntax ()
+      (let ((*suppress-print-errors* (if (and emergency-best-effort
+                                              (not (subtypep 'serious-condition *suppress-print-errors*)))
+                                         'serious-condition
+                                         *suppress-print-errors*))
+            (frame-index start))
+        (labels
+            ((print-frame (frame stream)
+               (print-frame-call frame stream
+                                 :number frame-index
+                                 :method-frame-style method-frame-style
+                                 :print-frame-source print-frame-source
+                                 :emergency-best-effort emergency-best-effort))
+             (print-frame/normal (frame)
+               (print-frame frame stream))
+             (print-frame/emergency-best-effort (frame)
+               (with-open-stream (buffer (make-string-output-stream))
+                 (handler-case
+                     (progn
+                       (fresh-line stream)
+                       (print-frame frame buffer)
+                       (write-string (get-output-stream-string buffer) stream))
+                   (serious-condition (error)
+                     (print-unreadable-object (error stream :type t)
+                       (format stream "while printing frame ~S. The partial output is: ~S"
+                               frame-index (get-output-stream-string buffer))))))))
+          (handler-bind
+              ((print-not-readable #'print-unreadably))
+            (fresh-line stream)
+            (when print-thread
+              (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
+            (map-backtrace (lambda (frame)
+                             (restart-case
+                                 (if emergency-best-effort
+                                     (print-frame/emergency-best-effort frame)
+                                     (print-frame/normal frame))
+                               (skip-printing-frame ()
+                                 :report (lambda (stream)
+                                           (format stream "Skip printing frame ~S" frame-index))
+                                 (print-unreadable-object (frame stream :type t :identity t))))
+                             (incf frame-index))
+                           :from start-frame
+                           :start start
+                           :count count))))
+      (fresh-line stream)
+      (values))))
 
 (defun list-backtrace (&key
                        (count *backtrace-frame-count*)
