@@ -328,12 +328,15 @@
          (bit-vector-= x y))            ; DEFTRANSFORM
         (t
          (and (= (length x) (length y))
-              (do ((i 0 (1+ i))
-                   (length (length x)))
-                  ((= i length) t)
-                (declare (fixnum i))
-                (unless (= (bit x i) (bit y i))
-                  (return nil)))))))
+              (with-array-data ((x x) (start-x) (end-x) :force-inline t
+                                                        :check-fill-pointer t)
+                (with-array-data ((y y) (start-y) (end-y) :force-inline t
+                                                          :check-fill-pointer t)
+                  (declare (ignore end-y))
+                  (loop for x-i fixnum from start-x below end-x
+                        for y-i fixnum from start-y
+                        always (or (= (sbit x x-i)
+                                      (sbit y y-i))))))))))
 
 (defun equal (x y)
   #!+sb-doc
@@ -486,6 +489,9 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
         ((%instancep x)
          (and (%instancep y)
               (instance-equalp x y)))
+        ((and (bit-vector-p x)
+              (bit-vector-p y))
+         (bit-vector-= x y))
         ((vectorp x)
          (and (vectorp y)
               (vector-equalp x y)))
