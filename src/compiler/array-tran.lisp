@@ -1039,7 +1039,8 @@
 (sb!xc:defmacro with-array-data (((data-var array &key offset-var)
                                   (start-var &optional (svalue 0))
                                   (end-var &optional (evalue nil))
-                                  &key force-inline check-fill-pointer)
+                                  &key force-inline check-fill-pointer
+                                       array-header-p)
                                  &body forms
                                  &environment env)
   (once-only ((n-array array)
@@ -1049,44 +1050,51 @@
       `(multiple-value-bind (,data-var
                              ,start-var
                              ,end-var
-                             ,@(when offset-var `(,offset-var)))
-           (if (not (array-header-p ,n-array))
-               (let ((,n-array ,n-array))
-                 (declare (type (simple-array * (*)) ,n-array))
-                 ,(once-only ((n-len (if check-fill-pointer
-                                         `(length ,n-array)
-                                         `(array-total-size ,n-array)))
-                              (n-end `(or ,n-evalue ,n-len)))
-                             (if check-bounds
-                                 `(if (<= 0 ,n-svalue ,n-end ,n-len)
-                                      (values ,n-array ,n-svalue ,n-end 0)
-                                      ,(if check-fill-pointer
-                                           `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
-                                           `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
-                                 `(values ,n-array ,n-svalue ,n-end 0))))
-               ,(if force-inline
-                    `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
-                                             :check-bounds ,check-bounds
-                                             :check-fill-pointer ,check-fill-pointer)
-                    (if check-fill-pointer
-                        `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue)
-                        `(%with-array-data ,n-array ,n-svalue ,n-evalue))))
+                             ,@ (when offset-var `(,offset-var)))
+           (cond ,@(and (not array-header-p)
+                        `(((not (array-header-p ,n-array))
+                           (let ((,n-array ,n-array))
+                             (declare (type (simple-array * (*)) ,n-array))
+                             ,(once-only ((n-len (if check-fill-pointer
+                                                     `(length ,n-array)
+                                                     `(array-total-size ,n-array)))
+                                          (n-end `(or ,n-evalue ,n-len)))
+                                (if check-bounds
+                                    `(if (<= 0 ,n-svalue ,n-end ,n-len)
+                                         (values ,n-array ,n-svalue ,n-end 0)
+                                         ,(if check-fill-pointer
+                                              `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
+                                              `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
+                                    `(values ,n-array ,n-svalue ,n-end 0)))))))
+                 (t
+                  ,(if force-inline
+                       `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
+                                                :check-bounds ,check-bounds
+                                                :check-fill-pointer ,check-fill-pointer
+                                                :array-header-p array-header-p)
+                       (if check-fill-pointer
+                           `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue)
+                           `(%with-array-data ,n-array ,n-svalue ,n-evalue)))))
          ,@forms))))
 
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
 ;;; DEFTRANSFORMs and DEFUNs.
 (sb!xc:defmacro %with-array-data-macro
-    (array start end &key (element-type '*) check-bounds check-fill-pointer)
+    (array start end &key (element-type '*) check-bounds check-fill-pointer
+                          array-header-p)
   (with-unique-names (size defaulted-end data cumulative-offset)
-    `(let* ((,size ,(if check-fill-pointer
-                        `(length ,array)
-                        `(array-total-size ,array)))
+    `(let* ((,size ,(cond (check-fill-pointer
+                           `(length ,array))
+                          (array-header-p
+                           `(%array-available-elements ,array))
+                          (t
+                           `(array-total-size ,array))))
             (,defaulted-end (or ,end ,size)))
-       ,@(when check-bounds
-               `((unless (<= ,start ,defaulted-end ,size)
-                   ,(if check-fill-pointer
-                        `(sequence-bounding-indices-bad-error ,array ,start ,end)
-                        `(array-bounding-indices-bad-error ,array ,start ,end)))))
+       ,@ (when check-bounds
+            `((unless (<= ,start ,defaulted-end ,size)
+                ,(if check-fill-pointer
+                     `(sequence-bounding-indices-bad-error ,array ,start ,end)
+                     `(array-bounding-indices-bad-error ,array ,start ,end)))))
        (do ((,data ,array (%array-data-vector ,data))
             (,cumulative-offset 0
                                 (+ ,cumulative-offset
