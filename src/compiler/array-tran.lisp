@@ -974,21 +974,19 @@
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based
-;;; on array-dimension. We can wrap a TRULY-THE INDEX around the
-;;; multiplications because we know that the total size must be an
-;;; INDEX.
-(deftransform array-total-size ((array)
-                                (array))
-  (let ((array-type (lvar-type array)))
-    (let ((dims (array-type-dimensions-or-give-up array-type)))
-      (unless (listp dims)
-        (give-up-ir1-transform "can't tell the rank at compile time"))
-      (if (member '* dims)
-          (do ((form 1 `(truly-the index
-                                   (* (array-dimension array ,i) ,form)))
-               (i 0 (1+ i)))
-              ((= i (length dims)) form))
-          (reduce #'* dims)))))
+;;; on array-dimension or %array-available-elements
+(deftransform array-total-size ((array) (array))
+  (let* ((array-type (lvar-type array))
+         (dims (array-type-dimensions-or-give-up array-type)))
+    (unless (listp dims)
+      (give-up-ir1-transform "can't tell the rank at compile time"))
+    (cond ((not (memq '* dims))
+           (reduce #'* dims))
+          ((not (cdr dims))
+           ;; A vector, can't use LENGTH since this ignores the fill-pointer
+           `(truly-the index (array-dimension array 0)))
+          (t
+           `(%array-available-elements array)))))
 
 ;;; Only complex vectors have fill pointers.
 (deftransform array-has-fill-pointer-p ((array))
