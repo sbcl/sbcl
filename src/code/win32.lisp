@@ -1003,10 +1003,7 @@ absense."
                                 FILE_SHARE_WRITE)
                         nil
                         create-disposition
-                        (logior
-                         file-attribute-normal
-                         file-flag-overlapped
-                         file-flag-sequential-scan)
+                        file-attribute-normal
                         0)))
       (if (eql handle invalid-handle)
           (values nil (get-last-error))
