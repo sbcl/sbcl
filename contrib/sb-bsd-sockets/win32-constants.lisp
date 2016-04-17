@@ -78,6 +78,7 @@
  (:integer ENETUNREACH "WSAENETUNREACH")
  (:integer ENOTCONN "WSAENOTCONN")
  (:integer EAFNOSUPPORT "EAFNOSUPPORT")
+ (:integer EINPROGRESS "EINPROGRESS")
 
  (:integer inaddr-any "INADDR_ANY")
  (:integer FIONBIO "FIONBIO")
