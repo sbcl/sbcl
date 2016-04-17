@@ -349,8 +349,6 @@
          (inst ldr (32-bit-reg ,flag-tn)
                (@ thread-tn
                   (+ (* n-word-bytes thread-pseudo-atomic-bits-slot) 4))))
-       ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
-       ;; do_pending_interrupt
        (let ((not-interrputed (gen-label)))
          (inst cbz ,flag-tn not-interrputed)
          (inst brk pending-interrupt-trap)

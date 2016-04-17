@@ -43,8 +43,8 @@
 #define LEAVE_PA \
         STORE_STATIC_SYMBOL_VALUE(reg_NULL,PSEUDO_ATOMIC_ATOMIC) ;\
         LOAD_STATIC_SYMBOL_VALUE(reg_TMP,PSEUDO_ATOMIC_INTERRUPTED) ;\
-        cbz     reg_TMP, 1f     ; \
-	blr     reg_TMP         ; \
+        cbz reg_TMP, 1f     ; \
+	brk trap_PendingInterrupt         ; \
 1:
 #endif
 	.align
