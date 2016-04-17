@@ -1084,7 +1084,8 @@ Users Manual for details about the PROCESS structure.
                                       (:input sb-unix:o_rdonly)
                                       (:output sb-unix:o_wronly)
                                       (t sb-unix:o_rdwr))
-                                    #o666)
+                                    #o666
+                                    #+win32 :overlapped #+win32 nil)
                (unless fd
                  (fail "~@<couldn't open ~S: ~2I~_~A~:>"
                        dev-null (strerror errno)))
@@ -1127,7 +1128,9 @@ Users Manual for details about the PROCESS structure.
              ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
              ;; than munge the &rest list for OPEN, just disable keyword
              ;; validation there.
-             (with-open-stream (file (apply #'open object :allow-other-keys t
+             (with-open-stream (file (apply #'open object
+                                            :allow-other-keys t
+                                            #+win32 :overlapped #+win32 nil
                                             keys))
                (when file
                  (multiple-value-bind
@@ -1227,6 +1230,8 @@ Users Manual for details about the PROCESS structure.
                     (sb-unix:unix-pipe)
                   (unless read-fd
                     (fail "couldn't create pipe: ~S" (strerror write-fd)))
+                  #+win32
+                  (setf (sb-win32::inheritable-handle-p write-fd) t)
                   (copy-descriptor-to-stream read-fd object cookie
                                              external-format)
                   (push read-fd *close-on-error*)

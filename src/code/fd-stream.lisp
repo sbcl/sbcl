@@ -2344,8 +2344,10 @@
                (if-exists nil if-exists-given)
                (if-does-not-exist nil if-does-not-exist-given)
                (external-format :default)
-               ;; :class is a private option - use it at your own risk
+               ;; private options - use at your own risk
                (class 'fd-stream)
+               #!+win32
+               (overlapped t)
              &aux                       ; Squelch assignment warning.
              (direction direction)
              (if-does-not-exist if-does-not-exist)
@@ -2492,7 +2494,8 @@
           ;; Now we can try the actual Unix open(2).
           (multiple-value-bind (fd errno)
               (if namestring
-                  (sb!unix:unix-open namestring mask mode)
+                  (sb!unix:unix-open namestring mask mode
+                                     #!+win32 :overlapped #!+win32 overlapped)
                   (values nil #!-win32 sb!unix:enoent
                               #!+win32 sb!win32::error_file_not_found))
             (flet ((vanilla-open-error ()
