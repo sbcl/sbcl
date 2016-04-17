@@ -383,6 +383,7 @@ request an input stream and get an output stream in response\)."
 (define-socket-condition sockint::ENETUNREACH network-unreachable-error)
 (define-socket-condition sockint::ENOTCONN not-connected-error)
 (define-socket-condition sockint::EAFNOSUPPORT address-family-not-supported)
+(define-socket-condition sockint::EINPROGRESS operation-in-progress)
 
 (defun condition-for-errno (err)
   (or (cdr (assoc err *conditions-for-errno* :test #'eql)) 'socket-error))
