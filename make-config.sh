@@ -722,7 +722,7 @@ elif [ "$sbcl_arch" = "alpha" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :stack-allocatable-fixed-objects' >> $ltf
 elif [ "$sbcl_arch" = "hppa" ]; then
-    printf ' :cheneygc' >> $ltf
+    printf ' :cheneygc :interleaved-raw-slots' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "arm" ]; then

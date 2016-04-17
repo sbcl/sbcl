@@ -299,6 +299,7 @@
                   (error "inst fstx cant handle offset-register loaded with immediate ~s" ,imm))))
            (raw-instance ((type inc-offset-by set &optional complex)
                           &body body)
+             (declare (ignore inc-offset-by)) ; FIXME: remove
              (let ((name (symbolicate "RAW-INSTANCE-"
                                       (if set "SET/" "REF/")
                                       (if (eq type 'unsigned)
@@ -322,17 +323,14 @@
                            `((value :scs (,type-reg) :target result))))
                 (:arg-types * positive-fixnum ,@(if set `(,type-num)))
                 (:results (,(if set 'result 'value) :scs (,type-reg)))
-                (:temporary (:scs (non-descriptor-reg)) offset)
+                ;; Floating-point load/store might need an extra register
+                ;; since an immediate displacement is only 5 signed bits.
+                ,@(if (member type '(single double))
+                      '((:temporary (:scs (non-descriptor-reg)) offset)))
                 (:temporary (:scs (interior-reg)) lip)
                 (:result-types ,type-num)
                 (:generator 5
-                  (loadw offset object 0 instance-pointer-lowtag)
-                  (inst srl offset n-widetag-bits offset)
-                  (inst sll offset 2 offset)
-                  (inst sub offset index offset)
-                  (inst addi ,(* inc-offset-by n-word-bytes)
-                             offset offset)
-                  (inst add offset object lip)
+                  (inst add index object lip)
                   ,@body)))))
   (raw-instance (unsigned -1 nil)
     (inst ldw (- (* instance-slots-offset n-word-bytes)
