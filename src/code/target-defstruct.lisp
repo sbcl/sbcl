@@ -139,16 +139,12 @@
          (layout (classoid-layout classoid)))
     (when (eq (dd-pure dd) t)
       (setf (layout-pure layout) t))
-    #!+interleaved-raw-slots
     ;; Make a vector of EQUALP slots comparators, indexed by (- word-index data-start).
     ;; This has to be assigned to something regardless of whether there are
     ;; raw slots just in case someone mutates a layout which had raw
     ;; slots into one which does not - although that would probably crash
     ;; unless no instances exist or all raw slots miraculously contained
     ;; bits which were the equivalent of valid Lisp descriptors.
-    ;;
-    ;; It's not worth adding a #-interleaved-raw-slots case to this optimization
-    ;; because every architecture can be made to use the new approach.
     (setf (layout-equalp-tests layout)
           (if (zerop (layout-untagged-bitmap layout))
               #()
@@ -190,25 +186,11 @@
     (let ((res (%make-instance (%instance-length structure)))
           (len (layout-length layout)))
       (declare (type index len))
-      #!-interleaved-raw-slots
-      (let ((nuntagged (layout-n-untagged-slots layout)))
-        ;; Copy ordinary slots including the layout.
-        (dotimes (i (- len nuntagged))
-          (declare (type index i))
-          (setf (%instance-ref res i) (%instance-ref structure i)))
-        ;; Copy raw slots.
-        (dotimes (i nuntagged)
-          (declare (type index i))
-          (setf (%raw-instance-ref/word res i)
-                (%raw-instance-ref/word structure i))))
-      #!+interleaved-raw-slots
       (let ((metadata (layout-untagged-bitmap layout)))
         ;; Don't assume that %INSTANCE-REF can access the layout.
         (setf (%instance-layout res) (%instance-layout structure))
-        ;; With interleaved slots, the only difference between %instance-ref
-        ;; and %raw-instance-ref/word is the storage class of the VOP operands.
-        ;; Since x86(-64) doesn't partition the register set, the bitmap test
-        ;; could be skipped if we wanted to copy everything as raw.
+        ;; On backends which don't segregate descriptor vs. non-descriptor
+        ;; registers, we could speed up this code in an obvious way.
         (macrolet ((copy-loop (raw-p &optional step)
                      `(do ((i sb!vm:instance-data-start (1+ i)))
                           ((>= i len))
@@ -228,23 +210,6 @@
                 (t ; bignum - use LOGBITP to avoid consing more bignums
                  (copy-loop (logbitp i metadata))))))
       res)))
-
-
-;; Do an EQUALP comparison on the raw slots (only, not the normal slots) of a
-;; structure.
-#!-interleaved-raw-slots
-(defun raw-instance-slots-equalp (layout x y)
-  ;; This implementation sucks, but hopefully EQUALP on raw structures
-  ;; won't be a major bottleneck for anyone. It'd be tempting to do
-  ;; all this with %RAW-INSTANCE-REF/WORD and bitwise comparisons, but
-  ;; that'll fail in some cases. For example -0.0 and 0.0 are EQUALP
-  ;; but have different bit patterns. -- JES, 2007-08-21
-  (loop for dsd in (dd-slots (layout-info layout))
-        for raw-type-index = (dsd-%raw-type dsd)
-        always (or (eql raw-type-index -1)
-                   (funcall (raw-slot-data-comparer
-                             (svref *raw-slot-data* raw-type-index))
-                            (dsd-index dsd) x y))))
 
 ;;; default PRINT-OBJECT method
 

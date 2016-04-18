@@ -393,15 +393,6 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   `(let ((x-el (%instance-ref x i))
                          (y-el (%instance-ref y i)))
                      (or (eq x-el y-el) (equalp x-el y-el)))))
-       #!-interleaved-raw-slots
-       (let ((raw-len (layout-n-untagged-slots layout-x))
-             (total-len (layout-length layout-x)))
-         (and (dotimes (i (- total-len raw-len) t)
-                (unless (slot-ref-equalp)
-                  (return nil)))
-              (or (zerop raw-len)
-                  (raw-instance-slots-equalp layout-x x y))))
-       #!+interleaved-raw-slots
        (let ((metadata (layout-untagged-bitmap layout-x)))
          (if (zerop metadata)
              (loop for i of-type index from sb!vm:instance-data-start

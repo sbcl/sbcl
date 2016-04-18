@@ -1290,9 +1290,6 @@
   (note-potential-circularity struct file)
   (do* ((length (%instance-length struct))
         (layout (%instance-layout struct))
-        #!-interleaved-raw-slots
-        (ntagged (- length (layout-n-untagged-slots layout)))
-        #!+interleaved-raw-slots
         (bitmap (layout-untagged-bitmap layout))
         (circ (fasl-output-circularity-table file))
         ;; last slot first on the stack, so that the layout is on top:
@@ -1300,12 +1297,7 @@
       ((< index sb!vm:instance-data-start)
        (dump-non-immediate-object layout file)
        (dump-fop 'fop-struct file length))
-    (let* ((obj #!-interleaved-raw-slots
-                (if (>= index ntagged)
-                    (%raw-instance-ref/word struct (- length index 1))
-                    (%instance-ref struct index))
-                #!+interleaved-raw-slots
-                (if (logbitp index bitmap)
+    (let* ((obj (if (logbitp index bitmap)
                     (%raw-instance-ref/word struct index)
                     (%instance-ref struct index)))
            (ref (gethash obj circ)))

@@ -464,23 +464,12 @@ static void brief_struct(lispobj obj)
 static boolean untagged_slot_p(struct layout * layout,
                                int slot_index)
 {
-#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
   extern boolean positive_bignum_logbitp(int,struct bignum*);
   lispobj bitmap = layout->untagged_bitmap;
   return fixnump(bitmap)
          ? (fixnum_value(bitmap) >> slot_index) & 1
          : positive_bignum_logbitp(slot_index,
                                    (struct bignum*)native_pointer(bitmap));
-#else
-  // STANDARD-OBJECT has layout-length = number of defined slots, but
-  // the primitive object always occupies 4 physical words. The guard on
-  // n_untagged_slots ensures that for classes with no slots, we don't
-  // wrongly show all words of the primitive object as untagged,
-  // because the second half of the expression reduces to slot_index>=1.
-  return layout->n_untagged_slots > 0
-         && slot_index >= (fixnum_value(layout->length)|1)
-                          - fixnum_value(layout->n_untagged_slots);
-#endif
 }
 
 static void print_struct(lispobj obj)

@@ -13,8 +13,6 @@
 
 (in-package :cl-user)
 
-#-interleaved-raw-slots (invoke-restart 'run-tests::skip-file)
-
 ;;; More tests of raw slots can be found in 'defstruct.impure.lisp'
 ;;; Since those are all passing, it's fair to say that interleaving works.
 ;;; But we want also to test what happens in a very specific case that

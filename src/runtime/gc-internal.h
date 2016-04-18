@@ -180,12 +180,10 @@ extern void scrub_thread_control_stack(struct thread *);
 # define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
 #endif
 
-#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
 extern void
 instance_scan_interleaved(void (*proc)(),
                           lispobj *instance_ptr,
                           sword_t n_words,
                           lispobj *layout_obj);
-#endif
 
 #endif /* _GC_INTERNAL_H_ */

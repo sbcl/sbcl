@@ -75,8 +75,6 @@
   ;; NIL if the option was given with no argument.
   (printer-fname nil :type (or cons symbol))
 
-  ;; The number of untagged slots at the end.
-  #!-interleaved-raw-slots (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
   ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :unspecified)))
@@ -176,14 +174,10 @@
   ;;
   ;; This slot is known to the C runtime support code.
   (pure nil :type (member t nil 0))
-  ;; Number of raw words at the end.
-  ;; This slot is known to the C runtime support code.
-  ;; It counts the number of untagged cells, not user-visible slots.
-  ;; e.g. on 32-bit machines, each (COMPLEX DOUBLE-FLOAT) counts as 4.
-  #!-interleaved-raw-slots (n-untagged-slots 0 :type index)
-  ;; Metadata
-  #!+interleaved-raw-slots (untagged-bitmap 0 :type unsigned-byte)
-  #!+interleaved-raw-slots (equalp-tests #() :type simple-vector)
+  ;; Map of raw slot indices.
+  (untagged-bitmap 0 :type unsigned-byte)
+  ;; Per-slot comparator for implementing EQUALP.
+  (equalp-tests #() :type simple-vector)
   ;; Definition location
   (source-location nil)
   ;; If this layout is for an object of metatype STANDARD-CLASS,

@@ -3174,17 +3174,9 @@ verify_space(lispobj *start, size_t words)
                             count = 1;
                             break;
                         }
-#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
                         instance_scan_interleaved(verify_space,
                                                   start, ntotal,
                                                   native_pointer(layout));
-#else
-                        lispobj nuntagged;
-                        nuntagged = ((struct layout *)
-                                     native_pointer(layout))->n_untagged_slots;
-                        verify_space(start + 1,
-                                     ntotal - fixnum_value(nuntagged));
-#endif
                         count = ntotal + 1;
                         break;
                     }

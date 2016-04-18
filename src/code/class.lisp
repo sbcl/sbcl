@@ -238,14 +238,6 @@
             t))
         (let ((old-metadata (layout-raw-slot-metadata old-layout)))
           (unless (= old-metadata raw-slot-metadata)
-            #!-interleaved-raw-slots
-            (warn "change in instance layout of class ~S:~%  ~
-                   ~A untagged slots: ~W~%  ~
-                   ~A untagged slots: ~W"
-                  name
-                  old-context old-metadata
-                  context raw-slot-metadata)
-            #!+interleaved-raw-slots
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"
                   name old-context context)

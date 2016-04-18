@@ -69,7 +69,7 @@
     (move-lvar-result node block locs lvar)))
 
 (defun emit-inits (node block name object lowtag instance-length inits args)
-  #!+interleaved-raw-slots (declare (ignore instance-length))
+  (declare (ignore instance-length))
   #!-raw-instance-init-vops
   (declare (ignore instance-length))
   (let ((unbound-marker-tn nil)
@@ -91,9 +91,8 @@
              (slot (cdr init)))
          (case kind
            (:slot
-            ;; FIXME: with #!+interleaved-raw-slots the only reason INIT-SLOT
-            ;; and its raw variants exist is to avoid an extra MOVE -
-            ;; setters are expected to return something, but INITers don't.
+            ;; FIXME: the only reason INIT-SLOT raw variants exist is to avoid
+            ;; an extra MOVE - setters return a value, but INITers don't.
             ;; It would probably produce better code by not assuming that
             ;; setters return a value, because as things are, if you call
             ;; 8 setters in a row, then you probably produce 7 extraneous moves,
@@ -114,9 +113,7 @@
                                (lambda (rsd)
                                  `(,(sb!kernel::raw-slot-data-raw-type rsd)
                                    (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
-                                        node block object arg-tn
-                                        #!-interleaved-raw-slots instance-length
-                                        slot)))
+                                        node block object arg-tn slot)))
                                (symbol-value rsd-list)))))
                     (make-case #!+raw-instance-init-vops
                                sb!kernel::*raw-slot-data*))))))

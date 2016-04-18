@@ -658,7 +658,6 @@ scav_boxed(lispobj *where, lispobj object)
     return 1;
 }
 
-#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
 boolean positive_bignum_logbitp(int index, struct bignum* bignum)
 {
   /* If the bignum in the layout has another pointer to it (besides the layout)
@@ -724,7 +723,6 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
               proc(instance_ptr + index, 1);
   }
 }
-#endif
 
 static sword_t
 scav_instance(lispobj *where, lispobj header)
@@ -738,12 +736,7 @@ scav_instance(lispobj *where, lispobj header)
     if (forwarding_pointer_p(layout))
         layout = native_pointer((lispobj)forwarding_pointer_value(layout));
 
-#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
     instance_scan_interleaved(scavenge, where, ntotal, layout);
-#else
-    lispobj nuntagged = ((struct layout*)layout)->n_untagged_slots;
-    scavenge(where + 1, ntotal - fixnum_value(nuntagged));
-#endif
 
     return ntotal + 1;
 }

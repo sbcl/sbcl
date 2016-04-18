@@ -1083,16 +1083,13 @@ core and return a descriptor to it."
      :length length
      :info *nil-descriptor*
      :pure *nil-descriptor*
-     #!-interleaved-raw-slots
-     (values :n-untagged-slots metadata)
-     #!+interleaved-raw-slots
-     (values :untagged-bitmap metadata
+     :untagged-bitmap metadata
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
-             :equalp-tests (if (boundp '*simple-vector-0-descriptor*)
-                               *simple-vector-0-descriptor*
-                               (setq *simple-vector-0-descriptor*
-                                     (vector-in-core nil))))
+     :equalp-tests (if (boundp '*simple-vector-0-descriptor*)
+                       *simple-vector-0-descriptor*
+                       (setq *simple-vector-0-descriptor*
+                             (vector-in-core nil)))
      :source-location *nil-descriptor*
      :%for-std-class-b (make-fixnum-descriptor 0)
      :slot-list *nil-descriptor*
@@ -2434,11 +2431,7 @@ core and return a descriptor to it."
          (result (allocate-struct *dynamic* layout size))
          (metadata
           (descriptor-fixnum
-           (read-slot layout *host-layout-of-layout*
-                      #!-interleaved-raw-slots :n-untagged-slots
-                      #!+interleaved-raw-slots :untagged-bitmap)))
-         #!-interleaved-raw-slots (ntagged (- size metadata))
-         )
+           (read-slot layout *host-layout-of-layout* :untagged-bitmap))))
     ;; Raw slots can not possibly work because dump-struct uses
     ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
     ;; Remove this assertion if that problem is somehow circumvented.
@@ -2450,8 +2443,7 @@ core and return a descriptor to it."
       (declare (fixnum index))
       (write-wordindexed result
                          (+ index sb!vm:instance-slots-offset)
-                         (if #!-interleaved-raw-slots (>= index ntagged)
-                             #!+interleaved-raw-slots (logbitp index metadata)
+                         (if (logbitp index metadata)
                              (descriptor-word-sized-integer (pop-stack))
                              (pop-stack))))
     result))
@@ -2473,10 +2465,7 @@ core and return a descriptor to it."
                (read-slot old-layout-descriptor *host-layout-of-layout* keyword)))
         (let ((old-length (descriptor-fixnum (get-slot :length)))
               (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
-              (old-metadata
-               (host-object-from-core
-                (get-slot #!-interleaved-raw-slots :n-untagged-slots
-                          #!+interleaved-raw-slots :untagged-bitmap)))
+              (old-metadata (host-object-from-core (get-slot :untagged-bitmap)))
               (length (descriptor-fixnum length-des))
               (depthoid (descriptor-fixnum depthoid-des))
               (metadata (host-object-from-core metadata-des)))
@@ -3431,20 +3420,6 @@ core and return a descriptor to it."
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
     ;; classoid's expressly declared layout isn't renamed as a special-case.
     (format t "    lispobj _layout;~%")
-    #!-interleaved-raw-slots
-    (progn
-      ;; Note: if the structure has no raw slots, but has an even number of
-      ;; ordinary slots (incl. layout, sans header), then the last slot gets
-      ;; named 'raw_slot_paddingN' (not 'paddingN')
-      ;; The choice of name is mildly disturbing, but harmless.
-      (dolist (slot (dd-slots dd))
-        (when (eq t (dsd-raw-type slot))
-          (format t "    lispobj ~A;~%" (cstring (dsd-name slot)))))
-      (unless (oddp (+ (dd-length dd) (dd-raw-length dd)))
-        (format t "    lispobj raw_slot_padding;~%"))
-      (dotimes (n (dd-raw-length dd))
-        (format t "    lispobj raw~D;~%" (- (dd-raw-length dd) n 1))))
-    #!+interleaved-raw-slots
     (let ((names ; round dd-length to odd so that total + header is even
            (coerce (loop for i from 1 below (logior (dd-length dd) 1)
                          collect (list (format nil "word_~D_" (1+ i))))

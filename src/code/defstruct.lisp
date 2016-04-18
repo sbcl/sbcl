@@ -840,13 +840,6 @@ unless :NAMED is also specified.")))
            (let* ((rsd (svref *raw-slot-data* rsd-index))
                   (words (raw-slot-data-n-words rsd))
                   (alignment (raw-slot-data-alignment rsd)))
-             #!-interleaved-raw-slots
-             (let ((off (rem (dd-raw-length dd) alignment)))
-               (unless (zerop off)
-                 (incf (dd-raw-length dd) (- alignment off)))
-               (setf (dsd-index dsd) (dd-raw-length dd))
-               (incf (dd-raw-length dd) words))
-             #!+interleaved-raw-slots
              (let ((len (dd-length dd)))
                (setf (dd-length dd)
                      ;; this formula works but can it be made less unclear?
@@ -906,9 +899,7 @@ unless :NAMED is also specified.")))
       (incf (dd-length dd) (dd-length included-structure))
       (when (dd-class-p dd)
         (when (eq (dd-pure dd) :unspecified)
-          (setf (dd-pure dd) (dd-pure included-structure)))
-        #!-interleaved-raw-slots
-        (setf (dd-raw-length dd) (dd-raw-length included-structure)))
+          (setf (dd-pure dd) (dd-pure included-structure))))
 
       (setf (dd-inherited-accessor-alist dd)
             (dd-inherited-accessor-alist included-structure))
@@ -1317,8 +1308,7 @@ or they must be declared locally notinline at each call site.~@:>")
   (values))
 
 (declaim (inline dd-layout-length))
-(defun dd-layout-length (dd)
-  (+ (dd-length dd) #!-interleaved-raw-slots (dd-raw-length dd)))
+(defun dd-layout-length (dd) (dd-length dd)) ; FIXME: just use DD-LENGTH
 
 (declaim (ftype (sfunction (defstruct-description) index) dd-instance-length))
 (defun dd-instance-length (dd)
@@ -1391,11 +1381,9 @@ or they must be declared locally notinline at each call site.~@:>")
               (make-layout :classoid class
                            :inherits inherits
                            :depthoid (length inherits)
-                           :length (dd-layout-length info)
-                           :info info . #!-interleaved-raw-slots
-                                        (:n-untagged-slots (dd-raw-length info))
-                                        #!+interleaved-raw-slots
-                                        (:untagged-bitmap (dd-bitmap info))))))
+                           :length (dd-length info)
+                           :info info
+                           :untagged-bitmap (dd-bitmap info)))))
       (cond
        ((not old-layout)
         (values class new-layout nil))
