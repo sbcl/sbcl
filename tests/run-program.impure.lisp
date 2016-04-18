@@ -19,8 +19,9 @@
 ;; (sometimes the handler will manage to WAIT3 a process before
 ;; run-tests WAITPIDs it).
 
-(with-test (:name :run-program-cat-1 :skipped-on :win32)
-  (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
+(with-test (:name :run-program-cat-1)
+  (let* ((process (sb-ext:run-program "cat" '() :wait nil
+                                      :search t
                                       :output :stream :input :stream))
          (out (process-input process))
          (in (process-output process)))
@@ -110,9 +111,10 @@
       (assert (= 0 (read-sequence (make-array 8) out)))
       (assert (equalp buf data)))))
 
-(with-test (:name :run-program-cat-4 :skipped-on :win32)
+(with-test (:name :run-program-cat-4)
   ;; Null broadcast stream as output
-  (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
+  (let* ((process (sb-ext:run-program "cat" '() :wait nil
+                                      :search t
                                       :output (make-broadcast-stream)
                                       :input :stream))
          (in (process-input process)))

@@ -226,8 +226,14 @@
           (sb!impl::os-close-wtimer timer))))))
 
 (define-alien-routine ("win32_wait_object_or_signal" wait-object-or-signal)
-    (signed 16)
+    dword
   (handle handle))
+
+(define-alien-routine ("win32_wait_for_two_objects_or_signal"
+                       wait-for-two-objects-or-signal)
+    dword
+  (a handle)
+  (b handle))
 
 #!+sb-unicode
 (progn
@@ -967,72 +973,73 @@ absense."
 ;; CreateFile, as complete as possibly.
 ;; FILE_FLAG_OVERLAPPED is a must for decent I/O.
 
-(defun unixlike-open (path flags mode &optional revertable)
+(defun unixlike-open (path flags &key revertable
+                                      overlapped)
   (declare (type sb!unix:unix-pathname path)
-           (type fixnum flags)
-           (type sb!unix:unix-file-mode mode)
-           (ignorable mode))
+           (type fixnum flags))
   (let* ((disposition-flags
-          (logior
-           (if (zerop (logand sb!unix:o_creat flags)) 0 #b100)
-           (if (zerop (logand sb!unix:o_excl flags)) 0 #b010)
-           (if (zerop (logand sb!unix:o_trunc flags)) 0 #b001)))
+           (logior
+            (if (logtest sb!unix:o_creat flags) #b100 0)
+            (if (logtest sb!unix:o_excl flags) #b010 0)
+            (if (logtest sb!unix:o_trunc flags) #b001 0)))
          (create-disposition
-          ;; there are 8 combinations of creat|excl|trunc, some of
-          ;; them are equivalent. Case stmt below maps them to 5
-          ;; dispositions (see CreateFile manual).
-          (case disposition-flags
-            ((#b110 #b111) file-create-new)
-            ((#b001 #b011) file-truncate-existing)
-            ((#b000 #b010) file-open-existing)
-            (#b100 file-open-always)
-            (#b101 file-create-always))))
+           ;; there are 8 combinations of creat|excl|trunc, some of
+           ;; them are equivalent. Case stmt below maps them to 5
+           ;; dispositions (see CreateFile manual).
+           (case disposition-flags
+             ((#b110 #b111) file-create-new)
+             ((#b001 #b011) file-truncate-existing)
+             ((#b000 #b010) file-open-existing)
+             (#b100 file-open-always)
+             (#b101 file-create-always))))
     (let ((handle
-           (create-file path
-                        (logior
-                         (if revertable #x10000 0)
-                         (if (plusp (logand sb!unix:o_append flags))
-                             access-file-append-data
-                             0)
-                         (ecase (logand 3 flags)
-                           (0 FILE_GENERIC_READ)
-                           (1 FILE_GENERIC_WRITE)
-                           ((2 3) (logior FILE_GENERIC_READ
-                                          FILE_GENERIC_WRITE))))
-                        (logior FILE_SHARE_READ
-                                FILE_SHARE_WRITE)
-                        nil
-                        create-disposition
-                        file-attribute-normal
-                        0)))
-      (if (eql handle invalid-handle)
-          (values nil (get-last-error))
-          (progn
-            ;; FIXME: seeking to the end is not enough for real APPEND
-            ;; semantics, but it's better than nothing.
-            ;;   -- AK
-            ;;
-            ;; On the other hand, the CL spec implies the "better than
-            ;; nothing" seek-once semantics implemented here, and our
-            ;; POSIX backend is incorrect in implementing :APPEND as
-            ;; O_APPEND.  Other CL implementations get this right across
-            ;; platforms.
-            ;;
-            ;; Of course, it would be nice if we had :IF-EXISTS
-            ;; :ATOMICALLY-APPEND separately as an extension, and in
-            ;; that case, we will have to worry about supporting it
-            ;; here after all.
-            ;;
-            ;; I've tested this only very briefly (on XP and Windows 7),
-            ;; but my impression is that WriteFile (without documenting
-            ;; it?) is like ZwWriteFile, i.e. if we pass in -1 as the
-            ;; offset in our overlapped structure, WriteFile seeks to the
-            ;; end for us.  Should we depend on that?  How do we communicate
-            ;; our desire to do so to the runtime?
-            ;;   -- DFL
-            ;;
-            (set-file-pointer-ex handle 0 (if (plusp (logand sb!unix::o_append flags)) 2 0))
-            (values handle 0))))))
+            (create-file path
+                         (logior
+                          (if revertable #x10000 0)
+                          (if (logtest sb!unix:o_append flags)
+                              access-file-append-data
+                              0)
+                          (ecase (logand 3 flags)
+                            (0 FILE_GENERIC_READ)
+                            (1 FILE_GENERIC_WRITE)
+                            ((2 3) (logior FILE_GENERIC_READ
+                                           FILE_GENERIC_WRITE))))
+                         (logior FILE_SHARE_READ
+                                 FILE_SHARE_WRITE)
+                         nil
+                         create-disposition
+                         (if overlapped
+                             file-flag-overlapped
+                             file-attribute-normal)
+                         0)))
+      (cond ((eql handle invalid-handle)
+             (values nil (get-last-error)))
+            (t
+             ;; FIXME: seeking to the end is not enough for real APPEND
+             ;; semantics, but it's better than nothing.
+             ;;   -- AK
+             ;;
+             ;; On the other hand, the CL spec implies the "better than
+             ;; nothing" seek-once semantics implemented here, and our
+             ;; POSIX backend is incorrect in implementing :APPEND as
+             ;; O_APPEND.  Other CL implementations get this right across
+             ;; platforms.
+             ;;
+             ;; Of course, it would be nice if we had :IF-EXISTS
+             ;; :ATOMICALLY-APPEND separately as an extension, and in
+             ;; that case, we will have to worry about supporting it
+             ;; here after all.
+             ;;
+             ;; I've tested this only very briefly (on XP and Windows 7),
+             ;; but my impression is that WriteFile (without documenting
+             ;; it?) is like ZwWriteFile, i.e. if we pass in -1 as the
+             ;; offset in our overlapped structure, WriteFile seeks to the
+             ;; end for us.  Should we depend on that?  How do we communicate
+             ;; our desire to do so to the runtime?
+             ;;   -- DFL
+             ;;
+             (set-file-pointer-ex handle 0 (if (logtest sb!unix::o_append flags) 2 0))
+             (values handle 0))))))
 
 (define-alien-routine ("closesocket" close-socket) int (handle handle))
 (define-alien-routine ("shutdown" shutdown-socket) int (handle handle)

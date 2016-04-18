@@ -2101,15 +2101,23 @@ os_get_runtime_executable_path(int external)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
-int
+DWORD
 win32_wait_object_or_signal(HANDLE waitFor)
 {
-    struct thread * self = arch_os_get_current_thread();
-    HANDLE handles[2];
-    handles[0] = waitFor;
-    handles[1] = self->private_events.events[1];
+    struct thread *self = arch_os_get_current_thread();
+    HANDLE handles[] = {waitFor, self->private_events.events[1]};
     return
         WaitForMultipleObjects(2,handles, FALSE,INFINITE);
+}
+
+DWORD
+win32_wait_for_multiple_objects_or_signal(HANDLE *handles, DWORD count)
+{
+    struct thread *self = arch_os_get_current_thread();
+    handles[count] = self->private_events.events[1];
+
+    return
+        WaitForMultipleObjects(count + 1, handles, FALSE, INFINITE);
 }
 
 /*

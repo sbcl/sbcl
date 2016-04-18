@@ -98,11 +98,7 @@
                               (alien-sap process-information))
               (let ((child (slot process-information 'process-handle)))
                 (close-handle (slot process-information 'thread-handle))
-                (if waitp
-                    (do () ((/= 1 (with-local-interrupts (wait-object-or-signal child)))
-                            (multiple-value-bind (got code) (get-exit-code-process child)
-                              (if got code -1))))
-                    child))
+                child)
               -2))))))
 
 (define-alien-routine ("SetConsoleCtrlHandler" set-console-ctrl-handler) int
@@ -166,3 +162,189 @@ true to stop searching)." *console-control-spec*)
 
 (initialize-console-control-handler t)
 (pushnew 'initialize-console-control-handler sb-ext:*init-hooks*)
+
+;;;; I/O copying for run-program
+;;;; Anonymous pipes do not support overlapped I/O,
+;;;; named pipes are to be used instead.
+
+(define-alien-type overlapped
+    (struct overlapped
+            (internal (* ulong))
+            (internal-high  (* ulong))
+            (offset dword)
+            (offset-high dword)
+            (event handle)))
+
+(define-alien-routine ("CreateNamedPipeW" create-named-pipe) handle
+  (name system-string)
+  (open-mode dword)
+  (pipe-mode dword)
+  (max-instances dword)
+  (out-buffer-size dword)
+  (in-buffer-size dword)
+  (default-time-out dword)
+  (security-attributes (* t)))
+
+(define-alien-routine ("WaitForSingleObject" wait-for-single-object) dword
+  (handle handle)
+  (timeout dword))
+
+(define-alien-routine ("CreateEventW" create-event) handle
+  (security-attributes (* t))
+  (manual-reset lispbool)
+  (initial-state lispbool)
+  (name system-string))
+
+(define-alien-routine ("GetOverlappedResult" get-overlapped-result) lispbool
+  (handle handle)
+  (overlapped (* t))
+  (bytes-transferred dword :out)
+  (wait lispbool))
+
+(defun maybe-win32-error (result)
+  (when (minusp result)
+    (win32-error ""))
+  result)
+
+(defglobal **run-program-pipe-counter** 0)
+(declaim (type fixnum **run-program-pipe-counter**))
+
+(defun make-named-pipe ()
+  (let* ((name (format nil "\\\\.\\pipe\\SBCL-~a-~a"
+                       (sb-unix:unix-getpid)
+                       (sb-ext:atomic-incf **run-program-pipe-counter**)))
+         (pipe (maybe-win32-error
+                (create-named-pipe name
+                                   (logior pipe-access-inbound file-flag-overlapped)
+                                   pipe-type-byte
+                                   1 0 0 0 nil))))
+    (multiple-value-bind (fd error) (sb-unix:unix-open name sb-unix:o_wronly
+                                                       0 :overlapped nil)
+      (unless fd
+        (win32-error "open" error))
+      (values pipe fd))))
+
+(define-alien-routine ("win32_wait_for_multiple_objects_or_signal"
+                       wait-for-multiple-objects-or-signal)
+    dword
+  (handles (* handle))
+  (count dword))
+
+(defstruct io-copier
+  pipe
+  stream
+  external-format
+  buffer
+  event
+  overlapped)
+
+(defconstant +copier-buffer+ 256)
+
+(defmacro zero-alien (alien type)
+  `(sb-kernel:system-area-ub8-fill
+    0 (alien-sap ,alien)
+    0 (alien-size ,type :bytes)))
+
+(defun setup-copiers (copiers)
+  (let ((result (make-array (length copiers))))
+    (loop for copier in copiers
+          for i from 0
+          do
+          (let ((overlapped (make-alien overlapped))
+                (event (create-event nil t nil nil)))
+           (setf (io-copier-event copier) event
+                 (io-copier-overlapped copier) overlapped
+                 (io-copier-buffer copier) (make-alien char +copier-buffer+)
+                 (svref result i) copier)
+           (zero-alien overlapped overlapped)
+           (setf (slot overlapped 'event) event)))
+    result))
+
+(defun free-copier (copier)
+  (close-handle (io-copier-pipe copier))
+  (when (io-copier-event copier)
+    (close-handle (io-copier-event copier)))
+  (when (io-copier-overlapped copier)
+    (free-alien (io-copier-overlapped copier)))
+  (when (io-copier-buffer copier)
+    (free-alien (io-copier-buffer copier))))
+
+(defun win32-process-wait (process)
+  (let ((pid (process-pid process))
+        (copiers (sb-impl::process-copiers process)))
+    (cond (copiers
+           (unwind-protect
+                (with-alien ((events
+                              ;; Should be enough for stdout, stderr, pid,
+                              ;; and the signal event
+                              (array handle 4)))
+                  (let ((copiers (setup-copiers copiers))
+                        (count (length copiers))
+                        (lisp-buffer (make-array +copier-buffer+ :element-type '(unsigned-byte 8))))
+                    (loop for i below count
+                          do (setf (deref events i)
+                                   (io-copier-event (svref copiers i))))
+                    (setf (deref events count) pid)
+                    (labels ((pending-or-error (operation
+                                                &optional (error (get-last-error)))
+                               (when (/= error error-io-pending)
+                                 (win32-error operation error)))
+                             (try-read (copier)
+                               (cond ((plusp
+                                       (read-file (io-copier-pipe copier)
+                                                  (io-copier-buffer copier)
+                                                  +copier-buffer+
+                                                  nil
+                                                  (io-copier-overlapped copier)))
+                                      (copy copier)
+                                      (try-read copier))
+                                     (t
+                                      (let ((last-error (get-last-error)))
+                                        (unless (= last-error error-broken-pipe)
+                                          (pending-or-error "ReadFile" last-error))))))
+                             (copy (copier)
+                               (multiple-value-bind (finished count)
+                                   (get-overlapped-result (io-copier-pipe copier)
+                                                          (io-copier-overlapped copier) nil)
+                                 (cond (finished
+                                        (loop for i below count
+                                              do (setf (aref lisp-buffer i)
+                                                       (deref (io-copier-buffer copier) i)))
+                                        (ecase (stream-element-type (io-copier-stream copier))
+                                          ((base-char character)
+                                           (write-string
+                                            (octets-to-string lisp-buffer
+                                                              :end count
+                                                              :external-format
+                                                              (io-copier-external-format copier))
+                                            (io-copier-stream copier)))))
+                                       (t
+                                        (let ((last-error (get-last-error)))
+                                          (unless (= last-error error-broken-pipe)
+                                            (pending-or-error "ReadFile" last-error))))))))
+                      (loop for copier across copiers
+                            do (try-read copier))
+                      (loop for event = (wait-for-multiple-objects-or-signal (cast events
+                                                                                   (* handle))
+                                                                             (1+ count))
+                            do
+                            (cond ((= event wait-timeout))
+                                  ((< event count)
+                                   (let ((copier (svref copiers event)))
+                                     (copy copier)
+                                     (try-read copier)))
+                                  ((= event count) ;; PID event
+                                   (return))
+                                  ((= event wait-failed)
+                                   (win32-error "WaitForMultipleObjects")))))))
+             (mapc #'free-copier copiers)))
+          (t
+           (do ()
+               ((= 0
+                   (wait-object-or-signal pid))))))
+    (multiple-value-bind (ok code) (get-exit-code-process pid)
+      (when (and (plusp ok) (/= code still-active))
+        (setf (sb-impl::process-%status process) :exited
+              (sb-impl::process-%exit-code process) code))))
+  process)
+

@@ -2611,11 +2611,11 @@
                         (nul-handle
                           (cond
                             ((and inputp outputp)
-                             (sb!win32:unixlike-open nul-name sb!unix:o_rdwr 0))
+                             (sb!win32:unixlike-open nul-name sb!unix:o_rdwr))
                             (inputp
-                             (sb!win32:unixlike-open nul-name sb!unix:o_rdonly 0))
+                             (sb!win32:unixlike-open nul-name sb!unix:o_rdonly))
                             (outputp
-                             (sb!win32:unixlike-open nul-name sb!unix:o_wronly 0))
+                             (sb!win32:unixlike-open nul-name sb!unix:o_wronly))
                             (t
                              ;; Not quite sure what to do in this case.
                              nil))))

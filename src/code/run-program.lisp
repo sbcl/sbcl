@@ -170,13 +170,15 @@
   %status             ; either :RUNNING, :STOPPED, :EXITED, or :SIGNALED
   %exit-code          ; either exit code or signal
   core-dumped         ; T if a core image was dumped
-  #-win32 pty                 ; stream to child's pty, or NIL
+  #-win32 pty         ; stream to child's pty, or NIL
   input               ; stream to child's input, or NIL
   output              ; stream from child's output, or NIL
   error               ; stream from child's error output, or NIL
   status-hook         ; closure to call when PROC changes status
   plist               ; a place for clients to stash things
-  cookie)             ; list of the number of pipes from the subproc
+  cookie              ; list of the number of pipes from the subproc
+  #+win32
+  copiers)            ; list of sb-win32::io-copier
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
@@ -252,13 +254,7 @@ CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
 PROCESS."
   (declare (ignorable check-for-stopped))
   #+win32
-  (let ((pid (process-pid process)))
-    (when (and pid (plusp pid))
-      (without-interrupts
-        (do ()
-            ((= 0
-                (with-local-interrupts
-                  (sb-win32:wait-object-or-signal pid))))))))
+  (sb-win32::win32-process-wait process)
   #-win32
   (loop
       (case (process-status process)
@@ -374,7 +370,8 @@ status slot."
                            (when pid
                              (multiple-value-bind (ok code)
                                  (sb-win32::get-exit-code-process pid)
-                               (when (and (plusp ok) (/= code 259))
+                               (when (and (plusp ok)
+                                          (/= code sb-win32::still-active))
                                  (setf (process-%status proc) :exited
                                        (process-%exit-code proc) code)
                                  (when (process-status-hook proc)
@@ -398,9 +395,7 @@ status slot."
 ;;; list of file descriptors to close when RUN-PROGRAM returns in the parent
 (defvar *close-in-parent* nil)
 
-;;; list of handlers installed by RUN-PROGRAM.  FIXME: nothing seems
-;;; to set this.
-#-win32
+;;; list of handlers installed by RUN-PROGRAM.
 (defvar *handlers-installed* nil)
 
 ;;; Find an unused pty. Return three values: the file descriptor for
@@ -785,9 +780,7 @@ Users Manual for details about the PROCESS structure.
          ;; communicate cleanup info.
          *close-on-error*
          *close-in-parent*
-         ;; Some other binding used only on non-Win32.  FIXME:
-         ;; nothing seems to set this.
-         #-win32 *handlers-installed*
+         *handlers-installed*
          ;; Establish PROC at this level so that we can return it.
          proc
          (progname (native-namestring program))
@@ -872,15 +865,9 @@ Users Manual for details about the PROCESS structure.
                                   :status-hook status-hook
                                   :cookie cookie
                                   #-win32 :pty #-win32 pty-stream
-                                  :%status #-win32 :running
-                                           #+win32 (if wait
-                                                       :exited
-                                                       :running)
-                                  :pid #-win32 child
-                                       #+win32 (if wait
-                                                   nil
-                                                   child)
-                                  #+win32 :%exit-code #+win32 (and wait child)))
+                                  :%status :running
+                                  :pid child
+                                  #+win32 :copiers #+win32 *handlers-installed*))
                            (push proc *active-processes*))))
                      ;; Report the error outside the lock.
                      (case child
@@ -901,10 +888,10 @@ Users Manual for details about the PROCESS structure.
         #-win32
         (dolist (handler *handlers-installed*)
           (remove-fd-handler handler)))
-      #-win32
       (when (and wait proc)
         (unwind-protect
              (process-wait proc)
+          #-win32
           (dolist (handler *handlers-installed*)
             (remove-fd-handler handler)))))
     proc))
@@ -912,6 +899,7 @@ Users Manual for details about the PROCESS structure.
 ;;; Install a handler for any input that shows up on the file
 ;;; descriptor. The handler reads the data and writes it to the
 ;;; stream.
+#-win32
 (defun copy-descriptor-to-stream (descriptor stream cookie external-format)
   (incf (car cookie))
   (let* ((handler nil)
@@ -1007,8 +995,15 @@ Users Manual for details about the PROCESS structure.
                     (t
                      (incf read-end count)
                      (funcall copy-fun))))))))
-    #-win32
     (push handler *handlers-installed*)))
+
+#+win32
+(defun copy-descriptor-to-stream (descriptor stream cookie external-format)
+  (declare (ignore cookie))
+  (push (sb-win32::make-io-copier :pipe descriptor
+                                  :stream stream
+                                  :external-format external-format)
+        *handlers-installed*))
 
 ;;; FIXME: something very like this is done in SB-POSIX to treat
 ;;; streams as file descriptor designators; maybe we can combine these
@@ -1063,6 +1058,8 @@ Users Manual for details about the PROCESS structure.
                (unless fd
                  (fail "could not open a temporary file: ~A"
                        (strerror name/errno)))
+               #+win32
+               (setf (sb-win32::inheritable-handle-p fd) t)
                ;; Can't unlink an open file on Windows
                #-win32
                (unless (sb-unix:unix-unlink name/errno)
@@ -1227,7 +1224,8 @@ Users Manual for details about the PROCESS structure.
                   (when fd
                     (return (values fd stream))))
                 (multiple-value-bind (read-fd write-fd)
-                    (sb-unix:unix-pipe)
+                    #-win32 (sb-unix:unix-pipe)
+                    #+win32 (sb-win32::make-named-pipe)
                   (unless read-fd
                     (fail "couldn't create pipe: ~S" (strerror write-fd)))
                   #+win32

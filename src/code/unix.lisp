@@ -158,11 +158,13 @@ corresponds to NAME, or NIL if there is none."
 ;;; If the O_CREAT flag is specified, then the file is created with a
 ;;; permission of argument MODE if the file doesn't exist. An integer
 ;;; file descriptor is returned by UNIX-OPEN.
-(defun unix-open (path flags mode)
+(defun unix-open (path flags mode &key #!+win32 overlapped)
   (declare (type unix-pathname path)
            (type fixnum flags)
-           (type unix-file-mode mode))
-  #!+win32 (sb!win32:unixlike-open path flags mode)
+           (type unix-file-mode mode)
+           #!+win32
+           (ignore mode))
+  #!+win32 (sb!win32:unixlike-open path flags :overlapped overlapped)
   #!-win32
   (with-restarted-syscall (value errno)
     (int-syscall ("open" c-string int int)
