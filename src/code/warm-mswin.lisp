@@ -303,25 +303,42 @@ true to stop searching)." *console-control-spec*)
                                         (unless (= last-error error-broken-pipe)
                                           (pending-or-error "ReadFile" last-error))))))
                              (copy (copier)
-                               (multiple-value-bind (finished count)
-                                   (get-overlapped-result (io-copier-pipe copier)
-                                                          (io-copier-overlapped copier) nil)
-                                 (cond (finished
-                                        (loop for i below count
-                                              do (setf (aref lisp-buffer i)
-                                                       (deref (io-copier-buffer copier) i)))
-                                        (ecase (stream-element-type (io-copier-stream copier))
-                                          ((base-char character)
-                                           (write-string
-                                            (octets-to-string lisp-buffer
-                                                              :end count
-                                                              :external-format
-                                                              (io-copier-external-format copier))
-                                            (io-copier-stream copier)))))
-                                       (t
-                                        (let ((last-error (get-last-error)))
-                                          (unless (= last-error error-broken-pipe)
-                                            (pending-or-error "ReadFile" last-error))))))))
+                               (let* ((stream (io-copier-stream copier))
+                                      (element-type (stream-element-type stream)))
+                                (multiple-value-bind (finished count)
+                                    (get-overlapped-result (io-copier-pipe copier)
+                                                           (io-copier-overlapped copier) nil)
+                                  (cond (finished
+                                         (loop for i below count
+                                               do (setf (aref lisp-buffer i)
+                                                        (deref (io-copier-buffer copier) i)))
+                                         (cond
+                                           ((member element-type '(base-char character))
+                                            (write-string
+                                             (octets-to-string lisp-buffer
+                                                               :end count
+                                                               :external-format
+                                                               (io-copier-external-format copier))
+                                             stream))
+                                           (t
+                                            (handler-bind
+                                                ((type-error
+                                                   (lambda (c)
+                                                     (error 'simple-type-error
+                                                            :format-control
+                                                            "Error using ~s for program output:~@
+                                                             ~a"
+                                                            :format-arguments
+                                                            (list stream c)
+                                                            :expected-type
+                                                            (type-error-expected-type c)
+                                                            :datum
+                                                            (type-error-datum c)))))
+                                              (write-sequence lisp-buffer stream :end count)))))
+                                        (t
+                                         (let ((last-error (get-last-error)))
+                                           (unless (= last-error error-broken-pipe)
+                                             (pending-or-error "ReadFile" last-error)))))))))
                       (loop for copier across copiers
                             do (try-read copier))
                       (loop for event = (wait-for-multiple-objects-or-signal (cast events

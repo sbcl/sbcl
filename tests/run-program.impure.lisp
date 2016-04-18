@@ -98,13 +98,16 @@
              :start2 start :end2 end)
     seq))
 
-(with-test (:name :run-program-cat-3 :skipped-on :win32)
+(with-test (:name :run-program-cat-3)
   ;; User-defined binary input and output streams.
   (let ((in (make-instance 'buffer-stream))
         (out (make-instance 'buffer-stream))
         (data #(0 1 2 3 4 5 6 7 8 9 10 11 12)))
     (write-sequence data in)
-    (let ((process (sb-ext:run-program "/bin/cat" '() :wait t :output out :input in))
+    (let ((process (sb-ext:run-program "cat" '()
+                                       :search t
+                                       :wait t
+                                       :output out :input in))
           (buf (make-array (length data))))
       (declare (ignore process))
       (assert (= 13 (read-sequence buf out)))
@@ -221,7 +224,7 @@
 
 ;;; This used to crash on Darwin and trigger recursive lock errors on
 ;;; every platform.
-(with-test (:name (:run-program :stress) :fails-on :win32)
+(with-test (:name (:run-program :stress))
   ;; Do it a hundred times in batches of 10 so that with a low limit
   ;; of the number of processes the test can have a chance to pass.
   (loop
@@ -230,8 +233,9 @@
         #'sb-ext:process-wait
         (loop repeat 10
               collect
-              (sb-ext:run-program "/bin/echo" '
-                                  ("It would be nice if this didn't crash.")
+              (sb-ext:run-program "echo"
+                                  '("It would be nice if this didn't crash.")
+                                  :search t
                                   :wait nil :output nil)))))
 
 (with-test (:name (:run-program :pty-stream) :fails-on :win32)
