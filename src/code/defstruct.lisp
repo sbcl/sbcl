@@ -1307,28 +1307,6 @@ or they must be declared locally notinline at each call site.~@:>")
                         :destruct-layout old-layout))))
   (values))
 
-(declaim (inline dd-layout-length))
-(defun dd-layout-length (dd) (dd-length dd)) ; FIXME: just use DD-LENGTH
-
-(declaim (ftype (sfunction (defstruct-description) index) dd-instance-length))
-(defun dd-instance-length (dd)
-  ;; Make sure the object ends at a two-word boundary.  Note that this does
-  ;; not affect the amount of memory used, since the allocator would add the
-  ;; same padding anyway.  However, raw slots are indexed from the length of
-  ;; the object as indicated in the header, so the pad word needs to be
-  ;; included in that length to guarantee proper alignment of raw double float
-  ;; slots, necessary for (at least) the SPARC backend.
-  ;; On backends with interleaved raw slots, the convention of having the
-  ;; header possibly "lie" about an extra word is more of a bug than a feature.
-  ;; Because the structure base is aligned, double-word raw slots are properly
-  ;; aligned, and won't change alignment in descendant object types. It would
-  ;; be correct to store the true instance length even though GC preserves
-  ;; the extra data word (as it does for odd-length SIMPLE-VECTOR), treating
-  ;; the total physical length as rounded-to-even. But having two different
-  ;; conventions would be even more unnecessarily confusing, so we use
-  ;; the not-sensible convention even when it does not make sense.
-  (logior (dd-layout-length dd) 1))
-
 (defun dd-bitmap (dd)
   ;; The bitmap stores a 1 for each untagged word,
   ;; including any internal padding words for alignment.
@@ -1404,7 +1382,7 @@ or they must be declared locally notinline at each call site.~@:>")
                                  (layout-length new-layout)
                                  (layout-inherits new-layout)
                                  (layout-depthoid new-layout)
-                                 (layout-raw-slot-metadata new-layout))
+                                 (layout-untagged-bitmap new-layout))
         (values class new-layout old-layout))
        (t
         (let ((old-info (layout-info old-layout)))
@@ -1963,7 +1941,7 @@ or they must be declared locally notinline at each call site.~@:>")
                 ;; and I don't know anything about raw slots
                 ;; Coincidentally, in either representation of
                 ;; raw-slot-metadata, 0 represents no untagged slots.
-                (zerop (layout-raw-slot-metadata
+                (zerop (layout-untagged-bitmap
                         (info :type :compiler-layout name)))))))
   (defun %instance-layout (instance)
     (aver (or (typep instance 'structure!object)

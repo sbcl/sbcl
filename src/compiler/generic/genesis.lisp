@@ -565,17 +565,12 @@
 ;; LAYOUT-LENGTH is as returned by the like-named function.
 (defun allocate-struct
     (gspace layout &optional (layout-length (cold-layout-length layout)))
-  ;; The math in here is best illustrated by two examples:
-  ;; even: size 4 => request to allocate 5 => rounds up to 6, logior => 5
-  ;; odd : size 5 => request to allocate 6 => no rounding up, logior => 5
-  ;; In each case, the length of the memory block is even.
-  ;; ALLOCATE-OBJECT performs the rounding. It must be supplied
-  ;; the number of words minimally needed, counting the header itself.
-  ;; The number written into the header (%INSTANCE-LENGTH) is always odd.
+  ;; Count +1 for the header word when allocating.
   (let ((des (allocate-object gspace (1+ layout-length)
                               sb!vm:instance-pointer-lowtag)))
-    (write-header-word des (logior layout-length 1)
-                       sb!vm:instance-header-widetag)
+    ;; Length as stored in the header is the exact number of useful words
+    ;; that follow, as is customary. A padding word, if any is not "useful"
+    (write-header-word des layout-length sb!vm:instance-header-widetag)
     (write-wordindexed des sb!vm:instance-slots-offset layout)
     des))
 
@@ -1179,7 +1174,7 @@ core and return a descriptor to it."
                             (error "No target layout for ~S" obj)))
          (result (allocate-struct *dynamic* target-layout))
          (cold-dd-slots (dd-slots-from-core host-type)))
-    (aver (zerop (layout-raw-slot-metadata (find-layout host-type))))
+    (aver (zerop (layout-untagged-bitmap (find-layout host-type))))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
          (index 1 (1+ index)))
@@ -1208,7 +1203,7 @@ core and return a descriptor to it."
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
-  (aver (= 0 (layout-raw-slot-metadata *host-layout-of-layout*)))
+  (aver (= 0 (layout-untagged-bitmap *host-layout-of-layout*)))
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1221,7 +1216,7 @@ core and return a descriptor to it."
               (number-to-core (layout-length warm-layout))
               (vector-in-core inherits)
               (number-to-core (layout-depthoid warm-layout))
-              (number-to-core (layout-raw-slot-metadata warm-layout))))))
+              (number-to-core (layout-untagged-bitmap warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
            (s!o-layout (chill-layout 'structure!object t-layout s-o-layout)))
@@ -3420,6 +3415,9 @@ core and return a descriptor to it."
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
     ;; classoid's expressly declared layout isn't renamed as a special-case.
     (format t "    lispobj _layout;~%")
+    ;; For GC, the relevant notion of length is what the structure
+    ;; actually occupies in memory, so we make sure the C struct
+    ;; incorporates a final padding word if necessary.
     (let ((names ; round dd-length to odd so that total + header is even
            (coerce (loop for i from 1 below (logior (dd-length dd) 1)
                          collect (list (format nil "word_~D_" (1+ i))))
@@ -3431,7 +3429,7 @@ core and return a descriptor to it."
               (rplaca cell name)
               (rplacd cell name))))
       (loop for slot across names
-            do (format t "    lispobj ~A;~@[ //~A~]~%" (car slot) (cdr slot))))
+            do (format t "    lispobj ~A;~@[ // ~A~]~%" (car slot) (cdr slot))))
     (format t "};~2%")
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
 

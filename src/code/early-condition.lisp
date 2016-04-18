@@ -43,7 +43,7 @@
                                       (layout-length layout)
                                       (layout-inherits layout)
                                       (layout-depthoid layout)
-                                      (layout-raw-slot-metadata layout))
+                                      (layout-untagged-bitmap layout))
              (register-layout layout :invalidate t))
             ((not (classoid-layout class))
              (register-layout layout)))

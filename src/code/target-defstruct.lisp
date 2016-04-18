@@ -35,7 +35,7 @@
 ;;; constructors only.
 #!+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
-  (let ((instance (%make-instance (dd-instance-length dd))))
+  (let ((instance (%make-instance (dd-length dd)))) ; length = sans header word
     (setf (%instance-layout instance) (dd-layout-or-lose dd))
     (mapc (lambda (spec value)
             (destructuring-bind (raw-type . index) (cdr spec)
@@ -183,8 +183,14 @@
   (let ((layout (%instance-layout structure)))
     (when (layout-invalid layout)
       (error "attempt to copy an obsolete structure:~%  ~S" structure))
-    (let ((res (%make-instance (%instance-length structure)))
-          (len (layout-length layout)))
+    ;; Previously this had to used LAYOUT-LENGTH in the allocation,
+    ;; to avoid copying random bits from the stack to the heap if you had a
+    ;; padding word in a stack-allocated instance. This is no longer an issue.
+    ;; %INSTANCE-LENGTH returns the number of words that are logically in the
+    ;; instance, with no padding. Using %INSTANCE-LENGTH allows potentially
+    ;; interesting nonstandard things like variable-length structures.
+    (let* ((len (%instance-length structure))
+           (res (%make-instance len)))
       (declare (type index len))
       (let ((metadata (layout-untagged-bitmap layout)))
         ;; Don't assume that %INSTANCE-REF can access the layout.

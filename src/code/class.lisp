@@ -125,7 +125,7 @@
 ;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
 ;;; is no longer true, :UNINITIALIZED used instead.
 (declaim (ftype (function (layout classoid index simple-vector layout-depthoid
-                                  layout-raw-slot-metadata-type)
+                                  unsigned-byte)
                           layout)
                 %init-or-check-layout))
 (defun %init-or-check-layout
@@ -136,7 +136,7 @@
          (setf (layout-length layout) length
                (layout-inherits layout) inherits
                (layout-depthoid layout) depthoid
-               (layout-raw-slot-metadata layout) raw-slot-metadata
+               (layout-untagged-bitmap layout) raw-slot-metadata
                (layout-classoid layout) classoid
                (layout-invalid layout) nil))
         ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
@@ -189,7 +189,7 @@
                              ',(layout-length layout)
                              ',(layout-inherits layout)
                              ',(layout-depthoid layout)
-                             ',(layout-raw-slot-metadata layout)))))
+                             ',(layout-untagged-bitmap layout)))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
@@ -199,7 +199,7 @@
                            index
                            simple-vector
                            layout-depthoid
-                           layout-raw-slot-metadata-type))
+                           unsigned-byte))
                 redefine-layout-warning))
 (defun redefine-layout-warning (old-context old-layout
                                 context length inherits depthoid
@@ -236,7 +236,7 @@
                   old-context old-length
                   context length)
             t))
-        (let ((old-metadata (layout-raw-slot-metadata old-layout)))
+        (let ((old-metadata (layout-untagged-bitmap old-layout)))
           (unless (= old-metadata raw-slot-metadata)
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"
@@ -250,10 +250,8 @@ between the ~A definition and the ~A definition"
 
 ;;; Require that LAYOUT data be consistent with CLASSOID, LENGTH,
 ;;; INHERITS, DEPTHOID, and RAW-SLOT-METADATA.
-(declaim (ftype (function
-                 (layout classoid index simple-vector layout-depthoid
-                         layout-raw-slot-metadata-type))
-                check-layout))
+(declaim (ftype (function (layout classoid index simple-vector layout-depthoid
+                           unsigned-byte)) check-layout))
 (defun check-layout (layout classoid length inherits depthoid raw-slot-metadata)
   (aver (eq (layout-classoid layout) classoid))
   (when (redefine-layout-warning "current" layout
@@ -283,8 +281,7 @@ between the ~A definition and the ~A definition"
 ;;; definitions may not have been loaded yet. This allows type tests
 ;;; to be loaded when the type definition hasn't been loaded yet.
 (declaim (ftype (function (symbol index simple-vector layout-depthoid
-                                  layout-raw-slot-metadata-type)
-                          layout)
+                                  unsigned-byte) layout)
                 find-and-init-or-check-layout))
 (defun find-and-init-or-check-layout (name length inherits depthoid metadata)
   (truly-the ; avoid an "assertion too complex to check" optimizer note
@@ -344,8 +341,7 @@ between the ~A definition and the ~A definition"
                 (layout-inherits destruct-layout) (layout-inherits layout)
                 (layout-depthoid destruct-layout) (layout-depthoid layout)
                 (layout-length destruct-layout) (layout-length layout)
-                (layout-raw-slot-metadata destruct-layout)
-                (layout-raw-slot-metadata layout)
+                (layout-untagged-bitmap destruct-layout) (layout-untagged-bitmap layout)
                 (layout-info destruct-layout) (layout-info layout)
                 (classoid-layout classoid) destruct-layout)
           (setf (layout-invalid layout) nil

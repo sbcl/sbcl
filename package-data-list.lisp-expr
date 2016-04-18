@@ -1691,12 +1691,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "IRRATIONAL" "JUST-DUMP-IT-NORMALLY" "KEY-INFO"
                "KEY-INFO-NAME" "KEY-INFO-P" "KEY-INFO-TYPE"
                "LAYOUT-DEPTHOID" "LAYOUT-EQUALP-TESTS" "LAYOUT-INVALID-ERROR"
-               ;; -METADATA is the wrapper over one or the other of the two
-               ;; 'untagged' accessors, not both of which are present.
-               ;; There's not need to featurize out, because Genesis will dtrt
-               ;; and dump only the present symbols.
-               "LAYOUT-RAW-SLOT-METADATA"
-               "LAYOUT-N-UNTAGGED-SLOTS" "LAYOUT-UNTAGGED-BITMAP"
+               "LAYOUT-UNTAGGED-BITMAP"
                "LAYOUT-FOR-STD-CLASS-P"
                "LAYOUT-SLOT-LIST" "LAYOUT-SLOT-TABLE"
                #!+(or x86-64 x86) "%LEA"

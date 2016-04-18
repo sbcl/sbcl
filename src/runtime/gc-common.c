@@ -727,7 +727,10 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
 static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
-    sword_t ntotal = instance_length(header);
+    // instance_length() is the number of words following the header including
+    // the layout. If this is an even number, it should be made odd so that
+    // scav_instance() always consumes an even number of words in total.
+    sword_t ntotal = instance_length(header) | 1;
     lispobj* layout = (lispobj*)instance_layout(where);
 
     if (!layout)

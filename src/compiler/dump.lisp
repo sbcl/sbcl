@@ -1331,5 +1331,5 @@
   (sub-dump-object (layout-inherits obj) file)
   (sub-dump-object (layout-depthoid obj) file)
   (sub-dump-object (layout-length obj) file)
-  (sub-dump-object (layout-raw-slot-metadata obj) file)
+  (sub-dump-object (layout-untagged-bitmap obj) file)
   (dump-fop 'fop-layout file))

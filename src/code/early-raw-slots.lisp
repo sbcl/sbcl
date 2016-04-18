@@ -44,16 +44,6 @@
 (def!type sb!vm:word () `(unsigned-byte ,sb!vm:n-word-bits))
 (def!type sb!vm:signed-word () `(signed-byte ,sb!vm:n-word-bits))
 
-;; These definitions pertain to how a LAYOUT stores the raw-slot metadata,
-;; and we need them before 'class.lisp' is compiled (why, I'm can't remember).
-;; LAYOUT-RAW-SLOT-METADATA is an abstraction over whichever kind of
-;; metadata we have - it will be one or the other.
-;; It would be possible to represent an unlimited number of trailing untagged
-;; slots (maybe) without consing a bignum if we wished to allow signed integers
-;; for the raw slot bitmap, but that's probably confusing and pointless, so...
-(progn (deftype layout-raw-slot-metadata-type () 'unsigned-byte)
-       (defmacro layout-raw-slot-metadata (x) `(layout-untagged-bitmap ,x)))
-
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
 (defstruct (raw-slot-data
             (:copier nil)
@@ -176,7 +166,8 @@
     ;; since that's the "strange" (though ironically more common) use.
     (let ((end-expr (if exclude-padding
                         `(layout-length ,n-layout)
-                        `(%instance-length ,instance))))
+                        ;; target instances have an odd number of payload words.
+                        `(logior (%instance-length ,instance) #-sb-xc-host 1))))
       `(let* (,@(if (and layout-p exclude-padding) nil `((,instance ,thing)))
               (,n-layout ,(or layout `(%instance-layout ,instance))))
          (do ((,bitmap (layout-untagged-bitmap ,n-layout))

@@ -26,7 +26,7 @@
                                   0 :type ,(if (> i 60) 'sb-ext:word t))))))
   (defbiggy))
 
-(assert (typep (sb-kernel:layout-raw-slot-metadata
+(assert (typep (sb-kernel:layout-untagged-bitmap
                 (sb-kernel::find-layout 'biggy)) 'bignum))
 
 (defvar *x* nil)
@@ -53,14 +53,14 @@
 ;; Run it twice to make sure things really worked.
 
 (let ((*y* (make-biggy))
-      (*x* (sb-kernel:layout-raw-slot-metadata
+      (*x* (sb-kernel:layout-untagged-bitmap
             (sb-kernel::find-layout 'biggy))))
   (sb-ext:gc :gen 1))
 (princ 'did-pass-1) (terpri)
 (force-output)
 
 (let ((*y* (make-biggy))
-      (*x* (sb-kernel:layout-raw-slot-metadata
+      (*x* (sb-kernel:layout-untagged-bitmap
             (sb-kernel::find-layout 'biggy))))
   (sb-ext:gc :gen 1))
 (princ 'did-pass-2) (terpri)
@@ -112,22 +112,24 @@
   (c 'cee))                                      ;    13       9
 
 (defvar *afoo* (make-foo1))
+(assert (= (sb-kernel:layout-length (sb-kernel:layout-of *afoo*))
+           (sb-kernel:%instance-length *afoo*)))
 (with-test (:name :tagged-slot-iterator-macro)
-  ;; on 32-bit, slots 1 through 14 exist, keeping the total length even.
-  #-64-bit (setf (sb-kernel:%instance-ref *afoo* 14) 'magic)
-  ;; on 64-bit, slots 1 through 10 exist, keeping the total length even.
-  #+64-bit (setf (sb-kernel:%instance-ref *afoo* 10) 'magic)
+  ;; on 32-bit, the logical length is 14, which means 15 words (with header),
+  ;; but slot index 14 (word index 15) exists after padding to 16 memory words.
+  #-64-bit (progn (assert (= (sb-kernel:%instance-length *afoo*) 14))
+                  (setf (sb-kernel:%instance-ref *afoo* 14) 'magic))
+  ;; on 64-bit, the logical length is 10, which means 11 words (with header),
+  ;; but slot index 10 (word index 11) exists after padding to 12 memory words.
+  #+64-bit (progn (assert (= (sb-kernel:%instance-length *afoo*) 10))
+                  (setf (sb-kernel:%instance-ref *afoo* 10) 'magic))
+
   (let (l)
     (sb-kernel:do-instance-tagged-slot (i *afoo*)
       (push `(,i ,(sb-kernel:%instance-ref *afoo* i)) l))
-    (assert (oddp (sb-kernel:%instance-length *afoo*)))
-    (assert (= (sb-kernel:layout-length (sb-kernel:layout-of *afoo*))
-               (1- (sb-kernel:%instance-length *afoo*))))
     (assert (equalp (nreverse l)
-                    #-64-bit
-                    `((3 aaay) (9 bee) (13 cee) (14 magic))
-                    #+64-bit
-                    `((2 aaay) (6 bee) (9 cee) (10 magic))))))
+                    #-64-bit `((3 aaay) (9 bee) (13 cee) (14 magic))
+                    #+64-bit `((2 aaay) (6 bee) (9 cee) (10 magic))))))
 
 (defvar *anotherfoo* (make-foo1))
 

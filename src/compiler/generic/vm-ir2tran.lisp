@@ -68,10 +68,7 @@
          res)
     (move-lvar-result node block locs lvar)))
 
-(defun emit-inits (node block name object lowtag instance-length inits args)
-  (declare (ignore instance-length))
-  #!-raw-instance-init-vops
-  (declare (ignore instance-length))
+(defun emit-inits (node block name object lowtag inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil)
         (lvar (node-lvar node)))
@@ -165,7 +162,7 @@
          (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
-    (emit-inits node block name result lowtag words inits args)
+    (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
@@ -178,7 +175,7 @@
           (emit-fixed-alloc node block name words type lowtag result lvar))
         (vop var-alloc node block (lvar-tn node block extra) name words
              type lowtag result))
-    (emit-inits node block name result lowtag nil inits args)
+    (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-structure-allocation
@@ -187,13 +184,12 @@
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
-    (aver (constant-lvar-p dd))
-    (aver (constant-lvar-p slot-specs))
+    (aver (and (constant-lvar-p dd) (constant-lvar-p slot-specs) (= words 1)))
     (let* ((c-dd (lvar-value dd))
            (c-slot-specs (lvar-value slot-specs))
-           (words (+ (sb!kernel::dd-instance-length c-dd) words)))
+           (words (+ (dd-length c-dd) words)))
       (emit-fixed-alloc node block name words type lowtag result lvar)
-      (emit-inits node block name result lowtag words `((:dd . ,c-dd) ,@c-slot-specs) args)
+      (emit-inits node block name result lowtag `((:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
 
 (defoptimizer (initialize-vector ir2-convert)
