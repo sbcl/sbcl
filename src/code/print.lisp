@@ -1098,39 +1098,22 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;
 ;;; It doesn't need a lock, but if you work on SCRUB-POWER-CACHE or
 ;;; POWERS-FOR-BASE, see that you don't break the assumptions!
-(defvar *power-cache* nil)
+(defglobal *power-cache* (make-array 37 :initial-element nil))
+(declaim (type (simple-vector 37) *power-cache*))
 
 (defconstant +power-cache-integer-length-limit+ 2048)
 
-(defun scrub-power-cache ()
-  (let ((cache *power-cache*))
-    (dolist (cell cache)
-      (let ((powers (cdr cell)))
-        (declare (simple-vector powers))
+(defun scrub-power-cache (&aux (cache *power-cache*))
+  (dotimes (i (length cache))
+    (let ((powers (aref cache i)))
+      (when powers
         (let ((too-big (position-if
                         (lambda (x)
                           (>= (integer-length x)
                               +power-cache-integer-length-limit+))
-                        powers)))
+                        (the simple-vector powers))))
           (when too-big
-            (setf (cdr cell) (subseq powers 0 too-big))))))
-    ;; Since base 10 is overwhelmingly common, make sure it's at head.
-    ;; Try to keep other bases in a hopefully sensible order as well.
-    (if (eql 10 (caar cache))
-        (setf *power-cache* cache)
-        ;; If we modify the list destructively we need to copy it, otherwise
-        ;; an alist lookup in progress might be screwed.
-        (setf *power-cache* (sort (copy-list cache)
-                                  (lambda (a b)
-                                    (declare (fixnum a b))
-                                    (cond ((= 10 a) t)
-                                          ((= 10 b) nil)
-                                          ((= 16 a) t)
-                                          ((= 16 b) nil)
-                                          ((= 2 a) t)
-                                          ((= 2 b) nil)
-                                          (t (< a b))))
-                                  :key #'car)))))
+            (setf (aref cache i) (subseq powers 0 too-big))))))))
 
 ;;; Compute (and cache) a power vector for a BASE and LIMIT:
 ;;; the vector holds integers for which
@@ -1146,26 +1129,18 @@ variable: an unreadable object representing the error is printed instead.")
                   (push p powers))
                (push p powers))
              (nreverse powers))))
-    ;; Grab a local reference so that we won't stuff consed at the
-    ;; head by other threads -- or sorting by SCRUB-POWER-CACHE.
-    (let ((cache *power-cache*))
-      (let ((cell (assoc base cache)))
-        (if cell
-            (let* ((powers (cdr cell))
-                   (len (length powers))
-                   (max (svref powers (1- len))))
-              (if (> max limit)
-                  powers
-                  (let ((new
-                         (concatenate 'vector powers
-                                      (compute-powers (* max max)))))
-                    (setf (cdr cell) new)
-                    new)))
-            (let ((powers (coerce (compute-powers base) 'vector)))
-              ;; Add new base to head: SCRUB-POWER-CACHE will later
-              ;; put it to a better place.
-              (setf *power-cache* (acons base powers cache))
-              powers))))))
+    (let* ((cache *power-cache*)
+           (powers (aref cache base)))
+      (setf (aref cache base)
+            (concatenate 'vector powers
+                         (compute-powers
+                          (if powers
+                              (let* ((len (length powers))
+                                     (max (svref powers (1- len))))
+                                (if (> max limit)
+                                    (return-from powers-for-base powers)
+                                    (* max max)))
+                              base)))))))
 
 ;; Algorithm by Harald Hanche-Olsen, sbcl-devel 2005-02-05
 (defun %output-huge-integer-in-base (n base stream)
