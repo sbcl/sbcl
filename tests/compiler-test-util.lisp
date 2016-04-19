@@ -115,12 +115,14 @@
 ;; Pretty horrible, but does the job
 (defun count-full-calls (name function)
   (let ((code (with-output-to-string (s)
-                (disassemble function :stream s)))
+                (let ((*print-right-margin* 120))
+                  (disassemble function :stream s))))
         (n 0))
     (with-input-from-string (s code)
       (loop for line = (read-line s nil nil)
             while line
+            do (print line)
             when (and (search name line)
-                      (search "#<FDEFINITION" line))
+                      (search "FDEFN" line))
             do (incf n)))
     n))
