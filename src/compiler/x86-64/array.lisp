@@ -153,6 +153,8 @@
          (bound :scs (any-reg descriptor-reg))
          (index :scs (any-reg descriptor-reg)))
   ;(:arg-types * positive-fixnum *)
+  (:variant-vars %test-fixnum)
+  (:variant t)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
@@ -161,13 +163,17 @@
           (index (if (sc-is index immediate)
                      (fixnumize (tn-value index))
                      index)))
-      (unless (integerp index)
+      (when (and %test-fixnum (not (integerp index)))
         (%test-fixnum index error t))
       (inst cmp bound index)
       ;; We use below-or-equal even though it's an unsigned test,
       ;; because negative indexes appear as large unsigned numbers.
       ;; Therefore, we get the <0 and >=bound test all rolled into one.
       (inst jmp :be error))))
+(define-vop (check-bound/fast check-bound)
+  (:policy :fast)
+  (:variant nil)
+  (:variant-cost 4))
 
 ;;;; accessors/setters
 
