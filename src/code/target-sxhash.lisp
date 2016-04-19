@@ -385,7 +385,7 @@
       (let ((max-iterations depthoid)
             (depthoid (1- depthoid)))
         ;; We don't mix in LAYOUT here because it was already done above.
-        (do-instance-tagged-slot (i key :layout layout :exclude-padding t)
+        (do-instance-tagged-slot (i key :layout layout :pad nil)
           (mixf result (psxhash (%instance-ref key i) depthoid))
           (if (zerop (decf max-iterations)) (return)))))
     ;; [The following comment blurs some issues: indeed it would take

@@ -146,34 +146,25 @@
 ;; that contain tagged objects. (The LAYOUT does not count as a manifest slot).
 ;; INDEX-VAR is bound to successive slot-indices,
 ;; and is usually used as the second argument to %INSTANCE-REF.
-;; EXCLUDE-PADDING, if T, skips a final word that may be present
-;; at the end of the structure due to alignment requirements.
+;; :PAD, if T, includes a final word that may be present at the end of the
+;; structure due to alignment requirements.
 ;; LAYOUT is optional and somewhat unnecessary, but since some uses of
 ;; this macro already have a layout in hand, it can be supplied.
 ;; [If the compiler were smarter about doing fewer memory accesses,
 ;; there would be no need at all for the LAYOUT - if it had already been
 ;; accessed, it shouldn't be another memory read]
-;; * CAUTION: with a STANDARD-OBJECT you MUST NOT specify :EXCLUDE-PADDING T
-;;   because that equates to using LAYOUT-LENGTH rather than %INSTANCE-LENGTH
-;;   to compute the upper bound, but LAYOUT-LENGTH of a STANDARD-OBJECT
-;;   is not pertinent to the number of storage cells in the primitive object.
 ;;
-(defmacro do-instance-tagged-slot ((index-var thing &key (layout nil layout-p)
-                                                         exclude-padding)
-                                   &body body)
-  (with-unique-names (instance n-layout limit bitmap)
-    ;; FIXME: probably the keyword should be inverted to be :INCLUDE-PADDING
-    ;; since that's the "strange" (though ironically more common) use.
-    (let ((end-expr (if exclude-padding
-                        `(layout-length ,n-layout)
-                        ;; target instances have an odd number of payload words.
-                        `(logior (%instance-length ,instance) #-sb-xc-host 1))))
-      `(let* (,@(if (and layout-p exclude-padding) nil `((,instance ,thing)))
-              (,n-layout ,(or layout `(%instance-layout ,instance))))
-         (do ((,bitmap (layout-untagged-bitmap ,n-layout))
-              (,index-var sb!vm:instance-data-start (1+ ,index-var))
-              (,limit ,end-expr))
-             ((>= ,index-var ,limit))
-           (declare (type index ,index-var))
-           (unless (logbitp ,index-var ,bitmap)
-             ,@body))))))
+(defmacro do-instance-tagged-slot ((index-var thing &key layout (pad t)) &body body)
+  (with-unique-names (instance bitmap limit)
+    `(let* ((,instance ,thing)
+            (,bitmap (layout-untagged-bitmap
+                      ,(or layout `(%instance-layout ,instance))))
+            (,limit ,(if pad
+                         ;; target instances have an odd number of payload words.
+                         `(logior (%instance-length ,instance) #-sb-xc-host 1)
+                         `(%instance-length ,instance))))
+       (do ((,index-var sb!vm:instance-data-start (1+ ,index-var)))
+           ((>= ,index-var ,limit))
+         (declare (type index ,index-var))
+         (unless (logbitp ,index-var ,bitmap)
+           ,@body)))))
