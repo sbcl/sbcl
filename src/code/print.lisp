@@ -1669,16 +1669,13 @@ variable: an unreadable object representing the error is printed instead.")
     (write-string "return PC object" stream)))
 
 (defun output-fdefn (fdefn stream)
-  (print-unreadable-object (fdefn stream)
-    (write-string "FDEFINITION for " stream)
-    ;; It's somewhat unhelpful to print as <FDEFINITION for (SETF #)>
-    ;; Generalized function names are indivisible.
+  (print-unreadable-object (fdefn stream :type t)
     (let ((name (fdefn-name fdefn)))
-      (if (atom name)
-          (output-object name stream)
-          ;; This needn't protect against improper lists.
-          ;; (You'd get crashes in INTERNAL-NAME-P and other places)
-          (format stream "(~{~S~^ ~})" name)))))
+      ;; It's somewhat unhelpful to print as <FDEFINITION for (SETF #)>
+      ;; Generalized function names are indivisible.
+      (if (proper-list-p name)
+          (format stream "(~{~S~^ ~})" name)
+          (output-object name stream)))))
 
 ;;; Making this a DEFMETHOD defers its compilation until after the inline
 ;;; functions %SIMD-PACK-{SINGLES,DOUBLES,UB64S} get defined.
