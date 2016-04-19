@@ -575,8 +575,7 @@
            (integer
               (make-ea :qword
                        :base object
-                       :disp (+ (* (+ instance-slots-offset index)
-                                   n-word-bytes)
+                       :disp (+ (* (+ instance-slots-offset index) n-word-bytes)
                                 (- instance-pointer-lowtag))))
            (tn
               (make-ea :qword
@@ -586,7 +585,7 @@
                        :disp (+ (* instance-slots-offset n-word-bytes)
                                 (- instance-pointer-lowtag)))))))
   (macrolet
-      ((def (suffix result-sc result-type inst)
+      ((def (suffix result-sc result-type inst &optional (inst/c inst))
          `(progn
             (define-vop (,(symbolicate "RAW-INSTANCE-REF/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
@@ -610,7 +609,7 @@
               (:results (value :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 4
-                (inst ,inst value (make-ea-for-raw-slot object index))))
+                (inst ,inst/c value (make-ea-for-raw-slot object index))))
             (define-vop (,(symbolicate "RAW-INSTANCE-SET/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
               (:policy :fast-safe)
@@ -636,7 +635,7 @@
               (:results (result :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 4
-                (inst ,inst (make-ea-for-raw-slot object index) value)
+                (inst ,inst/c (make-ea-for-raw-slot object index) value)
                 (move result value)))
             (define-vop (,(symbolicate "RAW-INSTANCE-INIT/" suffix))
               (:args (object :scs (descriptor-reg))
@@ -644,12 +643,13 @@
               (:arg-types * ,result-type)
               (:info index)
               (:generator 4
-                (inst ,inst (make-ea-for-raw-slot object index) value))))))
+                (inst ,inst/c (make-ea-for-raw-slot object index) value))))))
     (def word unsigned-reg unsigned-num mov)
     (def single single-reg single-float movss)
     (def double double-reg double-float movsd)
     (def complex-single complex-single-reg complex-single-float movq)
-    (def complex-double complex-double-reg complex-double-float movdqu))
+    (def complex-double complex-double-reg complex-double-float
+         movupd (if (oddp index) 'movapd 'movupd)))
 
   (define-vop (raw-instance-atomic-incf/word)
     (:translate %raw-instance-atomic-incf/word)

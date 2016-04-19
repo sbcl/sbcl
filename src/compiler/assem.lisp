@@ -1233,11 +1233,13 @@
 (defmacro inst (instruction &rest args &environment env)
   #!+sb-doc
   "Emit the specified instruction to the current segment."
-  (let ((sym (inst-emitter-symbol instruction)))
+  (let* ((stringablep (typep instruction '(or symbol string character)))
+         (sym (and stringablep (inst-emitter-symbol instruction))))
     (if (#-sb-xc macro-function #+sb-xc sb!xc:macro-function sym env)
         `(,sym ,@args)
         ;; An ordinary style-warning suffices to indicate missing emitters.
-        `(,sym (%%current-segment%%) (%%current-vop%%) ,@args))))
+        `(,@(if stringablep `(,sym) `(funcall (inst-emitter-symbol ,instruction)))
+          (%%current-segment%%) (%%current-vop%%) ,@args))))
 
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
 ;;; and %%CURRENT-VOP%% prevents this from being an ordinary function.
