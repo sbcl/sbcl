@@ -1361,7 +1361,7 @@ or they must be declared locally notinline at each call site.~@:>")
                            :depthoid (length inherits)
                            :length (dd-length info)
                            :info info
-                           :untagged-bitmap (dd-bitmap info)))))
+                           :bitmap (dd-bitmap info)))))
       (cond
        ((not old-layout)
         (values class new-layout nil))
@@ -1382,7 +1382,7 @@ or they must be declared locally notinline at each call site.~@:>")
                                  (layout-length new-layout)
                                  (layout-inherits new-layout)
                                  (layout-depthoid new-layout)
-                                 (layout-untagged-bitmap new-layout))
+                                 (layout-bitmap new-layout))
         (values class new-layout old-layout))
        (t
         (let ((old-info (layout-info old-layout)))
@@ -1941,8 +1941,7 @@ or they must be declared locally notinline at each call site.~@:>")
                 ;; and I don't know anything about raw slots
                 ;; Coincidentally, in either representation of
                 ;; raw-slot-metadata, 0 represents no untagged slots.
-                (zerop (layout-untagged-bitmap
-                        (info :type :compiler-layout name)))))))
+                (zerop (layout-bitmap (info :type :compiler-layout name)))))))
   (defun %instance-layout (instance)
     (aver (or (typep instance 'structure!object)
               (xc-dumpable-structure-instance-p instance)))

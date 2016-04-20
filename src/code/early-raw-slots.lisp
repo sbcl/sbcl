@@ -25,7 +25,7 @@
 ;;; The trade-off is that GC (and a few other things - structure dumping,
 ;;; EQUALP checking, to name a few) have to be able to determine for each
 ;;; slot whether it is a Lisp descriptor or just bits. This is done
-;;; with the LAYOUT-UNTAGGED-BITMAP of an object's layout.
+;;; with the LAYOUT-BITMAP of an object's layout.
 ;;; The bitmap stores a '1' for each bit representing a raw word,
 ;;; and could be a BIGNUM given a spectacularly huge structure.
 
@@ -157,8 +157,7 @@
 (defmacro do-instance-tagged-slot ((index-var thing &key layout (pad t)) &body body)
   (with-unique-names (instance bitmap limit)
     `(let* ((,instance ,thing)
-            (,bitmap (layout-untagged-bitmap
-                      ,(or layout `(%instance-layout ,instance))))
+            (,bitmap (layout-bitmap ,(or layout `(%instance-layout ,instance))))
             (,limit ,(if pad
                          ;; target instances have an odd number of payload words.
                          `(logior (%instance-length ,instance) #-sb-xc-host 1)

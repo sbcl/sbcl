@@ -1062,7 +1062,7 @@ core and return a descriptor to it."
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
                           descriptor)
                 make-cold-layout))
-(defun make-cold-layout (name length inherits depthoid metadata)
+(defun make-cold-layout (name length inherits depthoid bitmap)
   (let ((result (allocate-struct *dynamic* *layout-layout*
                                  target-layout-length)))
     ;; Don't set the CLOS hash value: done in cold-init instead.
@@ -1078,7 +1078,7 @@ core and return a descriptor to it."
      :length length
      :info *nil-descriptor*
      :pure *nil-descriptor*
-     :untagged-bitmap metadata
+     :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
      :equalp-tests (if (boundp '*simple-vector-0-descriptor*)
@@ -1174,7 +1174,7 @@ core and return a descriptor to it."
                             (error "No target layout for ~S" obj)))
          (result (allocate-struct *dynamic* target-layout))
          (cold-dd-slots (dd-slots-from-core host-type)))
-    (aver (zerop (layout-untagged-bitmap (find-layout host-type))))
+    (aver (zerop (layout-bitmap (find-layout host-type))))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
          (index 1 (1+ index)))
@@ -1203,7 +1203,7 @@ core and return a descriptor to it."
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
-  (aver (= 0 (layout-untagged-bitmap *host-layout-of-layout*)))
+  (aver (= 0 (layout-bitmap *host-layout-of-layout*)))
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1216,7 +1216,7 @@ core and return a descriptor to it."
               (number-to-core (layout-length warm-layout))
               (vector-in-core inherits)
               (number-to-core (layout-depthoid warm-layout))
-              (number-to-core (layout-untagged-bitmap warm-layout))))))
+              (number-to-core (layout-bitmap warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
            (s!o-layout (chill-layout 'structure!object t-layout s-o-layout)))
@@ -2424,13 +2424,12 @@ core and return a descriptor to it."
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
   (let* ((layout (pop-stack))
          (result (allocate-struct *dynamic* layout size))
-         (metadata
-          (descriptor-fixnum
-           (read-slot layout *host-layout-of-layout* :untagged-bitmap))))
+         (bitmap (descriptor-fixnum
+                  (read-slot layout *host-layout-of-layout* :bitmap))))
     ;; Raw slots can not possibly work because dump-struct uses
     ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
     ;; Remove this assertion if that problem is somehow circumvented.
-    (unless (= metadata 0)
+    (unless (= bitmap 0)
       (error "Raw slots not working in genesis."))
 
     (do ((index 1 (1+ index)))
@@ -2438,13 +2437,13 @@ core and return a descriptor to it."
       (declare (fixnum index))
       (write-wordindexed result
                          (+ index sb!vm:instance-slots-offset)
-                         (if (logbitp index metadata)
+                         (if (logbitp index bitmap)
                              (descriptor-word-sized-integer (pop-stack))
                              (pop-stack))))
     result))
 
 (define-cold-fop (fop-layout)
-  (let* ((metadata-des (pop-stack))
+  (let* ((bitmap-des (pop-stack))
          (length-des (pop-stack))
          (depthoid-des (pop-stack))
          (cold-inherits (pop-stack))
@@ -2460,10 +2459,10 @@ core and return a descriptor to it."
                (read-slot old-layout-descriptor *host-layout-of-layout* keyword)))
         (let ((old-length (descriptor-fixnum (get-slot :length)))
               (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
-              (old-metadata (host-object-from-core (get-slot :untagged-bitmap)))
+              (old-bitmap (host-object-from-core (get-slot :bitmap)))
               (length (descriptor-fixnum length-des))
               (depthoid (descriptor-fixnum depthoid-des))
-              (metadata (host-object-from-core metadata-des)))
+              (bitmap (host-object-from-core bitmap-des)))
           (unless (= length old-length)
             (error "cold loading a reference to class ~S when the compile~%~
                     time length was ~S and current length is ~S"
@@ -2484,16 +2483,13 @@ core and return a descriptor to it."
                    name
                    depthoid
                    old-depthoid))
-          (unless (= metadata old-metadata)
+          (unless (= bitmap old-bitmap)
             (error "cold loading a reference to class ~S when the compile~%~
-                    time raw-slot-metadata was ~S and is currently ~S"
-                   name
-                   metadata
-                   old-metadata)))
+                    time raw-slot-bitmap was ~S and is currently ~S"
+                   name bitmap old-bitmap)))
         old-layout-descriptor)
       ;; Make a new definition from scratch.
-      (make-cold-layout name length-des cold-inherits depthoid-des
-                        metadata-des))))
+      (make-cold-layout name length-des cold-inherits depthoid-des bitmap-des))))
 
 ;;;; cold fops for loading symbols
 

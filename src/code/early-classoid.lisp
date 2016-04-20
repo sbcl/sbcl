@@ -175,7 +175,7 @@
   ;; This slot is known to the C runtime support code.
   (pure nil :type (member t nil 0))
   ;; Map of raw slot indices.
-  (untagged-bitmap 0 :type unsigned-byte)
+  (bitmap 0 :type unsigned-byte)
   ;; Per-slot comparator for implementing EQUALP.
   (equalp-tests #() :type simple-vector)
   ;; Definition location

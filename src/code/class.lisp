@@ -116,8 +116,8 @@
                   (make-layout :classoid (or classoid (make-undefined-classoid name)))))))))
 
 ;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
-;;; INHERITS, DEPTHOID, and RAW-SLOT-METADATA. Otherwise require
-;;; that it be consistent with the existing values.
+;;; INHERITS, DEPTHOID, and BITMAP.
+;;; Otherwise require that it be consistent with the existing values.
 ;;;
 ;;; UNDEFINED-CLASS values are interpreted specially as "we don't know
 ;;; anything about the class", so if LAYOUT is initialized, any
@@ -128,15 +128,14 @@
                                   unsigned-byte)
                           layout)
                 %init-or-check-layout))
-(defun %init-or-check-layout
-    (layout classoid length inherits depthoid raw-slot-metadata)
+(defun %init-or-check-layout (layout classoid length inherits depthoid bitmap)
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
          (setf (layout-length layout) length
                (layout-inherits layout) inherits
                (layout-depthoid layout) depthoid
-               (layout-untagged-bitmap layout) raw-slot-metadata
+               (layout-bitmap layout) bitmap
                (layout-classoid layout) classoid
                (layout-invalid layout) nil))
         ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
@@ -148,8 +147,7 @@
          ;; information, and we'll now check that old information
          ;; which was known with certainty is consistent with current
          ;; information which is known with certainty.
-         (check-layout layout classoid length inherits depthoid
-                       raw-slot-metadata)))
+         (check-layout layout classoid length inherits depthoid bitmap)))
   layout)
 
 ;;; In code for the target Lisp, we don't dump LAYOUTs using the
@@ -189,7 +187,7 @@
                              ',(layout-length layout)
                              ',(layout-inherits layout)
                              ',(layout-depthoid layout)
-                             ',(layout-untagged-bitmap layout)))))
+                             ',(layout-bitmap layout)))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
@@ -202,8 +200,7 @@
                            unsigned-byte))
                 redefine-layout-warning))
 (defun redefine-layout-warning (old-context old-layout
-                                context length inherits depthoid
-                                raw-slot-metadata)
+                                context length inherits depthoid bitmap)
   (declare (type layout old-layout) (type simple-string old-context context))
   (let ((name (layout-proper-name old-layout))
         (old-inherits (layout-inherits old-layout)))
@@ -236,8 +233,8 @@
                   old-context old-length
                   context length)
             t))
-        (let ((old-metadata (layout-untagged-bitmap old-layout)))
-          (unless (= old-metadata raw-slot-metadata)
+        (let ((old-bitmap (layout-bitmap old-layout)))
+          (unless (= old-bitmap bitmap)
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"
                   name old-context context)
@@ -249,14 +246,13 @@ between the ~A definition and the ~A definition"
           t))))
 
 ;;; Require that LAYOUT data be consistent with CLASSOID, LENGTH,
-;;; INHERITS, DEPTHOID, and RAW-SLOT-METADATA.
+;;; INHERITS, DEPTHOID, and BITMAP.
 (declaim (ftype (function (layout classoid index simple-vector layout-depthoid
                            unsigned-byte)) check-layout))
-(defun check-layout (layout classoid length inherits depthoid raw-slot-metadata)
+(defun check-layout (layout classoid length inherits depthoid bitmap)
   (aver (eq (layout-classoid layout) classoid))
   (when (redefine-layout-warning "current" layout
-                                 "compile time" length inherits depthoid
-                                 raw-slot-metadata)
+                                 "compile time" length inherits depthoid bitmap)
     ;; Classic CMU CL had more options here. There are several reasons
     ;; why they might want more options which are less appropriate for
     ;; us: (1) It's hard to fit the classic CMU CL flexible approach
@@ -283,7 +279,7 @@ between the ~A definition and the ~A definition"
 (declaim (ftype (function (symbol index simple-vector layout-depthoid
                                   unsigned-byte) layout)
                 find-and-init-or-check-layout))
-(defun find-and-init-or-check-layout (name length inherits depthoid metadata)
+(defun find-and-init-or-check-layout (name length inherits depthoid bitmap)
   (truly-the ; avoid an "assertion too complex to check" optimizer note
    (values layout &optional)
    (with-world-lock ()
@@ -294,7 +290,7 @@ between the ~A definition and the ~A definition"
                              length
                              inherits
                              depthoid
-                             metadata)))))
+                             bitmap)))))
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
@@ -341,7 +337,7 @@ between the ~A definition and the ~A definition"
                 (layout-inherits destruct-layout) (layout-inherits layout)
                 (layout-depthoid destruct-layout) (layout-depthoid layout)
                 (layout-length destruct-layout) (layout-length layout)
-                (layout-untagged-bitmap destruct-layout) (layout-untagged-bitmap layout)
+                (layout-bitmap destruct-layout) (layout-bitmap layout)
                 (layout-info destruct-layout) (layout-info layout)
                 (classoid-layout classoid) destruct-layout)
           (setf (layout-invalid layout) nil

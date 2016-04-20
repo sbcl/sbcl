@@ -1290,7 +1290,7 @@
   (note-potential-circularity struct file)
   (do* ((length (%instance-length struct))
         (layout (%instance-layout struct))
-        (bitmap (layout-untagged-bitmap layout))
+        (bitmap (layout-bitmap layout))
         (circ (fasl-output-circularity-table file))
         ;; last slot first on the stack, so that the layout is on top:
         (index (1- length) (1- index)))
@@ -1331,5 +1331,5 @@
   (sub-dump-object (layout-inherits obj) file)
   (sub-dump-object (layout-depthoid obj) file)
   (sub-dump-object (layout-length obj) file)
-  (sub-dump-object (layout-untagged-bitmap obj) file)
+  (sub-dump-object (layout-bitmap obj) file)
   (dump-fop 'fop-layout file))

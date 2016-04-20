@@ -393,8 +393,8 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   `(let ((x-el (%instance-ref x i))
                          (y-el (%instance-ref y i)))
                      (or (eq x-el y-el) (equalp x-el y-el)))))
-       (let ((metadata (layout-untagged-bitmap layout-x)))
-         (if (zerop metadata)
+       (let ((bitmap (layout-bitmap layout-x)))
+         (if (zerop bitmap)
              (loop for i of-type index from sb!vm:instance-data-start
                    below (layout-length layout-x)
                    always (slot-ref-equalp))

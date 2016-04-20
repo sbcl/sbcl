@@ -697,7 +697,7 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
                           lispobj *layout_obj)
 {
   struct layout *layout = (struct layout*)layout_obj;
-  lispobj untagged_metadata = layout->untagged_bitmap;
+  lispobj layout_bitmap = layout->bitmap;
   sword_t index;
 
   /* This code would be more efficient if the Lisp stored an additional format
@@ -708,16 +708,16 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
      On the other hand, this may not be a bottleneck as-is */
 
   ++instance_ptr; // was supplied as the address of the header word
-  if (untagged_metadata == 0) {
+  if (layout_bitmap == 0) {
       proc(instance_ptr, n_words);
-  } else if (fixnump(untagged_metadata)) {
-      unsigned long bitmap = fixnum_value(untagged_metadata);
+  } else if (fixnump(layout_bitmap)) {
+      unsigned long bitmap = fixnum_value(layout_bitmap);
       for (index = 0; index < n_words ; index++, bitmap >>= 1)
           if (!(bitmap & 1))
               proc(instance_ptr + index, 1);
   } else { /* huge bitmap */
       struct bignum * bitmap;
-      bitmap = (struct bignum*)native_pointer(untagged_metadata);
+      bitmap = (struct bignum*)native_pointer(layout_bitmap);
       for (index = 0; index < n_words ; index++)
           if (!positive_bignum_logbitp(index, bitmap))
               proc(instance_ptr + index, 1);

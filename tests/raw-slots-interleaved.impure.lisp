@@ -26,7 +26,7 @@
                                   0 :type ,(if (> i 60) 'sb-ext:word t))))))
   (defbiggy))
 
-(assert (typep (sb-kernel:layout-untagged-bitmap
+(assert (typep (sb-kernel:layout-bitmap
                 (sb-kernel::find-layout 'biggy)) 'bignum))
 
 (defvar *x* nil)
@@ -53,14 +53,14 @@
 ;; Run it twice to make sure things really worked.
 
 (let ((*y* (make-biggy))
-      (*x* (sb-kernel:layout-untagged-bitmap
+      (*x* (sb-kernel:layout-bitmap
             (sb-kernel::find-layout 'biggy))))
   (sb-ext:gc :gen 1))
 (princ 'did-pass-1) (terpri)
 (force-output)
 
 (let ((*y* (make-biggy))
-      (*x* (sb-kernel:layout-untagged-bitmap
+      (*x* (sb-kernel:layout-bitmap
             (sb-kernel::find-layout 'biggy))))
   (sb-ext:gc :gen 1))
 (princ 'did-pass-2) (terpri)

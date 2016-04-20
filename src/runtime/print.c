@@ -465,7 +465,7 @@ static boolean untagged_slot_p(struct layout * layout,
                                int slot_index)
 {
   extern boolean positive_bignum_logbitp(int,struct bignum*);
-  lispobj bitmap = layout->untagged_bitmap;
+  lispobj bitmap = layout->bitmap;
   return fixnump(bitmap)
          ? (fixnum_value(bitmap) >> slot_index) & 1
          : positive_bignum_logbitp(slot_index,

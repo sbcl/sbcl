@@ -106,7 +106,7 @@
     ;; unless no instances exist or all raw slots miraculously contained
     ;; bits which were the equivalent of valid Lisp descriptors.
     (setf (layout-equalp-tests layout)
-          (if (zerop (layout-untagged-bitmap layout))
+          (if (zerop (layout-bitmap layout))
               #()
               ;; The initial element of NIL means "do not compare".
               ;; Ignored words (comparator = NIL) fall into two categories:
@@ -152,7 +152,7 @@
     (let* ((len (%instance-length structure))
            (res (%make-instance len)))
       (declare (type index len))
-      (let ((metadata (layout-untagged-bitmap layout)))
+      (let ((bitmap (layout-bitmap layout)))
         ;; Don't assume that %INSTANCE-REF can access the layout.
         (setf (%instance-layout res) (%instance-layout structure))
         ;; On backends which don't segregate descriptor vs. non-descriptor
@@ -167,14 +167,14 @@
                             (setf (%instance-ref res i)
                                   (%instance-ref structure i)))
                         ,step)))
-          (cond ((zerop metadata) ; no untagged slots.
+          (cond ((zerop bitmap) ; no untagged slots.
                  (copy-loop nil))
                 ;; The fixnum case uses fixnum operations for ODDP and ASH.
-                ((fixnump metadata) ; shift and mask is faster than logbitp
-                 (copy-loop (oddp (truly-the fixnum metadata))
-                            (setq metadata (ash metadata -1))))
+                ((fixnump bitmap) ; shift and mask is faster than logbitp
+                 (copy-loop (oddp (truly-the fixnum bitmap))
+                            (setq bitmap (ash bitmap -1))))
                 (t ; bignum - use LOGBITP to avoid consing more bignums
-                 (copy-loop (logbitp i metadata))))))
+                 (copy-loop (logbitp i bitbmap))))))
       res)))
 
 ;;; default PRINT-OBJECT method
