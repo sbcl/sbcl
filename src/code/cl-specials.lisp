@@ -12,6 +12,8 @@
 
 (in-package "COMMON-LISP")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
 (sb!xc:proclaim '(special cl:*
                           cl:**
                           cl:***
@@ -137,3 +139,5 @@
                        cl:*load-truename*
                        cl:*compile-file-pathname*
                        cl:*compile-file-truename*))
+
+) ; end EVAL-WHEN

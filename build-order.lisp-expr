@@ -45,6 +45,9 @@
  ("src/compiler/early-constantp")
  ("src/code/defsetfs" :not-host)
 
+ ;; Declare all target special variables defined by ANSI
+ ("src/code/cl-specials" :not-host)
+
  ;; Things like DX-FLET and AWHEN are available for use in both the host
  ;; and target very early, with no DEF! obfuscation necessary.
  ("src/code/primordial-extensions")
@@ -735,12 +738,6 @@
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; target macros and DECLAIMs installed at build-the-cross-compiler time
-
- ;; Declare all target special variables defined by ANSI now, so that
- ;; we don't have to worry about any of them being bound incorrectly
- ;; when the compiler processes code which appears before the appropriate
- ;; DEFVAR or DEFPARAMETER.
- ("src/code/cl-specials")
 
  ;; FIXME: here? earlier?  can probably be as late as possible.  Also
  ;; maybe call it FORCE-DELAYED-PROCLAIMS?
