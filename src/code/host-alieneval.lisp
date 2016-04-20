@@ -208,7 +208,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (create-alien-type-class-if-necessary 'root 'alien-type nil))
 
-(def!method print-object ((type alien-type) stream)
+(defmethod print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
     ;; Kludge to avoid printing #'(SIGNED 64) instead of (FUNCTION (SIGNED 64))
     ;; for a 0-argument function. This is only a problem with alien types
@@ -269,7 +269,7 @@
 
 ;;; HEAP-ALIEN-INFO -- defstruct.
 ;;;
-(def!method print-object ((info heap-alien-info) stream)
+(defmethod print-object ((info heap-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (funcall (formatter "~S ~S~@[ (data)~]")
              stream
@@ -828,7 +828,7 @@
   (type (missing-arg) :type alien-type)
   (bits nil :type (or unsigned-byte null))
   (offset 0 :type unsigned-byte))
-(def!method print-object ((field alien-record-field) stream)
+(defmethod print-object ((field alien-record-field) stream)
   (print-unreadable-object (field stream :type t)
     (format stream
             "~S ~S~@[:~D~]"
@@ -1093,7 +1093,7 @@
   ;; Must this local alien be forced into memory? Using the ADDR macro
   ;; on a local alien will set this.
   (force-to-memory-p nil :type (member t nil)))
-(def!method print-object ((info local-alien-info) stream)
+(defmethod print-object ((info local-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (format stream
             "~:[~;(forced to stack) ~]~S"

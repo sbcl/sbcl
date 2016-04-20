@@ -208,7 +208,7 @@ This is SETFable."
 
 ;;;; runtime C values that don't correspond directly to Lisp types
 
-(def!method print-object ((value alien-value) stream)
+(defmethod print-object ((value alien-value) stream)
   ;; Don't use ":TYPE T" here - TYPE-OF isn't what we want.
   (print-unreadable-object (value stream)
     ;; See identical kludge in host-alieneval.

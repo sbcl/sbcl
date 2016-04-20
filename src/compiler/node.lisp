@@ -64,7 +64,7 @@
   ;; :UNUSED continuations.
   (block nil :type (or cblock null)))
 
-(def!method print-object ((x ctran) stream)
+(defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream "~D" (cont-num x))))
 
@@ -94,7 +94,7 @@
   ;; something or other that the back end annotates this lvar with
   (info nil))
 
-(def!method print-object ((x lvar) stream)
+(defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream "~D" (cont-num x))))
 
@@ -345,7 +345,7 @@
   ;; Cache the physenv of a block during lifetime analysis. :NONE if
   ;; no cached value has been stored yet.
   (physenv-cache :none :type (or null physenv (member :none))))
-(def!method print-object ((cblock cblock) stream)
+(defmethod print-object ((cblock cblock) stream)
   (print-unreadable-object (cblock stream :type t :identity t)
     (format stream "~W :START c~W"
             (block-number cblock)

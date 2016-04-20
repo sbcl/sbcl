@@ -279,7 +279,7 @@ code to be loaded.
                        ; value = CL type specifier
   type-keywords)       ; hash table of type STRINGS, test EQUAL,
                        ; value = CL type spec
-(sb!int:def!method print-object ((u loop-universe) stream)
+(defmethod print-object ((u loop-universe) stream)
   (print-unreadable-object (u stream :type t :identity t)))
 
 ;;; This is the "current" loop context in use when we are expanding a

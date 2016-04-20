@@ -261,7 +261,7 @@
                             #'%default-structure-ugly-print)
                         structure stream name dd))))))
 
-(def!method print-object ((x structure-object) stream)
+(defmethod print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level-in-print*))
 
 ;; This generates a sexpr that can be recognized as having a particular

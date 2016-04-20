@@ -90,7 +90,7 @@
   (contents nil :type vector   :read-only t)
   (keyfun   nil :type function :read-only t))
 
-(def!method print-object ((object priority-queue) stream)
+(defmethod print-object ((object priority-queue) stream)
   (print-unreadable-object (object stream :type t :identity t)
     (format stream "~[empty~:;~:*~D item~:P~]"
             (length (%pqueue-contents object)))))
@@ -150,7 +150,7 @@ future versions."
   (interrupt-function nil :type (or null function))
   (cancel-function    nil :type (or null function)))
 
-(def!method print-object ((timer timer) stream)
+(defmethod print-object ((timer timer) stream)
   (let ((name (%timer-name timer)))
     (if name
         (print-unreadable-object (timer stream :type t :identity t)

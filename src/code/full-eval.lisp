@@ -204,7 +204,7 @@
   (push (cons name value) (env-funs body-env))
   (push (cons name :bogus) (sb!c::lexenv-funs (env-native-lexenv body-env))))
 
-(sb!int:def!method print-object ((env env) stream)
+(defmethod print-object ((env env) stream)
   (print-unreadable-object (env stream :type t :identity t)))
 
 (macrolet ((define-get-binding (name accessor &key (test '#'eq))

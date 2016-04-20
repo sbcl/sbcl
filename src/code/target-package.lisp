@@ -68,7 +68,7 @@
 
 ;;;; PACKAGE-HASHTABLE stuff
 
-(def!method print-object ((table package-hashtable) stream)
+(defmethod print-object ((table package-hashtable) stream)
   (declare (type stream stream))
   (print-unreadable-object (table stream :type t :identity t)
     (let* ((n-live (%package-hashtable-symbol-count table))
@@ -329,7 +329,7 @@ error if any of PACKAGES is not a valid package designator."
 
 ;;;; miscellaneous PACKAGE operations
 
-(def!method print-object ((package package) stream)
+(defmethod print-object ((package package) stream)
   (let ((name (package-%name package)))
     (print-unreadable-object (package stream :type t :identity (not name))
       (if name (prin1 name stream) (write-string "(deleted)" stream)))))

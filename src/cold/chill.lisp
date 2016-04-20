@@ -60,14 +60,11 @@
     (def 'defparameter)
     (def 'defvar)))
 
-(export '(sb-int::def!method
-          sb-int::!cold-init-forms
+(export '(sb-int::!cold-init-forms
           sb-int::!coerce-to-specialized
           sb-int::/show sb-int::/noshow sb-int::/show0 sb-int::/noshow0
           sb-int::!uncross-format-control)
         'sb-int)
-
-(setf (macro-function 'sb-int:def!method) (macro-function 'defmethod))
 
 (defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms))
 

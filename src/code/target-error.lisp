@@ -52,7 +52,7 @@
 ;;; on account of the fact that an initializer was supplied at all.
 (defparameter *restart-clusters* '())
 
-(def!method print-object ((restart restart) stream)
+(defmethod print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
         (prin1 (restart-name restart) stream))

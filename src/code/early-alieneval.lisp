@@ -80,7 +80,7 @@
   (result-tn nil :type (or null function))
   (subtypep nil :type (or null function)))
 
-(def!method print-object ((type-class alien-type-class) stream)
+(defmethod print-object ((type-class alien-type-class) stream)
   (print-unreadable-object (type-class stream :type t)
     (prin1 (alien-type-class-name type-class) stream)))
 

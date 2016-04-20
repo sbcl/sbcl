@@ -42,6 +42,11 @@
       #+sb-show (*/show* nil)
       ;; (another workaround for the problem of debugging while the
       ;; printer is disabled here)
+      ;; FIXME: the way to do this is bind print-pprint-dispatch
+      ;; to an "emergency fallback" table. Give it sane entries for
+      ;; CONDITION, STRUCTURE-OBJECT, INSTANCE, and T.
+      ;; Bind *print-pretty* to T for the duration of these forms,
+      ;; and then we no longer need this extra state variable.
       (sb-impl::*print-object-is-disabled-p* t))
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
@@ -177,3 +182,10 @@
     (print-unreadable-object (self stream :type t :identity (not have-obj))
       (when have-obj
         (write (slot-value self 'object) :stream stream)))))
+
+sb-c::
+(defmethod print-object ((self policy) stream)
+  (if *print-readably*
+      (call-next-method)
+      (print-unreadable-object (self stream :type t)
+        (write (policy-to-decl-spec self) :stream stream))))

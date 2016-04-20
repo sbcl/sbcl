@@ -175,7 +175,7 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
  "Name of the thread. Can be assigned to using SETF. Thread names can be
 arbitrary printable objects, and need not be unique.")
 
-(def!method print-object ((thread thread) stream)
+(defmethod print-object ((thread thread) stream)
   (print-unreadable-object (thread stream :type t :identity t)
     (let* ((cookie (list thread))
            (info (if (thread-alive-p thread)
@@ -214,7 +214,7 @@ arbitrary printable objects, and need not be unique.")
           (format stream "~@[~S ~]~2I~_owner: ~S" name owner)
           (format stream "~@[~S ~](free)" name)))))
 
-(def!method print-object ((mutex mutex) stream)
+(defmethod print-object ((mutex mutex) stream)
   (print-lock mutex (mutex-name mutex) (mutex-owner mutex) stream))
 
 (defun thread-alive-p (thread)
@@ -816,7 +816,7 @@ IF-NOT-OWNER is :FORCE)."
                (decf n)))
     nil))
 
-(def!method print-object ((waitqueue waitqueue) stream)
+(defmethod print-object ((waitqueue waitqueue) stream)
   (print-unreadable-object (waitqueue stream :type t :identity t)
     (format stream "~@[~A~]" (waitqueue-name waitqueue))))
 

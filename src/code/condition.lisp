@@ -92,7 +92,7 @@
 ;;;     (defmethod print-object ((x c) stream)
 ;;;       (if *print-escape* (call-next-method) (report-name x stream)))
 ;;; The current code doesn't seem to quite match that.
-(def!method print-object ((x condition) stream)
+(def*method print-object ((x condition) stream)
   (if *print-escape*
       (if (and (typep x 'simple-condition) (slot-value x 'format-control))
           (print-unreadable-object (x stream :type t :identity t)
@@ -108,6 +108,13 @@
         (let ((report (condition-classoid-report class)))
           (when report
             (return (funcall report x stream)))))))
+
+;;; It is essential that there be a method that works in warm load
+;;; because any conditions signaled are not printable otherwise,
+;;; except by the method on type T which is completely unhelpful.
+(defmethod print-object ((x condition) stream)
+  (print-unreadable-object (x stream :type t :identity t)
+    (write (%instance-ref x 1) :stream stream :escape t)))
 
 ;;;; slots of CONDITION objects
 
@@ -511,7 +518,7 @@
              (type-error-datum condition)
              (type-error-expected-type condition)))))
 
-(def!method print-object ((condition type-error) stream)
+(def*method print-object ((condition type-error) stream)
   (if (and *print-escape*
            (slot-boundp condition 'expected-type)
            (slot-boundp condition 'datum))
@@ -560,7 +567,7 @@
 (define-condition cell-error (error)
   ((name :reader cell-error-name :initarg :name)))
 
-(def!method print-object ((condition cell-error) stream)
+(def*method print-object ((condition cell-error) stream)
   (if (and *print-escape* (slot-boundp condition 'name))
       (print-unreadable-object (condition stream :type t :identity t)
         (princ (cell-error-name condition) stream))
@@ -761,7 +768,7 @@
 (define-condition reference-condition ()
   ((references :initarg :references :reader reference-condition-references)))
 (defvar *print-condition-references* t)
-(def!method print-object :around ((o reference-condition) s)
+(def*method print-object :around ((o reference-condition) s)
   (call-next-method)
   (unless (or *print-escape* *print-readably*)
     (when (and *print-condition-references*
@@ -1555,7 +1562,7 @@ the usual naming convention (names like *FOO*) for special variables"
    "Superclass for deprecation-related error and warning
 conditions."))
 
-(def!method print-object ((condition deprecation-condition) stream)
+(defmethod print-object ((condition deprecation-condition) stream)
   (flet ((print-it (stream)
            (print-deprecation-message
             (deprecation-condition-namespace condition)
@@ -1578,7 +1585,7 @@ conditions."))
                   ,@(when documentation
                       `((:documentation ,documentation))))
 
-                (def!method print-object :after ((condition ,name) stream)
+                (def*method print-object :after ((condition ,name) stream)
                   (when (and (not *print-escape*)
                              ,@(when check-runtime-error
                                 `((deprecation-condition-runtime-error condition))))

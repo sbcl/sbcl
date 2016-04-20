@@ -1607,7 +1607,7 @@
                         ;; the effective method for our classes earlier
                         ;; than the relevant PRINT-OBJECT methods are
                         ;; defined...
-                        ((boundp 'sb-impl::*delayed-def!method-args*)
+                        ((boundp '*!delayed-defmethod-args*)
                          (make-initial-dfun gf))
                         (t (multiple-value-bind (dfun cache info)
                                (make-final-dfun-internal

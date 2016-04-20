@@ -134,7 +134,7 @@
       (other-srcs
               '("SRC;CODE;SETF-FUNS"
                 ;; miscellaneous functionality which depends on CLOS
-                "SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS"
+                "SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS" ; FIXME: rename
                 "SRC;CODE;LATE-CONDITION"
 
                 ;; CLOS-level support for the Gray OO streams
@@ -217,64 +217,12 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
-   (let* ((ppd (copy-pprint-dispatch))
-          (sb-debug:*debug-print-variable-alist*
-           (list (cons '*print-pprint-dispatch* ppd)))
-          (*print-pprint-dispatch* ppd))
-     (set-pprint-dispatch
-      'sb-kernel:layout (lambda (stream obj)
-                          (print-unreadable-object (obj stream :type t)
-                            (write (sb-int:awhen (sb-kernel:layout-classoid obj)
-                                     (sb-kernel:classoid-name sb-int:it))
-                                   :stream stream))))
-     (set-pprint-dispatch
-      'sb-kernel:classoid (lambda (stream obj)
-                            (print-unreadable-object (obj stream :type t)
-                              (write (sb-kernel:classoid-name obj) :stream stream))))
-     (set-pprint-dispatch
-      'sb-kernel:ctype (lambda (stream obj)
-                         (print-unreadable-object (obj stream :type t)
-                           (prin1 (sb-kernel:type-specifier obj) stream))))
-     (set-pprint-dispatch
-      'package (lambda (stream obj)
-                 (print-unreadable-object (obj stream :type t)
-                   (write (package-name obj) :stream stream))))
-     (set-pprint-dispatch
-      'pathname (lambda (stream obj)
-                  (write-string "#P" stream)
-                  (write (namestring obj) :stream stream)))
-     (set-pprint-dispatch
-      'sb-thread:thread (lambda (stream obj)
-                          (declare (ignore obj))
-                          (write-string "#<main-thread>" stream)))
-     (set-pprint-dispatch
-      'restart (lambda (stream obj)
-                 (print-unreadable-object (obj stream :type t :identity t)
-                   (write (restart-name obj) :stream stream))))
-     ;; These next two are coded in a totally brittle way, but no more wrong
-     ;; than typing the decoding expressions into the debugger to decipher
-     ;; a backtrace. Anyway, if it ceases to print right, just fix it again!
-     (set-pprint-dispatch
-      ;; Circumlocution avoids use of unknown type.
-      '(and function (satisfies sb-pcl::generic-function-p))
-      (lambda (stream obj)
-        (format stream "<~S ~S>" (type-of obj)
-                (svref (sb-kernel:%funcallable-instance-info obj 1) 5))))
-     ;; dangerous: this type doesn't exist, and the testable-type-p thing
-     ;; isn't working the way it should. It's supposed to enable the ppd entry
-     ;; as soon as CLASS becomes defined, but instead it goes bonkers.
-     #+nil
-     (set-pprint-dispatch
-      'class
-      (lambda (stream obj)
-        (format stream "<~S ~S>" (type-of obj)
-                (svref (sb-kernel:%instance-ref obj 1) 3))))
-     (with-compilation-unit ()
-       (let ((*compile-print* nil))
-         (do-srcs pcl-srcs)))
-     (when *compile-files-p*
-       (format t "~&; Done with PCL compilation~2%"))
-     (do-srcs other-srcs))))
+  (with-compilation-unit ()
+    (let ((*compile-print* nil))
+      (do-srcs pcl-srcs)))
+  (when *compile-files-p*
+    (format t "~&; Done with PCL compilation~2%"))
+  (do-srcs other-srcs)))
 
 ;;;; setting package documentation
 

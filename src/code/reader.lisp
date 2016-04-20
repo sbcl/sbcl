@@ -525,7 +525,7 @@ standard Lisp readtable when NIL."
   (only-base-chars t :type boolean))
 (declaim (freeze-type token-buf))
 
-(def!method print-object ((self token-buf) stream)
+(defmethod print-object ((self token-buf) stream)
   (print-unreadable-object (self stream :identity t :type t)
     (format stream "~@[next=~S~]" (token-buf-next self))))
 
@@ -1884,7 +1884,7 @@ extended <package-name>::<form-in-package> syntax."
   (!cold-init-constituent-trait-table)
   (!cold-init-standard-readtable))
 
-(def!method print-object ((readtable readtable) stream)
+(defmethod print-object ((readtable readtable) stream)
   (print-unreadable-object (readtable stream :identity t :type t)))
 
 ;; Backward-compatibility adapter. The "named-readtables" system in

@@ -1024,7 +1024,7 @@
 
 ;;; Don't try to define a print method until it's actually gonna work!
 ;;; (Otherwise this would be near the DEFSTRUCT)
-(def!method print-object ((ctype ctype) stream)
+(defmethod print-object ((ctype ctype) stream)
   (print-unreadable-object (ctype stream :type t)
     (prin1 (type-specifier ctype) stream)))
 

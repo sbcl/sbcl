@@ -166,6 +166,16 @@
       (sb-sys:structure!object-make-load-form obj env)
       (sb-sys:structure!object-make-load-form obj)))
 
+(defmethod make-load-form ((class class) &optional env)
+  ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
+  ;; doesn't matter while all our environments are the same...
+  (declare (ignore env))
+  (let ((name (class-name class)))
+    (if (and name (eq (find-class name nil) class))
+        `(find-class ',name)
+        (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
+               class))))
+
 (defmethod make-load-form ((object layout) &optional env)
   (declare (ignore env))
   (if (layout-for-std-class-p object)
@@ -191,6 +201,11 @@
 (defmethod make-load-form ((object sb-impl::comma) &optional env)
   (declare (ignore object env))
   :sb-just-dump-it-normally)
+
+sb-impl::
+(defmethod make-load-form ((host (eql *physical-host*)) &optional env)
+  (declare (ignore env))
+  '*physical-host*)
 
 ;; Note that it is possible to produce structure dumping code which yields
 ;; illegal slot values in the resurrected structure, violating the assumption

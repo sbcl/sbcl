@@ -347,7 +347,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; DEFGENERIC PRINT-OBJECT is being built
 ;;;
 ;;; (hopefully will go away naturally when CLOS moves into cold init)
-(defvar *print-object-is-disabled-p*)
+(defvar *print-object-is-disabled-p* nil) ; real soon now
 
 ;;; Output OBJECT to STREAM observing all printer control variables
 ;;; except for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL,
@@ -1060,11 +1060,6 @@ variable: an unreadable object representing the error is printed instead.")
                (incf index count)))
            (write-char #\) stream)))))
 
-;;; a trivial non-generic-function placeholder for PRINT-OBJECT, for
-;;; use until CLOS is set up (at which time it will be replaced with
-;;; the real generic function implementation)
-(defun print-object (instance stream)
-  (default-structure-print instance stream *current-level-in-print*))
 
 ;;;; integer, ratio, and complex printing (i.e. everything but floats)
 

@@ -44,7 +44,7 @@
   ;; map from index in LIST to index into alien FDS
   #!+os-provides-poll (map))
 
-(def!method print-object ((handler handler) stream)
+(defmethod print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
     (format stream
             "~A on ~:[~;BOGUS ~]descriptor ~W: ~S"

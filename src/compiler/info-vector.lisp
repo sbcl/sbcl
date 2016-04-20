@@ -101,7 +101,7 @@
   ;; If no insertions are in progress, it is exactly right.
   (count 0 :type word))
 
-(def!method print-object ((self info-hashtable) stream)
+(defmethod print-object ((self info-hashtable) stream)
   (declare (stream stream))
   (print-unreadable-object (self stream :type t :identity t)
     (format stream "~D/~D entr~:@P" (info-env-count self)

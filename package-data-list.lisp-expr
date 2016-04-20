@@ -1085,10 +1085,12 @@ possibly temporarily, because it might be used internally."
                ;; bootstrapping magic, to make things happen both in
                ;; the cross-compilation host compiler's environment and
                ;; in the cross-compiler's environment
-               "DEF!CONSTANT" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
+               "DEF!CONSTANT" "DEF!STRUCT" "DEF!TYPE"
                ;; bootstrapping magic of a different kind, wherein things happen
                ;; as they ordinarily do, plus during second genesis.
                "!DEFGLOBAL" "!DEFPARAMETER" "!DEFVAR"
+               ;; bootstrapping macro whose effect is to delay until warm load.
+               "DEF*METHOD"
 
                ;; stuff for hinting to the compiler
                "NAMED-DS-BIND"

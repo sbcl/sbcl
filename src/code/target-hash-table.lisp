@@ -1018,7 +1018,7 @@ table itself."
     (setf (gethash (car x) hash-table) (cdr x)))
   hash-table)
 
-(def!method print-object ((hash-table hash-table) stream)
+(defmethod print-object ((hash-table hash-table) stream)
   (declare (type stream stream))
   (cond ((or (not *print-readably*) (not *read-eval*))
          (print-unreadable-object (hash-table stream :type t :identity t)
@@ -1034,7 +1034,7 @@ table itself."
                                      ',(%hash-table-alist hash-table))
                 :stream stream))))
 
-(def!method make-load-form ((hash-table hash-table) &optional environment)
+(defmethod make-load-form ((hash-table hash-table) &optional environment)
   (declare (ignore environment))
   (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
           `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))

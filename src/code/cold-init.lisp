@@ -34,12 +34,7 @@
              (or (and (>= (length name) 1) (char= (char name 0) #\!))
                  (and (>= (length name) 2) (string= name "*!" :end1 2))
                  (memq symbol
-                       ;; DEF!METHOD need no longer be accessible,
-                       ;; but *DELAYED-DEF!METHOD-ARGS* remains,
-                       ;; due to a reference from pcl/methods.lisp.
-                       ;; It would be nice to fix that.
-                       '(def!method
-                         sb!c::sb!pcl sb!c::sb!impl sb!c::sb!kernel
+                       '(sb!c::sb!pcl sb!c::sb!impl sb!c::sb!kernel
                          sb!c::sb!c sb!c::sb!int))))))
     ;; A structure constructor name, in particular !MAKE-SAETP,
     ;; can't be uninterned if referenced by a defstruct-description.

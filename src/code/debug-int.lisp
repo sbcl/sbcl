@@ -190,7 +190,7 @@
   (id 0 :type index)
   ;; Does the variable always have a valid value?
   (alive-p nil :type boolean))
-(def!method print-object ((debug-var debug-var) stream)
+(defmethod print-object ((debug-var debug-var) stream)
   (print-unreadable-object (debug-var stream :type t :identity t)
     (format stream
             "~S ~W"
@@ -240,7 +240,7 @@
   (blocks :unparsed :type (or simple-vector null (member :unparsed)))
   ;; the actual function if available
   (%function :unparsed :type (or null function (member :unparsed))))
-(def!method print-object ((obj debug-fun) stream)
+(defmethod print-object ((obj debug-fun) stream)
   (print-unreadable-object (obj stream :type t)
     (prin1 (debug-fun-name obj) stream)))
 
@@ -266,7 +266,7 @@
   ;; This kind of block has no start code-location. This slot is in
   ;; all debug-blocks since it is an exported interface.
   (elsewhere-p nil :type boolean))
-(def!method print-object ((obj debug-block) str)
+(defmethod print-object ((obj debug-block) str)
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-block-fun-name obj) str)))
 
@@ -339,7 +339,7 @@
   ;; saved when we were interrupted, an os_context_t, i.e. the third
   ;; argument to an SA_SIGACTION-style signal handler.
   escaped)
-(def!method print-object ((obj compiled-frame) str)
+(defmethod print-object ((obj compiled-frame) str)
   (print-unreadable-object (obj str :type t)
     (format str
             "~S~:[~;, interrupted~]"
@@ -381,7 +381,7 @@
   (instruction nil :type (or null sb!vm::word))
   ;; A list of user breakpoints at this location.
   (breakpoints nil :type list))
-(def!method print-object ((obj breakpoint-data) str)
+(defmethod print-object ((obj breakpoint-data) str)
   (print-unreadable-object (obj str :type t)
     (format str "~S at ~S"
             (debug-fun-name
@@ -431,7 +431,7 @@
   (cookie-fun nil :type (or null function))
   ;; This slot users can set with whatever information they find useful.
   %info)
-(def!method print-object ((obj breakpoint) str)
+(defmethod print-object ((obj breakpoint) str)
   (let ((what (breakpoint-what obj)))
     (print-unreadable-object (obj str :type t)
       (format str
@@ -458,7 +458,7 @@
 
 ;;;; CODE-LOCATIONs
 
-(def!method print-object ((obj code-location) str)
+(defmethod print-object ((obj code-location) str)
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-fun-name (code-location-debug-fun obj))
            str)))

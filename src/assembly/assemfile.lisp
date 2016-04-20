@@ -69,7 +69,7 @@
   (temp nil :type symbol)
   (scs nil :type (or list symbol))
   (offset nil))
-(def!method print-object ((spec reg-spec) stream)
+(defmethod print-object ((spec reg-spec) stream)
   (print-unreadable-object (spec stream :type t)
     (format stream
             ":KIND ~S :NAME ~S :SCS ~S :OFFSET ~S"

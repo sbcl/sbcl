@@ -128,7 +128,7 @@
   ;; maintain correctness of the slot in ANSI-STREAM-UNREAD-CHAR.
   (input-char-pos nil))
 
-(def!method print-object ((x ansi-stream) stream)
+(defmethod print-object ((x ansi-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)))
 
 (defmacro with-standard-io-syntax (&body body)

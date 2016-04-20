@@ -64,7 +64,7 @@
   (canon-transls nil :type list))
 
 #-sb-xc-host
-(def!method make-load-form ((logical-host logical-host) &optional env)
+(defmethod make-load-form ((logical-host logical-host) &optional env)
   (declare (ignore env))
   (values `(find-logical-host ',(logical-host-name logical-host))
           nil))

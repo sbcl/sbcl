@@ -644,19 +644,6 @@
     :initform nil
     :reader class-finalized-p)))
 
-(def!method make-load-form ((class class) &optional env)
-  ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
-  ;; doesn't matter while all our environments are the same...
-  (declare (ignore env))
-  (let ((name (class-name class)))
-    (unless (and name (eq (find-class name nil) class))
-      (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
-             class))
-    ;; Essentially we want `(FIND-CLASS ',NAME) but without using backquote.
-    ;; Because this is a delayed DEF!METHOD, its entire body is quoted structure
-    ;; and can't contain a comma object until a MAKE-LOAD-FORM exists for that.
-    (list 'find-class (list 'quote name))))
-
 ;;; The class PCL-CLASS is an implementation-specific common
 ;;; superclass of all specified subclasses of the class CLASS.
 (defclass pcl-class (class)

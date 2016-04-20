@@ -74,6 +74,7 @@
  ("src/code/globals" :not-host)
 
  ("src/code/cmacros" :not-host :slam-forcibly)
+ ("src/code/early-defmethod" :not-host)
 
  ("src/code/cold-init-helper-macros")
 
@@ -96,7 +97,6 @@
  ;;; stuff needed early both in cross-compilation host and in target Lisp
 
  ("src/code/uncross")
- ("src/code/early-defbangmethod")
 
  ("src/code/defbangtype")
  ("src/code/defbangconstant")
@@ -756,7 +756,6 @@
 
  ("src/code/late-format") ; needs SB!XC:DEFMACRO
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
- ("src/code/late-defbangmethod")
  ("src/code/late-cas" :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
