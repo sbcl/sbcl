@@ -160,37 +160,26 @@
 #!+(or x86 x86-64)
 (defknown %raw-instance-cas/word (instance index sb!vm:word sb!vm:word)
   sb!vm:word ())
-(defknown %raw-instance-ref/word (instance index) sb!vm:word
-  (flushable always-translatable))
-(defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
-  (always-translatable)
-  :derive-type #'result-type-last-arg)
-(defknown %raw-instance-ref/single (instance index) single-float
-  (flushable always-translatable))
-(defknown %raw-instance-set/single (instance index single-float) single-float
-  (always-translatable)
-  :derive-type #'result-type-last-arg)
-(defknown %raw-instance-ref/double (instance index) double-float
-  (flushable always-translatable))
-(defknown %raw-instance-set/double (instance index double-float) double-float
-  (always-translatable)
-  :derive-type #'result-type-last-arg)
-(defknown %raw-instance-ref/complex-single (instance index)
-  (complex single-float)
-  (flushable always-translatable))
-(defknown %raw-instance-set/complex-single
-    (instance index (complex single-float))
-  (complex single-float)
-  (always-translatable)
-  :derive-type #'result-type-last-arg)
-(defknown %raw-instance-ref/complex-double (instance index)
-  (complex double-float)
-  (flushable always-translatable))
-(defknown %raw-instance-set/complex-double
-    (instance index (complex double-float))
-  (complex double-float)
-  (always-translatable)
-  :derive-type #'result-type-last-arg)
+#.`(progn
+     ,@(map 'list
+            (lambda (rsd)
+              (let* ((reader (sb!kernel::raw-slot-data-accessor-name rsd))
+                     (name (copy-seq (string reader)))
+                     (writer (intern (replace name "-SET/"
+                                              :start1 (search "-REF/" name))))
+                     (type (sb!kernel::raw-slot-data-raw-type rsd)))
+                `(progn
+                   (defknown ,reader (instance index) ,type
+                     (flushable always-translatable))
+                   (defknown ,writer (instance index ,type) ,type
+                     (always-translatable) :derive-type #'result-type-last-arg)
+                   ;; Interpreter stubs, harmless but unnecessary on host
+                   #-sb-xc-host
+                   (progn (defun ,reader (instance index)
+                            (,reader instance index))
+                          (defun ,writer (instance index new-value)
+                            (,writer instance index new-value))))))
+            sb!kernel::*raw-slot-data*))
 
 #!+compare-and-swap-vops
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
