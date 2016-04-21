@@ -188,13 +188,6 @@
          (format stream "~S ~S" (process-pid process) status)))
     process))
 
-#+sb-doc
-(setf (documentation 'process-p 'function)
-      "T if OBJECT is a PROCESS, NIL otherwise.")
-
-#+sb-doc
-(setf (documentation 'process-pid 'function) "The pid of the child process.")
-
 #+win32
 (define-alien-routine ("GetExitCodeProcess" get-exit-code-process)
     int
@@ -216,36 +209,24 @@
 
 #+sb-doc
 (setf (documentation 'process-exit-code 'function)
-      "The exit code or the signal of a stopped process.")
-
-#+sb-doc
-(setf (documentation 'process-core-dumped 'function)
-      "T if a core image was dumped by the process.")
-
-#+sb-doc
-(setf (documentation 'process-pty 'function)
-      "The pty stream of the process or NIL.")
-
-#+sb-doc
-(setf (documentation 'process-input 'function)
-      "The input stream of the process or NIL.")
-
-#+sb-doc
-(setf (documentation 'process-output 'function)
-      "The output stream of the process or NIL.")
-
-#+sb-doc
-(setf (documentation 'process-error 'function)
-      "The error stream of the process or NIL.")
-
-#+sb-doc
-(setf (documentation 'process-status-hook  'function)
-      "A function that is called when PROCESS changes its status.
-The function is called with PROCESS as its only argument.")
-
-#+sb-doc
-(setf (documentation 'process-plist  'function)
-      "A place for clients to stash things.")
+      "The exit code or the signal of a stopped process."
+      (documentation 'process-core-dumped 'function)
+      "T if a core image was dumped by the process."
+      (documentation 'process-pty 'function)
+      "The pty stream of the process or NIL."
+      (documentation 'process-input 'function)
+      "The input stream of the process or NIL."
+      (documentation 'process-output 'function)
+      "The output stream of the process or NIL."
+      (documentation 'process-error 'function)
+      "The error stream of the process or NIL."
+      (documentation 'process-status-hook 'function) "A function that is called when PROCESS changes its status.
+The function is called with PROCESS as its only argument."
+      (documentation 'process-plist 'function)
+      "A place for clients to stash things."
+      (documentation 'process-p 'function)
+      "T if OBJECT is a PROCESS, NIL otherwise."
+      (documentation 'process-pid 'function) "The pid of the child process.")
 
 (defun process-wait (process &optional check-for-stopped)
   #+sb-doc
