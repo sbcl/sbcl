@@ -87,21 +87,18 @@
   (def!constant static-space-end      #x097fff00)
 
   (def!constant linkage-table-space-start #x0a000000)
-  (def!constant linkage-table-space-end   #x0b000000))
-
-#!+gencgc
-(!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
-
-(def!constant linkage-table-entry-size 16)
-
-#!+linux
-(progn
-  #!-gencgc
+  (def!constant linkage-table-space-end   #x0b000000)
+  #!+linux
   (progn
     (def!constant dynamic-0-space-start #x4f000000)
     (def!constant dynamic-0-space-end   #x66fff000)
     (def!constant dynamic-1-space-start #x67000000)
     (def!constant dynamic-1-space-end   #x7efff000)))
+
+#!+gencgc
+(!gencgc-space-setup #xF0000000 :dynamic-space-start #x1000000000)
+
+(def!constant linkage-table-entry-size 16)
 
 ;;;; other miscellaneous constants
 
