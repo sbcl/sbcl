@@ -593,7 +593,14 @@
         (format-princ stream number nil nil w 1 0 pad))))
 
 (defun format-exponent-marker (number)
-  (if (typep number *read-default-float-format*)
+  (if (case *read-default-float-format*
+        ((short-float single-float)
+         (typep number 'single-float))
+        ((double-float #!-long-float long-float)
+         (typep number 'double-float))
+        #!+long-float
+        (long-float
+         (typep number 'long-float)))
       #\e
       (typecase number
         (single-float #\f)

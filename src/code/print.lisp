@@ -1540,17 +1540,26 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Print the appropriate exponent marker for X and the specified exponent.
 (defun print-float-exponent (x exp stream)
   (declare (type float x) (type integer exp) (type stream stream))
-  (let ((*print-radix* nil))
-    (if (typep x *read-default-float-format*)
-        (unless (eql exp 0)
-          (format stream "e~D" exp))
-        (format stream "~C~D"
-                (etypecase x
-                  (single-float #\f)
-                  (double-float #\d)
-                  (short-float #\s)
-                  (long-float #\L))
-                exp))))
+  (cond ((case *read-default-float-format*
+           ((short-float single-float)
+            (typep x 'single-float))
+           ((double-float #!-long-float long-float)
+            (typep x 'double-float))
+           #!+long-float
+           (long-float
+            (typep x 'long-float)))
+         (unless (eql exp 0)
+           (write-char #\e stream)
+           (%output-integer-in-base exp 10 stream)))
+        (t
+         (write-char
+          (etypecase x
+            (single-float #\f)
+            (double-float #\d)
+            (short-float #\s)
+            (long-float #\L))
+          stream)
+         (%output-integer-in-base exp 10 stream))))
 
 (defun output-float-infinity (x stream)
   (declare (float x) (stream stream))
