@@ -71,13 +71,13 @@ some during the initialization of the Lisp system -- any remaining
 command line arguments are passed on to user code.
 
 The overall command line syntax is:
-.TP 3
+.IP
 .B sbcl [runtime options] \-\-end\-runtime\-options [toplevel options] \-\-end\-toplevel\-options [user options]
 .PP
 
 Both \-\-end\-runtime\-options and \-\-end\-toplevel\-options are
 optional, and may be omitted. They are intended for use in situations
-where any command line options are under user control (e.g. in batch
+where any command line options are under user control (\fIe.g.\fR in batch
 files): by using them you can prevent options intended for your
 program being accidentally processed by SBCL.
 
@@ -257,7 +257,7 @@ and Mellon made the big bucks.)
 
 SBCL compiles by default: even functions entered in the
 read-eval-print loop are compiled to native code, unless the evaluator
-has been explicitly turned on. (Even today, some 30 years after the
+has been explicitly turned on. (Even today, some 40 years after the
 MacLisp compiler, people will tell you that Lisp is an interpreted
 language. Ignore them.)
 
@@ -338,11 +338,11 @@ the compiler relied on the truth of the \f(CRDECLAIM\fR without checking it.
 
 Some things are implemented very inefficiently.
 .TP 3
-\--
+--
 Multidimensional arrays are inefficient, especially
 multidimensional arrays of floating point numbers.
 .TP 3
-\--
+--
 SBCL, like most (maybe all?) implementations of Common Lisp on stock
 hardware, has trouble passing floating point numbers around
 efficiently, because a floating point number, plus a few extra bits to
@@ -427,7 +427,7 @@ years. See the CREDITS file in the distribution for more information.
 This variable controls where files like "sbclrc", "sbcl.core", and the
 add-on "contrib" systems are searched for.  If it is not set, then
 sbcl sets it from a compile-time default location which is usually
-/usr/local/lib/sbcl/ but may have been changed \fIe.g.\fR by a third-party
+\fB/usr/local/lib/sbcl/\fR but may have been changed \fIe.g.\fR by a third-party
 packager.
 
 .SH FILES
@@ -439,12 +439,12 @@ a loader, used to read sbcl.core
 .TP
 .I sbcl.core
 dumped memory image containing most of SBCL, to be loaded by
-the `sbcl' executable.  Looked for in $\f(CRSBCL_HOME\fR,
+the `sbcl' executable.  Looked for in \fB$SBCL_HOME\fR,
 unless overridden by the \f(CR\-\-core\fR option.
 .TP
 .I sbclrc
-optional system-wide startup script, looked for in $\f(CRSBCL_HOME\fR/sbclrc
-then /etc/sbclrc, unless overridden by the \f(CR\-\-sysinit\fR command line
+optional system-wide startup script, looked for in \fB$SBCL_HOME\fR
+then \fB/etc\fR, unless overridden by the \f(CR\-\-sysinit\fR command line
 option.
 .TP
 .I .sbclrc
@@ -459,13 +459,13 @@ been installed, the command
 .B info sbcl
 .PP
 should give you access to the complete manual. Depending on your
-installation it may also be available in HTML and PDF formats in e.g.
+installation it may also be available in HTML and PDF formats in \fIe.g.\fR
 .IP
 .B /usr/local/share/doc/sbcl/
 .PP
 See the SBCL homepage 
 .IP
-.B <\f(CRhttp://www.sbcl.org/\fR>
+<\f(CRhttp://www.sbcl.org/\fR>
 .PP
 for more information, including directions on how to subscribe to the
 sbcl\-devel and sbcl\-help mailing-lists.
