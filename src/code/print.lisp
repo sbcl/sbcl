@@ -1346,36 +1346,38 @@ variable: an unreadable object representing the error is printed instead.")
   (nth-value 1 (decode-float least-positive-long-float)))
 
 (defun flonum-to-digits (v &optional position relativep)
-  (let ((print-base 10) ; B
-        (float-radix 2) ; b
+  (let ((print-base 10)                 ; B
+        (float-radix 2)                 ; b
         (float-digits (float-digits v)) ; p
         (digit-characters "0123456789")
         (min-e
-         (etypecase v
-           (single-float single-float-min-e)
-           (double-float double-float-min-e)
-           #!+long-float
-           (long-float long-float-min-e))))
+          (etypecase v
+            (single-float single-float-min-e)
+            (double-float double-float-min-e)
+            #!+long-float
+            (long-float long-float-min-e))))
     (multiple-value-bind (f e)
         (integer-decode-float v)
-      (let (;; FIXME: these even tests assume normal IEEE rounding
+      (let ( ;; FIXME: these even tests assume normal IEEE rounding
             ;; mode.  I wonder if we should cater for non-normal?
             (high-ok (evenp f))
             (low-ok (evenp f)))
         (with-push-char (:element-type base-char)
           (labels ((scale (r s m+ m-)
-                     (do ((k 0 (1+ k))
+                     (do ((r+m+ (+ r m+))
+                          (k 0 (1+ k))
                           (s s (* s print-base)))
-                         ((not (or (> (+ r m+) s)
-                                   (and high-ok (= (+ r m+) s))))
+                         ((not (or (> r+m+ s)
+                                   (and high-ok (= r+m+ s))))
                           (do ((k k (1- k))
                                (r r (* r print-base))
                                (m+ m+ (* m+ print-base))
                                (m- m- (* m- print-base)))
-                              ((not (and (plusp (- r m-)) ; Extension to handle zero
-                                         (or (< (* (+ r m+) print-base) s)
-                                             (and (not high-ok)
-                                                  (= (* (+ r m+) print-base) s)))))
+                              ((not (and (> r m-) ; Extension to handle zero
+                                         (let ((x (* (+ r m+) print-base)))
+                                           (or (< x s)
+                                               (and (not high-ok)
+                                                    (= x s))))))
                                (values k (generate r s m+ m-)))))))
                    (generate (r s m+ m-)
                      (let (d tc1 tc2)
@@ -1385,8 +1387,9 @@ variable: an unreadable object representing the error is printed instead.")
                           (setf m+ (* m+ print-base))
                           (setf m- (* m- print-base))
                           (setf tc1 (or (< r m-) (and low-ok (= r m-))))
-                          (setf tc2 (or (> (+ r m+) s)
-                                        (and high-ok (= (+ r m+) s))))
+                          (setf tc2 (let ((r+m+ (+ r m+)))
+                                      (or (> r+m+ s)
+                                          (and high-ok (= r+m+ s)))))
                           (when (or tc1 tc2)
                             (go end))
                           (push-char (char digit-characters d))
@@ -1395,34 +1398,36 @@ variable: an unreadable object representing the error is printed instead.")
                           (let ((d (cond
                                      ((and (not tc1) tc2) (1+ d))
                                      ((and tc1 (not tc2)) d)
-                                     (t ; (and tc1 tc2)
-                                      (if (< (* r 2) s) d (1+ d))))))
+                                     ((< (* r 2) s)
+                                      d)
+                                     (t
+                                      (1+ d)))))
                             (push-char (char digit-characters d))
                             (return-from generate (get-pushed-string))))))
                    (initialize ()
                      (let (r s m+ m-)
-                       (if (>= e 0)
-                           (let* ((be (expt float-radix e))
-                                  (be1 (* be float-radix)))
-                             (if (/= f (expt float-radix (1- float-digits)))
-                                 (setf r (* f be 2)
-                                       s 2
-                                       m+ be
-                                       m- be)
-                                 (setf r (* f be1 2)
-                                       s (* float-radix 2)
-                                       m+ be1
-                                       m- be)))
-                           (if (or (= e min-e)
-                                   (/= f (expt float-radix (1- float-digits))))
-                               (setf r (* f 2)
-                                     s (* (expt float-radix (- e)) 2)
-                                     m+ 1
-                                     m- 1)
-                               (setf r (* f float-radix 2)
-                                     s (* (expt float-radix (- 1 e)) 2)
-                                     m+ float-radix
-                                     m- 1)))
+                       (cond ((>= e 0)
+                              (let ((be (expt float-radix e)))
+                                (if (/= f (expt float-radix (1- float-digits)))
+                                    (setf r (* f be 2)
+                                          s 2
+                                          m+ be
+                                          m- be)
+                                    (setf m- be
+                                          m+ (* be float-radix)
+                                          r (* f m+ 2)
+                                          s (* float-radix 2)))))
+                             ((or (= e min-e)
+                                  (/= f (expt float-radix (1- float-digits))))
+                              (setf r (* f 2)
+                                    s (expt float-radix (- 1 e))
+                                    m+ 1
+                                    m- 1))
+                             (t
+                              (setf r (* f float-radix 2)
+                                    s (expt float-radix (- 2 e))
+                                    m+ float-radix
+                                    m- 1)))
                        (when position
                          (when relativep
                            (aver (> position 0))
@@ -1432,11 +1437,12 @@ variable: an unreadable object representing the error is printed instead.")
                                ((>= (* s l) (+ r m+))
                                 ;; k is now \hat{k}
                                 (if (< (+ r (* s (/ (expt print-base (- k position)) 2)))
-                                       (* s (expt print-base k)))
+                                       (* s l))
                                     (setf position (- k position))
                                     (setf position (- k position 1))))))
-                         (let ((low (max m- (/ (* s (expt print-base position)) 2)))
-                               (high (max m+ (/ (* s (expt print-base position)) 2))))
+                         (let* ((x (/ (* s (expt print-base position)) 2))
+                                (low (max m- x))
+                                (high (max m+ x)))
                            (when (<= m- low)
                              (setf m- low)
                              (setf low-ok t))
