@@ -1095,21 +1095,73 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
+;;; Widetags of FROM and TO should be equal
+(defun copy-vector-data (from to start end n-bits)
+  (declare (vector from to)
+           (index start end)
+           ((integer 0 255) n-bits))
+  (let ((from-length (length from)))
+    (cond ((simple-vector-p from)
+           (replace (truly-the simple-vector to)
+                    (truly-the simple-vector from)
+                    :start2 start :end2 end))
+          ;; Vector sizes are double-word aligned and have zeros in
+          ;; the extra word so it's safe to copy when the boundaries
+          ;; are matching the whole vector.
+          ;; A more generic routine is left for another time, even if
+          ;; only handling aligned data since it will avoid consing
+          ;; floats or word bignums.
+          ((and (= start 0)
+                (= end from-length))
+           (let ((words (ceiling (* from-length n-bits)
+                                 sb!vm:n-word-bits)))
+             (loop for i below words
+                   do (setf
+                       (%vector-raw-bits to i)
+                       (%vector-raw-bits from i)))))
+          (t
+           (replace to
+                    from
+                    :start2 start :end2 end)))
+    to))
+
+(defun extend-vector (vector min-extension)
+  (declare (optimize speed)
+           (vector vector))
+  (let* ((old-length (length vector))
+         (min-extension (or min-extension
+                            (min old-length
+                                 (- array-dimension-limit old-length))))
+         (new-length (the index (+ old-length
+                                   (max 1 min-extension))))
+         (fill-pointer (1+ old-length)))
+    (declare (fixnum new-length min-extension))
+    (with-array-data ((old-data vector) (old-start)
+                      (old-end old-length))
+      (let* ((widetag (%other-pointer-widetag old-data))
+             (n-bits (aref %%simple-array-n-bits%% widetag))
+             (new-data
+               (allocate-vector-with-widetag widetag new-length n-bits)))
+        (copy-vector-data old-data new-data old-start old-end n-bits)
+        (setf (%array-data-vector vector) new-data
+              (%array-available-elements vector) new-length
+              (%array-fill-pointer vector) fill-pointer
+              (%array-displacement vector) 0
+              (%array-dimension vector 0) new-length
+              (%array-displaced-p vector) nil)
+        vector))))
+
 (defun vector-push-extend (new-element vector &optional min-extension)
   (declare (type (or null (and index (integer 1))) min-extension))
   (declare (explicit-check))
-  (let ((fill-pointer (fill-pointer vector)))
-    (when (= fill-pointer (%array-available-elements vector))
-      (let ((min-extension
-              (or min-extension
-                  (let ((length (length vector)))
-                    (min length
-                         (- array-dimension-limit length))))))
-        (adjust-array vector (+ fill-pointer (max 1 min-extension)))))
+  (let* ((fill-pointer (fill-pointer vector))
+         (new-fill-pointer (1+ fill-pointer)))
+    (if (= fill-pointer (%array-available-elements vector))
+        (extend-vector vector min-extension)
+        (setf (%array-fill-pointer vector) new-fill-pointer))
     ;; disable bounds checking
     (locally (declare (optimize (safety 0)))
       (setf (aref vector fill-pointer) new-element))
-    (setf (%array-fill-pointer vector) (1+ fill-pointer))
     fill-pointer))
 
 (defun vector-pop (array)
