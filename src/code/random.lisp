@@ -20,3 +20,5 @@
   (state (init-random-state)
    :type (simple-array (unsigned-byte 32) (627))
    :read-only t))
+
+(declaim (freeze-type random-state))
