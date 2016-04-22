@@ -397,3 +397,11 @@
   (let ((array (make-array 10 :fill-pointer t)))
     (assert (= (fill-pointer (adjust-array array 5 :fill-pointer 2))
                2))))
+
+(with-test (:name :adjust-array-initial-element)
+  (assert (equal (funcall
+                  (checked-compile
+                   `(lambda (x)
+                      (adjust-array x 5 :initial-element #\x)))
+                  "abc")
+                 "abcxx")))
