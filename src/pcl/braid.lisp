@@ -31,35 +31,22 @@
 
 (in-package "SB-PCL")
 
-(defun allocate-standard-instance (wrapper
-                                   &optional (slots-init nil slots-init-p))
-  (let ((instance (%make-standard-instance nil 0))
-        (no-of-slots (wrapper-no-of-instance-slots wrapper)))
+(defun allocate-standard-instance (wrapper)
+  (let* ((no-of-slots (wrapper-no-of-instance-slots wrapper))
+         (instance (%make-standard-instance (make-array no-of-slots
+                                                        :initial-element +slot-unbound+)
+                                            0)))
     (setf (std-instance-wrapper instance) wrapper)
-    (setf (std-instance-slots instance)
-          (cond (slots-init-p
-                 ;; Inline the slots vector allocation and initialization.
-                 (let ((slots (make-array no-of-slots :initial-element 0)))
-                   (do ((rem-slots slots-init (rest rem-slots))
-                        (i 0 (1+ i)))
-                       ((>= i no-of-slots)) ;endp rem-slots))
-                     (declare (list rem-slots)
-                              (type index i))
-                     (setf (aref slots i) (first rem-slots)))
-                   slots))
-                (t
-                 (make-array no-of-slots
-                             :initial-element +slot-unbound+))))
     instance))
 
 (defmacro allocate-standard-funcallable-instance-slots
     (wrapper &optional slots-init-p slots-init)
   `(let ((no-of-slots (wrapper-no-of-instance-slots ,wrapper)))
-    ,(if slots-init-p
-         `(if ,slots-init-p
-           (make-array no-of-slots :initial-contents ,slots-init)
-           (make-array no-of-slots :initial-element +slot-unbound+))
-         `(make-array no-of-slots :initial-element +slot-unbound+))))
+     ,(if slots-init-p
+          `(if ,slots-init-p
+               (make-array no-of-slots :initial-contents ,slots-init)
+               (make-array no-of-slots :initial-element +slot-unbound+))
+          `(make-array no-of-slots :initial-element +slot-unbound+))))
 
 (define-condition unset-funcallable-instance-function
     (reference-condition simple-error)
