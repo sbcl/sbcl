@@ -795,7 +795,7 @@ many elements are copied."
 
 (defun reverse-word-specialized-vector (from to end)
   (declare (vector from))
-  (do ((length (length from))
+  (do ((length (length to))
        (left-index 0 (1+ left-index))
        (right-index end))
       ((= left-index length))

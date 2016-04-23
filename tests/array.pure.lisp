@@ -93,11 +93,19 @@
 
 ;;; Following refactoring of sequence functions to detect bad type
 ;;; specifiers, REVERSE was left broken on vectors with fill pointers.
-(let ((a (make-array 10
-                     :fill-pointer 5
-                     :element-type 'character
-                     :initial-contents "abcdefghij")))
-  (assert (string= (reverse a) "edcba")))
+(with-test (:name :reverse-fill-pointer.string)
+  (let ((a (make-array 10
+                       :fill-pointer 5
+                       :element-type 'character
+                       :initial-contents "abcdefghij")))
+    (assert (string= (reverse a) "edcba"))))
+
+(with-test (:name :reverse-fill-pointer.fixnum)
+  (let ((a (make-array 10
+                       :fill-pointer 6
+                       :element-type 'fixnum
+                       :initial-contents '(0 1 2 3 4 5 7 8 9 10))))
+    (assert (equalp (reverse a) #(5 4 3 2 1 0)))))
 
 ;;; ARRAY-IN-BOUNDS-P should work when given non-INDEXes as its
 ;;; subscripts (and return NIL, of course)
