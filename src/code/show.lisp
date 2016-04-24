@@ -62,6 +62,10 @@
          ;; output needed. Assume by default _not_ to suppress.
       (and (boundp '*/show*) (not */show*))))
 
+
+#!+(and sb-show (host-feature sb-xc))
+(declaim (special *print-pretty*))
+
 ;;; shorthand for a common idiom in output statements used in
 ;;; debugging: (/SHOW "Case 2:" X Y) becomes a pretty-printed version
 ;;; of (FORMAT .. "~&/Case 2: X=~S Y=~S~%" X Y), conditional on */SHOW*.
