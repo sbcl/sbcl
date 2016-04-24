@@ -23,6 +23,7 @@
 
 ;;;; IN-PACKAGE
 
+(sb!xc:proclaim '(special *package*))
 (sb!xc:defmacro in-package (string-designator)
   (let ((string (string string-designator)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)

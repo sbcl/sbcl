@@ -202,12 +202,11 @@
  ("src/code/cold-error"  :not-host)
  ("src/code/fdefinition" :not-host)
 
- ("src/code/pred" :not-host)
-
  ("src/compiler/generic/vm-array")
  ("src/code/weak"          :not-host)
  ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
+ ("src/code/pred" :not-host)
 
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)

@@ -273,6 +273,7 @@
           '(allocate-instance
             compute-applicable-methods
             slot-makunbound
+            make-load-form-saving-slots
             sb!ext:run-program
             sb!kernel:profile-deinit)
           ;; CLOS implementation
