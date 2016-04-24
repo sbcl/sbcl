@@ -174,7 +174,7 @@
                  (copy-loop (oddp (truly-the fixnum bitmap))
                             (setq bitmap (ash bitmap -1))))
                 (t ; bignum - use LOGBITP to avoid consing more bignums
-                 (copy-loop (logbitp i bitbmap))))))
+                 (copy-loop (logbitp i bitmap))))))
       res)))
 
 ;;; default PRINT-OBJECT method

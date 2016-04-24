@@ -163,6 +163,17 @@
       (assert (= im (sb-sys:sap-ref-double
                      (sb-sys:int-sap (foo-cdf-ptr thing)) 8))))))
 
+(macrolet ((def ()
+             `(defstruct foo-lotsaslots
+                ,@(loop for i below 100 collect
+                        `(,(sb-int:symbolicate "S" (write-to-string i))
+                          0 :type ,(if (oddp i) 'sb-ext:word 't))))))
+  (def))
+
+(with-test (:name :copy-structure-bignum-bitmap)
+  (assert (zerop (foo-lotsaslots-s0
+                  (copy-structure (make-foo-lotsaslots))))))
+
 (load "compiler-test-util.lisp")
 (with-test (:name :copy-structure-efficient-case)
   (assert (not (ctu:find-named-callees #'copy-structure :name 'ash))))
