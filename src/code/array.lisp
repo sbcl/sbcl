@@ -1020,8 +1020,8 @@ of specialized arrays is supported."
 
 (defun adjustable-array-p (array)
   #!+sb-doc
-  "Return T if (ADJUST-ARRAY ARRAY...) would return an array identical
-   to the argument, this happens for complex arrays."
+  "Return T if and only if calling ADJUST-ARRAY on ARRAY will return
+   the identical object."
   (declare (array array))
   ;; Note that this appears not to be a fundamental limitation.
   ;; non-vector SIMPLE-ARRAYs are in fact capable of being adjusted,
