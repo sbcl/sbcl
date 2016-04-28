@@ -152,9 +152,6 @@ F(shutdown)
 #if !defined(hpux) && !defined(SVR4) && !defined(LISP_FEATURE_X86)
 F(sigreturn)
 #endif
-#if !defined(SVR4)
-F(sigsetmask)
-#endif
 #if !defined(SVR4) && !defined(LISP_FEATURE_FREEBSD) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__DragonFly__)
 F(sigstack)
 F(sigvec)

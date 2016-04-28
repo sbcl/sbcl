@@ -345,8 +345,6 @@ ldso_stub__ ## fct: ;                  \\
                  '("sysctlbyname")
                  #!+os-provides-dladdr
                  '("dladdr")
-                 #!-sunos ;; !defined(SVR4)
-                 '("sigsetmask")
                  #!-android
                    '("nl_langinfo"
                      "getpagesize"
