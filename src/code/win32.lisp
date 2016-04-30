@@ -229,12 +229,6 @@
     dword
   (handle handle))
 
-(define-alien-routine ("win32_wait_for_two_objects_or_signal"
-                       wait-for-two-objects-or-signal)
-    dword
-  (a handle)
-  (b handle))
-
 #!+sb-unicode
 (progn
   (defvar *ansi-codepage* nil)
