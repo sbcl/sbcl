@@ -25,6 +25,9 @@
   ;; form (CONS (MEMBER <thing>)). If the type specifier is of this form,
   ;; we put it in this hash table instead of the regular entries table.
   (cons-entries (make-hash-table :test 'eql) :read-only t))
+
+(declaim (freeze-type pprint-dispatch-table))
+
 #+sb-xc
 (defmethod print-object ((table pprint-dispatch-table) stream)
   (print-unreadable-object (table stream :type t :identity t)))

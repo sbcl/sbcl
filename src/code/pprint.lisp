@@ -728,6 +728,9 @@ line break."
   (initial-p (null *initial-pprint-dispatch-table*) :type boolean :read-only t)
   ;; and the associated function
   (fun nil :type callable :read-only t))
+
+(declaim (freeze-type pprint-dispatch-entry))
+
 (defmethod print-object ((entry pprint-dispatch-entry) stream)
   (print-unreadable-object (entry stream :type t)
     (format stream "type=~S, priority=~S~@[ [initial]~]"
