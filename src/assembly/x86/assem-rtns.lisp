@@ -274,7 +274,7 @@
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
-        (make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
+        (make-ea-for-object-slot block unwind-block-uwp-slot 0))
   ;; If a match, return to context in arg block.
   (inst jmp :e DO-EXIT)
 
@@ -283,14 +283,14 @@
   (move edx-tn block)
   (move block uwp)
   ;; Set next unwind protect context.
-  (loadw uwp uwp unwind-block-current-uwp-slot)
+  (loadw uwp uwp unwind-block-uwp-slot)
   ;; we're about to reload ebp anyway, so let's borrow it here as a
   ;; temporary.  Hope this works
   (store-tl-symbol-value uwp *current-unwind-protect-block* ebp-tn)
 
   DO-EXIT
 
-  (loadw ebp-tn block unwind-block-current-cont-slot)
+  (loadw ebp-tn block unwind-block-cfp-slot)
 
   ;; Uwp-entry expects some things in known locations so that they can
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
@@ -350,7 +350,7 @@
 
   ;; By now we've unwound all the UWP frames required, so we
   ;; just jump to our target block.
-  (loadw ebp-tn block unwind-block-current-cont-slot)
+  (loadw ebp-tn block unwind-block-cfp-slot)
 
   ;; Nlx-entry expects the arg start in ebx-tn and the arg count
   ;; in ecx-tn.  Fortunately, that's where they are already.
@@ -424,7 +424,7 @@
                                        n-word-bytes))))
 
   ;; Update *CURRENT-UNWIND-PROTECT-BLOCK*.
-  (loadw ebx-tn block unwind-block-current-uwp-slot)
+  (loadw ebx-tn block unwind-block-uwp-slot)
   (store-tl-symbol-value ebx-tn *current-unwind-protect-block* ecx-tn)
 
   ;; Uwp-entry expects some things in known locations so that they can
@@ -436,7 +436,7 @@
   (inst xor ebx-tn ebx-tn)
   (inst xor ecx-tn ecx-tn)
   (inst mov ebx-tn ebp-tn)
-  (loadw ebp-tn block unwind-block-current-cont-slot)
+  (loadw ebp-tn block unwind-block-cfp-slot)
   (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
 
 #!+win32

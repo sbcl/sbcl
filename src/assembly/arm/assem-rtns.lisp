@@ -216,15 +216,15 @@
     (inst b :eq error))
 
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
-  (loadw ocfp block unwind-block-current-uwp-slot)
+  (loadw ocfp block unwind-block-uwp-slot)
   (inst cmp cur-uwp ocfp)
 
-  (loadw ocfp cur-uwp unwind-block-current-uwp-slot 0 :ne)
+  (loadw ocfp cur-uwp unwind-block-uwp-slot 0 :ne)
   (store-symbol-value ocfp *current-unwind-protect-block* :ne)
 
   (move cur-uwp block :eq)
 
-  (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
-  (loadw code-tn cur-uwp unwind-block-current-code-slot)
+  (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
+  (loadw code-tn cur-uwp unwind-block-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
   (lisp-return lra :known))

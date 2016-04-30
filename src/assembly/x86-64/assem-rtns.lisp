@@ -284,7 +284,7 @@
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
-        (make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
+        (make-ea-for-object-slot block unwind-block-uwp-slot 0))
   ;; If a match, return to context in arg block.
   (inst jmp :e DO-EXIT)
 
@@ -293,12 +293,12 @@
   (move rdx-tn block)
   (move block uwp)
   ;; Set next unwind protect context.
-  (loadw uwp uwp unwind-block-current-uwp-slot)
+  (loadw uwp uwp unwind-block-uwp-slot)
   (store-tl-symbol-value uwp *current-unwind-protect-block*)
 
   DO-EXIT
 
-  (loadw rbp-tn block unwind-block-current-cont-slot)
+  (loadw rbp-tn block unwind-block-cfp-slot)
 
   ;; Uwp-entry expects some things in known locations so that they can
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and

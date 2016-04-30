@@ -74,11 +74,11 @@
   (:generator 22
     (inst add block cfp-tn (add-sub-immediate (* (tn-offset tn) n-word-bytes)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    #.(assert (and (= unwind-block-current-uwp-slot 0)
-                   (= unwind-block-current-cont-slot 1)))
+    #.(assert (and (= unwind-block-uwp-slot 0)
+                   (= unwind-block-cfp-slot 1)))
     (inst stp temp cfp-tn (@ block))
     (inst compute-lra temp lip entry-label)
-    #.(assert (and (= unwind-block-current-code-slot 2)
+    #.(assert (and (= unwind-block-code-slot 2)
                    (= unwind-block-entry-pc-slot 3)))
     (inst stp code-tn temp (@ block (* n-word-bytes 2)))))
 
@@ -95,10 +95,10 @@
   (:generator 44
     (inst add result cfp-tn (add-sub-immediate (* (tn-offset tn) n-word-bytes)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    #.(assert (and (= catch-block-current-uwp-slot 0)
-                   (= catch-block-current-cont-slot 1)))
+    #.(assert (and (= catch-block-uwp-slot 0)
+                   (= catch-block-cfp-slot 1)))
     (inst stp temp cfp-tn (@ result))
-    #.(assert (and (= catch-block-current-code-slot 2)
+    #.(assert (and (= catch-block-code-slot 2)
                    (= catch-block-entry-pc-slot 3)))
     (inst compute-lra temp lip entry-label)
     (inst stp code-tn temp (@ result (* n-word-bytes 2)))
@@ -134,7 +134,7 @@
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
-    (loadw block block unwind-block-current-uwp-slot)
+    (loadw block block unwind-block-uwp-slot)
     (store-tl-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs:
@@ -262,10 +262,10 @@
       ;; Set up magic catch / UWP block.
 
       (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
-      (storew temp block unwind-block-current-uwp-slot)
+      (storew temp block unwind-block-uwp-slot)
       (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
-      (storew temp block unwind-block-current-cont-slot)
-      ;; Don't need to save code at unwind-block-current-code-slot since
+      (storew temp block unwind-block-cfp-slot)
+      ;; Don't need to save code at unwind-block-code-slot since
       ;; it's not going to be used and will be overwritten after the
       ;; function call
 

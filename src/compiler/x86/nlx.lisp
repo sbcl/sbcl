@@ -67,8 +67,8 @@
   (:generator 22
     (inst lea block (catch-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block unwind-block-current-uwp-slot)
-    (storew ebp-tn block unwind-block-current-cont-slot)
+    (storew temp block unwind-block-uwp-slot)
+    (storew ebp-tn block unwind-block-cfp-slot)
     (storew (make-fixup nil :code-object entry-label)
             block catch-block-entry-pc-slot)
     #!+win32
@@ -87,8 +87,8 @@
   (:generator 44
     (inst lea block (catch-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block  unwind-block-current-uwp-slot)
-    (storew ebp-tn block  unwind-block-current-cont-slot)
+    (storew temp block  unwind-block-uwp-slot)
+    (storew ebp-tn block  unwind-block-cfp-slot)
     (storew (make-fixup nil :code-object entry-label)
             block catch-block-entry-pc-slot)
     #!+win32
@@ -137,7 +137,7 @@
     (progn
       (loadw seh-frame block unwind-block-next-seh-frame-slot)
       (inst mov (make-ea :dword :disp 0) seh-frame :fs))
-    (loadw block block unwind-block-current-uwp-slot)
+    (loadw block block unwind-block-uwp-slot)
     (store-tl-symbol-value block *current-unwind-protect-block* tls)))
 
 ;;;; NLX entry VOPs
@@ -267,9 +267,9 @@
     ;; Set up magic catch / UWP block.
     (move block esp-tn)
     (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
-    (storew temp block unwind-block-current-uwp-slot)
+    (storew temp block unwind-block-uwp-slot)
     (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
-    (storew temp block unwind-block-current-cont-slot)
+    (storew temp block unwind-block-cfp-slot)
 
     (storew (make-fixup nil :code-object entry-label)
             block

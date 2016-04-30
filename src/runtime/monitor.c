@@ -429,13 +429,13 @@ catchers_cmd(char **ptr)
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\t"
                    "code: 0x%08lX\n\tentry: 0x%08lX\n\ttag: ",
                    (uword_t)catch,
-                   (uword_t)(catch->current_uwp),
-                   (uword_t)(catch->current_cont),
+                   (uword_t)(catch->uwp),
+                   (uword_t)(catch->cfp),
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
                    (uword_t)component_ptr_from_pc((void*)catch->entry_pc)
                        + OTHER_POINTER_LOWTAG,
 #else
-                   (uword_t)(catch->current_code),
+                   (uword_t)(catch->code),
 #endif
                    (uword_t)(catch->entry_pc));
             brief_print((lispobj)catch->tag);

@@ -172,20 +172,20 @@
     (inst nop))
 
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
-  (loadw target-uwp block unwind-block-current-uwp-slot)
+  (loadw target-uwp block unwind-block-uwp-slot)
   (inst bne cur-uwp target-uwp DO-UWP)
   (inst nop)
 
   (move cur-uwp block)
 
   DO-EXIT
-  (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
-  (loadw code-tn cur-uwp unwind-block-current-code-slot)
+  (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
+  (loadw code-tn cur-uwp unwind-block-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
   (lisp-return lra lip :frob-code nil)
 
   DO-UWP
-  (loadw next-uwp cur-uwp unwind-block-current-uwp-slot)
+  (loadw next-uwp cur-uwp unwind-block-uwp-slot)
   (inst b DO-EXIT)
   (store-symbol-value next-uwp *current-unwind-protect-block*))
 

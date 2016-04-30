@@ -75,9 +75,9 @@
     (composite-immediate-instruction add block cfp-tn
                                      (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block unwind-block-current-uwp-slot)
-    (storew cfp-tn block unwind-block-current-cont-slot)
-    (storew code-tn block unwind-block-current-code-slot)
+    (storew temp block unwind-block-uwp-slot)
+    (storew cfp-tn block unwind-block-cfp-slot)
+    (storew code-tn block unwind-block-code-slot)
     (inst compute-lra temp lip entry-label)
     (storew temp block catch-block-entry-pc-slot)))
 
@@ -95,9 +95,9 @@
     (composite-immediate-instruction
      add result cfp-tn (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp result catch-block-current-uwp-slot)
-    (storew cfp-tn result catch-block-current-cont-slot)
-    (storew code-tn result catch-block-current-code-slot)
+    (storew temp result catch-block-uwp-slot)
+    (storew cfp-tn result catch-block-cfp-slot)
+    (storew code-tn result catch-block-code-slot)
     (inst compute-lra temp lip entry-label)
     (storew temp result catch-block-entry-pc-slot)
 
@@ -133,7 +133,7 @@
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-symbol-value block *current-unwind-protect-block*)
-    (loadw block block unwind-block-current-uwp-slot)
+    (loadw block block unwind-block-uwp-slot)
     (store-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs:
@@ -252,10 +252,10 @@
       ;; Set up magic catch / UWP block.
 
       (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
-      (storew temp block unwind-block-current-uwp-slot)
+      (storew temp block unwind-block-uwp-slot)
       (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
-      (storew temp block unwind-block-current-cont-slot)
-      ;; Don't need to save code at unwind-block-current-code-slot since
+      (storew temp block unwind-block-cfp-slot)
+      ;; Don't need to save code at unwind-block-code-slot since
       ;; it's not going to be used and will be overwritten after the
       ;; function call
 

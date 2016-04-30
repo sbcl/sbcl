@@ -66,8 +66,8 @@
   (:generator 22
     (inst lea block (catch-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block unwind-block-current-uwp-slot)
-    (storew rbp-tn block unwind-block-current-cont-slot)
+    (storew temp block unwind-block-uwp-slot)
+    (storew rbp-tn block unwind-block-cfp-slot)
     (inst lea temp (make-fixup nil :code-object entry-label))
     (storew temp block unwind-block-entry-pc-slot)))
 
@@ -82,8 +82,8 @@
   (:generator 44
     (inst lea block (catch-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block catch-block-current-uwp-slot)
-    (storew rbp-tn block catch-block-current-cont-slot)
+    (storew temp block catch-block-uwp-slot)
+    (storew rbp-tn block catch-block-cfp-slot)
     (inst lea temp (make-fixup nil :code-object entry-label))
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
@@ -115,7 +115,7 @@
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
-    (loadw block block unwind-block-current-uwp-slot)
+    (loadw block block unwind-block-uwp-slot)
     (store-tl-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs
@@ -245,9 +245,9 @@
     ;; Set up magic catch / UWP block.
     (move block rsp-tn)
     (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
-    (storew temp block unwind-block-current-uwp-slot)
+    (storew temp block unwind-block-uwp-slot)
     (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
-    (storew temp block unwind-block-current-cont-slot)
+    (storew temp block unwind-block-cfp-slot)
 
     (inst lea temp-reg-tn (make-fixup nil :code-object entry-label))
     (storew temp-reg-tn block unwind-block-entry-pc-slot)

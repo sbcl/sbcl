@@ -294,17 +294,17 @@
   symbol) ;; on sb-thread, this is actually a tls-index
 
 (!define-primitive-object (unwind-block)
-  (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
-  (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-(or x86 x86-64) current-code
+  (uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
+  (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
+  #!-(or x86 x86-64) code
   entry-pc
   #!+win32 next-seh-frame
   #!+win32 seh-frame-handler)
 
 (!define-primitive-object (catch-block)
-  (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
-  (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-(or x86 x86-64) current-code
+  (uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
+  (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
+  #!-(or x86 x86-64) code
   entry-pc
   #!+(and win32 x86) next-seh-frame
   #!+(and win32 x86) seh-frame-handler

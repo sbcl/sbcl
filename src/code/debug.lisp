@@ -1858,7 +1858,7 @@ forms that explicitly control this kind of evaluation.")
                                          sb!vm:n-fixnum-tag-bits))))
          (enclosing-uwp (loop for uwp-block = current-uwp
                               then (sap-ref-sap uwp-block
-                                                sb!vm:unwind-block-current-uwp-slot)
+                                                sb!vm:unwind-block-uwp-slot)
                               when (or (zerop (sap-int uwp-block))
                                        #!+stack-grows-downward-not-upward
                                        (sap> uwp-block frame-pointer)

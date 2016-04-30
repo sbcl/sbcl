@@ -1082,12 +1082,12 @@ register."
           (when (sap= fp
                       #!-alpha
                       (sap-ref-sap catch
-                                   (* sb!vm:catch-block-current-cont-slot
+                                   (* sb!vm:catch-block-cfp-slot
                                       sb!vm:n-word-bytes))
                       #!+alpha
                       (int-sap
                        (sap-ref-32 catch
-                                   (* sb!vm:catch-block-current-cont-slot
+                                   (* sb!vm:catch-block-cfp-slot
                                       sb!vm:n-word-bytes))))
             (let* (#!-(or x86 x86-64)
                    (lra (stack-ref catch sb!vm:catch-block-entry-pc-slot))
@@ -1097,7 +1097,7 @@ register."
                                  sb!vm:n-word-bytes)))
                    #!-(or x86 x86-64)
                    (component
-                    (stack-ref catch sb!vm:catch-block-current-code-slot))
+                    (stack-ref catch sb!vm:catch-block-code-slot))
                    #!+(or x86 x86-64)
                    (component (component-from-component-ptr
                                (component-ptr-from-pc ra)))
@@ -1139,12 +1139,12 @@ register."
           do (when (sap= fp
                          #!-alpha
                          (sap-ref-sap catch
-                                      (* sb!vm:catch-block-current-cont-slot
+                                      (* sb!vm:catch-block-cfp-slot
                                          sb!vm:n-word-bytes))
                          #!+alpha
                          (int-sap
                           (sap-ref-32 catch
-                                      (* sb!vm:catch-block-current-cont-slot
+                                      (* sb!vm:catch-block-cfp-slot
                                          sb!vm:n-word-bytes))))
                (let ((current-tag
                       #!-(or x86 x86-64)

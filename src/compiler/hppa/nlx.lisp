@@ -63,9 +63,9 @@
   (:generator 22
     (inst ldo (* (tn-offset tn) n-word-bytes) cfp-tn block)
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block unwind-block-current-uwp-slot)
-    (storew cfp-tn block unwind-block-current-cont-slot)
-    (storew code-tn block unwind-block-current-code-slot)
+    (storew temp block unwind-block-uwp-slot)
+    (storew cfp-tn block unwind-block-cfp-slot)
+    (storew code-tn block unwind-block-code-slot)
     (inst compute-lra-from-code code-tn entry-label ndescr temp)
     (storew temp block catch-block-entry-pc-slot)))
 
@@ -83,9 +83,9 @@
   (:generator 44
     (inst ldo (* (tn-offset tn) n-word-bytes) cfp-tn result)
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp result catch-block-current-uwp-slot)
-    (storew cfp-tn result catch-block-current-cont-slot)
-    (storew code-tn result catch-block-current-code-slot)
+    (storew temp result catch-block-uwp-slot)
+    (storew cfp-tn result catch-block-cfp-slot)
+    (storew code-tn result catch-block-code-slot)
     (inst compute-lra-from-code code-tn entry-label ndescr temp)
     (storew temp result catch-block-entry-pc-slot)
 
@@ -121,7 +121,7 @@
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-symbol-value block *current-unwind-protect-block*)
-    (loadw block block unwind-block-current-uwp-slot)
+    (loadw block block unwind-block-uwp-slot)
     (store-symbol-value block *current-unwind-protect-block*)))
 
 
