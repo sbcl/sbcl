@@ -69,7 +69,7 @@
     (storew temp block unwind-block-current-uwp-slot)
     (storew rbp-tn block unwind-block-current-cont-slot)
     (inst lea temp (make-fixup nil :code-object entry-label))
-    (storew temp block catch-block-entry-pc-slot)))
+    (storew temp block unwind-block-entry-pc-slot)))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
 ;;; tag, and link the block into the CURRENT-CATCH list
@@ -82,8 +82,8 @@
   (:generator 44
     (inst lea block (catch-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block  unwind-block-current-uwp-slot)
-    (storew rbp-tn block  unwind-block-current-cont-slot)
+    (storew temp block catch-block-current-uwp-slot)
+    (storew rbp-tn block catch-block-current-cont-slot)
     (inst lea temp (make-fixup nil :code-object entry-label))
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
@@ -250,9 +250,7 @@
     (storew temp block unwind-block-current-cont-slot)
 
     (inst lea temp-reg-tn (make-fixup nil :code-object entry-label))
-    (storew temp-reg-tn
-            block
-            catch-block-entry-pc-slot)
+    (storew temp-reg-tn block unwind-block-entry-pc-slot)
 
     ;; Run any required UWPs.
     (inst mov temp-reg-tn (make-fixup 'unwind :assembly-routine))
