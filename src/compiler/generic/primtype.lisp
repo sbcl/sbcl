@@ -125,6 +125,7 @@
 
 ;;; miscellaneous primitive types that don't exist at the LISP level
 (!def-primitive-type catch-block (catch-block) :type nil)
+(!def-primitive-type unwind-block (unwind-block) :type nil)
 
 ;;;; PRIMITIVE-TYPE-OF and friends
 

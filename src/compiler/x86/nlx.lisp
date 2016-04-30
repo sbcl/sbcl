@@ -18,7 +18,12 @@
 (defun catch-block-ea (tn)
   (aver (sc-is tn catch-block))
   (make-ea :dword :base ebp-tn
-           :disp (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size))))
+                  :disp (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size))))
+
+(defun unwind-block-ea (tn)
+  (aver (sc-is tn unwind-block))
+  (make-ea :dword :base ebp-tn
+           :disp (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size))))
 
 
 ;;;; Save and restore dynamic environment.
@@ -65,7 +70,7 @@
   (:temporary (:sc unsigned-reg) temp)
   (:results (block :scs (any-reg)))
   (:generator 22
-    (inst lea block (catch-block-ea tn))
+    (inst lea block (unwind-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-uwp-slot)
     (storew ebp-tn block unwind-block-cfp-slot)
@@ -106,7 +111,7 @@
   (:args (tn))
   (:temporary (:sc unsigned-reg) new-uwp #!+sb-thread tls #!+win32 seh-frame)
   (:generator 7
-    (inst lea new-uwp (catch-block-ea tn))
+    (inst lea new-uwp (unwind-block-ea tn))
     #!+win32
     (progn
       (storew (make-fixup 'uwp-seh-handler :assembly-routine)

@@ -1759,7 +1759,13 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (let* ((2info (nlx-info-info info))
          (kind (cleanup-kind (nlx-info-cleanup info)))
          (block-tn (physenv-live-tn
-                    (make-normal-tn (primitive-type-or-lose 'catch-block))
+                    (make-normal-tn
+                     (primitive-type-or-lose
+                      (ecase kind
+                        (:catch
+                         'catch-block)
+                        ((:unwind-protect :block :tagbody)
+                         'unwind-block))))
                     (node-physenv node)))
          (res (make-stack-pointer-tn))
          (target-label (ir2-nlx-info-target 2info)))

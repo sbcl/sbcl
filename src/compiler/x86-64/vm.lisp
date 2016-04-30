@@ -385,8 +385,8 @@
                   :save-p t
                   :alternate-scs (single-sse-stack))
 
-  ;; a catch or unwind block
-  (catch-block stack :element-size catch-block-size))
+  (catch-block stack :element-size catch-block-size)
+  (unwind-block stack :element-size unwind-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *byte-sc-names*
