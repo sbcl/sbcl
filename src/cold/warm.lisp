@@ -89,7 +89,16 @@
 ;;; into build-order.lisp-expr with some new flag (perhaps :WARM) to
 ;;; indicate that the files should be handled not in cold load but
 ;;; afterwards.
-(let ((pcl-srcs
+(let ((interpreter-srcs
+              #+sb-fasteval
+              '("SRC;INTERPRETER;MACROS"
+                "SRC;INTERPRETER;CHECKFUNS"
+                "SRC;INTERPRETER;ENV"
+                "SRC;INTERPRETER;SEXPR"
+                "SRC;INTERPRETER;SPECIAL-FORMS"
+                "SRC;INTERPRETER;EVAL"
+                "SRC;INTERPRETER;DEBUG"))
+       (pcl-srcs
               '(;; CLOS, derived from the PCL reference implementation
                 ;;
                 ;; This PCL build order is based on a particular
@@ -151,14 +160,6 @@
                 ;; cold init
                 "SRC;CODE;DESCRIBE"
 
-                #+sb-fasteval "SRC;INTERPRETER;MACROS"
-                #+sb-fasteval "SRC;INTERPRETER;CHECKFUNS"
-                #+sb-fasteval "SRC;INTERPRETER;ENV"
-                #+sb-fasteval "SRC;INTERPRETER;SEXPR"
-                #+sb-fasteval "SRC;INTERPRETER;SPECIAL-FORMS"
-                #+sb-fasteval "SRC;INTERPRETER;EVAL"
-                #+sb-fasteval "SRC;INTERPRETER;DEBUG"
-
                 "SRC;CODE;DESCRIBE-POLICY"
                 "SRC;CODE;INSPECT"
                 "SRC;CODE;PROFILE"
@@ -217,6 +218,9 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
+  (with-compilation-unit ()
+    (let ((*compile-print* nil))
+      (do-srcs interpreter-srcs)))
   (with-compilation-unit ()
     (let ((*compile-print* nil))
       (do-srcs pcl-srcs)))

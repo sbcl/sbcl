@@ -285,7 +285,7 @@
             (recurse it (and globalp (not (lambda-env-p env)))))
            (globalp
             (setq list (copy-list sb-c::*disabled-package-locks*))))
-    (do-decl-spec (declaration (env-declarations env))
+    (do-decl-spec (declaration (env-declarations env) list)
       (when (member (car declaration)
                     '(disable-package-locks enable-package-locks))
         (setq list (sb-c::process-package-lock-decl declaration list))))))

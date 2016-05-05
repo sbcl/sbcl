@@ -23,14 +23,23 @@
 ;;;; to evaluate EXPR -- if EXPR is already a lambda form, there's
 ;;;; no need.
 (defun make-eval-lambda (expr)
-  (if (typep expr `(cons (member lambda named-lambda lambda-with-lexenv)))
-      (values expr nil)
-      (values `(lambda ()
+  (flet ((lexpr-p (x)
+           (typep x '(cons (member lambda named-lambda lambda-with-lexenv)))))
+    (cond ((lexpr-p expr)
+           (values expr nil))
+          (t
+           (when (typep expr '(cons (eql function) (cons t null)))
+             (let ((inner (second expr)))
+               (when (lexpr-p inner)
+                 (return-from make-eval-lambda (values inner nil)))))
+           (values `(lambda ()
                  ;; why PROGN? So that attempts to eval free declarations
                  ;; signal errors rather than return NIL. -- CSR, 2007-05-01
-                 (progn ,expr))
-              t)))
+                      (progn ,expr))
+                   t)))))
 
+;;; FIXME: what does "except in that it can't handle toplevel ..." mean?
+;;; Is there anything wrong with the implementation, or is the comment obsolete?
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
 (defun %simple-eval (expr lexenv)
@@ -53,6 +62,8 @@
           fun))))
 
 ;;; Handle PROGN and implicit PROGN.
+#!-sb-fasteval
+(progn
 (defun simple-eval-progn-body (progn-body lexenv)
   (unless (list-with-length-p progn-body)
     (let ((*print-circle* t))
@@ -99,6 +110,7 @@
                                   :lexenv lexenv
                                   :context :eval))))
       (simple-eval-progn-body body lexenv))))
+) ; end PROGN
 
 ;;;; EVAL-ERROR
 ;;;;
@@ -115,6 +127,7 @@
 
 ;;; Pick off a few easy cases, and the various top level EVAL-WHEN
 ;;; magical cases, and call %SIMPLE-EVAL for the rest.
+#!-sb-fasteval
 (defun simple-eval-in-lexenv (original-exp lexenv)
   (declare (optimize (safety 1)))
   ;; (aver (lexenv-simple-p lexenv))
@@ -258,6 +271,15 @@
           (t
            exp))))))
 
+;;; This definition will be replaced after the interpreter is compiled.
+;;; Until then we just always compile.
+#!+sb-fasteval
+(defun sb!interpreter:eval-in-environment (exp lexenv)
+  (let ((exp (macroexpand exp lexenv)))
+    (if (symbolp exp)
+        (symbol-value exp)
+        (%simple-eval exp (or lexenv (make-null-lexenv))))))
+
 (defun eval-in-lexenv (exp lexenv)
   #!+sb-eval
   (let ((lexenv (or lexenv (make-null-lexenv))))
@@ -265,9 +287,8 @@
         (simple-eval-in-lexenv exp lexenv)
         (sb!eval:eval-in-native-environment exp lexenv)))
   #!+sb-fasteval
-  (if (eq *evaluator-mode* :compile)
-      (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv)))
-      (sb!interpreter:eval-in-environment exp lexenv))
+  (sb!c:with-compiler-error-resignalling
+   (sb!interpreter:eval-in-environment exp lexenv))
   #!-(or sb-eval sb-fasteval)
   (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv))))
 
