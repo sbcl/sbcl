@@ -11,7 +11,6 @@
 
 ;;;; Rudimentary DEFMETHOD
 
-(eval-when (:compile-toplevel) ; Don't want any load-time effect
 (sb!xc:defmacro defmethod (name lambda-list &rest body)
   (ecase name
     (make-load-form
@@ -29,8 +28,8 @@
     `(!trivial-defmethod
       ',name ',specializer ',unspecialized-ll
       (named-lambda (fast-method ,name (,specializer))
-          (.pv .next-method-call. ,@unspecialized-ll)
-        (declare (ignore .pv .next-method-call.))
+          (.pv. .next-method-call. ,@unspecialized-ll)
+        (declare (ignore .pv. .next-method-call.))
         ,@decls
         ;; Fail at compile-time if any transformational magic needs to happen.
         (macrolet ,(mapcar (lambda (f)
@@ -44,7 +43,7 @@
                    (truly-the ,specializer ,(car unspecialized-ll))))
               ,@forms))))
       ;; Why is SOURCE-LOC needed? Lambdas should know their location.
-      (sb!c::source-location)))))
+      (sb!c::source-location))))
 
 (defvar *!trivial-methods* '())
 (defun !trivial-defmethod (name specializer lambda-list lambda source-loc)

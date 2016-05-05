@@ -309,9 +309,6 @@ generic function lambda list ~S~:>"
       (verify-each-atom-or-singleton '&key keys))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; Kill the existing definition of DEFMETHOD which expands to DEF!METHOD.
-  ;; It's there mainly so that DEFSTRUCT's printer options can expand
-  ;; to DEFMETHOD instead of a DEF!METHOD.
   (fmakunbound 'defmethod))
 ;;; As per CLHS -
 ;;; "defmethod is not required to perform any compile-time side effects."
