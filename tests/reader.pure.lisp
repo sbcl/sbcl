@@ -427,3 +427,6 @@
   (sb-int:collect ((l))
     (read-from-string "a" (l 'first) (l 'second) :start (progn (l 'third) 0))
     (assert (equal (l) '(first second third)))))
+
+(with-test (:name :sharp-star-reader-error)
+  (assert-error (read-from-string (format nil "#~D*" (1+ most-positive-fixnum))) reader-error))
