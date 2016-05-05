@@ -2431,15 +2431,13 @@ core and return a descriptor to it."
     ;; Remove this assertion if that problem is somehow circumvented.
     (unless (= bitmap 0)
       (error "Raw slots not working in genesis."))
-
-    (do ((index 1 (1+ index)))
-        ((eql index size))
-      (declare (fixnum index))
-      (write-wordindexed result
-                         (+ index sb!vm:instance-slots-offset)
-                         (if (logbitp index bitmap)
-                             (descriptor-word-sized-integer (pop-stack))
-                             (pop-stack))))
+    (loop for index downfrom (1- size) to sb!vm:instance-data-start
+          for val = (pop-stack) then (pop-stack)
+          do (write-wordindexed result
+                                (+ index sb!vm:instance-slots-offset)
+                                (if (logbitp index bitmap)
+                                    (descriptor-word-sized-integer val)
+                                    val)))
     result))
 
 (define-cold-fop (fop-layout)

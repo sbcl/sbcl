@@ -8,14 +8,14 @@
 ;;; to elide bounds checking.
 (defmacro with-fop-stack (((stack-var &optional stack-expr) ptr-var count)
                           &body body)
-  `(let* (,@(when stack-expr
-              (list `(,stack-var (the simple-vector ,stack-expr))))
-          (,ptr-var (truly-the index (fop-stack-pop-n ,stack-var ,count))))
-     (macrolet ((fop-stack-ref (i)
-                  `(locally
-                       #-sb-xc-host
-                       (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-                     (svref ,',stack-var (truly-the index ,i)))))
+  `(macrolet ((fop-stack-ref (i)
+                `(locally
+                     #-sb-xc-host
+                     (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                   (svref ,',stack-var (truly-the index ,i)))))
+     (let* (,@(when stack-expr
+                (list `(,stack-var (the simple-vector ,stack-expr))))
+            (,ptr-var (truly-the index (fop-stack-pop-n ,stack-var ,count))))
        ,@body)))
 
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE.
@@ -160,24 +160,22 @@
 
 ;; %MAKE-INSTANCE does not exist on the host.
 (!define-fop 48 :not-host (fop-struct ((:operands size) layout))
-  (let* ((res (%make-instance size)) ; number of words excluding header
-         ;; Compute count of elements to pop from stack, sans layout.
-         ;; If instance-data-start is 0, then size is the count,
-         ;; otherwise subtract 1 because the layout consumes a slot.
-         (n-data-words (- size sb!vm:instance-data-start)))
-    (declare (type index size))
+  (let ((res (%make-instance size)) ; number of words excluding header
+        ;; Discount the layout from number of user-visible words.
+        (n-data-words (- size sb!vm:instance-data-start)))
+    (setf (%instance-layout res) layout)
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
-      (let ((ptr (+ ptr n-data-words)))
-        (declare (type index ptr))
-        (setf (%instance-layout res) layout)
-        (let ((bitmap (layout-bitmap layout)))
-          (do ((i sb!vm:instance-data-start (1+ i)))
-              ((>= i size))
-            (declare (type index i))
-            (let ((val (fop-stack-ref (decf ptr))))
-              (if (logbitp i bitmap)
-                  (setf (%raw-instance-ref/word res i) val)
-                  (setf (%instance-ref res i) val)))))))
+      (declare (type index ptr))
+      (let ((bitmap (layout-bitmap layout)))
+        ;; Values on the stack are in the same order as in the structure itself.
+        (do ((i sb!vm:instance-data-start (1+ i)))
+            ((>= i size))
+          (declare (type index i))
+          (let ((val (fop-stack-ref ptr)))
+            (if (logbitp i bitmap)
+                (setf (%raw-instance-ref/word res i) val)
+                (setf (%instance-ref res i) val))
+            (incf ptr)))))
     res))
 
 (!define-fop 45 (fop-layout (name inherits depthoid length bitmap))

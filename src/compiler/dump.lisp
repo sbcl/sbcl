@@ -1292,9 +1292,8 @@
         (layout (%instance-layout struct))
         (bitmap (layout-bitmap layout))
         (circ (fasl-output-circularity-table file))
-        ;; last slot first on the stack, so that the layout is on top:
-        (index (1- length) (1- index)))
-      ((< index sb!vm:instance-data-start)
+        (index sb!vm:instance-data-start (1+ index)))
+      ((>= index length)
        (dump-non-immediate-object layout file)
        (dump-fop 'fop-struct file length))
     (let* ((obj (if (logbitp index bitmap)
