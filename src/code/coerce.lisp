@@ -65,6 +65,7 @@
   ;; [Also note, we won't encapsulate a macro or special-form, so this
   ;; introspective technique to decide what kind something is works either way]
   (let ((def (fdefinition symbol)))
+    (declare (notinline macro/special-guard-fun-p)) ; not performance-critical
     (if (macro/special-guard-fun-p def)
         (error (ecase (car (%fun-name def))
                 (:macro "~S names a macro.")

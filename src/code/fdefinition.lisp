@@ -290,18 +290,24 @@
 ;; whether FUNCTION is the same closure as for a known macro.
 ;; For cold-init to work, this must pick any macro defined before
 ;; this function is. A safe choice is a macro from this same file.
+(declaim (inline macro/special-guard-fun-p))
 (defun macro/special-guard-fun-p (function)
-  (and (closurep function)
+  ;; When inlined, this is a few instructions shorter than CLOSUREP
+  ;; if we already know that FUNCTION is a function.
+  ;; It will signal a type error if not, which is the right thing to do anyway.
+  ;; (this isn't quite a true predicate)
+  (and (= (fun-subtype function) sb!vm:closure-header-widetag)
        ;; Prior to cold-init fixing up the load-time-value, this compares
        ;; %closure-fun to 0, which is ok - it returns NIL.
-       (eq (load-time-value
-            (%closure-fun (symbol-function '%coerce-name-to-fun)) t)
+       (eq (load-time-value (%closure-fun (macro-function '%coerce-name-to-fun))
+                            t)
            (%closure-fun function))))
 
 ;; Reject any "object of implementation-dependent nature" that
 ;; so happens to be a function in SBCL, but which must not be
 ;; bound to a function-name by way of (SETF FEDFINITION).
 (defun err-if-unacceptable-function (object setter)
+  (declare (notinline macro/special-guard-fun-p)) ; not performance-critical
   (when (macro/special-guard-fun-p object)
     (error 'simple-reference-error
            :references (list '(:ansi-cl :function fdefinition))

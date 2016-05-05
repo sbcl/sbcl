@@ -1166,7 +1166,7 @@
                     (hlambda FUNCTION (fdefn) (env)
                       (declare (ignore env))
                       (let ((fun (sb-c:safe-fdefn-fun fdefn)))
-                        (if (%looks-like-macro-p fun)
+                        (if (sb-impl::macro/special-guard-fun-p fun)
                             (not-a-function (fdefn-name fdefn))
                             fun)))
                     (hlambda FUNCTION (fdefn) (env) ; could not be a macro

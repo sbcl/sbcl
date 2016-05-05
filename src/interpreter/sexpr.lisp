@@ -874,18 +874,6 @@ Test case.
 (get-thinginator) ; errs - it correctly perceives the redefinition
 |#
 
-;;; Figure out if F is supposed to be funcallable, versus is the error trampoline
-;;; that is installed in a global macro's fdefn object.  It is very efficient
-;;; to do this by seeing if F is a closure over the error trampoline, versus asking
-;;; the horribly slow globaldb if F's name's macro-function is NIL.
-;;; In the common case where F isn't a closure, it definitely isn't a macro.
-(declaim (inline %looks-like-macro-p))
-(defun %looks-like-macro-p (f) ; f is a FUNCTION
-  (and (= (fun-subtype (truly-the function f)) sb-vm:closure-header-widetag)
-       ;; compare to a known global macro
-       (eq (load-time-value (%closure-fun (symbol-function 'or)) t)
-           (%closure-fun f))))
-
 ;;; Return T if SYMBOL might get redefined as a macro when it was previously
 ;;; a function and vice versa. Extra checks are done on every use of the symbol
 ;;; as a function name.
@@ -1108,7 +1096,7 @@ Test case.
     (if (allow-macro-redefinition env)
         (macrolet ((re-expand-p ()
                      '(let ((f (fdefn-fun fdefn)))
-                        (and f (%looks-like-macro-p f)))))
+                        (and f (sb-impl::macro/special-guard-fun-p f)))))
           (generate-switch))
         (macrolet ((re-expand-p () nil)) (generate-switch)))))
 
