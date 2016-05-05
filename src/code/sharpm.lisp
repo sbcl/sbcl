@@ -48,7 +48,7 @@
 
 (defun sharp-star (stream ignore numarg)
   (declare (ignore ignore))
-  (declare (type (or null fixnum) numarg))
+  (declare (type (or null integer) numarg))
   (binding* (((buffer escape-appearedp) (read-extended-token stream))
              (input-len (token-buf-fill-ptr buffer))
              (bstring (token-buf-string buffer)))
