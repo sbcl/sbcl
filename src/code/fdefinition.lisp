@@ -299,7 +299,7 @@
   (and (= (fun-subtype function) sb!vm:closure-header-widetag)
        ;; Prior to cold-init fixing up the load-time-value, this compares
        ;; %closure-fun to 0, which is ok - it returns NIL.
-       (eq (load-time-value (%closure-fun (macro-function '%coerce-name-to-fun))
+       (eq (load-time-value (%closure-fun (symbol-function '%coerce-name-to-fun))
                             t)
            (%closure-fun function))))
 
