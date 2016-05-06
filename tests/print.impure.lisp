@@ -288,7 +288,10 @@
 
 ;;; a spot of random-testing for rational printing
 (defvar *seed-state* (make-random-state))
-(write *seed-state* :pretty nil) ; so that we can reproduce errors
+(with-open-file (f "last-random-state.lisp-expr"
+                   :direction :output :if-exists :supersede)
+ ;; I don't want to see this every time
+ (write *seed-state* :pretty nil :stream f)) ; so that we can reproduce errors
 (let ((seed (make-random-state *seed-state*)))
   (loop repeat 42
      do (let ((n (random (ash 1 1000) seed))
@@ -484,7 +487,8 @@
 (with-test (:name :write-return-value)
   ;; COMPILE is called explicitly because there was a bug in the
   ;; compiler-macro for WRITE, which isn't expanded by the evaluator.
-  (assert (= 123 (funcall (compile nil '(lambda () (write 123)))))))
+  (assert (= 123 (funcall (compile nil '(lambda (s) (write 123 :stream s)))
+                          (make-broadcast-stream)))))
 
 (with-test (:name :write/write-to-string-compiler-macro-lp/598374+581564)
   (let ((test (compile nil
