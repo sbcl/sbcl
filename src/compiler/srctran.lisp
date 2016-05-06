@@ -4460,7 +4460,16 @@
          (expr (handler-case ; in case %formatter wants to signal an error
                    (sb!format::%formatter control argc nil)
                  ;; otherwise, let the macro complain
-                 (sb!format:format-error () `(formatter ,control)))))
+                 (sb!format:format-error (c)
+                   (if (string= (sb!format::format-error-complaint c)
+                                "no package named ~S")
+                       ;; "~/apackage:afun/" might become legal later.
+                       ;; To put it in perspective, "~/f" (no closing slash)
+                       ;; *will* be a runtime error, but this only *might* be
+                       ;; a runtime error, so we can't signal a full warning.
+                       ;; At absolute worst it should be a style-warning.
+                       (give-up-ir1-transform "~~// directive mentions unknown package")
+                      `(formatter ,control))))))
     `(lambda (dest control ,@arg-names)
        (declare (ignore control))
        (format dest ,expr ,@arg-names))))

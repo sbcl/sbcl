@@ -720,3 +720,8 @@
 (define-condition foo (warning) (a))
 (with-test (:name :write-obsolete-condition)
   (assert (search "UNPRINTABLE" (write-to-string *ccc*))))
+
+(with-test (:name :no-overeager-compile-time-format-processing)
+  (multiple-value-bind (f warn err)
+      (compile nil '(lambda (x) (format t "~/nopackage:nofun/" x)))
+    (assert (and f (not warn) (not err)))))
