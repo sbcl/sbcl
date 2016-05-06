@@ -1802,9 +1802,8 @@
 
     (when input-p
       (flet ((no-input-routine ()
-               (error (!uncross-format-control
-                       "could not find any input routine for ~
-                        ~/sb!impl:print-type-specifier/")
+               (error "could not find any input routine for ~
+                        ~/sb!impl:print-type-specifier/"
                       target-type)))
         (when (or (not character-stream-p) bivalent-stream-p)
           (setf (values bin-routine bin-type bin-size read-n-characters
@@ -1908,11 +1907,9 @@
                 ((subtypep output-type input-type)
                  output-type)
                 (t
-                 (error (!uncross-format-control
-                         "Input type (~/sb!impl:print-type-specifier/) ~
-                          and output ~
-                          type (~/sb!impl:print-type-specifier/) are ~
-                          unrelated?")
+                 (error "Input type (~/sb!impl:print-type-specifier/) and
+                         output type (~/sb!impl:print-type-specifier/) ~
+                         are unrelated?"
                         input-type output-type))))))
 
 ;;; Handles the resource-release aspects of stream closing, and marks

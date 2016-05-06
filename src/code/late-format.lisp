@@ -1482,3 +1482,41 @@
 
   (sb!c:define-source-transform write-to-string (object &rest keys)
     (expand 'write-to-string object keys)))
+
+;;; A long as we're processing ERROR strings to remove "SB!" packages,
+;;; we might as well squash out tilde-newline-whitespace too.
+;;; This might even be robust enough to keep in the target image,
+;;; but, FIXME: this punts on ~newline with {~@,~:,~@:} modifiers
+#+sb-xc-host
+(defun sb!impl::!xc-preprocess-format-control (string)
+  (let (pieces ltrim)
+    ;; Tokenizing is the correct way to deal with "~~/foo/"
+    ;; without mistaking it for an occurrence of the "~/" directive.
+    (dolist (piece (tokenize-control-string string)
+                   (let ((new (apply 'concatenate 'string (nreverse pieces))))
+                     (if (string/= new string) new string)))
+      (etypecase piece
+        (string
+         (if ltrim
+             (let ((p (position-if
+                       (lambda (x) (and (not (eql x #\Space)) (graphic-char-p x)))
+                       piece)))
+               (when p
+                 (push (subseq piece p) pieces)))
+             (push piece pieces))
+         (setq ltrim nil))
+        (format-directive
+         (setq ltrim nil)
+         (let ((text (subseq string
+                             (format-directive-start piece)
+                             (format-directive-end piece)))
+               (processed nil))
+           (cond ((and (eql (format-directive-character piece) #\Newline)
+                       (not (format-directive-colonp piece))
+                       (not (format-directive-atsignp piece)))
+                  (setq ltrim t processed t))
+                 ((eql (format-directive-character piece) #\/)
+                  (when (string-equal text "~/sb!" :end1 5)
+                    (setq text (concatenate 'string "~/sb-" (subseq text 5))))))
+           (unless processed
+             (push text pieces))))))))

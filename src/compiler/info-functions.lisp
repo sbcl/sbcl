@@ -224,6 +224,7 @@ return NIL. Can be set with SETF when ENV is NIL."
     ;; we don't do it.
     (values (info :function :compiler-macro-function name))))
 
+;;; FIXME: we don't generate redefinition warnings for these.
 (defun (setf sb!xc:compiler-macro-function) (function name &optional env)
   (declare (type (or symbol list) name)
            (type (or function null) function))

@@ -395,10 +395,8 @@
                     `(and (>= (length (the ,ltype ,argname))
                            ,(dd-length defstruct))
                           (eq ',name (aref (the ,ltype ,argname) ,name-index))))
-                   (t (bug (!uncross-format-control
-                            "Uncatered-for lisp type in typed ~
-                             DEFSTRUCT: ~
-                             ~/sb!impl:print-type-specifier/.")
+                   (t (bug "Unhandled representation type in typed DEFSTRUCT: ~
+                            ~/sb!impl:print-type-specifier/."
                            ltype))))))))))
 
 ;;; Return a list of forms to create a copier function of a typed DEFSTRUCT.
@@ -593,9 +591,8 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
            (multiple-value-bind (winp certainp)
                (subtypep 'symbol (dd-element-type dd))
              (when (and (not winp) certainp)
-               (error (!uncross-format-control
-                       ":NAMED option is incompatible with element ~
-                        type ~/sb!impl:print-type-specifier/")
+               (error ":NAMED option is incompatible with element ~
+                        type ~/sb!impl:print-type-specifier/"
                       (dd-element-type dd))))
            (when (dd-predicate-name dd)
              (error ":PREDICATE cannot be used with :TYPE ~
@@ -1220,14 +1217,12 @@ unless :NAMED is also specified.")))
       (sb!c:compiler-style-warn
        'sb!c:inlining-dependency-failure
        ;; This message omits the http://en.wikipedia.org/wiki/Serial_comma
-       :format-control
-       (!uncross-format-control
-        "~@<Previously compiled call~P to ~
+       :format-control "~@<Previously compiled call~P to ~
 ~{~/sb!impl:print-symbol-with-prefix/~^~#[~; and~:;,~] ~} ~
 could not be inlined because the structure definition for ~
 ~/sb!impl:print-symbol-with-prefix/ was not yet seen. To avoid this warning, ~
 DEFSTRUCT should precede references to the affected functions, ~
-or they must be declared locally notinline at each call site.~@:>")
+or they must be declared locally notinline at each call site.~@:>"
        :format-arguments (list (length it) (nreverse it) (dd-name dd))))))
 
 ;;;; redefinition stuff

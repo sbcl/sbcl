@@ -211,9 +211,7 @@ This is SETFable."
 (defmethod print-object ((value alien-value) stream)
   ;; Don't use ":TYPE T" here - TYPE-OF isn't what we want.
   (print-unreadable-object (value stream)
-    (format stream
-            (!uncross-format-control
-             "~S ~S #X~8,'0X ~S ~/sb!impl:print-type-specifier/")
+    (format stream "~S ~S #X~8,'0X ~S ~/sb!impl:print-type-specifier/"
             'alien-value
             :sap (sap-int (alien-value-sap value))
             :type (unparse-alien-type (alien-value-type value)))))

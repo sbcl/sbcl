@@ -51,9 +51,7 @@
 
 (setf (condition-classoid-report (find-classoid 'condition))
       (lambda (cond stream)
-        (format stream (!uncross-format-control
-                        "Condition ~/sb!impl:print-type-specifier/ was ~
-                         signalled.")
+        (format stream "Condition ~/sb!impl:print-type-specifier/ was signalled."
                 (type-of cond))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -516,11 +514,10 @@
    (expected-type :reader type-error-expected-type :initarg :expected-type))
   (:report
    (lambda (condition stream)
-     (format stream (!uncross-format-control
-                     "~@<The value~
+     (format stream  "~@<The value~
                       ~@:_~2@T~S~@:_~
                       is not of type~
-                      ~@:_~2@T~/sb!impl:print-type-specifier/~:@>")
+                      ~@:_~2@T~/sb!impl:print-type-specifier/~:@>"
              (type-error-datum condition)
              (type-error-expected-type condition)))))
 
@@ -535,10 +532,9 @@
               (datum (maybe-string (type-error-datum condition))))
           (if (and type datum)
               (print-unreadable-object (condition stream :type t)
-                (format stream (!uncross-format-control
-                                "~@<expected-type: ~
-                                 ~/sb!impl:print-type-specifier/~_datum: ~
-                                 ~A~:@>")
+                (format stream "~@<expected-type: ~
+                                 ~/sb-impl:print-type-specifier/~_datum: ~
+                                 ~A~:@>"
                         type datum))
               (call-next-method))))
       (call-next-method)))
@@ -1030,12 +1026,11 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (let ((*print-array* nil))
        (format stream
-               (!uncross-format-control
-                "~@<Displaced array originally of type ~
+               "~@<Displaced array originally of type ~
                  ~/sb!impl:print-type-specifier/ has been invalidated ~
                  due its displaced-to array ~S having become too small ~
                  to hold it: the displaced array's dimensions have all ~
-                 been set to zero to trap accesses to it.~:@>")
+                 been set to zero to trap accesses to it.~:@>"
                (type-error-expected-type condition)
                (array-displacement (type-error-datum condition))))))
   (:default-initargs
@@ -1170,10 +1165,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                                                    simple-error)
   ()
   (:default-initargs
-   :format-control (!uncross-format-control
-                    "Symbol ~/sb!impl:print-symbol-with-prefix/ cannot ~
+   :format-control  "Symbol ~/sb-impl:print-symbol-with-prefix/ cannot ~
                      be both the name of a type and the name of a ~
-                     declaration")
+                     declaration"
    :references (list '(:ansi-cl :section (3 8 21)))))
 
 ;;; Single stepping conditions
@@ -1515,12 +1509,11 @@ the usual naming convention (names like *FOO*) for special variables"
   (:report
    (lambda (condition stream)
      (format stream
-             (!uncross-format-control
-              "~@<The new ~A proclamation for~@[ ~A~] ~
+             "~@<The new ~A proclamation for~@[ ~A~] ~
                ~/sb!impl:print-symbol-with-prefix/~
                ~@:_~2@T~/sb!impl:print-type-specifier/~@:_~
                does not match the old ~4:*~A~3* proclamation~
-               ~@:_~2@T~/sb!impl:print-type-specifier/~@:>")
+               ~@:_~2@T~/sb!impl:print-type-specifier/~@:>"
              (proclamation-mismatch-kind condition)
              (proclamation-mismatch-description condition)
              (proclamation-mismatch-name condition)
@@ -1608,11 +1601,15 @@ conditions."))
                             (deprecation-condition-software condition)
                             (deprecation-condition-name condition)))))))
 
+  ;; These print methods aren't defined until after PCL is compiled,
+  ;; at which point FORMAT has no auto-uncrossing macro.
+  ;; Better to just write PRINT-SYMBOL-WITH-PREFIX with a target package
+  ;; which drives home the point that you can't print the conditions
+  ;; until much later anyway, making them basically not helpful.
   (define-deprecation-warning early-deprecation-warning style-warning nil
-    (!uncross-format-control
      "~%~@<~:@_In future ~A versions ~
-      ~/sb!impl:print-symbol-with-prefix/ will signal a full warning ~
-      at compile-time.~:@>")
+      ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~
+      at compile-time.~:@>"
     #!+sb-doc
     "This warning is signaled when the use of a variable,
 function, type, etc. in :EARLY deprecation is detected at
@@ -1620,10 +1617,9 @@ compile-time. The use will work at run-time with no warning or
 error.")
 
   (define-deprecation-warning late-deprecation-warning warning t
-    (!uncross-format-control
      "~%~@<~:@_In future ~A versions ~
-      ~/sb!impl:print-symbol-with-prefix/ will signal a runtime ~
-      error.~:@>")
+      ~/sb-impl:print-symbol-with-prefix/ will signal a runtime ~
+      error.~:@>"
     #!+sb-doc
     "This warning is signaled when the use of a variable,
 function, type, etc. in :LATE deprecation is detected at
@@ -1631,9 +1627,8 @@ compile-time. The use will work at run-time with no warning or
 error.")
 
   (define-deprecation-warning final-deprecation-warning warning t
-    (!uncross-format-control
      "~%~@<~:@_~*An error will be signaled at runtime for ~
-      ~/sb!impl:print-symbol-with-prefix/.~:@>")
+      ~/sb-impl:print-symbol-with-prefix/.~:@>"
     #!+sb-doc
     "This warning is signaled when the use of a variable,
 function, type, etc. in :FINAL deprecation is detected at

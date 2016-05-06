@@ -67,9 +67,8 @@
          (let ((bound (ash 1 s)))
            `(integer 0 ,(- bound bite 1))))
         (t
-         (error (!uncross-format-control
-                 "Bad size specified for UNSIGNED-BYTE type specifier: ~
-                  ~/sb!impl:print-type-specifier/.")
+         (error "Bad size specified for UNSIGNED-BYTE type specifier: ~
+                  ~/sb!impl:print-type-specifier/."
                 s))))
 
 ;;; Motivated by the mips port. -- CSR, 2002-08-22
@@ -79,9 +78,8 @@
          (let ((bound (ash 1 (1- s))))
            `(integer ,(- bound) ,(- bound bite 1))))
         (t
-         (error (!uncross-format-control
-                 "Bad size specified for SIGNED-BYTE type specifier: ~
-                  ~/sb!impl:print-type-specifier/.")
+         (error "Bad size specified for SIGNED-BYTE type specifier: ~
+                  ~/sb!impl:print-type-specifier/."
                 s))))
 
 (def!type load/store-index (scale lowtag min-offset
@@ -1382,24 +1380,23 @@
 
 (defun print-deprecation-replacements (stream replacements &optional colonp atp)
   (declare (ignore colonp atp))
+  ;; I don't think this is callable during cross-compilation, is it?
   (apply #'format stream
-         (!uncross-format-control
-          "~#[~;~
-             Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
-             Use ~/sb!impl:print-symbol-with-prefix/ or ~
-             ~/sb!impl:print-symbol-with-prefix/ instead.~:;~
+         "~#[~;~
+             Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
+             Use ~/sb-impl:print-symbol-with-prefix/ or ~
+             ~/sb-impl:print-symbol-with-prefix/ instead.~:;~
              Use~@{~#[~; or~] ~
-             ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
-           ~]")
+             ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
+           ~]"
          replacements))
 
 (defun print-deprecation-message (namespace name software version
                                   &optional replacements stream)
   (format stream
-          (!uncross-format-control
            "The ~(~A~) ~/sb!impl:print-symbol-with-prefix/ has been ~
             deprecated as of ~@[~A ~]version ~A.~
-            ~@[~2%~/sb!impl::print-deprecation-replacements/~]")
+            ~@[~2%~/sb!impl::print-deprecation-replacements/~]"
           namespace name software version replacements))
 
 (defun setup-function-in-final-deprecation

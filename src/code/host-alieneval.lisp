@@ -101,30 +101,23 @@
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
         (unless translator
-          (error (!uncross-format-control
-                  "unknown alien type: ~
-                   ~/sb!impl:print-type-specifier/")
+          (error "unknown alien type: ~/sb!impl:print-type-specifier/"
                  type))
         (funcall translator type env))
       (ecase (info :alien-type :kind type)
         (:primitive
          (let ((translator (info :alien-type :translator type)))
            (unless translator
-             (error (!uncross-format-control
-                     "no translator for primitive alien type ~
-                      ~/sb!impl:print-type-specifier/")
+             (error "no translator for primitive alien type ~
+                      ~/sb!impl:print-type-specifier/"
                     type))
            (funcall translator (list type) env)))
         (:defined
          (or (info :alien-type :definition type)
-             (error (!uncross-format-control
-                     "no definition for alien type ~
-                      ~/sb!impl:print-type-specifier/")
+             (error "no definition for alien type ~/sb!impl:print-type-specifier/"
                     type)))
         (:unknown
-         (error (!uncross-format-control
-                 "unknown alien type: ~
-                  ~/sb!impl:print-type-specifier/")
+         (error "unknown alien type: ~/sb!impl:print-type-specifier/"
                 type)))))
 
 (defun auxiliary-alien-type (kind name env)
@@ -202,17 +195,14 @@
   (defun %define-alien-type (name new)
     (ecase (info :alien-type :kind name)
       (:primitive
-       (error (!uncross-format-control
-               "~/sb!impl:print-type-specifier/ is a built-in alien ~
-                type.")
+       (error "~/sb!impl:print-type-specifier/ is a built-in alien type."
               name))
       (:defined
        (let ((old (info :alien-type :definition name)))
          (unless (or (null old) (alien-type-= new old))
-           (warn (!uncross-format-control
-                  "redefining ~S to be:~% ~
+           (warn "redefining ~S to be:~% ~
                    ~/sb!impl:print-type-specifier/,~%was~% ~
-                   ~/sb!impl:print-type-specifier/")
+                   ~/sb!impl:print-type-specifier/"
                  name
                  (unparse-alien-type new)
                  (unparse-alien-type old)))))
@@ -380,8 +370,7 @@
 ;;;; default methods
 
 (defun missing-alien-operation-error (type operation)
-  (error (!uncross-format-control
-          "Cannot ~A aliens of type ~/sb!impl:print-type-specifier/.")
+  (error "Cannot ~A aliens of type ~/sb!impl:print-type-specifier/."
          operation type))
 
 (define-alien-type-method (root :unparse) (type)
