@@ -86,10 +86,9 @@
 ;;; the inline functions defined by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
 ;;; be; ordinary defstruct accessors are defined as source transforms.
+(declaim (inline fsc-instance-p))
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
-(define-compiler-macro fsc-instance-p (fin)
-  `(funcallable-instance-p ,fin))
 (defmacro fsc-instance-wrapper (fin)
   `(%funcallable-instance-layout ,fin))
 (defmacro fsc-instance-slots (fin)
@@ -108,10 +107,9 @@
 ;;; and normal instances, so we can return true on structures also. A
 ;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to
 ;;; PCL-INSTANCE-P.
+(declaim (inline std-instance-p))
 (defun std-instance-p (x)
   (%instancep x))
-(define-compiler-macro std-instance-p (x)
-  `(%instancep ,x))
 
 ;; a temporary definition used for debugging the bootstrap
 #!+sb-show
