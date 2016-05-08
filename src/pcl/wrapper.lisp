@@ -66,6 +66,7 @@
 ;;; don't necessarily always make a wrapper. Also, we help maintain
 ;;; the mapping between CL:CLASS and SB-KERNEL:CLASSOID objects.
 (defun make-wrapper (length class)
+  (declare (notinline slot-value))
   (cond
     ((or (typep class 'std-class)
          (typep class 'forward-referenced-class))

@@ -56,45 +56,6 @@
     (setf reader-specializers (mapcar #'find-class reader-specializers))
     (setf writer-specializers (mapcar #'find-class writer-specializers))))
 
-(flet ((call-gf (gf-nameize action object slot-name env &optional newval)
-         (aver (constantp slot-name env))
-         (let* ((slot-name (constant-form-value slot-name env))
-                (gf-name (funcall gf-nameize slot-name)))
-           `(funcall (load-time-value
-                      (progn (ensure-accessor ',action ',gf-name ',slot-name)
-                             (fdefinition ',gf-name)) t)
-                     ,@newval ,object))))
-  (defmacro accessor-slot-boundp (object slot-name &environment env)
-    (call-gf 'slot-boundp-name 'boundp object slot-name env))
-
-  (defmacro accessor-slot-value (object slot-name &environment env)
-    `(truly-the (values t &optional)
-                ,(call-gf 'slot-reader-name 'reader object slot-name env)))
-
-  (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
-    ;; Expand NEW-VALUE before deciding not to bind a temp var for OBJECT,
-    ;; which should be eval'd first. We skip the binding if either new-value
-    ;; is constant or a plain variable. This is still subtly wrong if NEW-VALUE
-    ;; is a special, because we'll read it more than once.
-    (setq new-value (%macroexpand new-value env))
-    (let ((bind-object (unless (or (constantp new-value env) (atom new-value))
-                         (let* ((object-var (gensym))
-                                (bind `((,object-var ,object))))
-                           (setf object object-var)
-                           bind)))
-          ;; What's going on by not assuming that #'(SETF x) returns NEW-VALUE?
-          ;; It seems wrong to return anything other than what the SETF fun
-          ;; yielded. By analogy, when the SETF macro changes (SETF (F x) v)
-          ;; into (funcall #'(setf F) ...), it does not insert any code to
-          ;; enforce V as the overall value. So we do we do that here???
-          (form `(let ((.new-value. ,new-value))
-                   ,(call-gf 'slot-writer-name 'writer object slot-name env
-                             '(.new-value.))
-                   .new-value.)))
-      (if bind-object
-          `(let ,bind-object ,form)
-          form))))
-
 (defun make-structure-slot-boundp-function (slotd)
   (declare (ignore slotd))
   (named-lambda always-bound (object)

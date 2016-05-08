@@ -133,15 +133,6 @@
         (slot-unbound (wrapper-class* wrapper) object slot-name)
         value)))
 
-;;; This is used during the PCL build, but gets replaced by a deftransform
-;;; in fixup.lisp.
-(define-compiler-macro slot-value (&whole form object slot-name
-                                   &environment env)
-  (if (and (constantp slot-name env)
-           (interned-symbol-p (constant-form-value slot-name env)))
-      `(accessor-slot-value ,object ,slot-name)
-      form))
-
 (defun set-slot-value (object slot-name new-value)
   (let* ((wrapper (valid-wrapper-of object))
          (cell (or (find-slot-cell wrapper slot-name)
@@ -173,21 +164,6 @@
 ;;;   * Isn't special-cased in WALK-METHOD-LAMBDA
 (defun safe-set-slot-value (object slot-name new-value)
   (set-slot-value object slot-name new-value))
-
-;;; This is used during the PCL build, but gets replaced by a deftransform
-;;; in fixup.lisp.
-(define-compiler-macro set-slot-value (&whole form object slot-name new-value
-                                      &environment env)
-  (if (and (constantp slot-name env)
-           (interned-symbol-p (constant-form-value slot-name env))
-           ;; We can't use the ACCESSOR-SET-SLOT-VALUE path in safe
-           ;; code, since it'll use the global automatically generated
-           ;; accessor, which won't do typechecking. (SLOT-OBJECT
-           ;; won't have been compiled with SAFETY 3, so SAFE-P will
-           ;; be NIL in MAKE-STD-WRITER-METHOD-FUNCTION).
-           (not (safe-code-p env)))
-      `(accessor-set-slot-value ,object ,slot-name ,new-value)
-      form))
 
 (defun (cas slot-value) (old-value new-value object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
@@ -238,13 +214,6 @@
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (not (eq +slot-unbound+ value))))
-
-(define-compiler-macro slot-boundp (&whole form object slot-name
-                                    &environment env)
-  (if (and (constantp slot-name env)
-           (interned-symbol-p (constant-form-value slot-name env)))
-      `(accessor-slot-boundp ,object ,slot-name)
-      form))
 
 (defun slot-makunbound (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))

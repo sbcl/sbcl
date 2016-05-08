@@ -1225,6 +1225,7 @@ possibly temporarily, because it might be used internally."
 
                ;; symbol-hacking idioms
                "GENSYMIFY" "KEYWORDICATE" "SYMBOLICATE"
+               "INTERNED-SYMBOL-P"
 
                ;; certainly doesn't belong in public extensions
                ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
