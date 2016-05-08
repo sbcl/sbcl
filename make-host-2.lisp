@@ -93,8 +93,17 @@
         (the sb!kernel:lexenv-designator env)
         (sb!impl::expand-quasiquote (second form) t)))
 (setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
-(sb-xc:with-compilation-unit ()
-  (load "src/cold/compile-cold-sbcl.lisp"))
+(let (fail)
+  (sb-xc:with-compilation-unit ()
+    (load "src/cold/compile-cold-sbcl.lisp")
+    ;; Enforce absence of unexpected forward-references to warm loaded code.
+    ;; Looking into a hidden detail of this compiler seems fair game.
+    #!+(or x86 x86-64) ; until all the rest are clean
+    (when sb!c::*undefined-warnings* (setq fail t)))
+  ;; Exit the compilation unit so that the summary is printed. Then complain.
+  (when fail
+    (cerror "Proceed anyway"
+            "SB-COLD::*UNDEFINED-FUN-WHITELIST* is incomplete")))
 
 (when sb!c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)
