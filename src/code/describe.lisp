@@ -532,6 +532,12 @@
         (*print-length* 24))
     (format stream "~@:_Lambda-list: ~:A" lambda-list)))
 
+(defun describe-argument-precedence-order (argument-list stream)
+  (let ((*print-circle* nil)
+        (*print-level* 24)
+        (*print-length* 24))
+    (format stream "~@:_Argument precedence order: ~:A" argument-list)))
+
 (defun describe-function-source (function stream)
   (if (compiled-function-p (the function function))
       (let* ((code (fun-code-header (%fun-fun function)))
@@ -577,7 +583,7 @@
                         from (proclaimed-ftype name))))))
         ;; Defined.
         (multiple-value-bind (fun what lambda-list derived-type declared-type
-                              inline methods)
+                              inline methods argument-precedence-order)
             (cond ((and (not function) (symbolp name) (special-operator-p name))
                    ;; The function in the symbol is irrelevant.
                    ;; Use the def-ir1-translator function for source location.
@@ -613,7 +619,15 @@
                                  declared-type
                                  nil
                                  (or (sb-mop:generic-function-methods fun)
-                                     :none))
+                                     :none)
+                                 ;; Argument precedence order
+                                 ;; information is only interesting
+                                 ;; for two or more required
+                                 ;; parameters.
+                                 (let ((order (sb-mop:generic-function-argument-precedence-order
+                                               fun)))
+                                   (when (>= (length order) 2)
+                                     order)))
                          (values fun
                                  (if (compiled-function-p fun)
                                      "a compiled function"
@@ -631,6 +645,8 @@
               (pprint-indent :block 2 stream))
             (describe-deprecation 'function name stream)
             (describe-lambda-list lambda-list stream)
+            (when argument-precedence-order
+              (describe-argument-precedence-order argument-precedence-order stream))
             (when declared-type
               (format stream "~@:_Declared type: ~
                               ~/sb-impl:print-type-specifier/"

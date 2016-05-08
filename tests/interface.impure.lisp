@@ -144,6 +144,16 @@
           (check (char= #\newline (char s (- n 1))))
           (check (char/= #\newline (char s (- n 2)))))))))
 
+(with-test (:name (describe :argument-precedence-order))
+  ;; Argument precedence order information is only interesting for two
+  ;; or more required parameters.
+  (assert (not (search "Argument precedence order"
+                       (with-output-to-string (stream)
+                         (describe #'class-name stream)))))
+  (assert (search "Argument precedence order"
+                  (with-output-to-string (stream)
+                    (describe #'add-method stream)))))
+
 
 ;;; Tests of documentation on types and classes
 
