@@ -23,7 +23,7 @@ struct tm *gmtime_r(const time_t *timer, struct tm *result);
 struct tm *localtime_r(const time_t *timer, struct tm *result);
 #endif
 
-void get_timezone(time_t when, int *secwest, boolean *dst)
+int get_timezone(time_t when, boolean *dst)
 {
     struct tm ltm, gtm;
     int sw;
@@ -50,6 +50,6 @@ void get_timezone(time_t when, int *secwest, boolean *dst)
         sw -= 24*3600;
     else if (gtm.tm_wday == (ltm.tm_wday + 1) % 7)
         sw += 24*3600;
-    *secwest = sw;
     *dst = ltm.tm_isdst;
+    return sw;
 }

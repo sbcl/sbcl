@@ -941,10 +941,9 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
             (tm-gmtoff long) ;  Seconds east of UTC.
             (tm-zone c-string))) ; Timezone abbreviation.
 
-(define-alien-routine get-timezone sb!alien:void
-  (when time-t :in)
-  (seconds-west sb!alien:int :out)
-  (daylight-savings-p sb!alien:boolean :out))
+(define-alien-routine get-timezone int
+  (when time-t)
+  (daylight-savings-p boolean :out))
 
 #!-win32
 (defun nanosleep (secs nsecs)
@@ -983,11 +982,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                          t)))
           do (setf (slot req 'tv-sec) (slot rem 'tv-sec)
                    (slot req 'tv-nsec) (slot rem 'tv-nsec)))))
-
-(defun unix-get-seconds-west (secs)
-  (multiple-value-bind (ignore seconds dst) (get-timezone secs)
-    (declare (ignore ignore) (ignore dst))
-    (values seconds)))
 
 ;;;; sys/time.h
 
