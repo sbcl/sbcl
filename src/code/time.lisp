@@ -199,7 +199,7 @@ format."
           (truncate years 100))
        (truncate (+ years 300) 400))))
 
-(defvar *days-before-month*
+(defglobal **days-before-month**
   #.(let ((reversed-result nil)
           (sum 0))
       (push nil reversed-result)
@@ -208,6 +208,7 @@ format."
         (incf sum days-in-month))
       (coerce (nreverse reversed-result) 'simple-vector)))
 
+(declaim (type (simple-vector 13) **days-before-month**))
 
 (defun encode-universal-time (second minute hour date month year
                                      &optional time-zone)
@@ -229,7 +230,8 @@ format."
                    (pick-obvious-year year)
                    year))
          (days (+ (1- date)
-                  (aref *days-before-month* month)
+                  (truly-the (mod 335)
+                             (svref **days-before-month** month))
                   (if (> month 2)
                       (leap-years-before (1+ year))
                       (leap-years-before year))
