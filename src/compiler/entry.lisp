@@ -56,7 +56,19 @@
         ;; 310132).
         (setf (entry-info-arguments info)
               (constant-value (find-constant args))))
-      (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
+      ;; Arguably we should not parse/unparse if the type was obtained from
+      ;; a proclamation. On the other hand, this preserves exact semantics
+      ;; if a later DEFTYPE changes something. Be that as it may, storing
+      ;; just <X> instead of (VALUES <X> &OPTIONAL) saves 6 words per entry.
+      (let ((spec (type-specifier (leaf-type internal-fun)))
+            (result))
+        (setf (entry-info-type info)
+              (if (and (listp spec)
+                       (typep (setq result (third spec))
+                              '(cons (eql values)
+                                     (cons t (cons (eql &optional) null)))))
+                  `(sfunction ,(cadr spec) ,(cadr result))
+                  spec)))))
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear

@@ -7,7 +7,7 @@
       (*print-circle* t))
   (load "src/cold/warm.lisp")
 
-  ;; Collapse identical FUN-INFOs
+  ;; Share identical FUN-INFOs
   sb-int::
   (let ((ht (make-hash-table :test 'equalp))
         (old-count 0))
@@ -21,6 +21,22 @@
            (setf (info :function :info name) shared-info)))))
     (format t "~&FUN-INFO: Collapsed ~D -> ~D~%"
             old-count (hash-table-count ht)))
+
+  ;; Share identical FUN-TYPEs.
+  (let ((ht (make-hash-table :test 'equal))
+        (raw-accessor
+         (compile nil '(lambda (f) (sb-vm::%%simple-fun-type f)))))
+    (sb-vm::map-allocated-objects
+     (lambda (obj type size)
+       (declare (ignore type size))
+       (when (sb-kernel:code-component-p obj)
+         (do ((f (sb-kernel:%code-entry-points obj)
+                 (sb-kernel:%simple-fun-next f)))
+             ((null f))
+           (let ((type (funcall raw-accessor f)))
+             (setf (sb-kernel:%simple-fun-type f)
+                   (or (gethash type ht) (setf (gethash type ht) type)))))))
+     :dynamic))
 
   (sb-disassem::!compile-inst-printers)
 

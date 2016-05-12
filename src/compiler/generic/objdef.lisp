@@ -219,7 +219,9 @@
            :set-known ()
            :set-trans (setf %simple-fun-arglist))
   (type :ref-known (flushable)
-        :ref-trans %simple-fun-type
+        ;; %%SIMPLE-FUN-TYPE is used only by %SIMPLE-FUN-TYPE.
+        ;; Nobody should care that %SIMPLE-FUN-TYPE isn't open-coded.
+        :ref-trans %%simple-fun-type
         :set-known ()
         :set-trans (setf %simple-fun-type))
   ;; NIL for empty, STRING for a docstring, SIMPLE-VECTOR for XREFS, and (CONS

@@ -427,6 +427,7 @@
   (flushable))
 (defknown (setf %simple-fun-self) (function function) function
   ())
+(defknown %simple-fun-type (function) t (flushable))
 
 (defknown %closure-fun (function) function
   (flushable))
