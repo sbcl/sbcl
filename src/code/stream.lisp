@@ -785,6 +785,18 @@
      (file-string-length stream arg1))
     (:file-position
      (file-position stream arg1))))
+
+(declaim (inline stream-element-mode))
+(defun stream-element-mode (stream)
+  (declare (type stream stream))
+  (cond
+    ((fd-stream-p stream)
+     (fd-stream-element-mode stream))
+    ((and (ansi-stream-p stream)
+          (funcall (ansi-stream-misc stream) stream :element-mode)))
+    (t
+     (stream-element-type-stream-element-mode
+      (stream-element-type stream)))))
 
 ;;;; broadcast streams
 
@@ -1994,20 +2006,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 ;;;; Shared {READ,WRITE}-SEQUENCE support functions
 
-(declaim (inline stream-element-mode
-                 stream-compute-io-function
+(declaim (inline stream-compute-io-function
                  compatible-vector-and-stream-element-types-p))
-
-(defun stream-element-mode (stream)
-  (declare (type stream stream))
-  (cond
-    ((fd-stream-p stream)
-     (fd-stream-element-mode stream))
-    ((and (ansi-stream-p stream)
-          (funcall (ansi-stream-misc stream) stream :element-mode)))
-    (t
-     (stream-element-type-stream-element-mode
-      (stream-element-type stream)))))
 
 (defun stream-compute-io-function (stream
                                    stream-element-mode sequence-element-type
