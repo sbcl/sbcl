@@ -115,3 +115,12 @@
       (eval `(defun ,foo () 5))
       (setf (sb-int:info :function :kind foo) :macro)
       (assert (functionp (coerce-it foo))))))
+
+(with-test (:name :no-coerce-macro-to-function)
+  ;; When compiled, we actually just pass the FDEFN-FUN
+  ;; of the FDEFN of AND even though AND is a standard macro
+  ;; (making this particular stupid).
+  ;; But at least it's generally an improvement
+  ;; to fail earlier than later in many cases.
+  (locally (declare (notinline sort))
+    (assert-error (sort () #'< :key 'and))))

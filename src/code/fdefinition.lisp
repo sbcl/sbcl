@@ -105,11 +105,41 @@
 ;;; As a special case it can be given as SYMBOL-FDEFN which is slightly quicker.
 ;;; This is the core of the implementation of the standard FDEFINITION function,
 ;;; but as we've defined FDEFINITION, that strips encapsulations.
-(defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn))
+(defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn)
+                                    strictly-functionp)
   `(let* ((name ,name) (fdefn (,lookup-fn name)))
-     (if fdefn
-         (sb!c:safe-fdefn-fun fdefn)
-         (error 'undefined-function :name name))))
+     (block nil
+       (when fdefn
+         (let ((f (sb!c:safe-fdefn-fun (truly-the fdefn fdefn))))
+           ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
+           ;; trampoline. This extra check ensures that full calls such as
+           ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
+           ;; This accords with the non-requirement that macros store strictly
+           ;; a function in the symbol that names them. In many implementations,
+           ;; (FUNCTIONP (SYMBOL-FUNCTION 'OR)) => NIL. We want to pretend that.
+           (,@(if strictly-functionp
+                  '(unless (macro/special-guard-fun-p f))
+                  '(progn))
+             (return f))))
+       (error 'undefined-function :name name))))
+
+;; Return T if FUNCTION is the error-signaling trampoline
+;; for a macro or a special operator. Test for this by seeing
+;; whether FUNCTION is the same closure as for a known macro.
+;; For cold-init to work, this must pick any macro defined before
+;; this function is. A safe choice is a macro from this same file.
+(declaim (inline macro/special-guard-fun-p))
+(defun macro/special-guard-fun-p (function)
+  ;; When inlined, this is a few instructions shorter than CLOSUREP
+  ;; if we already know that FUNCTION is a function.
+  ;; It will signal a type error if not, which is the right thing to do anyway.
+  ;; (this isn't quite a true predicate)
+  (and (= (fun-subtype function) sb!vm:closure-header-widetag)
+       ;; Prior to cold-init fixing up the load-time-value, this compares
+       ;; %closure-fun to 0, which is ok - it returns NIL.
+       (eq (load-time-value (%closure-fun (symbol-function '%coerce-name-to-fun))
+                            t)
+           (%closure-fun function))))
 
 ;; Coerce CALLABLE (a function-designator) to a FUNCTION.
 ;; The compiler emits this when someone tries to FUNCALL something.
@@ -125,7 +155,7 @@
   (declare (explicit-check))
   (etypecase callable
     (function callable)
-    (symbol (%coerce-name-to-fun callable symbol-fdefn))))
+    (symbol (%coerce-name-to-fun callable symbol-fdefn t))))
 
 
 ;;;; definition encapsulation
@@ -284,24 +314,6 @@
   #!+sb-doc
   "A list of functions that (SETF FDEFINITION) invokes before storing the
    new value. The functions take the function name and the new value.")
-
-;; Return T if FUNCTION is the error-signaling trampoline
-;; for a macro or a special operator. Test for this by seeing
-;; whether FUNCTION is the same closure as for a known macro.
-;; For cold-init to work, this must pick any macro defined before
-;; this function is. A safe choice is a macro from this same file.
-(declaim (inline macro/special-guard-fun-p))
-(defun macro/special-guard-fun-p (function)
-  ;; When inlined, this is a few instructions shorter than CLOSUREP
-  ;; if we already know that FUNCTION is a function.
-  ;; It will signal a type error if not, which is the right thing to do anyway.
-  ;; (this isn't quite a true predicate)
-  (and (= (fun-subtype function) sb!vm:closure-header-widetag)
-       ;; Prior to cold-init fixing up the load-time-value, this compares
-       ;; %closure-fun to 0, which is ok - it returns NIL.
-       (eq (load-time-value (%closure-fun (symbol-function '%coerce-name-to-fun))
-                            t)
-           (%closure-fun function))))
 
 ;; Reject any "object of implementation-dependent nature" that
 ;; so happens to be a function in SBCL, but which must not be
