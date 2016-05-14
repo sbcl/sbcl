@@ -32,6 +32,3 @@
     (find-class (classoid-name k))))
 (setq **boot-state** 'complete)
 
-(defun print-std-instance (instance stream depth)
-  (declare (ignore depth))
-  (print-object instance stream))

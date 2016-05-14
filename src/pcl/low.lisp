@@ -110,21 +110,6 @@
 (declaim (inline std-instance-p))
 (defun std-instance-p (x)
   (%instancep x))
-
-;; a temporary definition used for debugging the bootstrap
-#!+sb-show
-(defun print-std-instance (instance stream depth)
-  (declare (ignore depth))
-  (print-unreadable-object (instance stream :type t :identity t)
-    (let ((class (class-of instance)))
-      (when (or (eq class (find-class 'standard-class nil))
-                (eq class (find-class 'funcallable-standard-class nil))
-                (eq class (find-class 'system-class nil))
-                (eq class (find-class 'built-in-class nil)))
-        (princ (early-class-name instance) stream)))))
-
-(defmacro std-instance-class (instance)
-  `(wrapper-class* (std-instance-wrapper ,instance)))
 
 ;;; When given a funcallable instance, SET-FUN-NAME *must* side-effect
 ;;; that FIN to give it the name. When given any other kind of
