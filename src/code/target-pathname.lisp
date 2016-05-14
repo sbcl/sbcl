@@ -794,6 +794,8 @@ a host-structure or string."
            (type (or index null) end)
            (type (or t null) junk-allowed)
            (values (or null pathname) (or null index)))
+  (declare (ftype (function * (values (or null pathname) (or null index)))
+                  %parse-native-namestring))
   (with-host (found-host host)
     (let (;; According to ANSI defaults may be any valid pathname designator
           (defaults (etypecase defaults

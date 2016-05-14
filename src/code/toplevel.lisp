@@ -118,6 +118,7 @@ means to wait indefinitely.")
 ;;;; miscellaneous external functions
 
 (defun split-seconds-for-sleep (seconds)
+  (declare (muffle-conditions t))
   (declare (optimize speed))
   ;; KLUDGE: This whole thing to avoid consing floats
   (flet ((split-float ()

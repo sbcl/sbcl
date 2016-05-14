@@ -409,6 +409,7 @@
 ;;; Return a list of 3-lists (bytes object type-name) for the objects
 ;;; allocated in Space.
 (defun type-breakdown (space)
+  (declare (muffle-conditions t))
   (let ((sizes (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits)))
         (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits))))
     (map-allocated-objects

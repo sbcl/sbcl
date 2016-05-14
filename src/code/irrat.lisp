@@ -789,6 +789,7 @@
 #!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
                 (error "needs work for long float support"))
 (defun cssqs (z)
+  (declare (muffle-conditions t))
   (let ((x (float (realpart z) 1d0))
         (y (float (imagpart z) 1d0)))
     ;; Would this be better handled using an exception handler to
@@ -879,6 +880,7 @@
 ;;;
 ;;; This is for use with J /= 0 only when |z| is huge.
 (defun complex-log-scaled (z j)
+  (declare (muffle-conditions t))
   (declare (type (or rational complex) z)
            (fixnum j))
   ;; The constants t0, t1, t2 should be evaluated to machine
@@ -935,6 +937,7 @@
 ;;; i*y is never 0 since we have positive and negative zeroes. -- rtoy
 ;;; Compute atanh z = (log(1+z) - log(1-z))/2.
 (defun complex-atanh (z)
+  (declare (muffle-conditions t))
   (declare (type (or rational complex) z))
   (let* (;; constants
          (theta (/ (sqrt most-positive-double-float) 4.0d0))
@@ -992,6 +995,7 @@
 
 ;;; Compute tanh z = sinh z / cosh z.
 (defun complex-tanh (z)
+  (declare (muffle-conditions t))
   (declare (type (or rational complex) z))
   (let ((x (float (realpart z) 1.0d0))
         (y (float (imagpart z) 1.0d0)))

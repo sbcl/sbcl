@@ -828,6 +828,7 @@
                              (or escaped (and savedp off-stack)))))))
 
 (defun nth-interrupt-context (n)
+  (declare (muffle-conditions t))
   (declare (type (unsigned-byte 32) n)
            (optimize (speed 3) (safety 0)))
   (sb!alien:sap-alien (sb!vm::current-thread-offset-sap
