@@ -46,7 +46,7 @@
   (do-all-symbols (s)
     (when (macro-function s)
       (let* ((f (symbol-function s))
-             (name (sb-impl::fun-name f)))
+             (name (sb-kernel:%fun-name f)))
         (if (special-operator-p s)
             (assert (typep name '(cons (eql :special)
                                        (cons symbol null))))

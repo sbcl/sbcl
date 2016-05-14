@@ -575,8 +575,7 @@
 (defun interpreter-trampoline (fun &rest args)
   (setf (values (interpreted-function-frame fun)
                 (interpreted-function-cookie fun))
-        (proto-fn-frame (interpreted-function-proto-fn fun)
-                        (interpreted-function-env fun)))
+        (proto-fn-frame (fun-proto-fn fun) (interpreted-function-env fun)))
   (apply (setf (funcallable-instance-fun fun) (interpreted-applicator fun))
          args))
 
@@ -828,8 +827,7 @@
 ;;; and checks for a binding of *SELF-APPLYHOOK* on each call.
 (defun interpreter-hooked-trampoline (fun &rest args)
   (multiple-value-bind (frame cookie)
-      (proto-fn-frame (interpreted-function-proto-fn fun)
-                      (interpreted-function-env fun))
+      (proto-fn-frame (fun-proto-fn fun) (interpreted-function-env fun))
     (setf (values (interpreted-function-frame fun)
                   (interpreted-function-cookie fun)) (values frame cookie))
     ;; *SELF-APPLYHOOK* isn't the *APPLYHOOK* as described by CLtL.

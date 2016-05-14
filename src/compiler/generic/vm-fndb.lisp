@@ -408,7 +408,10 @@
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
 
-(defknown fun-subtype (function) (unsigned-byte #.sb!vm:n-widetag-bits)
+(defknown fun-subtype (function)
+  (member #.sb!vm:simple-fun-header-widetag
+          #.sb!vm:closure-header-widetag
+          #.sb!vm:funcallable-instance-header-widetag)
   (flushable))
 (defknown ((setf fun-subtype))
           ((unsigned-byte #.sb!vm:n-widetag-bits) function)
@@ -435,11 +438,17 @@
 (defknown %closure-index-ref (function index) t
   (flushable))
 
+(defknown %fun-fun (function) function (flushable recursive))
+
 (defknown %make-funcallable-instance (index) function
   ())
 
 (defknown %funcallable-instance-info (function index) t (flushable))
 (defknown %set-funcallable-instance-info (function index t) t ())
+
+#!+sb-fasteval
+(defknown sb!interpreter:fun-proto-fn (sb!interpreter:interpreted-function)
+  sb!interpreter::interpreted-fun-prototype (flushable))
 
 
 (defknown %data-vector-and-index (array index)

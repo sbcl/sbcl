@@ -511,6 +511,7 @@ If an unsupported TYPE is requested, the function will return NIL.
 Works for special-operators, macros, simple functions, interpreted functions,
 and generic functions. Signals an error if FUNCTION is not a valid extended
 function designator."
+  ;; FIXME: sink this logic into SB-KERNEL:%FUN-LAMBDA-LIST and just call that?
   (cond ((and (symbolp function) (special-operator-p function))
          (function-lambda-list (sb-int:info :function :ir1-convert function)))
         ((valid-function-name-p function)

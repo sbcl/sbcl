@@ -512,6 +512,7 @@
 (declaim (ftype function interpreter-trampoline interpreter-hooked-trampoline))
 
 (defun make-function (proto-fn env)
+  (declare (type interpreted-fun-prototype proto-fn))
   (let ((function (%make-interpreted-function proto-fn env nil nil)))
     ;; Hooking all functions, makes them somewhat slower,
     ;; but allows for really nifty introspection,
@@ -547,13 +548,13 @@
       (digest-lambda env proto-fn)))
 
 (defun %fun-type (fun)
-  (let ((proto-fn (interpreted-function-proto-fn fun)))
+  (let ((proto-fn (fun-proto-fn fun)))
     (or (proto-fn-type proto-fn)
         (setf (proto-fn-type proto-fn)
               (approximate-proto-fn-type
                (proto-fn-lambda-list proto-fn)
                (frame-symbols
-                (proto-fn-frame (interpreted-function-proto-fn fun)
+                (proto-fn-frame (fun-proto-fn fun)
                                 (interpreted-function-env fun))))))))
 
 ;; This is just a rename of DESTRUCTURING-BIND
@@ -1082,7 +1083,7 @@
       ;; KLUDGE: if for no other reason than to make some assertions pass,
       ;; we'll recognize the case where the function body does not actually
       ;; need its lexical environment.
-      (let ((forms (proto-fn-forms (interpreted-function-proto-fn function))))
+      (let ((forms (proto-fn-forms (fun-proto-fn function))))
         ;; Happily our CONSTANTP is smart enough to look into a BLOCK.
         (if (and (singleton-p forms) (constantp (car forms)))
             (setq nullify-lexenv t)

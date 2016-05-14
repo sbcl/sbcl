@@ -11,28 +11,6 @@
 
 (in-package "SB!INTERPRETER")
 
-;; !defstruct-with-alternate-metaclass is unslammable and the
-;; RECOMPILE restart doesn't work on it.  This is the main reason why
-;; this stuff is split out into its own file.  Also, it lets the
-;; INTERPRETED-FUNCTION type be declared before it is used in
-;; compiler/main and code/deftypes-for-target.
-
-;; This is 8 words: header, layout, trampoline, fin-fun, info[4]
-(sb!kernel::!defstruct-with-alternate-metaclass
- interpreted-function
- :slot-names (proto-fn env frame cookie)
- :boa-constructor %make-interpreted-function
- :superclass-name function
- :metaclass-name static-classoid
- :metaclass-constructor make-static-classoid
- :dd-type funcallable-structure
- :runtime-type-checks-p nil)
-
-(declaim (freeze-type interpreted-function))
-
-(defun interpreted-function-p (function) ; necessary stub
-  (typep function 'interpreted-function))
-
 (defstruct (interpreted-fun-prototype
              (:predicate proto-fn-p)
              (:conc-name proto-fn-)
@@ -54,11 +32,40 @@
   (cookie      nil) ; nonce for memoization of macros
   (%frame      nil))
 
-(defun fun-forms (fun)
-  (proto-fn-forms (interpreted-function-proto-fn fun)))
+(declaim (freeze-type interpreted-fun-prototype))
+
+;; !defstruct-with-alternate-metaclass is unslammable and the
+;; RECOMPILE restart doesn't work on it.  This is the main reason why
+;; this stuff is split out into its own file.  Also, it lets the
+;; INTERPRETED-FUNCTION type be declared before it is used in
+;; compiler/main and code/deftypes-for-target.
+
+;; This is 8 words: header, layout, trampoline, fin-fun, info[4]
+(sb!kernel::!defstruct-with-alternate-metaclass
+ interpreted-function
+ :slot-names (%proto-fn env frame cookie)
+ :boa-constructor %make-interpreted-function
+ :superclass-name function
+ :metaclass-name static-classoid
+ :metaclass-constructor make-static-classoid
+ :dd-type funcallable-structure
+ :runtime-type-checks-p nil)
+
+(declaim (freeze-type interpreted-function))
+
+;;; FIXME: alternate metaclass structures have dumb accessors
+;;; whose transforms don't contain TRULY-THE like for regular structures
+;;; because we don't have any way to declare types.
+;;; (and a DEFKNOWN isn't enough)
+(declaim (inline fun-proto-fn))
+(defun fun-proto-fn (f)
+  (truly-the interpreted-fun-prototype (interpreted-function-%proto-fn f)))
+
+(defun interpreted-function-p (function) ; necessary stub
+  (typep function 'interpreted-function))
 
 (defun fun-lambda-expression (fun)
-  (let* ((proto-fn (interpreted-function-proto-fn fun))
+  (let* ((proto-fn (fun-proto-fn fun))
          (name (proto-fn-name proto-fn))
          (named-p (neq name 0)))
     (values (append (if named-p (list 'named-lambda name) '(lambda))
@@ -80,23 +87,12 @@
 
 ;; INTERPRETED-FUNCTION-mumble accessors are slots in the primitive object.
 ;; FUN-mumble accessors are indirections through the PROTO-FN.
-(defun fun-docstring (f)
-  (proto-fn-docstring (interpreted-function-proto-fn f)))
-(defun set-fun-docstring (f new)
-  (setf (proto-fn-docstring (interpreted-function-proto-fn f)) new))
 
-(defun fun-lambda-list (f)
-  (proto-fn-lambda-list (interpreted-function-proto-fn f)))
+(defun fun-forms (fun)
+  (proto-fn-forms (fun-proto-fn fun)))
 
 (defun fun-name (f)
-  (proto-fn-name (interpreted-function-proto-fn f)))
-(defun set-fun-name (fun new-name)
-  (setf (proto-fn-name (interpreted-function-proto-fn fun)) new-name))
-
-(defun fun-pretty-arglist (fun)
-  (proto-fn-pretty-arglist (interpreted-function-proto-fn fun)))
-(defun set-fun-pretty-arglist (f new)
-  (setf (proto-fn-pretty-arglist (interpreted-function-proto-fn f)) new))
+  (proto-fn-name (fun-proto-fn f)))
 
 (defun fun-source-location (f)
-  (proto-fn-source-location (interpreted-function-proto-fn f)))
+  (proto-fn-source-location (fun-proto-fn f)))

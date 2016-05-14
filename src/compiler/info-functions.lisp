@@ -309,16 +309,13 @@ return NIL. Can be set with SETF when ENV is NIL."
   (cond ((not (fboundp name))
          nil)
         ((and (symbolp name)
-              (special-operator-p name))
-         (%fun-name (fdefinition name)))
-        ((and (symbolp name)
               (macro-function name))
          (let ((name (%fun-name (macro-function name))))
            (and (consp name)
                 (eq (car name) 'macro-function)
                 (cadr name))))
         (t
-         (sb!impl::fun-name (fdefinition name)))))
+         (%fun-name (fdefinition name)))))
 
 #-sb-xc-host
 (defun random-documentation (name type)

@@ -30,7 +30,7 @@
    (lambda (obj type size)
      (declare (ignore type size))
      (when (typep obj 'interpreted-function)
-       (let ((proto-fn (interpreted-function-proto-fn obj)))
+       (let ((proto-fn (fun-proto-fn obj)))
          (setf (proto-fn-%frame proto-fn) nil
                (proto-fn-cookie proto-fn) nil
                (proto-fn-type proto-fn) nil

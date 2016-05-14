@@ -120,7 +120,7 @@
                       doc-type)))
         (name (cond
                 ((typep x 'function)
-                 (sb-impl::fun-name x))
+                 (%fun-name x))
                 ((typep x 'class)
                  (class-name x))
                 (t

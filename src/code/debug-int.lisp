@@ -1281,7 +1281,7 @@ register."
             (awhen (car (debug-fun-symbol-vars debug-fun 'sb!interpreter::fun))
               (let ((val (debug-var-value it frame))) ; Ensure it's a function
                 (when (typep val 'sb!interpreter:interpreted-function)
-                  (sb!interpreter:fun-name val))))))) ; Get its name
+                  (%fun-name val))))))) ; Get its name
        ((sb!c::compiled-debug-fun-closure-save compiler-debug-fun)
         (let ((closure-name
                 (sb!impl::closure-name

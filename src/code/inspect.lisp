@@ -247,9 +247,9 @@ evaluated expressions.
             ;; it out. FIXME: We should make it easy to get
             ;; to DESCRIBE from the inspector.
             (list
-             (cons "Lambda-list" (sb-interpreter:fun-lambda-list object))
+             (cons "Lambda-list" (%fun-lambda-list object))
              (cons "Definition" defn)
-             (cons "Documentation" (sb-interpreter:fun-docstring object))))))
+             (cons "Documentation" (%fun-doc object))))))
 
 (defmethod inspected-parts ((object vector))
   (values (format nil

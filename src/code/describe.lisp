@@ -51,7 +51,7 @@
     (sb-interpreter:interpreted-function
      (sb-interpreter:fun-lambda-expression fun))
     (function
-     (let* ((name (fun-name fun))
+     (let* ((name (%fun-name fun))
             (fun (%simple-fun-self (%fun-fun fun)))
             (code (sb-di::fun-code-header fun))
             (info (sb-kernel:%code-debug-info code))
@@ -563,7 +563,7 @@
               (format stream "~@:_Source file: ~A" namestring)))))))
 
 (defun describe-function (name function stream)
-  (let ((name (if function (fun-name function) name)))
+  (let ((name (if function (%fun-name function) name)))
     (if (not (or function (and (legal-fun-name-p name) (fboundp name))))
         ;; Not defined, but possibly the type is declared, or we have
         ;; compiled calls to it.
