@@ -85,6 +85,21 @@
 ;; Refer to info-vector.lisp for the meaning of this constant.
 (defconstant +no-auxilliary-key+ 0)
 
+;; Return the globaldb info for SYMBOL. With respect to the state diagram
+;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
+;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
+;; Otherwise, it is in state 2 so return the value as-is.
+;; In terms of this function being named "-vector", implying always a vector,
+;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
+;;
+#-sb-xc-host
+(progn
+ #!-symbol-info-vops (declaim (inline symbol-info-vector))
+ (defun symbol-info-vector (symbol)
+  (let ((info-holder (symbol-info symbol)))
+    (truly-the (or null simple-vector)
+               (if (listp info-holder) (cdr info-holder) info-holder)))))
+
 ;;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
 ;;; But in the host Lisp, there is no such thing as a symbol-info slot.
 ;;; Instead, symbol-info is kept in the host symbol's plist.

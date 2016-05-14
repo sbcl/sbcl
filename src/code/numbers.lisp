@@ -653,13 +653,8 @@
         (foreach single-float double-float #!+long-float long-float))
        (truncate-float (dispatch-type divisor))))))
 
-;; Only inline when no VOP exists
-#!-multiply-high-vops (declaim (inline %multiply-high))
 (defun %multiply-high (x y)
   (declare (type word x y))
-  #!-multiply-high-vops
-  (values (sb!bignum:%multiply x y))
-  #!+multiply-high-vops
   (%multiply-high x y))
 
 (defun floor (number &optional (divisor 1))

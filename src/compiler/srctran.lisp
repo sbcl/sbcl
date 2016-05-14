@@ -3323,6 +3323,10 @@
                `(ash (%multiply-high (logandc2 x ,(1- (ash 1 shift1))) ,m)
                      ,(- (+ shift1 shift2)))))))))
 
+#!-multiply-high-vops
+(define-source-transform %multiply-high (x y)
+  `(values (sb!bignum:%multiply ,x ,y)))
+
 ;;; If the divisor is constant and both args are positive and fit in a
 ;;; machine word, replace the division by a multiplication and possibly
 ;;; some shifts and an addition. Calculate the remainder by a second

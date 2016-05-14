@@ -1134,21 +1134,6 @@ This is interpreted as
       (setf (symbol-info-vector symbol) newval))
     (values)))
 
-;; Return the globaldb info for SYMBOL. With respect to the state diagram
-;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
-;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
-;; Otherwise, it is in state 2 so return the value as-is.
-;; In terms of this function being named "-vector", implying always a vector,
-;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
-;;
-#-sb-xc-host
-(progn
- #!-symbol-info-vops (declaim (inline symbol-info-vector))
- (defun symbol-info-vector (symbol)
-  (let ((info-holder (symbol-info symbol)))
-    (truly-the (or null simple-vector)
-               (if (listp info-holder) (cdr info-holder) info-holder)))))
-
 ;;; The current *INFO-ENVIRONMENT*, a structure of type INFO-HASHTABLE.
 ;;; Cheat by setting to nil before the type is proclaimed
 ;;; so that we can then also proclaim ALWAYS-BOUND.
