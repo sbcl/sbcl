@@ -165,6 +165,7 @@
 (defun load-store-two-words (vop1 vop2)
   (let ((register-sb (sb-or-lose 'sb!vm::registers))
         used-load-tn)
+    (declare (notinline sb!c::vop-name)) ; too late
     (labels ((register-p (tn)
                (and (tn-p tn)
                     (eq (sc-sb (tn-sc tn)) register-sb)))

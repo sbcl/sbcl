@@ -634,7 +634,11 @@ has written, having proved that it is unreachable."))
                  ;; so that repeated proclamations don't warn. NIL is a valid
                  ;; value for :inlinep in the globaldb so use the 2nd result.
                  (not (nth-value 1 (info :function :inlinep name))))
-        (compiler-style-warn
+        ;; This will be a STYLE-WARNING for the target, but a full warning
+        ;; for the host. There's no constraint to use _only_ STYLE-WARN
+        ;; to signal a (subtype of) STYLE-WARNING. But conversely we enforce
+        ;; that STYLE-WARN not signal things that aren't style-warnings.
+        (compiler-warn
          'inlining-dependency-failure
          :format-control
          "~@<Proclaiming ~/sb!impl:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
