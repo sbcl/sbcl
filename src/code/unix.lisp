@@ -1112,6 +1112,7 @@ the UNIX epoch (January 1st 1970.)"
                    system-real-time-values))
 
   (defun system-real-time-values ()
+    #!+win32 (declare (notinline get-time-of-day)) ; forward ref
     (multiple-value-bind (sec usec) (get-time-of-day)
       (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
       (values sec (truncate usec micro-seconds-per-internal-time-unit))))
@@ -1196,6 +1197,7 @@ the UNIX epoch (January 1st 1970.)"
 ;;; So we're stuck with it for a while -- maybe delete it towards the end
 ;;; of 2009.
 (defun unix-gettimeofday ()
+  #!+win32 (declare (notinline get-time-of-day)) ; forward ref
   (multiple-value-bind (sec usec) (get-time-of-day)
     (values t sec usec nil nil)))
 
