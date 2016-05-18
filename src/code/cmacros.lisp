@@ -96,7 +96,8 @@
            form))
 
     (dolist (f '(bug error warn
-                 sb!c:compiler-error sb!c:compiler-notify sb!c:compiler-style-warn
+                 sb!c:compiler-error sb!c:compiler-notify
+                 sb!c:compiler-warn sb!c:compiler-style-warn
                  sb!c::note-lossage))
       (setf (sb!xc:compiler-macro-function f) #'uncross))
 
