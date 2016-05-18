@@ -15,6 +15,13 @@
 (defmethod host-ent-address ((host-ent host-ent))
   (car (host-ent-addresses host-ent)))
 
+(declaim (inline naturalize-unsigned-byte-8-array))
+(defun naturalize-unsigned-byte-8-array (array length)
+  (let ((addr (make-array length :element-type '(unsigned-byte 8))))
+    (dotimes (i length)
+      (setf (elt addr i) (sb-alien:deref array i)))
+    addr))
+
 #-sb-bsd-sockets-addrinfo
 (defun make-host-ent (h &optional errno)
   (when (sb-alien:null-alien h)
@@ -49,13 +56,6 @@
                    :type (sockint::hostent-type h)
                    :aliases aliases
                    :addresses addresses)))
-
-(declaim (inline naturalize-unsigned-byte-8-array)) ; FIXME: out-of-order
-(defun naturalize-unsigned-byte-8-array (array length)
-  (let ((addr (make-array length :element-type '(unsigned-byte 8))))
-    (dotimes (i length)
-      (setf (elt addr i) (sb-alien:deref array i)))
-    addr))
 
 ;;; Resolving
 
