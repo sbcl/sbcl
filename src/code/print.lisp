@@ -237,14 +237,15 @@ variable: an unreadable object representing the error is printed instead.")
                (when type
                  (write (type-of object) :stream stream :circle nil
                                          :level nil :length nil)
-                 (write-char #\space stream)
-                 (pprint-newline :fill stream))
+                 ;; Do NOT insert a pprint-newline here.
+                 ;; See ba34717602d80e5fd74d10e61f4729fb0d019a0c
+                 (write-char #\space stream))
                (when body
                  (funcall body))
                (when identity
                  (when (or body (not type))
                    (write-char #\space stream))
-                 (pprint-newline :fill stream)
+                 ;; Nor here.
                  (write-char #\{ stream)
                  (write (get-lisp-obj-address object) :stream stream
                                                       :radix nil :base 16)

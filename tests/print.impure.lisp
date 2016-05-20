@@ -461,21 +461,22 @@
       (let ((*print-pretty* t))
         (assert (string= (princ-to-string 'bar) "BAR"))))))
 
-;;; bug-lp#488979
+;;; lp#1398290 (which obsoletes lp#488979)
 
 (defclass a-class-name () ())
 
-(assert (find #\Newline
-              (let ((*print-pretty* t)
-                    (*print-right-margin* 10))
-                (format nil "~A" (make-instance 'a-class-name)))
-              :test #'char=))
+(with-test (:name :print-unreadable-no-conditional-newline)
+  (assert (not (find #\Newline
+                     (let ((*print-pretty* t)
+                           (*print-right-margin* 10))
+                       (format nil "~A" (make-instance 'a-class-name)))
+                     :test #'char=)))
 
-(assert (not (find #\Newline
-                   (let ((*print-pretty* nil)
-                         (*print-right-margin* 10))
-                     (format nil "~A" (make-instance 'a-class-name)))
-                   :test #'char=)))
+  (assert (not (find #\Newline
+                     (let ((*print-pretty* nil)
+                           (*print-right-margin* 10))
+                       (format nil "~A" (make-instance 'a-class-name)))
+                     :test #'char=))))
 
 ;;; The PRINT-OBJECT method for RANDOM-STATE used to have a bogus
 ;;; dimension argument for MAKE-ARRAY.
