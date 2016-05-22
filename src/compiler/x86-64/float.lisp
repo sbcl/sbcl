@@ -880,6 +880,16 @@
   (define-float-eql eql/complex-double-float 5
     complex-double-reg fp-complex-double-immediate complex-double-float))
 
+(define-vop (generic-eq/single-float/c float-compare)
+  (:translate eq)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:info y)
+  (:arg-types * (:constant single-float))
+  (:conditional :e)
+  (:generator 3
+    (inst cmp x (constantize (dpb (single-float-bits y) (byte 32 32)
+                                  single-float-widetag)))))
+
 ;;; comiss and comisd can cope with one or other arg in memory: we
 ;;; could (should, indeed) extend these to cope with descriptor args
 ;;; and stack args

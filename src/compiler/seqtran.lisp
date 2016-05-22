@@ -396,7 +396,7 @@
              (sequence-bounding-indices-bad-error vector start end)))))
 
 (def!type eq-comparable-type ()
-  '(or fixnum (not number)))
+  '(or fixnum #!+64-bit single-float (not number)))
 
 ;;; True if EQL comparisons involving type can be simplified to EQ.
 (defun eq-comparable-type-p (type)
