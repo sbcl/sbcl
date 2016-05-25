@@ -20,7 +20,7 @@
         (if number
             (let* ((ext (subseq line end))
                    (mult (cond ((or (zerop (length ext))
-                                    (member ext '("MB MIB") :test #'equalp))
+                                    (member ext '("MB" "MIB") :test #'equalp))
                                 (expt 2 20))
                                ((member ext '("GB" "GIB") :test #'equalp)
                                 (expt 2 30))
