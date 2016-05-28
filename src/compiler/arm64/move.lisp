@@ -328,8 +328,8 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:generator 4
-    (inst tst x fixnum-tag-mask)
-    (inst b :ne BIGNUM )
+    #.(assert (= fixnum-tag-mask 1))
+    (inst tbnz x 0 BIGNUM)
     (sc-case y
       (signed-reg
        (inst asr y x n-fixnum-tag-bits))

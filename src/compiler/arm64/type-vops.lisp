@@ -136,9 +136,7 @@
         (inst b :eq yep)
         (test-type value nope t (other-pointer-lowtag) :temp temp)
         (loadw temp value 0 other-pointer-lowtag)
-        (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
-        (inst eor temp temp tmp-tn)
-        (inst tst temp temp)
+        (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
         (inst b (if not-p :ne :eq) target)))
     not-target))
 
@@ -164,18 +162,14 @@
          ;; Get the header.
          (loadw temp value 0 other-pointer-lowtag)
          ;; Is it one?
-         (load-immediate-word tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
-         (inst eor temp temp tmp-tn)
-         (inst tst temp temp)
+         (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
          (inst b :eq single-word)
-         ;; If it's other than two, we can't be an (unsigned-byte 64)
-         (inst eor temp temp (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
-                                     (+ (ash 2 n-widetag-bits) bignum-widetag)))
-         (inst tst temp temp)
+         ;; If it's other than two, it can't be an (unsigned-byte 64)
+         (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
          (inst b :ne nope)
          ;; Get the second digit.
          (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-         ;; All zeros, its an (unsigned-byte 64).
+         ;; All zeros, it's an (unsigned-byte 64).
          (inst cbz temp yep)
          (inst b nope)
 
@@ -313,16 +307,20 @@
     (let* ((1+ (not (add-sub-immediate-p (fixnumize hi))))
            (fixnum-hi (fixnumize (if 1+
                                      (1+ hi)
-                                     hi)))
-           (skip (gen-label)))
-      (inst tst value fixnum-tag-mask)
-      (inst b :ne (if not-p target skip))
+                                     hi))))
+      #.(assert (= fixnum-tag-mask 1))
+      (cond (not-p
+             (inst tst value fixnum-tag-mask)
+             ;; TBNZ can't jump as far as B.
+             (inst b :ne target))
+            (t
+             (inst tbnz value 0 skip)))
       (inst cmp value fixnum-hi)
       (inst b (if not-p
                   (if 1+ :cs :hi)
                   (if 1+ :cc :ls))
-            target)
-      (emit-label SKIP))))
+            target))
+    skip))
 
 (define-vop (test-fixnum-mod-*)
   (:args (value :scs (any-reg descriptor-reg)))
@@ -334,8 +332,13 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 6
-    (inst tst value fixnum-tag-mask)
-    (inst b :ne (if not-p target skip))
+    #.(assert (= fixnum-tag-mask 1))
+    (cond (not-p
+           (inst tst value fixnum-tag-mask)
+           ;; TBNZ can't jump as far as B.
+           (inst b :ne target))
+          (t
+           (inst tbnz value 0 skip)))
     (let ((condition (if not-p :hi :ls)))
       (load-immediate-word temp (fixnumize hi))
       (inst cmp value temp)

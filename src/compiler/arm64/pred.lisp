@@ -64,13 +64,19 @@
   (:policy :fast-safe)
   (:translate eq)
   (:generator 3
-    (inst cmp
-          (sc-case x
-            (null null-tn)  ;; FIXME: should it really be like that?
-            (t x))
-          (sc-case y
-            (null null-tn)
-            (immediate
-             (fixnumize (tn-value y)))
-            (t y)))
-    (inst b (if not-p :ne :eq) target)))
+    (cond ((not (and (sc-is y immediate)
+                     (eql 0 (tn-value y))))
+           (inst cmp
+                 (sc-case x
+                   (null null-tn) ;; FIXME: should it really be like that?
+                   (t x))
+                 (sc-case y
+                   (null null-tn)
+                   (immediate
+                    (fixnumize (tn-value y)))
+                   (t y)))
+           (inst b (if not-p :ne :eq) target))
+          (not-p
+           (inst cbnz x target))
+          (t
+           (inst cbz x target)))))
