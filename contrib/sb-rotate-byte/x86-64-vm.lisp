@@ -17,7 +17,7 @@
     (move result integer)
     (if (> count 0)
         (inst rol (sb-vm::reg-in-size result :dword) count)
-        (inst ror (sb-vm::reg-in-size result :dword) count))))
+        (inst ror (sb-vm::reg-in-size result :dword) (- count)))))
 
 (define-vop (%32bit-rotate-byte)
   (:policy :fast-safe)

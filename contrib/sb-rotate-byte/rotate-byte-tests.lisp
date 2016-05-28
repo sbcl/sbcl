@@ -45,6 +45,15 @@
 (assert (= (ub32/c (ash 1 26)) (ash 1 31)))
 (assert (= (ub32/c (ash 1 27)) 1))
 
+(defun ub32/-c (integer)
+  (declare (type (unsigned-byte 32) integer))
+  (rotate-byte -5 (byte 32 0) integer))
+
+(assert (= (ub32/-c 320) 10))
+(assert (= (ub32/-c 64) 2))
+(assert (= (ub32/-c (ash 1 31)) (ash 1 26)))
+(assert (= (ub32/-c 1) (ash 1 27)))
+
 (defun ub32 (count integer)
   (declare (type (unsigned-byte 32) integer)
            (type (integer -31 31) count))

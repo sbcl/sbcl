@@ -15,7 +15,7 @@
     (aver (not (= count 0)))
     (inst mov res (sb-vm::ror integer (if (plusp count)
                                           (- 32 count)
-                                          count)))))
+                                          (- count))))))
 
 (define-vop (%32bit-rotate-byte-fixnum/c)
   (:policy :fast-safe)
