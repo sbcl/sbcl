@@ -560,9 +560,7 @@
 ;;; A VOP-INFO object holds the constant information for a given
 ;;; virtual operation. We include TEMPLATE so that functions with a
 ;;; direct VOP equivalent can be translated easily.
-(def!struct (vop-info
-             (:include template)
-             (:make-load-form-fun ignore-it))
+(def!struct (vop-info (:include template))
   ;; side effects of this VOP and side effects that affect the value
   ;; of this VOP
   (effects (missing-arg) :type attributes)
@@ -640,6 +638,7 @@
   ;; encodes the source ref (shifted 8, it is also encoded in
   ;; MAX-VOP-TN-REFS) and the dest ref index.
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1))))
+(!set-load-form-method vop-info (:xc :target) :ignore-it)
 
 ;; These printers follow the definition of VOP-INFO because they
 ;; want to inline VOP-INFO-NAME, and it's less code to move them here
@@ -696,7 +695,7 @@
 
 ;;; The SB structure represents the global information associated with
 ;;; a storage base.
-(def!struct (sb (:make-load-form-fun just-dump-it-normally))
+(def!struct (sb)
   ;; name, for printing and reference
   (name nil :type symbol)
   ;; the kind of storage base (which determines the packing
@@ -706,6 +705,7 @@
   ;; size. If unbounded, this is the size that the SB is initially
   ;; allocated at.
   (size 0 :type index))
+(!set-load-form-method sb (:host :xc) :sb-just-dump-it-normally)
 (defprinter (sb)
   name)
 

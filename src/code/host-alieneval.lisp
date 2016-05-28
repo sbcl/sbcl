@@ -828,8 +828,7 @@
 
 ;;;; the RECORD type
 
-(def!struct (alien-record-field
-             (:make-load-form-fun sb!kernel:just-dump-it-normally))
+(def!struct (alien-record-field)
   (name (missing-arg) :type symbol)
   (type (missing-arg) :type alien-type)
   (bits nil :type (or unsigned-byte null))
@@ -841,6 +840,7 @@
             (alien-record-field-type field)
             (alien-record-field-name field)
             (alien-record-field-bits field))))
+(!set-load-form-method alien-record-field (:xc :target) :sb-just-dump-it-normally)
 
 (define-alien-type-class (record :include mem-block)
   (kind :struct :type (member :struct :union))
@@ -1088,7 +1088,6 @@
 ;;; these structures and LOCAL-ALIEN and friends communicate
 ;;; information about how that local alien is represented.
 (def!struct (local-alien-info
-             (:make-load-form-fun sb!kernel:just-dump-it-normally)
              (:constructor make-local-alien-info
                            (&key type force-to-memory-p
                             &aux (force-to-memory-p (or force-to-memory-p
@@ -1099,6 +1098,7 @@
   ;; Must this local alien be forced into memory? Using the ADDR macro
   ;; on a local alien will set this.
   (force-to-memory-p nil :type (member t nil)))
+(!set-load-form-method local-alien-info (:xc :target) :sb-just-dump-it-normally)
 (defmethod print-object ((info local-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (format stream

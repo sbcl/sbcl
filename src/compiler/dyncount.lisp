@@ -19,10 +19,11 @@
   #!+sb-doc
   "Holds the TN for the counts vector.")
 
-(def!struct (dyncount-info (:make-load-form-fun just-dump-it-normally))
+(def!struct (dyncount-info)
   for
   (costs (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
   (counts (missing-arg) :type (simple-array (unsigned-byte 32) (*))))
+(!set-load-form-method dyncount-info (:target) :sb-just-dump-it-normally)
 
 (defprinter (dyncount-info)
   for

@@ -186,3 +186,18 @@ sb-c::
       (call-next-method)
       (print-unreadable-object (self stream :type t)
         (write (policy-to-decl-spec self) :stream stream))))
+
+(!incorporate-cross-compiled-methods 'print-object :except '(t condition))
+
+;;; Print-object methods on subtypes of CONDITION can't be cross-compiled
+;;; until CLOS is fully working. Compile them now.
+#.`(progn
+     ,@(mapcar (lambda (args)
+                 `(setf (slot-value (defmethod ,@(cdr args)) 'source)
+                        ,(car args)))
+               *!delayed-defmethod-args*))
+
+;;; Ordinary DEFMETHOD should be used from here on out.
+;;; This variable actually has some semantics to being unbound.
+;;; FIXME: see if we can eliminate the associated hack in 'methods.lisp'
+(makunbound '*!delayed-defmethod-args*)

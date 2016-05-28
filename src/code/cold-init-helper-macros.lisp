@@ -77,6 +77,41 @@
                      (cons value-form (package-name *package*))
                      (delete symbol (symbol-value list) :key #'car)))))
 
+(defmacro !set-load-form-method (class-name usable-by method)
+  ;; If USABLE-BY is:
+  ;;  :host   - the host compiler can execute this M-L-F method
+  ;;  :xc     - the cross-compiler can execute this M-L-F method
+  ;;  :target - the target compiler can execute this M-L-F method
+  (assert (and usable-by
+               (every (lambda (x) (member x '(:host :xc :target)))
+                      usable-by)))
+  (multiple-value-bind (host-expr target-expr)
+      (cond ((typep method '(cons (eql lambda)))
+             (assert (not (member :host usable-by)))
+             (values nil `(funcall ,method obj env)))
+            (t
+             (ecase method
+               (:sb-just-dump-it-normally
+                (values '(cl:make-load-form-saving-slots obj :environment env)
+                        :sb-just-dump-it-normally))
+               (:ignore-it
+                (values '(bug "Can't :ignore-it for host")
+                        :ignore-it)))))
+    `(progn
+       ,@(when (or #+sb-xc-host (member :host usable-by))
+           `((defmethod make-load-form ((obj ,class-name) &optional env)
+               ,host-expr)))
+       ,@(when (or #+sb-xc-host (member :xc usable-by))
+           ;; Use the host's CLOS implementation to select the target's method.
+           `((defmethod sb!xc:make-load-form ((obj ,class-name) &optional env)
+               (declare (ignorable obj env))
+               ,target-expr)))
+       ,@(when (or #-sb-xc-host (member :target usable-by))
+           ;; Use the target's CLOS implementation
+           `((defmethod make-load-form ((obj ,class-name) &optional env)
+               (declare (ignorable obj env))
+               ,target-expr))))))
+
 ;;; FIXME: Consider renaming this file asap.lisp,
 ;;; and the renaming the various things
 ;;;   *ASAP-FORMS* or *REVERSED-ASAP-FORMS*

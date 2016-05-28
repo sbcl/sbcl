@@ -221,8 +221,7 @@ the stack without triggering overflow protection.")
                 :format-arguments (list symbol)))
   (values))
 
-(def!struct (debug-name-marker (:make-load-form-fun dump-debug-name-marker)
-                               (:print-function print-debug-name-marker)))
+(def!struct (debug-name-marker (:print-function print-debug-name-marker)))
 
 (defvar *debug-name-level* 4)
 (defvar *debug-name-length* 12)
@@ -231,7 +230,7 @@ the stack without triggering overflow protection.")
 (defvar *debug-name-ellipsis*)
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun dump-debug-name-marker (marker &optional env)
+  (defmethod make-load-form ((marker debug-name-marker) &optional env)
     (declare (ignore env))
     (cond ((eq marker *debug-name-sharp*)
            `(if (boundp '*debug-name-sharp*)
@@ -298,11 +297,11 @@ the stack without triggering overflow protection.")
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.
-(def!struct (heap-alien-info
-             (:make-load-form-fun sb!kernel:just-dump-it-normally))
+(def!struct (heap-alien-info)
   ;; The type of this alien.
   (type (missing-arg) :type alien-type)
   ;; Its name.
   (alien-name (missing-arg) :type simple-string)
   ;; Data or code?
   (datap (missing-arg) :type boolean))
+(!set-load-form-method heap-alien-info (:xc :target) :sb-just-dump-it-normally)

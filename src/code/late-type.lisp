@@ -1030,8 +1030,8 @@
 
 ;;; Same here.
 ;;; Just dump it as a specifier. (We'll convert it back upon loading.)
-(defun make-type-load-form (type)
-  (declare (type ctype type))
+(defmethod make-load-form ((type ctype) &optional env)
+  (declare (ignore env))
   `(specifier-type ',(type-specifier type)))
 
 (defun-cached (type-negation :hash-function #'type-hash-value

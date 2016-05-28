@@ -259,7 +259,6 @@
 ;;; operand or temporary at meta-compile time. Besides the obvious
 ;;; stuff, we also store the names of per-operand temporaries here.
 (def!struct (operand-parse
-             (:make-load-form-fun just-dump-it-normally)
              #-sb-xc-host (:pure t))
   ;; name of the operand (which we bind to the TN)
   (name nil :type symbol)
@@ -290,12 +289,11 @@
   (sc nil :type (or symbol null))
   ;; If non-null, we are a temp wired to this offset in SC.
   (offset nil :type (or unsigned-byte null)))
+(!set-load-form-method operand-parse (:host :xc :target) :sb-just-dump-it-normally)
 
 ;;; A VOP-PARSE object holds everything we need to know about a VOP at
 ;;; meta-compile time.
-(def!struct (vop-parse
-             (:make-load-form-fun just-dump-it-normally)
-             #-sb-xc-host (:pure t))
+(def!struct (vop-parse #-sb-xc-host (:pure t))
   ;; the name of this VOP
   (name nil :type symbol)
   ;; If true, then the name of the VOP we inherit from.
@@ -354,6 +352,7 @@
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return)))
+(!set-load-form-method vop-parse (:host :xc :target) :sb-just-dump-it-normally)
 (defprinter (vop-parse)
   name
   (inherits :test inherits)

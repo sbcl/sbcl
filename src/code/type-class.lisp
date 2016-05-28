@@ -222,7 +222,6 @@
 
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
-                   (:make-load-form-fun make-type-load-form)
                    #-sb-xc-host (:pure t))
   ;; the class of this type
   ;;
@@ -691,7 +690,6 @@
 
 (in-package "SB!ALIEN")
 (def!struct (alien-type
-             (:make-load-form-fun sb!kernel:just-dump-it-normally)
              (:constructor make-alien-type
                            (&key class bits alignment
                             &aux (alignment
@@ -699,6 +697,7 @@
   (class 'root :type symbol :read-only t)
   (bits nil :type (or null unsigned-byte))
   (alignment nil :type (or null unsigned-byte)))
+(!set-load-form-method alien-type (:xc :target) :sb-just-dump-it-normally)
 
 (in-package "SB!KERNEL")
 (defstruct (alien-type-type

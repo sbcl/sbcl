@@ -32,15 +32,7 @@
 (defun comma-constructor (x)
   (svref #(unquote unquote-nsplice unquote-splice) (comma-kind x)))
 (defun comma-splicing-p (comma) (not (zerop (comma-kind comma))))
-
-#+sb-xc-host
-(progn
-  ;; tell the host how to dump it
-  (defmethod make-load-form ((self comma) &optional environment)
-    (declare (ignore environment))
-    (list (comma-constructor self) (list 'quote (comma-expr self))))
-  ;; tell the cross-compiler that it can do :just-dump-it-normally
-  (setf (get 'comma :sb-xc-allow-dumping-instances) t))
+(!set-load-form-method comma (:host :xc :target) :sb-just-dump-it-normally)
 
 (declaim (type (and fixnum unsigned-byte) *backquote-depth*))
 (defvar *backquote-depth* 0 #!+sb-doc "how deep we are into backquotes")

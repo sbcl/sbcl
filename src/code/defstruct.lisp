@@ -128,7 +128,6 @@
 ;;; A DEFSTRUCT-SLOT-DESCRIPTION holds compile-time information about
 ;;; a structure slot.
 (def!struct (defstruct-slot-description
-             (:make-load-form-fun just-dump-it-normally)
              (:conc-name dsd-)
              (:copier nil)
              #-sb-xc-host (:pure t))
@@ -152,6 +151,8 @@
   (%raw-type -1 :type (integer -1 (#.(length *raw-slot-data*))))
   (read-only nil :type (member t nil)))
 #!-sb-fluid (declaim (freeze-type defstruct-slot-description))
+(!set-load-form-method defstruct-slot-description
+                       (:host :xc :target) :sb-just-dump-it-normally)
 (defmethod print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))
@@ -1935,16 +1936,8 @@ or they must be declared locally notinline at each call site.~@:>"
 (progn
   (defun xc-dumpable-structure-instance-p (x)
     (and (typep x 'cl:structure-object)
-         (let ((name (type-of x)))
-           ;; Don't allow totally random structures, only ones that the
-           ;; cross-compiler has been advised will work.
-           (and (get name :sb-xc-allow-dumping-instances)
-                ;; but we must also have cross-compiled it for real.
-                (sb!kernel::compiler-layout-ready-p name)
-                ;; and I don't know anything about raw slots
-                ;; Coincidentally, in either representation of
-                ;; raw-slot-metadata, 0 represents no untagged slots.
-                (zerop (layout-bitmap (info :type :compiler-layout name)))))))
+         (keywordp (sb!xc:make-load-form x))
+         (sb!kernel::compiler-layout-ready-p (type-of x))))
   (defun %instance-layout (instance)
     (aver (or (typep instance 'structure!object)
               (xc-dumpable-structure-instance-p instance)))

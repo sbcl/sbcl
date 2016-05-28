@@ -21,7 +21,6 @@
 ;;; is declared to hold a DEFSTRUCT-DESCRIPTION.
 (def!struct (defstruct-description
              (:conc-name dd-)
-             (:make-load-form-fun just-dump-it-normally)
              #-sb-xc-host (:pure t)
              (:constructor make-defstruct-description (null-lexenv-p name)))
   ;; name of the structure
@@ -79,6 +78,8 @@
   ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :unspecified)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
+(!set-load-form-method defstruct-description
+                       (:host :xc :target) :sb-just-dump-it-normally)
 
 ;;;; basic LAYOUT stuff
 
@@ -108,29 +109,7 @@
 ;;; well, since the initialization of layout slots is hardcoded there.
 ;;;
 ;;; FIXME: ...it would be better to automate this, of course...
-(def!struct (layout
-             ;; KLUDGE: A special hack keeps this from being
-             ;; called when building code for the
-             ;; cross-compiler. See comments at the DEFUN for
-             ;; this. -- WHN 19990914
-             (:make-load-form-fun #-sb-xc-host ignore-it
-                                  ;; KLUDGE: DEF!STRUCT at #+SB-XC-HOST
-                                  ;; time controls both the
-                                  ;; build-the-cross-compiler behavior
-                                  ;; and the run-the-cross-compiler
-                                  ;; behavior. The value below only
-                                  ;; works for build-the-cross-compiler.
-                                  ;; There's a special hack in
-                                  ;; EMIT-MAKE-LOAD-FORM which gives
-                                  ;; effectively IGNORE-IT behavior for
-                                  ;; LAYOUT at run-the-cross-compiler
-                                  ;; time. It would be cleaner to
-                                  ;; actually have an IGNORE-IT value
-                                  ;; stored, but it's hard to see how to
-                                  ;; do that concisely with the current
-                                  ;; DEF!STRUCT setup. -- WHN 19990930
-                                  #+sb-xc-host
-                                  make-load-form-for-layout))
+(def!struct (layout)
   ;; a pseudo-random hash value for use by CLOS.
   (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
   ;; the class that this is a layout for
@@ -205,7 +184,6 @@
 ;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
 ;;; longer necessary)
 (def!struct (classoid
-             (:make-load-form-fun classoid-make-load-form-fun)
              (:include ctype
                        (class-info (type-class-or-lose 'classoid)))
              (:constructor nil)
@@ -303,10 +281,6 @@
 ;;; definitions with load-time resolution.
 (def!struct (classoid-cell
              (:constructor make-classoid-cell (name &optional classoid))
-             (:make-load-form-fun (lambda (c)
-                                    `(find-classoid-cell
-                                      ',(classoid-cell-name c)
-                                      :create t)))
              #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
@@ -318,6 +292,10 @@
   ;; PCL class, if any
   (pcl-class nil))
 (declaim (freeze-type classoid-cell))
+(!set-load-form-method classoid-cell (:xc :target)
+  (lambda (self env)
+    (declare (ignore env))
+    `(find-classoid-cell ',(classoid-cell-name self) :create t)))
 
 (defun find-classoid-cell (name &key create)
   (let ((real-name (uncross name)))

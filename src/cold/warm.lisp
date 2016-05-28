@@ -143,7 +143,6 @@
       (other-srcs
               '("SRC;CODE;SETF-FUNS"
                 ;; miscellaneous functionality which depends on CLOS
-                "SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS" ; FIXME: rename
                 "SRC;CODE;LATE-CONDITION"
 
                 ;; CLOS-level support for the Gray OO streams

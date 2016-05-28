@@ -14,8 +14,7 @@
 (def!struct (definition-source-location
              (:constructor %make-definition-source-location
                            (namestring toplevel-form-number form-number))
-             (:copier nil)
-             (:make-load-form-fun just-dump-it-normally))
+             (:copier nil))
   ;; Namestring of the source file that the definition was compiled from.
   ;; This is null if the definition was not compiled from a file.
   (namestring nil :type (or string null) :read-only t)
@@ -25,6 +24,8 @@
   (form-number nil :type (or fixnum null) :read-only t)
   ;; plist from WITH-COMPILATION-UNIT
   (plist *source-plist* :read-only t))
+(!set-load-form-method definition-source-location  (:xc :target)
+                       :sb-just-dump-it-normally)
 
 (defun make-definition-source-location ()
   (let* ((source-info (and (boundp '*source-info*) *source-info*))

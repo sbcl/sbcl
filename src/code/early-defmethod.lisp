@@ -28,8 +28,11 @@
     `(!trivial-defmethod
       ',name ',specializer ',unspecialized-ll
       (named-lambda (fast-method ,name (,specializer))
-          (.pv. .next-method-call. ,@unspecialized-ll)
-        (declare (ignore .pv. .next-method-call.))
+          (.pv. .next-method-call. .arg0. ,@(cdr unspecialized-ll)
+                ;; Rebind specialized arg with unchecked type assertion.
+                &aux (,(car unspecialized-ll) (truly-the ,specializer .arg0.)))
+        (declare (ignore .pv. .next-method-call.)
+                 (ignorable ,(car unspecialized-ll)))
         ,@decls
         ;; Fail at compile-time if any transformational magic needs to happen.
         (macrolet ,(mapcar (lambda (f)
@@ -39,9 +42,7 @@
                            '(slot-boundp slot-value %set-slot-value call-next-method))
           (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
             (declare (inline (setf slot-value)))
-            (let ((,(car unspecialized-ll)
-                   (truly-the ,specializer ,(car unspecialized-ll))))
-              ,@forms))))
+            ,@forms)))
       ;; Why is SOURCE-LOC needed? Lambdas should know their location.
       (sb!c::source-location))))
 
@@ -55,6 +56,9 @@
       (setf (cdr gf)
             (merge '(simple-array t (*)) ; SIMPLE-VECTOR not DEFTYPEd yet!
                    (list entry) (cdr gf) #'>
+                   ;; We only use hierarchical objects in self-build,
+                   ;; so sorting by LAYOUT-DEPTHOID is an accurate indicator
+                   ;; of what precedes what in the precedence list.
                    :key (lambda (x) (layout-depthoid (find-layout (car x))))))
       entry)))
 

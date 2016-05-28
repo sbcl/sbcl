@@ -34,7 +34,6 @@
 
 (def!struct (prim-object-slot
              (:constructor make-slot (name docs rest-p offset special options))
-             (:make-load-form-fun just-dump-it-normally)
              (:conc-name slot-))
   (name nil :type symbol :read-only t)
   (docs nil :type (or null simple-string) :read-only t)
@@ -45,7 +44,7 @@
   ;; referenced as special variables, this slot holds the name of that variable.
   (special nil :type symbol :read-only t))
 
-(def!struct (primitive-object (:make-load-form-fun just-dump-it-normally))
+(def!struct (primitive-object)
   (name nil :type symbol :read-only t)
   (widetag nil :type symbol :read-only t)
   (lowtag nil :type symbol :read-only t)
@@ -55,6 +54,9 @@
   (variable-length-p nil :type (member t nil) :read-only t))
 
 (declaim (freeze-type prim-object-slot primitive-object))
+(!set-load-form-method prim-object-slot (:host :xc) :sb-just-dump-it-normally)
+(!set-load-form-method primitive-object (:host :xc) :sb-just-dump-it-normally)
+
 (defvar *primitive-objects* nil)
 
 (defun !%define-primitive-object (primobj)

@@ -37,7 +37,6 @@
 ;;; A TRACE-INFO object represents all the information we need to
 ;;; trace a given function.
 (def!struct (trace-info
-             (:make-load-form-fun sb-kernel:just-dump-it-normally)
              (:print-object (lambda (x stream)
                               (print-unreadable-object (x stream :type t)
                                 (prin1 (trace-info-what x) stream)))))
@@ -77,6 +76,7 @@
   (break-after nil)
   ;; list of null environment forms
   (print-after () :type list))
+(!set-load-form-method trace-info (:target) :sb-just-dump-it-normally)
 
 ;;; This is a list of conses (fun-end-cookie . condition-satisfied),
 ;;; which we use to note distinct dynamic entries into functions. When

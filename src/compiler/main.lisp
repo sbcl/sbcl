@@ -2008,14 +2008,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
 (defun emit-make-load-form (constant &optional (name nil namep)
                                      &aux (fasl *compile-object*))
   (aver (fasl-output-p fasl))
-  (unless (or (fasl-constant-already-dumped-p constant fasl)
-              ;; KLUDGE: This special hack is because I was too lazy
-              ;; to rework DEF!STRUCT so that the MAKE-LOAD-FORM
-              ;; function of LAYOUT returns nontrivial forms when
-              ;; building the cross-compiler but :IGNORE-IT when
-              ;; cross-compiling or running under the target Lisp. --
-              ;; WHN 19990914
-              #+sb-xc-host (typep constant 'layout))
+  (unless (fasl-constant-already-dumped-p constant fasl)
     (let ((circular-ref (assoc constant *constants-being-created* :test #'eq)))
       (when circular-ref
         (when (find constant *constants-created-since-last-init* :test #'eq)

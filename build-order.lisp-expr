@@ -51,6 +51,8 @@
  ;; Things like DX-FLET and AWHEN are available for use in both the host
  ;; and target very early, with no DEF! obfuscation necessary.
  ("src/code/primordial-extensions")
+ ("src/code/cold-init-helper-macros")
+ ("src/code/early-defmethod" :not-host)
 
  ;; ASAP we replace the host's backquote reader with our own, to avoid leaking
  ;; details of the host into the target. This is not a concern in make-host-2
@@ -74,9 +76,6 @@
  ("src/code/globals" :not-host)
 
  ("src/code/cmacros" :not-host :slam-forcibly)
- ("src/code/early-defmethod" :not-host)
-
- ("src/code/cold-init-helper-macros")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; cross-compiler-only replacements for stuff which in target Lisp would be
@@ -90,7 +89,6 @@
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-sap"   :not-target)
  ("src/code/cross-thread" :not-target)
- ("src/code/cross-make-load-form" :not-target)
  ("src/code/cross-condition" :not-target)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

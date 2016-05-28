@@ -20,7 +20,8 @@
 ;;; The CLASSOID structure is a supertype of all classoid types.
 ;;; Its definition occurs in 'early-classoid.lisp'
 
-(defun classoid-make-load-form-fun (self)
+(defmethod make-load-form ((self classoid) &optional env)
+  (declare (ignore env))
   (let ((name (classoid-name self)))
     (if (and name (eq (find-classoid name nil) self))
         `(find-classoid ',name)
@@ -157,15 +158,8 @@
 ;;; to special non-ANSI low-level things like special fops, and we
 ;;; don't need to do that anyway because our code isn't going to be
 ;;; cold loaded, so we use the ordinary load form system.
-;;;
-;;; KLUDGE: A special hack causes this not to be called when we are
-;;; building code for the target Lisp. It would be tidier to just not
-;;; have it in place when we're building the target Lisp, but it
-;;; wasn't clear how to do that without rethinking DEF!STRUCT quite a
-;;; bit, so I punted. -- WHN 19990914
 #+sb-xc-host
-(defun make-load-form-for-layout (layout &optional env)
-  (declare (type layout layout))
+(defmethod make-load-form ((layout layout) &optional env)
   (declare (ignore env))
   (when (layout-invalid layout)
     (sb!c::compiler-error "can't dump reference to obsolete class: ~S"
@@ -188,6 +182,7 @@
                              ',(layout-inherits layout)
                              ',(layout-depthoid layout)
                              ',(layout-bitmap layout)))))
+(!set-load-form-method layout (:xc :target) :ignore-it)
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.

@@ -158,13 +158,30 @@
 (fmakunbound 'make-load-form)
 (defgeneric make-load-form (object &optional environment))
 
-;; Link bootstrap-time how-to-dump-it information into the shiny new
-;; CLOS system.
-(defmethod make-load-form ((obj sb-sys:structure!object)
-                           &optional (env nil env-p))
-  (if env-p
-      (sb-sys:structure!object-make-load-form obj env)
-      (sb-sys:structure!object-make-load-form obj)))
+(defun !incorporate-cross-compiled-methods (gf-name &key except)
+  (assert (generic-function-p (fdefinition gf-name)))
+  (loop for (specializer lambda-list fmf source-loc)
+        across (remove-if (lambda (x) (member x except))
+                          (cdr (assoc gf-name *!trivial-methods*))
+                          :key #'car)
+        do (multiple-value-bind (specializers arg-info)
+               (ecase gf-name
+                 (print-object
+                  (values (list (find-class specializer) (find-class t))
+                          '(:arg-info (2))))
+                 (make-load-form
+                  (values (list (find-class specializer))
+                          '(:arg-info (1 . t)))))
+             (load-defmethod
+              'standard-method gf-name '() specializers lambda-list
+              `(:function
+                ,(let ((mf (%make-method-function fmf nil)))
+                   (sb-mop:set-funcallable-instance-function
+                    mf (method-function-from-fast-function fmf arg-info))
+                   mf)
+                plist ,arg-info simple-next-method-call t)
+              source-loc))))
+(!incorporate-cross-compiled-methods 'make-load-form :except '(layout))
 
 (defmethod make-load-form ((class class) &optional env)
   ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
@@ -186,6 +203,7 @@
         `(classoid-layout (find-classoid ',pname)))
       :ignore-it))
 
+;; FIXME: this seems wrong. NO-APPLICABLE-METHOD should be signaled.
 (defun dont-know-how-to-dump (object)
   (error "~@<don't know how to dump ~S (default ~S method called).~>"
          object 'make-load-form))
@@ -197,10 +215,6 @@
   (define-default-make-load-form-method structure-object)
   (define-default-make-load-form-method standard-object)
   (define-default-make-load-form-method condition))
-
-(defmethod make-load-form ((object sb-impl::comma) &optional env)
-  (declare (ignore object env))
-  :sb-just-dump-it-normally)
 
 sb-impl::
 (defmethod make-load-form ((host (eql *physical-host*)) &optional env)

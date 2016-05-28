@@ -70,8 +70,6 @@
     (when (get s :sb-xc-globaldb-info)
       (remf (symbol-plist s) :sb-xc-globaldb-info)))
   (fill (symbol-value 'sb!c::*info-types*) nil)
-  (clrhash (symbol-value 'sb!kernel::*def!struct-type-make-load-form-fun*))
-  (clrhash (symbol-value 'sb!kernel::*def!struct-supertype*))
   (clrhash (symbol-value 'sb!kernel::*forward-referenced-layouts*))
   (setf (symbol-value 'sb!kernel:*type-system-initialized*) nil)
   (makunbound 'sb!c::*backend-primitive-type-names*)
