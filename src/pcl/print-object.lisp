@@ -70,9 +70,6 @@
 
 ;;;; PRINT-OBJECT methods for objects from PCL classes
 ;;;;
-;;;; FIXME: Perhaps these should be moved back alongside the definitions of
-;;;; the classes they print. (Bootstrapping problems could be avoided by
-;;;; using DEF!METHOD to do this.)
 
 (defmethod print-object ((method standard-method) stream)
   (if (slot-boundp method '%generic-function)

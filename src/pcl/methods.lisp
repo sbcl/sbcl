@@ -1603,7 +1603,7 @@
                              (make-caching-dfun gf (copy-cache initial-print-object-cache))
                            (set-dfun gf dfun cache info)))
                         ;; the relevant PRINT-OBJECT methods get defined
-                        ;; late, by delayed DEF!METHOD.  We mustn't cache
+                        ;; late, by delayed DEFMETHOD.  We mustn't cache
                         ;; the effective method for our classes earlier
                         ;; than the relevant PRINT-OBJECT methods are
                         ;; defined...

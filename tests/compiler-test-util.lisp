@@ -121,7 +121,6 @@
     (with-input-from-string (s code)
       (loop for line = (read-line s nil nil)
             while line
-            do (print line)
             when (and (search name line)
                       (search "FDEFN" line))
             do (incf n)))
