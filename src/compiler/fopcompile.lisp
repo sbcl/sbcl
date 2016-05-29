@@ -279,11 +279,6 @@
                    ((array t)
                     (dotimes (i (array-total-size value))
                       (grovel (row-major-aref value i))))
-                   ;; This is the same kludge as appears in EMIT-MAKE-LOAD-FORM
-                   ;; which informs the xc that LAYOUTs are leaf-like nodes.
-                   ;; This case was never reached before because cross-compiling
-                   ;; used to generate target machine code for everything.
-                   #+sb-xc-host (layout)
                    (instance
                     (multiple-value-bind (creation-form init-form)
                         (handler-case
