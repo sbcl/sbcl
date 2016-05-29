@@ -229,20 +229,19 @@ the stack without triggering overflow protection.")
 (defvar *debug-name-sharp*)
 (defvar *debug-name-ellipsis*)
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defmethod make-load-form ((marker debug-name-marker) &optional env)
-    (declare (ignore env))
-    (cond ((eq marker *debug-name-sharp*)
-           `(if (boundp '*debug-name-sharp*)
-                *debug-name-sharp*
-                (make-debug-name-marker)))
-          ((eq marker *debug-name-ellipsis*)
-           `(if (boundp '*debug-name-ellipsis*)
-                *debug-name-ellipsis*
-                (make-debug-name-marker)))
-          (t
-           (warn "Dumping unknown debug-name marker.")
-           '(make-debug-name-marker)))))
+(defmethod make-load-form ((marker debug-name-marker) &optional env)
+  (declare (ignore env))
+  (cond ((eq marker *debug-name-sharp*)
+         `(if (boundp '*debug-name-sharp*)
+              *debug-name-sharp*
+              (make-debug-name-marker)))
+        ((eq marker *debug-name-ellipsis*)
+         `(if (boundp '*debug-name-ellipsis*)
+              *debug-name-ellipsis*
+              (make-debug-name-marker)))
+        (t
+         (warn "Dumping unknown debug-name marker.")
+         '(make-debug-name-marker))))
 
 (defun print-debug-name-marker (marker stream level)
   (declare (ignore level))

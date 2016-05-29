@@ -14,20 +14,6 @@
 
 ;;;; type format database
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!struct (room-info)
-    ;; the name of this type
-    (name nil :type symbol)
-    ;; kind of type (how to reconstitute an object)
-    (kind (missing-arg)
-          :type (member :other :small-other :closure :instance :list
-                        :code :vector-nil :weak-pointer))))
-;; it's too late to use !set-load-form-method
-(eval-when (:compile-toplevel)
-  (defmethod sb!xc:make-load-form ((self room-info) &optional env)
-    (declare (ignore env))
-    :sb-just-dump-it-normally))
-
 (defun room-info-type-name (info)
   (if (specialized-array-element-type-properties-p info)
       (saetp-primitive-type-name info)

@@ -198,5 +198,3 @@
 
 ;;; Avoid an unknown type reference from globaldb.
 (deftype fdefn () '(satisfies fdefn-p))
-
-(defgeneric sb!xc:make-load-form (obj &optional env))

@@ -26,3 +26,5 @@
 (declaim (declaration sb!c::lambda-list))
 
 (declaim (declaration explicit-check))
+
+(defgeneric sb!xc:make-load-form (obj &optional env))
