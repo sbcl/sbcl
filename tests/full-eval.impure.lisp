@@ -104,3 +104,13 @@
   (let* ((foo 3)
          (foo (lambda () (typep foo 'integer))))
     (assert (funcall foo))))
+
+(declaim (inline some-inline-fun))
+(locally
+ (declare (muffle-conditions compiler-note))
+ (defun some-inline-fun (x) (- x)))
+(with-test (:name :inline-fun-captures-decl)
+  (assert (equal (sb-int:fun-name-inline-expansion 'some-inline-fun)
+                 '(sb-c:lambda-with-lexenv
+                   (:declare ((muffle-conditions compiler-note))) (x)
+                   (block some-inline-fun (- x))))))

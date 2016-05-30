@@ -1252,41 +1252,28 @@
     lexenv))
 
 ;;; Produce the source representation expected by :INLINE-EXPANSION-DESIGNATOR.
-(defun reconstruct-syntactic-closure-env (env)
-  (flet ((externalize (env forms)
-           (multiple-value-bind (kind data)
-               (let ((symbols (env-symbols env))
-                     (expansions (env-payload env)))
-                 (typecase env
-                   (symbol-macro-env
-                    (values :symbol-macro
-                            (map 'list (lambda (x y) (list (car x) y))
-                                 symbols expansions)))
-                   (macro-env
-                    (values
-                     :macro
-                     (map 'list
-                          (lambda (f)
-                            ;; The name of each macro is (MACROLET symbol).
-                            (cons (second (fun-name f))
-                                  (fun-lambda-expression f)))
-                          expansions)))
-                   ;; Insert all declarations, and hope for the best.
-                   ;; OPTIMIZE won't do anything. SPECIAL may or may not.
-                   (basic-env (values :declare nil))))
-             (when kind
-               (let ((decl (awhen (env-declarations env)
-                             (list* :declare it forms))))
-                 (if data
-                     (list* kind data (if decl (list decl) forms))
-                     decl))))))
-    (let ((nest nil))
-      (loop
-       (let ((sexpr (externalize env nest)))
-         (if sexpr
-             (acond ((env-parent env) (setq nest (list sexpr) env it))
-                    (t (return sexpr)))
-             (return nil)))))))
+(defun reconstruct-syntactic-closure-env (env &aux guts)
+  (loop
+    (awhen (env-declarations env)
+      (setq guts `((:declare ,(apply 'append (mapcar 'cdr it)) ,@guts))))
+    (multiple-value-bind (kind data)
+        (typecase env
+          (macro-env
+           (values :macro
+                   (map 'list
+                        (lambda (f)
+                          ;; The name of each macro is (MACROLET symbol).
+                          (cons (second (fun-name f))
+                                (fun-lambda-expression f)))
+                        (env-payload env))))
+          (symbol-macro-env
+           (values :symbol-macro
+                   (map 'list (lambda (x y) (list (car x) y))
+                        (env-symbols env) (env-payload env)))))
+      (when kind
+        (setq guts `((,kind ,data ,@guts)))))
+    (unless (setq env (env-parent env))
+      (return (car guts)))))
 
 ;;; Return :INLINE or :NOTINLINE if FNAME has a lexical declaration,
 ;;; otherwise NIL for no information.
