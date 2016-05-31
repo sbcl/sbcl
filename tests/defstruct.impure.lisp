@@ -506,7 +506,7 @@
    self
    :slot-names
    ;; skip the slot named A so that the optimization that turns
-   ;; MAKE-LOAD-FORM-SAVING-SLOTS into :SB-JUST-DUMP-IT-NORMALLY
+   ;; MAKE-LOAD-FORM-SAVING-SLOTS into "dump normally"
    ;; (change 4bf626e745d5d2e34630ec4dd67b7c17bd9b8f28) can not be used.
    (delete 'a (mapcar 'sb-kernel:dsd-name
                       (sb-kernel:dd-slots
@@ -537,8 +537,7 @@
 ;;; fasl dumper and loader also have special handling of raw slots, so
 ;;; dump all of them into a fasl
 (defmethod make-load-form ((self manyraw) &optional env)
-  self env
-  :sb-just-dump-it-normally)
+  (make-load-form-saving-slots self :environment env))
 (with-open-file (s "tmp-defstruct.manyraw.lisp"
                  :direction :output
                  :if-exists :supersede)

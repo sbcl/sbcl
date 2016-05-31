@@ -227,22 +227,27 @@
 
 )) ; end EVAL-WHEN
 
+;; Redefine the MAKE-LOAD-FORM method on FOO.
+(remove-method #'make-load-form (find-method #'make-load-form nil (list 'foo)))
+(defvar *foo-save-slots* nil)
+(defmethod make-load-form ((self foo) &optional env)
+  (declare (ignore env))
+  (if (eq *foo-save-slots* :all)
+      (make-load-form-saving-slots self)
+      (make-load-form-saving-slots self :slot-names *foo-save-slots*)))
 (with-test (:name :load-form-canonical-p)
   (let ((foo (make-foo :x 'x :y 'y)))
-    (multiple-value-bind (create init)
-        (make-load-form-saving-slots foo)
-      (assert (sb-kernel::canonical-slot-saving-forms-p foo create init)))
-    (multiple-value-bind (create init)
-        ;; specifying all slots is still canonical
-        (make-load-form-saving-slots foo :slot-names '(y x))
-      (assert (sb-kernel::canonical-slot-saving-forms-p foo create init)))
-    (multiple-value-bind (create init)
-        (make-load-form-saving-slots foo :slot-names '(x))
-      (assert (not (sb-kernel::canonical-slot-saving-forms-p
-                    foo create init))))))
+    (assert (eq (let ((*foo-save-slots* :all)) (sb-c::%make-load-form foo))
+                'sb-fasl::fop-struct))
+    ;; specifying all slots is still canonical
+    (assert (eq (let ((*foo-save-slots* '(y x))) (sb-c::%make-load-form foo))
+                'sb-fasl::fop-struct))
+    ;; specifying only one slot is not canonical
+    (assert (equal (let ((*foo-save-slots* '(x))) (sb-c::%make-load-form foo))
+                   '(sb-kernel::new-instance foo)))))
 
 ;; A huge constant vector. This took 9 seconds to compile (on a MacBook Pro)
-;; prior to the optimization for using :SB-JUST-DUMP-IT-NORMALLY.
+;; prior to the optimization for using fops to dump.
 ;; This assertion is simply whether it comes out correctly, not the time taken.
 (defparameter *airport-vector* #.(compute-airports 4000))
 
@@ -258,7 +263,7 @@
     (declare (optimize (speed 1)))
     ;; MAKE-LOAD-FORM discards the value of the CDF slot of one structure.
     ;; This probably isn't something "reasonable" to do, but it indicates
-    ;; that :JUST-DUMP-IT-NORMALLY was correctly not used.
+    ;; that SB-FASL::FOP-STRUCT was correctly not used.
     (setf (s1-cdf (second testcase)) #c(0d0 0d0))
     (assert (string= (write-to-string testcase :circle t :pretty nil)
                      (write-to-string *metadata* :circle t :pretty nil)))))

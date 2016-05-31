@@ -220,37 +220,3 @@ sb-impl::
 (defmethod make-load-form ((host (eql *physical-host*)) &optional env)
   (declare (ignore env))
   '*physical-host*)
-
-;; Note that it is possible to produce structure dumping code which yields
-;; illegal slot values in the resurrected structure, violating the assumption
-;; throughout the compiler that slot readers are always safe unless
-;; dictated otherwise by the SAFE-P flag in the DSD.
-;; * (defstruct S a (b (error "Must supply me") :type symbol))
-;; * (defmethod make-load-form ((x S) &optional e) (m-l-f-s-s x :slot-names '(a)))
-;; After these definitions, a dumped S will have 0 in slot B.
-;;
-(defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)
-  (declare (ignore environment))
-  (values
-   (let ((type (type-of object)))
-     (if (symbolp type)
-         `(sb-kernel::new-instance ,type)
-         ;; If TYPE-OF isn't a symbol, the creation form probably can't be compiled
-         ;; unless there is a MAKE-LOAD-FORM on the class without a proper-name.
-         ;; This is better than returning a creation form that produces
-         ;; something completely different.
-         `(allocate-instance ,type)))
-   (if (typep object 'structure-object)
-       `(setf ,@(sb-kernel::structure-obj-slot-saving-forms
-                 object slot-names slot-names-p))
-       (loop for slot in (class-slots (class-of object))
-             for name = (slot-definition-name slot)
-             when (if slot-names-p
-                      (memq name slot-names)
-                      (eq (sb-mop:slot-definition-allocation slot) :instance))
-             collect name into names
-             and
-             collect (if (slot-boundp object name)
-                         `',(slot-value object name)
-                         '+slot-unbound+) into vals
-             finally (return `(set-slots ,object ,names ,@vals))))))

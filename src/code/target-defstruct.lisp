@@ -263,58 +263,5 @@
 
 (defmethod print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level-in-print*))
-
-;; This generates a sexpr that can be recognized as having a particular
-;; shape so that the dumping mechanism can decide if it is or is not
-;; necessary to run that code through the main compiler - FASL operations
-;; can be used in the case that all slots are preserved.
-;; In particular, there are no gensyms in the result, so that calling this
-;; twice on the same object yields the same list as compared by EQUAL.
-(defun structure-obj-slot-saving-forms (struct slot-names slot-names-p)
-  (let* ((layout (%instance-layout struct))
-         (dd (layout-info layout)))
-    (mapcan (lambda (dsd)
-              (when (or (not slot-names-p) (memq (dsd-name dsd) slot-names))
-                (let ((index (dsd-index dsd))
-                      (rsd (dsd-raw-slot-data dsd)))
-                  (if (not rsd)
-                      `((%instance-ref ,struct ,index)
-                        ,(let ((val (%instance-ref struct index)))
-                           (if (and (or (listp val) (symbolp val))
-                                    (not (member val '(nil t))))
-                               (list 'quote val)
-                               val)))
-                      (let ((accessor (raw-slot-data-accessor-name rsd)))
-                        `((,accessor ,struct ,index)
-                          ,(funcall accessor struct index)))))))
-            (dd-slots dd))))
-
-;; Return T if CREATION-FORM and INIT-FORM would have the identical effect
-;; as :SB-JUST-DUMP-IT-NORMALLY for STRUCT. MAKE-LOAD-FORM-SAVING-SLOTS can't
-;; merely return the magic token (when possible) because a user application
-;; could call MAKE-LOAD-FORM-SAVING-SLOTS to obtain forms that can be evaluated
-;; or otherwise examined. So instead we scan the code and detect whether it is
-;; identical to what was returned from a trivial use of M-L-F-S-S.
-(defun canonical-slot-saving-forms-p (struct creation-form init-form)
-  (and (typep creation-form '(cons (eql new-instance) (cons symbol null)))
-       (typep init-form '(cons (eql setf)))
-       (eq (cadr creation-form) (class-name (class-of struct)))
-       (= (length (dd-slots (layout-info (%instance-layout struct))))
-          (ash (list-length (cdr init-form)) -1))
-       (flet ((eq-quoted-p (a b)
-                (and (typep a '(cons (eql quote) (cons t null)))
-                     (typep b '(cons (eql quote) (cons t null)))
-                     (eq (cadr a) (cadr b)))))
-         ;; Naively, EQUALP would almost work to compare the slot assignments,
-         ;; but we must not get stuck in circular lists, so traverse by hand.
-         (loop for (expect-place expect-value)
-               on (structure-obj-slot-saving-forms struct nil nil) by #'cddr
-               for (actual-place actual-value) on (cdr init-form) by #'cddr
-               always (and (equal actual-place expect-place)
-                           ;; Use EQL, not EQ. Values come from the identical
-                           ;; struct, but reading a raw slot can create new
-                           ;; pointers. For QUOTE forms, EQ is ok.
-                           (or (eql actual-value expect-value)
-                               (eq-quoted-p actual-value expect-value)))))))
 
 (/show0 "target-defstruct.lisp end of file")

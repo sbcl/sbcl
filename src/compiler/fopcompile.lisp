@@ -280,14 +280,8 @@
                     (dotimes (i (array-total-size value))
                       (grovel (row-major-aref value i))))
                    (instance
-                    (multiple-value-bind (creation-form init-form)
-                        (handler-case
-                            (sb!xc:make-load-form value (make-null-lexenv))
-                          (error (condition)
-                            (compiler-error condition)))
-                      (declare (ignore init-form))
-                      (case creation-form
-                        (:sb-just-dump-it-normally
+                    (case (%make-load-form value)
+                      (sb!fasl::fop-struct
                          ;; FIXME: Why is this needed? If the constant
                          ;; is deemed fopcompilable, then when we dump
                          ;; it we bind *dump-only-valid-structures* to
@@ -297,9 +291,8 @@
                          ;; there's never a need to grovel a layout.
                          (do-instance-tagged-slot (i value)
                            (grovel (%instance-ref value i))))
-                        (:ignore-it)
-                        (t
-                         (return-from constant-fopcompilable-p nil)))))
+                      (:ignore-it)
+                      (t (return-from constant-fopcompilable-p nil))))
                    (t
                     (return-from constant-fopcompilable-p nil))))))
       (grovel constant))

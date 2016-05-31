@@ -86,17 +86,15 @@
                (every (lambda (x) (member x '(:host :xc :target)))
                       usable-by)))
   (multiple-value-bind (host-expr target-expr)
-      (cond ((typep method '(cons (eql lambda)))
-             (assert (not (member :host usable-by)))
-             (values nil `(funcall ,method obj env)))
-            (t
-             (ecase method
-               ((nil)
-                (values '(cl:make-load-form-saving-slots obj :environment env)
-                        :sb-just-dump-it-normally))
-               (:ignore-it
-                (values '(bug "Can't :ignore-it for host")
-                        :ignore-it)))))
+      (case method
+        ((nil) ; default
+         (values '(cl:make-load-form-saving-slots obj :environment env)
+                 '(sb!xc:make-load-form-saving-slots obj :environment env)))
+        (:ignore-it
+         (values '(bug "Can't :ignore-it for host") :ignore-it))
+        (t
+         (assert (not (member :host usable-by)))
+         (values nil `(funcall ,method obj env))))
     `(progn
        ,@(when (or #+sb-xc-host (member :host usable-by))
            `((defmethod make-load-form ((obj ,class-name) &optional env)

@@ -2007,10 +2007,9 @@ SPEED and COMPILATION-SPEED optimization values, and the
 ;;; circular object.
 ;;;
 ;;; If the constant doesn't show up in *CONSTANTS-BEING-CREATED*, then
-;;; we have to create it. We call MAKE-LOAD-FORM and check to see
-;;; whether the creation form is the magic value
-;;; :SB-JUST-DUMP-IT-NORMALLY. If it is, then we don't do anything. The
-;;; dumper will eventually get its hands on the object and use the
+;;; we have to create it. We call %MAKE-LOAD-FORM and check
+;;; if the result is 'FOP-STRUCT, and if so we don't do anything.
+;;; The dumper will eventually get its hands on the object and use the
 ;;; normal structure dumping noise on it.
 ;;;
 ;;; Otherwise, we bind *CONSTANTS-BEING-CREATED* and
@@ -2042,18 +2041,9 @@ SPEED and COMPILATION-SPEED optimization values, and the
       (fopcompile `(symbol-global-value ',name) nil t nil)
       (fasl-note-handle-for-constant constant (sb!fasl::dump-pop fasl) fasl)
       (return-from emit-make-load-form nil))
-    (multiple-value-bind (creation-form init-form)
-        (handler-case (sb!xc:make-load-form constant (make-null-lexenv))
-          (error (condition) (compiler-error condition)))
-      #-sb-xc-host
-      (when (and (not namep)
-                 (listp creation-form) ; skip if already a magic keyword
-                 (typep constant 'structure-object)
-                 (sb!kernel::canonical-slot-saving-forms-p
-                  constant creation-form init-form))
-        (setq creation-form :sb-just-dump-it-normally))
+    (multiple-value-bind (creation-form init-form) (%make-load-form constant)
       (case creation-form
-        (:sb-just-dump-it-normally
+        (sb!fasl::fop-struct
          (fasl-validate-structure constant fasl)
          t)
         (:ignore-it

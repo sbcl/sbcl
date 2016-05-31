@@ -277,9 +277,12 @@
           ;; CLOS implementation
           '(sb!mop:class-finalized-p
             sb!mop:class-prototype
+            sb!mop:class-slots
             sb!mop:eql-specializer-object
             sb!mop:finalize-inheritance
             sb!mop:generic-function-name
+            sb!mop:slot-definition-allocation
+            sb!mop:slot-definition-name
             sb!pcl::%force-cache-flushes
             sb!pcl::check-wrapper-validity
             sb!pcl::class-has-a-forward-referenced-superclass-p
