@@ -705,7 +705,7 @@
   ;; size. If unbounded, this is the size that the SB is initially
   ;; allocated at.
   (size 0 :type index))
-(!set-load-form-method sb (:host :xc) :sb-just-dump-it-normally)
+(!set-load-form-method sb (:host :xc))
 (defprinter (sb)
   name)
 

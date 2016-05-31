@@ -303,4 +303,4 @@ the stack without triggering overflow protection.")
   (alien-name (missing-arg) :type simple-string)
   ;; Data or code?
   (datap (missing-arg) :type boolean))
-(!set-load-form-method heap-alien-info (:xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method heap-alien-info (:xc :target))

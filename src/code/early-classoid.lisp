@@ -78,8 +78,7 @@
   ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :unspecified)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
-(!set-load-form-method defstruct-description
-                       (:host :xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method defstruct-description (:host :xc :target))
 
 ;;;; basic LAYOUT stuff
 

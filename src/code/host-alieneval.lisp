@@ -840,7 +840,7 @@
             (alien-record-field-type field)
             (alien-record-field-name field)
             (alien-record-field-bits field))))
-(!set-load-form-method alien-record-field (:xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method alien-record-field (:xc :target))
 
 (define-alien-type-class (record :include mem-block)
   (kind :struct :type (member :struct :union))
@@ -1098,7 +1098,7 @@
   ;; Must this local alien be forced into memory? Using the ADDR macro
   ;; on a local alien will set this.
   (force-to-memory-p nil :type (member t nil)))
-(!set-load-form-method local-alien-info (:xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method local-alien-info (:xc :target))
 (defmethod print-object ((info local-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (format stream

@@ -77,7 +77,7 @@
                      (cons value-form (package-name *package*))
                      (delete symbol (symbol-value list) :key #'car)))))
 
-(defmacro !set-load-form-method (class-name usable-by method)
+(defmacro !set-load-form-method (class-name usable-by &optional method)
   ;; If USABLE-BY is:
   ;;  :host   - the host compiler can execute this M-L-F method
   ;;  :xc     - the cross-compiler can execute this M-L-F method
@@ -91,7 +91,7 @@
              (values nil `(funcall ,method obj env)))
             (t
              (ecase method
-               (:sb-just-dump-it-normally
+               ((nil)
                 (values '(cl:make-load-form-saving-slots obj :environment env)
                         :sb-just-dump-it-normally))
                (:ignore-it

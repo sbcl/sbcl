@@ -697,7 +697,7 @@
   (class 'root :type symbol :read-only t)
   (bits nil :type (or null unsigned-byte))
   (alignment nil :type (or null unsigned-byte)))
-(!set-load-form-method alien-type (:xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method alien-type (:xc :target))
 
 (in-package "SB!KERNEL")
 (defstruct (alien-type-type

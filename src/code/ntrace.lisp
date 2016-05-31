@@ -76,7 +76,7 @@
   (break-after nil)
   ;; list of null environment forms
   (print-after () :type list))
-(!set-load-form-method trace-info (:target) :sb-just-dump-it-normally)
+(!set-load-form-method trace-info (:target))
 
 ;;; This is a list of conses (fun-end-cookie . condition-satisfied),
 ;;; which we use to note distinct dynamic entries into functions. When

@@ -32,7 +32,7 @@
 (defun comma-constructor (x)
   (svref #(unquote unquote-nsplice unquote-splice) (comma-kind x)))
 (defun comma-splicing-p (comma) (not (zerop (comma-kind comma))))
-(!set-load-form-method comma (:host :xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method comma (:host :xc :target))
 
 (declaim (type (and fixnum unsigned-byte) *backquote-depth*))
 (defvar *backquote-depth* 0 #!+sb-doc "how deep we are into backquotes")

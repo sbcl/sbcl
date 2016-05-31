@@ -54,8 +54,8 @@
   (variable-length-p nil :type (member t nil) :read-only t))
 
 (declaim (freeze-type prim-object-slot primitive-object))
-(!set-load-form-method prim-object-slot (:host :xc) :sb-just-dump-it-normally)
-(!set-load-form-method primitive-object (:host :xc) :sb-just-dump-it-normally)
+(!set-load-form-method prim-object-slot (:host :xc))
+(!set-load-form-method primitive-object (:host :xc))
 
 (defvar *primitive-objects* nil)
 

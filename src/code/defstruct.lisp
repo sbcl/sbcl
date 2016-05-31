@@ -151,8 +151,7 @@
   (%raw-type -1 :type (integer -1 (#.(length *raw-slot-data*))))
   (read-only nil :type (member t nil)))
 #!-sb-fluid (declaim (freeze-type defstruct-slot-description))
-(!set-load-form-method defstruct-slot-description
-                       (:host :xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method defstruct-slot-description (:host :xc :target))
 (defmethod print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))

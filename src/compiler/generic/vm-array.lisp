@@ -225,7 +225,7 @@
   (kind (missing-arg)
         :type (member :other :small-other :closure :instance :list
                       :code :vector-nil :weak-pointer)))
-(!set-load-form-method room-info (:xc) :sb-just-dump-it-normally)
+(!set-load-form-method room-info (:xc))
 
 (in-package "SB!C")
 

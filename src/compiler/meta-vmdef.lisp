@@ -289,7 +289,7 @@
   (sc nil :type (or symbol null))
   ;; If non-null, we are a temp wired to this offset in SC.
   (offset nil :type (or unsigned-byte null)))
-(!set-load-form-method operand-parse (:host :xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method operand-parse (:host :xc :target))
 
 ;;; A VOP-PARSE object holds everything we need to know about a VOP at
 ;;; meta-compile time.
@@ -352,7 +352,7 @@
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return)))
-(!set-load-form-method vop-parse (:host :xc :target) :sb-just-dump-it-normally)
+(!set-load-form-method vop-parse (:host :xc :target))
 (defprinter (vop-parse)
   name
   (inherits :test inherits)

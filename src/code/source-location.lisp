@@ -24,8 +24,7 @@
   (form-number nil :type (or fixnum null) :read-only t)
   ;; plist from WITH-COMPILATION-UNIT
   (plist *source-plist* :read-only t))
-(!set-load-form-method definition-source-location  (:xc :target)
-                       :sb-just-dump-it-normally)
+(!set-load-form-method definition-source-location  (:xc :target))
 
 (defun make-definition-source-location ()
   (let* ((source-info (and (boundp '*source-info*) *source-info*))

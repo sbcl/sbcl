@@ -23,7 +23,7 @@
   for
   (costs (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
   (counts (missing-arg) :type (simple-array (unsigned-byte 32) (*))))
-(!set-load-form-method dyncount-info (:target) :sb-just-dump-it-normally)
+(!set-load-form-method dyncount-info (:target))
 
 (defprinter (dyncount-info)
   for
