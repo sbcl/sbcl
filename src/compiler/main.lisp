@@ -1483,7 +1483,29 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Compile the FORMS and arrange for them to be called (for effect,
 ;;; not value) at load time.
-(defun compile-make-load-form-init-forms (forms)
+(defun compile-make-load-form-init-forms (forms fasl)
+  ;; If FORMS has exactly one PROGN containing a call of SB-PCL::SET-SLOTS,
+  ;; then fopcompile it, otherwise use the main compiler.
+  (when (singleton-p forms)
+    (let ((call (car forms)))
+      (when (typep call '(cons (eql sb!pcl::set-slots) (cons instance)))
+        (pop call)
+        (let ((instance (pop call))
+              (slot-names (pop call))
+              (value-forms call)
+              (values))
+          (when (and (every #'symbolp slot-names)
+                     (every #'sb!xc:constantp value-forms))
+            (dolist (x value-forms)
+              (let ((val (constant-form-value x)))
+                ;; invoke recursive MAKE-LOAD-FORM stuff as necessary
+                (find-constant val)
+                (push val values)))
+            (mapc (lambda (x) (dump-object x fasl)) (nreverse values))
+            (dump-object (cons (length slot-names) slot-names) fasl)
+            (dump-object instance fasl)
+            (dump-fop 'sb!fasl::fop-set-slot-values fasl)
+            (return-from compile-make-load-form-init-forms))))))
   (let ((lambda (compile-load-time-stuff `(progn ,@forms) nil)))
     (fasl-dump-toplevel-lambda-call lambda *compile-object*)))
 
@@ -2049,8 +2071,16 @@ SPEED and COMPILATION-SPEED optimization values, and the
                  (catch constant
                    (fasl-note-handle-for-constant
                     constant
-                    (or (fopcompile-allocate-instance fasl creation-form)
-                        (compile-load-time-value creation-form))
+                    (cond ((typep creation-form
+                                  '(cons (eql sb!kernel::new-instance)
+                                         (cons symbol null)))
+                           (dump-object (cadr creation-form) fasl)
+                           (dump-fop 'sb!fasl::fop-allocate-instance fasl)
+                           (let ((index (sb!fasl::fasl-output-table-free fasl)))
+                             (setf (sb!fasl::fasl-output-table-free fasl) (1+ index))
+                             index))
+                          (t
+                           (compile-load-time-value creation-form)))
                     fasl)
                    nil)
                (compiler-error "circular references in creation form for ~S"
@@ -2061,8 +2091,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
                      (catch 'pending-init
                        (loop for (nil form) on (cdr info) by #'cddr
                          collect form into forms
-                         finally (or (fopcompile-constant-init-forms fasl forms)
-                                     (compile-make-load-form-init-forms forms)))
+                         finally (compile-make-load-form-init-forms forms fasl))
                        nil)))
                (when circular-ref
                  (setf (cdr circular-ref)

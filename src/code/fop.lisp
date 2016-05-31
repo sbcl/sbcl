@@ -193,14 +193,14 @@
 ;; This wants a 'count' as the first item in the SLOT-NAMES argument
 ;; rather than using read-arg because many calls of this might share
 ;; the list, which must be constructed into the fop-table no matter what.
-(!define-fop 69 :not-host (fop-initialize-instance (slot-names obj) nil)
+(!define-fop 69 :not-host (fop-set-slot-values (slot-names obj) nil)
   (let* ((n-slots (pop slot-names))
          (stack (operand-stack))
          (ptr (fop-stack-pop-n stack n-slots)))
       (dotimes (i n-slots)
         (let ((val (svref stack (+ ptr i)))
               (slot-name (pop slot-names)))
-          (if (eq val 'sb!pcl::..slot-unbound..)
+          (if (eq val sb!pcl:+slot-unbound+)
               ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
               (slot-makunbound obj slot-name)
               (setf (slot-value obj slot-name) val))))))

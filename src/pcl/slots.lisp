@@ -494,3 +494,11 @@
            :format-control "~S called on ~S, which is not yet finalized."
            :format-arguments (list 'class-slots class)
            :references (list '(:amop :generic-function class-slots)))))
+
+(defun %set-slots (object names &rest values)
+  (mapc (lambda (name value)
+          (if (eq value +slot-unbound+)
+              ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
+              (slot-makunbound object name)
+              (setf (slot-value object name) value)))
+        names values))

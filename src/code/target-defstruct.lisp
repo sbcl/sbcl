@@ -296,9 +296,9 @@
 ;; or otherwise examined. So instead we scan the code and detect whether it is
 ;; identical to what was returned from a trivial use of M-L-F-S-S.
 (defun canonical-slot-saving-forms-p (struct creation-form init-form)
-  (and (sb!c::canonical-instance-maker-form-p creation-form)
+  (and (typep creation-form '(cons (eql new-instance) (cons symbol null)))
        (typep init-form '(cons (eql setf)))
-       (eq (cadr (cadr (cadr creation-form))) (class-name (class-of struct)))
+       (eq (cadr creation-form) (class-name (class-of struct)))
        (= (length (dd-slots (layout-info (%instance-layout struct))))
           (ash (list-length (cdr init-form)) -1))
        (flet ((eq-quoted-p (a b)

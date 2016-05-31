@@ -231,24 +231,26 @@ sb-impl::
 ;;
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)
   (declare (ignore environment))
-  (if (typep object 'structure-object)
-      (values `(allocate-instance (find-class ',(class-name (class-of object))))
-              `(setf ,@(sb-kernel::structure-obj-slot-saving-forms
-                        object slot-names slot-names-p)))
-      (let* ((class (class-of object))
-             (inits
-              (mapcan
-               (lambda (slot)
-                 (let ((slot-name (slot-definition-name slot)))
-                   (when (if slot-names-p
-                             (memq slot-name slot-names)
-                             (eq :instance (slot-definition-allocation slot)))
-                     (list (if (slot-boundp-using-class class object slot)
-                               `(setf (slot-value ,object ',slot-name)
-                                      ',(slot-value-using-class class object slot))
-                               ;; Why is this needed? Is it not specified that
-                               ;; everything defaults to unbound?
-                               `(slot-makunbound ,object ',slot-name))))))
-               (class-slots class))))
-        (values `(allocate-instance (find-class ',(class-name class)))
-                `(progn ,@inits)))))
+  (values
+   (let ((type (type-of object)))
+     (if (symbolp type)
+         `(sb-kernel::new-instance ,type)
+         ;; If TYPE-OF isn't a symbol, the creation form probably can't be compiled
+         ;; unless there is a MAKE-LOAD-FORM on the class without a proper-name.
+         ;; This is better than returning a creation form that produces
+         ;; something completely different.
+         `(allocate-instance ,type)))
+   (if (typep object 'structure-object)
+       `(setf ,@(sb-kernel::structure-obj-slot-saving-forms
+                 object slot-names slot-names-p))
+       (loop for slot in (class-slots (class-of object))
+             for name = (slot-definition-name slot)
+             when (if slot-names-p
+                      (memq name slot-names)
+                      (eq (sb-mop:slot-definition-allocation slot) :instance))
+             collect name into names
+             and
+             collect (if (slot-boundp object name)
+                         `',(slot-value object name)
+                         '+slot-unbound+) into vals
+             finally (return `(set-slots ,object ,names ,@vals))))))

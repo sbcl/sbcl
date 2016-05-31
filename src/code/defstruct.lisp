@@ -2014,4 +2014,10 @@ or they must be declared locally notinline at each call site.~@:>"
                      (equal (slot-access-transform mode xform-args info) form))
             (return-from defstruct-generated-defn-p :accessor)))))))
 
+;;; It's easier for the compiler to recognize the output of M-L-F-S-S
+;;; without extraneous QUOTE forms, so we define some trivial wrapper macros.
+(defmacro new-instance (type) `(allocate-instance (find-class ',type)))
+(defmacro sb!pcl::set-slots (instance name-list &rest values)
+  `(sb!pcl::%set-slots ,instance ',name-list ,@values))
+
 (/show0 "code/defstruct.lisp end of file")

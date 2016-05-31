@@ -50,7 +50,8 @@
   #.(make-foo :x "X" :y "Y"))
 
 (assert (equalp (foo-x *foo*) '("X")))
-(assert (eql (foo-y *foo*) *foo*))
+(assert (locally (declare (notinline eql)) ; noise suppression
+                 (eql (foo-y *foo*) *foo*)))
 
 ;;; Logical pathnames should be dumpable, too, but what does it mean?
 ;;; As of sbcl-0.7.7.16, we've taken dumping the host part to mean
@@ -323,17 +324,17 @@
   (defclass twp2 (twp) ())
   (defmethod make-load-form ((x twp2) &optional environment)
     (declare (ignore environment))
-    (make-load-form-saving-slots x))
-  (defvar *call-tracker* nil)
-  (defun call-tracker (f &rest args)
-    (push f *call-tracker*)
-    (apply (the function f) args))
-  (defvar *track-funs*
-     'sb-c::(fopcompile-allocate-instance
-             fopcompile-constant-init-forms
-             compile-make-load-form-init-forms))
-  (dolist (f *track-funs*)
-    (sb-int:encapsulate f 'track #'call-tracker)))
+    (make-load-form-saving-slots x)))
+
+;; Track the make-load-form FOPs as they fly by at load-time.
+(defvar *call-tracker* nil)
+(dolist (fop-name 'sb-fasl::(fop-allocate-instance fop-set-slot-values))
+  (let* ((index (position fop-name sb-fasl::**fop-names**))
+         (fun (the function (aref sb-fasl::**fop-funs** index))))
+    (setf (aref sb-fasl::**fop-funs** index)
+          (lambda (&rest args)
+            (push fop-name *call-tracker*)
+            (apply fun args)))))
 
 ;; Same as *X* but the MAKE-LOAD-FORM method is different
 (defvar *y*
@@ -344,15 +345,50 @@
         (b p q r s)
         (c d e g))))
 
-(eval-when (:compile-toplevel)
-  (dolist (f *track-funs*)
-    (sb-int:unencapsulate f 'track))
-  (assert (= 14 (count #'sb-c::fopcompile-allocate-instance
-                       *call-tracker*)))
-  (assert (= 14 (count #'sb-c::fopcompile-constant-init-forms
-                       *call-tracker*)))
-  (assert (not (find #'sb-c::compile-make-load-form-init-forms
-                     *call-tracker*))))
+(assert (= 14 (count 'sb-fasl::fop-allocate-instance *call-tracker*)))
+(assert (= 14 (count 'sb-fasl::fop-set-slot-values *call-tracker*)))
 
 (with-test (:name :tree-with-parent-m-l-f-s-s)
   (verify-tree *y*))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass class-with-shared-slot ()
+    ((a-slot :allocation :class :initarg :a :accessor thing-a)))
+  (defmethod make-load-form ((self class-with-shared-slot) &optional environment)
+    (declare (ignore environment))
+    (make-load-form-saving-slots self :slot-names '(a-slot))))
+
+(defvar *fool1* (make-instance 'class-with-shared-slot :a 42))
+(defvar *fool2* #.(let ((i (make-instance 'class-with-shared-slot)))
+                    (slot-makunbound i 'a-slot)
+                    i))
+
+;; The CLHS writeup is slightly ambiguous about what to with unbound
+;; standard-object slots. Assuming that "initialized" and "uninitialized"
+;; correspond to slots for which SLOT-BOUNDP would return T
+;; and NIL respectively, the meaning of
+;;  "initialized slots in object are initialized ..."
+;; can only mean that you write values into slots of the reconstructed
+;; object that were bound in the compile-time object.
+;;
+;; However "Uninitialized slots in object are not initialized" has two
+;; opposing meanings depending on whether the verb is "are" which
+;; expresses state versus "are [not] initialized" which expresses inaction.
+;; For a similar grammatical construction, DEFINE-METHOD-COMBINATION
+;; says in the "Short Form" description that:
+;;   "that method serves as the effective method and operator is not called."
+;; In that sentence "is [not] called" means that "calling" does NOT happen.
+;; Analogously, "is [not] initialized" would imply that initializing
+;; does NOT happen; it does NOT imply that "uninitializing" DOES happen.
+;;
+;; It seems though, that "are [not] initialized" actually means
+;; SHALL be made to become uninitialized. This is based on the Notes
+;; below the main description referencing SLOT-MAKUNBOUND.
+;; (Though muddied by use of weasel-words "could" and "might")
+;;
+;; Ultimately the two end states (doing something / not doing something)
+;; agree when the slot is local to the object, and no behavior is imparted
+;; by ALLOCATE-INSTANCE to cause slots to be other than unbound.
+;; This tests the edge case: that we DO call slot-makunbound.
+(with-test (:name :mlfss-slot-makunbound)
+  (assert (not (slot-boundp *fool1* 'a-slot))))
