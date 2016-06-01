@@ -92,20 +92,13 @@
 ;;; easily do this optimization in the cross-compiler, and SBCL itself
 ;;; doesn't seem to need this optimization, so we don't try.
 (deftransform sxhash ((x) (simple-string))
-  (if #+sb-xc-host nil #-sb-xc-host (constant-lvar-p x)
-      (sxhash (lvar-value x))
-      '(%sxhash-simple-string x)))
+  (cond #-sb-xc-host ((constant-lvar-p x) (sxhash (lvar-value x)))
+        (t '(%sxhash-simple-string x))))
 (deftransform sxhash ((x) (symbol))
-  (if #+sb-xc-host nil #-sb-xc-host (constant-lvar-p x)
-      (sxhash (lvar-value x))
-      (if (csubtypep (lvar-type x) (specifier-type 'null))
-          ;; FIXME: this isn't in fact as optimized as it could be;
-          ;; this does a memory load, whereas (because we know the
-          ;; layout of NIL) we could simply take the address of NIL
-          ;; (or the contents of NULL-TN) and mask off the appropriate
-          ;; bits, since SYMBOL-HASH of NIL is also NIL's CDR, which
-          ;; is NIL.  -- CSR, 2004-07-14
-          '(symbol-hash x)
+  (cond #-sb-xc-host ((constant-lvar-p x) (sxhash (lvar-value x)))
+        ((csubtypep (lvar-type x) (specifier-type 'null))
+         (ash sb!vm::nil-value (- sb!vm:n-fixnum-tag-bits)))
+        (t
           ;; Cache the value of the symbol's sxhash in the symbol-hash
           ;; slot.
           '(let ((result (symbol-hash x)))

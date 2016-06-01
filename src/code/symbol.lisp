@@ -119,9 +119,7 @@ distinct from the global value. Can also be SETF."
               (and (char= (schar string 0) #\N)
                    (char= (schar string 1) #\I)
                    (char= (schar string 2) #\L)))))
-      ;; FIXME: hardwire this. See similar comment at
-      ;;   (deftransform sxhash ((x) (symbol))
-      (return-from compute-symbol-hash (symbol-hash nil)))
+      (return-from compute-symbol-hash (sxhash nil)))
   ;; And make a symbol's hash not the same as (sxhash name) in general.
   (let ((sxhash (logand (lognot (%sxhash-simple-substring string length))
                         sb!xc:most-positive-fixnum)))
