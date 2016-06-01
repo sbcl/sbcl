@@ -596,7 +596,7 @@
               (setf (node-tail-p use) t)))))))
   ;; The above loop does not find all calls to ERROR.
   (do-blocks (block component)
-    (do-nodes (node lvar block)
+    (do-nodes (node nil block)
       ;; CAUTION: This looks scary because it affects all known nil-returning
       ;; calls even if not in tail position. Use of the policy quality which
       ;; enables tail-p must be confined to a very restricted lexical scope.

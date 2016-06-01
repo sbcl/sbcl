@@ -4536,7 +4536,7 @@
          (concatenate
           'string
           ,@(let ((strings
-                    (loop for (directive rest) on tokenized
+                    (loop for directive in tokenized
                           for char = (and (not (stringp directive))
                                           (sb!format::format-directive-character directive))
                           when

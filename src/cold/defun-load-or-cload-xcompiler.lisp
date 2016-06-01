@@ -242,7 +242,7 @@
   ;; routines.
   (if (and (make-host-1-parallelism)
            (eq load-or-cload-stem #'host-cload-stem))
-      (funcall 'parallel-make-host-1 ; avoid potential style-warning
+      (funcall (intern "PARALLEL-MAKE-HOST-1" 'sb-cold)
                (make-host-1-parallelism))
       (do-stems-and-flags (stem flags)
         (unless (find :not-host flags)

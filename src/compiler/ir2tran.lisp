@@ -684,9 +684,9 @@
                               (args-type-optional type))
                       (list type))))
          (primitive-t *backend-t-primitive-type*))
-    (loop for rtype in rtypes
-          for type = (or (pop types) primitive-t)
-          collect type)))
+    (mapcar (lambda (rtype)
+              (declare (ignore rtype))
+              (or (pop types) primitive-t)) rtypes)))
 
 ;;; Return a list of TNs usable in a CALL to TEMPLATE delivering values to
 ;;; LVAR. As an efficiency hack, we pick off the common case where the LVAR is

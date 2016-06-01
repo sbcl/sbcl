@@ -94,6 +94,7 @@
          (optional-dynamic-space-end
           (when default-dynamic-space-size
             (list (+ dynamic-space-start* default-dynamic-space-size)))))
+    #+ccl safepoint-address ; workaround for incorrect "Unused" warning
     `(progn
        ,@safepoint-page-forms
        ,@small-space-forms

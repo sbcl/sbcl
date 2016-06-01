@@ -1410,7 +1410,6 @@
                         #-sb-xc-host (muffle-conditions compiler-note)
                         (ignorable .pos.))
                ,@(loop with constants = -1
-                       for first = t then nil
                        for value in lvar-values
                        for var in vars
                        collect

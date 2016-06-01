@@ -525,8 +525,8 @@
   ;; The asserts in the GCD implementation are way too expensive to
   ;; check in normal use, and are disabled here.
   (sb!xc:defmacro gcd-assert (&rest args)
-    (if nil
-        `(assert ,@args)))
+    (declare (ignore args))
+    #+sb-bignum-assertions `(assert ,@args))
   ;; We'll be doing a lot of modular arithmetic.
   (sb!xc:defmacro modularly (form)
     `(logand all-ones-digit ,form)))

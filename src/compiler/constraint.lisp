@@ -951,7 +951,7 @@
                           conset)
                 constraint-propagate-in-block))
 (defun constraint-propagate-in-block (block gen preprocess-refs-p)
-  (do-nodes (node lvar block)
+  (do-nodes (node nil block)
     (typecase node
       (bind
        (let ((fun (bind-lambda node)))

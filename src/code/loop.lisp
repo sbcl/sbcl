@@ -1608,6 +1608,7 @@ code to be loaded.
          (limit-given nil) ; T when prep phrase has specified end
          (limit-constantp nil)
          (limit-value nil))
+     #+ccl (progn start-constantp start-value) ; bogus "Unused" warnings
      (flet ((assert-index-for-arithmetic (index)
               (unless (atom index)
                 (loop-error "Arithmetic index must be an atom."))))
