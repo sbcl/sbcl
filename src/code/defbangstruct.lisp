@@ -78,9 +78,9 @@
             (when (find :type options :key #'first)
               (error "can't use :TYPE option in DEF!STRUCT"))
             (values name (second include-clause) options slots))))
-    (when supertype
-      (aver (subtypep supertype 'structure!object)))
     `(progn
+       ,@(when supertype
+           `((aver (subtypep ',supertype 'structure!object))))
        (defstruct (,name
                    ,@(unless supertype '((:include structure!object)))
                    ,@options) ,@slots)
