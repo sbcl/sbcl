@@ -11,6 +11,11 @@
 
 (in-package "SB!IMPL")
 
+;;; The STRUCTURE!OBJECT abstract class is the base of the hierarchy
+;;; of objects that need to be identifiable as SBCL system objects
+;;; in the host Lisp. This type does not exist in the target.
+(defstruct (structure!object (:constructor nil) (:copier nil) (:predicate nil)))
+
 (declaim (declaration truly-dynamic-extent))
 
 ;;; MAYBE-INLINE and FREEZE-TYPE declarations can be safely ignored

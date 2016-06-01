@@ -1933,11 +1933,6 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; only for object dumping.
 #+sb-xc-host
 (progn
-  (defun xc-dumpable-structure-instance-p (x)
-    (and (typep x 'cl:structure-object)
-         (sb!kernel::compiler-layout-ready-p (type-of x))
-         (sb!xc:make-load-form x)
-         t))
   (defun %instance-layout (instance)
     (classoid-layout (find-classoid (type-of instance))))
   (defun %instance-length (instance)

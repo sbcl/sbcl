@@ -1218,11 +1218,10 @@ core and return a descriptor to it."
               (number-to-core (layout-depthoid warm-layout))
               (number-to-core (layout-bitmap warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
-           (s-o-layout (chill-layout 'structure-object t-layout))
-           (s!o-layout (chill-layout 'structure!object t-layout s-o-layout)))
+           (s-o-layout (chill-layout 'structure-object t-layout)))
       (setf *layout-layout*
-            (chill-layout 'layout t-layout s-o-layout s!o-layout))
-      (dolist (layout (list t-layout s-o-layout s!o-layout *layout-layout*))
+            (chill-layout 'layout t-layout s-o-layout))
+      (dolist (layout (list t-layout s-o-layout *layout-layout*))
         (patch-instance-layout layout *layout-layout*))
       (setf *package-layout*
             (chill-layout 'package t-layout s-o-layout)))))

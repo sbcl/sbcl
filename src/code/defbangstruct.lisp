@@ -32,32 +32,6 @@
   ;; DEF!STRUCT is made to work fully, this list is processed, then
   ;; made unbound, and should no longer be used.
   (defvar *delayed-def!structs* nil))
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  ;; Parse the arguments for a DEF!STRUCT call, and return
-  ;;   (VALUES NAME DEFSTRUCT-ARGS DEF!STRUCT-SUPERTYPE),
-  ;; where NAME is the name of the new type, DEFSTRUCT-ARGS is the
-  ;; munged result suitable for passing on to DEFSTRUCT,
-  ;; and DEF!STRUCT-SUPERTYPE is the direct supertype of
-  ;; the type if it is another DEF!STRUCT-defined type, or NIL
-  ;; otherwise.
-  (defun parse-def!struct-args (nameoid &rest rest)
-    (multiple-value-bind (name options) ; Note: OPTIONS can change below.
-        (if (consp nameoid)
-            (values (first nameoid) (rest nameoid))
-            (values nameoid nil))
-      (declare (type list options))
-      (let* ((include-clause (find :include options :key #'first))
-             (def!struct-supertype nil)) ; may change below
-        (when (find :type options :key #'first)
-          (error "can't use :TYPE option in DEF!STRUCT"))
-        (when include-clause
-          (setf def!struct-supertype (second include-clause)))
-        (if (eq name 'structure!object) ; if root of hierarchy
-            (aver (not include-clause))
-            (unless include-clause
-              (setf def!struct-supertype 'structure!object)
-              (push `(:include ,def!struct-supertype) options)))
-        (values name `((,name ,@options) ,@rest) def!struct-supertype)))))
 
 ;;; a helper function for DEF!STRUCT in the #+SB-XC-HOST case: Return
 ;;; DEFSTRUCT-style arguments with any class names in the SB!XC
@@ -86,30 +60,38 @@
              ,@(mapcar #'uncross-option options))
             ,@slots-and-doc))))))
 
-;;; DEF!STRUCT's arguments are like DEFSTRUCT's arguments.
-;;; DEF!STRUCT also does some magic to ensure that anything it defines
-;;; includes STRUCTURE!OBJECT.
+;;; DEF!STRUCT defines a structure for both the host and target.
+;;; The host's structure inherits from STRUCTURE!OBJECT so that we can test
+;;; for containment in the target's type hierarchy with minimal fuss.
+;;; (A similar thing could be achieved by testing the package probably)
+;;; When executed by the cross-compiler, DEF!STRUCT is just DEFSTRUCT.
+#+sb-xc-host
 (defmacro def!struct (&rest args)
-  (multiple-value-bind (name defstruct-args def!struct-supertype)
-      (apply #'parse-def!struct-args args)
+  (multiple-value-bind (name supertype options slots)
+      (destructuring-bind (nameoid &rest slots) args
+        (multiple-value-bind (name options)
+            (if (consp nameoid)
+                (values (first nameoid) (rest nameoid))
+                (values nameoid nil))
+          (declare (type list options))
+          (let ((include-clause (find :include options :key #'first)))
+            (when (find :type options :key #'first)
+              (error "can't use :TYPE option in DEF!STRUCT"))
+            (values name (second include-clause) options slots))))
+    (when supertype
+      (aver (subtypep supertype 'structure!object)))
     `(progn
-       ;; There are two valid cases here: creating the
-       ;; STRUCTURE!OBJECT root of the inheritance hierarchy, or
-       ;; inheriting from STRUCTURE!OBJECT somehow.
-       ;;
-       ;; The invalid case that we want to exclude is when an :INCLUDE
-       ;; clause was used, and the included class didn't inherit from
-       ;; STRUCTURE!OBJECT.
-       ,@(if (eq name 'structure!object)
-             (aver (null def!struct-supertype))
-             `((aver (subtypep ',def!struct-supertype 'structure!object))))
-       (defstruct ,@defstruct-args)
-       #+sb-xc-host ,(let ((u (uncross-defstruct-args defstruct-args)))
-                       (if (boundp '*delayed-def!structs*)
-                           `(push (make-delayed-def!struct :args ',u)
-                                  *delayed-def!structs*)
-                           `(sb!xc:defstruct ,@u)))
+       (defstruct (,name
+                   ,@(unless supertype '((:include structure!object)))
+                   ,@options) ,@slots)
+       ,(let ((u (uncross-defstruct-args args)))
+          (if (boundp '*delayed-def!structs*)
+              `(push (make-delayed-def!struct :args ',u)
+                     *delayed-def!structs*)
+              `(sb!xc:defstruct ,@u)))
        ',name)))
+#-sb-xc-host
+(defmacro def!struct (&rest args) `(defstruct ,@args))
 
 ;;; When building the cross-compiler, this function has to be called
 ;;; some time after SB!XC:DEFSTRUCT is set up, in order to take care
@@ -140,11 +122,3 @@
       ;; because it definitely shouldn't come up in an ordinary build
       ;; process.
       (warn "*DELAYED-DEF!STRUCTS* is already unbound.")))
-
-;;; The STRUCTURE!OBJECT abstract class is the base of the type
-;;; hierarchy for objects which have/use DEF!STRUCT functionality.
-;;; (The extra hackery in DEF!STRUCT-defined things isn't needed for
-;;; STRUCTURE-OBJECTs defined by ordinary, post-warm-init programs, so
-;;; it's only put into STRUCTURE-OBJECTs which inherit from
-;;; STRUCTURE!OBJECT.)
-(def!struct (structure!object (:constructor nil) (:copier nil) (:predicate nil)))

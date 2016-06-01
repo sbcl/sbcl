@@ -1282,9 +1282,7 @@
 ;; But if it learns a layout by cross-compiling a DEFSTRUCT, that's ok too.
 (defun dump-structure (struct file)
   (when (and *dump-only-valid-structures*
-             (not (gethash struct (fasl-output-valid-structures file)))
-             #+sb-xc-host
-             (not (sb!kernel::xc-dumpable-structure-instance-p struct)))
+             (not (gethash struct (fasl-output-valid-structures file))))
     (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
            struct))
   (note-potential-circularity struct file)

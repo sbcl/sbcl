@@ -376,13 +376,6 @@
                       (aver (zerop (layout-bitmap (%instance-layout value))))
                       (do-instance-tagged-slot (i value)
                         (grovel (%instance-ref value i)))))
-                   ;; The cross-compiler can dump certain instances that are not
-                   ;; subtypes of STRUCTURE!OBJECT, as long as it has processed
-                   ;; the defstruct.
-                   #+sb-xc-host
-                   ((satisfies sb!kernel::xc-dumpable-structure-instance-p)
-                    (do-instance-tagged-slot (i value)
-                      (grovel (%instance-ref value i))))
                    (t
                     (compiler-error
                       "Objects of type ~/sb!impl:print-type-specifier/ ~
