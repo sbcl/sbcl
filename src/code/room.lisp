@@ -692,7 +692,7 @@
   (declare (type spaces space)
            (type (or index null) larger smaller type count)
            (type (or function null) test)
-           (inline map-allocated-objects))
+           #!-sb-fluid (inline map-allocated-objects))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
   (collect ((counted 0 1+))
@@ -739,7 +739,8 @@
                    #!-stack-grows-downward-not-upward (sap+ sp (- n-word-bytes))))))
 
 (defun map-referencing-objects (fun space object)
-  (declare (type spaces space) (inline map-allocated-objects))
+  (declare (type spaces space)
+           #!-sb-fluid (inline map-allocated-objects))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
   (flet ((maybe-call (fun obj)
