@@ -1936,17 +1936,8 @@ or they must be declared locally notinline at each call site.~@:>"
   (defun %instance-layout (instance)
     (classoid-layout (find-classoid (type-of instance))))
   (defun %instance-length (instance)
-    ;; INSTANCE-LENGTH tells you how many data words the backend is able to
-    ;; physically access in this structure. Since every structure occupies
-    ;; an even number of words, the storage slots comprise an odd number
-    ;; of words after subtracting 1 for the header.
-    ;; And in fact the fasl dumper / loader do write and read potentially
-    ;; one cell beyond the instance's LAYOUT-LENGTH if it was not odd.
-    ;; I'm not sure whether that is a good or bad thing.
-    ;; But be that as it may, in the cross-compiler you must not access
-    ;; more cells than there are in the declared structure because there
-    ;; is no lower level storage that you can peek at.
-    ;; So INSTANCE-LENGTH is exactly the same as LAYOUT-LENGTH on the host.
+    ;; In the target, it is theoretically possible to have %INSTANCE-LENGTH
+    ;; exceeed layout length, but in the cross-compiler they're the same.
     (layout-length (%instance-layout instance)))
   (defun %instance-ref (instance index)
     (let ((layout (%instance-layout instance)))
