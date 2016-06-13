@@ -208,17 +208,6 @@ To do this, extend ALLOCATE-VECTOR with ALLOW-JUNK argument, and when
 stack allocating don't zero if it is true -- and probably ALLOW-JUNK iff
 the vector is a specialized one (cannot have pointers.)
 --------------------------------------------------------------------------------
-#28
-a. Accessing raw slots in structure instances is more inefficient than
-it could be; if we placed raw slots before the header word, we would
-not need to do arithmetic at runtime to access them.  (But beware:
-this would complicate handling of the interior pointer).
-
-b. (Also note that raw slots are currently disabled on HPPA)
-
-c. Gencgc understands raw slots interleaved with tagged slots.
-x86-64 supports this, and other backends should be made to as well.
---------------------------------------------------------------------------------
 #29
 Python is overly zealous when converting high-level CL functions, such
 as MIN/MAX, LOGBITP, and LOGTEST, to low-level CL functions.  Reducing
