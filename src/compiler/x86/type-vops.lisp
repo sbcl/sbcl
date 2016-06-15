@@ -241,13 +241,13 @@
         (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
         (inst jmp :e single-word)
         ;; If it's other than two, we can't be an (unsigned-byte 32)
-        (inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+        ;: Leave EAX holding 0 in the affirmative case.
+        (inst sub eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
         (inst jmp :ne nope)
-        ;; Get the second digit.
-        (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
-        ;; All zeros, its an (unsigned-byte 32).
-        (inst test eax-tn eax-tn)
-        (inst jmp :z yep)
+        ;; Compare the second digit to zero (in EAX).
+        (inst cmp (make-ea-for-object-slot value (1+ bignum-digits-offset)
+                                           other-pointer-lowtag) eax-tn)
+        (inst jmp :z yep) ; All zeros, its an (unsigned-byte 32).
         (inst jmp nope)
 
         (emit-label single-word)
