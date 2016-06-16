@@ -370,8 +370,7 @@
 (progn
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
-         (symbol :scs (descriptor-reg) :target tmp
-                 :to :load))
+         (symbol :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rax-offset) tls-index)
   (:temporary (:sc unsigned-reg) bsp tmp)
   (:generator 10
