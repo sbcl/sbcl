@@ -286,7 +286,7 @@
 ;;; symbol.
 #!+sb-thread
 (progn
-  (define-vop (bind)
+  (define-vop (dynbind)
     (:args (value :scs (any-reg descriptor-reg) :to :save)
            (symbol :scs (descriptor-reg)))
     (:temporary (:sc descriptor-reg) value-temp)
@@ -360,7 +360,7 @@
     (store-binding-stack-pointer bsp)))
 #!-sb-thread
 (progn
-  (define-vop (bind)
+  (define-vop (dynbind)
     (:args (val :scs (any-reg descriptor-reg))
            (symbol :scs (descriptor-reg)))
     (:temporary (:scs (descriptor-reg)) value-temp)

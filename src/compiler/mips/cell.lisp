@@ -175,7 +175,7 @@
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 
-(define-vop (bind)
+(define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)

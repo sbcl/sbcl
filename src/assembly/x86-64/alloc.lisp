@@ -78,13 +78,12 @@
     ;; fixnumize its answer, which is confusing because it looks like a fixnum.
     ;; But the result of the function ENSURE-SYMBOL-TLS-INDEX is a fixnum whose
     ;; value in Lisp is the number that the assembly code computes,
-    ;; *not* the fixnum whose representation is what it computes.
+    ;; *not* the fixnum whose representation it computes.
     ((:arg symbol (descriptor-reg) rax-offset) ; both input and output
      (:res result (unsigned-reg) rax-offset))
   (let* ((scratch-reg rcx-tn) ; RCX gets callee-saved, not declared as a temp
          ;; The free-index and lock are in the low and high halves of 1 qword.
          (free-tls-index-ea (make-ea-for-symbol-value *free-tls-index*))
-         (spinlock free-tls-index-ea) ; same :qword
          (lock-bit 63) ; the qword's sign bit (any bit > 31 would work fine)
          (tls-full (gen-label)))
     ;; A pseudo-atomic section avoids bad behavior if the current thread were
@@ -94,10 +93,10 @@
     (pseudo-atomic
      (assemble () ; for conversion of tagbody-like labels to assembler labels
      RETRY
-       (inst bts spinlock lock-bit :lock)
+       (inst bts free-tls-index-ea lock-bit :lock)
        (inst jmp :nc got-tls-index-lock)
        (inst pause) ; spin loop hint
-       ;; TODO: yielding the CPU here would be a good idea
+       ;; TODO: yielding the CPU here might be a good idea
        (inst jmp retry)
      GOT-TLS-INDEX-LOCK
        ;; Now we hold the spinlock. With it held, see if the symbol's
@@ -107,7 +106,7 @@
        ;; CMP against memory showed the tls-index to be valid, so clear the lock
        ;; and re-read the memory (safe because transition can only occur to
        ;; a nonzero value), then jump out to end the PA section.
-       (inst btr spinlock lock-bit :lock)
+       (inst btr free-tls-index-ea lock-bit :lock)
        (inst mov (reg-in-size symbol :dword) (tls-index-of symbol))
        (inst jmp done)
      NEW-TLS-INDEX
@@ -131,7 +130,7 @@
     ;; The disassembly of this code looks nicer when the failure path
     ;; immediately follows the ordinary path vs. being in *ELSEWHERE*.
     (inst pop (reg-in-size scratch-reg :qword)) ; balance the stack
-    (inst btr spinlock lock-bit :lock)
+    (inst btr free-tls-index-ea lock-bit :lock)
     (%clear-pseudo-atomic)
     ;; There's a spurious RET instruction auto-inserted, but no matter.
     (error-call nil 'tls-exhausted-error)))

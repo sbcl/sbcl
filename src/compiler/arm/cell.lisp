@@ -170,7 +170,7 @@
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
 
-(define-vop (bind)
+(define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) value-temp)

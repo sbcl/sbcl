@@ -368,7 +368,7 @@
 
 #!+sb-thread
 (progn
-(define-vop (bind)
+(define-vop (dynbind) ; bind a symbol in a PROGV form
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rax-offset) tls-index)
@@ -389,12 +389,7 @@
     (storew tls-index bsp (- binding-symbol-slot binding-size))
     (inst mov (make-ea :qword :base thread-base-tn :index tls-index) val)))
 
-;; Nikodemus hypothetically terms the above VOP DYNBIND (in x86/cell.lisp)
-;; with this "new" one being BIND, but to re-purpose concepts in that way
-;; - though it be rational - is fraught with peril.
-;; So BIND/LET is for (LET ((*a-special* ...)))
-;;
-(define-vop (bind/let)
+(define-vop (bind) ; bind a known symbol
   (:args (val :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg) bsp tmp)
   (:info symbol)
@@ -415,16 +410,10 @@
       ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
       (inst mov (make-ea :dword :base bsp
                          :disp (ash binding-symbol-slot word-shift)) tls-index)
-      (inst mov tls-cell val))
-    ;; Emission of this VOP informs the compiler that later SYMBOL-VALUE calls
-    ;; should use a load-time constant displacement to the TLS for this symbol.
-    (unless (info :variable :wired-tls symbol)
-      ;; setting INFO is inefficient when done repeatedly for no reason.
-      ;; (I should fix that)
-      (setf (info :variable :wired-tls symbol) :always-has-tls)))))
+      (inst mov tls-cell val)))))
 
 #!-sb-thread
-(define-vop (bind)
+(define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp bsp)

@@ -928,13 +928,17 @@
    (let ((size (matching-operand-size dst src)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
-            (cond ((integerp src)
+            (cond ((or (integerp src)
+                       (and (fixup-p src)
+                            (eq (fixup-flavor src) :symbol-tls-index)))
                    (emit-byte-with-reg segment
                                        (if (eq size :byte)
                                            #b10110
                                            #b10111)
                                        (reg-tn-encoding dst))
-                   (emit-sized-immediate segment size src))
+                   (if (fixup-p src)
+                       (emit-absolute-fixup segment src)
+                       (emit-sized-immediate segment size src)))
                   ((and (fixup-p src) (accumulator-p dst))
                    (emit-byte segment
                               (if (eq size :byte)

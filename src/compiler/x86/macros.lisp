@@ -93,6 +93,10 @@
            (ash symbol-value-slot word-shift)
            (- other-pointer-lowtag))))
 
+(defmacro tls-index-of (symbol)
+  `(make-ea-for-object-slot ,symbol ,sb!vm:symbol-tls-index-slot
+                            ,other-pointer-lowtag))
+
 (defmacro load-symbol-value (reg symbol)
   `(inst mov ,reg (make-ea-for-symbol-value ,symbol)))
 

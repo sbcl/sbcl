@@ -293,7 +293,7 @@
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 #!+sb-thread
-(define-vop (bind)
+(define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
@@ -304,6 +304,7 @@
      (inst bne TLS-VALID)
 
      ;; No TLS slot allocated, so allocate one.
+     ;; FIXME: this is a ridiculous number of instructions to emit inline.
      (pseudo-atomic (pa-flag)
        (without-scheduling ()
          (assemble ()
@@ -349,7 +350,7 @@
      (inst stwx val thread-base-tn tls-index)))
 
 #!-sb-thread
-(define-vop (bind)
+(define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
