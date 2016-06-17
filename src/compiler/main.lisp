@@ -23,8 +23,7 @@
                   *compiler-warning-count* *compiler-style-warning-count*
                   *compiler-note-count*
                   *compiler-error-bailout*
-                  *last-source-context* *last-original-source*
-                  *last-source-form* *last-format-string* *last-format-args*
+                  *last-format-string* *last-format-args*
                   *last-message-count* *last-error-context*
                   *lexenv* *fun-names-in-this-file*
                   *allow-instrumenting*))
@@ -1698,9 +1697,6 @@ necessary, since type inference may take arbitrarily long to converge.")
            (declare (ignore error))
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
-        (*last-source-context* nil)
-        (*last-original-source* nil)
-        (*last-source-form* nil)
         (*last-format-string* nil)
         (*last-format-args* nil)
         (*last-message-count* 0)
