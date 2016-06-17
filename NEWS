@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.3.6:
+  * optimization: faster operations on list-sets.
+  * optimization: better type derivition of set functions.
+    (lp#1592152)
+
 changes in sbcl-1.3.6 relative to sbcl-1.3.5:
   * bug fix: do not insert conditional newlines in print-unreadable-object
     (lp#1398290). This reverses a change made in lp#488979 which reversed

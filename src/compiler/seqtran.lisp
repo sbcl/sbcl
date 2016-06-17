@@ -1996,3 +1996,56 @@
 
 (deftransform nreverse ((sequence) (list) * :important nil)
   `(sb!impl::list-nreverse sequence))
+
+(deftransform nintersection ((list1 list2 &rest args))
+  (let ((null-type (specifier-type 'null)))
+    (if (or (csubtypep (lvar-type list1) null-type)
+            (csubtypep (lvar-type list2) null-type))
+        nil
+        (give-up-ir1-transform))))
+
+(deftransform intersection ((list1 list2 &rest args))
+  (let ((null-type (specifier-type 'null)))
+    (if (or (csubtypep (lvar-type list1) null-type)
+            (csubtypep (lvar-type list2) null-type))
+        nil
+        (give-up-ir1-transform))))
+
+(defoptimizer (union derive-type) ((list1 list2 &rest args))
+  (declare (ignore args))
+  (let ((cons-type (specifier-type 'cons)))
+    (if (or (csubtypep (lvar-type list1) cons-type)
+            (csubtypep (lvar-type list2) cons-type))
+        cons-type
+        (specifier-type 'list))))
+
+(defoptimizer (nunion derive-type) ((list1 list2 &rest args))
+  (declare (ignore args))
+  (let ((cons-type (specifier-type 'cons)))
+    (if (or (csubtypep (lvar-type list1) cons-type)
+            (csubtypep (lvar-type list2) cons-type))
+        cons-type
+        (specifier-type 'list))))
+
+(deftransform set-difference ((list1 list2 &rest args))
+  (let ((null-type (specifier-type 'null)))
+    (cond ((csubtypep (lvar-type list1) null-type)
+           nil)
+          ((csubtypep (lvar-type list2) null-type)
+           'list1)
+          (t
+           (give-up-ir1-transform)))))
+
+(deftransform nset-difference ((list1 list2 &rest args))
+  (let ((null-type (specifier-type 'null)))
+    (cond ((csubtypep (lvar-type list1) null-type)
+           nil)
+          ((csubtypep (lvar-type list2) null-type)
+           'list1)
+          (t
+           (give-up-ir1-transform)))))
+
+(deftransform subsetp ((list1 list2 &rest args))
+  (if (csubtypep (lvar-type list1) (specifier-type 'null))
+      t
+      (give-up-ir1-transform)))
