@@ -135,14 +135,36 @@
         ((funcall test x y) t)
         (t ())))
 
-(defun tree-equal (x y &key (test #'eql testp) (test-not nil notp))
+(defun tree-equal-eql (x y)
+  (labels ((recurse (x y)
+             (if (eq x y)
+                 t
+                 (do ((x x (cdr x))
+                      (y y (cdr y)))
+                     ((or (atom x)
+                          (atom y))
+                      (eql x y))
+                   (cond ((consp (car x))
+                          (when (atom (car y))
+                            (return-from tree-equal-eql))
+                          (recurse (car x) (car y)))
+                         ((not (eql (car x) (car y)))
+                          (return-from tree-equal-eql)))))))
+    (recurse x y)))
+
+(defun tree-equal (x y &key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return T if X and Y are isomorphic trees with identical leaves."
-  (when (and testp notp)
-    (error ":TEST and :TEST-NOT were both supplied."))
-  (if test-not
-      (tree-equal-test-not x y (%coerce-callable-to-fun test-not))
-      (tree-equal-test x y (%coerce-callable-to-fun test))))
+  (cond (notp
+         (when testp
+           (error ":TEST and :TEST-NOT were both supplied."))
+         (tree-equal-test-not x y (%coerce-callable-to-fun test-not)))
+        ((or (not test)
+             (eql test #'eql)
+             (eql test 'eql))
+         (tree-equal-eql x y))
+        (t
+         (tree-equal-test x y (%coerce-callable-to-fun test)))))
 
 (defun endp (object)
   #!+sb-doc

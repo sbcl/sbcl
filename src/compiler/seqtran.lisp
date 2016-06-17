@@ -2049,3 +2049,9 @@
   (if (csubtypep (lvar-type list1) (specifier-type 'null))
       t
       (give-up-ir1-transform)))
+
+(deftransform tree-equal ((list1 list2 &key test test-not))
+  (if (or (and test
+               (not (lvar-fun-is test '(eql)))) test-not)
+      (give-up-ir1-transform)
+      `(sb!impl::tree-equal-eql list1 list2)))
