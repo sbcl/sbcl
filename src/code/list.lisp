@@ -887,36 +887,81 @@
                (%adjoin-key item list key)
                (%adjoin item list))))))
 
+;;; For cases where MEMBER is called in a loop this allows to perform
+;;; the dispatch that the MEMBER function does only once.
+(defmacro with-member-test (test-var &body body)
+  `(let* ((key (and key (%coerce-callable-to-fun key)))
+          (,test-var (cond (testp
+                            (if key
+                                (lambda (x list2 key test)
+                                  (%member-key-test (funcall (truly-the function key) x)
+                                                    list2 key test))
+                                (lambda (x list2 key test)
+                                  (declare (ignore key))
+                                  (%member-test x list2 test))))
+                           (notp
+                            (if key
+                                (lambda (x list2 key test)
+                                  (%member-key-test-not (funcall (truly-the function key) x)
+                                                        list2 key test))
+                                (lambda (x list2 key test)
+                                  (declare (ignore key))
+                                  (%member-test-not x list2 test))))
+                           (key
+                            (lambda (x list2 key test)
+                              (declare (ignore test))
+                              (%member-key (funcall (truly-the function key) x) list2 key)))
+                           (t
+                            (lambda (x list2 key test)
+                              (declare (ignore key test))
+                              (%member x list2)))))
+          (test (cond (testp
+                       (%coerce-callable-to-fun test))
+                      (notp
+                       (%coerce-callable-to-fun test-not)))))
+
+     ,@body))
+
 (defconstant +list-based-union-limit+ 80)
 
-(defun union (list1 list2 &key key (test #'eql testp) (test-not nil notp))
+(defun hash-table-test-p (fun)
+  (or (eq fun #'eq)
+      (eq fun #'eql)
+      (eq fun #'equal)
+      (eq fun #'equalp)
+      (eq fun 'eq)
+      (eq fun 'eql)
+      (eq fun 'equal)
+      (eq fun 'equalp)))
+
+(defun union (list1 list2 &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the union of LIST1 and LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   ;; We have two possibilities here: for shortish lists we pick up the
   ;; shorter one as the result, and add the other one to it. For long
   ;; lists we use a hash-table when possible.
   (let ((n1 (length list1))
-        (n2 (length list2))
-        (key (and key (%coerce-callable-to-fun key)))
-        (test (if notp
-                  (let ((test-not-fun (%coerce-callable-to-fun test-not)))
-                    (lambda (x y) (not (funcall test-not-fun x y))))
-                  (%coerce-callable-to-fun test))))
+        (n2 (length list2)))
     (multiple-value-bind (short long n-short)
         (if (< n1 n2)
             (values list1 list2 n1)
             (values list2 list1 n2))
       (if (or (< n-short +list-based-union-limit+)
-              (not (member test (list #'eq #'eql #'equal #'equalp))))
-          (let ((orig short))
-            (dolist (elt long)
-              (unless (member (apply-key key elt) orig :key key :test test)
-                (push elt short)))
-            short)
-          (let ((table (make-hash-table :test test :size (+ n1 n2)))
+              notp
+              (and testp
+                   (not (hash-table-test-p test))))
+          (with-member-test member-test
+            (let ((orig short))
+              (dolist (elt long)
+                (unless (funcall member-test elt orig key test)
+                  (push elt short)))
+              short))
+          (let ((table (make-hash-table :test (if testp
+                                                  test
+                                                  #'eql) :size (+ n1 n2)))
+                (key (and key (%coerce-callable-to-fun key)))
                 (union nil))
             (dolist (elt long)
               (setf (gethash (apply-key key elt) table) elt))
@@ -938,36 +983,36 @@
            (cdr temp) ,destination
            ,destination temp)))
 
-(defun nunion (list1 list2 &key key (test #'eql testp) (test-not nil notp))
+(defun nunion (list1 list2 &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the union of LIST1 and LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   ;; We have two possibilities here: for shortish lists we pick up the
   ;; shorter one as the result, and add the other one to it. For long
   ;; lists we use a hash-table when possible.
   (let ((n1 (length list1))
-        (n2 (length list2))
-        (key (and key (%coerce-callable-to-fun key)))
-        (test (if notp
-                  (let ((test-not-fun (%coerce-callable-to-fun test-not)))
-                    (lambda (x y) (not (funcall test-not-fun x y))))
-                  (%coerce-callable-to-fun test))))
+        (n2 (length list2)))
     (multiple-value-bind (short long n-short)
         (if (< n1 n2)
             (values list1 list2 n1)
             (values list2 list1 n2))
       (if (or (< n-short +list-based-union-limit+)
-              (not (member test (list #'eq #'eql #'equal #'equalp))))
-          (let ((orig short))
-            (do ((elt (car long) (car long)))
+              notp
+              (and testp
+                   (not (hash-table-test-p test))))
+          (with-member-test member-test
+            (do ((orig short)
+                 (elt (car long) (car long)))
                 ((endp long))
-              (if (not (member (apply-key key elt) orig :key key :test test))
-                  (steve-splice long short)
-                  (setf long (cdr long))))
+              (if (funcall member-test elt orig key test)
+                  (pop long)
+                  (steve-splice long short)))
             short)
-          (let ((table (make-hash-table :test test :size (+ n1 n2))))
+          (let ((table (make-hash-table :test (if testp
+                                                  test
+                                                  #'eql) :size (+ n1 n2)))
+                (key (and key (%coerce-callable-to-fun key))))
             (dolist (elt long)
               (setf (gethash (apply-key key elt) table) elt))
             (dolist (elt short)
@@ -984,91 +1029,82 @@
               union))))))
 
 (defun intersection (list1 list2
-                     &key key (test #'eql testp) (test-not nil notp))
+                     &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the intersection of LIST1 and LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (let ((res nil))
-      (dolist (elt list1)
-        (if (with-set-keys (member (apply-key key elt) list2))
+  (when (and list1 list2)
+    (with-member-test member-test
+      (let ((res nil))
+        (dolist (elt list1)
+          (when (funcall member-test elt list2 key test)
             (push elt res)))
-      res)))
+        res))))
 
 (defun nintersection (list1 list2
-                      &key key (test #'eql testp) (test-not nil notp))
+                      &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the intersection of LIST1 and LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (let ((res nil)
-          (list1 list1))
-      (do () ((endp list1))
-        (if (with-set-keys (member (apply-key key (car list1)) list2))
-            (steve-splice list1 res)
-            (setq list1 (cdr list1))))
-      res)))
+  (when (and list1 list2)
+    (with-member-test member-test
+      (let ((res nil)
+            (list1 list1))
+        (do () ((endp list1))
+          (if (funcall member-test (car list1) list2 key test)
+              (steve-splice list1 res)
+              (setf list1 (cdr list1))))
+        res))))
 
 (defun set-difference (list1 list2
-                       &key key (test #'eql testp) (test-not nil notp))
+                       &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the elements of LIST1 which are not in LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (if (null list2)
-        list1
+  (if list2
+      (with-member-test member-test
         (let ((res nil))
           (dolist (elt list1)
-            (if (not (with-set-keys (member (apply-key key elt) list2)))
-                (push elt res)))
-          res))))
+            (unless (funcall member-test elt list2 key test)
+              (push elt res)))
+          res))
+      list1))
 
 (defun nset-difference (list1 list2
-                        &key key (test #'eql testp) (test-not nil notp))
+                        &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the elements of LIST1 which are not in LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (let ((res nil)
-          (list1 list1))
-      (do () ((endp list1))
-        (if (not (with-set-keys (member (apply-key key (car list1)) list2)))
-            (steve-splice list1 res)
-            (setq list1 (cdr list1))))
-      res)))
+  (if list2
+      (with-member-test member-test
+        (let ((res nil)
+              (list1 list1))
+          (do () ((endp list1))
+            (if (funcall member-test (car list1) list2 key test)
+                (setf list1 (cdr list1))
+                (steve-splice list1 res)))
+          res))
+      list1))
 
 (defun set-exclusive-or (list1 list2
-                         &key key (test #'eql testp) (test-not #'eql notp))
+                         &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return new list of elements appearing exactly once in LIST1 and LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((result nil)
-        (key (and key (%coerce-callable-to-fun key)))
-        (test (if testp (%coerce-callable-to-fun test) test))
-        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
-    (declare (type function test test-not))
-    (dolist (elt list1)
-      (unless (with-set-keys (member (apply-key key elt) list2))
-        (setq result (cons elt result))))
-    (let ((test (if testp
-                    (lambda (x y) (funcall test y x))
-                    test))
-          (test-not (if notp
-                        (lambda (x y) (funcall test-not y x))
-                        test-not)))
-      (dolist (elt list2)
-        (unless (with-set-keys (member (apply-key key elt) list1))
-          (setq result (cons elt result)))))
+  (let ((result nil))
+    (with-member-test member-test
+      (dolist (elt list1)
+        (unless (funcall member-test elt list2 key test)
+          (push elt result)))
+      (dx-flet ((test (x y) (funcall (truly-the function test) y x)))
+        (dolist (elt list2)
+          (unless (funcall member-test elt list1 key #'test)
+            (push elt result)))))
     result))
 
 (defun nset-exclusive-or (list1 list2
@@ -1134,12 +1170,11 @@
 (defun subsetp (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return T if every element in LIST1 is also in LIST2."
-  (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
+  (with-member-test member-test
     (dolist (elt list1)
-      (unless (with-set-keys (member (apply-key key elt) list2))
+      (unless (funcall member-test elt list2 key test)
         (return-from subsetp nil)))
     t))
 
