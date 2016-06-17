@@ -973,16 +973,6 @@
                      table)
             union)))))
 
-;;; Destination and source are SETF-able and many-evaluable. Set the
-;;; SOURCE to the CDR, and "cons" the 1st elt of source to DESTINATION.
-;;;
-;;; FIXME: needs a more mnemonic name
-(defmacro steve-splice (source destination)
-  `(let ((temp ,source))
-     (setf ,source (cdr ,source)
-           (cdr temp) ,destination
-           ,destination temp)))
-
 (defun nunion (list1 list2 &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the union of LIST1 and LIST2."
@@ -1007,7 +997,7 @@
                 ((endp long))
               (if (funcall member-test elt orig key test)
                   (pop long)
-                  (steve-splice long short)))
+                  (shiftf long (cdr long) short long)))
             short)
           (let ((table (make-hash-table :test (if testp
                                                   test
@@ -1054,7 +1044,7 @@
             (list1 list1))
         (do () ((endp list1))
           (if (funcall member-test (car list1) list2 key test)
-              (steve-splice list1 res)
+              (shiftf list1 (cdr list1) res list1)
               (setf list1 (cdr list1))))
         res))))
 
@@ -1086,7 +1076,7 @@
           (do () ((endp list1))
             (if (funcall member-test (car list1) list2 key test)
                 (setf list1 (cdr list1))
-                (steve-splice list1 res)))
+                (shiftf list1 (cdr list1) res list1)))
           res))
       list1))
 

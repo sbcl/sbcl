@@ -486,8 +486,7 @@ one-past-the-end"
 
 (defun unintern-init-only-stuff ()
   (let ((this-package (find-package "SB-IMPL")))
-    (dolist (s '(char-class char-class2 char-class3
-                 steve-splice))
+    (dolist (s '(char-class char-class2 char-class3))
       (unintern s this-package))
     (flet ((ends-with-p (s1 s2)
              (let ((diff (- (length s1) (length s2))))
