@@ -4434,12 +4434,13 @@
                  "Too many arguments (~D) to ~S ~S: uses at most ~D."
                  :format-arguments (list nargs fun string max))))))))
 
-(defoptimizer (format optimizer) ((dest control &rest args))
+(defoptimizer (format optimizer) ((dest control &rest args) node)
   (declare (ignore dest))
   (when (constant-lvar-p control)
     (let ((x (lvar-value control)))
       (when (stringp x)
-        (check-format-args x args 'format)))))
+        (let ((*compiler-error-context* node))
+         (check-format-args x args 'format))))))
 
 (defoptimizer (format derive-type) ((dest control &rest args))
   (declare (ignore control args))
@@ -4581,11 +4582,12 @@
 
 (macrolet
     ((def (name)
-         `(defoptimizer (,name optimizer) ((control &rest args))
+         `(defoptimizer (,name optimizer) ((control &rest args) node)
             (when (constant-lvar-p control)
               (let ((x (lvar-value control)))
                 (when (stringp x)
-                  (check-format-args x args ',name)))))))
+                  (let ((*compiler-error-context* node))
+                    (check-format-args x args ',name))))))))
   (def error)
   (def warn)
   #+sb-xc-host ; Only we should be using these
