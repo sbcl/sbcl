@@ -156,7 +156,7 @@ the LP bug number should be a part of the test name:
 
 When a test can be associated to a name in the CL package or one of
 the SB-* packages, that name should appear as a separate component in
-the test name, like COERCE in the exaple above. This may be useful in
+the test name, like COERCE in the example above. This may be useful in
 order to automatically associate functions and tests.
 
 If possible, tests should not signal warnings during compilation or
