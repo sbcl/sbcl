@@ -5778,3 +5778,15 @@
                                    (cons x (isqrt b)))))
                                     0 4))
                   '(0 . 2))))
+
+(with-test (:name :check-important-result-warning)
+  (multiple-value-bind (fun failure warnings style-warnings)
+      (checked-compile '(lambda (x z)
+                         (declare (notinline nintersection))
+                         (nintersection x z) x)
+                       :allow-style-warnings t)
+    (declare (ignore fun failure warnings))
+    (loop for c in style-warnings
+          do
+          (assert (search "NINTERSECTION"
+                          (princ-to-string c))))))

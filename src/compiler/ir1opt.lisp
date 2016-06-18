@@ -885,7 +885,7 @@
     (let ((*compiler-error-context* node))
       (compiler-style-warn
        "The return value of ~A should not be discarded."
-       (lvar-fun-name (basic-combination-fun node))))))
+       (lvar-fun-name (basic-combination-fun node) t)))))
 
 ;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
