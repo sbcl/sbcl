@@ -5790,3 +5790,15 @@
           do
           (assert (search "NINTERSECTION"
                           (princ-to-string c))))))
+
+(with-test (:name :destroyed-constant-warning)
+  (multiple-value-bind (fun failure warnings)
+      (checked-compile '(lambda ()
+                         (declare (notinline nunion))
+                         (nunion '(1 2 3) '(1 2 4)))
+                       :allow-warnings t)
+    (declare (ignore fun failure))
+    (loop for c in warnings
+          do
+          (assert (search "NUNION"
+                          (princ-to-string c))))))

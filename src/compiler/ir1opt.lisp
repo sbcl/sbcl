@@ -913,15 +913,13 @@
        (cond (info
               (check-important-result node info)
               (let ((fun (fun-info-destroyed-constant-args info)))
-                (when fun
-                  (let ((destroyed-constant-args (funcall fun args)))
-                    (when destroyed-constant-args
-                      (let ((*compiler-error-context* node))
-                        (warn 'constant-modified
-                              :fun-name (lvar-fun-name
-                                         (basic-combination-fun node)))
-                        (setf (basic-combination-kind node) :error)
-                        (return-from ir1-optimize-combination))))))
+                (when (and fun (funcall fun args))
+                  (let ((*compiler-error-context* node))
+                    (warn 'constant-modified
+                          :fun-name (lvar-fun-name
+                                     (basic-combination-fun node) t))
+                    (setf (basic-combination-kind node) :error)
+                    (return-from ir1-optimize-combination))))
               (let ((fun (fun-info-derive-type info)))
                 (when fun
                   (let ((res (funcall fun node)))
