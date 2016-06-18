@@ -284,37 +284,60 @@
           (parse-deftransform lambda-list n-node
                               '(give-up-ir1-transform))
         (let ((stuff
-               `((,n-node &aux ,@bindings
-                               ,@(when result
-                                   `((,result (node-lvar ,n-node)))))
-                 (declare (ignorable ,@(mapcar #'car bindings)))
-                 (declare (lambda-list (node)))
-                 ,@decls
-                 ,@(if policy
-                      `((unless (policy ,n-node ,policy)
-                          (give-up-ir1-transform))))
-                 ;; What purpose does it serve to allow the transform's body
-                 ;; to return decls as a second value? They would go in the
-                 ;; right place if simply returned as part of the expression.
-                 (multiple-value-bind (,n-lambda ,n-decls)
-                       (progn ,@body)
-                     (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
-                         ,n-lambda
-                       `(lambda ,',lambda-list
-                          (declare (ignorable ,@',vars))
-                          ,@,n-decls
-                          ,,n-lambda))))))
+                `((,n-node &aux ,@bindings
+                           ,@(when result
+                               `((,result (node-lvar ,n-node)))))
+                  (declare (ignorable ,@(mapcar #'car bindings)))
+                  (declare (lambda-list (node)))
+                  ,@decls
+                  ,@(and defun-only
+                         doc
+                         `(,doc))
+                  ,@(if policy
+                        `((unless (policy ,n-node ,policy)
+                            (give-up-ir1-transform))))
+                  ;; What purpose does it serve to allow the transform's body
+                  ;; to return decls as a second value? They would go in the
+                  ;; right place if simply returned as part of the expression.
+                  (multiple-value-bind (,n-lambda ,n-decls)
+                      (progn ,@body)
+                    (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
+                        ,n-lambda
+                        `(lambda ,',lambda-list
+                           (declare (ignorable ,@',vars))
+                           ,@,n-decls
+                           ,,n-lambda))))))
           (if defun-only
-              `(defun ,name ,@(when doc `(,doc)) ,@stuff)
+              `(defun ,name ,@stuff)
               `(%deftransform
                 ,(if eval-name name `',name)
                 ,(if eval-name
                      ``(function ,,arg-types ,,result-type)
                      `'(function ,arg-types ,result-type))
                 (named-lambda ,(if eval-name "xform" `(deftransform ,name))
-                              ,@stuff)
+                  ,@stuff)
                 ,doc
                 ,important)))))))
+
+(defmacro deftransforms (names (lambda-list &optional (arg-types '*)
+                                                      (result-type '*)
+                                &key result policy node (important :slightly))
+                         &body body-decls-doc)
+
+  (let ((transform-name (symbolicate (car names) '-transform))
+        (type (list 'function arg-types result-type))
+        (doc (nth-value 2 (parse-body body-decls-doc t))))
+    `(progn
+       (deftransform ,transform-name
+           (,lambda-list ,arg-types ,result-type
+            :defun-only t
+            :result ,result :policy ,policy :node ,node)
+         ,@body-decls-doc)
+       ,@(loop for name in names
+               collect
+               `(%deftransform ',name ',type #',transform-name
+                               ,doc
+                               ,important)))))
 
 ;;;; DEFKNOWN and DEFOPTIMIZER
 

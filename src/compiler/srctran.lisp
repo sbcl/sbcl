@@ -3702,18 +3702,13 @@
 ;;; If X and Y are the same leaf, then the result is true. Otherwise,
 ;;; if there is no intersection between the types of the arguments,
 ;;; then the result is definitely false.
-(deftransform simple-equality-transform ((x y) * *
-                                         :defun-only t)
+(deftransforms (eq char=) ((x y) * *)
+  "Simple equality transform"
   (cond
     ((same-leaf-ref-p x y) t)
     ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
      nil)
     (t (give-up-ir1-transform))))
-
-(macrolet ((def (x)
-             `(%deftransform ',x '(function * *) #'simple-equality-transform)))
-  (def eq)
-  (def char=))
 
 ;;; Can't use the above thing, since TYPES-EQUAL-OR-INTERSECT is case sensitive.
 (deftransform two-arg-char-equal ((x y) * *)
