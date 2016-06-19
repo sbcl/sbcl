@@ -1816,84 +1816,172 @@ many elements are copied."
 ;;; original list up to the :end marker (this we have to do by running a
 ;;; do loop down the list that far and using our test.
 (defun list-remove-duplicates* (list test test-not start end key from-end)
-  (declare (fixnum start))
+  (declare (fixnum start)
+           (list list))
   (let* ((result (list ())) ; Put a marker on the beginning to splice with.
          (splice result)
          (current list)
-         (end (or end (length list)))
+         (length (length list))
+         (end (or end length))
+         (whole (= end length))
          (hash (and (> (- end start) 20)
-                    test
                     (not key)
                     (not test-not)
-                    (or (eql test #'eql)
-                        (eql test #'eq)
-                        (eql test #'equal)
-                        (eql test #'equalp))
-                    (make-hash-table :test test :size (- end start)))))
+                    (hash-table-test-p test)
+                    (make-hash-table :test test :size (- end start))))
+         (tail (and (not whole)
+                    (nthcdr end list))))
     (do ((index 0 (1+ index)))
         ((= index start))
       (declare (fixnum index))
       (setq splice (cdr (rplacd splice (list (car current)))))
       (setq current (cdr current)))
     (if hash
-        (do ((index start (1+ index)))
-            ((or (and end (= index (the fixnum end)))
-                 (atom current)))
-          (declare (fixnum index))
+        (do ()
+            ((eq current tail))
           ;; The hash table contains links from values that are
           ;; already in result to the cons cell *preceding* theirs
           ;; in the list.  That is, for each value v in the list,
           ;; v and (cadr (gethash v hash)) are equal under TEST.
           (let ((prev (gethash (car current) hash)))
             (cond
-             ((not prev)
-              (setf (gethash (car current) hash) splice)
-              (setq splice (cdr (rplacd splice (list (car current))))))
-             ((not from-end)
-              (let* ((old (cdr prev))
-                     (next (cdr old)))
-                (if next
-                  (let ((next-val (car next)))
-                    ;; (assert (eq (gethash next-val hash) old))
-                    (setf (cdr prev) next
-                          (gethash next-val hash) prev
-                          (gethash (car current) hash) splice
-                          splice (cdr (rplacd splice (list (car current))))))
-                  (setf (car old) (car current)))))))
+              ((not prev)
+               (setf (gethash (car current) hash) splice)
+               (setq splice (cdr (rplacd splice (list (car current))))))
+              ((not from-end)
+               (let* ((old (cdr prev))
+                      (next (cdr old)))
+                 (if next
+                     (let ((next-val (car next)))
+                       ;; (assert (eq (gethash next-val hash) old))
+                       (setf (cdr prev) next
+                             (gethash next-val hash) prev
+                             (gethash (car current) hash) splice
+                             splice (cdr (rplacd splice (list (car current))))))
+                     (setf (car old) (car current)))))))
           (setq current (cdr current)))
-      (do ((index start (1+ index)))
-          ((or (and end (= index (the fixnum end)))
-               (atom current)))
-        (declare (fixnum index))
-        (if (or (and from-end
-                     (not (if test-not
-                              (member (apply-key key (car current))
-                                      (nthcdr (1+ start) result)
-                                      :test-not test-not
-                                      :key key)
-                            (member (apply-key key (car current))
-                                    (nthcdr (1+ start) result)
-                                    :test test
-                                    :key key))))
-                (and (not from-end)
-                     (not (do ((it (apply-key key (car current)))
-                               (l (cdr current) (cdr l))
-                               (i (1+ index) (1+ i)))
-                              ((or (atom l) (and end (= i (the fixnum end))))
-                               ())
-                            (declare (fixnum i))
-                            (if (if test-not
-                                    (not (funcall test-not
-                                                  it
-                                                  (apply-key key (car l))))
-                                  (funcall test it (apply-key key (car l))))
-                                (return t))))))
-            (setq splice (cdr (rplacd splice (list (car current))))))
-        (setq current (cdr current))))
-    (do ()
-        ((atom current))
+        (let ((testp test) ;; for with-member-test
+              (notp test-not))
+          (with-member-test (member-test
+                             ((and (not from-end)
+                                   (not whole))
+                              (if notp
+                                  (if key
+                                      (lambda (x y key test)
+                                        (not (funcall (truly-the function test) x
+                                                      (funcall (truly-the function key) y))))
+                                      (lambda (x y key test)
+                                        (declare (ignore key))
+                                        (not (funcall (truly-the function test) x y))))
+                                  (if key
+                                      (lambda (x y key test)
+                                        (funcall (truly-the function test) x
+                                                 (funcall (truly-the function key) y)))
+                                      (lambda (x y key test)
+                                        (declare (ignore key))
+                                        (funcall (truly-the function test) x y))))))
+            (do ((copied (nthcdr start result)))
+                ((eq current tail))
+              (let ((elt (car current)))
+                (when (cond (from-end
+                             (not (funcall member-test elt (cdr copied) key test)))
+                            (whole
+                             (not (funcall member-test elt (cdr current) key test)))
+                            (t
+                             (do ((it (apply-key key elt))
+                                  (l (cdr current) (cdr l)))
+                                 ((eq l tail)
+                                  t)
+                               (when (funcall member-test it (car l) key test)
+                                 (return)))))
+                  (setf splice (cdr (rplacd splice (list elt))))))
+              (pop current)))))
+    (rplacd splice tail)
+    (cdr result)))
+
+(defun list-remove-duplicates*-2 (list test test-not start end key from-end)
+  (declare (fixnum start)
+           (optimize speed)
+           (list list))
+  (let* ((result (list ())) ; Put a marker on the beginning to splice with.
+         (splice result)
+         (current list)
+         (length (length list))
+         (end (or end (length list)))
+         (whole (= end length))
+         (hash (and (> (- end start) 20)
+                    (not key)
+                    (not test-not)
+                    (hash-table-test-p test)
+                    (make-hash-table :test test :size (- end start))))
+         (tail (and (not whole)
+                    (nthcdr end list))))
+    (do ((index 0 (1+ index)))
+        ((= index start))
+      (declare (fixnum index))
       (setq splice (cdr (rplacd splice (list (car current)))))
       (setq current (cdr current)))
+    (if hash
+        (do ()
+            ((eq current tail))
+          ;; The hash table contains links from values that are
+          ;; already in result to the cons cell *preceding* theirs
+          ;; in the list.  That is, for each value v in the list,
+          ;; v and (cadr (gethash v hash)) are equal under TEST.
+          (let ((prev (gethash (car current) hash)))
+            (cond
+              ((not prev)
+               (setf (gethash (car current) hash) splice)
+               (setq splice (cdr (rplacd splice (list (car current))))))
+              ((not from-end)
+               (let* ((old (cdr prev))
+                      (next (cdr old)))
+                 (if next
+                     (let ((next-val (car next)))
+                       ;; (assert (eq (gethash next-val hash) old))
+                       (setf (cdr prev) next
+                             (gethash next-val hash) prev
+                             (gethash (car current) hash) splice
+                             splice (cdr (rplacd splice (list (car current))))))
+                     (setf (car old) (car current)))))))
+          (setq current (cdr current)))
+        (let* ((testp test)
+               (notp test-not))
+          (with-member-test (member-test
+                             ((and (not from-end)
+                                   (not whole))
+                              (if testp
+                                  (if key
+                                      (lambda (x y key test)
+                                        (funcall (truly-the function test) x
+                                                 (funcall (truly-the function key) y)))
+                                      (lambda (x y key test)
+                                        (declare (ignore key))
+                                        (funcall (truly-the function test) x y)))
+                                  (if key
+                                      (lambda (x y key test)
+                                        (not (funcall (truly-the function test) x
+                                                      (funcall (truly-the function key) y))))
+                                      (lambda (x y key test)
+                                        (declare (ignore key))
+                                        (not (funcall (truly-the function test) x y)))))))
+            (do ((copied (nthcdr start result)))
+                ((eq current tail))
+              (let ((elt (car current)))
+                (when (cond (from-end
+                             (not (funcall member-test elt (cdr copied) key test)))
+                            (whole
+                             (not (funcall member-test elt (cdr current) key test)))
+                            (t
+                             (do ((it (apply-key key elt))
+                                  (l (cdr current) (cdr l)))
+                                 ((eq l tail)
+                                  t)
+                               (when (funcall member-test it (car l) key test)
+                                 (return)))))
+                  (setf splice (cdr (rplacd splice (list elt))))))
+              (pop current)))))
+    (rplacd splice tail)
     (cdr result)))
 
 (defun vector-remove-duplicates* (vector test test-not start end key from-end

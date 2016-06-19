@@ -911,16 +911,10 @@
 
 ;;; For cases where MEMBER is called in a loop this allows to perform
 ;;; the dispatch that the MEMBER function does only once.
-(defmacro with-member-test (test-var &body body)
+(defmacro with-member-test ((test-var &optional first-clause) &body body)
   `(let* ((key (and key (%coerce-callable-to-fun key)))
-          (,test-var (cond (testp
-                            (if key
-                                (lambda (x list2 key test)
-                                  (%member-key-test (funcall (truly-the function key) x)
-                                                    list2 key test))
-                                (lambda (x list2 key test)
-                                  (declare (ignore key))
-                                  (%member-test x list2 test))))
+          (,test-var (cond ,@(and first-clause ; used by LIST-REMOVE-DUPLICATES*
+                                  `(,first-clause))
                            (notp
                             (if key
                                 (lambda (x list2 key test)
@@ -929,6 +923,14 @@
                                 (lambda (x list2 key test)
                                   (declare (ignore key))
                                   (%member-test-not x list2 test))))
+                           (testp
+                            (if key
+                                (lambda (x list2 key test)
+                                  (%member-key-test (funcall (truly-the function key) x)
+                                                    list2 key test))
+                                (lambda (x list2 key test)
+                                  (declare (ignore key))
+                                  (%member-test x list2 test))))
                            (key
                             (lambda (x list2 key test)
                               (declare (ignore test))
@@ -937,10 +939,10 @@
                             (lambda (x list2 key test)
                               (declare (ignore key test))
                               (%member x list2)))))
-          (test (cond (testp
-                       (%coerce-callable-to-fun test))
-                      (notp
-                       (%coerce-callable-to-fun test-not)))))
+          (test (cond (notp
+                       (%coerce-callable-to-fun test-not))
+                      (testp
+                       (%coerce-callable-to-fun test)))))
 
      ,@body))
 
@@ -974,7 +976,7 @@
               notp
               (and testp
                    (not (hash-table-test-p test))))
-          (with-member-test member-test
+          (with-member-test (member-test)
             (let ((orig short))
               (dolist (elt long)
                 (unless (funcall member-test elt orig key test)
@@ -1013,7 +1015,7 @@
               notp
               (and testp
                    (not (hash-table-test-p test))))
-          (with-member-test member-test
+          (with-member-test (member-test)
             (do ((orig short)
                  (elt (car long) (car long)))
                 ((endp long))
@@ -1047,7 +1049,7 @@
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (when (and list1 list2)
-    (with-member-test member-test
+    (with-member-test (member-test)
       (let ((res nil))
         (dolist (elt list1)
           (when (funcall member-test elt list2 key test)
@@ -1061,7 +1063,7 @@
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (when (and list1 list2)
-    (with-member-test member-test
+    (with-member-test (member-test)
       (let ((res nil)
             (list1 list1))
         (do () ((endp list1))
@@ -1077,7 +1079,7 @@
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (if list2
-      (with-member-test member-test
+      (with-member-test (member-test)
         (let ((res nil))
           (dolist (elt list1)
             (unless (funcall member-test elt list2 key test)
@@ -1092,7 +1094,7 @@
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (if list2
-      (with-member-test member-test
+      (with-member-test (member-test)
         (let ((res nil)
               (list1 list1))
           (do () ((endp list1))
@@ -1109,7 +1111,7 @@
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((result nil))
-    (with-member-test member-test
+    (with-member-test (member-test)
       (dolist (elt list1)
         (unless (funcall member-test elt list2 key test)
           (push elt result)))
@@ -1184,7 +1186,7 @@
   "Return T if every element in LIST1 is also in LIST2."
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (with-member-test member-test
+  (with-member-test (member-test)
     (dolist (elt list1)
       (unless (funcall member-test elt list2 key test)
         (return-from subsetp nil)))
