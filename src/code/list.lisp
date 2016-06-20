@@ -647,6 +647,11 @@
   `(if ,key
        (funcall ,key ,element)
        ,element))
+
+(defmacro apply-key-function (key element)
+  `(if ,key
+       (funcall (truly-the function ,key) ,element)
+       ,element))
 
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 

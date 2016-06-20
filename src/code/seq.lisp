@@ -1974,37 +1974,39 @@ many elements are copied."
     (apply #'sb!sequence:remove-duplicates sequence args)))
 
 ;;;; DELETE-DUPLICATES
-
 (defun list-delete-duplicates* (list test test-not key from-end start end)
-  (declare (fixnum start))
-  (let ((handle (cons nil list)))
+  (declare (index start)
+           (list list))
+  (let* ((handle (cons nil list))
+         (from-end-start (and from-end
+                              (nthcdr (1+ start) handle)))
+         (length (length list))
+         (end (or end length))
+         (tail (and (/= length (truly-the fixnum end))
+                    (nthcdr end list))))
     (declare (truly-dynamic-extent handle))
-    (do ((current (nthcdr start list) (cdr current))
-         (previous (nthcdr start handle))
-         (index start (1+ index)))
-        ((or (and end (= index (the fixnum end))) (null current))
-         (cdr handle))
-      (declare (fixnum index))
-      (if (do ((x (if from-end
-                      (nthcdr (1+ start) handle)
+    (do* ((previous (nthcdr start handle))
+          (current (cdr previous) (cdr current)))
+         ((eq current tail)
+          (cdr handle))
+      (if (do ((end (if from-end
+                        current
+                        tail))
+               (x (if from-end
+                      from-end-start
                       (cdr current))
-                  (cdr x))
-               (i (1+ index) (1+ i)))
-              ((or (null x)
-                   (and (not from-end) end (= i (the fixnum end)))
-                   (eq x current))
-               nil)
-            (declare (fixnum i))
+                  (cdr x)))
+              ((eq x end))
             (if (if test-not
-                    (not (funcall test-not
-                                  (apply-key key (car current))
-                                  (apply-key key (car x))))
-                    (funcall test
-                             (apply-key key (car current))
-                             (apply-key key (car x))))
+                    (not (funcall (truly-the function test-not)
+                                  (apply-key-function key (car current))
+                                  (apply-key-function key (car x))))
+                    (funcall (truly-the function test)
+                             (apply-key-function key (car current))
+                             (apply-key-function key (car x))))
                 (return t)))
           (rplacd previous (cdr current))
-          (setq previous (cdr previous))))))
+          (pop previous)))))
 
 (defun vector-delete-duplicates* (vector test test-not key from-end start end
                                          &optional (length (length vector)))
