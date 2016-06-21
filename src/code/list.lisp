@@ -155,6 +155,7 @@
 (defun tree-equal (x y &key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return T if X and Y are isomorphic trees with identical leaves."
+  (declare (explicit-check))
   (cond (notp
          (when testp
            (error ":TEST and :TEST-NOT were both supplied."))
@@ -189,6 +190,7 @@
 (defun nth (n list)
   #!+sb-doc
   "Return the nth object in a list where the car is the zero-th element."
+  (declare (explicit-check))
   (car (nthcdr n list)))
 
 (defun first (list)
@@ -368,6 +370,7 @@
 (defun make-list (size &key initial-element)
   #!+sb-doc
   "Constructs a list with size elements each set to value"
+  (declare (explicit-check))
   (%make-list size initial-element))
 ;;; This entry point is to be preferred, irrespective of
 ;;; whether or not the backend has vops for %MAKE-LIST.
@@ -848,6 +851,7 @@
   #!+sb-doc
   "Return the tail of LIST beginning with first element satisfying EQLity,
    :TEST, or :TEST-NOT with the given ITEM."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -869,6 +873,7 @@
 (defun member-if (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element satisfying TEST."
+  (declare (explicit-check))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -878,6 +883,7 @@
 (defun member-if-not (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element not satisfying TEST."
+  (declare (explicit-check))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -896,6 +902,7 @@
 (defun adjoin (item list &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Add ITEM to LIST unless it is already a member"
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -966,6 +973,7 @@
 (defun union (list1 list2 &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the union of LIST1 and LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   ;; We have two possibilities here: for shortish lists we pick up the
@@ -1005,6 +1013,7 @@
 (defun nunion (list1 list2 &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the union of LIST1 and LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   ;; We have two possibilities here: for shortish lists we pick up the
@@ -1051,6 +1060,7 @@
                      &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the intersection of LIST1 and LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (when (and list1 list2)
@@ -1065,6 +1075,7 @@
                       &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the intersection of LIST1 and LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (when (and list1 list2)
@@ -1081,6 +1092,7 @@
                        &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the elements of LIST1 which are not in LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (if list2
@@ -1096,6 +1108,7 @@
                         &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the elements of LIST1 which are not in LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (if list2
@@ -1113,6 +1126,7 @@
                          &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return new list of elements appearing exactly once in LIST1 and LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((result nil))
@@ -1131,6 +1145,7 @@
   #!+sb-doc
   "Destructively return a list with elements which appear but once in LIST1
    and LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -1189,6 +1204,7 @@
 (defun subsetp (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return T if every element in LIST1 is also in LIST2."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (with-member-test (member-test)
@@ -1218,6 +1234,7 @@
   #!+sb-doc
   "Return the cons in ALIST whose car is equal (by a given test or EQL) to
    the ITEM."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -1240,6 +1257,7 @@
   #!+sb-doc
   "Return the first cons in ALIST whose CAR satisfies PREDICATE. If
    KEY is supplied, apply it to the CAR of each cons before testing."
+  (declare (explicit-check))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1250,6 +1268,7 @@
   #!+sb-doc
   "Return the first cons in ALIST whose CAR does not satisfy PREDICATE.
   If KEY is supplied, apply it to the CAR of each cons before testing."
+  (declare (explicit-check))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1257,10 +1276,10 @@
         (%assoc-if-not predicate alist))))
 
 (defun rassoc (item alist &key key (test nil testp) (test-not nil notp))
-  (declare (list alist))
   #!+sb-doc
   "Return the cons in ALIST whose CDR is equal (by a given test or EQL) to
    the ITEM."
+  (declare (explicit-check))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -1283,6 +1302,7 @@
   #!+sb-doc
   "Return the first cons in ALIST whose CDR satisfies PREDICATE. If KEY
   is supplied, apply it to the CDR of each cons before testing."
+  (declare (explicit-check))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1293,6 +1313,7 @@
   #!+sb-doc
   "Return the first cons in ALIST whose CDR does not satisfy PREDICATE.
   If KEY is supplied, apply it to the CDR of each cons before testing."
+  (declare (explicit-check))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1342,33 +1363,39 @@
 (defun mapc (function list &rest more-lists)
   #!+sb-doc
   "Apply FUNCTION to successive elements of lists. Return the second argument."
+  (declare (explicit-check))
   (map1 function (cons list more-lists) nil t))
 
 (defun mapcar (function list &rest more-lists)
   #!+sb-doc
   "Apply FUNCTION to successive elements of LIST. Return list of FUNCTION
    return values."
+  (declare (explicit-check))
   (map1 function (cons list more-lists) :list t))
 
 (defun mapcan (function list &rest more-lists)
   #!+sb-doc
   "Apply FUNCTION to successive elements of LIST. Return NCONC of FUNCTION
    results."
+  (declare (explicit-check))
   (map1 function (cons list more-lists) :nconc t))
 
 (defun mapl (function list &rest more-lists)
   #!+sb-doc
   "Apply FUNCTION to successive CDRs of list. Return NIL."
+  (declare (explicit-check))
   (map1 function (cons list more-lists) nil nil))
 
 (defun maplist (function list &rest more-lists)
   #!+sb-doc
   "Apply FUNCTION to successive CDRs of list. Return list of results."
+  (declare (explicit-check))
   (map1 function (cons list more-lists) :list nil))
 
 (defun mapcon (function list &rest more-lists)
   #!+sb-doc
   "Apply FUNCTION to successive CDRs of lists. Return NCONC of results."
+  (declare (explicit-check))
   (map1 function (cons list more-lists) :nconc nil))
 
 ;;;; Specialized versions
