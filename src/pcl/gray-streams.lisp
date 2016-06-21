@@ -20,14 +20,14 @@
 ;;; implementation generic functions.  All of them could (maybe
 ;;; should?) have two default methods: one on STREAM calling
 ;;; BUG-OR-ERROR, and one on T signalling a TYPE-ERROR.
-(defmacro bug-or-error (stream fun)
-  `(error
-    "~@<The stream ~S has no suitable method for ~S, ~
+(defun bug-or-error (stream fun)
+  (error
+   "~@<The stream ~S has no suitable method for ~S, ~
      and so has fallen through to this method.  If you think that this is ~
      a bug, please report it to the applicable authority (bugs in SBCL itself ~
      should go to the mailing lists referenced from ~
      <http://www.sbcl.org/>).~@:>"
-    ,stream ,fun))
+   stream fun))
 
 (fmakunbound 'stream-element-type)
 

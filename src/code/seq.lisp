@@ -124,8 +124,7 @@
          (symbol-macrolet (,@(rebindings/lazy))
            (let* (,@(rebindings/eager))
              (declare ,@(new-declarations))
-             ,@body
-             ))))))
+             ,@body))))))
 
 ;;; SEQ-DISPATCH does an efficient type-dispatch on the given SEQUENCE.
 ;;;
@@ -185,30 +184,30 @@
      (make-vector-like ,sequence ,length)
      (sb!sequence:make-sequence-like ,sequence ,length)))
 
-(sb!xc:defmacro bad-sequence-type-error (type-spec)
-  `(error 'simple-type-error
-          :datum ,type-spec
-          :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
-          :format-control "~S is a bad type specifier for sequences."
-          :format-arguments (list ,type-spec)))
+(defun bad-sequence-type-error (type-spec)
+  (error 'simple-type-error
+         :datum type-spec
+         :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
+         :format-control "~S is a bad type specifier for sequences."
+         :format-arguments (list type-spec)))
 
-(sb!xc:defmacro sequence-type-length-mismatch-error (type length)
-  `(error 'simple-type-error
-          :datum ,length
-          :expected-type (cond ((array-type-p ,type)
-                                `(eql ,(car (array-type-dimensions ,type))))
-                               ((type= ,type (specifier-type 'null))
-                                '(eql 0))
-                               ((cons-type-p ,type)
-                                '(integer 1))
-                               (t (bug "weird type in S-T-L-M-ERROR")))
-          ;; FIXME: this format control causes ugly printing.  There's
-          ;; probably some ~<~@:_~> incantation that would make it
-          ;; nicer. -- CSR, 2002-10-18
-          :format-control "The length requested (~S) does not match the type restriction in ~S."
-          :format-arguments (list ,length (type-specifier ,type))))
+(defun sequence-type-length-mismatch-error (type length)
+  (error 'simple-type-error
+         :datum length
+         :expected-type (cond ((array-type-p type)
+                               `(eql ,(car (array-type-dimensions type))))
+                              ((type= type (specifier-type 'null))
+                               '(eql 0))
+                              ((cons-type-p type)
+                               '(integer 1))
+                              (t (bug "weird type in S-T-L-M-ERROR")))
+         ;; FIXME: this format control causes ugly printing.  There's
+         ;; probably some ~<~@:_~> incantation that would make it
+         ;; nicer. -- CSR, 2002-10-18
+         :format-control "The length requested (~S) does not match the type restriction in ~S."
+         :format-arguments (list length (type-specifier type))))
 
-(sb!xc:defmacro sequence-type-too-hairy (type-spec)
+(defun sequence-type-too-hairy (type-spec)
   ;; FIXME: Should this be a BUG? I'm inclined to think not; there are
   ;; words that give some but not total support to this position in
   ;; ANSI.  Essentially, we are justified in throwing this on
@@ -217,9 +216,9 @@
 
   ;; On the other hand, I'm not sure it deserves to be a type-error,
   ;; either. -- bem, 2005-08-10
-  `(error 'simple-program-error
-          :format-control "~S is too hairy for sequence functions."
-          :format-arguments (list ,type-spec)))
+  (error 'simple-program-error
+         :format-control "~S is too hairy for sequence functions."
+         :format-arguments (list type-spec)))
 
 (sb!xc:defmacro when-extended-sequence-type
     ((type-specifier type

@@ -1827,10 +1827,10 @@ extended <package-name>::<form-in-package> syntax."
   (default to the beginning and end of the string)  It skips over
   whitespace characters and then tries to parse an integer. The
   radix parameter must be between 2 and 36."
-  (macrolet ((parse-error (format-control)
-               `(error 'simple-parse-error
-                       :format-control ,format-control
-                       :format-arguments (list string))))
+  (flet ((parse-error (format-control)
+           (error 'simple-parse-error
+                  :format-control format-control
+                  :format-arguments (list string))))
     (with-array-data ((string string :offset-var offset)
                       (start start)
                       (end end)
@@ -1865,7 +1865,7 @@ extended <package-name>::<form-in-package> syntax."
                    (incf index)
                    (when (= index end) (return))
                    (unless (whitespace[1]p (char string index))
-                      (parse-error "junk in string ~S")))
+                     (parse-error "junk in string ~S")))
                   (return nil))
                  (t
                   (parse-error "junk in string ~S"))))
