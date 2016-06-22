@@ -337,23 +337,26 @@ invoked. In that case it will store into PLACE and start over."
         `(let ((,keyform-value ,keyform))
            (block ,block
              (tagbody
-              ,again
-              (return-from
-               ,block
-               (cond ,@(nreverse clauses)
-                     (t
-                      (setf ,keyform-value
-                            (setf ,keyform
-                                  (case-body-error
-                                   ',name ',keyform ,keyform-value
-                                   ',expected-type ',keys)))
-                      (go ,again))))))))
+                ,again
+                (return-from
+                 ,block
+                  (cond ,@(nreverse clauses)
+                        (t
+                         (setf ,keyform-value
+                               (setf ,keyform
+                                     (case-body-error
+                                      ',name ',keyform ,keyform-value
+                                      ',expected-type ',keys)))
+                         (go ,again))))))))
       `(let ((,keyform-value ,keyform))
          (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
          (cond
-          ,@(nreverse clauses)
-          ,@(if errorp
-                `((t (case-failure ',name ,keyform-value ',keys))))))))
+           ,@(nreverse clauses)
+           ,@(when errorp
+               `((t (,(ecase name
+                        (etypecase 'etypecase-failure)
+                        (ecase 'ecase-failure))
+                     ,keyform-value ',keys))))))))
 ) ; EVAL-WHEN
 
 (sb!xc:defmacro case (keyform &body cases)

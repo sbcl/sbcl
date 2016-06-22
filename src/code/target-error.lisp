@@ -261,14 +261,20 @@ with that condition (or with no condition) will be returned."
         :interactive read-evaluated-form
         value))))
 
-(defun case-failure (name value keys)
+(defun etypecase-failure (value keys)
   (declare (optimize allow-non-returning-tail-call))
   (error 'case-failure
-         :name name
+         :name 'etypecase
          :datum value
-         :expected-type (if (eq name 'ecase)
-                            `(member ,@keys)
-                            `(or ,@keys))
+         :expected-type `(or ,@keys)
+         :possibilities keys))
+
+(defun ecase-failure (value keys)
+  (declare (optimize allow-non-returning-tail-call))
+  (error 'case-failure
+         :name 'ecase
+         :datum value
+         :expected-type `(member ,@keys)
          :possibilities keys))
 
 (defun case-body-error (name keyform keyform-value expected-type keys)

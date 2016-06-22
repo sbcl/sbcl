@@ -2087,7 +2087,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                ;; symbols from former SB!CONDITIONS
                "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
 
-               "CASE-FAILURE" "NAMESTRING-PARSE-ERROR"
+               "CASE-FAILURE" "ECASE-FAILURE" "ETYPECASE-FAILURE"
+               "NAMESTRING-PARSE-ERROR"
                "NAMESTRING-PARSE-ERROR-OFFSET"
                "MAKE-RESTART" "RESTART-ASSOCIATED-CONDITIONS"
                "COERCE-TO-CONDITION"
