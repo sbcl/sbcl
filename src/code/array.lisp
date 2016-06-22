@@ -996,12 +996,15 @@ of specialized arrays is supported."
 (defun array-dimensions (array)
   #!+sb-doc
   "Return a list whose elements are the dimensions of the array"
-  (declare (array array))
-  (if (array-header-p array)
-      (do ((results nil (cons (array-dimension array index) results))
-           (index (1- (array-rank array)) (1- index)))
-          ((minusp index) results))
-      (list (array-dimension array 0))))
+  (declare (explicit-check))
+  (cond ((array-header-p array)
+         (do ((results nil (cons (%array-dimension array index) results))
+              (index (1- (%array-rank array)) (1- index)))
+             ((minusp index) results)))
+        ((typep array 'vector)
+         (list (length array)))
+        (t
+         (sb!c::%type-check-error/c array 'object-not-array-error))))
 
 (defun array-total-size (array)
   #!+sb-doc
