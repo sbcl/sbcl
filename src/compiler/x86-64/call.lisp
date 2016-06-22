@@ -1345,7 +1345,7 @@
   (:args (object :scs (signed-reg unsigned-reg))
          ;; Types are trees of symbols, so 'any-reg' is not
          ;; really possible.
-         (type :scs (any-reg descriptor-reg)))
+         (type :scs (any-reg descriptor-reg constant)))
   (:arg-types untagged-num *)
   (:vop-var vop)
   (:save-p :compute-only)
