@@ -5802,3 +5802,10 @@
           do
           (assert (search "NUNION"
                           (princ-to-string c))))))
+
+(with-test (:name :%array-data-vector-complex-type-derivation)
+  (let ((type (funcall (checked-compile
+                        `(lambda (x)
+                           (ctu:compiler-derived-type (sb-kernel:%array-data-vector (the array x)))))
+                       #2A())))
+    (assert (eq type 'array))))

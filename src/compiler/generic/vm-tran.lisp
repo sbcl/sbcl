@@ -266,33 +266,52 @@
                              sb!vm:vector-data-offset
                              index offset t))))
 
-(defun maybe-array-data-vector-type-specifier (array-lvar)
-  (let ((atype (lvar-type array-lvar)))
-    (when (array-type-p atype)
-      (let ((dims (array-type-dimensions atype)))
-        (if (or (array-type-complexp atype)
-                (eq '* dims)
-                (notevery #'integerp dims))
+(defun simple-array-storage-vector-type (type)
+  (let ((dims (array-type-dimensions type)))
+    (cond ((array-type-complexp type)
+           nil)
+          (t
            `(simple-array ,(type-specifier
-                            (array-type-specialized-element-type atype))
-                          (*))
-           `(simple-array ,(type-specifier
-                            (array-type-specialized-element-type atype))
-                          (,(apply #'* dims))))))))
+                            (array-type-specialized-element-type type))
+                          (,(if (and (listp dims)
+                                     (every #'integerp dims))
+                                (reduce #'* dims)
+                                '*)))))))
 
-(macrolet ((def (name)
-             `(defoptimizer (,name derive-type) ((array-lvar))
-                (let ((spec (maybe-array-data-vector-type-specifier array-lvar)))
-                  (when spec
-                    (specifier-type spec))))))
-  (def %array-data-vector)
-  (def array-storage-vector))
+(defoptimizer (array-storage-vector derive-type) ((array))
+  (let ((atype (lvar-type array)))
+    (when (array-type-p atype)
+      (specifier-type (or (simple-array-storage-vector-type atype)
+                          `(simple-array ,(type-specifier
+                                           (array-type-specialized-element-type atype))
+                                         (*)))))))
+
+(deftransform array-storage-vector ((array) ((simple-array * (*))))
+  'array)
+
+(defoptimizer (%array-data-vector derive-type) ((array))
+  (let ((atype (lvar-type array)))
+    (when (array-type-p atype)
+      (specifier-type (or
+                       (simple-array-storage-vector-type atype)
+                       `(array ,(type-specifier
+                                 (array-type-specialized-element-type atype))))))))
 
 (defoptimizer (%data-vector-and-index derive-type) ((array index))
-  (declare (ignore index))
-  (let ((spec (maybe-array-data-vector-type-specifier array)))
-    (when spec
-      (values-specifier-type `(values ,spec index)))))
+  (let ((atype (lvar-type array))
+        (index-type (lvar-type index)))
+    (when (array-type-p atype)
+      (values-specifier-type
+       `(values ,(or
+                  (simple-array-storage-vector-type atype)
+                  `(simple-array ,(type-specifier
+                                   (array-type-specialized-element-type atype))
+                                 (*)))
+                ,(if (and (integer-type-p index-type)
+                          (numeric-type-low index-type))
+                     `(integer ,(numeric-type-low index-type)
+                               (,sb!xc:array-dimension-limit))
+                     `index))))))
 
 (deftransform %data-vector-and-index ((%array %index)
                                       (simple-array t)
