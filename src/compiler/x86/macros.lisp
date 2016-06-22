@@ -93,10 +93,6 @@
            (ash symbol-value-slot word-shift)
            (- other-pointer-lowtag))))
 
-(defmacro tls-index-of (symbol)
-  `(make-ea-for-object-slot ,symbol ,sb!vm:symbol-tls-index-slot
-                            ,other-pointer-lowtag))
-
 (defmacro load-symbol-value (reg symbol)
   `(inst mov ,reg (make-ea-for-symbol-value ,symbol)))
 
@@ -104,6 +100,10 @@
   `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
 
 #!+sb-thread
+(progn
+(defmacro tls-index-of (symbol)
+  `(make-ea-for-object-slot ,symbol ,sb!vm:symbol-tls-index-slot
+                            ,other-pointer-lowtag))
 (defmacro make-ea-for-symbol-tls-index (symbol)
   (declare (type symbol symbol))
   `(make-ea :dword
@@ -112,25 +112,24 @@
            (ash symbol-tls-index-slot word-shift)
            (- other-pointer-lowtag))))
 
-#!+sb-thread
 (defmacro load-tl-symbol-value (reg symbol)
   `(with-tls-ea (EA :base ,reg
                     :disp-type :index
                     :disp (make-ea-for-symbol-tls-index ,symbol))
      (inst mov ,reg (make-ea :dword :base ,reg) :maybe-fs)))
-#!-sb-thread
-(defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 
-#!+sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   `(with-tls-ea (EA :base ,temp
                     :disp-type :index
                     :disp (make-ea-for-symbol-tls-index ,symbol))
-     (inst mov EA ,reg :maybe-fs)))
+     (inst mov EA ,reg :maybe-fs))))
+
 #!-sb-thread
+(progn
+(defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 (defmacro store-tl-symbol-value (reg symbol temp)
   (declare (ignore temp))
-  `(store-symbol-value ,reg ,symbol))
+  `(store-symbol-value ,reg ,symbol)))
 
 (defmacro load-binding-stack-pointer (reg)
   #!+sb-thread
