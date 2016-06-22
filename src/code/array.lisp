@@ -1006,10 +1006,13 @@ of specialized arrays is supported."
 (defun array-total-size (array)
   #!+sb-doc
   "Return the total number of elements in the Array."
-  (declare (array array))
-  (if (array-header-p array)
-      (%array-available-elements array)
-      (length (the vector array))))
+  (declare (explicit-check))
+  (cond ((array-header-p array)
+         (%array-available-elements array))
+        ((typep array 'vector)
+         (length array))
+        (t
+         (sb!c::%type-check-error/c array 'object-not-array-error))))
 
 (defun array-displacement (array)
   #!+sb-doc
