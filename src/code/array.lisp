@@ -1073,7 +1073,8 @@ of specialized arrays is supported."
       (fill-pointer-error vector)))
 
 (defun %set-fill-pointer (vector new)
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (index new))
   (flet ((oops (x)
            (fill-pointer-error vector x)))
     (cond ((not (array-has-fill-pointer-p vector))
