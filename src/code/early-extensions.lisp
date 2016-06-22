@@ -835,6 +835,7 @@
 ;;; PACKAGE-DESIGNATOR is actually a deleted package, and in that case
 ;;; you generally do want to signal an error instead of proceeding.)
 (defun %find-package-or-lose (package-designator)
+  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
   (or (find-package package-designator)
       (error 'simple-package-error
              :package package-designator
@@ -845,6 +846,7 @@
 ;;; consequences of most operations on deleted packages are
 ;;; unspecified. We try to signal errors in such cases.
 (defun find-undeleted-package-or-lose (package-designator)
+  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
   (let ((maybe-result (%find-package-or-lose package-designator)))
     (if (package-%name maybe-result)    ; if not deleted
         maybe-result
@@ -864,6 +866,7 @@
 
 ;;; Signal an error unless NAME is a legal function name.
 (defun legal-fun-name-or-type-error (name)
+  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
   (unless (legal-fun-name-p name)
     (error 'simple-type-error
            :datum name
@@ -1251,6 +1254,7 @@
               (deprecation-info-replacements info)))))
 
 (defun deprecation-error (software version namespace name replacements)
+  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
   (error 'deprecation-error
          :namespace namespace
          :name name

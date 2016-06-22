@@ -40,6 +40,7 @@
 ;;;; reader errors
 
 (defun reader-eof-error (stream context)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'reader-eof-error
          :stream stream
          :context context))
@@ -47,6 +48,7 @@
 ;;; If The Gods didn't intend for us to use multiple namespaces, why
 ;;; did They specify them?
 (defun simple-reader-error (stream control &rest args)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'simple-reader-error
          :stream stream
          :format-control control
@@ -1766,6 +1768,7 @@ extended <package-name>::<form-in-package> syntax."
 ;;;; General reader for dispatch macros
 
 (defun dispatch-char-error (stream sub-char ignore)
+  (declare (optimize allow-non-returning-tail-call))
   (declare (ignore ignore))
   (if *read-suppress*
       (values)
@@ -1828,6 +1831,7 @@ extended <package-name>::<form-in-package> syntax."
   whitespace characters and then tries to parse an integer. The
   radix parameter must be between 2 and 36."
   (flet ((parse-error (format-control)
+           (declare (optimize allow-non-returning-tail-call))
            (error 'simple-parse-error
                   :format-control format-control
                   :format-arguments (list string))))

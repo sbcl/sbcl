@@ -27,61 +27,60 @@
         (sequence-bounding-indices-bad-error seq start end))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defparameter *sequence-keyword-info*
-  ;; (name default supplied-p adjustment new-type)
-  `((count nil
+  (defparameter *sequence-keyword-info*
+    ;; (name default supplied-p adjustment new-type)
+    `((count nil
+             nil
+             (etypecase count
+               (null (1- most-positive-fixnum))
+               (fixnum (max 0 count))
+               (integer (if (minusp count)
+                            0
+                            (1- most-positive-fixnum))))
+             (mod #.sb!xc:most-positive-fixnum))
+      ;; Entries for {start,end}{,1,2}
+      ,@(mapcan (lambda (names)
+                  (destructuring-bind (start end length sequence) names
+                    (list
+                     `(,start
+                       0
+                       nil
+                       ;; Only evaluate LENGTH (which may be expensive)
+                       ;; if START is non-NIL.
+                       (if (or (zerop ,start) (<= 0 ,start ,length))
+                           ,start
+                           (sequence-bounding-indices-bad-error ,sequence ,start ,end))
+                       index)
+                     `(,end
+                       nil
+                       nil
+                       ;; Only evaluate LENGTH (which may be expensive)
+                       ;; if END is non-NIL.
+                       (if (or (null ,end) (<= ,start ,end ,length))
+                           ;; Defaulting of NIL is done inside the
+                           ;; bodies, for ease of sharing with compiler
+                           ;; transforms.
+                           ;;
+                           ;; FIXME: defend against non-number non-NIL
+                           ;; stuff?
+                           ,end
+                           (sequence-bounding-indices-bad-error ,sequence ,start ,end))
+                       (or null index)))))
+                '((start end length sequence)
+                  (start1 end1 length1 sequence1)
+                  (start2 end2 length2 sequence2)))
+      (key nil
            nil
-           (etypecase count
-             (null (1- most-positive-fixnum))
-             (fixnum (max 0 count))
-             (integer (if (minusp count)
-                          0
-                          (1- most-positive-fixnum))))
-           (mod #.sb!xc:most-positive-fixnum))
-    ;; Entries for {start,end}{,1,2}
-    ,@(mapcan (lambda (names)
-                (destructuring-bind (start end length sequence) names
-                  (list
-                   `(,start
-                     0
-                     nil
-                     ;; Only evaluate LENGTH (which may be expensive)
-                     ;; if START is non-NIL.
-                     (if (or (zerop ,start) (<= 0 ,start ,length))
-                         ,start
-                         (sequence-bounding-indices-bad-error ,sequence ,start ,end))
-                     index)
-                   `(,end
-                     nil
-                     nil
-                     ;; Only evaluate LENGTH (which may be expensive)
-                     ;; if END is non-NIL.
-                     (if (or (null ,end) (<= ,start ,end ,length))
-                         ;; Defaulting of NIL is done inside the
-                         ;; bodies, for ease of sharing with compiler
-                         ;; transforms.
-                         ;;
-                         ;; FIXME: defend against non-number non-NIL
-                         ;; stuff?
-                         ,end
-                         (sequence-bounding-indices-bad-error ,sequence ,start ,end))
-                     (or null index)))))
-              '((start end length sequence)
-                (start1 end1 length1 sequence1)
-                (start2 end2 length2 sequence2)))
-    (key nil
-         nil
-         (and key (%coerce-callable-to-fun key))
-         (or null function))
-    (test #'eql
-          nil
-          (%coerce-callable-to-fun test)
-          function)
-    (test-not nil
-              nil
-              (and test-not (%coerce-callable-to-fun test-not))
-              (or null function))))
+           (and key (%coerce-callable-to-fun key))
+           (or null function))
+      (test #'eql
+            nil
+            (%coerce-callable-to-fun test)
+            function)
+      (test-not nil
+                nil
+                (and test-not (%coerce-callable-to-fun test-not))
+                (or null function)))))
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring) (parse-body body t)
@@ -185,6 +184,7 @@
      (sb!sequence:make-sequence-like ,sequence ,length)))
 
 (defun bad-sequence-type-error (type-spec)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'simple-type-error
          :datum type-spec
          :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
@@ -192,6 +192,7 @@
          :format-arguments (list type-spec)))
 
 (defun sequence-type-length-mismatch-error (type length)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'simple-type-error
          :datum length
          :expected-type (cond ((array-type-p type)
@@ -216,6 +217,7 @@
 
   ;; On the other hand, I'm not sure it deserves to be a type-error,
   ;; either. -- bem, 2005-08-10
+  (declare (optimize allow-non-returning-tail-call))
   (error 'simple-program-error
          :format-control "~S is too hairy for sequence functions."
          :format-arguments (list type-spec)))
@@ -241,8 +243,6 @@
                                (sb!pcl:ensure-class-finalized ,class))))
          ,@(unless prototypep `((ignore ,prototype)))
          ,@body))))
-
-) ; EVAL-WHEN
 
 (defun is-a-valid-sequence-type-specifier-p (type)
   (let ((type (specifier-type type)))
@@ -277,6 +277,7 @@
 
 (declaim (ftype (function (sequence index) nil) signal-index-too-large-error))
 (defun signal-index-too-large-error (sequence index)
+  (declare (optimize allow-non-returning-tail-call))
   (let* ((length (length sequence))
          (max-index (and (plusp length)
                          (1- length))))
@@ -289,6 +290,7 @@
 
 (declaim (ftype (function (t t t) nil) sequence-bounding-indices-bad-error))
 (defun sequence-bounding-indices-bad-error (sequence start end)
+  (declare (optimize allow-non-returning-tail-call))
   (let ((size (length sequence)))
     (error 'bounding-indices-bad-error
            :datum (cons start end)
@@ -298,6 +300,7 @@
 
 (declaim (ftype (function (t t t) nil) array-bounding-indices-bad-error))
 (defun array-bounding-indices-bad-error (array start end)
+  (declare (optimize allow-non-returning-tail-call))
   (let ((size (array-total-size array)))
     (error 'bounding-indices-bad-error
            :datum (cons start end)
@@ -307,12 +310,12 @@
 
 (declaim (ftype (function (t) nil) circular-list-error))
 (defun circular-list-error (list)
-  (let ((*print-circle* t))
-    (error 'simple-type-error
-           :format-control "List is circular:~%  ~S"
-           :format-arguments (list list)
-           :datum list
-           :type '(and list (satisfies list-length)))))
+  (declare (optimize allow-non-returning-tail-call))
+  (error 'simple-type-error
+         :format-control "List is circular:~%  ~S"
+         :format-arguments (list list)
+         :datum list
+         :type '(and list (satisfies list-length))))
 
 
 

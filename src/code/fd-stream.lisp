@@ -471,11 +471,13 @@
 
 ;;; common idioms for reporting low-level stream and file problems
 (defun simple-stream-perror (note-format stream errno)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'simple-stream-error
          :stream stream
          :format-control "~@<~?: ~2I~_~A~:>"
          :format-arguments (list note-format (list stream) (strerror errno))))
 (defun simple-file-perror (note-format pathname errno)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'simple-file-error
          :pathname pathname
          :format-control "~@<~?: ~2I~_~A~:>"
@@ -483,10 +485,12 @@
          (list note-format (list pathname) (strerror errno))))
 
 (defun c-string-encoding-error (external-format code)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'c-string-encoding-error
          :external-format external-format
          :code code))
 (defun c-string-decoding-error (external-format sap offset count)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'c-string-decoding-error
          :external-format external-format
          :octets (sap-ref-octets sap offset count)))
@@ -2388,6 +2392,7 @@
                                        (not if-does-not-exist-given)))
                               (native-namestring physical :as-file t)))))
       (flet ((open-error (format-control &rest format-arguments)
+               (declare (optimize allow-non-returning-tail-call))
                (error 'simple-file-error
                       :pathname pathname
                       :format-control format-control

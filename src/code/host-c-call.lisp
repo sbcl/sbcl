@@ -79,6 +79,7 @@
 
 (declaim (ftype (sfunction (t) nil) null-error))
 (defun null-error (type)
+  #-sb-xc-host(declare (optimize sb!kernel:allow-non-returning-tail-call))
   (aver (alien-c-string-type-not-null type))
   (error 'type-error
          :expected-type `(alien ,(unparse-alien-type type))

@@ -156,6 +156,7 @@ with that condition (or with no condition) will be returned."
 ;;; helper for the various functions which are ANSI-spec'ed to do
 ;;; something with a restart or signal CONTROL-ERROR if there is none
 (defun find-restart-or-control-error (identifier &optional condition (call-test-p t))
+  (declare (optimize allow-non-returning-tail-call))
   (or (%find-restart identifier condition call-test-p)
       (error 'simple-control-error
              :format-control "No restart ~S is active~@[ for ~S~]."
@@ -261,6 +262,7 @@ with that condition (or with no condition) will be returned."
         value))))
 
 (defun case-failure (name value keys)
+  (declare (optimize allow-non-returning-tail-call))
   (error 'case-failure
          :name name
          :datum value

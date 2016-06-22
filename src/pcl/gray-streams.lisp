@@ -20,7 +20,9 @@
 ;;; implementation generic functions.  All of them could (maybe
 ;;; should?) have two default methods: one on STREAM calling
 ;;; BUG-OR-ERROR, and one on T signalling a TYPE-ERROR.
+(declaim (ftype (function * nil) bug-or-error))
 (defun bug-or-error (stream fun)
+  (declare (optimize allow-non-returning-tail-call))
   (error
    "~@<The stream ~S has no suitable method for ~S, ~
      and so has fallen through to this method.  If you think that this is ~

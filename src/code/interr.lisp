@@ -305,6 +305,7 @@
      (error *heap-exhausted-error-condition*))))
 
 (defun undefined-alien-variable-error ()
+  (declare (optimize allow-non-returning-tail-call))
   (error 'undefined-alien-variable-error))
 
 #!-win32

@@ -772,6 +772,7 @@
 (defun values-specifier-type-r (context type-specifier)
   (declare (type cons context))
   (labels ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
+             #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
              (error "bad thing to be a type specifier: ~
                       ~/sb!impl:print-type-specifier/"
                     spec))
