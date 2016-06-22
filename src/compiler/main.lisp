@@ -122,9 +122,9 @@
 ;; Used during compilation to keep track of with source paths have been
 ;; instrumented in which blocks.
 (defvar *code-coverage-blocks* nil)
-;; Stores the code coverage instrumentation results. Keys are namestrings,
-;; the value is a list of (CONS PATH STATE), where STATE is NIL for
-;; a path that has not been visited, and T for one that has.
+;; Stores the code coverage instrumentation results. Keys are namestrings, the
+;; value is a list of (CONS PATH STATE), where STATE is +CODE-COVERAGE-UNMARKED+
+;; for a path that has not been visited, and T for one that has.
 (defvar *code-coverage-info* (make-hash-table :test 'equal))
 
 
