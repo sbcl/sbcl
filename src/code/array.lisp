@@ -57,14 +57,14 @@
   (%with-array-data-macro array start end :check-bounds t :check-fill-pointer t))
 
 (defun %with-array-data (array start end)
-  (%with-array-data-macro array start end :check-bounds t :check-fill-pointer nil))
+  (%with-array-data-macro array start end :check-bounds t :array-header-p t))
 
 (defun %data-vector-and-index (array index)
   (if (array-header-p array)
       (multiple-value-bind (vector index)
           (%with-array-data array index nil)
         (values vector index))
-      (values array index)))
+      (values (truly-the (simple-array * (*)) array) index)))
 
 ;;;; MAKE-ARRAY
 (defun %integer-vector-widetag-and-n-bits (signed high)

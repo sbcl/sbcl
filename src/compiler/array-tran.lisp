@@ -1067,14 +1067,15 @@
                                               `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
                                     `(values ,n-array ,n-svalue ,n-end 0)))))))
                  (t
-                  ,(if force-inline
-                       `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
-                                                :check-bounds ,check-bounds
-                                                :check-fill-pointer ,check-fill-pointer
-                                                :array-header-p array-header-p)
-                       (if check-fill-pointer
-                           `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue)
-                           `(%with-array-data ,n-array ,n-svalue ,n-evalue)))))
+                  ,(cond (force-inline
+                          `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
+                                                   :check-bounds ,check-bounds
+                                                   :check-fill-pointer ,check-fill-pointer
+                                                   :array-header-p t))
+                         (check-fill-pointer
+                          `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue))
+                         (t
+                          `(%with-array-data ,n-array ,n-svalue ,n-evalue)))))
          ,@forms))))
 
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
@@ -1084,7 +1085,7 @@
                           array-header-p)
   (with-unique-names (size defaulted-end data cumulative-offset)
     `(let* ((,size ,(cond (check-fill-pointer
-                           `(length ,array))
+                           `(length (the vector ,array)))
                           (array-header-p
                            `(%array-available-elements ,array))
                           (t
@@ -1095,16 +1096,21 @@
                 ,(if check-fill-pointer
                      `(sequence-bounding-indices-bad-error ,array ,start ,end)
                      `(array-bounding-indices-bad-error ,array ,start ,end)))))
-       (do ((,data ,array (%array-data-vector ,data))
-            (,cumulative-offset 0
-                                (+ ,cumulative-offset
-                                   (%array-displacement ,data))))
+       (do ((,data ,(if array-header-p
+                        `(%array-data-vector ,array)
+                        array)
+                   (%array-data-vector ,data))
+            (,cumulative-offset ,(if array-header-p
+                                     `(%array-displacement ,array)
+                                     0)
+                                (truly-the index
+                                           (+ ,cumulative-offset
+                                              (%array-displacement ,data)))))
            ((not (array-header-p ,data))
-            (values (the (simple-array ,element-type 1) ,data)
-                    (the index (+ ,cumulative-offset ,start))
-                    (the index (+ ,cumulative-offset ,defaulted-end))
-                    (the index ,cumulative-offset)))
-         (declare (type index ,cumulative-offset))))))
+            (values (truly-the (simple-array ,element-type 1) ,data)
+                    (truly-the index (+ ,cumulative-offset ,start))
+                    (truly-the index (+ ,cumulative-offset ,defaulted-end))
+                    ,cumulative-offset))))))
 
 (defun transform-%with-array-data/mumble (array node check-fill-pointer)
   (let ((element-type (upgraded-element-type-specifier-or-give-up array))
