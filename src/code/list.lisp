@@ -384,54 +384,41 @@
 (defun append (&rest lists)
   #!+sb-doc
   "Construct a new list by concatenating the list arguments"
-  (declare (truly-dynamic-extent lists) (optimize speed))
-  (labels ((fail (object)
-             (error 'type-error
-                    :datum object
-                    :expected-type 'list))
-           (append-into (last-cons current rest)
-             ;; Set (CDR LAST-CONS) to (APPLY #'APPEND CURRENT REST).
-             (declare (cons last-cons rest))
-             (if (listp current)
-                 (if (consp current)
-                     ;; normal case, cdr down the list
-                     (append-into (setf (cdr last-cons) (list (car current)))
-                                  (cdr current)
-                                  rest)
-                     ;; empty list
-                     (let ((more (cdr rest)))
-                       (if (null more)
-                           (setf (cdr last-cons) (car rest))
-                           (append-into last-cons (car rest) more))))
-                 (fail current)))
-           (append1 (lists)
-             (let ((current (car lists))
-                   (rest (cdr lists)))
-               (cond ((null rest)
-                      current)
-                     ((consp current)
-                      (let ((result (truly-the cons (list (car current)))))
-                        (append-into result
-                                     (cdr current)
-                                     rest)
-                        result))
-                     ((null current)
-                      (append1 rest))
-                     (t
-                      (fail current))))))
-    (append1 lists)))
+  (let* ((result (list nil))
+         (tail result)
+         (index 0)
+         (length (length lists))
+         (last (1- length)))
+    (declare (truly-dynamic-extent result))
+    (loop
+     (cond
+       ((< (truly-the index index) last)
+        (let ((list (fast-&rest-nth (truly-the index index) lists)))
+          (dolist (elt list)
+            (setf (cdr (truly-the cons tail)) (list elt)
+                  tail (cdr tail))))
+        (incf index))
+       (t (return nil))))
+    (cond
+      ((zerop length) nil)
+      ((null (cdr result))
+       (fast-&rest-nth (truly-the index last) lists))
+      (t
+       (setf (cdr (truly-the cons tail))
+             (fast-&rest-nth (truly-the index last) lists))
+       (cdr result)))))
 
 (defun append2 (x y)
-  (declare (optimize speed (sb!c::verify-arg-count 0)))
+  (declare (optimize (sb!c::verify-arg-count 0)))
   (if (null x)
       y
       (let ((result (list (car x))))
         (do ((more (cdr x) (cdr more))
              (tail result (cdr tail)))
             ((null more)
-             (rplacd tail y)
+             (rplacd (truly-the cons tail) y)
              result)
-          (rplacd tail (list (car more)))))))
+                    (rplacd (truly-the cons tail) (list (car more)))))))
 
 
 ;;;; list copying functions
