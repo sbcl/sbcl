@@ -29,6 +29,7 @@
   (apply #'make-instance (find-class class) initargs))
 
 (defmethod make-instance ((class class) &rest initargs)
+  (declare (inline ensure-class-finalized))
   (let ((instance-or-nil (maybe-call-ctor class initargs)))
     (when instance-or-nil
       (return-from make-instance instance-or-nil)))

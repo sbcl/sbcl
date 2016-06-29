@@ -44,7 +44,8 @@
 
 (defmethod allocate-instance
            ((class funcallable-standard-class) &rest initargs)
-  (declare (ignore initargs))
+  (declare (ignore initargs)
+           (inline ensure-class-finalized))
   (allocate-standard-funcallable-instance
    (class-wrapper (ensure-class-finalized class))))
 

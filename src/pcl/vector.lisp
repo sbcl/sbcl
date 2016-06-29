@@ -155,7 +155,8 @@
       (finalize-inheritance class)
       t)))
 
-(declaim (ftype (sfunction (class) class) ensure-class-finalized))
+(declaim (ftype (sfunction (class) class) ensure-class-finalized)
+         (maybe-inline ensure-class-finalized))
 (defun ensure-class-finalized (class)
   (unless (class-finalized-p class)
     (finalize-inheritance class))

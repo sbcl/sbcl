@@ -466,7 +466,8 @@
 ;;; if the class is not yet finalized, but we don't seem to be taking
 ;;; care of this for non-standard-classes.
 (defmethod allocate-instance ((class standard-class) &rest initargs)
-  (declare (ignore initargs))
+  (declare (ignore initargs)
+           (inline ensure-class-finalized))
   (allocate-standard-instance
    (class-wrapper (ensure-class-finalized class))))
 
