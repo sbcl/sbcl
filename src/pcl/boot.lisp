@@ -643,10 +643,6 @@ generic function lambda list ~S~:>"
                   ;; knowledge of specialized argument types so that
                   ;; it can avoid run-time type dispatch overhead,
                   ;; which can be a huge win for Python.)
-                  ;;
-                  ;; KLUDGE: when I tried moving these to
-                  ;; ADD-METHOD-DECLARATIONS, things broke.  No idea
-                  ;; why.  -- CSR, 2004-06-16
                   ,@(let ((specials (declared-specials declarations)))
                       (mapcar (lambda (par spec)
                                 (parameter-specializer-declaration-in-defmethod
