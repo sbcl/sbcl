@@ -413,3 +413,36 @@
                       (adjust-array x 5 :initial-element #\x)))
                   "abc")
                  "abcxx")))
+
+(with-test (:name :array-initial-contents-1)
+  (flet ((f (x y)
+           (sb-int:dx-let ((a (make-array `(,x ,y)
+                                          :initial-contents
+                                          '((a b c) (1 2 3)))))
+             (eval a)
+             nil)))
+    (f 2 3)
+    (assert-error (f 3 2))))
+
+(with-test (:name :array-initial-contents-2)
+  (labels ((compute-contents () '((a b c) (1 2 3)))
+           (f (x y)
+             (sb-int:dx-let ((a (make-array `(,x ,y)
+                                            :initial-contents
+                                            (compute-contents))))
+               (eval a)
+                nil)))
+    (declare (notinline compute-contents))
+    (f 2 3)
+    (assert-error (f 3 2))))
+
+(with-test (:name :array-initial-contents-3)
+  (multiple-value-bind (f warningp errorp)
+      ;; FIXME: should be CHECKED-COMPILE
+      (let ((*error-output* (make-broadcast-stream)))
+        (compile nil '(lambda (z)
+                        (symbol-macrolet ((x (+ 1 1)) (y (* 2 1)))
+                          (make-array `(,x ,y)
+                                      :initial-contents
+                                      `((,z ,z 1) (,z ,z ,z)))))))
+    (assert (and f warningp errorp))))

@@ -262,6 +262,21 @@
               (funcall setter (tnify i) tmp))))))
     (move-lvar-result node block locs lvar)))
 
+;;; An array header for simple non-unidimensional arrays is a fixed alloc,
+;;; because the rank has to be known.
+;;; (There are no compile-time optimizations for unknown rank arrays)
+(defoptimizer (make-array-header* ir2-convert) ((&rest args) node block)
+  (let ((n-args (length args)))
+    (ir2-convert-fixed-allocation
+     node block 'make-array
+     ;; Each argument fills in one slot of the array header.
+     ;; Add one word for the primitive object's header word.
+     (1+ n-args)
+     ;; MAKE-ARRAY optimizations will not kick in for complex arrays.
+     sb!vm:simple-array-widetag
+     sb!vm:other-pointer-lowtag
+     (loop for i from 1 to n-args collect `(:arg . ,i)))))
+
 ;;; :SET-TRANS (in objdef.lisp !DEFINE-PRIMITIVE-OBJECT) doesn't quite
 ;;; cut it for symbols, where under certain compilation options
 ;;; (e.g. #!+SB-THREAD) we have to do something complicated, rather
@@ -281,6 +296,9 @@
 ;;; Stack allocation optimizers per platform support
 #!+stack-allocatable-vectors
 (progn
+  (defoptimizer (make-array-header* stack-allocate-result) ((&rest args) node dx)
+    args dx
+    t)
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
     (declare (ignorable type) (ignore length))
@@ -374,3 +392,23 @@
     (vectorish-ltn-annotate-helper call ltn-policy
                                    'sb!vm::allocate-list-on-stack)))
 
+
+(in-package "SB!VM")
+;;; Return a list of parameters with which to call MAKE-ARRAY-HEADER*
+;;; given the mandatory slots for a simple array of rank 0 or > 1.
+(defun make-array-header-inits (storage n-elements dimensions)
+  (macrolet ((expand ()
+               `(list* ,@(mapcar (lambda (slot)
+                                   (ecase (slot-name slot)
+                                     (data           'storage)
+                                     (fill-pointer   'n-elements)
+                                     (elements       'n-elements)
+                                     (fill-pointer-p nil)
+                                     (displacement   0)
+                                     (displaced-p    nil)
+                                     (displaced-from nil)))
+                                 (butlast (primitive-object-slots
+                                           (find 'array *primitive-objects*
+                                                 :key 'primitive-object-name))))
+                       dimensions)))
+    (expand)))

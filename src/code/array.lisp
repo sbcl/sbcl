@@ -1736,3 +1736,14 @@ function to be removed without further warning."
                    (setf ,tag (%other-pointer-widetag ,(first args))))
                  (svref ,',table-name ,tag)))
              ,@args))))))
+
+(defun sb!kernel::check-array-shape (array dimensions)
+  (when (let ((dimensions dimensions))
+          (dotimes (i (array-rank array))
+            (unless (eql (array-dimension array i) (pop dimensions))
+              (return t))))
+    (error "malformed :INITIAL-CONTENTS: ~S should have dimensions ~S"
+           (make-array dimensions :displaced-to (%array-data-vector array)
+                                  :element-type (array-element-type array))
+           (array-dimensions array)))
+  array)

@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.3.7:
+  * enhancement: simple arrays of any rank can be stack-allocated
+    on platforms supporting stack allocation of vectors.
+
 changes in sbcl-1.3.7 relative to sbcl-1.3.6:
   * bug fix: preserve the name of the destructive function for the destroyed
     constant and important result warnings, even when declared NOTINLINE.

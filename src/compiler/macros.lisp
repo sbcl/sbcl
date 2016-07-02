@@ -121,15 +121,16 @@
                (,lambda-whole ,lambda-env &aux (,args (cdr ,lambda-whole)))
              ,@(if (not env) `((declare (ignore ,lambda-env))))
              ,@outer-decl ; SPECIALs or something? I hope not.
-             (if ,(emit-ds-lambda-list-match args new-ll)
+             (if (not ,(emit-ds-lambda-list-match args new-ll))
+                 (values nil t)
                  ;; The body can return 1 or 2 values, but consistently
                  ;; returning 2 values from the XEP is stylistically
                  ;; preferable, and produces shorter assembly code too.
                  (multiple-value-bind (call pass)
                      (binding* ,(expand-ds-bind new-ll args nil 'truly-the)
-                       ,@inner-decls ,@forms)
-                   (values call pass))
-                 (values nil t))))))
+                       ,@inner-decls
+                       (block ,(fun-name-block-name fun-name) ,@forms))
+                   (values call pass)))))))
 
 ;;;; lambda-list parsing utilities
 ;;;;

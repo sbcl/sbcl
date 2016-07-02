@@ -2865,23 +2865,44 @@ many elements are copied."
 ;;; FIXME: this was originally in array.lisp; it might be better to
 ;;; put it back there, and make DOSEQUENCE and SEQ-DISPATCH be in
 ;;; a new early-seq.lisp file.
-(defun fill-data-vector (vector dimensions initial-contents)
-  (declare (explicit-check))
-  (let ((index 0))
-    (labels ((frob (axis dims contents)
-               (cond ((null dims)
-                      (setf (aref vector index) contents)
-                      (incf index))
-                     (t
-                      (unless (typep contents 'sequence)
-                        (error "malformed :INITIAL-CONTENTS: ~S is not a ~
-                                sequence, but ~W more layer~:P needed."
-                               contents
-                               (- (length dimensions) axis)))
-                      (unless (= (length contents) (car dims))
-                        (error "malformed :INITIAL-CONTENTS: Dimension of ~
-                                axis ~W is ~W, but ~S is ~W long."
-                               axis (car dims) contents (length contents)))
-                      (sb!sequence:dosequence (content contents)
-                        (frob (1+ axis) (cdr dims) content))))))
-      (frob 0 dimensions initial-contents))))
+(macrolet ((body (lambda-list endp-test start-recursion next-layer)
+              `(let ((index 0))
+                 (labels ((frob ,lambda-list
+                            (cond (,endp-test
+                                   (setf (aref vector index) contents)
+                                   (incf index))
+                                  (t
+                                   (unless (typep contents 'sequence)
+                                     (error "malformed :INITIAL-CONTENTS: ~S is not a ~
+                                             sequence, but ~W more layer~:P needed."
+                                            contents
+                                            (- (length dimensions) axis)))
+                                   (let ((k this-dimension)
+                                         (l (length contents)))
+                                     (unless (= k l)
+                                       (error "malformed :INITIAL-CONTENTS: Dimension of ~
+                                               axis ~W is ~W, but ~S is ~W long."
+                                              axis k contents l)))
+                                   (sb!sequence:dosequence (content contents)
+                                     ,next-layer)))))
+                   ,start-recursion))))
+
+  (defun fill-data-vector (vector dimensions initial-contents)
+    (declare (explicit-check))
+    (symbol-macrolet ((this-dimension (car dims)))
+      (body (axis dims contents) (null dims)
+            (frob 0 dimensions initial-contents)
+            (frob (1+ axis) (cdr dims) content))))
+
+  ;; Identical to FILL-DATA-VECTOR but avoid reference
+  ;; to DIMENSIONS as a list except in case of error.
+  (defun fill-array (initial-contents array)
+    (declare (explicit-check))
+    (let ((rank (array-rank array))
+          (vector (%array-data-vector array)))
+      (symbol-macrolet ((dimensions (array-dimensions array))
+                        (this-dimension (%array-dimension array axis)))
+        (body (axis contents) (= axis rank)
+              (frob 0 initial-contents)
+              (frob (1+ axis) content))))
+    array))

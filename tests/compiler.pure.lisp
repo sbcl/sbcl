@@ -3149,7 +3149,15 @@
     (test `(lambda (x y z)
              (make-array '3 :initial-contents (vector x y z))))
     (test `(lambda (x y z)
-             (make-array '3 :initial-contents `(,x ,y ,z))))))
+             (make-array '3 :initial-contents `(,x ,y ,z))))
+    (test `(lambda (x y z)
+             ;; Single-use FLET is eliminated,
+             ;; so MAKE-ARRAY's result is obviously a vector.
+             (flet ((size () '(3)))
+               (make-array (size) :initial-contents `(,x ,y ,z)))))
+    (test `(lambda (x y z)
+             (flet ((size () (list 3))) ; here too
+               (make-array (size) :initial-contents `(,x ,y ,z)))))))
 
 ;;; optimizing array-in-bounds-p
 (with-test (:name :optimize-array-in-bounds-p)

@@ -290,6 +290,43 @@
     (true v)
     nil))
 
+(defun-with-dx make-3d-fixed-array-on-stack-1 ()
+  (let ((a (make-array '(4 8 3) :initial-element 12 :element-type t)))
+    (declare (sb-int:truly-dynamic-extent a))
+    (true a)
+    (true a)
+    nil))
+(defun-with-dx make-3d-fixed-array-on-stack-2 (a b c d)
+  (sb-int:dx-let ((a (make-array '(2 2 1)
+                                 :element-type 'bit
+                                 :initial-contents `(#((,a) (,b)) (#(,c) (,d))))))
+    (true a)
+    (true a)
+    nil))
+
+(defun-with-dx make-2d-variable-array-on-stack ()
+  (let* ((n (opaque-identity 5))
+         (a (make-array `(,n 2) :initial-element 12 :element-type t)))
+    (declare (sb-int:truly-dynamic-extent a))
+    (true a)
+    (true a)
+    nil))
+
+(defun 2d-array-initializer (n)
+  (ecase n
+    (1 '((a)))
+    (2 '((a b) (c d)))
+    (3 '((a b c) (c d e) (f g h)))))
+
+(defun-with-dx make-2d-array-function-initializer (n)
+  (let* ((x (opaque-identity n))
+         (y (opaque-identity x))
+         (a (make-array `(,x ,y) :initial-contents (2d-array-initializer x))))
+    (declare (sb-int:truly-dynamic-extent a))
+    (true a)
+    (true a)
+    nil))
+
 ;;; MAKE-LIST
 
 (declaim (inline make-list-container))
@@ -667,6 +704,14 @@
   (assert-no-consing (make-array-on-stack-4))
   (assert-no-consing (make-array-on-stack-5))
   (assert-no-consing (vector-on-stack :x :y)))
+
+(with-test (:name (:no-consing :dx-arrays) :skipped-on '(not :stack-allocatable-vectors))
+  (assert-no-consing (make-3d-fixed-array-on-stack-1))
+  (assert-no-consing (make-3d-fixed-array-on-stack-2 0 0 1 1))
+  (assert-no-consing (make-2d-variable-array-on-stack))
+  (assert-no-consing (make-2d-array-function-initializer 1))
+  (assert-no-consing (make-2d-array-function-initializer 2))
+  (assert-no-consing (make-2d-array-function-initializer 3)))
 
 (with-test (:name (:no-consing :specialized-dx-vectors)
             :skipped-on `(not (and :stack-allocatable-vectors

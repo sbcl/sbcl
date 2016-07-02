@@ -139,6 +139,11 @@
 (defknown %array-rank (t) array-rank
   (flushable))
 
+(defknown sb!kernel::check-array-shape (simple-array list)
+  (simple-array)
+  (flushable)
+  :result-arg 0)
+
 (defknown %make-instance (index) instance
   (flushable))
 (defknown %make-structure-instance (defstruct-description list &rest t) instance
@@ -214,6 +219,7 @@
 (defknown make-array-header ((unsigned-byte 8) (unsigned-byte 24)) array
   (flushable movable))
 
+(defknown make-array-header* (&rest t) array (flushable movable))
 
 (defknown make-weak-pointer (t) weak-pointer
   (flushable))

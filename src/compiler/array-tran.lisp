@@ -373,65 +373,216 @@
 ;; Traverse the :INTIAL-CONTENTS argument to an array constructor call,
 ;; changing the skeleton of the data to be constructed by calls to LIST
 ;; and wrapping some declarations around each array cell's constructor.
+;; In general, if we fail to optimize out the materialization
+;; of initial-contents as distinct from the array itself, we prefer VECTOR
+;; over LIST due to the smaller overhead (except for <= 1 item).
 ;; If a macro is involved, expand it before traversing.
-;; Known bugs:
-;; - Despite the effort to handle multidimensional arrays here,
-;;   an array-header will not be stack-allocated, so the data won't be either.
+;; Known limitations:
 ;; - inline functions whose behavior is merely to call LIST don't work
 ;;   e.g. :INITIAL-CONTENTS (MY-LIST a b) ; where MY-LIST is inline
 ;;                                        ; and effectively just (LIST ...)
 (defun rewrite-initial-contents (rank initial-contents env)
-  (named-let recurse ((rank rank) (data initial-contents))
-    (declare (type index rank))
-    (if (plusp rank)
-        (flet ((sequence-constructor-p (form)
-                 (member (car form) '(sb!impl::|List| list
-                                      sb!impl::|Vector| vector))))
-          (let (expanded)
-            (cond ((not (listp data)) data)
-                  ((sequence-constructor-p data)
-                   `(list ,@(mapcar (lambda (dim) (recurse (1- rank) dim))
-                                    (cdr data))))
-                  ((and (sb!xc:macro-function (car data) env)
-                        (listp (setq expanded (sb!xc:macroexpand data env)))
-                        (sequence-constructor-p expanded))
-                   (recurse rank expanded))
-                  (t data))))
-      ;; This is the important bit: once we are past the level of
-      ;; :INITIAL-CONTENTS that relates to the array structure, reinline LIST
-      ;; and VECTOR so that nested DX isn't screwed up.
-        `(locally (declare (inline list vector)) ,data))))
+  ;; If FORM is constant to begin with, we don't want to pessimize it
+  ;; by turning it into a non-literal. That would happen because when
+  ;; optimizing `#(#(foo bar) #(,x ,y)) we convert the whole expression
+  ;; into (VECTOR 'FOO 'BAR X Y), whereas in the unidimensional case
+  ;; it never makes sense to turn #(FOO BAR) into (VECTOR 'FOO 'BAR).
+  (when (or (and (= rank 1) (sb!xc:constantp initial-contents env))
+            ;; If you inhibit inlining these - game over.
+            (fun-lexically-notinline-p 'vector env)
+            (fun-lexically-notinline-p 'list env)
+            (fun-lexically-notinline-p 'list* env))
+    (return-from rewrite-initial-contents (values nil nil)))
+  (let ((dimensions (make-array rank :initial-element nil))
+        (output))
+    (named-let recurse ((form (sb!xc:macroexpand initial-contents env))
+                        (axis 0))
+      (flet ((make-list-ctor (tail &optional (prefix nil prefixp) &aux val)
+               (when (and (sb!xc:constantp tail)
+                          (or (proper-list-p (setq val (constant-form-value tail env)))
+                              (and (vectorp val) (not prefixp))))
+                 (setq form
+                       (cons 'list
+                             (append (butlast prefix)
+                                     (map 'list (lambda (x) (list 'quote x)) val)))))))
+        ;; Express quasiquotation using only LIST, not LIST*.
+        ;; e.g. `(,A ,B X Y) -> (LIST* A B '(X Y)) -> (LIST A B 'X 'Y)
+        (if (typep form '(cons (eql list*) list))
+            (let* ((cdr (cdr form)) (last (last cdr)))
+              (when (null (cdr last))
+                (make-list-ctor (car last) cdr)))
+            (make-list-ctor form)))
+      (unless (and (typep form '(cons (member list vector)))
+                   (do ((items (cdr form))
+                        (length 0 (1+ length))
+                        (fun (let ((axis (the (mod #.array-rank-limit) (1+ axis))))
+                               (if (= axis rank)
+                                   (lambda (item) (push item output))
+                                   (lambda (item) (recurse item axis))))))
+                       ;; FIXME: warn if the nesting is indisputably wrong
+                       ;; such as `((,x ,x) (,x ,x ,x)).
+                       ((atom items)
+                        (and (null items)
+                             (if (aref dimensions axis)
+                                 (eql length (aref dimensions axis))
+                                 (setf (aref dimensions axis) length))))
+                     (declare (type index length))
+                     (funcall fun (pop items))))
+        (return-from rewrite-initial-contents (values nil nil))))
+    (when (some #'null dimensions)
+      ;; Unless it is the rightmost axis, a 0-length subsequence
+      ;; causes a NIL dimension. Give up if that happens.
+      (return-from rewrite-initial-contents (values nil nil)))
+    (setq output (nreverse output))
+    (values
+     ;; If the unaltered INITIAL-CONTENTS were constant, then the flattened
+     ;; form must be too. Turning it back to a self-evaluating object
+     ;; is essential to avoid compile-time blow-up on huge vectors.
+     (if (sb!xc:constantp initial-contents env)
+         (map 'vector (lambda (x) (constant-form-value x env)) output)
+         (let ((f (if (singleton-p output) 'list 'vector)))
+           `(locally (declare (notinline ,f))
+             (,f ,@(mapcar (lambda (x)
+                             (cond ((and (symbolp x)
+                                         (not (nth-value
+                                               1 (sb!xc:macroexpand-1 x env))))
+                                    x)
+                                   ((sb!xc:constantp x env)
+                                    `',(constant-form-value x env))
+                                   (t
+                                    `(locally (declare (inline ,f)) ,x))))
+                           output)))))
+     (coerce dimensions 'list))))
 
-;;; Prevent open coding DIMENSION and :INITIAL-CONTENTS arguments, so that we
-;;; can pick them apart in the DEFTRANSFORMS, and transform '(3) style
-;;; dimensions to integer args directly.
-(define-source-transform make-array (dimensions &rest keyargs &environment env)
-  (if (or (and (fun-lexically-notinline-p 'list)
-               (fun-lexically-notinline-p 'vector))
-          (oddp (length keyargs)))
-      (values nil t)
-      (multiple-value-bind (new-dimensions rank)
-          (flet ((constant-dims (dimensions)
-                   (let* ((dims (constant-form-value dimensions env))
-                          (canon (ensure-list dims))
-                          (rank (length canon)))
-                     (values (if (= rank 1)
-                                 (list 'quote (car canon))
-                                 (list 'quote canon))
-                             rank))))
-            (cond ((sb!xc:constantp dimensions env)
-                   (constant-dims dimensions))
-                  ((and (consp dimensions) (eq 'list dimensions))
-                   (values dimensions (length (cdr dimensions))))
-                  (t
-                   (values dimensions nil))))
-        (let ((initial-contents (getf keyargs :initial-contents)))
-          (when (and initial-contents rank)
-            (setf keyargs (copy-list keyargs)
-                  (getf keyargs :initial-contents)
-                  (rewrite-initial-contents rank initial-contents env))))
-        `(locally (declare (notinline list vector))
-           (make-array ,new-dimensions ,@keyargs)))))
+;;; Prevent open coding :INITIAL-CONTENTS arguments, so that we
+;;; can pick them apart in the DEFTRANSFORMS.
+;;; (MAKE-ARRAY (LIST dim ...)) for rank != 1 is transformed now.
+;;; Waiting around to see if IR1 can deduce that the dims are of type LIST
+;;; is ineffective, because by then it's too late to flatten the initial
+;;; contents using the correct array rank.
+;;; We explicitly avoid handling non-simple arrays (uni- or multi-dimensional)
+;;; in this path, mainly due to complications in picking the right widetag.
+(define-source-transform make-array (dims-form &rest rest &environment env
+                                               &aux dims dims-constp)
+  (cond ((and (sb!xc:constantp dims-form env)
+              (listp (setq dims (constant-form-value dims-form env)))
+              (not (singleton-p dims))
+              (every (lambda (x) (typep x 'index)) dims))
+         (setq dims-constp t))
+        ((and (cond ((typep (setq dims (sb!xc:macroexpand dims-form env))
+                            '(cons (eql list)))
+                     (setq dims (cdr dims))
+                     t)
+                    ;; `(,X 2 1) -> (LIST* X '(2 1)) for example
+                    ((typep dims '(cons (eql list*) cons))
+                     (let ((last (car (last dims))))
+                       (when (sb!xc:constantp last env)
+                         (let ((lastval (constant-form-value last env)))
+                           (when (listp lastval)
+                             (setq dims (append (butlast (cdr dims)) lastval))
+                             t))))))
+              (proper-list-p dims)
+              (not (singleton-p dims)))
+         ;; If you spell '(2 2) as (LIST 2 2), it is constant for purposes of MAKE-ARRAY.
+         (when (every (lambda (x) (sb!xc:constantp x env)) dims)
+           (let ((values (mapcar (lambda (x) (constant-form-value x env)) dims)))
+             (when (every (lambda (x) (typep x 'index)) values)
+               (setq dims values dims-constp t)))))
+        (t
+         ;; Regardless of dimension, it is always good to flatten :INITIAL-CONTENTS
+         ;; if we can, ensuring that we convert `(,X :A :B) = (LIST* X '(:A :B))
+         ;; into (VECTOR X :A :B) which makes it cons less if not optimized,
+         ;; or cons not at all (not counting the destination array) if optimized.
+         ;; There is no need to transform dimensions of '(<N>) to the integer N.
+         ;; The IR1 transform for list-shaped dims will figure it out.
+         (binding* ((contents (and (evenp (length rest)) (getf rest :initial-contents))
+                              :exit-if-null)
+                    ;; N-DIMS = 1 can be "technically" wrong, but it doesn't matter.
+                    (data (rewrite-initial-contents 1 contents env) :exit-if-null))
+           (setf rest (copy-list rest) (getf rest :initial-contents) data)
+           (return-from make-array `(make-array ,dims-form ,@rest)))
+         (return-from make-array (values nil t))))
+  ;; So now we know that this is a multi-dimensional (or 0-dimensional) array.
+  ;; Parse keywords conservatively, rejecting anything that makes it non-simple,
+  ;; and accepting only a pattern that is likely to occur in practice.
+  ;; e.g we give up on a duplicate keywords rather than bind ignored temps.
+  (let* ((unsupplied '#:unsupplied) (et unsupplied) et-constp et-binding
+         contents element adjustable keys data-dims)
+    (unless (loop (if (null rest) (return t))
+                  (if (or (atom rest) (atom (cdr rest))) (return nil))
+                  (let ((k (pop rest))
+                        (v rest))
+                    (pop rest)
+                    (case k
+                      (:element-type
+                       (unless (eq et unsupplied) (return nil))
+                       (setq et (car v) et-constp (sb!xc:constantp et env)))
+                      (:initial-element
+                       (when (or contents element) (return nil))
+                       (setq element v))
+                      (:initial-contents
+                       (when (or contents element) (return nil))
+                       (if (not dims) ; If 0-dimensional, use :INITIAL-ELEMENT instead
+                           (setq k :initial-element element v)
+                           (setq contents v)))
+                      (:adjustable ; reject if anything other than literal NIL
+                       (when (or adjustable (car v)) (return nil))
+                       (setq adjustable v))
+                      (t
+                       ;; Reject :FILL-POINTER, :DISPLACED-{TO,INDEX-OFFSET},
+                       ;; and non-literal keywords.
+                       (return nil)))
+                    (unless (member k '(:adjustable))
+                      (setq keys (nconc keys (list k (car v)))))))
+      (return-from make-array (values nil t)))
+    (when contents
+      (multiple-value-bind (data shape)
+          (rewrite-initial-contents (length dims) (car contents) env)
+        (cond (shape ; initial-contents will be part of the vector allocation
+               ;; and we aren't messing up keyword arg order.
+               (when (and dims-constp (not (equal shape dims)))
+                 ;; This will become a runtime error if the code is executed.
+                 (warn "array dimensions are ~A but :INITIAL-CONTENTS dimensions are ~A"
+                       dims shape))
+               (setf data-dims shape (getf keys :initial-contents) data))
+              (t ; contents could not be flattened
+               ;; Preserve eval order. The only keyword arg to worry about
+               ;; is :ELEMENT-TYPE. See also the remark at DEFKNOWN FILL-ARRAY.
+               (when (and (eq (car keys) :element-type) (not et-constp))
+                 (let ((et-temp (make-symbol "ET")))
+                   (setf et-binding `((,et-temp ,et)) (cadr keys) et-temp)))
+               (remf keys :initial-contents)))))
+    (let* ((axis-bindings
+            (unless dims-constp
+              (loop for d in dims for i from 0
+                    collect (list (make-symbol (format nil "D~D" i))
+                                  `(the index ,d)))))
+           (dims (if axis-bindings (mapcar #'car axis-bindings) dims))
+           (size (make-symbol "SIZE"))
+           (alloc-form
+            `(truly-the (simple-array
+                         ,(cond ((eq et unsupplied) t)
+                                (et-constp (constant-form-value et env))
+                                (t '*))
+                         ,(if dims-constp dims (length dims)))
+              (make-array-header*
+               ,@(sb!vm::make-array-header-inits
+                  `(make-array ,size ,@keys) size dims)))))
+      `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dims))))
+         ,(cond ((or (not contents) (and dims-constp (equal dims data-dims)))
+                 ;; If no :initial-contents, or definitely correct shape,
+                 ;; then just call the constructor.
+                 alloc-form)
+                (data-dims ; data are flattened
+                 ;; original shape must be asserted to be correct
+                 ;; Arguably if the contents have a constant shape,
+                 ;; we could cast each individual dimension in its binding form,
+                 ;; i.e. (LET* ((#:D0 (THE (EQL <n>) dimension0)) ...)
+                 ;; but it seems preferable to imply that the initial contents
+                 ;; are wrongly shaped rather than that the array is.
+                 `(sb!kernel::check-array-shape ,alloc-form ',data-dims))
+                (t ; could not parse the data
+                 `(fill-array ,(car contents) ,alloc-form)))))))
 
 (define-source-transform coerce (x type &environment env)
   (if (and (sb!xc:constantp type env)
@@ -463,11 +614,11 @@
 ;;; to do a good job with all the different ways it can happen.
 (defun transform-make-array-vector (length element-type initial-element
                                     initial-contents call)
-  (aver (or (not element-type) (constant-lvar-p element-type)))
-  (let* ((c-length (when (constant-lvar-p length)
-                     (lvar-value length)))
+  (let* ((c-length (if (lvar-p length)
+                       (if (constant-lvar-p length) (lvar-value length))
+                       length))
          (elt-spec (if element-type
-                       (lvar-value element-type)
+                       (lvar-value element-type) ; enforces const-ness.
                        t))
          (elt-ctype (ir1-transform-specifier-type elt-spec))
          (saetp (if (unknown-type-p elt-ctype)
@@ -500,20 +651,30 @@
           `(simple-array ,(sb!vm:saetp-specifier saetp) (,(or c-length '*))))
          (alloc-form
            `(truly-the ,result-spec
-                       (allocate-vector ,typecode (the index length) ,n-words-form))))
+             (allocate-vector ,typecode
+                              ;; If LENGTH is a singleton list,
+                              ;; we want to avoid reading it.
+                              (the index ,(or c-length 'length))
+                              ,n-words-form))))
+   (flet ((eliminate-keywords ()
+            (eliminate-keyword-args
+             call 1
+             '((:element-type element-type)
+               (:initial-contents initial-contents)
+               (:initial-element initial-element)))))
     (cond ((and initial-element initial-contents)
            (abort-ir1-transform "Both ~S and ~S specified."
                                 :initial-contents :initial-element))
+          ;; Case (1)
           ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with a
           ;; constant LENGTH.
           ((and initial-contents c-length
                 (lvar-matches initial-contents
+                              ;; FIXME: probably don't need all 4 of these now?
                               :fun-names '(list vector
                                            sb!impl::|List| sb!impl::|Vector|)
                               :arg-count c-length))
-           (let ((parameters (eliminate-keyword-args
-                              call 1 '((:element-type element-type)
-                                       (:initial-contents initial-contents))))
+           (let ((parameters (eliminate-keywords))
                  (elt-vars (make-gensym-list c-length))
                  (lambda-list '(length)))
              (splice-fun-args initial-contents :any c-length)
@@ -528,48 +689,55 @@
                          (ignorable ,@lambda-list))
                 (truly-the ,result-spec
                  (initialize-vector ,alloc-form ,@elt-vars)))))
+          ;; Case (2)
           ;; constant :INITIAL-CONTENTS and LENGTH
-          ((and initial-contents c-length (constant-lvar-p initial-contents))
+          ((and initial-contents c-length
+                (constant-lvar-p initial-contents)
+                ;; As a practical matter, the initial-contents should not be
+                ;; too long, otherwise the compiler seems to spend forever
+                ;; compiling the lambda with one parameter per item.
+                ;; To make matters worse, the time grows superlinearly,
+                ;; and it's not entirely obvious that passing a constant array
+                ;; of 100x100 things is responsible for such an explosion.
+                (<= (length (lvar-value initial-contents)) 1000))
            (let ((contents (lvar-value initial-contents)))
              (unless (= c-length (length contents))
                (abort-ir1-transform "~S has ~S elements, vector length is ~S."
                                     :initial-contents (length contents) c-length))
-             (let ((parameters (eliminate-keyword-args
-                                call 1 '((:element-type element-type)
-                                         (:initial-contents initial-contents)))))
-               `(lambda (length ,@parameters)
-                  (declare (ignorable ,@parameters))
+             (let ((lambda-list `(length ,@(eliminate-keywords))))
+               `(lambda ,lambda-list
+                  (declare (ignorable ,@lambda-list))
                   (truly-the ,result-spec
                    (initialize-vector ,alloc-form
                                       ,@(map 'list (lambda (elt)
                                                      `(the ,elt-spec ',elt))
                                              contents)))))))
+          ;; Case (3)
           ;; any other :INITIAL-CONTENTS
           (initial-contents
-           (let ((parameters (eliminate-keyword-args
-                              call 1 '((:element-type element-type)
-                                       (:initial-contents initial-contents)))))
-             `(lambda (length ,@parameters)
-                (declare (ignorable ,@parameters))
-                (unless (= length (length initial-contents))
-                  (error "~S has ~S elements, vector length is ~S."
-                         :initial-contents (length initial-contents) length))
+           (let ((lambda-list `(length ,@(eliminate-keywords))))
+             `(lambda ,lambda-list
+                (declare (ignorable ,@lambda-list))
+                (unless (= (length initial-contents) ,(or c-length 'length))
+                  (error "~S has ~D elements, vector length is ~D."
+                         :initial-contents (length initial-contents)
+                         ,(or c-length 'length)))
                 (truly-the ,result-spec
                            (replace ,alloc-form initial-contents)))))
+          ;; Case (4)
           ;; :INITIAL-ELEMENT, not EQL to the default
           ((and initial-element
                 (or (not (constant-lvar-p initial-element))
                     (not (eql default-initial-element (lvar-value initial-element)))))
-           (let ((parameters (eliminate-keyword-args
-                              call 1 '((:element-type element-type)
-                                       (:initial-element initial-element))))
+           (let ((lambda-list `(length ,@(eliminate-keywords)))
                  (init (if (constant-lvar-p initial-element)
                            (list 'quote (lvar-value initial-element))
                            'initial-element)))
-             `(lambda (length ,@parameters)
-                (declare (ignorable ,@parameters))
+             `(lambda ,lambda-list
+                (declare (ignorable ,@lambda-list))
                 (truly-the ,result-spec
                            (fill ,alloc-form (the ,elt-spec ,init))))))
+          ;; Case (5)
           ;; just :ELEMENT-TYPE, or maybe with :INITIAL-ELEMENT EQL to the
           ;; default
           (t
@@ -594,12 +762,10 @@
                  (compiler-style-warn "The default initial element ~S is not a ~S."
                                       default-initial-element
                                       elt-spec)))
-           (let ((parameters (eliminate-keyword-args
-                              call 1 '((:element-type element-type)
-                                       (:initial-element initial-element)))))
-             `(lambda (length ,@parameters)
-                (declare (ignorable ,@parameters))
-                ,alloc-form))))))
+           (let ((lambda-list `(length ,@(eliminate-keywords))))
+             `(lambda ,lambda-list
+                (declare (ignorable ,@lambda-list))
+                ,alloc-form)))))))
 
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least
 ;;; specific must come first, otherwise suboptimal transforms will result for
@@ -688,10 +854,20 @@
                           *
                           :node call)
   (block make-array
-    (when (lvar-matches dims :fun-names '(list) :arg-count 1)
-      (let ((length (car (splice-fun-args dims :any 1))))
+    ;; If lvar-use of DIMS is a call to LIST, then it must mean that LIST
+    ;; was declared notinline - because if it weren't, then it would have been
+    ;; source-transformed into CONS - which gives us reason NOT to optimize
+    ;; this call to MAKE-ARRAY. So look for CONS instead of LIST,
+    ;; which means that LIST was *not* declared notinline.
+    (when (and (lvar-matches dims :fun-names '(cons) :arg-count 2)
+               (let ((cdr (second (combination-args (lvar-uses dims)))))
+                 (and (constant-lvar-p cdr) (null (lvar-value cdr)))))
+      (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS
+             (dummy (cadr args)))
+        (flush-dest dummy)
+        (setf (combination-args call) (delete dummy (combination-args call)))
         (return-from make-array
-          (transform-make-array-vector length
+          (transform-make-array-vector (car args)
                                        element-type
                                        initial-element
                                        initial-contents
@@ -709,14 +885,9 @@
         (give-up-ir1-transform
          "The dimension list contains something other than an integer: ~S"
          dims))
-      (if (= (length dims) 1)
-          `(make-array ',(car dims)
-                       ,@(when element-type
-                               '(:element-type element-type))
-                       ,@(when initial-element
-                               '(:initial-element initial-element))
-                       ,@(when initial-contents
-                               '(:initial-contents initial-contents)))
+      (if (singleton-p dims)
+          (transform-make-array-vector (car dims) element-type
+                                       initial-element initial-contents call)
           (let* ((total-size (reduce #'* dims))
                  (rank (length dims))
                  (spec `(simple-array
@@ -734,7 +905,7 @@
                                              '(:initial-element initial-element)))))
                ,@(when initial-contents
                        ;; FIXME: This is could be open coded at least a bit too
-                       `((sb!impl::fill-data-vector data ',dims initial-contents)))
+                       `((fill-data-vector data ',dims initial-contents)))
                (setf (%array-fill-pointer header) ,total-size)
                (setf (%array-fill-pointer-p header) nil)
                (setf (%array-available-elements header) ,total-size)

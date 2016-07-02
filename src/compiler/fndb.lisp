@@ -945,7 +945,26 @@
                        (:displaced-index-offset index))
     array (flushable))
 
-(defknown sb!impl::fill-data-vector (vector list sequence) t ())
+(defknown fill-data-vector (vector list sequence) t ())
+
+;; INITIAL-CONTENTS is the first argument to FILL-ARRAY because
+;; of the possibility of source-transforming it for various recognized
+;; contents after the source-transform for MAKE-ARRAY has run.
+;; The original MAKE-ARRAY call might resemble either of:
+;;   (MAKE-ARRAY DIMS :ELEMENT-TYPE (F) :INITIAL-CONTENTS (G))
+;;   (MAKE-ARRAY DIMS :INITIAL-CONTENTS (F) :ELEMENT-TYPE (G))
+;; and in general we must bind temporaries to preserve left-to-right
+;; evaluation of F and G if they have side effects.
+;; Now ideally :ELEMENT-TYPE will be a constant, so it doesn't matter
+;; if it moves. But if INITIAL-CONTENTS were the second argument to FILL-ARRAY,
+;; then the multi-dimensional array creation form would look like
+;;  (FILL-ARRAY (allocate-array) initial-contents)
+;; which would mean that if the user expressed the MAKE- call the
+;; second way shown above, we would have to bind INITIAL-CONTENTS,
+;; to ensure its evaluation before the allocation,
+;; causing difficulty if doing any futher macro-like processing.
+(defknown fill-array (sequence simple-array) (simple-array) (flushable)
+  :result-arg 1)
 
 (defknown vector (&rest t) simple-vector (flushable))
 
