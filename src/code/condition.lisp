@@ -443,6 +443,8 @@
            (let ((arg (second option)))
              (setq report
                    `#'(named-lambda (condition-report ,name) (condition stream)
+                        (declare (type condition condition)
+                                 (type stream stream))
                         ,@(if (stringp arg)
                               `((declare (ignore condition))
                                 (write-string ,arg stream))
