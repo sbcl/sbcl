@@ -337,7 +337,7 @@
                      (if (endp list)
                          (signal-index-too-large-error sequence index)
                          (car list)))
-                  (declare (type (integer 0) count)))
+                  (declare (type index count)))
                 (progn
                   (when (>= index (length sequence))
                     (signal-index-too-large-error sequence index))
