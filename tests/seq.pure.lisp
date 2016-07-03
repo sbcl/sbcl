@@ -13,6 +13,8 @@
 
 (in-package :cl-user)
 
+(load "compiler-test-util.lisp")
+
 ;;; As reported by Paul Dietz from his ansi-test suite for gcl, REMOVE
 ;;; malfunctioned when given :START, :END and :FROM-END arguments.
 ;;; Make sure it doesn't happen again.
@@ -426,3 +428,13 @@
    (locally (declare (notinline map))
             (map '(cons t (cons t null)) '+ '(1 2 3) '(10 10 10)))
    type-error))
+
+(defstruct ship size name)
+(with-test (:name :find-derive-type)
+  (let ((f (compile nil '(lambda (x list)
+                           (ship-size (find x list :key 'ship-name))))))
+    ;; The test of SHIP-P in the SHIP-SIZE call is optimized into (NOT NULL).
+    ;; Therefore the code header for F does not reference #<LAYOUT for SHIP>
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:layout)))
+    ;; And the function is safe.
+    (assert-error (funcall f nil nil) type-error)))

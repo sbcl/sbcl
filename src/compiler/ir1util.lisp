@@ -2073,6 +2073,12 @@ is :ANY, the function name is not checked."
               nil))
         nil)))
 
+;;; As above, but allow a quoted symbol also,
+;;; in which case we don't check for notinline-ness,
+;;; so be careful how you use this.
+(defun lvar-fun-name* (lvar)
+  (if (constant-lvar-p lvar) (lvar-value lvar) (lvar-fun-name lvar)))
+
 (defun lvar-fun-debug-name (lvar)
   (declare (type lvar lvar))
   (let ((uses (lvar-uses lvar)))
