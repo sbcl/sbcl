@@ -669,30 +669,26 @@
 (defknown position (t sequence &rest t &key (:test (callable 2))
                     (:test-not (callable 2)) (:start index) (:from-end t)
                     (:end sequence-end) (:key (callable 1)))
-  (or index null)
-  (foldable flushable call)
-  :derive-type #'position-derive-type)
+  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (foldable flushable call))
 
 (defknown (position-if position-if-not)
   ((callable 1) sequence &rest t &key (:from-end t) (:start index)
    (:end sequence-end) (:key (callable 1)))
-  (or index null)
-  (foldable flushable call)
-  :derive-type #'position-derive-type)
+  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (foldable flushable call))
 
 (defknown count (t sequence &rest t &key
                    (:test (callable 2)) (:test-not (callable 2)) (:start index)
                    (:from-end t) (:end sequence-end) (:key (callable 1)))
   index
-  (foldable flushable call)
-  :derive-type #'count-derive-type)
+  (foldable flushable call))
 
 (defknown (count-if count-if-not)
   ((callable 1) sequence &rest t &key
    (:from-end t) (:start index) (:end sequence-end) (:key (callable 1)))
   index
-  (foldable flushable call)
-  :derive-type #'count-derive-type)
+  (foldable flushable call))
 
 (defknown (mismatch search)
   (sequence sequence &rest t &key (:from-end t) (:test (callable 2))

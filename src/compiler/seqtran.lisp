@@ -1379,6 +1379,77 @@
                                   ,(- max-result min-sequence1-length))
                          null))))
 
+(defun index-into-sequence-derive-type (sequence start end &key (inclusive t))
+  (let* ((constant-start (and (constant-lvar-p start)
+                              (lvar-value start)))
+         (constant-end (and (constant-lvar-p end)
+                            (lvar-value end)))
+         (min-result (or constant-start 0))
+         (max-result (or constant-end (1- sb!xc:array-dimension-limit)))
+         (max (sequence-lvar-dimensions sequence))
+         (max-result (if (integerp max)
+                         (min max-result max)
+                         max-result)))
+    (values min-result (if inclusive
+                           max-result
+                           (1- max-result)))))
+
+(defoptimizer (mismatch derive-type) ((sequence1 sequence2
+                                                 &key start1 end1
+                                                 &allow-other-keys))
+  (declare (ignorable sequence2))
+  ;; Could be as smart as the SEARCH one above but I ran out of steam.
+  (multiple-value-bind (min max) (index-into-sequence-derive-type sequence1 start1 end1)
+    (specifier-type `(or (integer ,min ,max) null))))
+
+(defoptimizer (position derive-type) ((item sequence
+                                            &key start end
+                                            &allow-other-keys))
+  (declare (ignore item))
+  (multiple-value-bind (min max)
+      (index-into-sequence-derive-type sequence start end :inclusive nil)
+    (specifier-type `(or (integer ,min ,max) null))))
+
+(defoptimizer (position-if derive-type) ((function sequence
+                                                   &key start end
+                                                   &allow-other-keys))
+  (declare (ignore function))
+  (multiple-value-bind (min max)
+      (index-into-sequence-derive-type sequence start end :inclusive nil)
+    (specifier-type `(or (integer ,min ,max) null))))
+
+(defoptimizer (position-if-not derive-type) ((function sequence
+                                                       &key start end
+                                                       &allow-other-keys))
+  (declare (ignore function))
+  (multiple-value-bind (min max)
+      (index-into-sequence-derive-type sequence start end :inclusive nil)
+    (specifier-type `(or (integer ,min ,max) null))))
+
+(defoptimizer (count derive-type) ((item sequence
+                                         &key start end
+                                         &allow-other-keys))
+  (declare (ignore item))
+  (multiple-value-bind (min max)
+      (index-into-sequence-derive-type sequence start end)
+    (specifier-type `(integer 0 ,(- max min)))))
+
+(defoptimizer (count-if derive-type) ((function sequence
+                                                &key start end
+                                                &allow-other-keys))
+  (declare (ignore function))
+  (multiple-value-bind (min max)
+      (index-into-sequence-derive-type sequence start end)
+    (specifier-type `(integer 0 ,(- max min)))))
+
+(defoptimizer (count-if-not derive-type) ((function sequence
+                                                    &key start end
+                                                    &allow-other-keys))
+  (declare (ignore function))
+  (multiple-value-bind (min max)
+      (index-into-sequence-derive-type sequence start end)
+    (specifier-type `(integer 0 ,(- max min)))))
+
 
 ;;; Open-code CONCATENATE for strings. It would be possible to extend
 ;;; this transform to non-strings, but I chose to just do the case that
