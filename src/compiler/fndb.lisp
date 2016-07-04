@@ -1061,7 +1061,8 @@
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
   (string &key (:start index) (:end sequence-end))
   string ()
-  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1)
+  :derive-type #'result-type-first-arg)
 
 (defknown string (string-designator) string (flushable))
 
