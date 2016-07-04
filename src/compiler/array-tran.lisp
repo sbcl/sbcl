@@ -591,21 +591,18 @@
                            sb!impl::|Vector| vector)))
       (let* ((type (constant-form-value type env))
              (length (1- (length x)))
-             ;; Special case, since strings are unions
-             (string-p (member type '(string simple-string)))
-             (ctype (or string-p
-                        (careful-values-specifier-type type))))
-        (if (or string-p
-                (and (array-type-p ctype)
-                     (csubtypep ctype (specifier-type '(array * (*))))
-                     (proper-list-of-length-p (array-type-dimensions ctype) 1)
-                     (or (eq (car (array-type-dimensions ctype)) '*)
-                         (eq (car (array-type-dimensions ctype)) length))))
-            `(make-array ,length
-                         :element-type ',(if string-p
-                                             'character
-                                             (nth-value 1 (simplify-vector-type ctype)))
-                         :initial-contents ,x)
+             (ctype (careful-values-specifier-type type)))
+        (if (csubtypep ctype (specifier-type '(array * (*))))
+            (multiple-value-bind (type element-type upgraded had-dimensions)
+                (simplify-vector-type ctype)
+              (declare (ignore type upgraded))
+              (if had-dimensions
+                  (values nil t)
+                  `(make-array ,length
+                               :initial-contents ,x
+                               ,@(and (not (eq element-type *universal-type*))
+                                      (not (eq element-type *wild-type*))
+                                      `(:element-type ',(type-specifier element-type))))))
             (values nil t)))
       (values nil t)))
 

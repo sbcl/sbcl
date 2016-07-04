@@ -4691,15 +4691,12 @@
               (type-union result-typeoid
                           (type-intersection (lvar-type value)
                                              (specifier-type 'rational))))))
+          ;; At zero safety the deftransform for COERCE can elide dimension
+          ;; checks for the things like (COERCE X '(SIMPLE-VECTOR 5)) -- so we
+          ;; need to simplify the type to drop the dimension information.
           ((and (policy node (zerop safety))
-                (csubtypep result-typeoid (specifier-type '(array * (*)))))
-           ;; At zero safety the deftransform for COERCE can elide dimension
-           ;; checks for the things like (COERCE X '(SIMPLE-VECTOR 5)) -- so we
-           ;; need to simplify the type to drop the dimension information.
-           (let ((vtype (simplify-vector-type result-typeoid)))
-             (if vtype
-                 (specifier-type vtype)
-                 result-typeoid)))
+                (csubtypep result-typeoid (specifier-type '(array * (*))))
+                (simplify-vector-type result-typeoid)))
           (t
            result-typeoid))))))
 

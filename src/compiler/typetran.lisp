@@ -807,28 +807,59 @@
         t))))
 
 ;;; Drops dimension information from vector types.
+;;; Returns either three values
+;;; * vector ctype
+;;; * upgraded-element ctype or requsted element
+;;; * T if the upgraded-element is upgraded, i.e. it
+;;;   does not contain any unknown types.
+;;; * T if there were any dimensions
 (defun simplify-vector-type (type)
-  (aver (csubtypep type (specifier-type '(array * (*)))))
-  (let* ((array-type
-          (if (csubtypep type (specifier-type 'simple-array))
-              'simple-array
-              'array))
-         (complexp
-          (not
-           (or (eq 'simple-array array-type)
-               (neq *empty-type*
-                    (type-intersection type (specifier-type 'simple-array)))))))
-    (dolist (etype
-              #+sb-xc-host '(t bit character)
-              #-sb-xc-host sb!kernel::*specialized-array-element-types*
-              #+sb-xc-host (values nil nil nil)
-              #-sb-xc-host (values `(,array-type * (*)) t complexp))
-      (when etype
-        (let ((simplified (specifier-type `(,array-type ,etype (*)))))
-          (when (csubtypep type simplified)
-            (return (values (type-specifier simplified)
-                            etype
-                            complexp))))))))
+  (labels ((process-compound-type (types)
+             (let (array-types
+                   element-types
+                   (upgraded t)
+                   dimensions-removed)
+               (dolist (type types)
+                 (multiple-value-bind (type et upgraded dimensions) (simplify type)
+                   (push type array-types)
+                   (push et element-types)
+                   (when dimensions
+                     (setf dimensions-removed t))
+                   (unless upgraded
+                     (setf upgraded nil))))
+               (values (apply #'type-union array-types)
+                       (apply #'type-union element-types)
+                       upgraded
+                       dimensions-removed)))
+           (simplify (type)
+             (cond ((and (array-type-p type)
+                         (singleton-p (array-type-dimensions type)))
+                    (let* ((upgraded t)
+                           (et (array-type-specialized-element-type type))
+                           (et (cond ((neq et *wild-type*)
+                                      et)
+                                     ((eq (array-type-element-type type) *wild-type*)
+                                      et)
+                                     (t
+                                      (setf upgraded nil)
+                                      (array-type-element-type type)))))
+                      (values (specifier-type
+                               (list (if (array-type-complexp type)
+                                         'array
+                                         'simple-array)
+                                     (type-specifier et)
+                                     '(*)))
+                              et
+                              upgraded
+                              (not (eq (car (array-type-dimensions type)) '*)))))
+                   ((union-type-p type)
+                    (process-compound-type (union-type-types type)))
+                   ((member-type-p  type)
+                    (process-compound-type
+                     (mapcar #'ctype-of (member-type-members type))))
+                   (t
+                    (error "~a is not a subtype of VECTOR." type)))))
+    (simplify type)))
 
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)
@@ -866,8 +897,8 @@
                    (the ,result-type
                         (complex (coerce (realpart x) ',part-type)
                                  (coerce (imagpart x) ',part-type))))))))
-           ;; Special case STRING and SIMPLE-STRING as they are union types
-           ;; in SBCL.
+          ;; Special case STRING and SIMPLE-STRING as they are union types
+          ;; in SBCL.
           ((member tval '(string simple-string))
            `(the ,tval
                  (if (typep x ',tval)
@@ -875,50 +906,51 @@
                      (replace (make-array (length x) :element-type 'character) x))))
           ((eq tval 'character)
            `(character x))
-           ;; Special case VECTOR
-           ((eq tval 'vector)
-            `(the ,tval
-               (if (vectorp x)
-                   x
-                   (replace (make-array (length x)) x))))
-           ;; Handle specialized element types for 1D arrays.
-           ((csubtypep tspec (specifier-type '(array * (*))))
-            ;; Can we avoid checking for dimension issues like (COERCE FOO
-            ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
-            ;;
-            ;; CLHS actually allows this for all code with SAFETY < 3,
-            ;; but we're a conservative bunch.
-            (if (or (policy node (zerop safety)) ; no need in unsafe code
-                    (and (array-type-p tspec)    ; no need when no dimensions
-                         (equal (array-type-dimensions tspec) '(*))))
-                ;; We can!
-                (multiple-value-bind (vtype etype complexp) (simplify-vector-type tspec)
-                  (unless vtype
-                    (give-up-ir1-transform))
-                  `(the ,vtype
-                     (if (typep x ',vtype)
-                         x
-                         (replace
-                          (make-array (length x) :element-type ',etype
-                                      ,@(when complexp
-                                              (list :fill-pointer t
-                                                    :adjustable t)))
-                          x))))
-                ;; No, duh. Dimension checking required.
-                (give-up-ir1-transform
-                 "~@<~S specifies dimensions other than (*) in safe code.~:@>"
-                 tval)))
-           ((type= tspec (specifier-type 'list))
-            `(coerce-to-list x))
-           ((csubtypep tspec (specifier-type 'function))
-            (if (csubtypep (lvar-type x) (specifier-type 'symbol))
-                `(coerce-symbol-to-fun x)
-                ;; if X can later be derived as FUNCTION then we don't want
-                ;; to call COERCE-TO-FUN, because there's no smartness
-                ;; that can undo that and see that it's really (IDENTITY X).
-                (progn (delay-ir1-transform node :constraint)
-                       `(coerce-to-fun x))))
-           (t
-            (give-up-ir1-transform
-             "~@<open coding coercion to ~S not implemented.~:@>"
-             tval))))))
+          ;; Special case VECTOR
+          ((eq tval 'vector)
+           `(the ,tval
+                 (if (vectorp x)
+                     x
+                     (replace (make-array (length x)) x))))
+          ;; Handle specialized element types for 1D arrays.
+          ((csubtypep tspec (specifier-type '(array * (*))))
+           ;; Can we avoid checking for dimension issues like (COERCE FOO
+           ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
+           ;;
+           ;; CLHS actually allows this for all code with SAFETY < 3,
+           ;; but we're a conservative bunch.
+           (if (or (policy node (zerop safety)) ; no need in unsafe code
+                   (and (array-type-p tspec) ; no need when no dimensions
+                        (equal (array-type-dimensions tspec) '(*))))
+               ;; We can!
+               (multiple-value-bind (vtype etype upgraded) (simplify-vector-type tspec)
+                 (unless upgraded
+                   (give-up-ir1-transform))
+                 (let ((vtype (type-specifier vtype)))
+                   `(the ,vtype
+                         (if (typep x ',vtype)
+                             x
+                             (replace
+                              (make-array (length x)
+                                          ,@(and (not (eq etype *universal-type*))
+                                                 (not (eq etype *wild-type*))
+                                                 `(:element-type ',(type-specifier etype))))
+                              x)))))
+               ;; No, duh. Dimension checking required.
+               (give-up-ir1-transform
+                "~@<~S specifies dimensions other than (*) in safe code.~:@>"
+                tval)))
+          ((type= tspec (specifier-type 'list))
+           `(coerce-to-list x))
+          ((csubtypep tspec (specifier-type 'function))
+           (if (csubtypep (lvar-type x) (specifier-type 'symbol))
+               `(coerce-symbol-to-fun x)
+               ;; if X can later be derived as FUNCTION then we don't want
+               ;; to call COERCE-TO-FUN, because there's no smartness
+               ;; that can undo that and see that it's really (IDENTITY X).
+               (progn (delay-ir1-transform node :constraint)
+                      `(coerce-to-fun x))))
+          (t
+           (give-up-ir1-transform
+            "~@<open coding coercion to ~S not implemented.~:@>"
+            tval))))))
