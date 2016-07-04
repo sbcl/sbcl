@@ -652,6 +652,15 @@ between the ~A definition and the ~A definition"
 (!define-type-class classoid :enumerable #'classoid-enumerable-p
                     :might-contain-other-types nil)
 
+(defun classoid-inherits-from (sub super-or-name)
+  (declare (type classoid sub)
+           (type (or symbol classoid) super-or-name))
+  (let ((super (if (symbolp super-or-name)
+                   (find-classoid super-or-name)
+                   super-or-name)))
+    (find (classoid-layout super)
+          (layout-inherits (classoid-layout sub)))))
+
 ;;; We might be passed classoids with invalid layouts; in any pairwise
 ;;; class comparison, we must ensure that both are valid before
 ;;; proceeding.
@@ -788,9 +797,15 @@ between the ~A definition and the ~A definition"
 ;;; FUNCALLABLE-INSTANCE types (which used to be CLASSOIDs until CSR
 ;;; discovered that this was incompatible with the MOP class
 ;;; hierarchy).  See NAMED :COMPLEX-SUBTYPEP-ARG2
-(defvar *non-instance-classoid-types*
+(declaim (type cons **non-instance-classoid-types**))
+(defglobal **non-instance-classoid-types**
   '(symbol system-area-pointer weak-pointer code-component
     lra fdefn random-class))
+
+(defun classoid-non-instance-p (classoid)
+  (declare (type classoid classoid))
+  (member classoid **non-instance-classoid-types**
+          :key #'find-classoid))
 
 ;;; KLUDGE: we need this because of the need to represent
 ;;; intersections of two classes, even when empty at a given time, as

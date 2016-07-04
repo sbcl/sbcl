@@ -1276,35 +1276,24 @@
          ;; FUNCALLABLE-INSTANCE in surprising ways.
          (invoke-complex-subtypep-arg1-method type1 type2))
         ((and (eq type2 *extended-sequence-type*) (classoid-p type1))
-         (let* ((layout (classoid-layout type1))
-                (inherits (layout-inherits layout))
-                (sequencep (find (classoid-layout (find-classoid 'sequence))
-                                 inherits)))
-           (values (if sequencep t nil) t)))
+         (values (if (classoid-inherits-from type1 'sequence) t nil) t))
         ((and (eq type2 *instance-type*) (classoid-p type1))
-         (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
-             (values nil t)
-             (let* ((layout (classoid-layout type1))
-                    (inherits (layout-inherits layout))
-                    (functionp (find (classoid-layout (find-classoid 'function))
-                                     inherits)))
-               (cond
-                 (functionp
-                  (values nil t))
-                 ((eq type1 (find-classoid 'function))
-                  (values nil t))
-                 ((or (structure-classoid-p type1)
-                      (condition-classoid-p type1))
-                  (values t t))
-                 (t (values nil nil))))))
+         (cond
+           ((classoid-non-instance-p type1)
+            (values nil t))
+           ((classoid-inherits-from type1 'function)
+            (values nil t))
+           ((eq type1 (find-classoid 'function))
+            (values nil t))
+           ((or (structure-classoid-p type1)
+                (condition-classoid-p type1))
+            (values t t))
+           (t (values nil nil))))
         ((and (eq type2 *funcallable-instance-type*) (classoid-p type1))
-         (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
-             (values nil t)
-             (let* ((layout (classoid-layout type1))
-                    (inherits (layout-inherits layout))
-                    (functionp (find (classoid-layout (find-classoid 'function))
-                                     inherits)))
-               (values (if functionp t nil) t))))
+         (if (and (not (classoid-non-instance-p type1))
+                  (classoid-inherits-from type1 'function))
+             (values t t)
+             (values nil t)))
         (t
          ;; FIXME: This seems to rely on there only being 4 or 5
          ;; NAMED-TYPE values, and the exclusion of various
@@ -1329,91 +1318,58 @@
   ;; FIXME: This assertion failed when I added it in sbcl-0.6.11.13.
   ;; Perhaps when bug 85 is fixed it can be reenabled.
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
-  (cond
-    ((eq type2 *extended-sequence-type*)
-     (typecase type1
-       ((or structure-classoid condition-classoid) *empty-type*)
-       (classoid
-        (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
-            *empty-type*
-            (if (find (classoid-layout (find-classoid 'sequence))
-                      (layout-inherits (classoid-layout type1)))
-                type1
-                nil)))
-       (t
-        (if (or (type-might-contain-other-types-p type1)
-                (member-type-p type1))
-            nil
-            *empty-type*))))
-    ((eq type2 *instance-type*)
-     (typecase type1
-       ((or structure-classoid condition-classoid) type1)
-       (classoid
-        (if (and (not (member type1 *non-instance-classoid-types*
-                              :key #'find-classoid))
-                 (not (eq type1 (find-classoid 'function)))
-                 (not (find (classoid-layout (find-classoid 'function))
-                            (layout-inherits (classoid-layout type1)))))
-            nil
-            *empty-type*))
-       (t
-        (if (or (type-might-contain-other-types-p type1)
-                (member-type-p type1))
-            nil
-            *empty-type*))))
-    ((eq type2 *funcallable-instance-type*)
-     (typecase type1
-       ((or structure-classoid condition-classoid) *empty-type*)
-       (classoid
-        (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
-            *empty-type*
-            (if (find (classoid-layout (find-classoid 'function))
-                      (layout-inherits (classoid-layout type1)))
-                type1
-                (if (type= type1 (find-classoid 'function))
-                    type2
-                    nil))))
-       (fun-type nil)
-       (t
-        (if (or (type-might-contain-other-types-p type1)
-                (member-type-p type1))
-            nil
-            *empty-type*))))
-    (t (hierarchical-intersection2 type1 type2))))
+  (flet ((empty-unless-hairy (type)
+           (unless (or (type-might-contain-other-types-p type)
+                       (member-type-p type))
+             *empty-type*)))
+    (cond
+      ((eq type2 *extended-sequence-type*)
+       (typecase type1
+         ((or structure-classoid condition-classoid) *empty-type*)
+         (classoid (cond
+                     ((classoid-non-instance-p type1) *empty-type*)
+                     ((classoid-inherits-from type1 'sequence) type1)))
+         (t (empty-unless-hairy type1))))
+      ((eq type2 *instance-type*)
+       (typecase type1
+         ((or structure-classoid condition-classoid) type1)
+         (classoid (when (or (classoid-non-instance-p type1)
+                             (eq type1 (find-classoid 'function))
+                             (classoid-inherits-from type1 'function))
+                     *empty-type*))
+         (t (empty-unless-hairy type1))))
+      ((eq type2 *funcallable-instance-type*)
+       (typecase type1
+         ((or structure-classoid condition-classoid) *empty-type*)
+         (classoid
+          (cond
+            ((classoid-non-instance-p type1) *empty-type*)
+            ((classoid-inherits-from type1 'function) type1)
+            ((type= type1 (find-classoid 'function)) type2)))
+         (fun-type nil)
+         (t (empty-unless-hairy type1))))
+      (t (hierarchical-intersection2 type1 type2)))))
 
 (!define-type-method (named :complex-union2) (type1 type2)
   ;; Perhaps when bug 85 is fixed this can be reenabled.
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond
     ((eq type2 *extended-sequence-type*)
-     (if (classoid-p type1)
-         (if (or (member type1 *non-instance-classoid-types*
-                         :key #'find-classoid)
-                 (not (find (classoid-layout (find-classoid 'sequence))
-                            (layout-inherits (classoid-layout type1)))))
-             nil
-             type2)
-         nil))
+     (cond ((not (classoid-p type1)) nil)
+           ((and (not (classoid-non-instance-p type1))
+                 (classoid-inherits-from type1 'sequence))
+            type2)))
     ((eq type2 *instance-type*)
-     (if (classoid-p type1)
-         (if (or (member type1 *non-instance-classoid-types*
-                         :key #'find-classoid)
-                 (find (classoid-layout (find-classoid 'function))
-                       (layout-inherits (classoid-layout type1))))
-             nil
-             type2)
-         nil))
+     (cond ((not (classoid-p type1)) nil)
+           ((and (not (classoid-non-instance-p type1))
+                 (not (classoid-inherits-from type1 'function)))
+            type2)))
     ((eq type2 *funcallable-instance-type*)
-     (if (classoid-p type1)
-         (if (or (member type1 *non-instance-classoid-types*
-                         :key #'find-classoid)
-                 (not (find (classoid-layout (find-classoid 'function))
-                            (layout-inherits (classoid-layout type1)))))
-             nil
-             (if (eq type1 (specifier-type 'function))
-                 type1
-                 type2))
-         nil))
+     (cond ((not (classoid-p type1)) nil)
+           ((classoid-non-instance-p type1) nil)
+           ((not (classoid-inherits-from type1 'function)) nil)
+           ((eq type1 (specifier-type 'function)) type1)
+           (t type2)))
     (t (hierarchical-union2 type1 type2))))
 
 (!define-type-method (named :negate) (x)
