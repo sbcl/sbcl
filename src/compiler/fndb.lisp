@@ -701,7 +701,7 @@
 (defknown (stable-sort sort) (sequence (callable 2) &rest t &key (:key (callable 1)))
   sequence
   (call)
-  :derive-type (sequence-result-nth-arg 1)
+  :derive-type #'result-type-first-arg
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown sb!impl::stable-sort-list (list function function) list
   (call important-result)
