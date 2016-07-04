@@ -277,38 +277,48 @@
           (type-union unexceptional-type null-type)
           unexceptional-type))))
 
-(defun count/position-max-value (call)
-  (declare (type combination call))
-    ;; Could possibly constrain the result more highly if
-    ;; the :start/:end were provided and of known types.
-  (labels ((max-dim (type)
-             ;; This can deal with just enough hair to handle type STRING,
-             ;; but might be made to use GENERIC-ABSTRACT-TYPE-FUNCTION
-             ;; if we really want to be more clever.
-             (typecase type
-               (union-type (reduce #'max2 (union-type-types type)
-                                   :key #'max-dim))
-               (array-type (if (and (not (array-type-complexp type))
-                                    (singleton-p (array-type-dimensions type)))
-                               (first (array-type-dimensions type))
-                               '*))
-               (t '*)))
-           (max2 (a b)
-             (if (and (integerp a) (integerp b)) (max a b) '*)))
-    ;; If type derivation were able to notice that non-simple arrays can
-    ;; be mutated (changing the type), we could safely use LVAR-TYPE on
-    ;; any vector type. But it doesn't notice.
-    ;; We could use LVAR-CONSERVATIVE-TYPE to get a conservative answer.
-    ;; However that's probably not an important use, so the above
-    ;; logic restricts itself to simple arrays.
-    (max-dim (lvar-type (second (combination-args call))))))
+;;; Return MAX MIN
+(defun sequence-lvar-dimensions (lvar)
+  (if (not (constant-lvar-p lvar))
+      (let ((max 0) (min array-total-size-limit))
+        (block nil
+          (labels ((max-dim (type)
+                     ;; This can deal with just enough hair to handle type STRING,
+                     ;; but might be made to use GENERIC-ABSTRACT-TYPE-FUNCTION
+                     ;; if we really want to be more clever.
+                     (typecase type
+                       (union-type
+                        (mapc #'max-dim (union-type-types type)))
+                       (array-type (if (array-type-complexp type)
+                                       (return '*)
+                                       (process-dim (array-type-dimensions type))))
+                       (t (return '*))))
+                   (process-dim (dim)
+                     (let ((length (car dim)))
+                       (if (and (singleton-p dim)
+                                (integerp length))
+                           (setf max (max max length)
+                                 min (min min length))
+                           (return '*)))))
+            ;; If type derivation were able to notice that non-simple arrays can
+            ;; be mutated (changing the type), we could safely use LVAR-TYPE on
+            ;; any vector type. But it doesn't notice.
+            ;; We could use LVAR-CONSERVATIVE-TYPE to get a conservative answer.
+            ;; However that's probably not an important use, so the above
+            ;; logic restricts itself to simple arrays.
+            (max-dim (lvar-type lvar))
+            (values max min))))
+      (let ((value (lvar-value lvar)))
+        (and (typep value 'sequence)
+             (let ((length (length value)))
+               (values length length))))))
 
 (defun position-derive-type (call)
-  (let ((dim (count/position-max-value call)))
+  (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
     (when (integerp dim)
       (specifier-type `(or (integer 0 (,dim)) null)))))
 (defun count-derive-type (call)
-  (let ((dim (count/position-max-value call)))
+  (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
     (when (integerp dim)
       (specifier-type `(integer 0 ,dim)))))
 

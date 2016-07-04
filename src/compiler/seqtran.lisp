@@ -1339,6 +1339,46 @@
                         (return nil)))
                 (return index2)))))))))
 
+(defoptimizer (search derive-type) ((sequence1 sequence2
+                                               &key start1 end1 start2 end2
+                                               &allow-other-keys))
+  (let* ((constant-start1 (and (constant-lvar-p start1)
+                               (lvar-value start1)))
+         (constant-end1 (and (constant-lvar-p end1)
+                             (lvar-value end1)))
+         (constant-start2 (and (constant-lvar-p start2)
+                               (lvar-value start2)))
+         (constant-end2 (and (constant-lvar-p end2)
+                             (lvar-value end2)))
+         (min-result (or constant-start2 0))
+         (max-result (or constant-end2 (1- sb!xc:array-dimension-limit)))
+         (max2 (sequence-lvar-dimensions sequence2))
+         (max-result (if (integerp max2)
+                         (min max-result max2)
+                         max-result))
+         (min1 (nth-value 1 (sequence-lvar-dimensions sequence1)))
+         (min-sequence1-length (cond ((and constant-start1 constant-end1)
+                                      (- constant-end1 constant-start1))
+                                     ((and constant-end1 (not start1))
+                                      constant-end1)
+                                     ((and constant-start1
+                                           (not end1)
+                                           (integerp min1))
+                                      (- min1 constant-start1))
+                                     ((or start1 end1 (not (integerp min1)))
+                                      ;; The result can be equal to MAX-RESULT only when
+                                      ;; searching for "" and :start2 being equal to :end2
+                                      (if (or (and start2
+                                                   (not constant-start2))
+                                              (= max-result min-result))
+                                          0
+                                          1))
+                                     (t
+                                      min1))))
+    (specifier-type `(or (integer ,min-result
+                                  ,(- max-result min-sequence1-length))
+                         null))))
+
 
 ;;; Open-code CONCATENATE for strings. It would be possible to extend
 ;;; this transform to non-strings, but I chose to just do the case that
