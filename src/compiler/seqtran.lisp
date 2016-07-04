@@ -1250,6 +1250,36 @@
 
 (deftransform copy-seq ((seq) ((and sequence (not vector) (not list))))
   '(sb!sequence:copy-seq seq))
+
+(deftransform search ((pattern text &key start1 start2 end1 end2 test test-not
+                               key from-end)
+                      ((constant-arg sequence) * &rest *))
+  (if key
+      (give-up-ir1-transform)
+      (let* ((pattern (lvar-value pattern))
+             (pattern-start (cond ((constant-lvar-p start1)
+                                   (lvar-value start1))
+                                  ((not start1)
+                                   0)
+                                  (t
+                                   (give-up-ir1-transform))))
+             (pattern-end (cond ((constant-lvar-p end1)
+                                 (lvar-value end1))
+                                ((not start1)
+                                 (length pattern))
+                                (t
+                                 (give-up-ir1-transform))))
+             (pattern (if (= (- pattern-end pattern-start) 1)
+                          (elt pattern pattern-start)
+                          (give-up-ir1-transform))))
+        (macrolet ((maybe-arg (arg &optional (key (keywordicate arg)))
+                     `(and ,arg `(,,key ,',arg))))
+          `(position ',pattern text
+                     ,@(maybe-arg start2 :start)
+                     ,@(maybe-arg end2 :end)
+                     ,@(maybe-arg test)
+                     ,@(maybe-arg test-not)
+                     ,@(maybe-arg from-end))))))
 
 ;;; FIXME: it really should be possible to take advantage of the
 ;;; macros used in code/seq.lisp here to avoid duplication of code,
