@@ -2372,18 +2372,55 @@
 
 ;;; overconfident primitive type computation leading to bogus type
 ;;; checking.
-(let* ((form1 '(lambda (x)
-                (declare (type (and condition function) x))
-                x))
-       (fun1 (compile nil form1))
-       (form2 '(lambda (x)
-                (declare (type (and standard-object function) x))
-                x))
-       (fun2 (compile nil form2)))
-  (assert-error (funcall fun1 (make-condition 'error)))
-  (assert-error (funcall fun1 fun1))
-  (assert-error (funcall fun2 fun2))
-  (assert (eq (funcall fun2 #'print-object) #'print-object)))
+(with-test (:name (compile :primitive-type standard-object condition function))
+  (flet ((test-case/incompatible (type1 type2 object1 object2)
+           (multiple-value-bind (fun failure-p warnings)
+               (checked-compile
+                `(lambda (x)
+                   (declare (type (and ,type1 ,type2) x))
+                   x)
+                :allow-failure t :allow-warnings t)
+             (assert failure-p)
+             (assert (= (length warnings) 1))
+             ;; FIXME (declare (type <equivalent-to-empty-type> x)) is
+             ;; currently dropped instead of compiled into a type
+             ;; check.
+             ;; (assert-error (funcall fun object1) type-error)
+             ;; (assert-error (funcall fun object2) type-error)
+             ))
+         (test-case/compatible (type1 type2 object1 object2)
+           (let ((fun (checked-compile
+                       `(lambda (x)
+                          (declare (type (and ,type1 ,type2) x))
+                          x))))
+             (when (typep object1 type2)
+               (assert (typep (funcall fun object1) type1)))
+             (when (typep object2 type1)
+               (assert (typep (funcall fun object2) type2))))))
+    ;; TODO Add structure classes, SEQUENCE and EXTENDED-SEQUENCE
+    (let ((types `((condition                      . ,(make-condition 'error))
+                   (sb-kernel:funcallable-instance . ,#'print-object)
+                   (function                       . ,#'identity)
+                   (sb-kernel:instance             . ,(find-class 'class))
+                   (standard-object                . ,(find-class 'class))))
+          (compatible '((sb-kernel:instance             . condition)
+                        (sb-kernel:instance             . standard-object)
+                        (sb-kernel:funcallable-instance . function)
+                        (sb-kernel:funcallable-instance . standard-object)
+                        (function                       . standard-object))))
+      (loop :for (type1 . object1) :in types :do
+         (loop :for (type2 . object2) :in types :do
+            (funcall
+             (if (or (eq type1 type2)
+                     (find-if (lambda (cell)
+                                (or (and (eq type1 (car cell))
+                                         (eq type2 (cdr cell)))
+                                    (and (eq type2 (car cell))
+                                         (eq type1 (cdr cell)))))
+                              compatible))
+                 #'test-case/compatible
+                 #'test-case/incompatible)
+             type1 type2 object1 object2))))))
 
 ;;; LET* + VALUES declaration: while the declaration is a non-standard
 ;;; and possibly a non-conforming extension, as long as we do support

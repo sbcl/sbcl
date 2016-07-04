@@ -1294,7 +1294,6 @@
                  ((eq type1 (find-classoid 'function))
                   (values nil t))
                  ((or (structure-classoid-p type1)
-                      #+nil
                       (condition-classoid-p type1))
                   (values t t))
                  (t (values nil nil))))))
@@ -1333,7 +1332,7 @@
   (cond
     ((eq type2 *extended-sequence-type*)
      (typecase type1
-       (structure-classoid *empty-type*)
+       ((or structure-classoid condition-classoid) *empty-type*)
        (classoid
         (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
             *empty-type*
@@ -1348,7 +1347,7 @@
             *empty-type*))))
     ((eq type2 *instance-type*)
      (typecase type1
-       (structure-classoid type1)
+       ((or structure-classoid condition-classoid) type1)
        (classoid
         (if (and (not (member type1 *non-instance-classoid-types*
                               :key #'find-classoid))
@@ -1364,7 +1363,7 @@
             *empty-type*))))
     ((eq type2 *funcallable-instance-type*)
      (typecase type1
-       (structure-classoid *empty-type*)
+       ((or structure-classoid condition-classoid) *empty-type*)
        (classoid
         (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
             *empty-type*

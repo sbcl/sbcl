@@ -771,6 +771,15 @@ between the ~A definition and the ~A definition"
           ((eq (classoid-state class2) :sealed)
            ;; checking whether a subclass of both can be defined:
            (sealed-class-intersection2 class2 class1))
+          ;; If exactly one of CLASS{1,2} is a CONDITION-CLASSOID,
+          ;; there can be no intersection: sub-/superclass relations
+          ;; between CONDITION-CLASSOIDs and other CLASSOIDs are not
+          ;; possible and a CONDITION-CLASSOIDs cannot be changed into
+          ;; different CLASSOIDs.
+          ((let ((c1 (condition-classoid-p class1))
+                 (c2 (condition-classoid-p class2)))
+             (or (and c1 (not c2)) (and (not c1) c2)))
+           *empty-type*)
           (t
            ;; uncertain, since a subclass of both might be defined
            nil))))
