@@ -337,12 +337,14 @@
         (careful-specifier-type spec))))
 
 (defoptimizer (make-array derive-type)
-    ((dims &key element-type adjustable fill-pointer displaced-to))
+    ((dims &key element-type adjustable fill-pointer displaced-to
+           &allow-other-keys))
   (derive-make-array-type dims element-type adjustable
                           fill-pointer displaced-to))
 
 (defoptimizer (%make-array derive-type)
-    ((dims widetag n-bits &key adjustable fill-pointer displaced-to))
+    ((dims widetag n-bits &key adjustable fill-pointer displaced-to
+                          &allow-other-keys))
   (declare (ignore n-bits))
   (let ((saetp (and (constant-lvar-p widetag)
                     (find (lvar-value widetag)
