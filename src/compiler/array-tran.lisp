@@ -770,70 +770,76 @@
 ;;; specific must come first, otherwise suboptimal transforms will result for
 ;;; some forms.
 
-(deftransform make-array ((dims &key initial-element element-type
-                                     adjustable fill-pointer)
+(deftransform make-array ((dims &key initial-element initial-contents
+                                     element-type
+                                     adjustable fill-pointer
+                                     displaced-to
+                                     displaced-index-offset)
                           (t &rest *) *
                           :node node)
   (delay-ir1-transform node :constraint)
-  (let* ((eltype (cond ((not element-type) t)
-                       ((not (constant-lvar-p element-type))
-                        (give-up-ir1-transform
-                         "ELEMENT-TYPE is not constant."))
-                       (t
-                        (lvar-value element-type))))
-         (eltype-type (ir1-transform-specifier-type eltype))
-         (saetp (if (unknown-type-p eltype-type)
-                    (give-up-ir1-transform
-                     "ELEMENT-TYPE ~s is not a known type"
-                     eltype-type)
-                    (find eltype-type
-                          sb!vm:*specialized-array-element-type-properties*
-                          :key #'sb!vm:saetp-ctype
-                          :test #'csubtypep)))
-         (creation-form `(%make-array
-                          dims
-                          ,(if saetp
-                               (sb!vm:saetp-typecode saetp)
-                               (give-up-ir1-transform))
-                          ,(sb!vm:saetp-n-bits saetp)
-                          ,@(when fill-pointer
-                              '(:fill-pointer fill-pointer))
-                          ,@(when adjustable
-                              '(:adjustable adjustable)))))
-    (cond ((or (not initial-element)
-               (and (constant-lvar-p initial-element)
-                    (eql (lvar-value initial-element)
-                         (sb!vm:saetp-initial-element-default saetp))))
-           creation-form)
-          (t
-           ;; error checking for target, disabled on the host because
-           ;; (CTYPE-OF #\Null) is not possible.
-           #-sb-xc-host
-           (when (constant-lvar-p initial-element)
-             (let ((value (lvar-value initial-element)))
-               (cond
-                 ((not (ctypep value (sb!vm:saetp-ctype saetp)))
-                  ;; this case will cause an error at runtime, so we'd
-                  ;; better WARN about it now.
-                  (warn 'array-initial-element-mismatch
-                        :format-control "~@<~S is not a ~S (which is the ~
+  (macrolet ((maybe-arg (arg)
+               `(and ,arg `(,,(keywordicate arg) ,',arg))))
+    (let* ((eltype (cond ((not element-type) t)
+                         ((not (constant-lvar-p element-type))
+                          (give-up-ir1-transform
+                           "ELEMENT-TYPE is not constant."))
+                         (t
+                          (lvar-value element-type))))
+           (eltype-type (ir1-transform-specifier-type eltype))
+           (saetp (if (unknown-type-p eltype-type)
+                      (give-up-ir1-transform
+                       "ELEMENT-TYPE ~s is not a known type"
+                       eltype-type)
+                      (find eltype-type
+                            sb!vm:*specialized-array-element-type-properties*
+                            :key #'sb!vm:saetp-ctype
+                            :test #'csubtypep)))
+           (creation-form `(%make-array
+                            dims
+                            ,(if saetp
+                                 (sb!vm:saetp-typecode saetp)
+                                 (give-up-ir1-transform))
+                            ,(sb!vm:saetp-n-bits saetp)
+                            ,@(maybe-arg initial-contents)
+                            ,@(maybe-arg adjustable)
+                            ,@(maybe-arg fill-pointer)
+                            ,@(maybe-arg displaced-to)
+                            ,@(maybe-arg displaced-index-offset))))
+      (cond ((or (not initial-element)
+                 (and (constant-lvar-p initial-element)
+                      (eql (lvar-value initial-element)
+                           (sb!vm:saetp-initial-element-default saetp))))
+             creation-form)
+            (t
+             ;; error checking for target, disabled on the host because
+             ;; (CTYPE-OF #\Null) is not possible.
+             #-sb-xc-host
+             (when (constant-lvar-p initial-element)
+               (let ((value (lvar-value initial-element)))
+                 (cond
+                   ((not (ctypep value (sb!vm:saetp-ctype saetp)))
+                    ;; this case will cause an error at runtime, so we'd
+                    ;; better WARN about it now.
+                    (warn 'array-initial-element-mismatch
+                          :format-control "~@<~S is not a ~S (which is the ~
                                          ~S of ~S).~@:>"
-                        :format-arguments
-                        (list
-                         value
-                         (type-specifier (sb!vm:saetp-ctype saetp))
-                         'upgraded-array-element-type
-                         eltype)))
-                 ((not (ctypep value eltype-type))
-                  ;; this case will not cause an error at runtime, but
-                  ;; it's still worth STYLE-WARNing about.
-                  (compiler-style-warn "~S is not a ~S."
-                                       value eltype)))))
-           `(let ((array ,creation-form))
-              (multiple-value-bind (vector)
-                  (%data-vector-and-index array 0)
-                (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
-              array)))))
+                          :format-arguments
+                          (list
+                           value
+                           (type-specifier (sb!vm:saetp-ctype saetp))
+                           'upgraded-array-element-type
+                           eltype)))
+                   ((not (ctypep value eltype-type))
+                    ;; this case will not cause an error at runtime, but
+                    ;; it's still worth STYLE-WARNing about.
+                    (compiler-style-warn "~S is not a ~S."
+                                         value eltype)))))
+             `(let ((array ,creation-form))
+                (multiple-value-bind (vector)
+                    (%data-vector-and-index array 0)
+                  (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
+                array))))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
