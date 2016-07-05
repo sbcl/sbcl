@@ -778,6 +778,32 @@
                           (t &rest *) *
                           :node node)
   (delay-ir1-transform node :constraint)
+  (when (and initial-contents initial-element)
+    (compiler-warn "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS")
+    (give-up-ir1-transform))
+  (when (and displaced-index-offset
+             (not displaced-to))
+    (compiler-warn "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO")
+    (give-up-ir1-transform))
+  (let ((fp-type (and fill-pointer
+                      (lvar-type fill-pointer)) ))
+    (when (and fp-type
+               (csubtypep fp-type (specifier-type '(or index (eql t)))))
+      (let* ((dims (and (constant-lvar-p dims)
+                        (lvar-value dims)))
+             (length (cond ((integerp dims)
+                            dims)
+                           ((singleton-p dims)
+                            (car dims)))))
+        (cond ((not dims))
+              ((not length)
+               (compiler-warn "Only vectors can have fill pointers."))
+              ((and (csubtypep fp-type (specifier-type 'index))
+                    (not (types-equal-or-intersect fp-type
+                                                   (specifier-type `(integer 0 ,length)))))
+               (compiler-warn "Invalid fill-pointer ~s for a vector of length ~s."
+                              (type-specifier fp-type)
+                              length))))))
   (macrolet ((maybe-arg (arg)
                `(and ,arg `(,,(keywordicate arg) ,',arg))))
     (let* ((eltype (cond ((not element-type) t)
