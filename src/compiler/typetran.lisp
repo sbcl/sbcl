@@ -812,35 +812,29 @@
 ;;; * upgraded-element ctype or requsted element
 ;;; * T if the upgraded-element is upgraded, i.e. it
 ;;;   does not contain any unknown types.
-;;; * The removed dimension or T if a union doesn't agree on dimensions.
+;;; * T if there were any dimensions
 (defun simplify-vector-type (type)
   (labels ((process-compound-type (types)
              (let (array-types
                    element-types
                    (upgraded t)
-                   removed-dimensions
                    dimensions-removed)
                (dolist (type types)
                  (multiple-value-bind (type et upgraded dimensions) (simplify type)
                    (push type array-types)
                    (push et element-types)
                    (when dimensions
-                     (cond ((not dimensions-removed)
-                            (setf dimensions-removed t)
-                            (setf removed-dimensions dimensions))
-                           ((not (eql removed-dimensions dimensions))
-                            (setf removed-dimensions t))))
+                     (setf dimensions-removed t))
                    (unless upgraded
                      (setf upgraded nil))))
                (values (apply #'type-union array-types)
                        (apply #'type-union element-types)
                        upgraded
-                       removed-dimensions)))
+                       dimensions-removed)))
            (simplify (type)
              (cond ((and (array-type-p type)
                          (singleton-p (array-type-dimensions type)))
                     (let* ((upgraded t)
-                           (length (car (array-type-dimensions type)))
                            (et (array-type-specialized-element-type type))
                            (et (cond ((neq et *wild-type*)
                                       et)
@@ -857,8 +851,7 @@
                                      '(*)))
                               et
                               upgraded
-                              (and (neq length '*)
-                                   length))))
+                              (not (eq (car (array-type-dimensions type)) '*)))))
                    ((union-type-p type)
                     (process-compound-type (union-type-types type)))
                    ((member-type-p  type)
@@ -867,6 +860,56 @@
                    (t
                     (error "~a is not a subtype of VECTOR." type)))))
     (simplify type)))
+
+;;; Unlike ARRAY-TYPE-DIMENSIONS this handles union types, which
+;;; includes the type STRING.
+(defun ctype-array-dimensions (type)
+  (labels ((process-compound-type (types)
+             (let (dimensions)
+               (dolist (type types)
+                 (let ((current-dimensions (determine type)))
+                   (cond ((eq current-dimensions '*)
+                          (return-from ctype-array-dimensions '*))
+                         ((and dimensions
+                               (not (equal current-dimensions dimensions)))
+                          (if (= (length dimensions)
+                                 (length current-dimensions))
+                              (setf dimensions
+                                    (loop for dimension in dimensions
+                                          for current-dimension in current-dimensions
+                                          collect (if (eql dimension current-dimension)
+                                                      dimension
+                                                      '*)))
+                              (return-from ctype-array-dimensions '*)))
+                         (t
+
+                          (setf dimensions current-dimensions)))))
+               dimensions))
+           (determine (type)
+             (etypecase type
+               (array-type
+                (array-type-dimensions type))
+               (union-type
+                (process-compound-type (union-type-types type)))
+               (member-type
+                (process-compound-type
+                 (mapcar #'ctype-of (member-type-members type)))))))
+    (determine type)))
+
+;;; Handles union types
+(defun ctype-array-upgraded-element-type (type)
+  (labels ((determine (type)
+             (etypecase type
+               (array-type
+                (array-type-upgraded-element-type type))
+               (union-type
+                (apply #'type-union (mapcar #'determine (union-type-types type))))
+               (member-type
+                (apply #'type-union
+                       (mapcar (lambda (x)
+                                 (determine (ctype-of x)))
+                               (member-type-members type)))))))
+    (determine type)))
 
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)
