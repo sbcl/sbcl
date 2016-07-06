@@ -812,29 +812,35 @@
 ;;; * upgraded-element ctype or requsted element
 ;;; * T if the upgraded-element is upgraded, i.e. it
 ;;;   does not contain any unknown types.
-;;; * T if there were any dimensions
+;;; * The removed dimension or T if a union doesn't agree on dimensions.
 (defun simplify-vector-type (type)
   (labels ((process-compound-type (types)
              (let (array-types
                    element-types
                    (upgraded t)
+                   removed-dimensions
                    dimensions-removed)
                (dolist (type types)
                  (multiple-value-bind (type et upgraded dimensions) (simplify type)
                    (push type array-types)
                    (push et element-types)
                    (when dimensions
-                     (setf dimensions-removed t))
+                     (cond ((not dimensions-removed)
+                            (setf dimensions-removed t)
+                            (setf removed-dimensions dimensions))
+                           ((not (eql removed-dimensions dimensions))
+                            (setf removed-dimensions t))))
                    (unless upgraded
                      (setf upgraded nil))))
                (values (apply #'type-union array-types)
                        (apply #'type-union element-types)
                        upgraded
-                       dimensions-removed)))
+                       removed-dimensions)))
            (simplify (type)
              (cond ((and (array-type-p type)
                          (singleton-p (array-type-dimensions type)))
                     (let* ((upgraded t)
+                           (length (car (array-type-dimensions type)))
                            (et (array-type-specialized-element-type type))
                            (et (cond ((neq et *wild-type*)
                                       et)
@@ -851,7 +857,8 @@
                                      '(*)))
                               et
                               upgraded
-                              (not (eq (car (array-type-dimensions type)) '*)))))
+                              (and (neq length '*)
+                                   length))))
                    ((union-type-p type)
                     (process-compound-type (union-type-types type)))
                    ((member-type-p  type)
