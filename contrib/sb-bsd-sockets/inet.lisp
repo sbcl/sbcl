@@ -79,13 +79,16 @@ a list of protocol aliases"
                            name result-buf buffer buffer-length #-solaris result)))
                  (cond ((eql res 0)
                         #-solaris
-                        (when (sb-alien::null-alien (sb-alien:deref result 0))
+                        (when (sb-alien:null-alien (sb-alien:deref result 0))
                           (error 'unknown-protocol :name name))
                         (return-from getprotobyname
                           (protoent-to-values result-buf)))
                        (t
-                        (let ((errno (sb-unix::get-errno)))
-                          (cond ((eql errno sockint::erange)
+                        (let ((errno (sb-alien:get-errno)))
+                          (cond ((eql errno sb-unix:enoent)
+                                 ;; Usually caused by missing /etc/protocols
+                                 (error 'unknown-protocol :name name))
+                                ((eql errno sockint::erange)
                                  (incf buffer-length 1024)
                                  (when (> buffer-length max-buffer)
                                    (error "Exceeded max-buffer of ~d" max-buffer)))
