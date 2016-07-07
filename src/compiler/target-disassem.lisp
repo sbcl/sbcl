@@ -330,6 +330,7 @@
      (declare (type address seg-base-addr code-insts-addr addr))
      (- addr seg-base-addr))))
 
+#!-(or x86 x86-64)
 (defun lra-hook (chunk stream dstate)
   (declare (type dchunk chunk)
            (ignore chunk)
@@ -967,7 +968,8 @@
             (incf bit-shift sb!vm:n-byte-bits)))
         (format stream "#X~V,'0X" (ash sb!vm:n-word-bits -2) word)))))
 
-(defvar *default-dstate-hooks* (list #'lra-hook))
+(defvar *default-dstate-hooks*
+  (list*  #!-(or x86 x86-64) #'lra-hook nil))
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
