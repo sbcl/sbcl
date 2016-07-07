@@ -5818,7 +5818,7 @@
                        #2A())))
     (assert (eq type 'array))))
 
-(with-test (:name :equalp-transofmr)
+(with-test (:name :equalp-transofrm)
   (assert
    (funcall (checked-compile
              `(lambda (x y)
@@ -5826,3 +5826,15 @@
                         (the (simple-array double-float (*)) y))))
             (coerce '(1f0) '(simple-array single-float (*)))
             (coerce '(1d0) '(simple-array double-float (*))))))
+
+(with-test (:name :array-hairy-type-derivation)
+  (assert
+   (equal (funcall (checked-compile
+                    `(lambda (x)
+                       (subseq (the (and (satisfies sb-impl::vector-with-fill-pointer-p)
+                                         (string 3)) x)
+                               1)))
+                   (make-array 3 :element-type 'character
+                                 :fill-pointer t
+                                 :initial-contents "abc"))
+          "bc")))

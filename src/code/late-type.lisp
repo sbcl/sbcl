@@ -3109,6 +3109,68 @@ used for a COMPLEX component.~:@>"
   (apply #'type-intersection
          (mapcar #'type-negation (union-type-types type))))
 
+;;; Unlike ARRAY-TYPE-DIMENSIONS this handles union types, which
+;;; includes the type STRING.
+(defun ctype-array-dimensions (type)
+  (labels ((process-compound-type (types)
+             (let (dimensions)
+               (dolist (type types)
+                 (unless (hairy-type-p type)
+                   (let ((current-dimensions (determine type)))
+                     (cond ((eq current-dimensions '*)
+                            (return-from ctype-array-dimensions '*))
+                           ((and dimensions
+                                 (not (equal current-dimensions dimensions)))
+                            (if (= (length dimensions)
+                                   (length current-dimensions))
+                                (setf dimensions
+                                      (loop for dimension in dimensions
+                                            for current-dimension in current-dimensions
+                                            collect (if (eql dimension current-dimension)
+                                                        dimension
+                                                        '*)))
+                                (return-from ctype-array-dimensions '*)))
+                           (t
+
+                            (setf dimensions current-dimensions))))))
+               dimensions))
+           (determine (type)
+             (etypecase type
+               (array-type
+                (array-type-dimensions type))
+               (union-type
+                (process-compound-type (union-type-types type)))
+               (member-type
+                (process-compound-type
+                 (mapcar #'ctype-of (member-type-members type))))
+               (intersection-type
+                (process-compound-type (intersection-type-types type))))))
+    (determine type)))
+
+(defun ctype-array-specialized-element-types (type)
+  (let (types)
+    (labels ((process-compound-type (types)
+               (loop for type in types
+                     unless (hairy-type-p type)
+                     do (determine type)))
+             (determine (type)
+               (etypecase type
+                 (array-type
+                  (when (eq (array-type-specialized-element-type type) *wild-type*)
+                    (return-from ctype-array-specialized-element-types
+                      *wild-type*))
+                  (pushnew (array-type-specialized-element-type type)
+                           types :test #'type=))
+                 (union-type
+                  (process-compound-type (union-type-types type)))
+                 (intersection-type
+                  (process-compound-type (intersection-type-types type)))
+                 (member-type
+                  (process-compound-type
+                   (mapcar #'ctype-of (member-type-members type)))))))
+      (determine type))
+    types))
+
 ;;; The LIST, FLOAT and REAL types have special names.  Other union
 ;;; types just get mechanically unparsed.
 (!define-type-method (union :unparse) (type)

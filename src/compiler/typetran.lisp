@@ -820,13 +820,14 @@
                    (upgraded t)
                    dimensions-removed)
                (dolist (type types)
-                 (multiple-value-bind (type et upgraded dimensions) (simplify type)
-                   (push type array-types)
-                   (push et element-types)
-                   (when dimensions
-                     (setf dimensions-removed t))
-                   (unless upgraded
-                     (setf upgraded nil))))
+                 (unless (hairy-type-p type)
+                   (multiple-value-bind (type et upgraded dimensions) (simplify type)
+                     (push type array-types)
+                     (push et element-types)
+                     (when dimensions
+                       (setf dimensions-removed t))
+                     (unless upgraded
+                       (setf upgraded nil)))))
                (values (apply #'type-union array-types)
                        (apply #'type-union element-types)
                        upgraded
@@ -854,66 +855,14 @@
                               (not (eq (car (array-type-dimensions type)) '*)))))
                    ((union-type-p type)
                     (process-compound-type (union-type-types type)))
-                   ((member-type-p  type)
+                   ((intersection-type-p type)
+                    (process-compound-type (intersection-type-types type)))
+                   ((member-type-p type)
                     (process-compound-type
                      (mapcar #'ctype-of (member-type-members type))))
                    (t
                     (error "~a is not a subtype of VECTOR." type)))))
     (simplify type)))
-
-;;; Unlike ARRAY-TYPE-DIMENSIONS this handles union types, which
-;;; includes the type STRING.
-(defun ctype-array-dimensions (type)
-  (labels ((process-compound-type (types)
-             (let (dimensions)
-               (dolist (type types)
-                 (let ((current-dimensions (determine type)))
-                   (cond ((eq current-dimensions '*)
-                          (return-from ctype-array-dimensions '*))
-                         ((and dimensions
-                               (not (equal current-dimensions dimensions)))
-                          (if (= (length dimensions)
-                                 (length current-dimensions))
-                              (setf dimensions
-                                    (loop for dimension in dimensions
-                                          for current-dimension in current-dimensions
-                                          collect (if (eql dimension current-dimension)
-                                                      dimension
-                                                      '*)))
-                              (return-from ctype-array-dimensions '*)))
-                         (t
-
-                          (setf dimensions current-dimensions)))))
-               dimensions))
-           (determine (type)
-             (etypecase type
-               (array-type
-                (array-type-dimensions type))
-               (union-type
-                (process-compound-type (union-type-types type)))
-               (member-type
-                (process-compound-type
-                 (mapcar #'ctype-of (member-type-members type)))))))
-    (determine type)))
-
-(defun ctype-array-specialized-element-types (type)
-  (let (types)
-    (labels ((determine (type)
-               (etypecase type
-                 (array-type
-                  (when (eq (array-type-specialized-element-type type) *wild-type*)
-                    (return-from ctype-array-specialized-element-types
-                      *wild-type*))
-                  (pushnew (array-type-specialized-element-type type)
-                           types :test #'type=))
-                 (union-type
-                  (mapc #'determine (union-type-types type)))
-                 (member-type
-                  (mapc (lambda (x)
-                          (determine (ctype-of x)))
-                        (member-type-members type))))))
-      (determine type))
-    types))
 
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)

@@ -151,7 +151,7 @@
     (let ((lvar (nth (1- n) (combination-args call))))
       (when lvar
         (let ((type (lvar-type lvar)))
-          (if (csubtypep type (specifier-type '(array * (*))))
+          (if (csubtypep type (specifier-type 'vector))
               (values (simplify-vector-type type))
               (let ((ltype (specifier-type 'list)))
                 (when (csubtypep type ltype)
