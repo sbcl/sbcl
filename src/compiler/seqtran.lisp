@@ -1481,20 +1481,41 @@
     (specifier-type `(integer 0 ,(- max min)))))
 
 (defoptimizer (subseq derive-type) ((sequence start &optional end) node)
-  (let ((sequence-type (lvar-type sequence))
-        (constant-start (and (constant-lvar-p start)
-                             (lvar-value start)))
-        (constant-end (and (constant-lvar-p end)
-                           (lvar-value end))))
+  (let* ((sequence-type (lvar-type sequence))
+         (constant-start (and (constant-lvar-p start)
+                              (lvar-value start)))
+         (constant-end (and (constant-lvar-p end)
+                            (lvar-value end)))
+         (index-length (and constant-start constant-end
+                            (- constant-end constant-start)))
+         (list-type (specifier-type 'list)))
     (flet ((bad ()
              (let ((*compiler-error-context* node))
                (compiler-warn "Bad bounding indeces ~s, ~s for ~s"
                               constant-start constant-end (type-specifier sequence-type)))))
-      (cond ((and constant-start constant-end
-                  (> constant-start constant-end))
+      (cond ((and index-length
+                  (minusp index-length))
              ;; Would be a good idea to transform to something like
              ;; %compile-time-type-error
              (bad))
+            ((csubtypep sequence-type list-type)
+             (let ((null-type (specifier-type 'null)))
+               (cond ((csubtypep sequence-type null-type)
+                      (cond ((or (and constant-start
+                                      (plusp constant-start))
+                                 (and index-length
+                                      (plusp index-length)))
+                             (bad))
+                            ((eql constant-start 0)
+                             null-type)
+                            (t
+                             list-type)))
+                     ((not index-length)
+                      list-type)
+                     ((zerop index-length)
+                      null-type)
+                     (t
+                      (specifier-type 'cons)))))
             ((csubtypep sequence-type (specifier-type 'vector))
              (let* ((dimensions
                       ;; Can't trust lengths from non-simple vectors due to
@@ -1505,8 +1526,7 @@
                       (and (singleton-p dimensions)
                            (integerp (car dimensions))
                            (car dimensions)))
-                    (length (cond ((and constant-start constant-end)
-                                   (- constant-end constant-start))
+                    (length (cond (index-length)
                                   ((and dimensions-length
                                         (not end)
                                         constant-start)
@@ -1523,8 +1543,13 @@
                       (type-intersection simplified
                                          (specifier-type `(simple-array * (,length)))))
                      (t
-                      simplified))))))))
-
+                      simplified))))
+            ((not index-length)
+             nil)
+            ((zerop index-length)
+             (specifier-type '(not cons)))
+            (t
+             (specifier-type '(not null)))))))
 
 ;;; Open-code CONCATENATE for strings. It would be possible to extend
 ;;; this transform to non-strings, but I chose to just do the case that
