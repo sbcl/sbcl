@@ -3752,6 +3752,28 @@
       (t
        (give-up-ir1-transform)))))
 
+(defun array-type-dimensions-mismatch (x-type y-type)
+  (let ((array-type (specifier-type 'array))
+        (simple-array-type (specifier-type 'simple-array)))
+    (and (csubtypep x-type array-type)
+         (csubtypep y-type array-type)
+         (let ((x-dims (ctype-array-dimensions x-type))
+               (y-dims (ctype-array-dimensions y-type)))
+           (and (consp x-dims)
+                (consp y-dims)
+                (or (/= (length x-dims)
+                        (length y-dims))
+                    ;; Can compare dimensions only for simple
+                    ;; arrays due to fill-pointer and
+                    ;; adjust-array.
+                    (and (csubtypep x-type simple-array-type)
+                         (csubtypep y-type simple-array-type)
+                         (loop for x-dim in x-dims
+                               for y-dim in y-dims
+                               thereis (and (integerp x-dim)
+                                            (integerp y-dim)
+                                            (not (= x-dim y-dim)))))))))))
+
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful
 ;;; with strings and bit-vectors.
@@ -3792,6 +3814,8 @@
                                  element-types))))))
       (cond
         ((same-leaf-ref-p x y) t)
+        ((array-type-dimensions-mismatch x-type y-type)
+         nil)
         ((and (constant-lvar-p x)
               (equal (lvar-value x) ""))
          `(and (stringp y)
@@ -3806,23 +3830,6 @@
          '(bit-vector-= x y))
         ((both-csubtypep 'pathname)
          '(pathname= x y))
-        ((and (both-csubtypep 'array)
-              (let ((x-dims (ctype-array-dimensions x-type))
-                    (y-dims (ctype-array-dimensions y-type)))
-                (and (consp x-dims)
-                     (consp y-dims)
-                     (or (/= (length x-dims)
-                             (length y-dims))
-                         ;; Can compare dimensions only for simple
-                         ;; arrays due to fill-pointer and
-                         ;; adjust-array.
-                         (and (both-csubtypep 'simple-array)
-                              (loop for x-dim in x-dims
-                                    for y-dim in y-dims
-                                    thereis (and (integerp x-dim)
-                                                 (integerp y-dim)
-                                                 (not (= x-dim y-dim)))))))))
-         nil)
         ((or (non-equal-array-p x-type)
              (non-equal-array-p y-type))
          '(eq x y))
@@ -3852,7 +3859,7 @@
              (mismatching-types-p 'string))
          nil)
         ((some-csubtypep2 '(and array (not vector))
-                         'vector)
+                          'vector)
          nil)
         (t (give-up-ir1-transform))))))
 
@@ -3876,6 +3883,8 @@
                    (and (not x-equal) y-equal)))))
       (cond
         ((same-leaf-ref-p x y) t)
+        ((array-type-dimensions-mismatch x-type y-type)
+         nil)
         ((and (constant-lvar-p x)
               (equal (lvar-value x) ""))
          `(and (stringp y)
@@ -3897,26 +3906,10 @@
         ((both-csubtypep 'hash-table)
          '(hash-table-equalp x y))
         ((and (both-csubtypep 'array)
-              (or
-               (let ((x-dims (ctype-array-dimensions x-type))
-                     (y-dims (ctype-array-dimensions y-type)))
-                 (and (consp x-dims)
-                      (consp y-dims)
-                      (or (/= (length x-dims)
-                              (length y-dims))
-                          ;; Can compare dimensions only for simple
-                          ;; arrays due to fill-pointer and
-                          ;; adjust-array.
-                          (and (both-csubtypep 'simple-array)
-                               (loop for x-dim in x-dims
-                                     for y-dim in y-dims
-                                     thereis (and (integerp x-dim)
-                                                  (integerp y-dim)
-                                                  (not (= x-dim y-dim))))))))
-               (flet ((upgraded-et (type)
-                        (multiple-value-bind (specialized supetype)
-                            (array-type-upgraded-element-type type)
-                          (or supetype specialized))))
+              (flet ((upgraded-et (type)
+                       (multiple-value-bind (specialized supetype)
+                           (array-type-upgraded-element-type type)
+                         (or supetype specialized))))
                 (let ((number-ctype (specifier-type 'number))
                       (x-et (upgraded-et x-type))
                       (y-et (upgraded-et y-type)))
@@ -3927,7 +3920,7 @@
                              ((csubtypep x-et number-ctype)
                               (not (types-equal-or-intersect y-et number-ctype)))
                              ((types-equal-or-intersect y-et number-ctype)
-                              (not (types-equal-or-intersect x-et number-ctype)))))))))
+                              (not (types-equal-or-intersect x-et number-ctype))))))))
          nil)
         ((types-equal-or-intersect x-type y-type)
          (if (or (types-equal-or-intersect x-type combination-type)
