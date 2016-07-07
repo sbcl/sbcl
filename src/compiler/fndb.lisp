@@ -490,7 +490,7 @@
   (flushable))
 
 (defknown copy-seq (sequence) consed-sequence (flushable)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
 
 (defknown length (sequence) index (foldable flushable dx-safe))
 
