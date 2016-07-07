@@ -3171,6 +3171,22 @@ used for a COMPLEX component.~:@>"
       (determine type))
     types))
 
+(defun unparse-string-type (ctype string-type)
+  (let ((string-ctype (specifier-type string-type)))
+    (and (union-type-p ctype)
+         (csubtypep ctype string-ctype)
+         (let ((types (copy-list (union-type-types string-ctype))))
+           (and (loop for type in (union-type-types ctype)
+                      for matching = (find type types
+                                           :test #'csubtypep)
+                      always matching
+                      do (setf types (delete matching types)))
+                (null types)))
+         (let ((dimensions (ctype-array-dimensions ctype)))
+           (cond ((and (singleton-p dimensions)
+                       (integerp (car dimensions)))
+                  `(,string-type ,@dimensions)))))))
+
 ;;; The LIST, FLOAT and REAL types have special names.  Other union
 ;;; types just get mechanically unparsed.
 (!define-type-method (union :unparse) (type)
@@ -3183,6 +3199,8 @@ used for a COMPLEX component.~:@>"
     ((type= type (specifier-type 'bignum)) 'bignum)
     ((type= type (specifier-type 'simple-string)) 'simple-string)
     ((type= type (specifier-type 'string)) 'string)
+    ((unparse-string-type type 'simple-string))
+    ((unparse-string-type type 'string))
     ((type= type (specifier-type 'complex)) 'complex)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 

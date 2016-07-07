@@ -643,3 +643,10 @@
 (test-util:with-test (:name :make-numeric-type)
   (assert (eq (make-numeric-type :class 'integer :low '(4) :high '(5))
               *empty-type*)))
+
+(test-util:with-test (:name :unparse-string)
+  (assert (equal (type-specifier (specifier-type '(string 10)))
+                 '(string 10)))
+  (assert (equal (type-specifier (specifier-type '(simpl-string 10)))
+                 '(simple-string 10))))
+
