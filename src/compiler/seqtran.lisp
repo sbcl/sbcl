@@ -1672,16 +1672,16 @@
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
-(defoptimizer (find derive-type) ((item sequence &rest rest))
-  (declare (ignore sequence))
-  (let ((key-fun (loop for (kwdarg value) on rest by #'cddr
-                       do (cond ((not (constant-lvar-p kwdarg))
-                                 (return nil))
-                                ((eq (lvar-value kwdarg) :key)
-                                 (return (lvar-fun-name* value)))))))
-    (when (and key-fun (neq key-fun 'identity))
-      ;; If :KEY is a known function, then regardless of the :TEST,
-      ;; FIND returns an object of the type that KEY accepts, or nil.
+(defoptimizer (find derive-type) ((item sequence &key key test
+                                        start end from-end))
+  (declare (ignore sequence start end from-end))
+  (let ((key-fun (or (and key (lvar-fun-name* key)) 'identity)))
+    ;; If :KEY is a known function, then regardless of the :TEST,
+    ;; FIND returns an object of the type that KEY accepts, or nil.
+    ;; If LVAR-FUN-NAME can't be determined, it returns NIL.
+    ;; :KEY NIL is valid, and means #'IDENTITY.
+    ;; So either way, we get IDENTITY which skips this code.
+    (unless (eq key-fun 'identity)
       (acond ((info :function :info key-fun)
               (let ((type (info :function :type key-fun)))
                 (awhen (fun-type-required type)
@@ -1689,20 +1689,18 @@
                     (type-union (first it) (specifier-type 'null))))))
              ((structure-instance-accessor-p key-fun)
               (return-from find-derive-type-optimizer
-                (specifier-type `(or ,(dd-name (car it)) null))))))
-    ;; Otherwise maybe it returns ITEM itself (or an EQL number).
-    ;; :START, :END, ;FROM-END are ok, but there must be no :TEST-NOT,
-    ;; nor :KEY unless :KEY is identity. :TEST is OK only if EQ or EQL.
-    (if (loop for (kwdarg value) on rest by #'cddr
-              always
-              (and (constant-lvar-p kwdarg)
-                   (let ((kwdarg (lvar-value kwdarg)))
-                     (or (member kwdarg '(:start :end :from-end))
-                         (and (eq kwdarg :test)
-                              (member (lvar-fun-name* value) '(eq eql)))
-                         (and (eq kwdarg :key) (eq key-fun 'identity))))))
+                (specifier-type `(or ,(dd-name (car it)) null)))))))
+  ;; Otherwise maybe FIND returns ITEM itself (or an EQL number).
+  ;; :TEST is allowed only if EQ or EQL (where NIL means EQL).
+  ;; :KEY is allowed only if IDENTITY or NIL.
+  (if (and (or (not test)
+               (lvar-fun-is test '(eq eql))
+               (and (constant-lvar-p test) (null (lvar-value test))))
+           (or (not key)
+               (lvar-fun-is key '(identity))
+               (and (constant-lvar-p key) (null (lvar-value key)))))
         (type-union (lvar-type item) (specifier-type 'null))
-        (specifier-type 't))))
+        (specifier-type 't)))
 
 ;;; We want to make sure that %FIND-POSITION is inline-expanded into
 ;;; %FIND-POSITION-IF only when %FIND-POSITION-IF has an inline
