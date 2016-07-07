@@ -139,8 +139,11 @@
       (number (try-cache x))
       (array (ctype-of-array x))
       (cons (specifier-type 'cons))
-      ;; This makes no distinction for BASE/EXTENDED-CHAR. Should it?
-      (character (specifier-type 'character))
+      (character
+       (typecase x
+         (standard-char (specifier-type 'standard-char))
+         (base-char (specifier-type 'base-char))
+         (extended-char (specifier-type 'extended-char))))
       #!+sb-simd-pack
       (simd-pack
        (let ((tag (%simd-pack-tag x)))
