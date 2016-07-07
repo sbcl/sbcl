@@ -896,20 +896,24 @@
                  (mapcar #'ctype-of (member-type-members type)))))))
     (determine type)))
 
-;;; Handles union types
-(defun ctype-array-upgraded-element-type (type)
-  (labels ((determine (type)
-             (etypecase type
-               (array-type
-                (array-type-upgraded-element-type type))
-               (union-type
-                (apply #'type-union (mapcar #'determine (union-type-types type))))
-               (member-type
-                (apply #'type-union
-                       (mapcar (lambda (x)
-                                 (determine (ctype-of x)))
-                               (member-type-members type)))))))
-    (determine type)))
+(defun ctype-array-specialized-element-types (type)
+  (let (types)
+    (labels ((determine (type)
+               (etypecase type
+                 (array-type
+                  (when (eq (array-type-specialized-element-type type) *wild-type*)
+                    (return-from ctype-array-specialized-element-types
+                      *wild-type*))
+                  (pushnew (array-type-specialized-element-type type)
+                           types :test #'type=))
+                 (union-type
+                  (mapc #'determine (union-type-types type)))
+                 (member-type
+                  (mapc (lambda (x)
+                          (determine (ctype-of x)))
+                        (member-type-members type))))))
+      (determine type))
+    types))
 
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)

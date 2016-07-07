@@ -5817,3 +5817,12 @@
                            (ctu:compiler-derived-type (sb-kernel:%array-data-vector (the array x)))))
                        #2A())))
     (assert (eq type 'array))))
+
+(with-test (:name :equalp-transofmr)
+  (assert
+   (funcall (checked-compile
+             `(lambda (x y)
+                (equalp (the (simple-array single-float (*)) x)
+                        (the (simple-array double-float (*)) y))))
+            (coerce '(1f0) '(simple-array single-float (*)))
+            (coerce '(1d0) '(simple-array double-float (*))))))
