@@ -101,7 +101,7 @@
     (load "src/cold/compile-cold-sbcl.lisp")
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.
-    #!+(or x86 x86-64) ; until all the rest are clean
+    #!+(or x86 x86-64 arm64) ; until all the rest are clean
     (when sb!c::*undefined-warnings*
       (setf fail t)
       (dolist (warning sb!c::*undefined-warnings*)
