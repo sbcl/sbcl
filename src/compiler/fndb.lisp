@@ -487,8 +487,7 @@
 (defknown elt (sequence index) t (foldable unsafely-flushable))
 
 (defknown subseq (sequence index &optional sequence-end) consed-sequence
-  (flushable)
-  :derive-type (sequence-result-nth-arg 1))
+  (flushable))
 
 (defknown copy-seq (sequence) consed-sequence (flushable)
   :derive-type (sequence-result-nth-arg 1))

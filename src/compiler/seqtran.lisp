@@ -1480,6 +1480,51 @@
       (index-into-sequence-derive-type sequence start end)
     (specifier-type `(integer 0 ,(- max min)))))
 
+(defoptimizer (subseq derive-type) ((sequence start &optional end) node)
+  (let ((sequence-type (lvar-type sequence))
+        (constant-start (and (constant-lvar-p start)
+                             (lvar-value start)))
+        (constant-end (and (constant-lvar-p end)
+                           (lvar-value end))))
+    (flet ((bad ()
+             (let ((*compiler-error-context* node))
+               (compiler-warn "Bad bounding indeces ~s, ~s for ~s"
+                              constant-start constant-end (type-specifier sequence-type)))))
+      (cond ((and constant-start constant-end
+                  (> constant-start constant-end))
+             ;; Would be a good idea to transform to something like
+             ;; %compile-time-type-error
+             (bad))
+            ((csubtypep sequence-type (specifier-type 'vector))
+             (let* ((dimensions
+                      ;; Can't trust lengths from non-simple vectors due to
+                      ;; fill-pointer and adjust-array
+                      (and (csubtypep sequence-type (specifier-type 'simple-array))
+                           (ctype-array-dimensions sequence-type)))
+                    (dimensions-length
+                      (and (singleton-p dimensions)
+                           (integerp (car dimensions))
+                           (car dimensions)))
+                    (length (cond ((and constant-start constant-end)
+                                   (- constant-end constant-start))
+                                  ((and dimensions-length
+                                        (not end)
+                                        constant-start)
+                                   (- dimensions-length constant-start))))
+                    (simplified (simplify-vector-type sequence-type)))
+               (cond ((and dimensions-length
+                           (or
+                            (and constant-start
+                                 (> constant-start) dimensions-length)
+                            (and constant-end
+                                 (> constant-end) dimensions-length)))
+                      (bad))
+                     (length
+                      (type-intersection simplified
+                                         (specifier-type `(simple-array * (,length)))))
+                     (t
+                      simplified))))))))
+
 
 ;;; Open-code CONCATENATE for strings. It would be possible to extend
 ;;; this transform to non-strings, but I chose to just do the case that
