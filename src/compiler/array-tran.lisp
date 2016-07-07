@@ -257,6 +257,9 @@
   (declare (ignore index offset))
   (derive-aref-type array))
 
+(defoptimizer (vector-pop derive-type) ((array))
+  (derive-aref-type array))
+
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index new-value))
                 (declare (ignore index))
