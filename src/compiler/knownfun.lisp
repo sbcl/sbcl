@@ -142,26 +142,45 @@
           :key #'lvar-type
           :initial-value (specifier-type 'single-float)))
 
+(defun simplify-list-type (type &key preserve-dimensions)
+  ;; Preserve all the list types without dragging
+  ;; (cons (eql 10)) stuff in.
+  (let ((cons-type (specifier-type 'cons))
+        (list-type (specifier-type 'list))
+        (null-type (specifier-type 'null)))
+    (cond ((and preserve-dimensions
+                (csubtypep type cons-type))
+           cons-type)
+          ((and preserve-dimensions
+                (csubtypep type null-type))
+           null-type)
+          ((csubtypep type list-type)
+           list-type))))
+
 ;;; Return a closure usable as a derive-type method for accessing the
 ;;; N'th argument. If arg is a list, result is a list. If arg is a
 ;;; vector, result is a vector with the same element type.
-(defun sequence-result-nth-arg (n &key preserve-dimensions)
+(defun sequence-result-nth-arg (n &key preserve-dimensions
+                                       preserve-vector-type)
   (lambda (call)
     (declare (type combination call))
     (let ((lvar (nth (1- n) (combination-args call))))
       (when lvar
         (let ((type (lvar-type lvar)))
-          (if (csubtypep type (specifier-type 'vector))
-              (let ((simplified (simplify-vector-type type)))
-                (if (and preserve-dimensions
-                         (csubtypep simplified (specifier-type 'simple-array)))
-                    (type-intersection (specifier-type
-                                        `(simple-array * ,(ctype-array-dimensions type)))
-                                       simplified)
-                    simplified))
-              (let ((ltype (specifier-type 'list)))
-                (when (csubtypep type ltype)
-                  ltype))))))))
+          (cond ((simplify-list-type type
+                                     :preserve-dimensions preserve-dimensions))
+                ((not (csubtypep type (specifier-type 'vector)))
+                 nil)
+                (preserve-vector-type
+                 type)
+                (t
+                 (let ((simplified (simplify-vector-type type)))
+                   (if (and preserve-dimensions
+                            (csubtypep simplified (specifier-type 'simple-array)))
+                       (type-intersection (specifier-type
+                                           `(simple-array * ,(ctype-array-dimensions type)))
+                                          simplified)
+                       simplified)))))))))
 
 ;;; Derive the type to be the type specifier which is the Nth arg.
 (defun result-type-specifier-nth-arg (n)

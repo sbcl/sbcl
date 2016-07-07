@@ -5838,3 +5838,10 @@
                                  :fill-pointer t
                                  :initial-contents "abc"))
           "bc")))
+
+(with-test (:name :nreverse-derive-type)
+  (assert
+   (not (funcall (checked-compile
+                  '(lambda (x)
+                    (eql (car (nreverse (the (cons (eql 10)) x))) 10)))
+                 '(10 20)))))

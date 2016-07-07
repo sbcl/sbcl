@@ -495,10 +495,11 @@
 (defknown length (sequence) index (foldable flushable dx-safe))
 
 (defknown reverse (sequence) consed-sequence (flushable)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
 
 (defknown nreverse (sequence) sequence (important-result)
-  :derive-type #'result-type-first-arg
+  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t
+                                          :preserve-vector-type t)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown make-sequence (type-specifier index
