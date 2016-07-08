@@ -1218,7 +1218,8 @@
      :unwinnage-fun (cond (info #'compiler-style-warn)
                           (for-real #'compiler-notify)
                           (t nil))
-     :really-assert (and for-real (not explicit-check))
+     :really-assert (if for-real
+                        (explicit-check->really-assert explicit-check))
      :where (if for-real
                 "previous declaration"
                 "previous definition"))))

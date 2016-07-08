@@ -931,10 +931,9 @@ and no value was provided for it." name))))))))))
 ;;; false). If there was a problem, we return NIL.
 (defun assert-definition-type
     (functional type &key (really-assert t)
-     ((:lossage-fun *lossage-fun*)
-      #'compiler-style-warn)
-     unwinnage-fun
-     (where "previous declaration"))
+                          ((:lossage-fun *lossage-fun*) #'compiler-style-warn)
+                          unwinnage-fun
+                          (where "previous declaration"))
   (declare (type functional functional)
            (type function *lossage-fun*)
            (string where))
@@ -966,8 +965,13 @@ and no value was provided for it." name))))))))))
           (*lossage-detected* nil)
           ((not really-assert) t)
           (t
+           ;; REALLY-ASSERT can be T or `(:NOT . ,vars) where the latter is
+           ;; a list of vars for which compiling will *not* generate
+           ;; an automatic check.
            (let ((policy (lexenv-policy (functional-lexenv functional))))
-             (when (policy policy (> type-check 0))
+             (when (and (policy policy (> type-check 0))
+                        (or (eq really-assert t)
+                            (not (member :result (cdr really-assert)))))
                (assert-lvar-type (return-result return) type-returns
                                  policy)))
            (loop for var in vars and type in types do
@@ -981,12 +985,24 @@ and no value was provided for it." name))))))))))
                                      prevents use of assertion from function ~
                                      type ~A:~% ~/sb!impl:print-type/~%")
                                    (leaf-debug-name var) where type)))
+                       ((and (listp really-assert) ; (:NOT . ,vars)
+                             (member (lambda-var-%source-name var)
+                                     (cdr really-assert)))) ; do nothing
                        (t
                         (setf (leaf-type var) type)
                         (let ((s-type (make-single-value-type type)))
                           (dolist (ref (leaf-refs var))
                             (derive-node-type ref s-type))))))
            t))))))
+
+;;; Manipulate the poorly-named :REALLY-ASSERT value.
+;;; It would make sense to pass the opposite sense of the arg
+;;; (as ":SKIP-CHECKS") corresponding to the declaration.
+(defun explicit-check->really-assert (explicit-check)
+  (case explicit-check
+    ((nil) t)
+    ((t) nil)
+    (t `(:not . ,explicit-check))))
 
 ;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.
 (defun assert-global-function-definition-type (name fun)
@@ -1001,7 +1017,7 @@ and no value was provided for it." name))))))))))
            fun type
            :unwinnage-fun #'compiler-notify
            :where "proclamation"
-           :really-assert (not explicit-check)))
+           :really-assert (explicit-check->really-assert explicit-check)))
         ;; Can't actually test this. DEFSTRUCTs declare this, but non-toplevel
         ;; ones won't have an FTYPE at compile-time.
         #+nil

@@ -2054,6 +2054,11 @@
        ;; inefficient, but since the TEST-NOT option is deprecated
        ;; anyway, we don't care.)
        (complement (%coerce-callable-to-fun ,test-not)))
+      ;; :TEST of NIL (whether implicit or explicit) means #'EQL.
+      ;; This behavior is not specified by CLHS, but is fairly conventional.
+      ;; (KEY is expressly specified as allowing NIL, but TEST is not)
+      ;; In our implementation, it has to be this way because we don't track
+      ;; whether the :TEST and :TEST-NOT args were actually present.
       (t #'eql))))
 (define-source-transform effective-find-position-key (key)
   (once-only ((key key))

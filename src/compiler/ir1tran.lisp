@@ -1677,15 +1677,20 @@
                                   `(values ,@types)))))))
                    ((and allow-explicit-check
                          (typep spec '(cons (eql explicit-check))))
-                    ;; EXPLICIT-CHECK can specify that all arguments will be
-                    ;; checked by the function body, and/or all results.
-                    ;; Alternatively, a subset of arguments can be listed,
-                    ;; so that sequence operations can dispatch on the sequence
-                    ;; arguments, but benefit from automatic checks of others.
-                    ;; You can't actually specify anything yet, as the goal
-                    ;; is to be 100% compatible with the globaldb attribute.
-                    (aver (not (cdr spec)))
-                    (setq explicit-check t
+                    ;; EXPLICIT-CHECK by itself specifies that all argument and
+                    ;; result types are checked by the function body.
+                    ;; Alternatively, a subset of arguments, and/or :RESULT,
+                    ;; can be specified to indicate that only a subset are
+                    ;; checked; in that case, the compiler asserts all others.
+                    (awhen (remove-if (lambda (x)
+                                        (or (member x vars
+                                                    :test #'eq
+                                                    :key #'lambda-var-%source-name)
+                                            (eq x :result)))
+                                      (cdr spec))
+                      (compiler-error "explicit-check list ~S must refer to lambda vars"
+                                      it))
+                    (setq explicit-check (or (cdr spec) t)
                           allow-explicit-check nil)) ; at most one of this decl
                    (t
                     (multiple-value-bind (new-env new-qualities)
