@@ -116,11 +116,12 @@
           (or (get-unary-predicate simplified) simplified)))))
 
 (defun specifier-from-checkfun (fun-or-ctype)
-  (if (functionp fun-or-ctype)
-      (or (gethash (%fun-name fun-or-ctype)
-                   sb-c::*backend-predicate-types*)
-          (bug "No type specifier for function ~S" fun-or-ctype))
-      (type-specifier fun-or-ctype)))
+  (type-specifier
+   (if (functionp fun-or-ctype)
+       (or (gethash (%fun-name fun-or-ctype)
+                    sb-c::*backend-predicate-types*)
+           (bug "No type specifier for function ~S" fun-or-ctype))
+       fun-or-ctype)))
 
 (defun typecheck-fail (symbol value type)
   (error 'interpreter-type-error
