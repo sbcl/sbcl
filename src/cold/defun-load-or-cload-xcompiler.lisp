@@ -211,10 +211,6 @@
                     "UPGRADED-COMPLEX-PART-TYPE"
                     "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
-  ;; Symbols that can't be entered into the whitelist
-  ;; until this function executes.
-  (setf (gethash (intern "MAKE-LOAD-FORM" "SB-XC")
-                 *undefined-fun-whitelist*) t)
   ;; don't watch:
   (dolist (package (list-all-packages))
     (when (= (mismatch (package-name package) "SB!") 3)
