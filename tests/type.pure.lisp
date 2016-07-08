@@ -647,6 +647,5 @@
 (test-util:with-test (:name :unparse-string)
   (assert (equal (type-specifier (specifier-type '(string 10)))
                  '(string 10)))
-  (assert (equal (type-specifier (specifier-type '(simpl-string 10)))
+  (assert (equal (type-specifier (specifier-type '(simple-string 10)))
                  '(simple-string 10))))
-
