@@ -38,14 +38,5 @@
 
 #define REGNAMES "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI", "UESP"
 
-/* classification of registers
- *
- * reg_SP = the register used by Lisp as stack pointer
- * reg_FP = the register used by Lisp as frame pointer
- * BOXED_REGISTERS =
- *   the registers which may contain Lisp object pointers */
+/* reg_SP = the register used by Lisp as stack pointer */
 #define reg_SP reg_ESP
-#define reg_FP reg_EBP
-#define BOXED_REGISTERS {\
-  reg_EAX, reg_ECX, reg_EDX, reg_EBX, reg_ESI, reg_EDI \
-  }
