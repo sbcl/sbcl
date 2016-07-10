@@ -1535,9 +1535,9 @@
                (cond ((and dimensions-length
                            (or
                             (and constant-start
-                                 (> constant-start) dimensions-length)
+                                 (> constant-start dimensions-length))
                             (and constant-end
-                                 (> constant-end) dimensions-length)))
+                                 (> constant-end dimensions-length))))
                       (bad))
                      (length
                       (type-intersection simplified

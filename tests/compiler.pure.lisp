@@ -5882,3 +5882,11 @@
                   '(lambda (x)
                     (eql (car (nreverse (the (cons (eql 10)) x))) 10)))
                  '(10 20)))))
+
+(with-test (:name :subseq-derive-type)
+  (assert
+   (equalp (funcall (checked-compile
+                    '(lambda (x)
+                      (subseq (the (simple-vector 3) x) 1)))
+                   #(1 2 3))
+          #(2 3))))
