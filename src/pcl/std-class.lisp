@@ -146,6 +146,7 @@
 ;;; all.
 (macrolet ((def (class)
              `(defmethod class-prototype ((class ,class))
+                (declare (notinline allocate-instance))
                 (with-slots (prototype) class
                   (or prototype
                       (setf prototype (allocate-instance class)))))))

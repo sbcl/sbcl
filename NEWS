@@ -5,6 +5,7 @@ changes relative to sbcl-1.3.7:
     on platforms supporting stack allocation of vectors.
   * optimization: improved type derivation for FIND, POSITION, COUNT, SEARCH,
     MISMATCH and other array and sequence functions.
+  * optimization: allocate-instance is now as fast as make-instance.
 
 changes in sbcl-1.3.7 relative to sbcl-1.3.6:
   * bug fix: preserve the name of the destructive function for the destroyed
