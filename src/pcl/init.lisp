@@ -211,26 +211,28 @@
   ;; the same name exists in the previous class."
   (let ((added-slots '())
         (current-slotds (class-slots (class-of current)))
-        (previous-slot-names (mapcar #'slot-definition-name
-                                     (class-slots (class-of previous)))))
+        (previous-slotds (class-slots (class-of previous))))
     (dolist (slotd current-slotds)
-      (if (and (not (memq (slot-definition-name slotd) previous-slot-names))
-               (eq (slot-definition-allocation slotd) :instance))
-          (push (slot-definition-name slotd) added-slots)))
-    (check-initargs-1
-     (class-of current) initargs
-     (list (list* 'update-instance-for-different-class previous current initargs)
-           (list* 'shared-initialize current added-slots initargs)))
+      (when (and (eq (slot-definition-allocation slotd) :instance)
+                 (not (member (slot-definition-name slotd) previous-slotds
+                              :key #'slot-definition-name)))
+        (push (slot-definition-name slotd) added-slots)))
+    (when initargs
+      (let ((call-list (list (list* 'update-instance-for-different-class previous current initargs)
+                             (list* 'shared-initialize current added-slots initargs))))
+        (declare (dynamic-extent call-list))
+        (check-initargs-1 (class-of current) initargs call-list)))
     (apply #'shared-initialize current added-slots initargs)))
 
 (defmethod update-instance-for-redefined-class
     ((instance standard-object) added-slots discarded-slots property-list
      &rest initargs)
-  (check-initargs-1
-   (class-of instance) initargs
-   (list (list* 'update-instance-for-redefined-class
-                instance added-slots discarded-slots property-list initargs)
-         (list* 'shared-initialize instance added-slots initargs)))
+  (when initargs
+    (check-initargs-1
+     (class-of instance) initargs
+     (list (list* 'update-instance-for-redefined-class
+                  instance added-slots discarded-slots property-list initargs)
+           (list* 'shared-initialize instance added-slots initargs))))
   (apply #'shared-initialize instance added-slots initargs))
 
 (defmethod shared-initialize ((instance slot-object) slot-names &rest initargs)
@@ -257,15 +259,13 @@
                              (slot-boundp-using-class class instance slotd))
                    (setf (slot-value-using-class class instance slotd)
                          (funcall initfun)))))))
-    (let* ((class (class-of instance))
-           (initfn-slotds
-            (loop for slotd in (class-slots class)
-                  unless (initialize-slot-from-initarg class instance slotd)
-                  collect slotd)))
-      (dolist (slotd initfn-slotds)
-        (when (or (eq t slot-names)
-                  (memq (slot-definition-name slotd) slot-names))
-          (initialize-slot-from-initfunction class instance slotd))))
+    (let ((class (class-of instance)))
+      (loop for slotd in (class-slots class)
+            unless (initialize-slot-from-initarg class instance slotd)
+            do
+            (when (or (eq t slot-names)
+                      (memq (slot-definition-name slotd) slot-names))
+              (initialize-slot-from-initfunction class instance slotd))))
     instance))
 
 ;;; If initargs are valid return nil, otherwise signal an error.

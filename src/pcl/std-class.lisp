@@ -1613,6 +1613,7 @@
 
 
 (defun %change-class (instance new-class initargs)
+  (declare (notinline allocate-instance))
   (binding* ((old-class (class-of instance))
              (copy (allocate-instance new-class))
              (new-wrapper (get-wrapper copy))
@@ -1620,12 +1621,13 @@
              (old-slots (get-slots instance))
              (new-slots (get-slots copy))
              (safe (safe-p new-class))
-             (new-instance-slots
-              (classify-slotds (layout-slot-list new-wrapper)))
-             ((old-instance-slots old-class-slots)
-              (classify-slotds (layout-slot-list old-wrapper))))
-    (labels ((find-slot (name slots)
-               (find name slots :key #'slot-definition-name))
+             (new-wrapper-slots (layout-slot-list new-wrapper))
+             (old-wrapper-slots (layout-slot-list old-wrapper)))
+    (labels ((find-instance-slot (name slots)
+               (loop for slot in slots
+                     when (and (eq (slot-definition-allocation slot) :instance)
+                               (eq (slot-definition-name slot) name))
+                     return slot))
              (initarg-for-slot-p (slot)
                (dolist (slot-initarg (slot-definition-initargs slot))
                  ;; Abuse +slot-unbound+
@@ -1640,20 +1642,22 @@
       ;; "The values of local slots specified by both the class CTO
       ;; and CFROM are retained. If such a local slot was unbound, it
       ;; remains unbound."
-      (dolist (new new-instance-slots)
-        (unless (initarg-for-slot-p new)
-          (binding* ((old (find-slot (slot-definition-name new) old-instance-slots)
+      (dolist (new new-wrapper-slots)
+        (when (and (not (initarg-for-slot-p new))
+                   (eq (slot-definition-allocation new) :instance))
+          (binding* ((old (find-instance-slot (slot-definition-name new) old-wrapper-slots)
                           :exit-if-null)
                      (value (clos-slots-ref old-slots (slot-definition-location old))))
             (set-value value new))))
 
       ;; "The values of slots specified as shared in the class CFROM and
       ;; as local in the class CTO are retained."
-      (dolist (old old-class-slots)
-        (binding* ((slot-and-val (slot-definition-location old))
-                   (new (find-slot (car slot-and-val) new-instance-slots)
-                        :exit-if-null))
-          (set-value (cdr slot-and-val) new))))
+      (dolist (old old-wrapper-slots)
+        (when (eq (slot-definition-allocation old) :class)
+         (binding* ((slot-and-val (slot-definition-location old))
+                    (new (find-instance-slot (car slot-and-val) new-wrapper-slots)
+                         :exit-if-null))
+           (set-value (cdr slot-and-val) new)))))
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.
