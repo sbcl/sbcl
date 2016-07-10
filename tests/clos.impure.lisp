@@ -2499,3 +2499,10 @@
     (let ((instance (make-instance class2)))
       (sb-mop:finalize-inheritance (find-class class1))
       (assert (not (sb-kernel:layout-invalid (sb-kernel:layout-of instance)))))))
+
+(with-test (:name :allocate-instance-on-symbol)
+  (let ((class (gensym "CLASS-")))
+    (eval `(defclass ,class () ()))
+    (assert-error
+     (funcall (checked-compile `(lambda ()
+                                  (allocate-instance ',class)))))))
