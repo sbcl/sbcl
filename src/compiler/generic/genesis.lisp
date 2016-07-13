@@ -3408,11 +3408,11 @@ core and return a descriptor to it."
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
     ;; classoid's expressly declared layout isn't renamed as a special-case.
     (format t "    lispobj _layout;~%")
-    ;; For GC, the relevant notion of length is what the structure
-    ;; actually occupies in memory, so we make sure the C struct
-    ;; incorporates a final padding word if necessary.
-    (let ((names ; round dd-length to odd so that total + header is even
-           (coerce (loop for i from 1 below (logior (dd-length dd) 1)
+    ;; Output exactly the number of Lisp words consumed by the structure,
+    ;; no more, no less. C code can always compute the padded length from
+    ;; the precise length, but the other way doesn't work.
+    (let ((names
+           (coerce (loop for i from 1 below (dd-length dd)
                          collect (list (format nil "word_~D_" (1+ i))))
                    'vector)))
       (dolist (slot (dd-slots dd))

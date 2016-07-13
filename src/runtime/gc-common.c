@@ -1844,7 +1844,7 @@ scav_vector (lispobj *where, lispobj object)
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
     scavenge((lispobj *)hash_table,
-             sizeof(struct hash_table) / sizeof(lispobj));
+             CEILING(sizeof(struct hash_table) / sizeof(lispobj), 2));
 
     /* Cross-check the kv_vector. */
     if (where != (lispobj *)native_pointer(hash_table->table)) {
