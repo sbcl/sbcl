@@ -223,7 +223,7 @@
   (name nil :type symbol)
   ;; kind of type (how to reconstitute an object)
   (kind (missing-arg)
-        :type (member :other :small-other :closure :instance :list
+        :type (member :other :tiny-other :closure :instance :list
                       :code :vector-nil :weak-pointer)))
 (!set-load-form-method room-info (:xc))
 

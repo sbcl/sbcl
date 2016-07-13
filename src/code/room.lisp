@@ -33,7 +33,7 @@
       (setf (svref *meta-room-info* (symbol-value widetag))
             (make-room-info :name name
                             :kind (if (eq name 'symbol)
-                                      :small-other
+                                      :tiny-other
                                       :other))))))
 
 (dolist (code (list #!+sb-unicode complex-character-string-widetag
@@ -235,7 +235,7 @@
                    widetag
                    (boxed-size header-value)))
 
-          (:small-other
+          (:tiny-other
            (values (tagged-object other-pointer-lowtag)
                    widetag
                    (boxed-size (logand header-value #xff))))
