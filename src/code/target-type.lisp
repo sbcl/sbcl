@@ -143,7 +143,11 @@
        (typecase x
          (standard-char (specifier-type 'standard-char))
          (base-char (specifier-type 'base-char))
-         (extended-char (specifier-type 'extended-char))))
+         ;; If the last case were expressed as EXTENDED-CHAR,
+         ;; we wrongly get "this is not a (VALUES CTYPE): NIL"
+         ;; because the compiler is too naive to see that
+         ;; the last 2 cases partition CHARACTER.
+         (t (specifier-type 'extended-char))))
       #!+sb-simd-pack
       (simd-pack
        (let ((tag (%simd-pack-tag x)))
