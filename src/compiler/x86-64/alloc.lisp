@@ -68,6 +68,31 @@
 
 ;;;; special-purpose inline allocators
 
+;;; Special variant of 'storew' which might have a shorter encoding
+;;; when storing to the heap (which starts out zero-filled).
+(defun storew* (word object slot lowtag zeroed)
+  (if (or (not zeroed) (not (typep word '(signed-byte 32))))
+      (storew word object slot lowtag) ; Possibly use temp-reg-tn
+      (inst mov
+            (make-ea (cond ((typep word '(unsigned-byte 8)) :byte)
+                           ((and (not (logtest word #xff))
+                                 (typep (ash word -8) '(unsigned-byte 8)))
+                            ;; Array lengths 128 to 16384 which are multiples of 128
+                            (setq word (ash word -8))
+                            (decf lowtag 1) ; increment address by 1
+                            :byte)
+                           ((and (not (logtest word #xffff))
+                                 (typep (ash word -16) '(unsigned-byte 8)))
+                            ;; etc
+                            (setq word (ash word -16))
+                            (decf lowtag 2) ; increment address by 2
+                            :byte)
+                           ((typep word '(unsigned-byte 16)) :word)
+                           ((typep word '(unsigned-byte 31)) :dword))
+                     :base object
+                     :disp (- (* slot n-word-bytes) lowtag))
+            word)))
+
 ;;; ALLOCATE-VECTOR
 (macrolet ((calc-size-in-bytes (n-words result-tn)
              `(cond ((sc-is ,n-words immediate)
@@ -80,13 +105,14 @@
                                                    (* vector-data-offset n-word-bytes))))
                      (inst and ,result-tn (lognot lowtag-mask))
                      ,result-tn)))
-           (put-header (vector-tn type length)
-             `(progn (storew (if (sc-is ,type immediate) (tn-value ,type) ,type)
-                             ,vector-tn 0 other-pointer-lowtag)
-                     (storew (if (sc-is ,length immediate)
-                                 (fixnumize (tn-value ,length))
-                                 ,length)
-                             ,vector-tn vector-length-slot other-pointer-lowtag))))
+           (put-header (vector-tn type length zeroed)
+             `(progn (storew* (if (sc-is ,type immediate) (tn-value ,type) ,type)
+                              ,vector-tn 0 other-pointer-lowtag ,zeroed)
+                     (storew* (if (sc-is ,length immediate)
+                                  (fixnumize (tn-value ,length))
+                                  ,length)
+                              ,vector-tn vector-length-slot other-pointer-lowtag
+                              ,zeroed))))
 
   (define-vop (allocate-vector-on-heap)
     (:args (type :scs (unsigned-reg immediate))
@@ -101,7 +127,7 @@
       (let ((size (calc-size-in-bytes words result)))
         (pseudo-atomic
          (allocation result size nil nil other-pointer-lowtag)
-         (put-header result type length)))))
+         (put-header result type length t)))))
 
   (define-vop (allocate-vector-on-stack)
     (:args (type :scs (unsigned-reg immediate) :to :save)
@@ -118,7 +144,7 @@
     (:generator 100
       (let ((size (calc-size-in-bytes words result)))
         (allocation result size node t other-pointer-lowtag)
-        (put-header result type length)
+        (put-header result type length nil)
     ;; FIXME: It would be good to check for stack overflow here.
     ;; It would also be good to skip zero-fill of specialized vectors
     ;; perhaps in a policy-dependent way. At worst you'd see random
@@ -296,10 +322,8 @@
     (maybe-pseudo-atomic stack-allocate-p
      (allocation result (pad-data-block words) node stack-allocate-p lowtag)
      (when type
-       (storew (logior (ash (1- words) n-widetag-bits) type)
-               result
-               0
-               lowtag)))))
+       (storew* (logior (ash (1- words) n-widetag-bits) type)
+                result 0 lowtag (not stack-allocate-p))))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

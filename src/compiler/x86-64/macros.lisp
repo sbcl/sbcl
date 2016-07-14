@@ -49,14 +49,13 @@
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
-(defmacro storew (value ptr &optional (slot 0) (lowtag 0))
-  (once-only ((value value))
-    `(cond ((and (integerp ,value)
-                 (not (typep ,value '(signed-byte 32))))
-            (inst mov temp-reg-tn ,value)
-            (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) temp-reg-tn))
-           (t
-            (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))))
+(defun storew (value ptr &optional (slot 0) (lowtag 0))
+  (cond ((and (integerp value)
+              (not (typep value '(signed-byte 32))))
+         (inst mov temp-reg-tn value)
+         (inst mov (make-ea-for-object-slot ptr slot lowtag) temp-reg-tn))
+        (t
+         (inst mov (make-ea-for-object-slot ptr slot lowtag) value))))
 
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
   `(inst push (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
