@@ -444,7 +444,7 @@
                              .pv. instance-slots 0
                              (slot-value instance slot-name))))))))
        (setf (getf (getf initargs 'plist) :slot-name-lists)
-             (list (list nil slot-name)))
+             (list (list slot-name)))
        initargs))
     ((:custom :accessor)
      (let* ((initargs (copy-tree
@@ -454,7 +454,7 @@
                                         (instance) nil)
                             (instance-read-custom .pv. 0 instance)))))))
        (setf (getf (getf initargs 'plist) :slot-name-lists)
-             (list (list nil slot-name)))
+             (list (list slot-name)))
        initargs))))
 
 (defun make-std-writer-method-function (class-or-name slot-name)
@@ -479,7 +479,7 @@
                                   .pv. instance-slots 0 nv
                                   (setf (slot-value instance slot-name) .good-new-value.)))))))))
          (setf (getf (getf initargs 'plist) :slot-name-lists)
-               (list nil (list nil slot-name)))
+               (list nil (list slot-name)))
          initargs))
      ((:custom :accessor)
       (let ((initargs (copy-tree
@@ -489,7 +489,7 @@
                                         (instance) nil)
                             (instance-write-custom .pv. 0 instance nv)))))))
         (setf (getf (getf initargs 'plist) :slot-name-lists)
-              (list nil (list nil slot-name)))
+              (list nil (list slot-name)))
         initargs)))))
 
 (defun make-std-boundp-method-function (class-or-name slot-name)
@@ -504,7 +504,7 @@
                             .pv. instance-slots 0
                             (slot-boundp instance slot-name))))))))
        (setf (getf (getf initargs 'plist) :slot-name-lists)
-             (list (list nil slot-name)))
+             (list (list slot-name)))
        initargs))
     ((:custom :accessor)
      (let ((initargs (copy-tree
@@ -514,7 +514,7 @@
                                        (instance) nil)
                            (instance-boundp-custom .pv. 0 instance)))))))
        (setf (getf (getf initargs 'plist) :slot-name-lists)
-             (list (list nil slot-name)))
+             (list (list slot-name)))
        initargs))))
 
 ;;;; FINDING SLOT DEFINITIONS

@@ -63,20 +63,13 @@
 
 (defun intern-pv-table (&key slot-name-lists)
   (flet ((intern-slot-names (slot-names)
-           ;; FIXME: NIL at the head of the list is a remnant from
-           ;; old purged code, that hasn't been quite cleaned up yet.
-           ;; ...but as long as we assume it is there, we may as well
-           ;; assert it.
-           (aver (not (car slot-names)))
            (or (gethash slot-names *slot-name-lists*)
                (setf (gethash slot-names *slot-name-lists*) slot-names)))
          (%intern-pv-table (snl)
            (or (gethash snl *pv-tables*)
                (setf (gethash snl *pv-tables*)
                      (make-pv-table :slot-name-lists snl
-                                    :pv-size (* 2 (reduce #'+ snl
-                                                          :key (lambda (slots)
-                                                                 (length (cdr slots))))))))))
+                                    :pv-size (* 2 (reduce #'+ snl :key #'length)))))))
     (sb-thread:with-mutex (*pv-lock*)
       (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
@@ -105,7 +98,7 @@
         (let* ((wrapper (pop wrappers))
                (std-p (layout-for-std-class-p wrapper))
                (class (wrapper-class* wrapper)))
-          (dolist (slot-name (cdr slot-names))
+          (dolist (slot-name slot-names)
             (let ((cell
                     (or (find-slot-cell wrapper slot-name)
                         (cons nil (slot-missing-info class slot-name)))))
@@ -533,7 +526,7 @@
 (defun slot-name-lists-from-slots (slots)
   (mapcar (lambda (parameter-entry)
             (when (cdr parameter-entry)
-              (cons nil (mapcar #'car (cdr parameter-entry)))))
+              (mapcar #'car (cdr parameter-entry))))
           (mutate-slots slots)))
 
 (defun mutate-slots (slots)
