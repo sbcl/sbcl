@@ -555,7 +555,8 @@
 (defun sort-slots (slots)
   (mapcar (lambda (parameter-entry)
             (destructuring-bind (name . entries) parameter-entry
-              (cons name (sort entries #'symbol-or-cons-lessp :key #'car))))
+              (cons name (stable-sort entries #'symbol-or-cons-lessp
+                                      :key #'car))))
           slots))
 
 
