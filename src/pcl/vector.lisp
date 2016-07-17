@@ -91,28 +91,23 @@
              new-value)))
 
 (defun compute-pv (slot-name-lists wrappers)
-  (let ((wrappers (ensure-list wrappers))
-        elements)
-    (dolist (slot-names slot-name-lists)
-      (when slot-names
-        (let* ((wrapper (pop wrappers))
-               (std-p (layout-for-std-class-p wrapper))
-               (class (wrapper-class* wrapper)))
-          (dolist (slot-name slot-names)
-            (let ((cell
-                    (or (find-slot-cell wrapper slot-name)
-                        (cons nil (slot-missing-info class slot-name)))))
-              (push (when (and std-p (use-standard-slot-access-p class slot-name 'all))
-                      (car cell))
-                    elements)
-              (push (or (cdr cell)
-                        (bug "No SLOT-INFO for ~S in ~S" slot-name class))
-                    elements))))))
-    (let* ((n (length elements))
-           (pv (make-array n)))
-      (loop for i from (1- n) downto 0
-            do (setf (svref pv i) (pop elements)))
-      pv)))
+  (let ((wrappers (ensure-list wrappers)))
+    (collect ((pv))
+      (dolist (slot-names slot-name-lists)
+        (when slot-names
+          (let* ((wrapper (pop wrappers))
+                 (std-p (layout-for-std-class-p wrapper))
+                 (class (wrapper-class* wrapper)))
+            (dolist (slot-name slot-names)
+              (destructuring-bind (location . info)
+                  (or (find-slot-cell wrapper slot-name)
+                      (cons nil (slot-missing-info class slot-name)))
+                (unless info
+                  (bug "No SLOT-INFO for ~S in ~S" slot-name class))
+                (pv (when (and std-p (use-standard-slot-access-p class slot-name 'all))
+                      location))
+                (pv info))))))
+      (coerce (pv) 'vector))))
 
 (defun pv-table-lookup (pv-table pv-wrappers)
   (let* ((slot-name-lists (pv-table-slot-name-lists pv-table))
@@ -835,8 +830,7 @@
   (pv-table-lookup pv-table (pv-wrappers-from-pv-args pv-parameters)))
 
 (defun pv-wrappers-from-pv-args (&rest args)
-  (loop for arg in args
-        collect (valid-wrapper-of arg)))
+  (mapcar #'valid-wrapper-of args))
 
 (defun pv-wrappers-from-all-args (pv-table args)
   (loop for snl in (pv-table-slot-name-lists pv-table)
@@ -847,6 +841,7 @@
 ;;; Return the subset of WRAPPERS which is used in the cache
 ;;; of PV-TABLE.
 (defun pv-wrappers-from-all-wrappers (pv-table wrappers)
-  (loop for snl in (pv-table-slot-name-lists pv-table) and w in wrappers
+  (loop for snl in (pv-table-slot-name-lists pv-table)
+        and w in wrappers
         when snl
         collect w))
