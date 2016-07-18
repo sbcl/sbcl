@@ -280,8 +280,6 @@
 
   ;; uid, gid
   (define-call "geteuid" uid-t never-fails) ; "always successful", it says
-  #-sunos
-  (define-call "getresuid" uid-t never-fails)
   (define-call "getuid" uid-t never-fails)
   (define-call "seteuid" int minusp (uid uid-t))
   #-sunos
@@ -293,7 +291,31 @@
   (define-call "getegid" gid-t never-fails)
   (define-call "getgid" gid-t never-fails)
   #-sunos
-  (define-call "getresgid" gid-t never-fails)
+  (progn
+    (export '(getresgid getresuid) :sb-posix)
+    (declaim (inline getresgid getresuid))
+    (defun getresgid ()
+      (with-alien ((rgid gid-t)
+                   (egid gid-t)
+                   (sgid gid-t))
+        (let ((r
+                (alien-funcall (extern-alien "getresgid"
+                                             (function int (* gid-t) (* gid-t) (* gid-t)))
+                               (addr rgid) (addr egid) (addr sgid))))
+          (if (minusp r)
+              (syscall-error 'getresgid)
+              (values rgid egid sgid)))))
+    (defun getresuid ()
+      (with-alien ((ruid uid-t)
+                   (euid uid-t)
+                   (suid uid-t))
+        (let ((r
+                (alien-funcall (extern-alien "getresuid"
+                                             (function int (* uid-t) (* uid-t) (* uid-t)))
+                               (addr ruid) (addr euid) (addr suid))))
+          (if (minusp r)
+              (syscall-error 'getresuid)
+              (values ruid euid suid))))))
   (define-call "setegid" int minusp (gid gid-t))
   #-sunos
   (define-call "setfsgid" int minusp (gid gid-t))
