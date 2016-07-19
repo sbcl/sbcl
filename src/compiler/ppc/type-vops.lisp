@@ -203,5 +203,5 @@
   (:info target not-p widetags)
   (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
   (:generator 15 ; arbitrary
-    (%test-headers value target not-p nil (canonicalize-headers widetags)
+    (%test-headers value target not-p nil (canonicalize-widetags widetags)
                    :temp temp)))

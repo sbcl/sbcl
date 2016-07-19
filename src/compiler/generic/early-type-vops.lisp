@@ -25,7 +25,7 @@
 ;;        in an ad-hoc way by each backend. The range convention should be
 ;;        changed to indicate explicitly when either limit needn't be checked.
 ;;        (Use NIL or * as a bound perhaps)
-(defun canonicalize-headers (headers)
+(defun canonicalize-widetags (headers)
   (collect ((results))
     (let ((start nil)
           (prev nil)
@@ -54,17 +54,27 @@
 ;; or return the unmodified ranges and NIL.
 ;; This could be generalized: three ranges that collapse to one with at most
 ;; two exceptions, or three collapsing to two with one exception, etc.
-(defun canonicalize-headers-and-exceptions (widetags)
-  (let ((ranges (canonicalize-headers widetags)))
-    (if (and (cdr ranges) (endp (cddr ranges))
-             (listp (car ranges)) (listp (cadr ranges)) ; 2 ranges
-             (let ((end-range-1 (cdar ranges))
-                   (start-range-2 (caadr ranges)))
-               (= start-range-2 (+ end-range-1 8))))
-        ;; Return ((start-range-1 . end-range-2))
-        (values (list (cons (caar ranges) (cdadr ranges)))
-                (list (+ (cdar ranges) 4))) ; the excluded value
-        (values ranges nil))))
+(defun canonicalize-widetags+exceptions (widetags)
+  (let ((ranges (canonicalize-widetags widetags)))
+    (flet ((begin (x) (if (listp x) (car x) x))
+           (end (x) (if (listp x) (cdr x) x)))
+      (when (and (cdr ranges) (endp (cddr ranges))) ; 2 ranges
+        (let* ((range-1 (first ranges))
+               (range-2 (second ranges))
+               (begin-1 (begin range-1))
+               (end-1 (end range-1))
+               (begin-2 (begin range-2))
+               (end-2 (end range-2))
+               (delta (- other-immediate-1-lowtag other-immediate-0-lowtag)))
+          (when (and (= (+ end-1 (* 2 delta)) begin-2)
+                     ;; Don't return {X} - {Y} if {X} spans only 3 widetags,
+                     ;; because clearly we can just test the 2 members of X.
+                     ;; fencepost: 3 delta is 4 widetags.
+                     (>= (- end-2 begin-1) (* 3 delta)))
+            (return-from canonicalize-widetags+exceptions
+              (values `((,begin-1 . ,end-2))
+                      `(,(+ end-1 delta)))))))) ; the excluded value
+    (values ranges nil)))
 
 (defmacro test-type (value target not-p
                      (&rest type-codes)
@@ -115,7 +125,7 @@
          ((and (= n-word-bits 64) immediates headers)
           `(%test-fixnum-immediate-and-headers ,value ,target ,not-p
                                                ,(car immediates)
-                                               ',(canonicalize-headers
+                                               ',(canonicalize-widetags
                                                   headers)
                                                ,@other-args))
          (immediates
@@ -126,7 +136,7 @@
               (error "can't mix fixnum testing with other immediates")))
          (headers
           `(%test-fixnum-and-headers ,value ,target ,not-p
-                                     ',(canonicalize-headers headers)
+                                     ',(canonicalize-widetags headers)
                                      ,@other-args))
          (t
           `(%test-fixnum ,value ,target ,not-p
@@ -137,7 +147,7 @@
           (if (= n-word-bits 64)
               `(%test-immediate-and-headers ,value ,target ,not-p
                                             ,(car immediates)
-                                            ',(canonicalize-headers headers)
+                                            ',(canonicalize-widetags headers)
                                             ,@other-args)
               (error "can't mix testing of immediates with testing of headers")))
          (lowtags
@@ -155,7 +165,7 @@
        `(%test-lowtag ,value ,target ,not-p ,(car lowtags) ,@other-args))
       (headers
        `(%test-headers ,value ,target ,not-p ,function-p
-         ',(canonicalize-headers headers)
+         ',(canonicalize-widetags headers)
          ,@other-args))
       (t
        (error "nothing to test?")))))

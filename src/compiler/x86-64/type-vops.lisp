@@ -400,6 +400,6 @@
   (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
   (:generator 15 ; arbitrary
     (multiple-value-bind (headers exceptions)
-        (canonicalize-headers-and-exceptions widetags)
+        (canonicalize-widetags+exceptions widetags)
       (%test-headers value target not-p nil headers
                      :except exceptions))))
