@@ -3070,7 +3070,8 @@ used for a COMPLEX component.~:@>"
   (labels ((process-compound-type (types)
              (let (dimensions)
                (dolist (type types)
-                 (unless (hairy-type-p type)
+                 (unless (or (hairy-type-p type)
+                             (negation-type-p type))
                    (let ((current-dimensions (determine type)))
                      (cond ((eq current-dimensions '*)
                             (return-from ctype-array-dimensions '*))
@@ -3106,7 +3107,8 @@ used for a COMPLEX component.~:@>"
   (let (types)
     (labels ((process-compound-type (types)
                (loop for type in types
-                     unless (hairy-type-p type)
+                     unless (or (hairy-type-p type)
+                                (negation-type-p type))
                      do (determine type)))
              (determine (type)
                (etypecase type
@@ -3132,8 +3134,9 @@ used for a COMPLEX component.~:@>"
          (csubtypep ctype string-ctype)
          (let ((types (copy-list (union-type-types string-ctype))))
            (and (loop for type in (union-type-types ctype)
-                      for matching = (find type types
-                                           :test #'csubtypep)
+                      for matching = (and (array-type-p type)
+                                          (find type types
+                                                :test #'csubtypep))
                       always matching
                       do (setf types (delete matching types)))
                 (null types)))

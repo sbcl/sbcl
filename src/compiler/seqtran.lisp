@@ -1491,7 +1491,7 @@
          (list-type (specifier-type 'list)))
     (flet ((bad ()
              (let ((*compiler-error-context* node))
-               (compiler-warn "Bad bounding indeces ~s, ~s for ~s"
+               (compiler-warn "Bad bounding indices ~s, ~s for ~s"
                               constant-start constant-end (type-specifier sequence-type)))))
       (cond ((and index-length
                   (minusp index-length))

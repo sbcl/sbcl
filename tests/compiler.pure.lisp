@@ -5889,4 +5889,24 @@
                     '(lambda (x)
                       (subseq (the (simple-vector 3) x) 1)))
                    #(1 2 3))
-          #(2 3))))
+           #(2 3))))
+
+(with-test (:name :sequence-derive-type)
+  (assert
+   (equalp (funcall (checked-compile
+                     '(lambda (x)
+                       (copy-seq (the (and string (not (simple-array nil))) x))))
+                    (make-array 3 :element-type 'character
+                                  :fill-pointer 2
+                                  :initial-contents "123"))
+           "12")))
+
+(with-test (:name :sequence-derive-type.2)
+  (assert
+   (funcall (checked-compile
+             '(lambda (x y)
+               (equal (the (and string (not (simple-array nil))) x) y)))
+            (make-array 3 :element-type 'character
+                          :fill-pointer 2
+                          :initial-contents "123")
+            "12")))

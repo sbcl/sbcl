@@ -807,7 +807,7 @@
         t))))
 
 ;;; Drops dimension information from vector types.
-;;; Returns either three values
+;;; Returns four values
 ;;; * vector ctype
 ;;; * upgraded-element ctype or requsted element
 ;;; * T if the upgraded-element is upgraded, i.e. it
@@ -820,7 +820,8 @@
                    (upgraded t)
                    dimensions-removed)
                (dolist (type types)
-                 (unless (hairy-type-p type)
+                 (unless (or (hairy-type-p type)
+                             (sb!kernel::negation-type-p type))
                    (multiple-value-bind (type et upgraded dimensions) (simplify type)
                      (push type array-types)
                      (push et element-types)
