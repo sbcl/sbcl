@@ -1,12 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.3.7:
+  * minor incompatible change: the system now understands that the CONDITION
+    type is disjoint with many other system types.
+  * minor incompatible change: argument types in condition report functions
+    are now declared (in combination with the above change, this can result in
+    early detection of erroneous code).
   * enhancement: simple arrays of any rank can be stack-allocated
     on platforms supporting stack allocation of vectors.
   * optimization: improved type derivation for FIND, POSITION, COUNT, SEARCH,
     MISMATCH and other array and sequence functions.
   * optimization: ALLOCATE-INSTANCE is now as fast as MAKE-INSTANCE.
   * optimization: more efficient CHANGE-CLASS.
+  * bug fix: versions of getresuid() and getresgid() in SB-POSIX no longer
+    cause memory faults, and should work properly (lp#1603806, reported by
+    Kieran Grant)
+  * bug fix: handle ENOENT from getprotobyname() (lp#1596043, reported by
+    Stephen Hassard)
 
 changes in sbcl-1.3.7 relative to sbcl-1.3.6:
   * bug fix: preserve the name of the destructive function for the destroyed
