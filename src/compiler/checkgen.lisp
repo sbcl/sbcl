@@ -198,7 +198,7 @@
 ;;; of types that we are checking its values against. If we have
 ;;; proven that LVAR generates a fixed number of values, then for each
 ;;; value, we check whether it is cheaper to then difference between
-;;; the proven type and the corresponding type in TYPES. 
+;;; the proven type and the corresponding type in TYPES.
 (defun maybe-negate-check (lvar types original-types n-required)
   (declare (type lvar lvar) (list types original-types))
   (let ((ptypes (values-type-out (lvar-derived-type lvar) (length types))))

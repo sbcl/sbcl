@@ -1491,8 +1491,9 @@
          (list-type (specifier-type 'list)))
     (flet ((bad ()
              (let ((*compiler-error-context* node))
-               (compiler-warn "Bad bounding indices ~s, ~s for ~s"
-                              constant-start constant-end (type-specifier sequence-type)))))
+               (compiler-warn "Bad bounding indices ~s, ~s for ~
+                               ~/sb!impl:print-type/"
+                              constant-start constant-end sequence-type))))
       (cond ((and index-length
                   (minusp index-length))
              ;; Would be a good idea to transform to something like
