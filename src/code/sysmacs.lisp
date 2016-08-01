@@ -25,6 +25,11 @@
 #!+sb-thread
 (!defvar *stop-for-gc-pending* nil)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (symbol '(*gc-inhibit* *in-without-gcing*
+                    *gc-pending* *stop-for-gc-pending*))
+    (setf (info :variable :always-bound symbol) :always-bound)))
+
 ;;; This one is initialized by the runtime, at thread creation.  On
 ;;; non-x86oid gencgc targets, this is a per-thread list of objects
 ;;; which must not be moved during GC.  It is frobbed by the code for

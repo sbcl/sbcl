@@ -237,3 +237,19 @@
 (defun double-float-low-bits (x) (double-float-low-bits x))
 
 (defun value-cell-ref (x) (value-cell-ref x))
+
+;;; A unique GC id. This is supplied for code that needs to detect
+;;; whether a GC has happened since some earlier point in time. For
+;;; example:
+;;;
+;;;   (let ((epoch *gc-epoch*))
+;;;      ...
+;;;      (unless (eql epoch *gc-epoch)
+;;;        ....))
+;;;
+;;; This isn't just a fixnum counter since then we'd have theoretical
+;;; problems when exactly 2^29 GCs happen between epoch
+;;; comparisons. Unlikely, but the cost of using a cons instead is too
+;;; small to measure. -- JES, 2007-09-30
+(declaim (type cons *gc-epoch*))
+(!defglobal *gc-epoch* '(nil . nil))
