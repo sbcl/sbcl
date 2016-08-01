@@ -758,9 +758,10 @@ if there is no such entry. Entries can be added using SETF."
 ;;; Three argument version of GETHASH
 (defun gethash3 (key hash-table default)
   (declare (type hash-table hash-table))
-  (with-hash-table-locks (hash-table :operation :read :inline (%gethash3)
-                                     :pin (key))
-    (%gethash3 key hash-table default)))
+  (truly-the (values t boolean)
+             (with-hash-table-locks (hash-table :operation :read :inline (%gethash3)
+                                                :pin (key))
+               (%gethash3 key hash-table default))))
 
 ;;; so people can call #'(SETF GETHASH)
 ;;; FIXME: this function is not mandated. Why do we have it?
