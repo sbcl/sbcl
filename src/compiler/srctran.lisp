@@ -5004,3 +5004,14 @@
   `(ash (sap-ref-32 (int-sap (get-lisp-obj-address (the symbol ,sym)))
                     (- 4 sb!vm:other-pointer-lowtag))
         (- sb!vm:n-fixnum-tag-bits)))
+
+(deftransform make-string-output-stream ((&key element-type))
+  (let ((element-type (cond ((not element-type)
+                             'character)
+                            ((constant-lvar-p element-type)
+                             (let ((specifier (careful-specifier-type (lvar-value element-type))))
+                               (and (csubtypep specifier (specifier-type 'character))
+                                    (type-specifier specifier)))))))
+   (if element-type
+       `(sb!impl::%make-string-output-stream ',element-type)
+       (give-up-ir1-transform))))

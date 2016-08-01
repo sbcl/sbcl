@@ -205,10 +205,9 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; This produces the printed representation of an object as a string.
 ;;; The few ...-TO-STRING functions above call this.
 (defun stringify-object (object)
-  (let ((stream (make-string-output-stream)))
+  (with-simple-output-to-string (stream)
     (setup-printer-state)
-    (output-object object stream)
-    (get-output-stream-string stream)))
+    (output-object object stream)))
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 

@@ -1341,7 +1341,7 @@
 ;;;; string-output-streams with element-type base-char. This would
 ;;;; mean either a separate subclass, or typecases in functions.
 
-(defparameter *string-output-stream-buffer-initial-size* 64)
+(defconstant +string-output-stream-buffer-initial-size+ 64)
 
 (defstruct (string-output-stream
             (:include ansi-stream
@@ -1353,7 +1353,7 @@
             (:predicate nil))
   ;; The string we throw stuff in.
   (buffer (make-string
-           *string-output-stream-buffer-initial-size*)
+           +string-output-stream-buffer-initial-size+)
    :type (simple-array character (*)))
   ;; Chains of buffers to use
   (prev nil :type list)
