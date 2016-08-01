@@ -1805,8 +1805,6 @@
 
 (defvar *assembler-routines-by-addr* nil)
 
-(defvar *foreign-symbols-by-addr* nil)
-
 ;;; Build an address-name hash-table from the name-address hash
 (defun invert-address-hash (htable &optional (addr-hash (make-hash-table)))
   (maphash (lambda (name address)
