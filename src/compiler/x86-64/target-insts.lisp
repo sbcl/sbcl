@@ -237,7 +237,11 @@
                (princ16 offset stream)
                (or (minusp offset)
                    (nth-value 1 (note-code-constant-absolute offset dstate))
-                   (maybe-note-assembler-routine offset nil dstate)))
+                   (maybe-note-assembler-routine offset nil dstate)
+                   ;; Static symbols coming frorm CELL-REF
+                   (maybe-note-static-symbol (+ offset (- other-pointer-lowtag
+                                                          n-word-bytes))
+                                             dstate)))
             (t
              (princ offset stream)))))))
   (write-char #\] stream)

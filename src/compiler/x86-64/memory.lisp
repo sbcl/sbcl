@@ -19,12 +19,19 @@
 ;;; SETF function (new value first, as apposed to a SETF macro, which
 ;;; takes the new value last).
 (define-vop (cell-ref)
-  (:args (object :scs (descriptor-reg)))
+  (:args (object :scs (descriptor-reg)
+                 :load-if (not (and (sc-is object immediate)
+                                    (symbolp (tn-value object))))))
   (:results (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (loadw value object offset lowtag)))
+    (if (sc-is object immediate)
+        (inst mov value
+              (make-ea :qword :disp
+                       (+ nil-value (static-symbol-offset (tn-value object))
+                          (- (* offset n-word-bytes) lowtag))))
+        (loadw value object offset lowtag))))
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
