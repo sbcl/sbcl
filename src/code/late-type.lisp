@@ -544,10 +544,10 @@
                        do (res type))))
           (process-types (values-type-required type))
           (process-types (values-type-optional type))
-          (when (plusp count)
-            (loop with rest = (the ctype (values-type-rest type))
-                  repeat count
-                  do (res rest))))
+          (let ((rest (values-type-rest type)))
+            (when rest
+              (loop repeat count
+                    do (res rest)))))
         (res))))
 
 ;;; types of variable in (m-v-bind (v_1 ... v_n) (the <type> ...

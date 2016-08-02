@@ -5910,3 +5910,9 @@
                           :fill-pointer 2
                           :initial-contents "123")
             "12")))
+
+(with-test (:name :not-enough-values-cast)
+  (assert
+   (not (funcall (checked-compile
+                  `(lambda ()
+                     (car (describe 1 (make-broadcast-stream)))))))))
