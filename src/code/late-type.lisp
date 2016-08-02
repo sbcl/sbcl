@@ -528,8 +528,8 @@
       (values nil *universal-type*)
       (values (append (args-type-required type)
                       (args-type-optional type))
-              (cond ((args-type-rest type))
-                    (t default-type)))))
+              (or (args-type-rest type)
+                  default-type))))
 
 ;;; types of values in (the <type> (values o_1 ... o_n))
 (defun values-type-out (type count)

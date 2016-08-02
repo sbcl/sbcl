@@ -198,10 +198,7 @@
 ;;; of types that we are checking its values against. If we have
 ;;; proven that LVAR generates a fixed number of values, then for each
 ;;; value, we check whether it is cheaper to then difference between
-;;; the proven type and the corresponding type in TYPES. If so, we opt
-;;; for a :HAIRY check with that test negated. Otherwise, we try to do
-;;; a simple test, and if that is impossible, we do a hairy test with
-;;; non-negated types. If true, FORCE-HAIRY forces a hairy type check.
+;;; the proven type and the corresponding type in TYPES. 
 (defun maybe-negate-check (lvar types original-types n-required)
   (declare (type lvar lvar) (list types original-types))
   (let ((ptypes (values-type-out (lvar-derived-type lvar) (length types))))
@@ -274,11 +271,10 @@
                            ((args-type-optional type)
                             (car it))
                            (t (bug "type ~S is too hairy" type)))))
-             (multiple-value-bind (ctype atype)
-                 (values (get-type ctype) (get-type atype))
-               (values :simple (maybe-negate-check value
-                                                   (list ctype) (list atype)
-                                                   n-required)))))
+             (values :simple (maybe-negate-check value
+                                                 (list (get-type ctype))
+                                                 (list (get-type atype))
+                                                 n-required))))
           ((and (mv-combination-p dest)
                 (eq (mv-combination-kind dest) :local))
            ;; we know the number of consumed values
