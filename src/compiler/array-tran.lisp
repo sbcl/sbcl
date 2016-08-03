@@ -1259,10 +1259,8 @@
            (cond ,@(and (not array-header-p)
                         `(((not (array-header-p ,n-array))
                            (let ((,n-array ,n-array))
-                             (declare (type (simple-array * (*)) ,n-array))
-                             ,(once-only ((n-len (if check-fill-pointer
-                                                     `(length ,n-array)
-                                                     `(array-total-size ,n-array)))
+                             (declare (type vector ,n-array))
+                             ,(once-only ((n-len `(length ,n-array))
                                           (n-end `(or ,n-evalue ,n-len)))
                                 (if check-bounds
                                     `(if (<= 0 ,n-svalue ,n-end ,n-len)
