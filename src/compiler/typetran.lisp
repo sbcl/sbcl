@@ -830,7 +830,9 @@
                      (unless upgraded
                        (setf upgraded nil)))))
                (values (apply #'type-union array-types)
-                       (apply #'type-union element-types)
+                       (if (member *wild-type* element-types)
+                           *wild-type*
+                           (apply #'type-union element-types))
                        upgraded
                        dimensions-removed)))
            (simplify (type)

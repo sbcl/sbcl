@@ -5911,6 +5911,14 @@
                           :initial-contents "123")
             "12")))
 
+(with-test (:name :sequence-derive-type.3)
+  (assert
+   (equalp (funcall (checked-compile
+                     '(lambda (x)
+                       (subseq (the (or (simple-array * (*)) string) x)  0 2)))
+                    #(1 2 3))
+           #(1 2))))
+
 (with-test (:name :not-enough-values-cast)
   (assert
    (not (funcall (checked-compile
