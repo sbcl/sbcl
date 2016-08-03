@@ -1664,6 +1664,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (declare (ignore var))
   (vop unbind node block))
 
+#!+(and sb-thread unbind-n-vop)
+(defoptimizer (%special-unbind-n ir2-convert) ((n) node block)
+  (vop unbind-n node block (lvar-value n)))
+
 ;;; ### It's not clear that this really belongs in this file, or
 ;;; should really be done this way, but this is the least violation of
 ;;; abstraction in the current setup. We don't want to wire

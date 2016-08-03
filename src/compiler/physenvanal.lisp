@@ -512,13 +512,25 @@
             (:dynamic-extent
              (when (cleanup-info cleanup)
                (code `(%cleanup-point))))))))
-
-    (when (code)
-      (aver (not (node-tail-p (block-last block1))))
-      (insert-cleanup-code
-       block1 block2 (block-last block1) `(progn ,@(code)))
-      (dolist (fun (reanalyze-funs))
-        (locall-analyze-fun-1 fun))))
+    (flet ((coalesce-unbinds (code)
+             code
+             #!+(and sb-thread unbind-n-vop)
+             (loop with cleanup
+                   while code
+                   do (setf cleanup (pop code))
+                   collect (if (and (eq (car cleanup) '%special-unbind)
+                                    (eq (caar code) '%special-unbind))
+                               `(%special-unbind-n
+                                 ,(1+ (loop while (eq (caar code) '%special-unbind)
+                                            do (pop code)
+                                            count t)))
+                               cleanup))))
+     (when (code)
+       (aver (not (node-tail-p (block-last block1))))
+       (insert-cleanup-code
+        block1 block2 (block-last block1) `(progn ,@(coalesce-unbinds (code))))
+       (dolist (fun (reanalyze-funs))
+         (locall-analyze-fun-1 fun)))))
 
   (values))
 

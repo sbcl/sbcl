@@ -445,6 +445,28 @@
     (storew temp bsp binding-value-slot)
     (store-binding-stack-pointer bsp)))
 
+#!+sb-thread
+(define-vop (unbind-n)
+  (:temporary (:sc unsigned-reg) temp bsp tls-index zero)
+  (:info n)
+  (:generator 0
+    (let ()
+      (load-binding-stack-pointer bsp)
+      (zeroize zero)
+      (loop repeat n
+            do
+            (inst sub bsp (* binding-size n-word-bytes))
+            ;; Load TLS-INDEX of the SYMBOL from stack
+            (loadw tls-index bsp binding-symbol-slot)
+            ;; Load VALUE from stack, then restore it to the TLS area.
+            (loadw temp bsp binding-value-slot)
+            (inst mov (make-ea :qword :base thread-base-tn :index tls-index)
+                  temp)
+            ;; Zero out the stack.
+            (storew zero bsp binding-symbol-slot)
+            (storew zero bsp binding-value-slot))
+      (store-binding-stack-pointer bsp))))
+
 #!-sb-thread
 (define-vop (unbind)
   (:temporary (:sc unsigned-reg) symbol value bsp)
