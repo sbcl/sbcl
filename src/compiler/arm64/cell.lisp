@@ -313,19 +313,22 @@
       (inst str value (@ thread-tn tls-index))))
 
   (define-vop (unbind)
+    (:info n)
     (:temporary (:sc descriptor-reg) value)
     (:temporary (:sc any-reg) tls-index bsp)
     (:generator 0
       (load-binding-stack-pointer bsp)
-      (inst ldp value tls-index (@ bsp (* (- binding-value-slot binding-size)
-                                          n-word-bytes)))
-      (inst str value (@ thread-tn tls-index))
+      (loop repeat n
+            do
+            (inst ldp value tls-index (@ bsp (* (- binding-value-slot binding-size)
+                                                n-word-bytes)))
+            (inst str value (@ thread-tn tls-index))
 
-      ;; The order of stores here is reversed with respect to interrupt safety,
-      ;; but STP cannot be interrupted in the middle.
-      (inst stp zr-tn zr-tn (@ bsp (* (- binding-value-slot binding-size)
-                                      n-word-bytes)
-                                   :pre-index))
+            ;; The order of stores here is reversed with respect to interrupt safety,
+            ;; but STP cannot be interrupted in the middle.
+            (inst stp zr-tn zr-tn (@ bsp (* (- binding-value-slot binding-size)
+                                            n-word-bytes)
+                                         :pre-index)))
       (store-binding-stack-pointer bsp))))
 
 (define-vop (unbind-to-here)

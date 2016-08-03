@@ -741,7 +741,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :unbind-n-vop :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :compare-and-swap-vops :memory-barrier-vops' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
