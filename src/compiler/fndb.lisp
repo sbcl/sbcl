@@ -1578,9 +1578,7 @@
 
 (defknown %cleanup-point () t)
 (defknown %special-bind (t t) t)
-(defknown %special-unbind (t) t)
-#!+(and sb-thread unbind-n-vop)
-(defknown %special-unbind-n (index) t)
+(defknown %special-unbind (index) t)
 (defknown %listify-rest-args (t index) list (flushable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t)

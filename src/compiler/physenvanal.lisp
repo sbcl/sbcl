@@ -498,7 +498,7 @@
                        (basic-combination-args node))))
           (ecase (cleanup-kind cleanup)
             (:special-bind
-             (code `(%special-unbind ',(lvar-value (first args)))))
+             (code `(%special-unbind 1)))
             (:catch
              (code `(%catch-breakup)))
             (:unwind-protect
@@ -518,9 +518,8 @@
              (loop with cleanup
                    while code
                    do (setf cleanup (pop code))
-                   collect (if (and (eq (car cleanup) '%special-unbind)
-                                    (eq (caar code) '%special-unbind))
-                               `(%special-unbind-n
+                   collect (if (eq (car cleanup) '%special-unbind)
+                               `(%special-unbind
                                  ,(1+ (loop while (eq (caar code) '%special-unbind)
                                             do (pop code)
                                             count t)))

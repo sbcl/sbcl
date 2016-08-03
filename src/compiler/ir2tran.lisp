@@ -1660,13 +1660,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
        (vop dynbind node block (lvar-tn node block value)
             (emit-constant name))))))
 
-(defoptimizer (%special-unbind ir2-convert) ((var) node block)
-  (declare (ignore var))
-  (vop unbind node block))
-
-#!+(and sb-thread unbind-n-vop)
-(defoptimizer (%special-unbind-n ir2-convert) ((n) node block)
-  (vop unbind-n node block (lvar-value n)))
+(defoptimizer (%special-unbind ir2-convert) ((n) node block)
+  (declare (ignorable n))
+  (vop unbind node block #!+(and sb-thread unbind-n-vop) (lvar-value n)))
 
 ;;; ### It's not clear that this really belongs in this file, or
 ;;; should really be done this way, but this is the least violation of
