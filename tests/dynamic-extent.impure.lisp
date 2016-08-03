@@ -707,11 +707,15 @@
 
 (with-test (:name (:no-consing :dx-arrays) :skipped-on '(not :stack-allocatable-vectors))
   (assert-no-consing (make-3d-fixed-array-on-stack-1))
-  (assert-no-consing (make-3d-fixed-array-on-stack-2 0 0 1 1))
   (assert-no-consing (make-2d-variable-array-on-stack))
   (assert-no-consing (make-2d-array-function-initializer 1))
   (assert-no-consing (make-2d-array-function-initializer 2))
   (assert-no-consing (make-2d-array-function-initializer 3)))
+
+(with-test (:name (:no-consing :dx-specialized-arrays)
+            :skipped-on '(not (and :stack-allocatable-vectors
+                                   :c-stack-is-control-stack)))
+  (assert-no-consing (make-3d-fixed-array-on-stack-2 0 0 1 1)))
 
 (with-test (:name (:no-consing :specialized-dx-vectors)
             :skipped-on `(not (and :stack-allocatable-vectors
