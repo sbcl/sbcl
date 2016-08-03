@@ -1264,11 +1264,13 @@
                                           (n-end `(or ,n-evalue ,n-len)))
                                 (if check-bounds
                                     `(if (<= 0 ,n-svalue ,n-end ,n-len)
-                                         (values ,n-array ,n-svalue ,n-end 0)
+                                         (values (truly-the simple-array ,n-array)
+                                                 ,n-svalue ,n-end 0)
                                          ,(if check-fill-pointer
                                               `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
                                               `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
-                                    `(values ,n-array ,n-svalue ,n-end 0)))))))
+                                    `(values (truly-the simple-array ,n-array)
+                                             ,n-svalue ,n-end 0)))))))
                  (t
                   ,(cond (force-inline
                           `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
