@@ -823,3 +823,13 @@ if a restart was invoked."
                 (equal
                  names
                  (list name2 name1))))))
+
+(with-test (:name (defpackage :local-nicknames :lock))
+  (destructuring-bind (name1 name2 name3)
+      (loop :repeat 3 :collect (string (gensym)))
+    (let ((package1 (eval `(defpackage ,name1)))
+          (package2 (eval `(defpackage ,name2
+                             (:local-nicknames (,name3 ,name1))
+                             (:lock t)))))
+      (assert (equal (package-local-nicknames package2) `((,name3 . ,package1))))
+      (assert (package-locked-p package2)))))

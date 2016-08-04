@@ -23,6 +23,10 @@
 
 (defpackage :test-unused)
 
+(defpackage :test-nicknamed)
+
+(defpackage :test-not-nicknamed)
+
 (defpackage :test-aux (:export #:noslot #:noslot2))
 
 (defpackage :test
@@ -80,6 +84,9 @@
       (unintern s)
       (intern (symbol-name s) :test))
     (rename-package (find-package :test) :test)
+    (dolist (nickname (package-local-nicknames :test))
+      (remove-package-local-nickname (car nickname) :test))
+    (add-package-local-nickname :nicknamed :test-nicknamed :test)
     (unexport (intern "INTERNAL" :test) :test)
     (intern *interned* :test)
     (use-package :test-used :test)
@@ -188,6 +195,8 @@
       (rename-package p :test '(:test-nick)))
     (use-package :test-unused :test)
     (unuse-package :test-used :test)
+    (add-package-local-nickname :not-nicknamed :test-not-nicknamed :test)
+    (remove-package-local-nickname :nicknamed :test)
     (shadow 'not-from-test :test)
     (unintern (or (find-symbol *interned* :test) (error "bugo")) :test)
     (delete-package :test-delete)
