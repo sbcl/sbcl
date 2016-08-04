@@ -277,8 +277,8 @@
                    :stack-allocate-p ,stack-allocate-p
                    :lip ,lip)
        (when ,type-code
-         (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
-         (inst add ,flag-tn ,flag-tn ,type-code)
+         (load-immediate-word ,flag-tn (+ (ash (1- ,size) n-widetag-bits)
+                                          ,type-code))
          (storew ,flag-tn ,result-tn 0 ,lowtag))
        ,@body)))
 
