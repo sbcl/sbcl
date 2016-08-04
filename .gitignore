@@ -36,6 +36,7 @@ src/runtime/sparc-funcdef.h
 tests/test-status.lisp-expr
 tests/*.so
 tests/run-tests-*
+tests/last-random-state.lisp-expr
 tools-for-build/determine-endianness
 tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
