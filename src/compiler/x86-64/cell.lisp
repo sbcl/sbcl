@@ -428,23 +428,25 @@
 
 #!+sb-thread
 (define-vop (unbind)
-  (:temporary (:sc unsigned-reg) temp bsp tls-index zero)
+  (:temporary (:sc unsigned-reg) temp bsp tls-index)
+  (:temporary (:sc complex-double-reg) zero)
   (:info n)
   (:generator 0
     (load-binding-stack-pointer bsp)
-    (zeroize zero)
+    (inst xorpd zero zero)
     (loop repeat n
           do
           (inst sub bsp (* binding-size n-word-bytes))
           ;; Load TLS-INDEX of the SYMBOL from stack
-          (loadw tls-index bsp binding-symbol-slot)
+          (inst mov (reg-in-size tls-index :dword)
+                (make-ea :dword :base bsp :disp (* binding-symbol-slot n-word-bytes)))
+
           ;; Load VALUE from stack, then restore it to the TLS area.
           (loadw temp bsp binding-value-slot)
           (inst mov (make-ea :qword :base thread-base-tn :index tls-index)
                 temp)
           ;; Zero out the stack.
-          (storew zero bsp binding-symbol-slot)
-          (storew zero bsp binding-value-slot))
+          (inst movapd (make-ea :qword :base bsp) zero))
     (store-binding-stack-pointer bsp)))
 
 #!-sb-thread
