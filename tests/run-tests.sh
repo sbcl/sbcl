@@ -20,7 +20,7 @@ Usage: $0 [OPTIONS] [files]
 Options:
 
   --evaluator-mode              Either compile or interpret. Set the
-                                value SB-EXT:*EVALUATOR-MODE* while
+                                value of SB-EXT:*EVALUATOR-MODE* while
                                 running tests.
   --break-on-failure            Break into the debugger when a test fails
                                 unexpectedly
