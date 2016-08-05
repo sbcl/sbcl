@@ -160,7 +160,9 @@
   (foldable-call-check nil :type (or function null))
   ;; A function that is called with lvars to check that the functions
   ;; passed to CALLABLE arguments have the right argument counts.
-  (callable-check nil :type (or function null)))
+  (callable-check nil :type (or function null))
+  ;; Customizing behavior of ASSERT-CALL-TYPE
+  (call-type-deriver nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

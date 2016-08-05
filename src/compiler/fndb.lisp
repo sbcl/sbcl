@@ -964,7 +964,8 @@
 
 (defknown vector (&rest t) simple-vector (flushable))
 
-(defknown aref (array &rest index) t (foldable))
+(defknown aref (array &rest index) t (foldable)
+  :call-type-deriver #'array-call-type-deriver)
 (defknown row-major-aref (array index) t (foldable))
 
 (defknown array-element-type (array) (or list symbol)
@@ -976,9 +977,11 @@
 ;; be in the range 0 through 6, not 0 through 7.
 (defknown array-dimension (array array-rank) index (foldable flushable))
 (defknown array-dimensions (array) list (foldable flushable))
-(defknown array-in-bounds-p (array &rest integer) boolean (foldable flushable))
+(defknown array-in-bounds-p (array &rest integer) boolean (foldable flushable)
+  :call-type-deriver #'array-call-type-deriver)
 (defknown array-row-major-index (array &rest index) array-total-size
-  (foldable flushable))
+  (foldable flushable)
+  :call-type-deriver #'array-call-type-deriver)
 (defknown array-total-size (array) array-total-size (foldable flushable))
 (defknown adjustable-array-p (array) boolean (movable foldable flushable))
 
@@ -1729,7 +1732,7 @@
 
 (defknown (setf aref) (t array &rest index) t ()
   :destroyed-constant-args (nth-constant-args 2)
-  :derive-type #'result-type-first-arg)
+  :call-type-deriver #'array-call-type-deriver)
 (defknown %set-row-major-aref (array index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
 (defknown (%rplaca %rplacd) (cons t) t ()

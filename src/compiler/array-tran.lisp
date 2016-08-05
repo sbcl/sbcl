@@ -142,22 +142,10 @@
 
 ;;;; DERIVE-TYPE optimizers
 
-;;; Array operations that use a specific number of indices implicitly
-;;; assert that the array is of that rank.
-(defun assert-array-rank (array rank)
-  (assert-lvar-type
-   array
-   (specifier-type `(array * ,(make-list rank :initial-element '*)))
-   (lexenv-policy (node-lexenv (lvar-dest array)))))
-
 (defun derive-aref-type (array)
   (multiple-value-bind (uaet other)
       (array-type-upgraded-element-type (lvar-type array))
     (or other uaet)))
-
-(defoptimizer (array-in-bounds-p derive-type) ((array &rest indices))
-  (assert-array-rank array (length indices))
-  *universal-type*)
 
 (deftransform array-in-bounds-p ((array &rest subscripts))
   (block nil
@@ -236,12 +224,12 @@
                 t
                 (give-up))))))))
 
-(defoptimizer (aref derive-type) ((array &rest indices))
-  (assert-array-rank array (length indices))
+(defoptimizer (aref derive-type) ((array &rest subscripts))
+  (declare (ignore subscripts))
   (derive-aref-type array))
 
 (defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
-  (assert-array-rank array (length subscripts))
+  (declare (ignore subscripts))
   (assert-new-value-type new-value array))
 
 (macrolet ((define (name)
@@ -288,10 +276,6 @@
 (defoptimizer (%with-array-data/fp derive-type) ((array start end))
   (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
-
-(defoptimizer (array-row-major-index derive-type) ((array &rest indices))
-  (assert-array-rank array (length indices))
-  *universal-type*)
 
 (defoptimizer (row-major-aref derive-type) ((array index))
   (declare (ignore index))

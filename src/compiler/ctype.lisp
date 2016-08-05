@@ -1098,11 +1098,18 @@ and no value was provided for it." name))))))))))
                      (lvar-has-single-use-p lvar))
             (when (assert-lvar-type lvar returns policy)
               (reoptimize-lvar lvar)))))
-    (map-combination-args-and-types
-     (lambda (arg type)
-       (when (assert-lvar-type arg type policy)
-         (unless trusted (reoptimize-lvar arg))))
-     call))
+    (let* ((name (lvar-fun-name (combination-fun call) t))
+           (info (and name
+                      (info :function :info name))))
+      (if (and info
+               (fun-info-call-type-deriver info))
+          (funcall (fun-info-call-type-deriver info) call trusted)
+          (map-combination-args-and-types
+           (lambda (arg type)
+             (when (and (assert-lvar-type arg type policy)
+                        (not trusted))
+               (reoptimize-lvar arg)))
+           call))))
   (values))
 
 ;;;; FIXME: Move to some other file.

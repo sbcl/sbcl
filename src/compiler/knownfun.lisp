@@ -73,14 +73,16 @@
                                 (:result-arg (or index null))
                                 (:overwrite-fndb-silently boolean)
                                 (:foldable-call-check (or function null))
-                                (:callable-check (or function null)))
+                                (:callable-check (or function null))
+                                (:call-type-deriver (or function null)))
                           *)
                 %defknown))
 (defun %defknown (names type attributes location
                   &key derive-type optimizer destroyed-constant-args result-arg
                        overwrite-fndb-silently
                        foldable-call-check
-                       callable-check)
+                       callable-check
+                       call-type-deriver)
   (let ((ctype (specifier-type type)))
     (dolist (name names)
       (unless overwrite-fndb-silently
@@ -108,7 +110,8 @@
                            :destroyed-constant-args destroyed-constant-args
                            :result-arg result-arg
                            :foldable-call-check foldable-call-check
-                           :callable-check callable-check))
+                           :callable-check callable-check
+                           :call-type-deriver call-type-deriver))
       (if location
           (setf (getf (info :source-location :declaration name) 'defknown)
                 location)
@@ -341,9 +344,29 @@
   (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
     (when (integerp dim)
       (specifier-type `(or (integer 0 (,dim)) null)))))
+
 (defun count-derive-type (call)
   (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
     (when (integerp dim)
       (specifier-type `(integer 0 ,dim)))))
+
+;;; This used to be done in DEFOPTIMIZER DERIVE-TYPE, but
+;;; ASSERT-CALL-TYPE already asserts the ARRAY type, so it gets an extra
+;;; assertion that may not get eliminated and requires extra work.
+(defun array-call-type-deriver (call trusted)
+  (let ((type (lvar-type (combination-fun call)))
+        (policy (lexenv-policy (node-lexenv call)))
+        (args (combination-args call)))
+    (flet ((assert-type (arg type)
+             (when (assert-lvar-type arg type policy)
+               (unless trusted (reoptimize-lvar arg)))))
+      (loop for (type . next) on (fun-type-required type)
+            while next
+            do (assert-type (pop args) type))
+      (assert-type (pop args)
+                   (specifier-type `(array * ,(make-list (length args)
+                                                         :initial-element '*))))
+      (loop for subscript in args
+            do (assert-type subscript (fun-type-rest type))))))
 
 (/show0 "knownfun.lisp end of file")
