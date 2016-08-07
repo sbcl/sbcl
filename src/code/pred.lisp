@@ -276,7 +276,7 @@
 ;;; IR1 might potentially transform EQL into %EQL/INTEGER.
 #!+integer-eql-vop
 (defun %eql/integer (obj1 obj2)
-  ;; This is just for constand folding, no need to transform into the %EQL/INTEGER VOP
+  ;; This is just for constant folding, no need to transform into the %EQL/INTEGER VOP
   (eql obj1 obj2))
 
 (declaim (inline %eql))
@@ -312,7 +312,15 @@
               (lambda (x y)
                 (and (eql (numerator x) (numerator y))
                      (eql (denominator x) (denominator y)))))
-             (complex
+             ((complex single-float)
+              (lambda (x y)
+                (and (eql (realpart x) (realpart y))
+                     (eql (imagpart x) (imagpart y)))))
+             ((complex double-float)
+              (lambda (x y)
+                (and (eql (realpart x) (realpart y))
+                     (eql (imagpart x) (imagpart y)))))
+             ((complex rational)
               (lambda (x y)
                 (and (eql (realpart x) (realpart y))
                      (eql (imagpart x) (imagpart y))))))))))
