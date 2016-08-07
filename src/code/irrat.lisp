@@ -42,6 +42,9 @@
     ((double-float)
      (,function ,var))))
 
+(defun handle-complex (form)
+  `((((foreach (complex double-float) (complex single-float) (complex rational)))
+     ,form)))
 ) ; EVAL-WHEN
 
 #!+x86 ;; for constant folding
@@ -103,7 +106,7 @@
   (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %exp number)
-    ((complex)
+    (handle-complex
      (* (exp (realpart number))
         (cis (imagpart number))))))
 
@@ -293,9 +296,12 @@
          (real-expt base power 'double-float))
         ;; Handle (expt <complex> <rational>), except the case dealt with
         ;; in the first clause above, (expt <(complex rational)> <integer>).
-        (((foreach (complex rational) (complex single-float)
-                   (complex double-float))
-          rational)
+        (((foreach (complex rational))
+          ratio)
+         (* (expt (abs base) power)
+            (cis (* power (phase base)))))
+        (((foreach (complex single-float) (complex double-float))
+          (foreach fixnum (or bignum ratio)))
          (* (expt (abs base) power)
             (cis (* power (phase base)))))
         ;; The next three clauses handle (expt <real> <complex>).
@@ -415,7 +421,7 @@
   (number-dispatch ((number number))
     (((foreach single-float double-float fixnum rational))
      (abs number))
-    ((complex)
+    (handle-complex
      (let ((rx (realpart number))
            (ix (imagpart number)))
        (etypecase rx
@@ -435,20 +441,20 @@
   For non-complex positive numbers, this is 0. For non-complex negative
   numbers this is PI."
   (declare (explicit-check))
-  (etypecase number
-    (rational
+  (number-dispatch ((number number))
+    ((rational)
      (if (minusp number)
          (coerce pi 'single-float)
          0.0f0))
-    (single-float
+    ((single-float)
      (if (minusp (float-sign number))
          (coerce pi 'single-float)
          0.0f0))
-    (double-float
+    ((double-float)
      (if (minusp (float-sign number))
          (coerce pi 'double-float)
          0.0d0))
-    (complex
+    (handle-complex
      (atan (imagpart number) (realpart number)))))
 
 (defun sin (number)
@@ -457,7 +463,7 @@
   (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %sin number)
-    ((complex)
+    (handle-complex
      (let ((x (realpart number))
            (y (imagpart number)))
        (complex (* (sin x) (cosh y))
@@ -469,7 +475,7 @@
   (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %cos number)
-    ((complex)
+    (handle-complex
      (let ((x (realpart number))
            (y (imagpart number)))
        (complex (* (cos x) (cosh y))
@@ -481,14 +487,20 @@
   (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %tan number)
-    ((complex)
-     (complex-tan number))))
+    (handle-complex
+     ;; tan z = -i * tanh(i*z)
+     (let* ((result (complex-tanh (complex (- (imagpart number))
+                                           (realpart number)))))
+       (complex (imagpart result)
+                (- (realpart result)))))))
 
 (defun cis (theta)
   #!+sb-doc
   "Return cos(Theta) + i sin(Theta), i.e. exp(i Theta)."
-  (declare (type real theta) (explicit-check))
-  (complex (cos theta) (sin theta)))
+  (declare (explicit-check ))
+  (number-dispatch ((theta real))
+    (((foreach single-float double-float rational))
+     (complex (cos theta) (sin theta)))))
 
 (defun asin (number)
   #!+sb-doc
@@ -569,7 +581,7 @@
   (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %sinh number)
-    ((complex)
+    (handle-complex
      (let ((x (realpart number))
            (y (imagpart number)))
        (complex (* (sinh x) (cos y))
@@ -581,7 +593,7 @@
   (declare (explicit-check))
   (number-dispatch ((number number))
     (handle-reals %cosh number)
-    ((complex)
+    (handle-complex
      (let ((x (realpart number))
            (y (imagpart number)))
        (complex (* (cosh x) (cos y))
@@ -679,7 +691,6 @@
 ;;;;   complex-asin
 ;;;;   complex-asinh
 ;;;;   complex-atan
-;;;;   complex-tan
 ;;;;
 ;;;; utility functions:
 ;;;;   logb
@@ -1104,16 +1115,5 @@
   ;; atan z = -i * atanh (i*z)
   (let* ((iz (complex (- (imagpart z)) (realpart z)))
          (result (complex-atanh iz)))
-    (complex (imagpart result)
-             (- (realpart result)))))
-
-;;; Compute tan z = -i * tanh(i * z)
-;;;
-;;; Z may be any number, but the result is always a complex.
-(defun complex-tan (z)
-  (declare (type (or rational complex) z))
-  ;; tan z = -i * tanh(i*z)
-  (let* ((iz (complex (- (imagpart z)) (realpart z)))
-         (result (complex-tanh iz)))
     (complex (imagpart result)
              (- (realpart result)))))
