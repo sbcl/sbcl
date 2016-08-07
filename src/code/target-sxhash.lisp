@@ -442,52 +442,61 @@
     result))
 
 (defun number-psxhash (key)
-  (declare (optimize speed))
-  (declare (type number key))
+  (declare (type number key)
+           (optimize speed))
   (flet ((sxhash-double-float (val)
            (declare (type double-float val))
            ;; FIXME: Check to make sure that the DEFTRANSFORM kicks in and the
            ;; resulting code works without consing. (In Debian cmucl 2.4.17,
            ;; it didn't.)
            (sxhash val)))
-    (etypecase key
-      (integer (sxhash key))
-      (float (macrolet ((frob (type)
-                          (let ((lo (coerce sb!xc:most-negative-fixnum type))
-                                (hi (coerce sb!xc:most-positive-fixnum type)))
-                            `(cond (;; This clause allows FIXNUM-sized integer
-                                    ;; values to be handled without consing.
-                                    (<= ,lo key ,hi)
-                                    (multiple-value-bind (q r)
-                                        (floor (the (,type ,lo ,hi) key))
-                                      (if (zerop (the ,type r))
-                                          (sxhash q)
-                                          (sxhash-double-float
-                                           (coerce key 'double-float)))))
-                                   (t
-                                    (multiple-value-bind (q r) (floor key)
-                                      (if (zerop (the ,type r))
-                                          (sxhash q)
-                                          (sxhash-double-float
-                                           (coerce key 'double-float)))))))))
-               (etypecase key
-                 (single-float (frob single-float))
-                 (double-float (frob double-float))
-                 #!+long-float
-                 (long-float (error "LONG-FLOAT not currently supported")))))
-      (rational (if (and (<= most-negative-double-float
-                             key
-                             most-positive-double-float)
-                         (= (coerce key 'double-float) key))
-                    (sxhash-double-float (coerce key 'double-float))
-                    (sxhash key)))
-      (complex (if (zerop (imagpart key))
-                   (number-psxhash (realpart key))
-                   (let ((result 330231))
-                     (declare (type fixnum result))
-                     (mixf result (number-psxhash (realpart key)))
-                     (mixf result (number-psxhash (imagpart key)))
-                     result))))))
+    (macrolet ((hash-float (type key)
+                 (let ((lo (coerce sb!xc:most-negative-fixnum type))
+                       (hi (coerce sb!xc:most-positive-fixnum type)))
+                   `(let ((key ,key))
+                      (cond ( ;; This clause allows FIXNUM-sized integer
+                             ;; values to be handled without consing.
+                             (<= ,lo key ,hi)
+                             (multiple-value-bind (q r)
+                                 (floor (the (,type ,lo ,hi) key))
+                               (if (zerop (the ,type r))
+                                   (sxhash q)
+                                   (sxhash-double-float
+                                    (coerce key 'double-float)))))
+                            (t
+                             (multiple-value-bind (q r) (floor key)
+                               (if (zerop (the ,type r))
+                                   (sxhash q)
+                                   (sxhash-double-float
+                                    (coerce key 'double-float)))))))))
+               (hash-complex (&optional (hasher '(number-psxhash)))
+                 `(if (zerop (imagpart key))
+                      (,@hasher (realpart key))
+                      (let ((result 330231))
+                        (declare (type fixnum result))
+                        (mixf result (,@hasher (realpart key)))
+                        (mixf result (,@hasher (imagpart key)))
+                        result))))
+     (etypecase key
+       (integer (sxhash key))
+       (float (macrolet ()
+                (etypecase key
+                  (single-float (hash-float single-float key))
+                  (double-float (hash-float double-float key))
+                  #!+long-float
+                  (long-float (error "LONG-FLOAT not currently supported")))))
+       (rational (if (and (<= most-negative-double-float
+                              key
+                              most-positive-double-float)
+                          (= (coerce key 'double-float) key))
+                     (sxhash-double-float (coerce key 'double-float))
+                     (sxhash key)))
+       ((complex double-float)
+        (hash-complex (hash-float double-float)))
+       ((complex single-float)
+        (hash-complex (hash-float single-float)))
+       ((complex rational)
+        (hash-complex))))))
 
 ;;; Semantic equivalent of SXHASH, but better-behaved for function names.
 ;;; It performs more work by not cutting off as soon in the CDR direction.
