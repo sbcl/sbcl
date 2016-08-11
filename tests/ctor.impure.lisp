@@ -44,7 +44,7 @@
 (make-instances-obsolete 'no-slots)
 
 (assert (typep (make-no-slots) 'no-slots))
-(assert (typep (funcall #'(sb-pcl::ctor no-slots nil)) 'no-slots))
+(assert (typep (funcall (gethash '(sb-pcl::ctor no-slots nil) sb-pcl::*all-ctors*)) 'no-slots))
 
 (defclass one-slot ()
   ((a :initarg :a)))
@@ -67,9 +67,10 @@
 (make-instances-obsolete 'one-slot)
 
 (assert (= (slot-value (make-one-slot-a 3) 'a) 3))
-(assert (= (slot-value (funcall #'(sb-pcl::ctor one-slot nil :a sb-pcl::\.p0.) 4) 'a) 4))
+(assert (= (slot-value (funcall (gethash '(sb-pcl::ctor one-slot nil :a sb-pcl::\.p0.) sb-pcl::*all-ctors*)
+                                4) 'a) 4))
 (assert (not (slot-boundp (make-one-slot-noa) 'a)))
-(assert (not (slot-boundp (funcall #'(sb-pcl::ctor one-slot nil)) 'a)))
+(assert (not (slot-boundp (funcall (gethash '(sb-pcl::ctor one-slot nil) sb-pcl::*all-ctors*)) 'a)))
 
 (defclass one-slot-superclass ()
   ((b :initarg :b)))
@@ -90,11 +91,13 @@
 (make-instances-obsolete 'one-slot-subclass)
 
 (assert (= (slot-value (make-one-slot-subclass 2) 'b) 2))
-(assert (= (slot-value (funcall #'(sb-pcl::ctor one-slot-subclass nil :b sb-pcl::\.p0.) 3) 'b) 3))
+(assert (= (slot-value (funcall (gethash '(sb-pcl::ctor one-slot-subclass nil :b sb-pcl::\.p0.) sb-pcl::*all-ctors*)
+                                3) 'b) 3))
 (make-instances-obsolete 'one-slot-superclass)
 
 (assert (= (slot-value (make-one-slot-subclass 2) 'b) 2))
-(assert (= (slot-value (funcall #'(sb-pcl::ctor one-slot-subclass nil :b sb-pcl::\.p0.) 4) 'b) 4))
+(assert (= (slot-value (funcall (gethash '(sb-pcl::ctor one-slot-subclass nil :b sb-pcl::\.p0.) sb-pcl::*all-ctors*)
+                                4) 'b) 4))
 
 ;;; Tests for CTOR optimization of non-constant class args and constant class object args
 (defun find-ctor-caches (fun)
@@ -181,7 +184,7 @@
   (let ((fun (compile nil `(lambda () (make-instance 'some-class)))))
     (assert (aroundp (funcall fun)))
     ;; make sure we tested what we think we tested...
-    (let ((ctors (find-named-callees fun :type 'sb-pcl::ctor)))
+    (let ((ctors (find-anonymous-callees fun :type 'sb-pcl::ctor)))
       (assert ctors)
       (assert (not (cdr ctors)))
       (assert (find-named-callees (car ctors) :name 'sb-pcl::fast-make-instance)))))
@@ -210,7 +213,7 @@
     (assert (aroundp (funcall fun)))
     (assert (= 2 *some-counter*))
     ;; make sure we tested what we think we tested...
-    (let ((ctors (find-named-callees fun :type 'sb-pcl::ctor)))
+    (let ((ctors (find-anonymous-callees fun :type 'sb-pcl::ctor)))
       (assert ctors)
       (assert (not (cdr ctors)))
       (assert (find-named-callees (car ctors) :name 'sb-pcl::fast-make-instance)))))

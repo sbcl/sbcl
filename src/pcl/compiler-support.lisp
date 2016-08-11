@@ -79,16 +79,6 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
-(declaim (ftype function sb-pcl::std-instance-p sb-pcl::fsc-instance-p))
-(define-internal-pcl-function-name-syntax sb-pcl::ctor (list)
-  (let ((class-or-name (cadr list)))
-    (cond
-      ((symbolp class-or-name)
-       (values (valid-function-name-p class-or-name) nil))
-      ((or (sb-pcl::std-instance-p class-or-name)
-           (sb-pcl::fsc-instance-p class-or-name))
-       (values t nil)))))
-
 (defun interned-symbol-p (x) (and (symbolp x) (symbol-package x)))
 
 (flet ((struct-accessor-p (object slot-name)

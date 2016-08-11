@@ -21,6 +21,7 @@
            #:find-value-cell-values
            #:find-code-constants
            #:find-named-callees
+           #:find-anonymous-callees
            #:file-compile))
 
 (cl:in-package :ctu)
@@ -51,6 +52,13 @@
                            (or (not namep)
                                (equal name (sb-impl::fdefn-name c))))))
           collect (sb-impl::fdefn-fun c))))
+
+(defun find-anonymous-callees (fun &key (type 'function))
+  (let ((code (sb-kernel:fun-code-header (sb-kernel:%fun-fun fun))))
+    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+          for fun = (sb-kernel:code-header-ref code i)
+          when (typep fun type)
+          collect fun)))
 
 (defun find-code-constants (fun &key (type t))
   (let ((code (sb-kernel:fun-code-header (sb-kernel:%fun-fun fun))))

@@ -126,7 +126,7 @@
 
 ;;; Type is either CTOR, for MAKE-INSTANCE, or ALLOCATOR, for ALLOCATE-INSTANCE
 (!defstruct-with-alternate-metaclass ctor
-  :slot-names (type function-name class-or-name class initargs state safe-p)
+  :slot-names (type class-or-name class initargs state safe-p)
   :boa-constructor %make-ctor
   :superclass-name function
   :metaclass-name static-classoid
@@ -134,8 +134,10 @@
   :dd-type funcallable-structure
   :runtime-type-checks-p nil)
 
-;;; List of all defined ctors.
-(defvar *all-ctors* ())
+;;; All defined ctors.
+(defglobal *all-ctors* (make-hash-table :test #'equal
+                                        :weakness :value))
+(declaim (hash-table *all-ctors*))
 
 (defun make-ctor-parameter-list (ctor)
   (plist-values (ctor-initargs ctor) :test (complement #'constantp)))
@@ -164,6 +166,7 @@
                ;; exactly the set of types descended into by EQUAL,
                ;; which is the predicate used by globaldb to test for
                ;; name equality.
+               (null nil)
                (list (gensym "LIST-INITARG-"))
                (string (gensym "STRING-INITARG-"))
                (bit-vector (gensym "BIT-VECTOR-INITARG-"))
@@ -177,32 +180,26 @@
 ;;; Keep this a separate function for testing.
 (defun ensure-ctor (function-name class-name initargs safe-code-p)
   (with-world-lock ()
-    (if (fboundp function-name)
-        (the ctor (fdefinition function-name))
+    (or (gethash function-name *all-ctors*)
         (make-ctor function-name class-name initargs safe-code-p))))
 
 ;;; Keep this a separate function for testing.
 (defun make-ctor (function-name class-name initargs safe-p)
-  (without-package-locks ; for (setf symbol-function)
-    (let ((ctor (%make-ctor 'ctor function-name class-name nil initargs nil safe-p)))
-      (install-initial-constructor ctor :force-p t)
-      (push ctor *all-ctors*)
-      (setf (fdefinition function-name) ctor)
-      ctor)))
+  (let ((ctor (%make-ctor 'ctor class-name nil initargs nil safe-p)))
+    (install-initial-constructor ctor :force-p t)
+    (setf (gethash function-name *all-ctors*) ctor)
+    ctor))
 
 (defun ensure-allocator (function-name class-name)
   (with-world-lock ()
-    (if (fboundp function-name)
-        (the ctor (fdefinition function-name))
+    (or (gethash function-name *all-ctors*)
         (make-allocator function-name class-name))))
 
 (defun make-allocator (function-name class-name)
-  (without-package-locks ; for (setf symbol-function)
-    (let ((ctor (%make-ctor 'allocator function-name class-name nil nil nil nil)))
-      (install-initial-constructor ctor :force-p t)
-      (push ctor *all-ctors*)
-      (setf (fdefinition function-name) ctor)
-      ctor)))
+  (let ((ctor (%make-ctor 'allocator class-name nil nil nil nil)))
+    (install-initial-constructor ctor :force-p t)
+    (setf (gethash function-name *all-ctors*) ctor)
+    ctor))
 
 ;;; *****************
 ;;; Inline CTOR cache
@@ -381,8 +378,7 @@
                (let ((function-name (list 'ctor 'allocator class)))
                  (declare (dynamic-extent function-name))
                  (with-world-lock ()
-                   (if (fboundp function-name)
-                       (the ctor (fdefinition function-name))
+                   (or (gethash function-name *all-ctors*)
                        (make-allocator (copy-list function-name) class))))
                ;; Invalid first argument: let ALLOCATE-INSTANCE worry about it.
                (return-from ensure-cached-allocator
@@ -417,28 +413,19 @@
 ;;; before FOP compilation, while source transforms aren't, there's no
 ;;; reason to optimize make-instance for top-level forms
 (sb-c:define-source-transform make-instance (&whole form &rest args &environment env)
-  (declare (ignore args))
   ;; Compiling an optimized constructor for a non-standard class means
   ;; compiling a lambda with (MAKE-INSTANCE #<SOME-CLASS X> ...) in it
   ;; -- need to make sure we don't recurse there.
-  (or (unless *compiling-optimized-constructor*
+  (or (unless (or *compiling-optimized-constructor*
+                  (not args))
         (make-instance->constructor-call form (safe-code-p env)))
       (values nil t)))
 
 (sb-c:define-source-transform allocate-instance (class &rest initargs)
   (if (or *compiling-optimized-constructor*
           initargs)
-      (allocate-instance->constructor-call class)
-      (values nil t)))
-
-(defun proclaim-constructor (function-name)
-  ;; Prevent compiler warnings for calling the ctor.
-  (proclaim-as-fun-name function-name)
-  (note-name-defined function-name :function)
-  (when (eq (info :function :where-from function-name) :assumed)
-    (setf (info :function :where-from function-name) :defined)
-    (when (info :function :assumed-type function-name)
-      (setf (info :function :assumed-type function-name) nil))))
+      (values nil t)
+      (allocate-instance->constructor-call class)))
 
 (defun allocate-instance->constructor-call (class-arg)
   (let ((constant-class (if (classp class-arg)
@@ -455,15 +442,12 @@
           (sb-int:check-deprecated-type (if (classp class-or-name)
                                             (class-name class-or-name)
                                             class-or-name))
-          (proclaim-constructor function-name)
           ;; Return code constructing a ctor at load time, which,
           ;; when called, will set its funcallable instance
           ;; function to an optimized constructor function.
-          `(locally
-               (declare (disable-package-locks ,function-name))
-             (load-time-value
-              (ensure-allocator ',function-name ',class-or-name))
-             (funcall (function ,function-name))))
+          `(funcall (truly-the function
+                               (load-time-value
+                                (ensure-allocator ',function-name ',class-or-name) t))))
         `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.))
            (let* ((.cache. (load-time-value (cons 'ctor-cache nil)))
                   (.store. (cdr .cache.))
@@ -518,24 +502,15 @@
               (sb-int:check-deprecated-type (if (classp class-or-name)
                                                 (class-name class-or-name)
                                                 class-or-name))
-              (proclaim-constructor function-name)
               ;; Return code constructing a ctor at load time, which,
               ;; when called, will set its funcallable instance
               ;; function to an optimized constructor function.
-              `(locally
-                   (declare (disable-package-locks ,function-name))
-                 (let ((.x. (load-time-value
-                             (ensure-ctor ',function-name ',class-or-name ',initargs
-                                          ',safe-code-p))))
-                   (declare (ignore .x.))
-                   ;; ??? check if this is worth it.
-                   (declare
-                    (ftype (or (function ,(make-list (length value-forms)
-                                                     :initial-element t)
-                                         t)
-                               (function (&rest t) t))
-                           ,function-name))
-                   (funcall (function ,function-name) ,@value-forms))))
+              `(funcall (truly-the function
+                                   (load-time-value
+                                    (ensure-ctor ',function-name ',class-or-name ',initargs
+                                                 ',safe-code-p)
+                                    t))
+                        ,@value-forms))
             (when (and class-arg (not (constantp class-arg)))
               ;; Build an inline cache: a CONS, with the actual cache
               ;; in the CDR.
@@ -580,7 +555,8 @@
       (when (eq (layout-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
-      (pushnew ctor (plist-value class 'ctors) :test #'eq)
+      (pushnew (make-weak-pointer ctor) (plist-value class 'ctors)
+               :test #'eq :key #'weak-pointer-value)
       (multiple-value-bind (form locations names optimizedp)
           (constructor-function-form ctor)
         (setf (funcallable-instance-fun ctor)
@@ -606,7 +582,8 @@
       (when (eq (layout-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
-      (pushnew ctor (plist-value class 'allocators) :test #'eq)
+      (pushnew (make-weak-pointer ctor) (plist-value class 'ctors)
+               :test #'eq :key #'weak-pointer-value)
       (multiple-value-bind (form optimizedp)
           (allocator-function-form ctor)
         (setf (funcallable-instance-fun ctor)
@@ -1132,8 +1109,15 @@
 (defun update-ctors (reason &key class name generic-function method)
   (labels ((reset (class &optional initarg-caches-p (ctorsp t))
              (when ctorsp
-               (dolist (ctor (plist-value class 'ctors))
-                 (install-initial-constructor ctor)))
+               (setf (plist-value class 'ctors)
+                     (delete-if
+                      (lambda (weak)
+                        (let ((ctor (weak-pointer-value weak)))
+                          (cond (ctor
+                                 (install-initial-constructor ctor)
+                                 nil)
+                                (t))))
+                      (plist-value class 'ctors))))
              (when initarg-caches-p
                (dolist (cache '(mi-initargs ri-initargs))
                  (setf (plist-value class cache) ())))
@@ -1145,8 +1129,9 @@
        (reset class t))
       ;; NAME must have been specified.
       (setf-find-class
-       (loop for ctor in *all-ctors*
-             when (eq (ctor-class-or-name ctor) name) do
+       (loop for ctor being the hash-values of *all-ctors*
+             when (eq (ctor-class-or-name ctor) name)
+             do
              (when (ctor-class ctor)
                (reset (ctor-class ctor)))
              (loop-finish)))
@@ -1178,11 +1163,12 @@
                 (reset (find-class 'standard-object))))))))))
 
 (defun precompile-ctors ()
-  (dolist (ctor *all-ctors*)
-    (when (null (ctor-class ctor))
-      (let ((class (find-class (ctor-class-or-name ctor) nil)))
-        (when (and class (class-finalized-p class))
-          (install-optimized-constructor ctor))))))
+  (loop for ctor being the hash-values of *all-ctors*
+        unless (ctor-class ctor)
+        do
+        (let ((class (find-class (ctor-class-or-name ctor) nil)))
+          (when (and class (class-finalized-p class))
+            (install-optimized-constructor ctor)))))
 
 (defun maybe-call-ctor (class initargs)
   (flet ((frob-initargs (ctor)
@@ -1199,12 +1185,15 @@
                    (unless (eql cval ival)
                      (return nil))
                    (push ival args))))))
-    (dolist (ctor (plist-value class 'ctors))
-      (when (eq (ctor-state ctor) 'optimized)
-        (multiple-value-bind (ctor-args matchp)
-            (frob-initargs ctor)
-          (when matchp
-            (return (apply ctor ctor-args))))))))
+    (dolist (weak (plist-value class 'ctors))
+      (let ((ctor (weak-pointer-value weak)))
+        (when (and ctor
+                   (eq (ctor-type ctor) 'ctor)
+                   (eq (ctor-state ctor) 'optimized))
+          (multiple-value-bind (ctor-args matchp)
+              (frob-initargs ctor)
+            (when matchp
+              (return (apply ctor ctor-args)))))))))
 
 ;;; FIXME: CHECK-FOO-INITARGS share most of their bodies.
 (defun check-mi-initargs (class initargs)
