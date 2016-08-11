@@ -412,20 +412,24 @@
 ;;; There are some MAKE-INSTANCE calls compiled prior to this macro definition.
 ;;; While it would be trivial to move earlier, I'm not sure that it would
 ;;; actually work.
-(define-compiler-macro make-instance (&whole form &rest args &environment env)
+;;;
+;;; This used to be a compiler macro but compiler macros are invoked
+;;; before FOP compilation, while source transforms aren't, there's no
+;;; reason to optimize make-instance for top-level forms
+(sb-c:define-source-transform make-instance (&whole form &rest args &environment env)
   (declare (ignore args))
   ;; Compiling an optimized constructor for a non-standard class means
   ;; compiling a lambda with (MAKE-INSTANCE #<SOME-CLASS X> ...) in it
   ;; -- need to make sure we don't recurse there.
   (or (unless *compiling-optimized-constructor*
         (make-instance->constructor-call form (safe-code-p env)))
-      form))
+      (values nil t)))
 
-(define-compiler-macro allocate-instance (&whole form class &rest initargs)
-  (or (unless (or *compiling-optimized-constructor*
-                  initargs)
-        (allocate-instance->constructor-call class))
-      form))
+(sb-c:define-source-transform allocate-instance (class &rest initargs)
+  (if (or *compiling-optimized-constructor*
+          initargs)
+      (allocate-instance->constructor-call class)
+      (values nil t)))
 
 (defun proclaim-constructor (function-name)
   ;; Prevent compiler warnings for calling the ctor.

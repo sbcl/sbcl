@@ -102,17 +102,17 @@
                    (and (consp value) (eq 'sb-pcl::ctor-cache (car value))))
                  (find-value-cell-values fun)))
 
-(let* ((cmacro (compiler-macro-function 'make-instance))
+(let* ((transform (sb-int:info :function :source-transform 'make-instance))
         (opt 0)
         (wrapper (lambda (form env)
-                   (let ((res (funcall cmacro form env)))
+                   (let ((res (funcall transform form env)))
                      (unless (eq form res)
                        (incf opt))
                      res))))
    (sb-ext:without-package-locks
      (unwind-protect
           (progn
-            (setf (compiler-macro-function 'make-instance) wrapper)
+            (setf (sb-int:info :function :source-transform 'make-instance) wrapper)
             (with-test (:name (make-instance :non-constant-class))
               (assert (= 0 opt))
               (let ((f (compile nil `(lambda (class)
@@ -138,7 +138,7 @@
                 (assert (not (find-ctor-caches f)))
                 (assert (= 4 opt))
                 (assert (typep (funcall f) 'structure-object)))))
-       (setf (compiler-macro-function 'make-instance) cmacro))))
+       (setf (sb-int:info :function :source-transform 'make-instance) transform))))
 
 (with-test (:name (make-instance :ctor-inline-cache-resize))
   (let* ((f (compile nil `(lambda (name) (make-instance name))))
