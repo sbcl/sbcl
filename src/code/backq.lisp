@@ -17,7 +17,8 @@
 (defstruct (comma (:constructor unquote (expr &optional (kind 0)))
                   #+sb-xc-host (:include structure!object)
                   ;; READing unpretty commas requires a default constructor.
-                  (:constructor %default-comma-constructor)
+                  ;; Not needed on the host.
+                  #-sb-xc-host (:constructor %default-comma-constructor)
                   (:copier nil))
  (expr nil :read-only t)
  (kind nil :read-only t :type (member 0 1 2)))
