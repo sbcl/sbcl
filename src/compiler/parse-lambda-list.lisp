@@ -68,7 +68,7 @@
 ;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.
 (declaim (ftype (sfunction
-                 (list &key (:context t) (:accept integer) (:silent boolean)
+                 (list &key (:context t) (:accept integer) (:silent t)
                             (:condition-class symbol))
                  (values (unsigned-byte 13) list list list list list list list))
                 parse-lambda-list))
