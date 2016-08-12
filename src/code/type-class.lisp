@@ -522,8 +522,6 @@
         do (setq res (logxor (ash res -1) (type-hash-value type)))
         finally (return res)))
 
-(!defun-from-collected-cold-init-forms !type-class-cold-init)
-
 ;;; A few type representations need to be defined slightly earlier than
 ;;; 'early-type' is compiled, so they're defined here.
 
@@ -765,3 +763,17 @@
   (cond ((csubtypep type1 type2) type2)
         ((csubtypep type2 type1) type1)
         (t nil)))
+
+;; KLUDGE: putting this here satisfies CMUCL for an inexplicable reason.
+;; It should suffice to put it anywhere before %MAKE-CHARACTER-SET-TYPE
+;; is actually called.
+;;
+;; all character-set types are enumerable, but it's not possible
+;; for one to be TYPE= to a MEMBER type because (MEMBER #\x)
+;; is not internally represented as a MEMBER type.
+;; So in case it wasn't clear already ENUMERABLE-P does not mean
+;;  "possibly a MEMBER type in the Lisp-theoretic sense",
+;; but means "could be implemented in SBCL as a MEMBER type".
+(!define-type-class character-set :enumerable nil
+                    :might-contain-other-types nil)
+(!defun-from-collected-cold-init-forms !type-class-cold-init)

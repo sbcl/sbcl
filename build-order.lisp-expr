@@ -420,7 +420,8 @@
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
- ("src/code/defstruct")
+ ;; FIXME: #+ should be (and sb-xc-host) but it isn't set yet.
+ ("src/code/defstruct" #+cmucl :ignore-failure-p)
  ("src/code/target-defstruct" :not-host)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
@@ -498,7 +499,8 @@
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")
  ("src/compiler/ir1-translators")
- ("src/compiler/ir1util")
+ ;; FIXME: #+ should be (and sb-xc-host) but it isn't set yet.
+ ("src/compiler/ir1util" #+cmucl :ignore-failure-p)
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
 
