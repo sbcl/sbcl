@@ -82,7 +82,7 @@
   (with-open-file (stream *stamp-file*
                           :direction :output
                           :if-exists :supersede)
-    #-sbcl (declare (ignore stream))))
+    (declare (ignorable stream))))
 
 ;;; Repository-level functions
 
