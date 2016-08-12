@@ -88,7 +88,8 @@
                             (decf lowtag 2) ; increment address by 2
                             :byte)
                            ((typep word '(unsigned-byte 16)) :word)
-                           ((typep word '(unsigned-byte 31)) :dword))
+                           ;; Definitely a (signed-byte 32) due to pre-test.
+                           (t :dword))
                      :base object
                      :disp (- (* slot n-word-bytes) lowtag))
             word)))
