@@ -66,7 +66,9 @@
 ;;; Symbol contruction utilities
 (defun format-symbol (package format-string &rest format-arguments)
   (without-package-locks
-   (intern (apply #'format nil format-string format-arguments) package)))
+   (intern (possibly-base-stringize
+            (apply #'format nil format-string format-arguments))
+           package)))
 
 (defun make-class-symbol (class-name)
   ;; Reference a package that is now SB!PCL but later SB-PCL

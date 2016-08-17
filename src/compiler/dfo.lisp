@@ -346,7 +346,8 @@
                 ((or (some #'has-xep-or-nlx funs)
                      (and has-top (rest funs)))
                  (setf (component-name component)
-                       (find-component-name component))
+                       (possibly-base-stringize
+                        (find-component-name component)))
                  (real component)
                  (when has-top
                    (setf (component-kind component) :complex-toplevel)

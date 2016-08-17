@@ -781,7 +781,8 @@ line break."
                             (write-to-string type-spec :pretty nil :escape nil
                                              :readably nil))))))
         (compile nil
-                 `(named-lambda ,name (object) (typep object ',type-spec))))))
+                 `(named-lambda ,(possibly-base-stringize name) (object)
+                    (typep object ',type-spec))))))
 
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
