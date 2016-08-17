@@ -671,7 +671,7 @@ status slot."
                     directory)
   #+sb-doc
   #.(concatenate
-     'string
+     'base-string
      ;; The Texinfoizer is sensitive to whitespace, so mind the
      ;; placement of the #-win32 pseudosplicings.
      "RUN-PROGRAM creates a new process specified by the PROGRAM
