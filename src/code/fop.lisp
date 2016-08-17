@@ -229,7 +229,9 @@
 
 ;; Cold load has its own implementation of all symbol fops,
 ;; but we have to execute define-fop now to assign their numbers.
-(labels ((read-symbol-name (length+flag fasl-input)
+(labels #+sb-xc-host ()
+        #-sb-xc-host
+        ((read-symbol-name (length+flag fasl-input)
            (let* ((namelen (ash (the fixnum length+flag) -1))
                   (base-p (oddp length+flag))
                   (buffer (%fasl-input-name-buffer fasl-input))
@@ -262,7 +264,7 @@
            (ensure-symbol-hash symbol)
            symbol))
 
-  (declare (inline ensure-hashed))
+  #-sb-xc-host (declare (inline ensure-hashed))
   (!define-fop 80 :not-host (fop-lisp-symbol-save ((:operands length+flag)))
     (aux-fop-intern length+flag *cl-package* (fasl-input)))
   (!define-fop 84 :not-host (fop-keyword-symbol-save ((:operands length+flag)))
