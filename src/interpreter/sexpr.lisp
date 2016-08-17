@@ -494,6 +494,7 @@
                        env 0 specials)))
 
 (defun err-too-few-args (fun n-args)
+  (declare (explicit-check))
   (let ((frame (interpreted-function-frame fun)))
     (ip-error "~S received ~D argument~:P but expects~:[ at least~;~] ~D."
            (name-for-fun fun) n-args
@@ -501,6 +502,7 @@
            (lambda-frame-min-args frame))))
 
 (defun err-too-many-args (fun n-args)
+  (declare (explicit-check))
   (let ((frame (interpreted-function-frame fun)))
     (ip-error "~S received ~D argument~:P but expects~:[ at most~;~] ~D"
            (name-for-fun fun) n-args
