@@ -1695,6 +1695,13 @@ to :INTERPRET, an interpreter will be used.")
            (truly-the (simple-array character (*))
                       (get-output-stream-string ,var))))))
 
+(defun possibly-base-stringize (s)
+  (cond #!+(and sb-unicode (host-feature sb-xc))
+        ((and (typep s '(array character (*))) (every #'base-char-p s))
+         (coerce s 'base-string))
+        (t
+         s)))
+
 (defun self-evaluating-p (x)
   (typecase x
     (null t)

@@ -928,7 +928,9 @@ directory."
                     thing))
            (values name nil)))))))
 
-(defun namestring (pathname)
+(defun-cached (namestring :hash-bits 5 :hash-function #'sxhash
+                          :memoizer memoize)
+    ((pathname pathname=))
   #!+sb-doc
   "Construct the full (name)string form of the pathname."
   (declare (type pathname-designator pathname))
@@ -938,7 +940,8 @@ directory."
         (unless host
           (error "can't determine the namestring for pathnames with no ~
                   host:~%  ~S" pathname))
-        (funcall (host-unparse host) pathname)))))
+        (memoize (possibly-base-stringize
+                  (funcall (host-unparse host) pathname)))))))
 
 (defun native-namestring (pathname &key as-file)
   #!+sb-doc
