@@ -944,6 +944,8 @@
   (declare (type fasl-output file))
   (let* ((pname (symbol-name s))
          (pname-length (length pname))
+         (base-string-p (typep pname (or #-sb-xc-host 'base-string t)))
+         (length+flag (logior (ash pname-length 1) (if base-string-p 1 0)))
          (dumped-as-copy nil)
          (pkg (symbol-package s)))
     ;; see comment in genesis: we need this here for repeatable fasls
@@ -957,15 +959,11 @@
         (setq pkg sb!int:*cl-package*)))
 
     (cond ((null pkg)
-           (let ((this-base-p #+sb-xc-host t
-                              #-sb-xc-host (typep pname 'base-string)))
+           (let ((this-base-p base-string-p))
              (dolist (lookalike (gethash pname (fasl-output-string=-table file))
                                 (dump-fop 'fop-uninterned-symbol-save
-                                          file pname-length))
+                                          file length+flag))
                ;; Find the right kind of lookalike symbol.
-               ;; actually this seems pretty bogus - afaict, we don't correctly
-               ;; preserve the type of the string (base or character) anyway,
-               ;; but if we did, then this would be right also.
                ;; [what about a symbol whose name is a (simple-array nil (0))?]
                (let ((that-base-p
                       #+sb-xc-host t
@@ -975,27 +973,19 @@
                    (dump-fop 'fop-copy-symbol-save file
                              (gethash lookalike (fasl-output-eq-table file)))
                    (return (setq dumped-as-copy t)))))))
-          ;; CMU CL had FOP-SYMBOL-SAVE/FOP-SMALL-SYMBOL-SAVE fops which
-          ;; used the current value of *PACKAGE*. Unfortunately that's
-          ;; broken w.r.t. ANSI Common Lisp semantics, so those are gone
-          ;; from SBCL.
-          ;;((eq pkg *package*)
-          ;; (dump-fop* pname-length
-          ;;        fop-small-symbol-save
-          ;;        fop-symbol-save file))
           ((eq pkg sb!int:*cl-package*)
-           (dump-fop 'fop-lisp-symbol-save file pname-length))
+           (dump-fop 'fop-lisp-symbol-save file length+flag))
           ((eq pkg sb!int:*keyword-package*)
-           (dump-fop 'fop-keyword-symbol-save file pname-length))
+           (dump-fop 'fop-keyword-symbol-save file length+flag))
           (t
            (dump-fop 'fop-symbol-in-package-save file
-                     (dump-package pkg file) pname-length)))
+                     (dump-package pkg file) length+flag)))
 
     (unless dumped-as-copy
-      #+sb-xc-host (dump-base-chars-of-string pname file)
-      #-sb-xc-host (#!+sb-unicode dump-characters-of-string
-                    #!-sb-unicode dump-base-chars-of-string
-                    pname file)
+      (funcall (if base-string-p
+                   'dump-base-chars-of-string
+                   'dump-characters-of-string)
+               pname file)
       (push s (gethash (symbol-name s) (fasl-output-string=-table file))))
 
     (setf (gethash s (fasl-output-eq-table file))

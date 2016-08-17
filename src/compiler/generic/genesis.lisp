@@ -2492,28 +2492,28 @@ core and return a descriptor to it."
 
 ;;; Load a symbol SIZE characters long from FASL-INPUT, and
 ;;; intern that symbol in PACKAGE.
-(defun cold-load-symbol (size package fasl-input)
-  (let ((string (make-string size)))
+(defun cold-load-symbol (length+flag package fasl-input)
+  (let ((string (make-string (ash length+flag -1))))
     (read-string-as-bytes (%fasl-input-stream fasl-input) string)
     (push-fop-table (intern string package) fasl-input)))
 
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
-(flet ((fop-cold-symbol-in-package-save (fasl-input index pname-len)
-         (cold-load-symbol pname-len (ref-fop-table fasl-input index)
+(flet ((fop-cold-symbol-in-package-save (fasl-input index length+flag)
+         (cold-load-symbol length+flag (ref-fop-table fasl-input index)
                            fasl-input)))
   (dotimes (i 16) ; occupies 16 cells in the dispatch table
     (setf (svref **fop-funs** (+ (get 'fop-symbol-in-package-save 'opcode) i))
           #'fop-cold-symbol-in-package-save)))
 
-(define-cold-fop (fop-lisp-symbol-save (namelen))
-  (cold-load-symbol namelen *cl-package* (fasl-input)))
+(define-cold-fop (fop-lisp-symbol-save (length+flag))
+  (cold-load-symbol length+flag *cl-package* (fasl-input)))
 
-(define-cold-fop (fop-keyword-symbol-save (namelen))
-  (cold-load-symbol namelen *keyword-package* (fasl-input)))
+(define-cold-fop (fop-keyword-symbol-save (length+flag))
+  (cold-load-symbol length+flag *keyword-package* (fasl-input)))
 
-(define-cold-fop (fop-uninterned-symbol-save (namelen))
-  (let ((name (make-string namelen)))
+(define-cold-fop (fop-uninterned-symbol-save (length+flag))
+  (let ((name (make-string (ash length+flag -1))))
     (read-string-as-bytes (fasl-input-stream) name)
     (push-fop-table (get-uninterned-symbol name) (fasl-input))))
 
