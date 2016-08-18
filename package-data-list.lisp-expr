@@ -1226,8 +1226,8 @@ possibly temporarily, because it might be used internally."
                "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
 
                ;; symbol-hacking idioms
-               "GENSYMIFY" "KEYWORDICATE" "SYMBOLICATE"
-               "INTERNED-SYMBOL-P"
+               "GENSYMIFY" "GENSYMIFY*" "KEYWORDICATE" "SYMBOLICATE"
+               "INTERNED-SYMBOL-P" "PACKAGE-SYMBOLICATE"
 
                ;; certainly doesn't belong in public extensions
                ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?

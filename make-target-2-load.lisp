@@ -85,4 +85,9 @@
           (if winp (unintern symbol "CL-USER") (return)))))
 
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
-(sb-ext:save-lisp-and-die "output/sbcl.core")
+(sb-ext:save-lisp-and-die
+ (progn
+   ;; See comment in 'reader.lisp'
+   #+sb-unicode (setq sb-impl::*read-prefer-base-string* nil)
+   ;; This is a base string since the flag wasn't set to NIL yet.
+   "output/sbcl.core"))

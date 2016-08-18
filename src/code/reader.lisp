@@ -893,6 +893,21 @@ standard Lisp readtable when NIL."
               (simple-reader-error
                stream "More than one object follows . in list.")))))))
 
+;;; Whether it is permissible to read strings as base-string
+;;; if no extended-chars are present. The system itself prefers this, but
+;;; otherwise it is a contentious issue. We don't (by default) use base-strings,
+;;; so that people can dubiously write:
+;;;   (SETF (CHAR (READ-STRING S) 0) #\PILE_OF_POO),
+;;; which is stupid because it makes an assumption about what READ does.
+#!+sb-unicode
+(defvar *read-prefer-base-string* t)
+(eval-when (:compile-toplevel :execute)
+  (sb!xc:defmacro token-elt-type (flag)
+    (declare (ignorable flag))
+    `(if (and ,flag #!+sb-unicode *read-prefer-base-string*)
+         'base-char
+         'character)))
+
 (defun read-string (stream closech)
   ;; This accumulates chars until it sees same char that invoked it.
   ;; We avoid copying any given input character more than twice-
@@ -920,6 +935,8 @@ standard Lisp readtable when NIL."
                                   buf (make-array lim :element-type 'character)))
                           (setq ptr 0))
                         (setf (schar buf ptr) (truly-the character char))
+                        #!+sb-unicode ; BASE-CHAR-P does not exist if not
+                        (unless (base-char-p char) (setq only-base-chars nil))
                         (incf ptr)))))
     (let* ((token-buf *read-buffer*)
            (buf (token-buf-string token-buf))
@@ -928,6 +945,7 @@ standard Lisp readtable when NIL."
            (suppress *read-suppress*)
            (lim (length buf))
            (ptr 0)
+           (only-base-chars t)
            (chain))
       (declare (type (simple-array character (*)) buf))
       (reset-read-buffer token-buf)
@@ -939,7 +957,9 @@ standard Lisp readtable when NIL."
       (if suppress
           ""
           (let* ((sum (loop for buf in chain sum (length buf)))
-                 (result (make-array (+ sum ptr) :element-type 'character)))
+                 (result
+                  (make-array (+ sum ptr)
+                              :element-type (token-elt-type only-base-chars))))
             (setq ptr sum)
             ;; Now work backwards from the end
             (replace result buf :start1 ptr)
@@ -1090,9 +1110,8 @@ standard Lisp readtable when NIL."
 ;;; Normalize TOKEN-BUF to NFKC, returning a new TOKEN-BUF and the
 ;;; COLON value
 (defun normalize-read-buffer (token-buf &optional colon)
-  (unless (readtable-normalization *readtable*)
-    (return-from normalize-read-buffer (values token-buf colon)))
-  (when (token-buf-only-base-chars token-buf)
+  (when (or (token-buf-only-base-chars token-buf)
+            (not (readtable-normalization *readtable*)))
     (return-from normalize-read-buffer (values token-buf colon)))
   (let ((current-buffer (copy-token-buf-string token-buf))
         (old-escapes (copy-seq (token-buf-escapes token-buf)))
@@ -1535,27 +1554,28 @@ extended <package-name>::<form-in-package> syntax."
       RETURN-SYMBOL
       (setf buf (normalize-read-buffer buf))
       (casify-read-buffer buf)
-      (let ((pkg (if package-designator
-                     (reader-find-package package-designator stream)
-                     (or *reader-package* (sane-package)))))
-        (if (or (zerop colons) (= colons 2) (eq pkg *keyword-package*))
-            (return (%intern (token-buf-string buf) (token-buf-fill-ptr buf)
-                             pkg t))
-            (multiple-value-bind (symbol accessibility)
-                (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf)
-                              pkg)
-              (when (eq accessibility :external) (return symbol))
-              (let ((name (copy-token-buf-string buf)))
-                (with-simple-restart (continue "Use symbol anyway.")
-                  (error 'simple-reader-package-error
-                         :package pkg
-                         :stream stream
-                         :format-arguments (list name (package-name pkg))
-                         :format-control
-                         (if accessibility
-                             "The symbol ~S is not external in the ~A package."
-                             "Symbol ~S not found in the ~A package.")))
-                (return (intern name pkg))))))))))
+      (let* ((pkg (if package-designator
+                      (reader-find-package package-designator stream)
+                      (or *reader-package* (sane-package))))
+             (intern-p (or (/= colons 1) (eq pkg *keyword-package*))))
+        (unless intern-p ; Try %FIND-SYMBOL
+          (multiple-value-bind (symbol accessibility)
+              (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
+            (when (eq accessibility :external) (return symbol))
+            (with-simple-restart (continue "Use symbol anyway.")
+              (error 'simple-reader-package-error
+                     :package pkg
+                     :stream stream
+                     :format-arguments
+                     (list (copy-token-buf-string buf) (package-name pkg))
+                     :format-control
+                     (if accessibility
+                         "The symbol ~S is not external in the ~A package."
+                         "Symbol ~S not found in the ~A package.")))))
+        (return (%intern (token-buf-string buf)
+                         (token-buf-fill-ptr buf)
+                         pkg
+                         (token-elt-type (token-buf-only-base-chars buf)))))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of

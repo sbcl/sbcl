@@ -278,9 +278,7 @@
         (push `(,n-value ,default) binds)
         (let ((macro-body
                (if (or (null collector) (eq collector 'collect))
-                   (let ((n-tail
-                          (make-symbol
-                           (concatenate 'string (symbol-name name) "-TAIL"))))
+                   (let ((n-tail (gensymify* name "-TAIL")))
                      (push n-tail ignores)
                      (push `(,n-tail ,(if default `(last ,n-value))) binds)
                      `(collect-list-expander ',n-value ',n-tail args))

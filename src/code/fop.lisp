@@ -233,26 +233,29 @@
         #-sb-xc-host
         ((read-symbol-name (length+flag fasl-input)
            (let* ((namelen (ash (the fixnum length+flag) -1))
-                  (base-p (oddp length+flag))
+                  (base-p (logand length+flag 1))
+                  (elt-type (if (eql base-p 1) 'base-char 'character))
                   (buffer (%fasl-input-name-buffer fasl-input))
-                  (string (the string (if base-p (car buffer) (cdr buffer)))))
+                  (string (the string (svref buffer base-p))))
              (when (< (length string) namelen) ; grow
-               (setf string
-                     (if base-p
-                         (setf (car buffer) (make-array namelen :element-type 'base-char))
-                         (setf (cdr buffer) (make-array namelen :element-type 'character)))))
-             (funcall (if base-p 'read-base-string-as-bytes 'read-string-as-unsigned-byte-32)
+               (setf string (make-string namelen :element-type elt-type)
+                     (svref buffer base-p) string))
+             (funcall (if (eql base-p 1)
+                          'read-base-string-as-bytes
+                          'read-string-as-unsigned-byte-32)
                       (%fasl-input-stream fasl-input) string namelen)
-             (values string namelen)))
+             (values string namelen elt-type)))
          (aux-fop-intern (length+flag package fasl-input)
-           (multiple-value-bind (name length) (read-symbol-name length+flag fasl-input)
+           (multiple-value-bind (name length elt-type)
+               (read-symbol-name length+flag fasl-input)
              (if (undefined-package-p package)
                  (error 'simple-package-error
                         :format-control "Error finding package for symbol ~s:~% ~a"
                         :format-arguments
                         (list (subseq name 0 length)
                               (undefined-package-error package)))
-                 (push-fop-table (without-package-locks (%intern name length package t))
+                 (push-fop-table (without-package-locks
+                                  (%intern name length package elt-type))
                                  fasl-input))))
          ;; Symbol-hash is usually computed lazily and memoized into a symbol.
          ;; Laziness slightly improves the speed of allocation.

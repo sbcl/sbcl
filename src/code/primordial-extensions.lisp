@@ -52,7 +52,7 @@
                    (let* ((symbol-name (symbol-name symbol))
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
-                                    (concatenate 'string symbol-name "-"))))
+                                    (string (gensymify* symbol-name "-")))))
                      `(,symbol (sb!xc:gensym ,stem))))
                  symbols)
      ,@body))
@@ -84,32 +84,64 @@
 (defun singleton-p (list)
   (and (listp list) (null (rest list)) list))
 
-;;; Concatenate together the names of some strings and symbols,
-;;; producing a symbol in the current package.
-(defun symbolicate (&rest things)
-  (declare (dynamic-extent things))
-  (values
-     (intern
-      (if (singleton-p things)
-          (string (first things))
-          (let* ((length (reduce #'+ things
-                                 :key (lambda (x) (length (string x)))))
-                 (name (make-array length :element-type 'character))
-                 (index 0))
-            (dolist (thing things name)
-              (let ((x (string thing)))
-                (replace name x :start1 index)
-                (incf index (length x)))))))))
-
 (defun gensymify (x)
   (if (symbolp x)
       (sb!xc:gensym (symbol-name x))
       (sb!xc:gensym)))
 
-;;; like SYMBOLICATE, but producing keywords
-(defun keywordicate (&rest things)
-  (let ((*package* *keyword-package*))
-    (apply #'symbolicate things)))
+(labels ((symbol-concat (package &rest things)
+           (dx-let ((strings (make-array (length things)))
+                    (length 0)
+                    (only-base-chars t))
+             ;; This loop is nearly like DO-REST-ARG
+             ;; but it works on the host too.
+             (loop for index from 0 below (length things)
+                   do (let* ((s (string (nth index things)))
+                             (l (length s)))
+                        (setf (svref strings index) s)
+                        (incf length l)
+                        #!+sb-unicode
+                        (when (and (typep s '(array character (*)))
+                                   (notevery #'base-char-p s))
+                          (setq only-base-chars nil))))
+             ;; We copy the string when interning, so DX is ok.
+             (dx-let ((name (make-array (if package length 0)
+                                        :element-type 'character))
+                      (elt-type (if only-base-chars 'base-char 'character))
+                      (start 0))
+               (unless package
+                 ;; %MAKE-SYMBOL doesn't copy NAME (unless non-simple).
+                 (setq name (make-array length :element-type elt-type)))
+               (dotimes (index (length things)
+                               (if package
+                                   (values (%intern name length package elt-type))
+                                   (%make-symbol name)))
+                 (let ((s (svref strings index)))
+                   (replace name s :start1 start)
+                   (incf start (length s)))))))
+         #+sb-xc-host (base-char-p (char) (typep char 'base-char))
+         #+sb-xc-host (%make-symbol (name) (make-symbol name))
+         #+sb-xc-host (%intern (name length package elt-type)
+                        (declare (ignore length elt-type))
+                        ;; Copy, in case the host respects the DX declaration,
+                        ;; but does not copy, which makes our assumption wrong.
+                        (intern (copy-seq name) package)))
+  ;; Concatenate together the names of some strings and symbols,
+  ;; producing a symbol in the current package.
+  (defun symbolicate (&rest things)
+    (apply #'symbol-concat (sane-package) things))
+  ;; SYMBOLICATE in given package.
+  (defun package-symbolicate (package &rest things)
+    (apply #'symbol-concat package things))
+  ;; like SYMBOLICATE, but producing keywords
+  (defun keywordicate (&rest things)
+    (apply #'symbol-concat *keyword-package* things))
+  ;; like the above, but producing an uninterned symbol.
+  ;; [we already have GENSYMIFY, and naming this GENSYMICATE for
+  ;; consistency with the above would not be particularly enlightening
+  ;; as to how it isn't just GENSYMIFY]
+  (defun gensymify* (&rest things)
+    (apply #'symbol-concat nil things)))
 
 ;;; Access *PACKAGE* in a way which lets us recover when someone has
 ;;; done something silly like (SETF *PACKAGE* :CL-USER) in unsafe code.

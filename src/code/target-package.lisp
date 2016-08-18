@@ -983,7 +983,7 @@ implementation it is ~S." *default-package-use-list*)
   #!+sb-doc
   "Return a symbol in PACKAGE having the specified NAME, creating it
   if necessary."
-    (find/intern %intern t))
+    (find/intern %intern (if (base-string-p name) 'base-char 'character)))
 
   (defun find-symbol (name &optional (package (sane-package)))
   #!+sb-doc
@@ -995,7 +995,11 @@ implementation it is ~S." *default-package-use-list*)
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
-(defun %intern (name length package copy-p)
+;;; If a new symbol is created, its print name will be an array of ELT-TYPE.
+;;; The fasloader always supplies NAME as a (SIMPLE-ARRAY <ELT-TYPE> 1),
+;;; but the reader uses a buffer of CHARACTER, which, based on a flag,
+;;; can be demoted to an array of BASE-CHAR.
+(defun %intern (name length package elt-type)
   (declare (simple-string name) (index length))
   (multiple-value-bind (symbol where) (%find-symbol name length package)
     (cond (where
@@ -1009,20 +1013,9 @@ implementation it is ~S." *default-package-use-list*)
              (setf (values symbol where) (%find-symbol name length package))
              (if where
                  (values symbol where)
-                 (let ((symbol-name (cond ((not copy-p)
-                                           (aver (= (length name) length))
-                                           name)
-                                          ((typep name '(simple-array nil (*)))
-                                           "")
-                                          (t
-                                           ;; This so that SUBSEQ is inlined,
-                                           ;; because we need it fixed for cold init.
-                                           (string-dispatch
-                                               ((simple-array base-char (*))
-                                                (simple-array character (*)))
-                                               name
-                                             (declare (optimize speed))
-                                             (subseq name 0 length))))))
+                 (let ((symbol-name
+                        (replace (make-string length :element-type elt-type)
+                                 name)))
                    (with-single-package-locked-error
                        (:package package "interning ~A" symbol-name)
                      (let ((symbol (make-symbol symbol-name)))

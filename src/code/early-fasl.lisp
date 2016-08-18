@@ -173,8 +173,8 @@
   (stream nil :type ansi-stream :read-only t)
   (table (make-fop-vector 1000) :type simple-vector)
   (stack (make-fop-vector 100) :type simple-vector)
-  (name-buffer (cons (make-array 31 :element-type 'base-char)
-                     (make-array  1 :element-type 'character)))
+  (name-buffer (vector (make-string  1 :element-type 'character)
+                       (make-string 31 :element-type 'base-char)))
   (deprecated-stuff nil :type list)
   ;; Sometimes we want to skip over any FOPs with side-effects (like
   ;; function calls) while executing other FOPs. SKIP-UNTIL will

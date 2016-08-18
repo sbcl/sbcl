@@ -520,8 +520,9 @@
 (defun gen-arg-forms (arg rendering funstate)
   (labels ((tempvars (n)
              (if (plusp n)
-                 (cons (intern (format nil ".T~D" (incf *!temp-var-counter*))
-                               (load-time-value (find-package "SB!DISASSEM")))
+                 (cons (package-symbolicate
+                        (load-time-value (find-package "SB!DISASSEM"))
+                        ".T" (write-to-string (incf *!temp-var-counter*)))
                        (tempvars (1- n))))))
     (let* ((arg-cell (assq arg funstate))
            (rendering-temps (cdr (assq rendering (cdr arg-cell))))

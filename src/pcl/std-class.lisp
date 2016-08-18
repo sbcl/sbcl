@@ -1750,7 +1750,8 @@
              `(defmethod ,name ,args
                 (declare (ignore initargs))
                 (error 'metaobject-initialization-violation
-                       :format-control ,(format nil "~@<~A~@:>" control)
+                       :format-control ,(coerce (format nil "~@<~A~@:>" control)
+                                                'base-string)
                        :format-arguments (list (class-name class))
                        :references (list '(:amop :initialization "Class"))))))
   (def initialize-instance ((class system-class) &rest initargs)

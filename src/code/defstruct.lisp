@@ -631,7 +631,7 @@ unless :NAMED is also specified.")))
                    (or (dd-class-p dd) named-p))
           (setf (dd-predicate-name dd) (symbolicate name "-P")))
         (unless (option-present-p :conc-name)
-          (setf (dd-conc-name dd) (concatenate 'string (string name) "-")))
+          (setf (dd-conc-name dd) (string (gensymify* name "-"))))
         (unless (option-present-p :copier)
           (setf (dd-copier-name dd) (symbolicate "COPY-" name))))))
   dd)
@@ -1714,7 +1714,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                               metaclass-constructor
                                               slot-names)
   (let* ((dd (make-defstruct-description t class-name))
-         (conc-name (concatenate 'string (symbol-name class-name) "-"))
+         (conc-name (string (gensymify* class-name "-")))
          (dd-slots (let ((reversed-result nil)
                          ;; The index starts at 1 for ordinary named
                          ;; slots because slot 0 is magical, used for

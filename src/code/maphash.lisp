@@ -85,7 +85,7 @@ applies to all threads, not just the current one -- even for synchronized
 hash-tables. If the table may be mutated by another thread during iteration,
 use eg. SB-EXT:WITH-LOCKED-HASH-TABLE to protect the WITH-HASH-TABLE-ITERATOR
 for."
-  (let ((function (make-symbol (concatenate 'string (symbol-name name) "-FUN"))))
+  (let ((function (gensymify* name "-FUN")))
     `(let ((,function
             (let* ((table ,hash-table)
                    (size (* 2 (length (hash-table-next-vector table))))
