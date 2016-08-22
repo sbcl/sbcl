@@ -2365,5 +2365,3 @@
   (unless do-not-optimize
     (setf (node-reoptimize cast) nil)))
 
-(deftransform make-symbol ((string) (simple-string))
-  `(%make-symbol string))

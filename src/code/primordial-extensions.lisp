@@ -102,7 +102,9 @@
                         (incf length l)
                         #!+sb-unicode
                         (when (and (typep s '(array character (*)))
-                                   (notevery #'base-char-p s))
+                                   ;; BASE-CHAR-p isn't a standard predicate.
+                                   ;; and host ignores ELT-TYPE anyway.
+                                   #-sb-xc-host (notevery #'base-char-p s))
                           (setq only-base-chars nil))))
              ;; We copy the string when interning, so DX is ok.
              (dx-let ((name (make-array (if package length 0)
@@ -110,17 +112,15 @@
                       (elt-type (if only-base-chars 'base-char 'character))
                       (start 0))
                (unless package
-                 ;; %MAKE-SYMBOL doesn't copy NAME (unless non-simple).
+                 ;; MAKE-SYMBOL doesn't copy NAME (unless non-simple).
                  (setq name (make-array length :element-type elt-type)))
                (dotimes (index (length things)
                                (if package
                                    (values (%intern name length package elt-type))
-                                   (%make-symbol name)))
+                                   (make-symbol name)))
                  (let ((s (svref strings index)))
                    (replace name s :start1 start)
                    (incf start (length s)))))))
-         #+sb-xc-host (base-char-p (char) (typep char 'base-char))
-         #+sb-xc-host (%make-symbol (name) (make-symbol name))
          #+sb-xc-host (%intern (name length package elt-type)
                         (declare (ignore length elt-type))
                         ;; Copy, in case the host respects the DX declaration,
