@@ -1648,14 +1648,14 @@ register."
           (loop
            (when (>= i len) (return))
            (let ((block (make-compiled-debug-block)))
-             (dotimes (k (sb!c:read-var-integer blocks i))
+             (dotimes (k (sb!c:read-var-integerf blocks i))
                (let ((kind (svref sb!c::*compiled-code-location-kinds*
                                   (aref+ blocks i)))
                      (pc (+ last-pc
-                            (sb!c:read-var-integer blocks i)))
+                            (sb!c:read-var-integerf blocks i)))
                      (tlf-offset (or tlf-number
-                                     (sb!c:read-var-integer blocks i)))
-                     (form-number (sb!c:read-var-integer blocks i))
+                                     (sb!c:read-var-integerf blocks i)))
+                     (form-number (sb!c:read-var-integerf blocks i))
                      (live-set (sb!c:read-packed-bit-vector
                                 live-set-len blocks i))
                      (step-info (sb!c:read-var-string blocks i)))

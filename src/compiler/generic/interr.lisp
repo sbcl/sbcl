@@ -213,10 +213,9 @@
       (cddr (svref sb!c:+backend-internal-errors+ error-number))
       0))
 
-#-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGER
+#-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGERF
 (defun decode-internal-error-args (sap error-number)
   (let ((length (sb!kernel::error-length error-number)))
     (declare (type (unsigned-byte 8) length))
-    (let ((index 0))
-      (loop repeat length
-            collect (sb!c:sap-read-var-integer sap index)))))
+    (loop repeat length with index = 0
+       collect (sb!c:sap-read-var-integerf sap index))))

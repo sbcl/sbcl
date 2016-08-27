@@ -2117,19 +2117,16 @@
     (declare (type sb!sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
-         (loop repeat length
-               do
-               (sb!c::sap-read-var-integer sap index))
-         (values 0 (- index offset) nil nil))
+           (loop repeat length do (sb!c:sap-read-var-integerf sap index))
+           (values 0 (- index offset) nil nil))
           (t
            (collect ((sc-offsets)
                      (lengths))
              (lengths 1) ;; error-number
-             (loop repeat length
-                   do
-                   (let ((old-index index))
-                     (sc-offsets (sb!c::sap-read-var-integer sap index))
-                     (lengths (- index old-index))))
+             (loop repeat length do
+                  (let ((old-index index))
+                    (sc-offsets (sb!c:sap-read-var-integerf sap index))
+                    (lengths (- index old-index))))
              (values error-number
                      (- index offset)
                      (sc-offsets)

@@ -13,79 +13,70 @@
 
 ;;;; reading variable length integers
 ;;;;
-;;;; The debug info representation makes extensive use of integers
-;;;; encoded in a byte vector using a variable number of bytes:
-;;;;    0..253 => the integer
-;;;;    254 => read next two bytes for integer
-;;;;    255 => read next four bytes for integer
+;;;; The debug info representation makes extensive use of 32-bit
+;;;; integers encoded in an octet vector using between one and five
+;;;; octets. Each octet
+;;;;
+;;;;   miiiiiii
+;;;;
+;;;; encodes 7 bits of the integer (i) while the final bit indicates
+;;;; whether more (m) octets follow. For example:
+;;;;
+;;;;   #x88888888 => 10001000 10010001 10100010 11000100 00001000
 
-;;; Given a byte vector VEC and an index variable INDEX, read a
-;;; variable length integer and advance index.
+;;; Given an octet-vector SOURCE and an initial offset START, read a
+;;; variable length integer and return two values 1) the integer 2)
+;;; the new offset
+(defun var-integer-decoding-error (source start offset)
+  (error "~@<Improperly terminated variable-length integer in ~S at ~
+          ~D (starting at ~D).~@:>"
+         source offset start))
+
 #-sb-xc-host
-(progn
-(defun %read-var-integer (vec index)
-  (let ((val (aref vec index)))
-    (cond ((<= val 253)
-           (values val (1+ index)))
-          ((= val 254)
-           (values
-            (logior (aref vec (+ index 1))
-                    (ash (aref vec (+ index 2)) 8))
-            (+ index 3)))
-          (t
-           (values
-            (logior (aref vec (+ index 1))
-                    (ash (aref vec (+ index 2)) 8)
-                    (ash (aref vec (+ index 3)) 16)
-                    (ash (aref vec (+ index 4)) 24))
-            (+ index 5))))))
+(macrolet
+    ((define-read-var-integer (function-name macro-name source-type accessor)
+       `(progn
+          (declaim (ftype (function (,source-type index)
+                                    (values (unsigned-byte 32) index))
+                          ,function-name))
+          (defun ,function-name (source start)
+            (loop
+               for offset :of-type index              from start  ; position in buffer
+               for k      :of-type (integer 0 28)     from 0 by 7 ; position in integer
+               for octet                              =    (,accessor source offset)
+               for finalp                             =    (not (logbitp 7 octet))
+               for accum  :of-type (unsigned-byte 36) =    (mask-field (byte 7 0) octet)
+                                                      then (dpb octet (byte 7 k) accum)
+               when (and (= k 28) (not (zerop (ldb (byte 4 4) octet))))
+               do (var-integer-decoding-error source start offset)
+               when finalp return (values accum (1+ offset))))
 
-(defmacro read-var-integer (vec index)
-  (once-only ((vec vec))
-    `(multiple-value-bind (value new-index)
-         (%read-var-integer ,vec ,index)
-       (setf ,index new-index)
-       value)))
+          (defmacro ,macro-name (vector index)
+            `(multiple-value-bind (value new-index)
+                 (,',function-name ,vector ,index)
+               (setf ,index new-index)
+               value)))))
 
-(defun %sap-read-var-integer (sap index)
-  (let ((val (sap-ref-8 sap index)))
-    (cond ((<= val 253)
-           (values val (1+ index)))
-          ((= val 254)
-           (values
-            (logior (sap-ref-8 sap (+ index 1))
-                    (ash (sap-ref-8 sap (+ index 2)) 8))
-            (+ index 3)))
-          (t
-           (values
-            (logior (sap-ref-8 sap (+ index 1))
-                    (ash (sap-ref-8 sap (+ index 2)) 8)
-                    (ash (sap-ref-8 sap (+ index 3)) 16)
-                    (ash (sap-ref-8 sap (+ index 4)) 24))
-            (+ index 5))))))
+  (define-read-var-integer read-var-integer read-var-integerf
+    (array (unsigned-byte 8) 1) aref)
+  (define-read-var-integer sap-read-var-integer sap-read-var-integerf
+    system-area-pointer sap-ref-8))
 
-(defmacro sap-read-var-integer (sap index)
-  (once-only ((sap sap))
-    `(multiple-value-bind (value new-index)
-         (%sap-read-var-integer ,sap ,index)
-       (setf ,index new-index)
-       value))))
+;;; Take an adjustable vector VECTOR with a fill pointer and push the
+;;; variable length representation of VALUE on the end.
+(declaim (ftype (sfunction ((unsigned-byte 32) (array (unsigned-byte 8) 1)) (integer 0 5))
+                write-var-integer))
+(defun write-var-integer (value vector)
+  (loop
+     for v      :of-type (unsigned-byte 32) = value then (ash v -7)
+     for v-next :of-type (unsigned-byte 32) = (ash v -7)
+     for i                                  from 0
+     until (and (plusp i) (zerop v))
+     do (vector-push-extend (dpb (if (zerop v-next) 0 1) (byte 1 7)
+                                 (ldb (byte 7 0) v))
+                            vector)
+     finally (return i)))
 
-;;; Take an adjustable vector VEC with a fill pointer and push the
-;;; variable length representation of INT on the end.
-(defun write-var-integer (int vec)
-  (declare (type (unsigned-byte 32) int))
-  (cond ((<= int 253)
-         (vector-push-extend int vec))
-        (t
-         (let ((32-p (> int #xFFFF)))
-           (vector-push-extend (if 32-p 255 254) vec)
-           (vector-push-extend (ldb (byte 8 0) int) vec)
-           (vector-push-extend (ldb (byte 8 8) int) vec)
-           (when 32-p
-             (vector-push-extend (ldb (byte 8 16) int) vec)
-             (vector-push-extend (ldb (byte 8 24) int) vec)))))
-  (values))
 
 ;;;; packed strings
 ;;;;
@@ -94,12 +85,12 @@
 
 ;;; Read a packed string from VEC starting at INDEX, advancing INDEX.
 (defmacro read-var-string (vec index)
-  (once-only ((len `(read-var-integer ,vec ,index)))
+  (once-only ((len `(read-var-integerf ,vec ,index)))
     (once-only ((res `(make-string ,len)))
       `(progn
          (loop for i from 0 below ,len
                do (setf (aref ,res i)
-                        (code-char (read-var-integer ,vec ,index))))
+                        (code-char (read-var-integerf ,vec ,index))))
          ,res))))
 
 ;;; Write STRING into VEC (adjustable, with fill-pointer) represented

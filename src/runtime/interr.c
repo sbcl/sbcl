@@ -31,6 +31,7 @@
 #include "thread.h"
 #include "monitor.h"
 #include "breakpoint.h"
+#include "var-io.h"
 
 /* the way that we shut down the system on a fatal error */
 
@@ -181,7 +182,8 @@ void
 describe_internal_error(os_context_t *context)
 {
     unsigned char *ptr = arch_internal_error_arguments(context);
-    int scoffset, sc, offset, ch;
+    char count;
+    int position, sc_offset, sc_number, offset, ch;
     void * pc = (void*)*os_context_pc_addr(context);
 
 #ifdef LISP_FEATURE_ARM64
@@ -194,31 +196,19 @@ describe_internal_error(os_context_t *context)
 #endif
 
     if (code > sizeof(internal_error_nargs)) {
-      printf("Unknown error code %d at %p\n", code, pc);
+        printf("Unknown error code %d at %p\n", code, pc);
     }
     printf("Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
 
-    char len = internal_error_nargs[code];
+    for (count = internal_error_nargs[code], position = 0;
+         count > 0;
+         --count) {
+        sc_offset = read_var_integer(ptr, &position);
+        sc_number = sc_offset & 0x3F;
+        offset = sc_offset >> 6;
 
-    while (len > 0) {
-        scoffset = *ptr++;
-        len--;
-        if (scoffset == 253) {
-            scoffset = *ptr++;
-        }
-        else if (scoffset == 254) {
-            scoffset = ptr[0] + ptr[1]*256;
-            ptr += 2;
-        }
-        else if (scoffset == 255) {
-            scoffset = ptr[0] + (ptr[1]<<8) + (ptr[2]<<16) + (ptr[3]<<24);
-            ptr += 4;
-        }
-        sc = scoffset & 0x3F;
-        offset = scoffset >> 6;
-
-        printf("    SC: %d, Offset: %d", sc, offset);
-        switch (sc) {
+        printf("    SC: %d, Offset: %d", sc_number, offset);
+        switch (sc_number) {
         case sc_AnyReg:
         case sc_DescriptorReg:
             putchar('\t');
