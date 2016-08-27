@@ -1169,7 +1169,7 @@
 ;;; segment so uses of %%CURRENT-SEGMENT%% inside the body don't have
 ;;; to keep dereferencing the symbol. Given that ASSEMBLE is the only
 ;;; interface to **CURRENT-SEGMENT**, we don't have to worry about the
-;;; special value becomming out of sync with the lexical value. Unless
+;;; special value becoming out of sync with the lexical value. Unless
 ;;; some bozo closes over it, but nobody does anything like that...
 (defmacro assemble ((&optional segment vop &key labels) &body body
                     &environment env)

@@ -808,7 +808,7 @@
 ;; not cause the ERRORP value from COMPILE-TIME to be T.
 ;; Nor do we cite section 3.2.2.3 as the governing prohibition.
 (defun report-duplicate-definition (condition stream)
-  (format stream "~@<Duplicate definition for ~S found in  one file.~@:>"
+  (format stream "~@<Duplicate definition for ~S found in one file.~@:>"
           (slot-value condition 'name)))
 
 (define-condition duplicate-definition (reference-condition warning)
