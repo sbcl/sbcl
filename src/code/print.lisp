@@ -926,22 +926,31 @@ variable: an unreadable object representing the error is printed instead.")
                   '(simple-array ,(array-element-type vector) (*)))
          :stream stream))
 
-(defun output-vector (vector stream)
+(defun output-vector (vector stream &aux (readably *print-readably*))
   (declare (vector vector))
   (cond ((stringp vector)
-         (cond ((and *print-readably*
-                     (not (eq (array-element-type vector)
-                              (load-time-value
-                               (array-element-type
-                                (make-array 0 :element-type 'character))))))
-                (print-not-readable-error vector stream))
-               ((or *print-escape* *print-readably*)
-                (write-char #\" stream)
-                (quote-string vector stream)
-                (write-char #\" stream))
-               (t
-                (write-string vector stream))))
-        ((not (or *print-array* *print-readably*))
+         (let ((coerce-p
+                #!+sb-unicode (and readably (base-string-p vector))))
+           (cond ((and coerce-p (not *read-eval*))
+                  (print-not-readable-error vector stream))
+                 ((or *print-escape* readably)
+                  (when coerce-p
+                    ;; OUTPUT-UNREADABLE-VECTOR-READABLY would output each char
+                    ;; in #\c syntax. In addition to wasting time coercing to a
+                    ;; general vector, it's not nice looking.
+                    (write-string "#.(" stream)
+                    (write 'coerce :stream stream) ; package-qualify / casify as needed
+                    (write-char #\Space stream))
+                  (write-char #\" stream)
+                  (quote-string vector stream)
+                  (write-char #\" stream)
+                  (when coerce-p
+                    (write-char #\Space stream)
+                    (write ''base-string :stream stream)
+                    (write-char #\) stream)))
+                 (t
+                  (write-string vector stream)))))
+        ((not (or *print-array* readably))
          (output-terse-array vector stream))
         ((bit-vector-p vector)
          (write-string "#*" stream)
@@ -949,8 +958,7 @@ variable: an unreadable object representing the error is printed instead.")
            ;; (Don't use OUTPUT-OBJECT here, since this code
            ;; has to work for all possible *PRINT-BASE* values.)
            (write-char (if (zerop bit) #\0 #\1) stream)))
-        ((or (not *print-readably*)
-             (array-readably-printable-p vector))
+        ((or (not readably) (array-readably-printable-p vector))
          (descend-into (stream)
                        (write-string "#(" stream)
                        (dotimes (i (length vector))
