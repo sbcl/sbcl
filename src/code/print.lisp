@@ -930,7 +930,7 @@ variable: an unreadable object representing the error is printed instead.")
   (declare (vector vector))
   (cond ((stringp vector)
          (let ((coerce-p
-                #!+sb-unicode (and readably (base-string-p vector))))
+                (and readably (not (typep vector '(vector character))))))
            (cond ((and coerce-p (not *read-eval*))
                   (print-not-readable-error vector stream))
                  ((or *print-escape* readably)
@@ -946,7 +946,7 @@ variable: an unreadable object representing the error is printed instead.")
                   (write-char #\" stream)
                   (when coerce-p
                     (write-char #\Space stream)
-                    (write ''base-string :stream stream)
+                    (write `'(vector ,(array-element-type vector)) :stream stream)
                     (write-char #\) stream)))
                  (t
                   (write-string vector stream)))))

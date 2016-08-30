@@ -661,7 +661,8 @@
 (with-test (:name :print-unreadably-function)
   (assert (equal "\"foo\""
                  (handler-bind ((print-not-readable #'sb-ext:print-unreadably))
-                   (write-to-string (coerce "foo" 'base-string) :readably t)))))
+                   (let ((*read-eval* nil))
+                     (write-to-string (coerce "foo" 'base-string) :readably t))))))
 
 (with-test (:name :printing-specialized-arrays-readably)
   (let ((*read-eval* t)
