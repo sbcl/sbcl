@@ -587,7 +587,7 @@ static char *symbol_slots[] = {"value: ", "hash: ",
     NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
-static char *code_slots[] = {"words: ", "entry: ", "debug: ", NULL};
+static char *code_slots[] = {"bytes: ", "entry: ", "debug: ", NULL};
 static char *fn_slots[] = {
     "self: ", "next: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
