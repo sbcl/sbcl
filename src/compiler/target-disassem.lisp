@@ -556,8 +556,9 @@
                                  (inst-length inst)))
                         (let ((orig-next (dstate-next-offs dstate))
                               (control (inst-control inst)))
-                          (print-inst (inst-length inst) stream dstate
-                                      :trailing-space nil)
+                          (when stream
+                            (print-inst (inst-length inst) stream dstate
+                                        :trailing-space nil))
 
                           (dolist (item (inst-prefilters inst))
                             (declare (optimize (sb!c::insert-array-bounds-checks 0)))
