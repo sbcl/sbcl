@@ -1678,7 +1678,10 @@ variable: an unreadable object representing the error is printed instead.")
              (write-string "bogus code object" stream))
             (t
              (write-string "code object" stream)
-             (when dinfo
+             (do ((n 0 (1+ n))
+                  (f (%code-entry-points component) (%simple-fun-next f)))
+                 ((null f) (format stream " [~D]" n)))
+             (when (typep dinfo 'sb!c::debug-info)
                (write-char #\space stream)
                (output-object (sb!c::debug-info-name dinfo) stream)))))))
 
