@@ -213,13 +213,12 @@ static struct code *
 trans_code(struct code *code)
 {
     struct code *new_code;
-    lispobj first, l_code, l_new_code;
+    lispobj l_code, l_new_code;
     uword_t nheader_words, ncode_words, nwords;
     uword_t displacement;
     lispobj fheaderl, *prev_pointer;
 
     /* if object has already been transported, just return pointer */
-    first = code->header;
     if (forwarding_pointer_p((lispobj *)code)) {
 #ifdef DEBUG_CODE_GC
         printf("Was already transported\n");
@@ -228,7 +227,7 @@ trans_code(struct code *code)
             ((lispobj *)((pointer_sized_uint_t) code));
     }
 
-    gc_assert(widetag_of(first) == CODE_HEADER_WIDETAG);
+    gc_assert(widetag_of(code->header) == CODE_HEADER_WIDETAG);
 
     /* prepare to transport the code vector */
     l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
