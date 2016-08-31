@@ -258,7 +258,7 @@
     (load-type type function (- fun-pointer-lowtag))
     (inst cmp type simple-fun-header-widetag)
     (inst b :eq SIMPLE-FUN)
-    (load-inline-constant lip '(:fixup "closure_tramp" :foreign) lip)
+    (load-inline-constant lip '(:fixup closure-tramp :assembly-routine) lip)
     SIMPLE-FUN
     (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -273,7 +273,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (load-inline-constant temp '(:fixup "undefined_tramp" :foreign) lip)
+    (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine) lip)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 

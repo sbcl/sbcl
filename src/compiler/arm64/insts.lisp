@@ -2154,22 +2154,23 @@
   (label :fields (list (byte 2 29) (byte 19 5)) :type 'label)
   (rd :field (byte 5 0) :type 'x-reg))
 
-(defun emit-pc-relative-inst (op segment rd label)
+(defun emit-pc-relative-inst (op segment rd label &optional (offset 0))
   (assert (label-p label))
   (assert (register-p rd))
   (emit-back-patch segment 4
                    (lambda (segment posn)
-                     (let ((offset (- (label-position label) posn)))
+                     (let ((offset (+ (- (label-position label) posn)
+                                      offset)))
                        (emit-pc-relative segment
                                          op
                                          (ldb (byte 2 0) offset)
                                          (ldb (byte 19 2) offset)
                                          (tn-offset rd))))))
 
-(define-instruction adr (segment rd label)
+(define-instruction adr (segment rd label &optional (offset 0))
   (:printer pc-relative ((op 0)))
   (:emitter
-   (emit-pc-relative-inst 0 segment rd label)))
+   (emit-pc-relative-inst 0 segment rd label offset)))
 
 (define-instruction adrp (segment rd label)
   (:printer pc-relative ((op 1)))

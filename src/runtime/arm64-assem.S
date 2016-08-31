@@ -347,95 +347,7 @@ call_into_c:
         ret
 
 	.size	call_into_c, .-call_into_c
-
-	.align	4
-	.global	undefined_tramp
-	.type	undefined_tramp, %object
-        .equ    undefined_tramp_header, . + FUN_POINTER_LOWTAG
-	.dword	SIMPLE_FUN_HEADER_WIDETAG
-        .dword	undefined_tramp_header
-.known_nil:
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-undefined_tramp:
-
-        // As in ppc-assem.S, point reg_CODE to the header with a
-        // function lowtag
-        adr     reg_CODE, undefined_tramp_header
-
-
-        brk UNDEFINED_FUN_ERROR << 8 | trap_Error
-
-        // Encode LEXENV
-        // produced with
-        // (let ((result (make-array 10 :fill-pointer 0)))
-        //  (sb-c:write-var-integer
-        //   (sb-c:make-sc-offset sb-vm:descriptor-reg-sc-number sb-vm::lexenv-offset)
-        //   result)
-        //  result)
-        .byte   254
-        .byte   69
-        .byte   5
-.error_args_end:
-
 
-        .align	4
-	.global	undefined_alien_function
-	.type	undefined_alien_function, %object
-        .equ    undefined_alien_function_header, . + FUN_POINTER_LOWTAG
-	.dword	SIMPLE_FUN_HEADER_WIDETAG
-        .dword	undefined_alien_function_header
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-undefined_alien_function:
-        adr     reg_CODE, undefined_alien_function_header
-
-        brk     UNDEFINED_ALIEN_FUN_ERROR << 8 | trap_Error
-
-        // Encode unsigned R8, which comes from call_into_c
-        .byte   0xFE
-        .byte   0x92
-        .byte   0x04
-
-
-	.align	4
-	.global	closure_tramp
-	.type	closure_tramp, %object
-	.dword	SIMPLE_FUN_HEADER_WIDETAG
-        .dword	closure_tramp - SIMPLE_FUN_CODE_OFFSET
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-closure_tramp:
-	ldr	reg_LEXENV, [reg_LEXENV, #FDEFN_FUN_OFFSET]
-	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-        br      reg_LR
-
-	.align	4
-	.global	funcallable_instance_tramp
-	.type	funcallable_instance_tramp, %object
-        .equ	funcallable_instance_tramp, .+ FUN_POINTER_LOWTAG
-	.dword	SIMPLE_FUN_HEADER_WIDETAG
-	.dword	funcallable_instance_tramp
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        .dword	NIL
-        ldr	reg_LEXENV, [reg_LEXENV, #FUNCALLABLE_INSTANCE_FUNCTION_OFFSET]
-	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-        br      reg_LR
-
         // FIXME-ARM: The following is random garbage, to make
         // code/debug-int compile. To get the debugger working, this
         // needs to be implemented.

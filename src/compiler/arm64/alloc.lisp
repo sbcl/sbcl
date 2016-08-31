@@ -105,7 +105,7 @@
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size :lip lip)
-      (load-inline-constant temp '(:fixup "undefined_tramp" :foreign) lip)
+      (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine) lip)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
@@ -159,7 +159,7 @@
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (load-inline-constant result '(:fixup "funcallable_instance_tramp" :foreign) lip)))
+    (load-inline-constant result '(:fixup funcallable-instance-tramp :assembly-routine) lip)))
 
 (define-vop (fixed-alloc)
   (:args)
