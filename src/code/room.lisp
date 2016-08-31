@@ -137,7 +137,7 @@
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
 #!+gencgc
-(defun current-dynamic-space-start () sb!vm:dynamic-space-start)
+(defun current-dynamic-space-start () dynamic-space-start)
 #!-gencgc
 (defun current-dynamic-space-start ()
   (extern-alien "current_dynamic_space" unsigned-long))
@@ -306,8 +306,7 @@
               ;; will be a short. On platforms with larger ones, it'll
               ;; be an int.
               (bytes-used (unsigned
-                           #.(if (typep sb!vm:gencgc-card-bytes
-                                        '(unsigned-byte 16))
+                           #.(if (typep gencgc-card-bytes '(unsigned-byte 16))
                                  16
                                  32)))
               (flags (unsigned 8))
@@ -401,8 +400,8 @@
 ;;; allocated in Space.
 (defun type-breakdown (space)
   (declare (muffle-conditions t))
-  (let ((sizes (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits)))
-        (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits))))
+  (let ((sizes (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.n-word-bits)))
+        (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.n-word-bits))))
     (map-allocated-objects
      (lambda (obj type size)
        (declare (word size) (optimize (speed 3)) (ignore obj))

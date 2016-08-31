@@ -43,7 +43,7 @@
           collect (sb-vm::value-cell-ref c))))
 
 (defun find-named-callees (fun &key (type t) (name nil namep))
-  (let ((code (sb-kernel:fun-code-header (sb-kernel:%fun-fun fun))))
+  (let ((code (fun-code-header (%fun-fun fun))))
     (loop for i from sb-vm:code-constants-offset below (code-header-words code)
           for c = (code-header-ref code i)
           when (and (typep c 'sb-impl::fdefn)
@@ -54,14 +54,14 @@
           collect (sb-impl::fdefn-fun c))))
 
 (defun find-anonymous-callees (fun &key (type 'function))
-  (let ((code (sb-kernel:fun-code-header (%fun-fun fun))))
+  (let ((code (fun-code-header (%fun-fun fun))))
     (loop for i from sb-vm:code-constants-offset below (code-header-words code)
           for fun = (code-header-ref code i)
           when (typep fun type)
           collect fun)))
 
 (defun find-code-constants (fun &key (type t))
-  (let ((code (sb-kernel:fun-code-header (%fun-fun fun))))
+  (let ((code (fun-code-header (%fun-fun fun))))
     (loop for i from sb-vm:code-constants-offset below (code-header-words code)
           for c = (code-header-ref code i)
           when (typep c type)
