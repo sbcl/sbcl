@@ -342,7 +342,7 @@
                             fun-pointer-lowtag)))
     (inst cmp (reg-in-size type :byte) simple-fun-header-widetag)
     (inst jmp :e NORMAL-FUN)
-    (inst mov raw (make-fixup "closure_tramp" :foreign))
+    (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
     NORMAL-FUN
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
@@ -355,7 +355,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
-    (storew (make-fixup "undefined_tramp" :foreign)
+    (storew (make-fixup 'undefined-tramp :assembly-routine)
             fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 

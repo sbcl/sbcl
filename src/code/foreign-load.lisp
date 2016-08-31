@@ -194,7 +194,10 @@ is never in the linkage-table."
               (remhash symbol symbols)
               (if datap
                   undefined-alien-address
-                  (find-foreign-symbol-address "undefined_alien_function")))
+                  (or
+                   #!+read-only-tramps
+                   (gethash 'sb!vm::undefined-alien-tramp sb!fasl:*assembler-routines*)
+                   (find-foreign-symbol-address "undefined_alien_function"))))
              (addr
               (setf (gethash symbol symbols) t)
               (remhash symbol undefineds)

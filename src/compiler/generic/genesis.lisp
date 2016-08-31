@@ -3723,7 +3723,7 @@ initially undefined function references:~2%")
           (load-cold-foreign-symbol-table symbol-table-file-name)
           (error "can't output a core file without symbol table file input")))
 
-    #!+sb-dynamic-core
+    #!+(and sb-dynamic-core (not read-only-tramps))
     (progn
       (setf (gethash (extern-alien-name "undefined_tramp")
                      *cold-foreign-symbol-table*)

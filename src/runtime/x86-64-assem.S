@@ -18,10 +18,7 @@
 #include "validate.h"
 #include "sbcl.h"
 #include "genesis/closure.h"
-#include "genesis/funcallable-instance.h"
-#include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
-#include "genesis/symbol.h"
 #include "genesis/thread.h"
 	
 /* Minimize conditionalization for different OS naming schemes. */
@@ -251,39 +248,6 @@ GNAME(fpu_restore):
 	ret
 	SIZE(GNAME(fpu_restore))
 
-/*
- * the undefined-function trampoline
- */
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(undefined_tramp)
-	TYPE(GNAME(undefined_tramp))
-GNAME(undefined_tramp):
-	pop	8(%rbp)         # Save return PC for backtrace.
-	TRAP
-	.byte	trap_Error
-        .byte   UNDEFINED_FUN_ERROR
-        .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
-	ret
-	SIZE(GNAME(undefined_tramp))
-
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(undefined_alien_function)
-	TYPE(GNAME(undefined_alien_function))
-GNAME(undefined_alien_function):
-	pop	8(%rbp)         # Save return PC for backtrace.
-	TRAP
-	.byte	trap_Error
-        .byte   UNDEFINED_ALIEN_FUN_ERROR
-        /* Encode RBX
-           FIXME: make independt of the encoding changes. */
-        .byte   0xFE 
-        .byte   0x9F
-        .byte   0x01
-	ret
-	SIZE(GNAME(undefined_alien_function))
-
 /* KLUDGE: FIND-ESCAPED-FRAME (SYS:SRC;CODE;DEBUG-INT.LISP) needs
  * to know the name of the function immediately following the
  * undefined-function trampoline. */
@@ -349,38 +313,6 @@ GNAME(alloc_tramp):
 	ret
 	SIZE(GNAME(alloc_tramp))
 
-		
-/*
- * the closure trampoline - entered when a global function is a closure
- * and the function is called "by name" (normally, as when it is the
- * head of a form) via an FDEFN. Register %RAX holds the fdefn address,
- * but the simple-fun which underlies the closure expects %RAX to be the
- * closure itself. So we grab the closure out of the fdefn pointed to,
- * then jump to the simple-fun that the closure points to.
- */
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(closure_tramp)
-	TYPE(GNAME(closure_tramp))
-GNAME(closure_tramp):
-	mov	FDEFN_FUN_OFFSET(%rax),%rax
-	jmp	*CLOSURE_FUN_OFFSET(%rax)
-	SIZE(GNAME(closure_tramp))
-
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(funcallable_instance_tramp)
-#if !defined(LISP_FEATURE_DARWIN)
-	TYPE(GNAME(funcallable_instance_tramp))
-#endif
-        GNAME(funcallable_instance_tramp):
-	mov	FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(%rax),%rax
-	/* KLUDGE: on this platform, whatever kind of function is in %rax
-	 * now, the first word of it contains the address to jump to. */
-	jmp	*CLOSURE_FUN_OFFSET(%rax)
-#if !defined(LISP_FEATURE_DARWIN)
-	SIZE(GNAME(funcallable_instance_tramp))
-#endif
 /*
  * fun-end breakpoint magic
  */

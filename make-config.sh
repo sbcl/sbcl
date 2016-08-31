@@ -661,7 +661,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :precise-arg-count-error :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
+    printf ' :alien-callbacks :cycle-counter :complex-float-vops :read-only-tramps' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
 

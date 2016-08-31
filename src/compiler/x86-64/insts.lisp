@@ -1660,7 +1660,8 @@
             ;; the linkage table) and for linkage table references, since
             ;; these should always end up in low memory.
             (aver (or (member (fixup-flavor src)
-                              '(:foreign :foreign-dataref :symbol-tls-index))
+                              '(:foreign :foreign-dataref :symbol-tls-index
+                                :assembly-routine))
                       (eq (ea-size dst) :dword)))
             (maybe-emit-rex-for-ea segment dst nil)
             (emit-byte segment #b11000111)

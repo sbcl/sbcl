@@ -3130,7 +3130,9 @@ verify_space(lispobj *start, size_t words)
                 extern char funcallable_instance_tramp;
                 /* Verify that it points to another valid space. */
                 if (!to_readonly_space && !to_static_space
+#ifndef LISP_FEATURE_READ_ONLY_TRAMPS
                     && (thing != (lispobj)&funcallable_instance_tramp)
+#endif
                     && !is_in_stack_space(thing)) {
                     lose("Ptr %p @ %p sees junk.\n", thing, start);
                 }
