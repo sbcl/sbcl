@@ -14,12 +14,6 @@
 (defconstant +mul+ #+sb-unicode (code-char 215) #-sb-unicode #\*)
 (defconstant +div+ #+sb-unicode (code-char 247) #-sb-unicode #\/)
 
-(defun split-string (string delimiter)
-  (loop for begin = 0 then (1+ end)
-        for end = (position delimiter string) then (position delimiter string :start begin)
-        collect (subseq string begin end)
-        while end))
-
 (defun line-to-clusters (line)
   (let ((codepoints
          (remove "" (split-string (substitute #\Space +div+ line) #\Space)

@@ -5,7 +5,7 @@
            #:*break-on-failure* #:*break-on-expected-failure*
            #:make-kill-thread #:make-join-thread
            #:checked-compile
-           #:runtime))
+           #:runtime #:split-string))
 
 (in-package :test-util)
 
@@ -261,3 +261,9 @@
 
 (defmacro runtime (form &key (repetitions 3) (precision 10))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
+
+(defun split-string (string delimiter)
+  (loop for begin = 0 then (1+ end)
+        for end = (position delimiter string) then (position delimiter string :start begin)
+        collect (subseq string begin end)
+        while end))
