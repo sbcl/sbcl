@@ -47,12 +47,12 @@
   (tail 0 :type index))
 (declaim (freeze-type buffer))
 
-(defvar *available-buffers* ()
+(defglobal *available-buffers* ()
   #!+sb-doc
   "List of available buffers.")
 
-(defvar *available-buffers-lock* (sb!thread:make-mutex
-                                  :name "lock for *AVAILABLE-BUFFERS*")
+(defglobal *available-buffers-lock*
+  (sb!thread:make-mutex :name "lock for *AVAILABLE-BUFFERS*")
   #!+sb-doc
   "Mutex for access to *AVAILABLE-BUFFERS*.")
 
@@ -2587,9 +2587,7 @@
 (defun stream-deinit ()
   ;; Unbind to make sure we're not accidently dealing with it
   ;; before we're ready (or after we think it's been deinitialized).
-  (with-available-buffers-lock ()
-    (without-package-locks
-        (makunbound '*available-buffers*))))
+  (with-available-buffers-lock () (%makunbound '*available-buffers*)))
 
 (defun stdstream-external-format (fd outputp)
   #!-win32 (declare (ignore fd outputp))

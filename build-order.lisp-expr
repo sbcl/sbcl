@@ -274,9 +274,9 @@
 
  ("src/code/room"   :not-host)
 
+ ("src/code/symbol"        :not-host)
  ("src/code/fd-stream"     :not-host)
  ("src/code/stream"        :not-host)
- ("src/code/symbol"        :not-host) ; uses STRING-OUTPUT-STREAM
  ("src/code/early-format")
  ("src/code/defpackage"    :not-host)
 
