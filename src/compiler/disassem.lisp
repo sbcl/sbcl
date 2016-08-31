@@ -83,7 +83,15 @@
                  dchunk=
                  dchunk-count-bits))
 
-(defconstant dchunk-bits sb!vm:n-word-bits)
+;;; For variable-length instruction sets, such as x86, it is better to
+;;; define the dchunk size to be the smallest number of bits necessary
+;;; and sufficient to decode any instruction format, if that quantity
+;;; of bits is small enough to avoid bignum consing.
+;;; Ideally this constant would go in the 'insts' file for the architecture,
+;;; but there's really no easy way to do that at present.
+(defconstant dchunk-bits
+  #!+x86-64 56
+  #!-x86-64 sb!vm:n-word-bits)
 
 (deftype dchunk ()
   `(unsigned-byte ,dchunk-bits))
@@ -91,7 +99,7 @@
   `(integer 0 ,dchunk-bits))
 
 (defconstant dchunk-zero 0)
-(defconstant dchunk-one (1- (expt 2 sb!vm:n-word-bits)))
+(defconstant dchunk-one (ldb (byte dchunk-bits 0) -1))
 
 (defun dchunk-extract (chunk byte-spec)
   (declare (type dchunk chunk))
@@ -133,7 +141,12 @@
   (declare (type sb!sys:system-area-pointer sap)
            (type offset byte-offset)
            (muffle-conditions compiler-note) ; returns possible bignum
+           ;; Not all backends can actually disassemble for either byte order.
+           (ignorable byte-order)
            (optimize (speed 3) (safety 0)))
+  #!+x86-64
+  (logand (sb!sys:sap-ref-word sap byte-offset) dchunk-one)
+  #!-x86-64
   (the dchunk
        (ecase dchunk-bits
          (32 (if (eq byte-order :big-endian)
@@ -382,6 +395,7 @@
       If non-NIL, the value of this argument is used as an address, and if
       that address occurs inside the disassembled code, it is replaced by a
       label. If this is a function, it is called to filter the value."
+  (aver (<= length-in-bits dchunk-bits))
   `(progn
      (eval-when (:compile-toplevel)
        (%def-inst-format
