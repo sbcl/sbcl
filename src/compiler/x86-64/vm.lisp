@@ -190,22 +190,6 @@
 
 ;;;; SC definitions
 
-;;; a handy macro so we don't have to keep changing all the numbers whenever
-;;; we insert a new storage class
-;;;
-(defmacro !define-storage-classes (&rest classes)
-  (collect ((forms))
-    (let ((index 0))
-      (dolist (class classes)
-        (let* ((sc-name (car class))
-               (constant-name (symbolicate sc-name "-SC-NUMBER")))
-          (forms `(define-storage-class ,sc-name ,index
-                    ,@(cdr class)))
-          (forms `(defconstant ,constant-name ,index))
-          (incf index))))
-    `(progn
-       ,@(forms))))
-
 (!define-storage-classes
 
   ;; non-immediate constants in the constant pool

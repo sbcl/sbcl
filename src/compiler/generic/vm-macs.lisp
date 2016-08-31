@@ -161,6 +161,19 @@
          (setf *!late-primitive-object-forms*
                (append *!late-primitive-object-forms*
                        ',(forms)))))))
+
+(defmacro !define-storage-classes (&rest classes)
+  (collect ((forms))
+    (let ((index 0))
+      (dolist (class classes)
+        (let* ((sc-name (car class))
+               (constant-name (symbolicate sc-name "-SC-NUMBER")))
+          (forms `(define-storage-class ,sc-name ,index
+                    ,@(cdr class)))
+          (forms `(defconstant ,constant-name ,index))
+          (incf index))))
+    `(progn
+       ,@(forms))))
 
 ;;;; stuff for defining reffers and setters
 
