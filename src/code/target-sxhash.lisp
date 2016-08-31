@@ -443,6 +443,7 @@
 
 (defun number-psxhash (key)
   (declare (type number key)
+           (muffle-conditions compiler-note)
            (optimize speed))
   (flet ((sxhash-double-float (val)
            (declare (type double-float val))

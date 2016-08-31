@@ -31,5 +31,7 @@
            (ignore code))
   t)
 
+(eval-when (:compile-toplevel)
+  (sb!xc:proclaim '(muffle-conditions compiler-note)))
 (define-multibyte-encoding :gbk (:gbk :cp936)
   ucs-to-gbk gbk-to-ucs mb-len-as-gbk gbk-continuation-byte-p)
