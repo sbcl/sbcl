@@ -162,18 +162,25 @@
                (append *!late-primitive-object-forms*
                        ',(forms)))))))
 
+;;; We want small SC-NUMBERs for SCs whose numbers are frequently
+;;; embedded into machine code. We therefore fix the numbers for the
+;;; four (i.e two bits) most frequently embedded SCs (empirically
+;;; determined) and assign the rest sequentially.
 (defmacro !define-storage-classes (&rest classes)
-  (collect ((forms))
-    (let ((index 0))
-      (dolist (class classes)
-        (let* ((sc-name (car class))
-               (constant-name (symbolicate sc-name "-SC-NUMBER")))
-          (forms `(define-storage-class ,sc-name ,index
-                    ,@(cdr class)))
-          (forms `(def!constant ,constant-name ,index))
-          (incf index))))
-    `(progn
-       ,@(forms))))
+  (let* ((fixed-numbers '((descriptor-reg . 0)
+                          (any-reg        . 1)
+                          (signed-reg     . 2)
+                          (constant       . 3)))
+         (index (length fixed-numbers)))
+    (flet ((process-class (class-spec)
+             (destructuring-bind (sc-name sb-name &rest args) class-spec
+               (let* ((sc-number (or (cdr (assoc sc-name fixed-numbers))
+                                     (1- (incf index))))
+                      (constant-name (symbolicate sc-name "-SC-NUMBER")))
+                 `((define-storage-class ,sc-name ,sc-number
+                     ,sb-name ,@args)
+                   (def!constant ,constant-name ,sc-number))))))
+      `(progn ,@(mapcan #'process-class classes)))))
 
 ;;;; stuff for defining reffers and setters
 
