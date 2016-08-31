@@ -14,7 +14,7 @@
 
 #!-sb-fluid (declaim (inline store-word))
 (defun store-word (word base &optional (offset 0) (lowtag 0))
-  (declare (type (unsigned-byte #.sb!vm:n-word-bits) word base offset)
+  (declare (type (unsigned-byte #.n-word-bits) word base offset)
            (type (unsigned-byte #.n-lowtag-bits) lowtag))
   (setf (sap-ref-word (int-sap base) (- (ash offset word-shift) lowtag)) word))
 
@@ -27,10 +27,8 @@
    (without-gcing
      (let* ((pointer (ash *static-space-free-pointer* n-fixnum-tag-bits))
             (vector (logior pointer other-pointer-lowtag))
-            ;; rounded to dual word boundary
-            (nwords (logandc2 (+ lowtag-mask (+ words vector-data-offset 1))
-                              lowtag-mask))
-            (new-pointer (+ pointer (ash nwords word-shift))))
+            (nbytes (pad-data-block (+ words vector-data-offset)))
+            (new-pointer (+ pointer nbytes)))
        (when (> static-space-end new-pointer)
          (store-word widetag
                      vector 0 other-pointer-lowtag)
