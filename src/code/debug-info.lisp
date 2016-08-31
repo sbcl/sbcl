@@ -32,14 +32,14 @@
 ;;;    SC-Offset of primary location (as var-length integer)
 ;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
-(def!constant compiled-debug-var-more-context-p         #b00000001)
-(def!constant compiled-debug-var-more-count-p           #b00000010)
-(def!constant compiled-debug-var-environment-live       #b00000100)
-(def!constant compiled-debug-var-save-loc-p             #b00001000)
-(def!constant compiled-debug-var-id-p                   #b00010000)
-(def!constant compiled-debug-var-minimal-p              #b00100000)
-(def!constant compiled-debug-var-deleted-p              #b01000000)
-(def!constant compiled-debug-var-indirect-p             #b10000000)
+(defconstant compiled-debug-var-more-context-p         #b00000001)
+(defconstant compiled-debug-var-more-count-p           #b00000010)
+(defconstant compiled-debug-var-environment-live       #b00000100)
+(defconstant compiled-debug-var-save-loc-p             #b00001000)
+(defconstant compiled-debug-var-id-p                   #b00010000)
+(defconstant compiled-debug-var-minimal-p              #b00100000)
+(defconstant compiled-debug-var-deleted-p              #b01000000)
+(defconstant compiled-debug-var-indirect-p             #b10000000)
 
 ;;;; compiled debug blocks
 ;;;;

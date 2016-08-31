@@ -21,29 +21,29 @@
 ;;; Secondly, the numerical order of these constants is coupled with
 ;;; code in CHAR-CLASS{,2,3} in the reader implementation, so beware
 ;;; when changing them.
-(def!constant +char-attr-whitespace+ 0)
-(def!constant +char-attr-terminating-macro+ 1)
-(def!constant +char-attr-single-escape+ 2)
-(def!constant +char-attr-multiple-escape+ 3)
-(def!constant +char-attr-constituent+ 4)
-(def!constant +char-attr-constituent-dot+ 5)
-(def!constant +char-attr-constituent-expt+ 6)
-(def!constant +char-attr-constituent-slash+ 7)
-(def!constant +char-attr-constituent-digit+ 8)
-(def!constant +char-attr-constituent-sign+ 9)
+(defconstant +char-attr-whitespace+ 0)
+(defconstant +char-attr-terminating-macro+ 1)
+(defconstant +char-attr-single-escape+ 2)
+(defconstant +char-attr-multiple-escape+ 3)
+(defconstant +char-attr-constituent+ 4)
+(defconstant +char-attr-constituent-dot+ 5)
+(defconstant +char-attr-constituent-expt+ 6)
+(defconstant +char-attr-constituent-slash+ 7)
+(defconstant +char-attr-constituent-digit+ 8)
+(defconstant +char-attr-constituent-sign+ 9)
 ;;; the following two are not static but depend on *READ-BASE*.
 ;;; DECIMAL-DIGIT is for characters being digits in base 10 but not in
 ;;; base *READ-BASE* (which is therefore perforce smaller than 10);
 ;;; DIGIT-OR-EXPT is for characters being both exponent markers and
 ;;; digits in base *READ-BASE* (which is therefore perforce larger
 ;;; than 10).  -- CSR, 2004-03-16
-(def!constant +char-attr-constituent-decimal-digit+ 10)
-(def!constant +char-attr-constituent-digit-or-expt+ 11)
+(defconstant +char-attr-constituent-decimal-digit+ 10)
+(defconstant +char-attr-constituent-digit-or-expt+ 11)
 
-(def!constant +char-attr-package-delimiter+ 12)
-(def!constant +char-attr-invalid+ 13)
+(defconstant +char-attr-package-delimiter+ 12)
+(defconstant +char-attr-invalid+ 13)
 ;; Meta: there is no such function as READ-UNQUALIFIED-TOKEN. No biggie.
-(def!constant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
+(defconstant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
 (sb!xc:defstruct (readtable (:conc-name nil)
                             (:constructor make-readtable ())

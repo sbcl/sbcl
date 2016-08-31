@@ -82,14 +82,14 @@
                     (decf end alignment)
                     (setf safepoint-address end))
                   (prog1
-                      `((def!constant ,(symbolicate space "-SPACE-START")
+                      `((defconstant ,(symbolicate space "-SPACE-START")
                             ,ptr)
-                        (def!constant ,(symbolicate space "-SPACE-END")
+                        (defconstant ,(symbolicate space "-SPACE-END")
                             ,(- end margin-size)))
                     (setf ptr next-start)))))
          (safepoint-page-forms
           (list #!+sb-safepoint
-                `(def!constant gc-safepoint-page-addr ,safepoint-address)))
+                `(defconstant gc-safepoint-page-addr ,safepoint-address)))
          (dynamic-space-start* (or dynamic-space-start* ptr))
          (optional-dynamic-space-end
           (when default-dynamic-space-size
@@ -98,9 +98,9 @@
     `(progn
        ,@safepoint-page-forms
        ,@small-space-forms
-       (def!constant dynamic-space-start ,dynamic-space-start*)
-       (def!constant dynamic-space-end (!configure-dynamic-space-end
-                                        ,@optional-dynamic-space-end)))))
+       (defconstant dynamic-space-start ,dynamic-space-start*)
+       (defconstant dynamic-space-end (!configure-dynamic-space-end
+                                       ,@optional-dynamic-space-end)))))
 
 (defparameter *c-callable-static-symbols*
   '(sub-gc
@@ -190,13 +190,13 @@
 
 ;;; Number of entries in the thread local storage. Limits the number
 ;;; of symbols with thread local bindings.
-(def!constant tls-size 4096)
+(defconstant tls-size 4096)
 ;;; Refer to the lengthy comment in 'src/runtime/interrupt.h' about
 ;;; the choice of this number. Rather than have to two copies
 ;;; of the comment, please see that file before adjusting this.
-(def!constant max-interrupts 1024)
+(defconstant max-interrupts 1024)
 
 #!+gencgc
 (progn
-  (def!constant +highest-normal-generation+ 5)
-  (def!constant +pseudo-static-generation+ 6))
+  (defconstant +highest-normal-generation+ 5)
+  (defconstant +pseudo-static-generation+ 6))
