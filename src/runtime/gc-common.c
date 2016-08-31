@@ -232,8 +232,8 @@ trans_code(struct code *code)
     /* prepare to transport the code vector */
     l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
 
-    ncode_words = fixnum_word_value(code->code_size);
-    nheader_words = HeaderValue(code->header);
+    ncode_words = code_instruction_words(code->code_size);
+    nheader_words = code_header_words(code->header);
     nwords = ncode_words + nheader_words;
     nwords = CEILING(nwords, 2);
 
@@ -315,8 +315,8 @@ scav_code_header(lispobj *where, lispobj object)
     struct simple_fun *function_ptr; /* untagged pointer to entry point */
 
     code = (struct code *) where;
-    n_code_words = fixnum_word_value(code->code_size);
-    n_header_words = HeaderValue(object);
+    n_code_words = code_instruction_words(code->code_size);
+    n_header_words = code_header_words(object);
     n_words = n_code_words + n_header_words;
     n_words = CEILING(n_words, 2);
 
@@ -360,8 +360,8 @@ size_code_header(lispobj *where)
 
     code = (struct code *) where;
 
-    ncode_words = fixnum_word_value(code->code_size);
-    nheader_words = HeaderValue(code->header);
+    ncode_words = code_instruction_words(code->code_size);
+    nheader_words = code_header_words(code->header);
     nwords = ncode_words + nheader_words;
     nwords = CEILING(nwords, 2);
 

@@ -221,7 +221,7 @@
   ;; and the first simple-fun.
   (let ((f (%code-entry-points code-obj)))
     (or (and f
-             (let ((from (get-header-data code-obj))
+             (let ((from (code-header-words code-obj))
                    (to (ash (with-pinned-objects (f)
                               (sap-ref-word (int-sap (get-lisp-obj-address f))
                                             (- sb!vm:fun-pointer-lowtag)))

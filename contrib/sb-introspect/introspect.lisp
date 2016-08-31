@@ -117,7 +117,7 @@ FBOUNDP."
   "Call FN for each constant in CODE's constant pool."
   (check-type code sb-kernel:code-component)
   (loop for i from sb-vm:code-constants-offset below
-       (sb-kernel:get-header-data code)
+       (sb-kernel:code-header-words code)
      do (funcall fn (sb-kernel:code-header-ref code i))))
 
 (declaim (inline map-allocated-code-components))
@@ -1010,7 +1010,7 @@ Experimental: interface subject to change."
          (call (sb-kernel:%code-entry-points object))
          (call (sb-kernel:%code-debug-info object))
          (loop for i from sb-vm:code-constants-offset
-               below (sb-kernel:get-header-data object)
+               below (sb-kernel:code-header-words object)
                do (call (sb-kernel:code-header-ref object i))))
         (sb-kernel:fdefn
          (call (sb-kernel:fdefn-name object))

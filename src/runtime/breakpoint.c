@@ -44,7 +44,7 @@ static void *compute_pc(lispobj code_obj, int pc_offset)
     struct code *code;
 
     code = (struct code *)native_pointer(code_obj);
-    return (void *)((char *)code + HeaderValue(code->header)*sizeof(lispobj)
+    return (void *)((char *)code + code_header_words(code->header)*sizeof(lispobj)
                     + pc_offset);
 }
 
@@ -116,7 +116,7 @@ static long compute_offset(os_context_t *context, lispobj code)
 #endif
 
         code_start = (uword_t)codeptr
-            + HeaderValue(codeptr->header)*sizeof(lispobj);
+            + code_header_words(codeptr->header)*sizeof(lispobj);
         if (pc < code_start)
             return 0;
         else {

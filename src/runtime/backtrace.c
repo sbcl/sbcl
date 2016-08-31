@@ -54,7 +54,7 @@ sbcl_putwc(wchar_t c, FILE *file)
 struct compiled_debug_fun *
 debug_function_from_pc (struct code* code, void *pc)
 {
-    uword_t code_header_len = sizeof(lispobj) * HeaderValue(code->header);
+    uword_t code_header_len = sizeof(lispobj) * code_header_words(code->header);
     uword_t offset
         = (uword_t) pc - (uword_t) code - code_header_len;
     struct compiled_debug_fun *df;

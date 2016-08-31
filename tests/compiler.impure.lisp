@@ -2126,7 +2126,7 @@
 (defun count-code-constants (x f)
   (let ((code (sb-kernel:fun-code-header f))
         (n 0))
-    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+    (loop for i from sb-vm:code-constants-offset below (sb-kernel:code-header-words code)
           do (when (equal x (sb-kernel:code-header-ref code i))
                (incf n)))
     n))

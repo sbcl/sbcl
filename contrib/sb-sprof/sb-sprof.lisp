@@ -424,7 +424,7 @@ profiling, and :TIME for wallclock profiling.")
                  (values nil (sap-int pc)))))
           (t
            (let* ((code (sb-di::component-from-component-ptr ptr))
-                  (code-header-len (* (sb-kernel:get-header-data code)
+                  (code-header-len (* (sb-kernel:code-header-words code)
                                       sb-vm:n-word-bytes))
                   (pc-offset (- (sap-int pc)
                                 (- (sb-kernel:get-lisp-obj-address code)

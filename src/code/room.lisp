@@ -738,6 +738,9 @@
                    #!+stack-grows-downward-not-upward (sap+ sp n-word-bytes)
                    #!-stack-grows-downward-not-upward (sap+ sp (- n-word-bytes))))))
 
+(declaim (inline code-header-words))
+(defun code-header-words (code) (get-header-data code))
+
 (defun map-referencing-objects (fun space object)
   (declare (type spaces space)
            #!-sb-fluid (inline map-allocated-objects))
@@ -761,7 +764,7 @@
                         (return t))))
             (maybe-call fun obj)))
          (code-component
-          (let ((length (get-header-data obj)))
+          (let ((length (code-header-words obj)))
             (do ((i code-constants-offset (1+ i)))
                 ((= i length))
               (when (eq (code-header-ref obj i) object)

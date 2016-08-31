@@ -1088,7 +1088,7 @@
            :unboxed-data-range
            (and code
                 (let ((n-words (sb!kernel:code-n-unboxed-data-words code))
-                      (start (sb!kernel:get-header-data code)))
+                      (start (sb!kernel:code-header-words code)))
                   (and (plusp n-words)
                        (cons (* sb!vm:n-word-bytes start)
                              (* sb!vm:n-word-bytes (+ start n-words)))))))))
@@ -1795,7 +1795,7 @@
     ;; computation and the comparison below. But we're already in WITHOUT-GCING
     ;; in MAP-SEGMENT-INSTRUCTIONS, so, who cares, I guess?
     (sb!sys:without-gcing
-     (let* ((n-header-bytes (* (sb!kernel:get-header-data code) sb!vm:n-word-bytes))
+     (let* ((n-header-bytes (* (sb!kernel:code-header-words code) sb!vm:n-word-bytes))
             (header-addr (- (sb!kernel:get-lisp-obj-address code)
                             sb!vm:other-pointer-lowtag))
             (code-start (+ header-addr n-header-bytes)))

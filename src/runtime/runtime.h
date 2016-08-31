@@ -351,8 +351,14 @@ fixnum_value(lispobj n)
     return n >> N_FIXNUM_TAG_BITS;
 }
 
+static inline uword_t
+code_header_words(lispobj header) // given header = code->header
+{
+  return HeaderValue(header);
+}
+
 static inline sword_t
-fixnum_word_value(lispobj n)
+code_instruction_words(lispobj n) // given n = code->code_size
 {
     /* Convert bytes into words, double-word aligned. */
     sword_t x = ((n >> N_FIXNUM_TAG_BITS) + LOWTAG_MASK) & ~LOWTAG_MASK;

@@ -253,9 +253,7 @@
                (seg-code (dstate-segment dstate)))
       ;; Try to reverse-engineer which thread-local binding this is
       (let* ((code (seg-code (dstate-segment dstate)))
-             (header-n-words
-              (ash (sap-ref-word (int-sap (get-lisp-obj-address code))
-                                 (- other-pointer-lowtag)) -8))
+             (header-n-words (code-header-words code))
              (tls-index (ash disp (- n-fixnum-tag-bits))))
         (loop for word-num from code-constants-offset below header-n-words
               for obj = (code-header-ref code word-num)

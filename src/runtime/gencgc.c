@@ -1668,8 +1668,8 @@ sniff_code_object(struct code *code, os_vm_size_t displacement)
 
     FSHOW((stderr, "/sniffing code: %p, %lu\n", code, displacement));
 
-    ncode_words = fixnum_word_value(code->code_size);
-    nheader_words = HeaderValue(*(lispobj *)code);
+    ncode_words = code_instruction_words(code->code_size);
+    nheader_words = code_header_words(*(lispobj *)code);
     nwords = ncode_words + nheader_words;
 
     constants_start_addr = code_addr + 5*N_WORD_BYTES;
@@ -1841,8 +1841,8 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     lispobj fixups = NIL;
     struct vector *fixups_vector;
 
-    ncode_words = fixnum_word_value(new_code->code_size);
-    nheader_words = HeaderValue(*(lispobj *)new_code);
+    ncode_words = code_instruction_words(new_code->code_size);
+    nheader_words = code_header_words(*(lispobj *)new_code);
     nwords = ncode_words + nheader_words;
     /* FSHOW((stderr,
              "/compiled code object at %x: header words = %d, code words = %d\n",
@@ -3203,8 +3203,8 @@ verify_space(lispobj *start, size_t words)
                                    start));
                         }
 
-                        ncode_words = fixnum_word_value(code->code_size);
-                        nheader_words = HeaderValue(object);
+                        ncode_words = code_instruction_words(code->code_size);
+                        nheader_words = code_header_words(object);
                         nwords = ncode_words + nheader_words;
                         nwords = CEILING(nwords, 2);
                         /* Scavenge the boxed section of the code data block */

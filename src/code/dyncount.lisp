@@ -216,7 +216,7 @@ comments from CMU CL:
   (declare (type function function))
   (let* ((function (%primitive closure-fun function))
          (component (sb!di::fun-code-header function)))
-    (do ((end (get-header-data component))
+    (do ((end (code-header-words component))
          (i sb!vm:code-constants-offset (1+ i)))
         ((= end i))
       (let ((constant (code-header-ref component i)))

@@ -545,7 +545,7 @@
   (let ((component-ptr (component-ptr-from-pc pc)))
     (unless (sap= component-ptr (int-sap #x0))
        (let* ((code (component-from-component-ptr component-ptr))
-              (code-header-len (* (get-header-data code) sb!vm:n-word-bytes))
+              (code-header-len (* (code-header-words code) sb!vm:n-word-bytes))
               (pc-offset (- (sap-int pc)
                             (- (get-lisp-obj-address code)
                                sb!vm:other-pointer-lowtag)
@@ -878,7 +878,7 @@
                                                   #!+x86-64 "alloc_tramp"))
                   (return (values :undefined-function 0 context))
                   (return (values code 0 context))))
-            (let* ((code-header-len (* (get-header-data code)
+            (let* ((code-header-len (* (code-header-words code)
                                        sb!vm:n-word-bytes))
                    (pc-offset
                      (- (sap-int (sb!vm:context-pc context))
@@ -913,7 +913,7 @@
             (/noshow0 "got CODE")
             (when (symbolp code)
               (return (values code 0 scp)))
-            (let* ((code-header-len (* (get-header-data code)
+            (let* ((code-header-len (* (code-header-words code)
                                        sb!vm:n-word-bytes))
                    (pc-offset
                      (- (sap-int (sb!vm:context-pc scp))
@@ -1111,7 +1111,7 @@ register."
                     (- (sap-int ra)
                        (- (get-lisp-obj-address component)
                           sb!vm:other-pointer-lowtag)
-                       (* (get-header-data component) sb!vm:n-word-bytes))))
+                       (* (code-header-words component) sb!vm:n-word-bytes))))
               (push (cons #!-(or x86 x86-64)
                           (stack-ref catch sb!vm:catch-block-tag-slot)
                           #!+(or x86 x86-64)
@@ -1330,7 +1330,7 @@ register."
           ;; -- WHN 20000120
           (debug-fun-from-pc component
                              (* (- (fun-word-offset simple-fun)
-                                   (get-header-data component))
+                                   (code-header-words component))
                                 sb!vm:n-word-bytes))))))
 
 ;;; Return the kind of the function, which is one of :OPTIONAL,

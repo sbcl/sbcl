@@ -158,7 +158,7 @@ void print_constant(os_context_t *context, int offset) {
     lispobj code = find_code(context);
     if (code != NIL) {
         struct code *codeptr = (struct code *)native_pointer(code);
-        int length = HeaderValue(codeptr->header);
+        int length = code_header_words(codeptr->header);
         putchar('\t');
         if (offset >= length) {
             printf("Constant offset %d out of bounds for the code object of length %d.\n",
