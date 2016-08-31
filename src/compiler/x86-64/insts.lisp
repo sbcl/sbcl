@@ -161,43 +161,31 @@
   (declare (type disassem-state dstate)
            (type (unsigned-byte 2) mod)
            (type (unsigned-byte 3) r/m))
-  (flet ((extend (bit-name reg)
+  (flet ((displacement ()
+           (case mod
+             (#b01 (read-signed-suffix 8 dstate))
+             (#b10 (read-signed-suffix 32 dstate))))
+         (extend (bit-name reg)
            (logior (if (dstate-get-inst-prop dstate bit-name) 8 0)
                    reg)))
     (declare (inline extend))
     (let ((full-reg (extend 'rex-b r/m)))
-      (cond ((= mod #b11)
-             ;; registers
-             full-reg)
+      (cond ((= mod #b11) full-reg) ; register direct mode
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
-             (let* ((sib (the (unsigned-byte 8)
-                              (read-suffix 8 dstate)))
-                    (base-reg (ldb (byte 3 0) sib))
+             (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
                     (index-reg (extend 'rex-x (ldb (byte 3 3) sib)))
-                    (offset
-                         (case mod
-                               (#b00
-                                (if (= base-reg #b101)
-                                    (read-signed-suffix 32 dstate)
-                                  nil))
-                               (#b01
-                                (read-signed-suffix 8 dstate))
-                               (#b10
-                                (read-signed-suffix 32 dstate)))))
+                    (base-reg (ldb (byte 3 0) sib)))
+               ;; mod=0 and base=RBP means no base reg
                (list (unless (and (= mod #b00) (= base-reg #b101))
                        (extend 'rex-b base-reg))
-                     offset
+                     (cond ((/= mod #b00) (displacement))
+                           ((= base-reg #b101) (read-signed-suffix 32 dstate)))
                      (unless (= index-reg #b100) index-reg) ; index can't be RSP
                      (ash 1 (ldb (byte 2 6) sib)))))
+            ((/= mod #b00) (list full-reg (displacement)))
             ;; rex.b is not decoded in determining RIP-relative mode
-            ((and (= mod #b00) (= r/m #b101))
-             (list 'rip (read-signed-suffix 32 dstate)))
-            ((= mod #b00)
-             (list full-reg))
-            ((= mod #b01)
-             (list full-reg (read-signed-suffix 8 dstate)))
-            (t                            ; (= mod #b10)
-             (list full-reg (read-signed-suffix 32 dstate)))))))
+            ((= r/m #b101) (list 'rip (read-signed-suffix 32 dstate)))
+            (t (list full-reg))))))
 
 (defun read-address (dstate)
   (read-suffix (width-bits (inst-operand-size dstate)) dstate))
