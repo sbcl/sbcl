@@ -25,7 +25,7 @@
            (type disassem-state dstate))
   (princ (if (and (eq width :byte)
                   (<= 4 value 7)
-                  (not (dstate-get-inst-prop dstate 'rex)))
+                  (not (dstate-get-inst-prop dstate +rex+)))
              (aref *high-byte-reg-names* (- value 4))
              (aref (ecase width
                      (:byte *byte-reg-names*)
@@ -62,7 +62,7 @@
            (type stream stream)
            (type disassem-state dstate))
   (print-reg-with-width value
-                        (if (dstate-get-inst-prop dstate 'rex-w) :qword :dword)
+                        (if (dstate-get-inst-prop dstate +rex-w+) :qword :dword)
                         stream
                         dstate))
 
