@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-LINKFLAGS += -export-dynamic
+LINKFLAGS += -export-dynamic -Wl,-z,wxneeded
 OS_LIBS += -lutil
 
 # If the compiler recognizes a -nopie flag then we're building on a
