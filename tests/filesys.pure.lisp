@@ -191,6 +191,9 @@
                  (directory (make-pathname
                              :name :unspecific
                              :type :unspecific)))))
+(with-test (:name (directory :..*))
+  ;; This used to signal a TYPE-ERROR.
+  (directory "somedir/..*"))
 
 ;;; Generated with
 ;;; (loop for exist in '(nil t)

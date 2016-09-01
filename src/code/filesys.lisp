@@ -739,18 +739,18 @@ matching filenames."
     (let ((name (simplify (pathname-name pathname)))
           (type (simplify (pathname-type pathname)))
           (dir (canonicalize-directory (pathname-directory pathname))))
-      (cond ((equal "." name)
-             (cond ((not type)
-                    (make-pathname :name nil :defaults pathname))
-                   ((equal "" type)
-                    (make-pathname :name nil
-                                   :type nil
-                                   :directory (butlast dir)
-                                   :defaults pathname))))
-            (t
-             (make-pathname :name name :type type
-                            :directory dir
-                            :defaults pathname))))))
+      (cond
+        ((not (equal "." name))
+         (make-pathname :name name :type type :directory dir
+                        :defaults pathname))
+        ((not type)
+         (make-pathname :name nil :defaults pathname))
+        ((equal "" type)
+         (make-pathname :name nil :type nil :directory (butlast dir)
+                        :defaults pathname))
+        (t
+         (make-pathname :name name :type type :directory dir
+                        :defaults pathname))))))
 
 ;;; Given a native namestring, provides a WITH-HASH-TABLE-ITERATOR style
 ;;; interface to mapping over namestrings of entries in the corresponding
