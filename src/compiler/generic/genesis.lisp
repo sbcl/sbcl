@@ -1790,6 +1790,7 @@ core and return a descriptor to it."
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
   (declare (type (or symbol descriptor) cold-name))
+  (declare (special core-file-name))
   (/noshow0 "/cold-fdefinition-object")
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
@@ -1804,7 +1805,9 @@ core and return a descriptor to it."
                                sb!vm:fdefn-raw-addr-slot
                                (make-random-descriptor
                                 #!+read-only-tramps
-                                (or (lookup-assembler-reference 'sb!vm::undefined-tramp)
+                                (or (lookup-assembler-reference
+                                     'sb!vm::undefined-tramp
+                                     (not (null core-file-name)))
                                     ;; Our preload for the tramps
                                     ;; doesn't happen during host-1,
                                     ;; so substitute a usable value.
@@ -2032,11 +2035,11 @@ core and return a descriptor to it."
   (push (list routine code-object offset kind)
         *cold-assembler-fixups*))
 
-(defun lookup-assembler-reference (symbol)
+(defun lookup-assembler-reference (symbol &optional (errorp t))
   (let ((value (cdr (assoc symbol *cold-assembler-routines*))))
-    ;; FIXME: Should this be ERROR instead of WARN?
     (unless value
-      (warn "Assembler routine ~S not defined." symbol))
+      (when errorp
+        (error "Assembler routine ~S not defined." symbol)))
     value))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
@@ -3704,6 +3707,7 @@ initially undefined function references:~2%")
                       #+nil (list-objects t))
   #!+sb-dynamic-core
   (declare (ignorable symbol-table-file-name))
+  (declare (special core-file-name))
 
   (format t
           "~&beginning GENESIS, ~A~%"
