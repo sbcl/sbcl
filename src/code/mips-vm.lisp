@@ -116,5 +116,5 @@
          (error-number (sap-ref-8 pc offset)))
     (declare (type system-area-pointer pc))
     (values error-number
-            (sb-kernel::decode-internal-error-args (sap+ pc (1+ offset))
+            (sb!kernel::decode-internal-error-args (sap+ pc (1+ offset))
                                                    error-number))))
