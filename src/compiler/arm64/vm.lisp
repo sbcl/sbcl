@@ -228,7 +228,7 @@
   (defregtn lexenv descriptor-reg)
   (defregtn code descriptor-reg)
   (defregtn tmp any-reg)
-  
+
   (defregtn nargs any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg)

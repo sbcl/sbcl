@@ -163,8 +163,7 @@
     (with-fixed-allocation (result fdefn-widetag fdefn-size node)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
-      (storew #!-read-only-tramps (make-fixup "undefined_tramp" :foreign)
-              #!+read-only-tramps (make-fixup 'undefined-tramp :assembly-routine)
+      (storew (make-fixup 'undefined-tramp :assembly-routine)
               result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
@@ -207,7 +206,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst lea result (make-fixup "funcallable_instance_tramp" :foreign))))
+    (inst lea result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
 
 (define-vop (fixed-alloc)
   (:args)

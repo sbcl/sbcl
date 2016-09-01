@@ -508,60 +508,6 @@ GNAME(fpu_restore):
 	SIZE(GNAME(fpu_restore))
 
 /*
- * the undefined-function trampoline
- */
-#if !defined(LISP_FEATURE_READ_ONLY_TRAMPS)
-	.text
-	.align	align_16byte,0x90
-	.globl GNAME(undefined_tramp)
-	TYPE(GNAME(undefined_tramp))
-        .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
-GNAME(undefined_tramp):
-	pop	4(%ebp)         # Save return PC for backtrace.
-	TRAP
-	.byte	trap_Error
-        .byte   UNDEFINED_FUN_ERROR
-        .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
-	ret
-	SIZE(GNAME(undefined_tramp))
-#endif
-
-/* KLUDGE: FIND-ESCAPED-FRAME (SYS:SRC;CODE;DEBUG-INT.LISP) needs
- * to know the name of the function immediately following the
- * undefined-function trampoline. */
-
-/*
- * the closure trampoline - entered when a global function is a closure
- * and the function is called "by name" (normally, as when it is the
- * head of a form) via an FDEFN. Register %EAX holds the fdefn address,
- * but the simple-fun which underlies the closure expects %EAX to be the
- * closure itself. So we grab the closure out of the fdefn pointed to,
- * then jump to the simple-fun that the closure points to.
- */
-#if !defined(LISP_FEATURE_READ_ONLY_TRAMPS)
-	.text
-	.align	align_16byte,0x90
-	.globl GNAME(closure_tramp)
-	TYPE(GNAME(closure_tramp))
-        .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
-GNAME(closure_tramp):
-	movl	FDEFN_FUN_OFFSET(%eax),%eax
-	jmp	*CLOSURE_FUN_OFFSET(%eax)
-	SIZE(GNAME(closure_tramp))
-#endif
-
-	.text
-	.align	align_16byte,0x90
-	.globl GNAME(funcallable_instance_tramp)
-	TYPE(GNAME(funcallable_instance_tramp))
-GNAME(funcallable_instance_tramp):
-	movl	FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(%eax),%eax	
-	/* KLUDGE: on this platform, whatever kind of function is in %rax
-	 * now, the first word of it contains the address to jump to. */
-	jmp	*CLOSURE_FUN_OFFSET(%eax)
-	SIZE(GNAME(funcallable_instance_tramp))
-	
-/*
  * fun-end breakpoint magic
  */
 

@@ -872,12 +872,7 @@
               ;; KLUDGE: Detect undefined functions by a range-check
               ;; against the trampoline address and the following
               ;; function in the runtime.
-              (if (< (static-foreign-symbol-address "undefined_tramp")
-                     (sap-int (sb!vm:context-pc context))
-                     (static-foreign-symbol-address #!+x86 "closure_tramp"
-                                                  #!+x86-64 "alloc_tramp"))
-                  (return (values :undefined-function 0 context))
-                  (return (values code 0 context))))
+              (return (values code 0 context)))
             (let* ((code-header-len (* (code-header-words code)
                                        sb!vm:n-word-bytes))
                    (pc-offset
@@ -1016,8 +1011,13 @@ register."
   (let ((info (%code-debug-info component)))
     (cond
       ((not info)
-       (make-bogus-debug-fun (or (find-assembly-routine component pc)
-                                 "no debug information for frame")))
+       (let ((routine (find-assembly-routine component pc)))
+         (make-bogus-debug-fun (cond ((not routine)
+                                      "no debug information for frame")
+                                     ((memq routine '(sb!vm::undefined-tramp
+                                                      sb!vm::undefined-alien-tramp))
+                                      "undefined function")
+                                     (routine)))))
      ((eq info :bogus-lra)
       (make-bogus-debug-fun "function end breakpoint"))
      (t

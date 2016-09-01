@@ -254,9 +254,6 @@
                                    fun-pointer-lowtag))
     (inst cmp type simple-fun-header-widetag)
     (inst jmp :e normal-fn)
-    #!-read-only-tramps
-    (inst lea raw (make-fixup "closure_tramp" :foreign))
-    #!+read-only-tramps
     (inst lea raw (make-fixup 'closure-tramp :assembly-routine))
     NORMAL-FN
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -270,8 +267,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
-    (storew #!-read-only-tramps (make-fixup "undefined_tramp" :foreign)
-            #!+read-only-tramps (make-fixup 'undefined-tramp :assembly-routine)
+    (storew (make-fixup 'undefined-tramp :assembly-routine)
             fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 
