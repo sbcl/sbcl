@@ -111,9 +111,10 @@
   (/hexstr context)
   (let* ((pc (context-pc context))
          (cause (context-bd-cause-int context))
-         (error-number (sap-ref-8 pc 4)))
+         ;; KLUDGE: This exposure of the branch delay mechanism hurts.
+         (offset (if (logbitp 31 cause) 8 4))
+         (error-number (sap-ref-8 pc offset)))
     (declare (type system-area-pointer pc))
     (values error-number
-            ;; KLUDGE: This exposure of the branch delay mechanism hurts.
-            (sb!kernel::decode-internal-error-args (sap+ pc (if (logbitp 31 cause) 9 5))
+            (sb-kernel::decode-internal-error-args (sap+ pc (1+ offset))
                                                    error-number))))
