@@ -109,9 +109,17 @@
 (defvar *fixup-notes*)
 #!+inline-constants
 (progn
-  (defvar *constant-segment*)
-  (defvar *constant-table*)
-  (defvar *constant-vector*))
+  (defvar *unboxed-constants*)
+  (defstruct (unboxed-constants (:conc-name constant-)
+                                (:predicate nil) (:copier nil))
+    (table (make-hash-table :test #'equal) :read-only t)
+    (segment
+     (sb!assem:make-segment :type :elsewhere
+                            :run-scheduler nil
+                            :inst-hook (default-segment-inst-hook)
+                            :alignment 0) :read-only t)
+    (vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t))
+  (declaim (freeze-type unboxed-constants)))
 (defvar *source-info*)
 (defvar *source-plist*)
 (defvar *source-namestring*)

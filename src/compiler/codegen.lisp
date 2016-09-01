@@ -58,12 +58,6 @@
 (defvar *code-segment* nil)
 (defvar *elsewhere* nil)
 (defvar *elsewhere-label* nil)
-#!+inline-constants
-(progn
-  (defvar *constant-segment* nil)
-  (defvar *constant-table*   nil)
-  (defvar *constant-vector*  nil))
-
 
 ;;;; noise to emit an instruction trace
 
@@ -120,28 +114,22 @@
                                :inst-hook (default-segment-inst-hook)
                                :alignment 0))
   #!+inline-constants
-  (setf *constant-segment*
-        (sb!assem:make-segment :type :elsewhere
-                               :run-scheduler nil
-                               :inst-hook (default-segment-inst-hook)
-                               :alignment 0)
-        *constant-table*  (make-hash-table :test #'equal)
-        *constant-vector* (make-array 16 :adjustable t :fill-pointer 0))
+  (setf *unboxed-constants* (make-unboxed-constants))
   (values))
 
 #!+inline-constants
-(defun emit-inline-constants ()
-  (unless (zerop (length *constant-vector*))
-    (let ((constants (sb!vm:sort-inline-constants *constant-vector*)))
-      (assemble (*constant-segment*)
+(defun emit-inline-constants (&aux (constant-holder *unboxed-constants*)
+                                   (vector (constant-vector constant-holder)))
+  (setf *unboxed-constants* nil)
+  (unless (zerop (length vector))
+    (let ((constants (sb!vm:sort-inline-constants vector)))
+      (assemble ((constant-segment constant-holder))
         (map nil (lambda (constant)
                    (sb!vm:emit-inline-constant (car constant) (cdr constant)))
              constants)))
-    (sb!assem:append-segment *constant-segment* *code-segment*)
-    (setf *code-segment* *constant-segment*))
-  (setf *constant-segment* nil
-        *constant-vector*  nil
-        *constant-table*   nil))
+    (setf *code-segment* (let ((seg (constant-segment constant-holder)))
+                           (sb!assem:append-segment seg *code-segment*)
+                           seg))))
 
 ;;; If a constant is already loaded into a register use that register.
 (defun optimize-constant-loads (component)
@@ -308,8 +296,9 @@
 #!+inline-constants
 (defun register-inline-constant (&rest constant-descriptor)
   (declare (dynamic-extent constant-descriptor))
-  (let ((constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
-    (or (gethash constant *constant-table*)
+  (let ((constants *unboxed-constants*)
+        (constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
+    (or (gethash constant (constant-table constants))
         (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
-          (vector-push-extend (cons constant label) *constant-vector*)
-          (setf (gethash constant *constant-table*) value)))))
+          (vector-push-extend (cons constant label) (constant-vector constants))
+          (setf (gethash constant (constant-table constants)) value)))))

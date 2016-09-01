@@ -571,12 +571,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun %compile-component (component)
   (let ((*code-segment* nil)
         (*elsewhere* nil)
-        #!+inline-constants
-        (*constant-segment* nil)
-        #!+inline-constants
-        (*constant-table* nil)
-        #!+inline-constants
-        (*constant-vector* nil))
+        #!+inline-constants (*unboxed-constants* nil))
     (maybe-mumble "GTN ")
     (gtn-analyze component)
     (maybe-mumble "LTN ")

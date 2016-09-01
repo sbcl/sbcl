@@ -39,12 +39,7 @@
          (*elsewhere* nil)
          (*assembly-optimize* nil)
          (*fixup-notes* nil)
-         #!+inline-constants
-         *constant-segment*
-         #!+inline-constants
-         *constant-table*
-         #!+inline-constants
-         *constant-vector*)
+         #!+inline-constants (*unboxed-constants* nil))
     (unwind-protect
         (let ((*features* (cons :sb-assembling *features*)))
           (init-assembler)
