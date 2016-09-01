@@ -193,7 +193,7 @@ describe_internal_error(os_context_t *context)
     ptr++;
 #endif
 
-    if (code > sizeof(internal_error_descriptions)) {
+    if (code > sizeof(internal_error_descriptions)/sizeof(char*)) {
       printf("Unknown error code %d at %p\n", code, pc);
     }
     printf("Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
