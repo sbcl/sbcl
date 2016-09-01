@@ -20,7 +20,7 @@
 (macrolet ((defreg (name offset)
                (let ((offset-sym (symbolicate name "-OFFSET")))
                  `(eval-when (:compile-toplevel :load-toplevel :execute)
-                   (def!constant ,offset-sym ,offset)
+                   (defconstant ,offset-sym ,offset)
                    (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
            (defregset (name &rest regs)
                `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -316,19 +316,19 @@
 
 ;;; The SC numbers for register and stack arguments/return values.
 ;;;
-(def!constant immediate-arg-scn (sc-number-or-lose 'any-reg))
-(def!constant control-stack-arg-scn (sc-number-or-lose 'control-stack))
+(defconstant immediate-arg-scn (sc-number-or-lose 'any-reg))
+(defconstant control-stack-arg-scn (sc-number-or-lose 'control-stack))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;;; Offsets of special stack frame locations
-(def!constant ocfp-save-offset 0)
-(def!constant lra-save-offset 1)
-(def!constant nfp-save-offset 2)
+(defconstant ocfp-save-offset 0)
+(defconstant lra-save-offset 1)
+(defconstant nfp-save-offset 2)
 
 ;;; The number of arguments/return values passed in registers.
 ;;;
-(def!constant register-arg-count 6)
+(defconstant register-arg-count 6)
 
 ;;; Names to use for the argument registers.
 ;;;
@@ -347,7 +347,7 @@
           *register-arg-offsets*))
 
 ;;; This is used by the debugger.
-(def!constant single-value-return-byte-offset 4)
+(defconstant single-value-return-byte-offset 4)
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.

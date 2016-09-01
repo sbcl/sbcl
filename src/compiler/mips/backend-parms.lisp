@@ -1,6 +1,6 @@
 (in-package "SB!VM")
 
-(def!constant +backend-fasl-file-implementation+ :mips)
+(defconstant +backend-fasl-file-implementation+ :mips)
 (setf *backend-register-save-penalty* 3)
 (setf *backend-byte-order*
       #!+little-endian :little-endian

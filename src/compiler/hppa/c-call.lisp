@@ -11,6 +11,11 @@
 
 (in-package "SB!VM")
 
+(defstruct arg-state
+  (stack-frame-size 0)
+  (float-args 0)
+  nargs)
+
 ;;; beware that we deal alot here with register-offsets directly
 ;;; instead of their symbol-name in vm.lisp
 ;;; offset works differently depending on sc-type
@@ -41,11 +46,6 @@
                    ;; -1 points to the correct place to write that data
                    ((sap-stack signed-stack unsigned-stack)
                      (- (arg-state-nargs state) offset 8 1)))))
-
-(defstruct arg-state
-  (stack-frame-size 0)
-  (float-args 0)
-  nargs)
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (let ((stack-frame-size (arg-state-stack-frame-size state)))

@@ -738,7 +738,6 @@ about function addresses and register values.")
                                 op3 (reg-tn-encoding src1) 1
                                 (if extended 1 0) src2))))
 
-;;; have to do this because def!constant is evalutated in the null lex env.
 (defmacro with-ref-format (printer)
   `(let* ((addend
            '(:choose (:plus-integer immed) ("+" rs2)))

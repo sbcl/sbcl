@@ -272,8 +272,6 @@
  ("src/code/target-unicode" :not-host)
  ("src/code/misc")
 
- ("src/code/room"   :not-host)
-
  ("src/code/symbol"        :not-host)
  ("src/code/fd-stream"     :not-host)
  ("src/code/stream"        :not-host)
@@ -337,6 +335,7 @@
 
  ;; needs "backend"
  ("src/compiler/target/backend-parms")
+ ("src/code/room" :not-host) ; needs GENCGC-CARD-BYTES
 
  ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro")

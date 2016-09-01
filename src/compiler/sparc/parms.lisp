@@ -13,71 +13,71 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;;; number of bits per word where a word holds one lisp descriptor
-(def!constant n-word-bits 32)
+(defconstant n-word-bits 32)
 
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
-(def!constant n-machine-word-bits 32)
+(defconstant n-machine-word-bits 32)
 
 ;;; number of bits per byte where a byte is the smallest addressable object
-(def!constant n-byte-bits 8)
+(defconstant n-byte-bits 8)
 
 ;;; flags for the generational garbage collector
-(def!constant pseudo-atomic-interrupted-flag 1)
-(def!constant pseudo-atomic-flag
+(defconstant pseudo-atomic-interrupted-flag 1)
+(defconstant pseudo-atomic-flag
     ;; Must be (ash 1 (1- sb-vm:n-lowtag-bits)) for cheneygc ALLOCATION.
     4)
 
-(def!constant float-sign-shift 31)
+(defconstant float-sign-shift 31)
 
-(def!constant single-float-bias 126)
+(defconstant single-float-bias 126)
 (defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
 (defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-(def!constant single-float-normal-exponent-min 1)
-(def!constant single-float-normal-exponent-max 254)
-(def!constant single-float-hidden-bit (ash 1 23))
-(def!constant single-float-trapping-nan-bit (ash 1 22))
+(defconstant single-float-normal-exponent-min 1)
+(defconstant single-float-normal-exponent-max 254)
+(defconstant single-float-hidden-bit (ash 1 23))
+(defconstant single-float-trapping-nan-bit (ash 1 22))
 
-(def!constant double-float-bias 1022)
+(defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
 (defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
-(def!constant double-float-normal-exponent-min 1)
-(def!constant double-float-normal-exponent-max #x7FE)
-(def!constant double-float-hidden-bit (ash 1 20))
-(def!constant double-float-trapping-nan-bit (ash 1 19))
+(defconstant double-float-normal-exponent-min 1)
+(defconstant double-float-normal-exponent-max #x7FE)
+(defconstant double-float-hidden-bit (ash 1 20))
+(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 ;;; CMUCL COMMENT:
 ;;;   X These values are for the x86 80 bit format and are no doubt
 ;;;   incorrect for the sparc.
 ;;; FIXME
-(def!constant long-float-bias 16382)
+(defconstant long-float-bias 16382)
 (defconstant-eqx long-float-exponent-byte (byte 15 0) #'equalp)
 (defconstant-eqx long-float-significand-byte (byte 31 0) #'equalp)
-(def!constant long-float-normal-exponent-min 1)
-(def!constant long-float-normal-exponent-max #x7FFE)
-(def!constant long-float-hidden-bit (ash 1 31))
-(def!constant long-float-trapping-nan-bit (ash 1 30))
+(defconstant long-float-normal-exponent-min 1)
+(defconstant long-float-normal-exponent-max #x7FFE)
+(defconstant long-float-hidden-bit (ash 1 31))
+(defconstant long-float-trapping-nan-bit (ash 1 30))
 
-(def!constant single-float-digits
+(defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
 
-(def!constant double-float-digits
+(defconstant double-float-digits
   (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
 ;;; This looks wrong - CSR
-(def!constant long-float-digits
+(defconstant long-float-digits
   (+ (byte-size long-float-significand-byte) n-word-bits 1))
 
-(def!constant float-inexact-trap-bit (ash 1 0))
-(def!constant float-divide-by-zero-trap-bit (ash 1 1))
-(def!constant float-underflow-trap-bit (ash 1 2))
-(def!constant float-overflow-trap-bit (ash 1 3))
-(def!constant float-invalid-trap-bit (ash 1 4))
+(defconstant float-inexact-trap-bit (ash 1 0))
+(defconstant float-divide-by-zero-trap-bit (ash 1 1))
+(defconstant float-underflow-trap-bit (ash 1 2))
+(defconstant float-overflow-trap-bit (ash 1 3))
+(defconstant float-invalid-trap-bit (ash 1 4))
 
-(def!constant float-round-to-nearest 0)
-(def!constant float-round-to-zero 1)
-(def!constant float-round-to-positive 2)
-(def!constant float-round-to-negative 3)
+(defconstant float-round-to-nearest 0)
+(defconstant float-round-to-zero 1)
+(defconstant float-round-to-positive 2)
+(defconstant float-round-to-negative 3)
 
 (defconstant-eqx float-rounding-mode (byte 2 30) #'equalp)        ; RD
 (defconstant-eqx float-sticky-bits (byte 5 5) #'equalp)   ; aexc
@@ -88,7 +88,7 @@
 ;;; bit (EFM) is "reserved", and should always be zero.  However, for
 ;;; sparc-V8 and sparc-V9, it appears to work, causing denormals to
 ;;; be truncated to 0 silently.
-(def!constant float-fast-bit (ash 1 22))
+(defconstant float-fast-bit (ash 1 22))
 
 ); eval-when
 
@@ -98,86 +98,86 @@
 ;;; Where to put the different spaces.  Must match the C code!
 #!+(and linux cheneygc)
 (progn
-  (def!constant linkage-table-space-start #x0f800000)
-  (def!constant linkage-table-space-end   #x10000000)
+  (defconstant linkage-table-space-start #x0f800000)
+  (defconstant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x11000000)
-  (def!constant read-only-space-end       #x15000000)
+  (defconstant read-only-space-start     #x11000000)
+  (defconstant read-only-space-end       #x15000000)
 
-  (def!constant static-space-start        #x28000000)
-  (def!constant static-space-end          #x2c000000)
+  (defconstant static-space-start        #x28000000)
+  (defconstant static-space-end          #x2c000000)
 
-  (def!constant dynamic-0-space-start #x30000000)
-  (def!constant dynamic-0-space-end   #x38000000)
+  (defconstant dynamic-0-space-start #x30000000)
+  (defconstant dynamic-0-space-end   #x38000000)
 
-  (def!constant dynamic-1-space-start #x40000000)
-  (def!constant dynamic-1-space-end   #x48000000))
+  (defconstant dynamic-1-space-start #x40000000)
+  (defconstant dynamic-1-space-end   #x48000000))
 
 #!+(and linux gencgc) ; sensibly small read-only and static spaces
 (progn
-  (def!constant linkage-table-space-start #x0f800000)
-  (def!constant linkage-table-space-end   #x10000000)
+  (defconstant linkage-table-space-start #x0f800000)
+  (defconstant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x11000000)
-  (def!constant read-only-space-end       #x110ff000)
+  (defconstant read-only-space-start     #x11000000)
+  (defconstant read-only-space-end       #x110ff000)
 
-  (def!constant static-space-start        #x11100000)
-  (def!constant static-space-end          #x111ff000)
+  (defconstant static-space-start        #x11100000)
+  (defconstant static-space-end          #x111ff000)
 
-  (def!constant dynamic-space-start       #x30000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end)))
+  (defconstant dynamic-space-start       #x30000000)
+  (defconstant dynamic-space-end         (!configure-dynamic-space-end)))
 
 #!+(and sunos cheneygc) ; might as well start by trying the same numbers
 (progn
-  (def!constant linkage-table-space-start #x0f800000)
-  (def!constant linkage-table-space-end   #x10000000)
+  (defconstant linkage-table-space-start #x0f800000)
+  (defconstant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x11000000)
-  (def!constant read-only-space-end       #x15000000)
+  (defconstant read-only-space-start     #x11000000)
+  (defconstant read-only-space-end       #x15000000)
 
-  (def!constant static-space-start        #x28000000)
-  (def!constant static-space-end          #x2c000000)
+  (defconstant static-space-start        #x28000000)
+  (defconstant static-space-end          #x2c000000)
 
-  (def!constant dynamic-0-space-start     #x30000000)
-  (def!constant dynamic-0-space-end       #x38000000)
+  (defconstant dynamic-0-space-start     #x30000000)
+  (defconstant dynamic-0-space-end       #x38000000)
 
-  (def!constant dynamic-1-space-start     #x40000000)
-  (def!constant dynamic-1-space-end       #x48000000))
+  (defconstant dynamic-1-space-start     #x40000000)
+  (defconstant dynamic-1-space-end       #x48000000))
 
 #!+(and sunos gencgc) ; sensibly small read-only and static spaces
 (progn
-  (def!constant linkage-table-space-start #x0f800000)
-  (def!constant linkage-table-space-end   #x10000000)
+  (defconstant linkage-table-space-start #x0f800000)
+  (defconstant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x11000000)
-  (def!constant read-only-space-end       #x110ff000)
+  (defconstant read-only-space-start     #x11000000)
+  (defconstant read-only-space-end       #x110ff000)
 
-  (def!constant static-space-start        #x11100000)
-  (def!constant static-space-end          #x111ff000)
+  (defconstant static-space-start        #x11100000)
+  (defconstant static-space-end          #x111ff000)
 
-  (def!constant dynamic-space-start       #x30000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end)))
+  (defconstant dynamic-space-start       #x30000000)
+  (defconstant dynamic-space-end         (!configure-dynamic-space-end)))
 
 #!+netbsd ; Need a gap at 0x4000000 for shared libraries
 (progn
-  (def!constant linkage-table-space-start #x0f800000)
-  (def!constant linkage-table-space-end   #x10000000)
+  (defconstant linkage-table-space-start #x0f800000)
+  (defconstant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x11000000)
-  (def!constant read-only-space-end       #x15000000)
+  (defconstant read-only-space-start     #x11000000)
+  (defconstant read-only-space-end       #x15000000)
 
-  (def!constant static-space-start        #x18000000)
-  (def!constant static-space-end          #x1c000000)
+  (defconstant static-space-start        #x18000000)
+  (defconstant static-space-end          #x1c000000)
 
-  (def!constant dynamic-0-space-start     #x48000000)
-  (def!constant dynamic-0-space-end       #x5ffff000)
+  (defconstant dynamic-0-space-start     #x48000000)
+  (defconstant dynamic-0-space-end       #x5ffff000)
 
-  (def!constant dynamic-1-space-start     #x60000000)
-  (def!constant dynamic-1-space-end       #x77fff000))
+  (defconstant dynamic-1-space-start     #x60000000)
+  (defconstant dynamic-1-space-end       #x77fff000))
 
 ;; Size of one linkage-table entry in bytes. See comment in
 ;; src/runtime/sparc-arch.c
-(def!constant linkage-table-entry-size 16)
+(defconstant linkage-table-entry-size 16)
 
 
 ;;;; other random constants.
@@ -234,6 +234,6 @@
 ;;; for pseudo-atomic) to propagate a magic number to C land via
 ;;; sbcl.h.
 #!-linux
-(def!constant pseudo-atomic-trap #x10)
+(defconstant pseudo-atomic-trap #x10)
 #!+linux
-(def!constant pseudo-atomic-trap #x40)
+(defconstant pseudo-atomic-trap #x40)
