@@ -290,19 +290,18 @@
     (when vop
       (note-this-location vop :internal-error))
     (inst unimp kind)
+    (inst byte code)
     (with-adjustable-vector (vector)
-      (inst byte (error-number-or-lose code))
       (dolist (tn values)
-        (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
-                                           (tn-offset tn))
-                           vector))
+        (write-var-integer
+         (make-sc-offset (sc-number (tn-sc tn)) (tn-offset tn)) vector))
       (dotimes (i (length vector))
         (inst byte (aref vector i))))
     (emit-alignment word-shift)))
 
 (defun error-call (vop error-code &rest values)
   "Cause an error.  ERROR-CODE is the error to cause."
-  (emit-error-break vop error-trap error-code values))
+  (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 
 (defun generate-error-code (vop error-code &rest values)

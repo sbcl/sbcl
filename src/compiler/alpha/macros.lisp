@@ -193,13 +193,11 @@
     (when vop
       (note-this-location vop :internal-error))
     (inst gentrap kind)
+    (inst byte code)
     (with-adjustable-vector (vector)
-      (inst byte code)
       (dolist (tn values)
-        (write-var-integer (make-sc-offset (sc-number
-                                            (tn-sc tn))
-                                           (tn-offset tn))
-                           vector))
+        (write-var-integer
+         (make-sc-offset (sc-number (tn-sc tn)) (tn-offset tn)) vector))
       (dotimes (i (length vector))
         (inst byte (aref vector i))))
     (emit-alignment word-shift)))
