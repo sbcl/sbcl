@@ -753,7 +753,7 @@ default-value-8
                    ;; calculated.
                    (insert-step-instrumenting name-pass)
                    ;; The raw-addr (ENTRY-POINT) will be one of:
-                   ;; closure_tramp, undefined_tramp, or somewhere
+                   ;; closure-tramp, undefined-tramp, or somewhere
                    ;; within a simple-fun object.  If the latter, then
                    ;; it is essential (due to it being an interior
                    ;; pointer) that the function itself be in a

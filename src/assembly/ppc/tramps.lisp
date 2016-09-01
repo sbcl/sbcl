@@ -16,11 +16,8 @@
   (inst word simple-fun-header-widetag) ;; header
   (inst word (make-fixup 'undefined-tramp-tagged
                          :assembly-routine)) ;; self
-  (inst word nil-value) ;; next
-  (inst word nil-value) ;; name
-  (inst word nil-value) ;; arglist
-  (inst word nil-value) ;; type
-  (inst word nil-value) ;; xref
+  (dotimes (i (- simple-fun-code-offset 2))
+    (inst word nil-value))
 
   UNDEFINED-TRAMP
   (inst addi code-tn lip-tn (- fun-pointer-lowtag
@@ -45,5 +42,25 @@
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   (inst addi lip-tn code-tn (- (ash simple-fun-code-offset word-shift)
                                fun-pointer-lowtag))
+  (inst mtctr lip-tn)
+  (inst bctr))
+
+(define-assembly-routine
+    (xfuncallable-instance-tramp (:return-style :none)
+                      (:align n-lowtag-bits)
+                      (:export (funcallable-instance-tramp
+                                (+ xfuncallable-instance-tramp
+                                   fun-pointer-lowtag))))
+    ((:temp fdefn-tn descriptor-reg fdefn-offset))
+  (inst word simple-fun-header-widetag)
+  (inst word (make-fixup 'funcallable-instance-tramp-tagged
+                         :assembly-routine))
+  (dotimes (i (- simple-fun-code-offset 2))
+    (inst word nil-value))
+
+  (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
+  (loadw fdefn-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst addi lip-tn fdefn-tn (- (ash simple-fun-code-offset word-shift)
+                                fun-pointer-lowtag))
   (inst mtctr lip-tn)
   (inst bctr))
