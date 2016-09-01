@@ -1471,7 +1471,8 @@ arrange_return_to_c_function(os_context_t *context,
 #if defined(LISP_FEATURE_DARWIN)
     u32 *register_save_area = (u32 *)os_validate(0, 0x40);
 
-    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function, sp));
+    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function,
+                  *os_context_register_addr(context,reg_ESP)));
     FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: context: %x, &context %x\n", context, &context));
 
     /* 1. os_validate (malloc/mmap) register_save_block
