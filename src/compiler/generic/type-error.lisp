@@ -115,3 +115,11 @@
   (def unknown-key-arg-error unknown-key-arg-error
     sb!c::%unknown-key-arg-error key)
   (def nil-fun-returned-error nil-fun-returned-error nil fun))
+
+(defun encode-internal-error-args (values)
+  (with-adjustable-vector (vector)
+    (dolist (tn values)
+      (write-var-integer
+       (make-sc-offset (sc-number (tn-sc tn)) (or (tn-offset tn) 0))
+       vector))
+    (loop for octet across vector do (inst byte octet))))

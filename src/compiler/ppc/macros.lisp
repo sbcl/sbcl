@@ -306,12 +306,7 @@
       (note-this-location vop :internal-error))
     (inst unimp kind)
     (inst byte code)
-    (with-adjustable-vector (vector)
-      (dolist (tn values)
-        (write-var-integer
-         (make-sc-offset (sc-number (tn-sc tn)) (or (tn-offset tn) 0)) vector))
-      (dotimes (i (length vector))
-        (inst byte (aref vector i))))
+    (encode-internal-error-args values)
     (emit-alignment word-shift)))
 
 (defun error-call (vop error-code &rest values)

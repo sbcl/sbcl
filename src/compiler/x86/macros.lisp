@@ -354,15 +354,7 @@
       (note-this-location vop :internal-error))
     (inst byte kind)                    ; e.g. trap_xyyy
     (inst byte code)
-    (with-adjustable-vector (vector)
-      (dolist (tn values)
-        ;; classic CMU CL comment:
-        ;;   zzzzz jrd here. tn-offset is zero for constant
-        ;;   tns.
-        (write-var-integer
-         (make-sc-offset (sc-number (tn-sc tn)) (or (tn-offset tn) 0)) vector))
-      (dotimes (i (length vector))
-        (inst byte (aref vector i))))))
+    (encode-internal-error-args values)))
 
 (defun error-call (vop error-code &rest values)
   #!+sb-doc
