@@ -296,7 +296,6 @@
          (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
                                             (or (tn-offset tn) 0))
                             vector))
-       (inst byte (length vector))
        (dotimes (i (length vector))
          (inst byte (aref vector i)))
        (emit-alignment 2)))))

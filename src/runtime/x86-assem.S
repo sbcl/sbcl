@@ -519,7 +519,6 @@ GNAME(undefined_tramp):
 	pop	4(%ebp)         # Save return PC for backtrace.
 	TRAP
 	.byte	trap_Error
-        .byte   2
         .byte   UNDEFINED_FUN_ERROR
         .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
 	ret

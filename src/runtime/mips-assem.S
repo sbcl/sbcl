@@ -397,9 +397,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	/* Now that the preliminaries are dealt with, actually trap. */
 	.set	noreorder
 	b	1f
-	 break	0x0, trap_Cerror
-	/* Error data length. */
-	.byte	4
+	break	0x0, trap_Cerror
 	/* Error number. */
 	.byte	UNDEFINED_FUN_ERROR
 	/* Magic value 254 means a 16bit little endian value follows.

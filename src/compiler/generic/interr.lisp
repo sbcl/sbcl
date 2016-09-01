@@ -16,7 +16,8 @@
 ;;; This is for generating runtime/genesis/constants.h
 ;;; (The strings are only used in C code and are relatively unimportant)
 (defun !c-stringify-internal-error (interr)
-  (destructuring-bind (description . symbol) interr
+  (destructuring-bind (description symbol . nargs) interr
+    (declare (ignore nargs))
     (if (stringp description)
         description
         ;; Isn't this rewording a bit pointless? OBJECT-NOT-FOO-ERROR is
@@ -74,8 +75,11 @@
                ,(map 'vector
                      (lambda (x)
                        (if (symbolp x)
-                           (cons x (symbolicate "OBJECT-NOT-" x "-ERROR"))
-                           (cons (car x) (symbolicate (cadr x) "-ERROR"))))
+                           (list* x (symbolicate "OBJECT-NOT-" x "-ERROR") 1)
+                           (list* (car x) (symbolicate (second x) "-ERROR")
+                                  (if (stringp (car x))
+                                      (third x)
+                                      1))))
                      list)
                #'equalp))))
  (compute-it
@@ -85,25 +89,25 @@
   ;; FIXME: These should either consistently be sentences beginning with
   ;; a capital letter and ending with a period, or consistently not that,
   ;; instead of a random mix of both.
-  (("unknown system lossage" unknown)
-   ("An attempt was made to use an undefined FDEFINITION." undefined-fun)
+  (("unknown system lossage" unknown 0)
+   ("An attempt was made to use an undefined FDEFINITION." undefined-fun 1)
    #!+(or arm arm64 x86-64)
-   ("An attempt was made to use an undefined alien function" undefined-alien-fun)
-   ("invalid argument count" invalid-arg-count)
-   ("bogus argument to VALUES-LIST" bogus-arg-to-values-list)
-   ("An attempt was made to use an undefined SYMBOL-VALUE." unbound-symbol)
-   ("attempt to RETURN-FROM a block that no longer exists" invalid-unwind)
-   ("attempt to THROW to a non-existent tag" unseen-throw-tag)
-   ("division by zero" division-by-zero)
-   ("Object is of the wrong type." object-not-type)
-   ("odd number of &KEY arguments" odd-key-args)
-   ("unknown &KEY argument" unknown-key-arg)
-   ("invalid array index" invalid-array-index)
-   ("wrong number of indices" wrong-number-of-indices)
-   ("A function with declared result type NIL returned." nil-fun-returned)
-   ("An array with element-type NIL was accessed." nil-array-accessed)
-   ("Object layout is invalid. (indicates obsolete instance)" layout-invalid)
-   ("Thread local storage exhausted." tls-exhausted))
+   ("An attempt was made to use an undefined alien function" undefined-alien-fun 1)
+   ("invalid argument count" invalid-arg-count 1)
+   ("invalid argument count" local-invalid-arg-count 2)
+   ("bogus argument to VALUES-LIST" bogus-arg-to-values-list 1)
+   ("An attempt was made to use an undefined SYMBOL-VALUE." unbound-symbol 1)
+   ("attempt to RETURN-FROM a block that no longer exists" invalid-unwind 0)
+   ("attempt to THROW to a non-existent tag" unseen-throw-tag 1)
+   ("division by zero" division-by-zero 2)
+   ("Object is of the wrong type." object-not-type 2)
+   ("odd number of &KEY arguments" odd-key-args 0)
+   ("unknown &KEY argument" unknown-key-arg 1)
+   ("invalid array index" invalid-array-index 3)
+   ("A function with declared result type NIL returned." nil-fun-returned 1)
+   ("An array with element-type NIL was accessed." nil-array-accessed 1)
+   ("Object layout is invalid. (indicates obsolete instance)" layout-invalid 2)
+   ("Thread local storage exhausted." tls-exhausted 0))
 
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
@@ -201,5 +205,17 @@
 
 (defun error-number-or-lose (name)
   (or (position name sb!c:+backend-internal-errors+
-                :key #'cdr :test #'eq)
+                :key #'cadr :test #'eq)
       (error "unknown internal error: ~S" name)))
+
+(defun error-length (error-number)
+ (if (array-in-bounds-p (load-time-value sb!c:+backend-internal-errors+) error-number)
+     (cddr (svref (load-time-value sb!c:+backend-internal-errors+) error-number))
+     0))
+
+(defun decode-internal-error-args (sap error-number)
+  (let ((length (sb!kernel::error-length error-number)))
+    (declare (type (unsigned-byte 8) length))
+    (let ((index 0))
+      (loop repeat length
+            collect (sb!c:sap-read-var-integer sap index)))))

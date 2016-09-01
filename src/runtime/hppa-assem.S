@@ -487,7 +487,6 @@ closure_tramp:
         .EXPORT undefined_tramp
 undefined_tramp:
         break   trap_Error,0
-        .byte   4
         .byte   UNDEFINED_FUN_ERROR
         .byte   254
         .byte   (0x40 + sc_DescriptorReg)

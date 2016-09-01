@@ -45,6 +45,30 @@
        (setf ,index new-index)
        value)))
 
+(defun %sap-read-var-integer (sap index)
+  (let ((val (sap-ref-8 sap index)))
+    (cond ((<= val 253)
+           (values val (1+ index)))
+          ((= val 254)
+           (values
+            (logior (sap-ref-8 sap (+ index 1))
+                    (ash (sap-ref-8 sap (+ index 2)) 8))
+            (+ index 3)))
+          (t
+           (values
+            (logior (sap-ref-8 sap (+ index 1))
+                    (ash (sap-ref-8 sap (+ index 2)) 8)
+                    (ash (sap-ref-8 sap (+ index 3)) 16)
+                    (ash (sap-ref-8 sap (+ index 4)) 24))
+            (+ index 5))))))
+
+(defmacro sap-read-var-integer (sap index)
+  (once-only ((sap sap))
+    `(multiple-value-bind (value new-index)
+         (%sap-read-var-integer ,sap ,index)
+       (setf ,index new-index)
+       value)))
+
 ;;; Take an adjustable vector VEC with a fill pointer and push the
 ;;; variable length representation of INT on the end.
 (defun write-var-integer (int vec)

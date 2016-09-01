@@ -216,7 +216,7 @@
                             (%more-arg-context ,n-supplied ,max)
                           (%funcall ,more ,@temps ,n-context ,n-count))))))
              (t
-              (%arg-count-error ,n-supplied ',(leaf-debug-name fun))))))))))
+              (%local-arg-count-error ,n-supplied ',(leaf-debug-name fun))))))))))
 
 ;;; Make an external entry point (XEP) for FUN and return it. We
 ;;; convert the result of MAKE-XEP-LAMBDA in the correct environment,
@@ -532,8 +532,8 @@
    node
    `(lambda (&rest args)
       (declare (ignore args))
-      (%arg-count-error ,count ',(combination-fun-debug-name node)))
-   '%arg-count-error))
+      (%local-arg-count-error ,count ',(combination-fun-debug-name node)))
+   '%local-arg-count-error))
 
 ;;; Attempt to convert a call to a lambda. If the number of args is
 ;;; wrong, we give a warning and mark the call as :ERROR to remove it

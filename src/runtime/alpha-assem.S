@@ -292,7 +292,6 @@ undefined_tramp= call_into_lisp_LRA_page+0x15c
 
 	call_pal PAL_bugchk
 	.long    trap_Error
-        .byte    4                         /* what are these numbers? */
         .byte    UNDEFINED_FUN_ERROR
         .byte    254
         .byte    (0xc0 + sc_DescriptorReg)

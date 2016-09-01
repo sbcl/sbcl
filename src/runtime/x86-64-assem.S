@@ -262,7 +262,6 @@ GNAME(undefined_tramp):
 	pop	8(%rbp)         # Save return PC for backtrace.
 	TRAP
 	.byte	trap_Error
-        .byte   2
         .byte   UNDEFINED_FUN_ERROR
         .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
 	ret
@@ -276,7 +275,6 @@ GNAME(undefined_alien_function):
 	pop	8(%rbp)         # Save return PC for backtrace.
 	TRAP
 	.byte	trap_Error
-        .byte   4
         .byte   UNDEFINED_ALIEN_FUN_ERROR
         /* Encode RBX
            FIXME: make independt of the encoding changes. */

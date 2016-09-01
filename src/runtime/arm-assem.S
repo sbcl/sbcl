@@ -327,7 +327,6 @@ call_into_c:
 #endif
         @@ Error arguments for an undefined function.
         .byte   trap_Error
-        .byte   .error_args_end - . - 1
         .byte   UNDEFINED_FUN_ERROR
         @@ Need to indicate reg_LEXENV here, which is R3.  Encoding
         @@ rules are to produce an "sc-offset" with the SC number in
@@ -365,7 +364,6 @@ undefined_alien_function:
 
         @@ Error arguments for an undefined function.
         .byte   trap_Error
-        .byte   4
         .byte   UNDEFINED_ALIEN_FUN_ERROR
         @@ Encode unsigned R8, which comes from call_into_c
         .byte   0xFE

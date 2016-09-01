@@ -217,7 +217,6 @@ undefined_tramp = . + 1
 
 	b	1f
         unimp   trap_Cerror
-	.byte	4
         .byte   UNDEFINED_FUN_ERROR
 	.byte	254, sc_DescriptorReg, 6
 	.align	4

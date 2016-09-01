@@ -348,7 +348,7 @@
         hashtable))
 (defun %interr-symbol-for-type-spec (spec)
   (let ((table **type-spec-interr-symbols**))
-    (cdr (assoc spec (svref table (rem (sxhash spec) (length table)))
+    (cadr (assoc spec (svref table (rem (sxhash spec) (length table)))
                 :test #'equal))))
 #+nil ; some meta-analysis to decide what types should be in "generic/interr"
 (progn

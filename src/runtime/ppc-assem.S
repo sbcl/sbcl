@@ -653,7 +653,6 @@ CSYMBOL(undefined_tramp):
 
 	/* Now that the preliminaries are dealt with, actually trap. */
 	twllei reg_ZERO,trap_Cerror
-	.byte 4
 	.byte UNDEFINED_FUN_ERROR
 	.byte 254, sc_DescriptorReg+0x80, 0x2 /* 280 */
 	/* This stuff is for the continuable error.  I don't think there's

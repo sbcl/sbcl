@@ -162,7 +162,7 @@
   (loop for (type-spec . (count . interr-p)) in l
         do (format t "~:[ ~;+~] ~5D ~S~%" interr-p count type-spec))
   (format t "~&Error numbers not used by checkgen:~%")
-  (loop for (spec . symbol) across sb!c:+backend-internal-errors+
+  (loop for (spec symbol) across sb!c:+backend-internal-errors+
         when (and (not (stringp spec))
                   (not (gethash spec sb!c::*checkgen-used-types*)))
         do (format t "       ~S~%" spec)))

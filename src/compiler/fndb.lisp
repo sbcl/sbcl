@@ -1594,7 +1594,8 @@
 #!-precise-arg-count-error
 (defknown %verify-arg-count (index index) (values))
 
-(defknown %arg-count-error (t t) nil)
+(defknown %arg-count-error (t) nil)
+(defknown (%local-arg-count-error) (t t) nil)
 (defknown %unknown-values () *)
 (defknown %catch (t t) t)
 (defknown %unwind-protect (t t) t)

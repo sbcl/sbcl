@@ -232,32 +232,12 @@
   (declare (type (alien (* os-context-t)) context))
   (/show0 "entering INTERNAL-ERROR-ARGS, CONTEXT=..")
   (/hexstr context)
-  (let ((pc (context-pc context)))
+  (let* ((pc (context-pc context))
+         (error-number (sap-ref-8 pc 1)))
     (declare (type system-area-pointer pc))
     (/show0 "got PC")
-    ;; using INT3 the pc is .. INT3 <here> code length bytes...
-    (let* ((length (sap-ref-8 pc 1))
-           (vector (make-array length :element-type '(unsigned-byte 8))))
-      (declare (type (unsigned-byte 8) length)
-               (type (simple-array (unsigned-byte 8) (*)) vector))
-      (/show0 "LENGTH,VECTOR,ERROR-NUMBER=..")
-      (/hexstr length)
-      (/hexstr vector)
-      (copy-ub8-from-system-area pc 2 vector 0 length)
-      (let* ((index 0)
-             (error-number (sb!c:read-var-integer vector index)))
-        (/hexstr error-number)
-        (collect ((sc-offsets))
-          (loop
-           (/show0 "INDEX=..")
-           (/hexstr index)
-           (when (>= index length)
-             (return))
-           (let ((sc-offset (sb!c:read-var-integer vector index)))
-             (/show0 "SC-OFFSET=..")
-             (/hexstr sc-offset)
-             (sc-offsets sc-offset)))
-          (values error-number (sc-offsets)))))))
+    (values error-number
+            (sb!kernel::decode-internal-error-args (sap+ pc 2) error-number))))
 
 ;;; This is used in error.lisp to insure that floating-point exceptions
 ;;; are properly trapped. The compiler translates this to a VOP.

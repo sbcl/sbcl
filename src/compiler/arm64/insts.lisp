@@ -415,32 +415,29 @@
 
 ;;;; special magic to support decoding internal-error and related traps
 (defun snarf-error-junk (sap offset &optional length-only)
-  (let ((length (sap-ref-8 sap offset)))
-    (declare (type system-area-pointer sap)
+  (let* ((inst (sap-ref-32 sap (- offset 4)))
+         (error-number (ldb (byte 8 13) inst))
+         (length (sb!kernel::error-length error-number))
+         (index offset))
+    (declare (type sb!sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
-           (values 0 (1+ length) nil nil))
+           (loop repeat length
+                 do
+                 (sb!c::sap-read-var-integer sap index))
+           (values 0 (- index offset) nil nil))
           (t
-           (let* ((inst (sap-ref-32 sap (- offset 4)))
-                  (vector (make-array length :element-type '(unsigned-byte 8)))
-                  (index 0)
-                  (error-number (ldb (byte 8 13) inst)))
-             (declare (type (simple-array (unsigned-byte 8) (*)) vector))
-             (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
-                                                  vector 0 length)
-             (collect ((sc-offsets)
-                       (lengths))
-               (lengths 1) ; the length byte
-               (loop
-                (when (>= index length)
-                  (return))
-                (let ((old-index index))
-                  (sc-offsets (read-var-integer vector index))
-                  (lengths (- index old-index))))
-               (values error-number
-                       (1+ length)
-                       (sc-offsets)
-                       (lengths))))))))
+           (collect ((sc-offsets)
+                     (lengths))
+             (loop repeat length
+                   do
+                   (let ((old-index index))
+                     (sc-offsets (sb!c::sap-read-var-integer sap index))
+                     (lengths (- index old-index))))
+             (values error-number
+                     (- index offset)
+                     (sc-offsets)
+                     (lengths)))))))
 
 (defun brk-control (chunk inst stream dstate)
   (declare (ignore inst chunk))

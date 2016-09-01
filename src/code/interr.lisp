@@ -53,14 +53,15 @@
 (defun undefined-alien-fun-error ()
   (error 'undefined-alien-function-error))
 
-(deferr invalid-arg-count-error (nargs &optional (fname nil fnamep))
-  (if fnamep
-      (error 'simple-program-error
+(deferr invalid-arg-count-error (nargs)
+  (error 'simple-program-error
+         :format-control "invalid number of arguments: ~S"
+         :format-arguments (list nargs)))
+
+(deferr local-invalid-arg-count-error (nargs name)
+  (error 'simple-program-error
          :format-control "~S called with invalid number of arguments: ~S"
-         :format-arguments (list fname nargs))
-      (error 'simple-program-error
-             :format-control "invalid number of arguments: ~S"
-             :format-arguments (list nargs))))
+         :format-arguments (list name nargs)))
 
 (deferr bogus-arg-to-values-list-error (list)
   (error 'simple-type-error
@@ -144,9 +145,6 @@
   (error 'simple-program-error
          :format-control "unknown &KEY argument: ~S"
          :format-arguments (list key-name)))
-
-;; FIXME: missing (deferr wrong-number-of-indices)
-;; we don't ever raise that error through a primitive trap I guess.
 
 ;; TODO: make the arguments (ARRAY INDEX &optional BOUND)
 ;; and don't need the bound for vectors. Just read it.

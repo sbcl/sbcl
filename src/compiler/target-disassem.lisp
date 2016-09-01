@@ -2044,7 +2044,7 @@
       (return (note (lambda (s) (prin1 symbol s)) dstate)))))
 
 (defun get-internal-error-name (errnum)
-  (cdr (svref sb!c:+backend-internal-errors+ errnum)))
+  (cadr (svref sb!c:+backend-internal-errors+ errnum)))
 
 (defun get-sc-name (sc-offs)
   (sb!c:location-print-name
@@ -2063,8 +2063,6 @@
 ;;; ERROR-PARSE-FUN should be a function that accepts:
 ;;;   1) a SYSTEM-AREA-POINTER
 ;;;   2) a BYTE-OFFSET from the SAP to begin at
-;;;   3) optionally, LENGTH-ONLY, which if non-NIL, means to only return
-;;;      the byte length of the arguments (to avoid unnecessary consing)
 ;;; It should read information from the SAP starting at BYTE-OFFSET, and
 ;;; return four values:
 ;;;   1) the error number
@@ -2094,7 +2092,6 @@
              (emit-note (note)
                (when note
                  (note note dstate))))
-        (emit-err-arg)
         ;; ARM64 encodes the error number in BRK instruction itself
         #!-arm64
         (emit-err-arg)
@@ -2107,38 +2104,36 @@
                                      sb!vm:n-word-bytes)
                                   dstate)
               (emit-note (get-sc-name sc-offs))))))
-    (incf (dstate-next-offs dstate)
-          adjust)))
+    (incf (dstate-next-offs dstate) adjust)))
 
 ;;; arm64 stores an error-number in the instruction bytes,
 ;;; so can't easily share this code.
 ;;; But probably we should just add the conditionalization in here.
 #!-arm64
 (defun snarf-error-junk (sap offset &optional length-only)
-  (let ((length (sb!sys:sap-ref-8 sap offset)))
+  (let* ((error-number (sb!sys:sap-ref-8 sap offset))
+         (length (sb!kernel::error-length error-number))
+         (index (1+ offset)))
     (declare (type sb!sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))
-    (if length-only
-        (values 0 (1+ length) nil nil)
-        (let ((vector
-               (truly-the (simple-array (unsigned-byte 8) (*))
-                          (sb!sys:sap-ref-octets sap (1+ offset) length))))
+    (cond (length-only
+         (loop repeat length
+               do
+               (sb!c::sap-read-var-integer sap index))
+         (values 0 (- index offset) nil nil))
+          (t
            (collect ((sc-offsets)
                      (lengths))
-             (lengths 1)                ; the length byte
-             (let* ((index 0)
-                    (error-number (sb!c:read-var-integer vector index)))
-               (lengths index)
-               (loop
-                 (when (>= index length)
-                   (return))
-                 (let ((old-index index))
-                   (sc-offsets (sb!c:read-var-integer vector index))
-                   (lengths (- index old-index))))
-               (values error-number
-                       (1+ length)
-                       (sc-offsets)
-                       (lengths))))))))
+             (lengths 1) ;; error-number
+             (loop repeat length
+                   do
+                   (let ((old-index index))
+                     (sc-offsets (sb!c::sap-read-var-integer sap index))
+                     (lengths (- index old-index))))
+             (values error-number
+                     (- index offset)
+                     (sc-offsets)
+                     (lengths)))))))
 
 ;; A prefilter set is a list of vectors specifying bytes to extract
 ;; and a function to call on the extracted value(s).

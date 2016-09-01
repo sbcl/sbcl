@@ -354,7 +354,7 @@
       (note-this-location vop :internal-error))
     (inst byte kind)                    ; e.g. trap_xyyy
     (with-adjustable-vector (vector)    ; interr arguments
-      (write-var-integer code vector)
+      (inst byte code)
       (dolist (tn values)
         ;; classic CMU CL comment:
         ;;   zzzzz jrd here. tn-offset is zero for constant
@@ -362,7 +362,6 @@
         (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
                                            (or (tn-offset tn) 0))
                            vector))
-      (inst byte (length vector))
       (dotimes (i (length vector))
         (inst byte (aref vector i))))))
 

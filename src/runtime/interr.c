@@ -171,6 +171,7 @@ void print_constant(os_context_t *context, int offset) {
 }
 
 char *internal_error_descriptions[] = {INTERNAL_ERROR_NAMES};
+char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
 /* internal error handler for when the Lisp error system doesn't exist
  *
  * FIXME: Shouldn't error output go to stderr instead of stdout? (Alas,
@@ -180,41 +181,38 @@ void
 describe_internal_error(os_context_t *context)
 {
     unsigned char *ptr = arch_internal_error_arguments(context);
-    int len, scoffset, sc, offset, ch;
+    int scoffset, sc, offset, ch;
+    void * pc = (void*)*os_context_pc_addr(context);
 
 #ifdef LISP_FEATURE_ARM64
     u32 trap_instruction = *(u32 *)ptr;
-    unsigned code = trap_instruction >> 13 & 0xFF;
-    printf("Internal error #%d \"%s\" at %p\n", code,
-           internal_error_descriptions[code],
-           (void*)*os_context_pc_addr(context));
+    unsigned char code = trap_instruction >> 13 & 0xFF;
     ptr += 4;
-    len = *ptr++;
 #else
-    len = *ptr++;
-    printf("Internal error #%d \"%s\" at %p\n", *ptr,
-           internal_error_descriptions[*ptr],
-           (void*)*os_context_pc_addr(context));
+    unsigned char code = *ptr;
     ptr++;
-    len--;
 #endif
+
+    if (code > sizeof(internal_error_descriptions)) {
+      printf("Unknown error code %d at %p\n", code, pc);
+    }
+    printf("Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
+
+    char len = internal_error_nargs[code];
 
     while (len > 0) {
         scoffset = *ptr++;
         len--;
         if (scoffset == 253) {
             scoffset = *ptr++;
-            len--;
         }
         else if (scoffset == 254) {
             scoffset = ptr[0] + ptr[1]*256;
             ptr += 2;
-            len -= 2;
         }
         else if (scoffset == 255) {
             scoffset = ptr[0] + (ptr[1]<<8) + (ptr[2]<<16) + (ptr[3]<<24);
             ptr += 4;
-            len -= 4;
         }
         sc = scoffset & 0x3F;
         offset = scoffset >> 6;

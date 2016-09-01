@@ -105,25 +105,15 @@
     unsigned-int
   (context (* os-context-t) :in))
 
-;;;; Internal-error-arguments.
-
-;;; INTERNAL-ERROR-ARGUMENTS -- interface.
-;;;
-;;; Given the sigcontext, extract the internal error arguments from the
-;;; instruction stream.  This is e.g.
-;;; 4       23      254     206     1       0       0       0
-;;; |       ~~~~~~~~~~~~~~~~~~~~~~~~~
-;;; length         data              (everything is an octet)
-;;; (pc + 4)
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (/show0 "entering INTERNAL-ERROR-ARGS, CONTEXT=..")
   (/hexstr context)
-  (let ((pc (context-pc context))
-        (cause (context-bd-cause-int context)))
+  (let* ((pc (context-pc context))
+         (cause (context-bd-cause-int context))
+         (error-number (sap-ref-8 pc 4)))
     (declare (type system-area-pointer pc))
-    (multiple-value-bind (error-number length sc-offsets)
-        ;; KLUDGE: This exposure of the branch delay mechanism hurts.
-        (sb!disassem:snarf-error-junk pc (if (logbitp 31 cause) 8 4))
-      (declare (ignore length))
-      (values error-number sc-offsets))))
+    (values error-number
+            ;; KLUDGE: This exposure of the branch delay mechanism hurts.
+            (sb!kernel::decode-internal-error-args (sap+ pc (if (logbitp 31 cause) 9 5))
+                                                   error-number))))

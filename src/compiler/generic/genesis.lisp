@@ -3281,14 +3281,16 @@ core and return a descriptor to it."
   ;; Assembly code needs only the constants for UNDEFINED_[ALIEN_]FUN_ERROR
   ;; but to avoid imparting that knowledge here, we'll expose all error
   ;; number constants except for OBJECT-NOT-<x>-ERROR ones.
-  (loop for interr across sb!c:+backend-internal-errors+
+  (loop for (description name) across sb!c:+backend-internal-errors+
         for i from 0
-        when (stringp (car interr))
-        do (format t "#define ~A ~D~%" (c-symbol-name (cdr interr)) i))
+        when (stringp description)
+        do (format t "#define ~A ~D~%" (c-symbol-name name) i))
   ;; C code needs strings for describe_internal_error()
   (format t "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
           (map 'list 'sb!kernel::!c-stringify-internal-error
                sb!c:+backend-internal-errors+))
+  (format t "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
+          (map 'list #'cddr sb!c:+backend-internal-errors+))
 
   ;; I'm not really sure why this is in SB!C, since it seems
   ;; conceptually like something that belongs to SB!VM. In any case,

@@ -369,7 +369,6 @@ undefined_tramp:
 
         brk UNDEFINED_FUN_ERROR << 8 | trap_Error
 
-        .byte  .error_args_end - . - 1
         // Encode LEXENV
         // produced with
         // (let ((result (make-array 10 :fill-pointer 0)))
@@ -399,8 +398,6 @@ undefined_alien_function:
 
         brk     UNDEFINED_ALIEN_FUN_ERROR << 8 | trap_Error
 
-        // Error arguments for an undefined function.
-        .byte   3
         // Encode unsigned R8, which comes from call_into_c
         .byte   0xFE
         .byte   0x92
