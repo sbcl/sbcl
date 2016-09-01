@@ -395,7 +395,6 @@
       If non-NIL, the value of this argument is used as an address, and if
       that address occurs inside the disassembled code, it is replaced by a
       label. If this is a function, it is called to filter the value."
-  (aver (<= length-in-bits dchunk-bits))
   `(progn
      (eval-when (:compile-toplevel)
        (%def-inst-format
