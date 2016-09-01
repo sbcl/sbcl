@@ -213,6 +213,7 @@
      (cddr (svref (load-time-value sb!c:+backend-internal-errors+) error-number))
      0))
 
+#-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGER
 (defun decode-internal-error-args (sap error-number)
   (let ((length (sb!kernel::error-length error-number)))
     (declare (type (unsigned-byte 8) length))

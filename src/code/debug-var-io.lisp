@@ -21,6 +21,8 @@
 
 ;;; Given a byte vector VEC and an index variable INDEX, read a
 ;;; variable length integer and advance index.
+#-sb-xc-host
+(progn
 (defun %read-var-integer (vec index)
   (let ((val (aref vec index)))
     (cond ((<= val 253)
@@ -67,7 +69,7 @@
     `(multiple-value-bind (value new-index)
          (%sap-read-var-integer ,sap ,index)
        (setf ,index new-index)
-       value)))
+       value))))
 
 ;;; Take an adjustable vector VEC with a fill pointer and push the
 ;;; variable length representation of INT on the end.
