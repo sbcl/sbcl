@@ -170,7 +170,7 @@
                (constant-name (symbolicate sc-name "-SC-NUMBER")))
           (forms `(define-storage-class ,sc-name ,index
                     ,@(cdr class)))
-          (forms `(defconstant ,constant-name ,index))
+          (forms `(def!constant ,constant-name ,index))
           (incf index))))
     `(progn
        ,@(forms))))
