@@ -7,25 +7,55 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; SC-OFFSETs are needed by sparc-vm.lisp
-
 (in-package "SB!C")
 
 ;;;; SC-OFFSETs
 ;;;;
 ;;;; We represent the place where some value is stored with a SC-OFFSET,
 ;;;; which is the SC number and offset encoded as an integer.
+;;;;
+;;;; The concrete encoding is exported to sc-offset.h during genesis
+;;;; for use by the runtime.
 
-;;;; FIXME: this layout is hardcoded in describe_internal_error and
-;;;; some .S files, undefined_tramp in at least mips/ppc/sparc-assem.S
-;;;; uses it. Ideally, it shouldn't be hardcoded.
-(defconstant-eqx sc-offset-scn-byte (byte 6 0) #'equalp)
-(defconstant-eqx sc-offset-offset-byte (byte 21 6) #'equalp)
 (def!type sc-offset () '(unsigned-byte 27))
 
-(defmacro make-sc-offset (scn offset)
-  `(dpb ,scn sc-offset-scn-byte
-        (dpb ,offset sc-offset-offset-byte 0)))
+(defconstant-eqx +sc-offset-scn-bytes+
+    `(,(byte 6 0))
+  #'equalp)
 
-(defmacro sc-offset-scn (sco) `(ldb sc-offset-scn-byte ,sco))
-(defmacro sc-offset-offset (sco) `(ldb sc-offset-offset-byte ,sco))
+(defconstant-eqx +sc-offset-offset-bytes+
+    `(,(byte 21 6))
+  #'equalp)
+
+(declaim (ftype (sfunction ((unsigned-byte 6) (unsigned-byte 21)) sc-offset)
+                make-sc-offset))
+(defun make-sc-offset (sc-number offset)
+  (let ((result 0))
+    (flet ((add-bits (bytes source)
+             (loop for byte in bytes
+                for size = (byte-size byte)
+                with i = 0
+                do
+                  (setf result (dpb (ldb (byte size i) source) byte result))
+                  (incf i size))))
+      (add-bits +sc-offset-scn-bytes+ sc-number)
+      (add-bits +sc-offset-offset-bytes+ offset))
+    result))
+
+(declaim (ftype (sfunction (sc-offset) unsigned-byte)
+                sc-offset-scn sc-offset-offset))
+(flet ((extract-bits (bytes source)
+         (loop with result = 0
+            for byte in bytes
+            for size = (byte-size byte)
+            with i = 0
+            do
+              (setf result (dpb (ldb byte source) (byte size i) result))
+              (incf i size)
+            finally (return result))))
+
+  (defun sc-offset-scn (sc-offset)
+    (extract-bits +sc-offset-scn-bytes+ sc-offset))
+
+  (defun sc-offset-offset (sc-offset)
+    (extract-bits +sc-offset-offset-bytes+ sc-offset)))

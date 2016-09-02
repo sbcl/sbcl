@@ -3465,8 +3465,23 @@ core and return a descriptor to it."
               (+ sb!vm:static-space-start
                  sb!vm:n-word-bytes
                  sb!vm:other-pointer-lowtag
-                   (if symbol (sb!vm:static-symbol-offset symbol) 0))))))
+                 (if symbol (sb!vm:static-symbol-offset symbol) 0))))))
 
+(defun write-sc-offset-coding ()
+  (flet ((write-array (name bytes)
+           (format t "static struct sc_offset_byte ~A[] = {~@
+                      ~{    {~{ ~2D, ~2D ~}}~^,~%~}~@
+                      };~2%"
+                   name
+                   (mapcar (lambda (byte)
+                             (list (byte-size byte) (byte-position byte)))
+                           bytes))))
+    (format t "struct sc_offset_byte {
+    int position;
+    int size;
+};~2%")
+    (write-array "sc_offset_sc_number_bytes" sb!c::+sc-offset-scn-bytes+)
+    (write-array "sc_offset_offset_bytes"    sb!c::+sc-offset-offset-bytes+)))
 
 ;;;; writing map file
 
@@ -3946,6 +3961,7 @@ initially undefined function references:~2%")
            (write-structure-object
             (layout-info (find-layout class)))))
         (out-to "static-symbols" (write-static-symbols))
+        (out-to "sc-offset" (write-sc-offset-coding))
 
         (let ((fn (format nil "~A/Makefile.features" c-header-dir-name)))
           (ensure-directories-exist fn)

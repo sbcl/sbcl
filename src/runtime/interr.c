@@ -32,6 +32,7 @@
 #include "monitor.h"
 #include "breakpoint.h"
 #include "var-io.h"
+#include "sc-offset.h"
 
 /* the way that we shut down the system on a fatal error */
 
@@ -204,8 +205,8 @@ describe_internal_error(os_context_t *context)
          count > 0;
          --count) {
         sc_offset = read_var_integer(ptr, &position);
-        sc_number = sc_offset & 0x3F;
-        offset = sc_offset >> 6;
+        sc_number = sc_offset_sc_number(sc_offset);
+        offset = sc_offset_offset(sc_offset);
 
         printf("    SC: %d, Offset: %d", sc_number, offset);
         switch (sc_number) {
