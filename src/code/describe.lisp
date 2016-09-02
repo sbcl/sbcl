@@ -461,7 +461,7 @@
         (dolist (slotd (nreverse slots))
           (describe-slot
            (sb-mop:slot-definition-name slotd)
-           (sb-pcl::slot-value-or-default object (sb-mop:slot-definition-name slotd))))))
+           (sb-pcl::slot-value-for-printing object (sb-mop:slot-definition-name slotd))))))
     (unless slotds
       (format stream "~@:_No slots."))
     (terpri stream)))

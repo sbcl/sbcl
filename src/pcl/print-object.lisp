@@ -101,10 +101,9 @@
 
 (defmethod print-object ((mc standard-method-combination) stream)
   (print-unreadable-object (mc stream :type t :identity t)
-    (format stream
-            "~S ~S"
-            (slot-value-or-default mc 'type-name)
-            (slot-value-or-default mc 'options))))
+    (format stream "~S ~S"
+            (slot-value-for-printing mc 'type-name)
+            (slot-value-for-printing mc 'options))))
 
 (defun named-object-print-function (instance stream
                                     &optional (properly-named-p t)
@@ -119,7 +118,7 @@
          (print-unreadable-object (instance stream :type t :identity t)))
         (t ; case (3). no name, but extra data - show #<unbound slot> and data
          (print-unreadable-object (instance stream :type t :identity t)
-           (format stream "~S ~:S" *unbound-slot-value-marker* extra)))))
+           (format stream "#<unbound slot> ~:S" extra)))))
 
 (defmethod print-object ((class class) stream)
   ;; Use a similar concept as in OUTPUT-FUN.

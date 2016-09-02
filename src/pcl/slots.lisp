@@ -243,15 +243,10 @@
 (defun slot-exists-p (object slot-name)
   (not (null (find-slot-cell (valid-wrapper-of object) slot-name))))
 
-(defvar *unbound-slot-value-marker* (make-unprintable-object "unbound slot"))
-
-;;; This isn't documented, but is used within PCL in a number of print
-;;; object methods. (See NAMED-OBJECT-PRINT-FUNCTION.)
-(defun slot-value-or-default (object slot-name &optional
-                              (default *unbound-slot-value-marker*))
+(defun slot-value-for-printing (object slot-name)
   (if (slot-boundp object slot-name)
       (slot-value object slot-name)
-      default))
+      (load-time-value (make-unprintable-object "unbound slot") t)))
 
 (defmethod slot-value-using-class ((class std-class)
                                    (object standard-object)
