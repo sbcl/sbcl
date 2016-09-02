@@ -20,11 +20,11 @@
 (def!type sc-offset () '(unsigned-byte 27))
 
 (defconstant-eqx +sc-offset-scn-bytes+
-    `(,(byte 6 0))
+    `(,(byte 2 0) ,(byte 4 23))
   #'equalp)
 
 (defconstant-eqx +sc-offset-offset-bytes+
-    `(,(byte 21 6))
+    `(,(byte 21 2))
   #'equalp)
 
 (declaim (ftype (sfunction ((unsigned-byte 6) (unsigned-byte 21)) sc-offset)
