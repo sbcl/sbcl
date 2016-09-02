@@ -2422,6 +2422,7 @@ core and return a descriptor to it."
 ;;; loading functions.
 (defun cold-load (filename)
   "Load the file named by FILENAME into the cold load image being built."
+  (write-line (namestring filename))
   (with-open-file (s filename :element-type '(unsigned-byte 8))
     (load-as-fasl s nil nil)))
 
@@ -3844,7 +3845,6 @@ initially undefined function references:~2%")
 
       ;; Cold load.
       (dolist (file-name object-file-names)
-        (write-line (namestring file-name))
         (cold-load file-name))
 
       (when *known-structure-classoids*

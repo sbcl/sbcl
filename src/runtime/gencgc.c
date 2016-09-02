@@ -3127,7 +3127,7 @@ verify_space(lispobj *start, size_t words)
                 }
                 */
             } else {
-                extern char funcallable_instance_tramp;
+                extern char __attribute__((unused)) funcallable_instance_tramp;
                 /* Verify that it points to another valid space. */
                 if (!to_readonly_space && !to_static_space
 #ifndef LISP_FEATURE_READ_ONLY_TRAMPS
