@@ -877,11 +877,6 @@
 
 ;;;; transforms for sequence functions
 
-;;; Moved here from generic/vm-tran.lisp to satisfy clisp.  Only applies
-;;; to vectors based on simple arrays.
-(def!constant vector-data-bit-offset
-  (* sb!vm:vector-data-offset sb!vm:n-word-bits))
-
 ;;; FIXME: In the copy loops below, we code the loops in a strange
 ;;; fashion:
 ;;;

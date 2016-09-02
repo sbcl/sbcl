@@ -16,9 +16,6 @@
 ;;; FIXME: Doesn't this belong somewhere else, like early-c.lisp?
 (declaim (special *constants* *free-vars* *component-being-compiled*
                   *free-funs* *source-paths*
-                  *continuation-number* *continuation-numbers*
-                  *number-continuations* *tn-id* *tn-ids* *id-tns*
-                  *label-ids* *label-id* *id-labels*
                   *undefined-warnings* *compiler-error-count*
                   *compiler-warning-count* *compiler-style-warning-count*
                   *compiler-note-count*
