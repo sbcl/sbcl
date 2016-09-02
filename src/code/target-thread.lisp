@@ -458,9 +458,10 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 #!+(and sb-thread sb-futex)
 (progn
-  (define-structure-slot-addressor mutex-state-address
-      :structure mutex
-      :slot state)
+  (locally (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
+    (define-structure-slot-addressor mutex-state-address
+        :structure mutex
+        :slot state))
   ;; Important: current code assumes these are fixnums or other
   ;; lisp objects that don't need pinning.
   (defconstant +lock-free+ 0)
@@ -654,6 +655,7 @@ HOLDING-MUTEX-P."
 
 #!+sb-thread
 (defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
+  (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
   (with-deadlocks (self mutex timeout)
     (with-interrupts (check-deadlock))
     (tagbody
@@ -827,9 +829,10 @@ IF-NOT-OWNER is :FORCE)."
       "Create a waitqueue.")
 
 #!+(and sb-thread sb-futex)
-(define-structure-slot-addressor waitqueue-token-address
-    :structure waitqueue
-    :slot token)
+(locally (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
+  (define-structure-slot-addressor waitqueue-token-address
+      :structure waitqueue
+      :slot token))
 
 (declaim (inline %condition-wait))
 (defun %condition-wait (queue mutex

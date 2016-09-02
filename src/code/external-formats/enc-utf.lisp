@@ -449,6 +449,8 @@
               (decoding-error array pos (+ pos bytes) :utf-32be
                               'octet-decoding-error pos)))))))
 
+(eval-when (:compile-toplevel)
+  (sb!xc:proclaim '(muffle-conditions compiler-note)))
 (instantiate-octets-definition define-simple-get-utf32-character)
 
 (defmacro define-utf-32->string (accessor type)

@@ -371,6 +371,8 @@
               (decoding-error array pos (+ pos bytes) :ucs-4be
                               'octet-decoding-error pos)))))))
 
+(eval-when (:compile-toplevel)
+  (sb!xc:proclaim '(muffle-conditions compiler-note)))
 (instantiate-octets-definition define-simple-get-ucs4-character)
 
 (defmacro define-ucs-4->string (accessor type)
