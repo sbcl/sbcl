@@ -209,9 +209,9 @@
       (error "unknown internal error: ~S" name)))
 
 (defun error-length (error-number)
- (if (array-in-bounds-p (load-time-value sb!c:+backend-internal-errors+) error-number)
-     (cddr (svref (load-time-value sb!c:+backend-internal-errors+) error-number))
-     0))
+  (if (array-in-bounds-p sb!c:+backend-internal-errors+ error-number)
+      (cddr (svref sb!c:+backend-internal-errors+ error-number))
+      0))
 
 #-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGER
 (defun decode-internal-error-args (sap error-number)
