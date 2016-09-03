@@ -1242,7 +1242,8 @@
         (vop verify-arg-count node block
              arg-count-location
              min
-             max)))))
+             max)
+        min))))
 
 ;;; Do all the stuff that needs to be done on XEP entry:
 ;;; -- Create frame.
@@ -1259,18 +1260,21 @@
       (vop xep-allocate-frame node block start-label)
       ;; Arg verification needs to be done before the stack pointer is adjusted
       ;; so that the extra arguments are still present when the error is signalled
-      (unless (eq (functional-kind fun) :toplevel)
-        (setf arg-count-tn (make-arg-count-location))
-        #!+precise-arg-count-error
-        (xep-verify-arg-count node block fun arg-count-tn))
-      (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
-             ;; COPY-MORE-ARG should handle SP adjustemnt, but it
-             ;; isn't done on all targets.
-             #!-precise-arg-count-error
-             (vop xep-setup-sp node block)
-             (vop copy-more-arg node block (optional-dispatch-max-args ef)))
-            (t
-             (vop xep-setup-sp node block)))
+      (let ((verified (unless (eq (functional-kind fun) :toplevel)
+                        (setf arg-count-tn (make-arg-count-location))
+                        #!+precise-arg-count-error
+                        (xep-verify-arg-count node block fun arg-count-tn))))
+        #!-x86-64
+        (declare (ignore verified))
+       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
+              ;; COPY-MORE-ARG should handle SP adjustemnt, but it
+              ;; isn't done on all targets.
+              #!-precise-arg-count-error
+              (vop xep-setup-sp node block)
+              (vop copy-more-arg node block (optional-dispatch-max-args ef)
+                   #!+x86-64 verified))
+             (t
+              (vop xep-setup-sp node block))))
       (when (ir2-physenv-closure env)
         (let ((closure (make-normal-tn *backend-t-primitive-type*)))
           (when (policy fun (> store-closure-debug-pointer 1))

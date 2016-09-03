@@ -1051,11 +1051,15 @@
   (:temporary (:sc any-reg :offset r8-offset) copy-index)
   (:temporary (:sc any-reg :offset r9-offset) source)
   (:temporary (:sc descriptor-reg :offset r10-offset) temp)
-  (:info fixed)
+  (:info fixed min-verified)
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
            (inst jrcxz JUST-ALLOC-FRAME))
+          ((and (eql min-verified fixed)
+                (> fixed 1))
+           ;; verify-arg-count will do a CMP
+           (inst jmp :e JUST-ALLOC-FRAME))
           (t
            (inst cmp rcx-tn (fixnumize fixed))
            (inst jmp :be JUST-ALLOC-FRAME)))
@@ -1082,9 +1086,6 @@
 
     ;; Now: nargs>=1 && nargs>fixed
 
-    ;; Save the original count of args.
-    (inst mov rbx-tn rcx-tn)
-
     (cond ((< fixed register-arg-count)
            ;; the code above only moves the final value of rsp in
            ;; rsp directly if that condition is satisfied.  Currently,
@@ -1095,12 +1096,15 @@
            ;; We must stop when we run out of stack args, not when we
            ;; run out of more args.
            ;; Number to copy = nargs-3
+           ;; Save the original count of args.
+           (inst mov rbx-tn rcx-tn)
            (inst sub rbx-tn (fixnumize register-arg-count))
            ;; Everything of interest in registers.
            (inst jmp :be DO-REGS))
           (t
            ;; Number to copy = nargs-fixed
-           (inst sub rbx-tn (fixnumize fixed))))
+           (inst lea rbx-tn (make-ea :qword :base rcx-tn
+                                     :disp (- (fixnumize fixed))))))
 
     ;; Initialize R8 to be the end of args.
     ;; Swap with SP if necessary to mirror the previous condition
@@ -1310,6 +1314,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
+    ;; NOTE: copy-more-arg expects this to issue a CMP for min > 1
     (let ((err-lab
             (generate-error-code vop 'invalid-arg-count-error nargs)))
       (flet ((check-min ()
