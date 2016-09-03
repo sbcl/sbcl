@@ -9,15 +9,13 @@
     (undefined-tramp (:return-style :none))
     ((:temp rax descriptor-reg rax-offset))
   (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
-  (error-call nil 'undefined-fun-error rax)
-  (inst ret))
+  (error-call nil 'undefined-fun-error rax))
 
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
   (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
-  (error-call nil 'undefined-alien-fun-error rbx-tn)
-  (inst ret))
+  (error-call nil 'undefined-alien-fun-error rbx-tn))
 
 ;;; the closure trampoline - entered when a global function is a closure
 ;;; and the function is called "by name" (normally, as when it is the
