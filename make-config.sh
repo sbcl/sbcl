@@ -725,6 +725,7 @@ elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
+    printf ' :read-only-tramps' >> $ltf
 elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :gencgc :linkage-table :alien-callbacks' >> $ltf
     # As opposed to soft-float or FPA, we support VFP only (and

@@ -177,52 +177,6 @@
     (inst ble fixup lisp-heap-space fix))
   (move catch target t))
 
-; we need closure-tramp and funcallable-instance-tramp in
-; same space as other lisp-code, because caller is doing
-; normal lisp-calls where we doesnt specify space.
-; if we doesnt have the lisp-function (code from defun, closure, lambda etc..)
-; machine-address, resolve it here and jump to it.
-(define-assembly-routine
-  (closure-tramp (:return-style :none))
-  ((:temp lip interior-reg lip-offset)
-   (:temp nl0 descriptor-reg nl0-offset))
-  (inst ldw (- (* fdefn-fun-slot n-word-bytes)
-               other-pointer-lowtag)
-            fdefn-tn lexenv-tn)
-  (inst ldw (- (* closure-fun-slot n-word-bytes)
-                  fun-pointer-lowtag)
-            lexenv-tn nl0)
-  (inst addi (- (* simple-fun-code-offset n-word-bytes)
-                fun-pointer-lowtag)
-        nl0 lip)
-  (inst bv lip :nullify t))
-
-#+sb-assembling ;; No VOP for this one
-(define-assembly-routine
-    (funcallable-instance-tramp-header
-     (:return-style :none)
-     (:align n-lowtag-bits)
-     (:export (funcallable-instance-tramp
-               (+ funcallable-instance-tramp-header
-                  fun-pointer-lowtag))))
-  nil
-  (inst word simple-fun-header-widetag) ;;header
-  (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine)) ;; self
-  (inst word nil-value) ;; next
-  (inst word nil-value) ;; name
-  (inst word nil-value) ;; arglist
-  (inst word nil-value) ;; type
-  (inst word nil-value) ;; info
-  (loadw lexenv-tn lexenv-tn
-         funcallable-instance-function-slot
-         fun-pointer-lowtag)
-  (loadw code-tn lexenv-tn
-         closure-fun-slot
-         fun-pointer-lowtag)
-  (inst addi (- (* simple-fun-code-offset n-word-bytes)
-                fun-pointer-lowtag) code-tn lip-tn)
-  (inst bv lip-tn :nullify t))
-
 #!+hpux
 (define-assembly-routine
   (return-from-lisp-stub (:return-style :none))

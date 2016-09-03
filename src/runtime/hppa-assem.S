@@ -467,29 +467,3 @@ fun_end_breakpoint_trap:
 
 	.export	fun_end_breakpoint_end
 fun_end_breakpoint_end:
-
-/* FIX-lav: these are found in assem-rtns.lisp too, but
-   genesis.lisp has problem referencing them, so we keep
-   these old versions too.  Lisp code cant jump to them
-   because it is an inter space jump but lisp do intra
-   space jumps */
-
-	.align	8
-        .EXPORT closure_tramp
-closure_tramp:
-        /* reg_FDEFN holds the fdefn object. */
-        ldw     FDEFN_FUN_OFFSET(0,reg_FDEFN),reg_LEXENV
-        ldw     CLOSURE_FUN_OFFSET(0,reg_LEXENV),reg_L0
-        addi    SIMPLE_FUN_CODE_OFFSET, reg_L0, reg_LIP
-        bv,n    0(reg_LIP)
-
-	.align	8
-        .EXPORT undefined_tramp
-undefined_tramp:
-        break   trap_Error,0
-        .byte   UNDEFINED_FUN_ERROR
-        .byte   254
-        .byte   (0x40 + sc_DescriptorReg)
-        .byte   2
-        .align  4
-
