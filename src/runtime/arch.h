@@ -47,9 +47,6 @@ extern lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1,
                         lispobj arg2);
 extern lispobj *component_ptr_from_pc(lispobj *pc);
 
-extern void AMD64_SYSV_ABI fpu_save(void *);
-extern void AMD64_SYSV_ABI fpu_restore(void *);
-
 #if defined(LISP_FEATURE_X86)||defined(LISP_FEATURE_X86_64)
 extern unsigned int * single_stepping;
 extern void restore_breakpoint_from_single_step(os_context_t * context);

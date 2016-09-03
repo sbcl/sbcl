@@ -66,8 +66,6 @@ extern FILE* win32_fopen_runtime();
 #define SIG_DEQUEUE (SIGRTMIN+2)
 #define SIG_THREAD_EXIT (SIGRTMIN+3)
 
-#define FPU_STATE_SIZE 27
-
 struct lisp_exception_frame {
     struct lisp_exception_frame *next_frame;
     void *handler;

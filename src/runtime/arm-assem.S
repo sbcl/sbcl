@@ -359,21 +359,6 @@ alloc_tramp:
 	bx	lr
 
         .align
-	.global	fpu_save
-	.type	fpu_save, %function
-fpu_save:
-        fstmiad r0, {d0-d7}
-	bx	lr
-
-        .align
-	.global	fpu_restore
-	.type	fpu_restore, %function
-fpu_restore:
-        add     r0, r0, #16
-        fldmiad r0, {d0-d7}
-	bx	lr
-
-        .align
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:

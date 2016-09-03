@@ -230,28 +230,6 @@ LsingleValue:
 	ret
 	SIZE(GNAME(call_into_lisp))
 
-/* support for saving and restoring the NPX state from C */
-	.text
-	.globl 	GNAME(fpu_save)
-	TYPE(GNAME(fpu_save))
-	.align	align_16byte,0x90
-GNAME(fpu_save):
-	fnsave	(%rdi)		# Save the NPX state. (resets NPX)
-	ret
-	SIZE(GNAME(fpu_save))
-
-	.globl 	GNAME(fpu_restore)
-	TYPE(GNAME(fpu_restore))
-	.align	align_16byte,0x90
-GNAME(fpu_restore):
-	frstor	(%rdi)		# Restore the NPX state.
-	ret
-	SIZE(GNAME(fpu_restore))
-
-/* KLUDGE: FIND-ESCAPED-FRAME (SYS:SRC;CODE;DEBUG-INT.LISP) needs
- * to know the name of the function immediately following the
- * undefined-function trampoline. */
-
 /* Our call-site does not take care of caller-saved xmm registers, so it
  * falls to us spill them beforing hopping into C.
  *

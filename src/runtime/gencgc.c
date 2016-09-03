@@ -474,37 +474,23 @@ generation_average_age(generation_index_t gen)
         / ((double)generations[gen].bytes_allocated);
 }
 
+#ifdef LISP_FEATURE_X86
+extern void fpu_save(void *);
+extern void fpu_restore(void *);
+#endif
+
 extern void
 write_generation_stats(FILE *file)
 {
     generation_index_t i;
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-#define FPU_STATE_SIZE 27
-    int fpu_state[FPU_STATE_SIZE];
-#elif defined(LISP_FEATURE_PPC)
-#define FPU_STATE_SIZE 32
-    long long fpu_state[FPU_STATE_SIZE];
-#elif defined(LISP_FEATURE_SPARC)
-    /*
-     * 32 (single-precision) FP registers, and the FP state register.
-     * But Sparc V9 has 32 double-precision registers (equivalent to 64
-     * single-precision, but can't be accessed), so we leave enough room
-     * for that.
-     */
-#define FPU_STATE_SIZE (((32 + 32 + 1) + 1)/2)
-    long long fpu_state[FPU_STATE_SIZE];
-#elif defined(LISP_FEATURE_ARM)
-    #define FPU_STATE_SIZE 8
-    long long fpu_state[FPU_STATE_SIZE];
-#elif defined(LISP_FEATURE_ARM64)
-    #define FPU_STATE_SIZE 64
-    long fpu_state[FPU_STATE_SIZE];
-#endif
+#ifdef LISP_FEATURE_X86
+    int fpu_state[27];
 
-    /* This code uses the FP instructions which may be set up for Lisp
-     * so they need to be saved and reset for C. */
+    /* Can end up here after calling alloc_tramp which doesn't prepare
+     * the x87 state, and the C ABI uses a different mode */
     fpu_save(fpu_state);
+#endif
 
     /* Print the heap stats. */
     fprintf(file,
@@ -569,7 +555,9 @@ write_generation_stats(FILE *file)
     fprintf(file,"   Total bytes allocated    = %"OS_VM_SIZE_FMT"\n", bytes_allocated);
     fprintf(file,"   Dynamic-space-size bytes = %"OS_VM_SIZE_FMT"\n", dynamic_space_size);
 
+#ifdef LISP_FEATURE_X86
     fpu_restore(fpu_state);
+#endif
 }
 
 extern void
