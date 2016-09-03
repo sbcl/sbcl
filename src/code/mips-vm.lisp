@@ -22,6 +22,8 @@
   (without-gcing
    (let ((sap (%primitive sb!c::code-instructions code)))
      (ecase kind
+       (:absolute
+        (setf (sap-ref-32 sap offset) fixup))
        (:jump
         (aver (zerop (ash value -28)))
         (setf (ldb (byte 26 0) (sap-ref-32 sap offset))

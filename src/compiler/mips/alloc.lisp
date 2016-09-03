@@ -168,7 +168,7 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   (:generator 37
     (with-fixed-allocation (result pa-flag temp fdefn-widetag fdefn-size nil)
-      (inst li temp (make-fixup "undefined_tramp" :foreign))
+      (inst li temp (make-fixup 'undefined-tramp :assembly-routine))
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
@@ -220,7 +220,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst li result (make-fixup "funcallable_instance_tramp" :foreign))))
+    (inst li result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
 
 (define-vop (fixed-alloc)
   (:args)

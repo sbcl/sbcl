@@ -2216,6 +2216,8 @@ core and return a descriptor to it."
                           (mask-field (byte 11 21) (bvref-32 gspace-bytes gspace-byte-offset))))))))
       (:mips
        (ecase kind
+         (:absolute
+          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))
          (:jump
           (assert (zerop (ash value -28)))
           (setf (ldb (byte 26 0)
