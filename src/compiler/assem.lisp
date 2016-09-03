@@ -1235,7 +1235,8 @@
   "Emit the specified instruction to the current segment."
   (let* ((stringablep (typep instruction '(or symbol string character)))
          (sym (and stringablep (inst-emitter-symbol instruction))))
-    (cond ((null sym)
+    (cond ((and stringablep
+                (null sym))
            (warn "Undefined instruction: ~s in~% ~s" instruction whole)
            `(error "Undefined instruction: ~s in~% ~s" ',instruction ',whole))
           ((#-sb-xc macro-function #+sb-xc sb!xc:macro-function sym env)
