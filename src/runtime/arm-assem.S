@@ -13,6 +13,8 @@
 
 #define STATIC_SYMBOL_VALUE(sym) [reg_NULL, #(((sym)-NIL)+SYMBOL_VALUE_OFFSET)]
 
+.known_nil:
+	.word	NIL
 	.align
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
@@ -299,108 +301,6 @@ call_into_c:
         add     reg_PC, reg_NL2, reg_CODE
 
 	.size	call_into_c, .-call_into_c
-
-
-/* Trampolines, like on SPARC, use Lisp calling conventions. */
-	.align	3
-	.global	undefined_tramp
-	.type	undefined_tramp, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	undefined_tramp, .+1
-	.word	undefined_tramp
-.known_nil:
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-
-        @@ As in ppc-assem.S, point reg_CODE to the header with a
-        @@ function lowtag...  Which the address already has.
-        ldr     reg_CODE, =undefined_tramp
-
-        @@ The magic (undefined) "BREAK_POINT" instruction.
-#if defined(LISP_FEATURE_LINUX)
-	.word 0xe7f001f0
-#elif defined(LISP_FEATURE_NETBSD)
-	.word 0xe7ffdefe
-#endif
-        @@ Error arguments for an undefined function.
-        .byte   trap_Error
-        .byte   UNDEFINED_FUN_ERROR
-        @@ Need to indicate reg_LEXENV here, which is R3.  Encoding
-        @@ rules are to produce an "sc-offset" with the SC number in
-        @@ the low six bits and the offset (3 in our case) in the
-        @@ high $n$ bits.  sc_DescriptorReg happens to be 5, but we
-        @@ should use the constant for it.  So long as the overall
-        @@ value of the sc-offset is less than 254, we can use a
-        @@ single byte.  Overflowing that will take having the SC
-        @@ number being 30 or 31, and as of this writing the highest
-        @@ SC number is sc_CatchBlock at 16.  It would also take an
-        @@ offset of 7, not the 3 that we use for LEXENV.
-        .byte   sc_DescriptorReg + (0x40 * 3)
-.error_args_end:
-
-        .align	3
-	.global	undefined_alien_function
-	.type	undefined_alien_function, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	undefined_alien_function, .+1
-	.word	undefined_alien_function
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-undefined_alien_function:
-        ldr     reg_CODE, = undefined_alien_function
-
-        @@ The magic (undefined) "BREAK_POINT" instruction.
-#if defined(LISP_FEATURE_LINUX)
-	.word 0xe7f001f0
-#elif defined(LISP_FEATURE_NETBSD)
-	.word 0xe7ffdefe
-#endif
-
-        @@ Error arguments for an undefined function.
-        .byte   trap_Error
-        .byte   UNDEFINED_ALIEN_FUN_ERROR
-        @@ Encode unsigned R8, which comes from call_into_c
-        .byte   0xFE
-        .byte   0x11
-        .byte   0x02
-
-	.align	3
-	.global	closure_tramp
-	.type	closure_tramp, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	closure_tramp, .+1
-	.word	closure_tramp
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-
-	ldr	reg_LEXENV, [reg_LEXENV, #FDEFN_FUN_OFFSET]
-	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-
-	.align	3
-	.global	funcallable_instance_tramp
-	.type	funcallable_instance_tramp, %object
-	.word	SIMPLE_FUN_HEADER_WIDETAG
-	.equ	funcallable_instance_tramp, .+1
-	.word	funcallable_instance_tramp
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-
-	ldr	reg_LEXENV, [reg_LEXENV, #FUNCALLABLE_INSTANCE_FUNCTION_OFFSET]
-	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
 
         @@ FIXME-ARM: The following is random garbage, to make
         @@ code/debug-int compile. To get the debugger working, this

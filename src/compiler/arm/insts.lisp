@@ -1322,6 +1322,20 @@
         #'two-instruction-maybe-shrink
         #'two-instruction-emitter)))))
 
+(define-instruction adr (segment code label &optional (offset 0))
+  (:vop-var vop)
+  (:emitter
+   (emit-back-patch
+    segment 4
+    (lambda (segment position)
+      (assemble (segment vop)
+        (let ((offset (+ (- (label-position label)
+                            (+ position 8))
+                         offset)))
+          (if (plusp offset)
+              (inst add code pc-tn offset)
+              (inst sub code pc-tn (- offset)))))))))
+
 ;; data processing floating point instructions
 (define-bitfield-emitter emit-fp-dp-instruction 32
   (byte 4 28) ; cond

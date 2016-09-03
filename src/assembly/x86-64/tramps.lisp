@@ -7,13 +7,9 @@
 
 (define-assembly-routine
     (undefined-tramp (:return-style :none))
-    ()
+    ((:temp rax descriptor-reg rax-offset))
   (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
-  (error-call nil 'undefined-fun-error
-              ;; We can't just use RAX-TN because the SC is wrong.
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset rax-offset))
+  (error-call nil 'undefined-fun-error rax)
   (inst ret))
 
 (define-assembly-routine

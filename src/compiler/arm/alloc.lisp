@@ -111,7 +111,7 @@
         (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))
       (assemble (*elsewhere*)
         (emit-label undefined-tramp-fixup)
-        (inst word (make-fixup "undefined_tramp" :foreign))))))
+        (inst word (make-fixup 'undefined-tramp :assembly-routine))))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -162,7 +162,7 @@
       (inst load-from-label result lip fixup)
       (assemble (*elsewhere*)
         (emit-label fixup)
-        (inst word (make-fixup "funcallable_instance_tramp" :foreign))))))
+        (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine))))))
 
 (define-vop (fixed-alloc)
   (:args)
