@@ -73,7 +73,7 @@ call_into_lisp:
         stp     d14,d15, [sp,#144]
 
 	// Start by finding NIL.
-	ldr	reg_NULL, .known_nil
+	ldr	reg_NULL, =NIL
 
 	// Set up NARGS.
 	lsl	reg_NARGS, x2, #N_FIXNUM_TAG_BITS
