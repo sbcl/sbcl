@@ -71,8 +71,7 @@
                                    fun-pointer-lowtag))))
     ()
   (inst dword simple-fun-header-widetag)
-  (inst dword (make-fixup 'funcallable-instance-tramp-tagged
-                         :assembly-routine))
+  (inst dword (make-fixup 'funcallable-instance-tramp :assembly-routine))
   (dotimes (i (- simple-fun-code-offset 2))
     (inst dword nil-value))
 
