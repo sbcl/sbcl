@@ -884,7 +884,7 @@ the first."
                (double-float
                 (values most-negative-exactly-double-float-fixnum
                         most-positive-exactly-double-float-fixnum)))
-           (if (<= lo y hi)
+           (if (<= lo x hi)
                (,op (coerce x '(dispatch-type y)) y)
                (,op x (rational y))))))
     (((foreach single-float double-float) fixnum)
