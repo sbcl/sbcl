@@ -2151,7 +2151,9 @@ core and return a descriptor to it."
           (setf (bvref-8 gspace-bytes gspace-byte-offset)
                 (ldb (byte 8 0) value)
                 (bvref-8 gspace-bytes (1+ gspace-byte-offset))
-                (ldb (byte 8 8) value)))))
+                (ldb (byte 8 8) value)))
+         (:absolute32
+          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
       (:arm
        (ecase kind
          (:absolute

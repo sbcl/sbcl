@@ -608,10 +608,15 @@
 ;;;;
 
 (define-instruction lword (segment lword)
-  (:declare (type (or (unsigned-byte 32) (signed-byte 32)) lword))
+  (:declare (type (or (unsigned-byte 32) (signed-byte 32) fixup) lword))
   (:cost 0)
   (:emitter
-   (emit-lword segment lword)))
+   (etypecase lword
+     (fixup
+      (note-fixup segment :absolute32 lword)
+      (emit-lword segment 0))
+     (integer
+      (emit-lword segment lword)))))
 
 (define-instruction short (segment word)
   (:declare (type (or (unsigned-byte 16) (signed-byte 16)) word))

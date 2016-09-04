@@ -721,6 +721,7 @@ elif [ "$sbcl_arch" = "alpha" ]; then
     printf ' :64-bit-registers' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :read-only-tramps' >> $ltf
 elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf

@@ -147,7 +147,7 @@
             (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
             lip)
       (inst beq type normal-fn)
-      (inst li (make-fixup "closure_tramp" :foreign) lip)
+      (inst li (make-fixup 'closure-tramp :assembly-routine) lip)
       (emit-label normal-fn)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -162,7 +162,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (inst li (make-fixup "undefined_tramp" :foreign) temp)
+    (inst li (make-fixup 'undefined-tramp :assembly-routine) temp)
     (move fdefn result)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
