@@ -904,25 +904,22 @@ thruption_handler(int signal, siginfo_t *info, os_context_t *ctx)
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
 /* Designed to be of the same type as call_into_lisp.  Ignores its
  * arguments. */
 lispobj
 handle_global_safepoint_violation(lispobj fun, lispobj *args, int nargs)
 {
-#if trap_GlobalSafepoint != 0x1a
-# error trap_GlobalSafepoint mismatch
-#endif
-    asm("int3; .byte 0x1a;");
+
+    asm("int3; .byte " XSTR(trap_GlobalSafepoint));
     return 0;
 }
 
 lispobj
 handle_csp_safepoint_violation(lispobj fun, lispobj *args, int nargs)
 {
-#if trap_CspSafepoint != 0x1b
-# error trap_CspSafepoint mismatch
-#endif
-    asm("int3; .byte 0x1b;");
+    asm("int3; .byte " XSTR(trap_CspSafepoint));
     return 0;
 }
 

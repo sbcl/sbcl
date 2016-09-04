@@ -1076,10 +1076,6 @@
         ;; the non-exportation of PSEUDO-ATOMIC-TRAP.
         (#.sb!vm::pseudo-atomic-trap
          (nt "Pseudo atomic trap"))
-        (#.object-not-list-trap
-         (nt "Object not list trap"))
-        (#.object-not-instance-trap
-         (nt "Object not instance trap"))
         (#.single-step-around-trap
          (nt "Single step around trap"))
         (#.single-step-before-trap

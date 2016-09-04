@@ -127,11 +127,7 @@
   fun-end-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
-  invalid-arg-count-trap)
-
-(defenum (:start 24)
-  object-not-list-trap
-  object-not-instance-trap
+  invalid-arg-count-trap
   #!+sb-safepoint global-safepoint-trap
   #!+sb-safepoint csp-safepoint-trap)
 

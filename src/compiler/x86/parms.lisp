@@ -213,11 +213,7 @@
   breakpoint-trap
   fun-end-breakpoint-trap
   single-step-around-trap
-  single-step-before-trap)
-
-(defenum (:start 24)
-  object-not-list-trap
-  object-not-instance-trap
+  single-step-before-trap
   #!+sb-safepoint global-safepoint-trap
   #!+sb-safepoint csp-safepoint-trap)
 

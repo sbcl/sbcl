@@ -193,10 +193,6 @@
   single-step-around-trap
   single-step-before-trap
   #!+gencgc allocation-trap)
-
-(defenum (:start 24)
-  object-not-list-trap
-  object-not-instance-trap)
 
 ;;;; static symbols.
 

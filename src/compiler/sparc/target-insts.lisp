@@ -160,8 +160,6 @@
       (#.cerror-trap
        (nt "Cerror trap")
        (handle-break-args #'snarf-error-junk stream dstate))
-      (#.object-not-list-trap
-       (nt "Object not list trap"))
       (#.breakpoint-trap
        (nt "Breakpoint trap"))
       (#.pending-interrupt-trap
@@ -169,6 +167,4 @@
       (#.halt-trap
        (nt "Halt trap"))
       (#.fun-end-breakpoint-trap
-       (nt "Function end breakpoint trap"))
-      (#.object-not-instance-trap
-       (nt "Object not instance trap")))))
+       (nt "Function end breakpoint trap")))))

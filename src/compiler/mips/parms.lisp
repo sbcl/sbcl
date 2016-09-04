@@ -127,8 +127,6 @@
   after-breakpoint-trap
   unused-trap
   pseudo-atomic-trap
-  object-not-list-trap
-  object-not-instance-trap
   single-step-around-trap
   single-step-before-trap)
 

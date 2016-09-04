@@ -167,9 +167,6 @@
   single-step-around-trap
   single-step-before-trap)
 
-(defenum (:start 24)
-  object-not-list-trap
-  object-not-instance-trap)
 
 ;;;; Static symbols.
 
