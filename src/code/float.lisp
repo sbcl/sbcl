@@ -846,12 +846,10 @@
      (multiple-value-bind (bits exp) (integer-decode-float x)
        (if (eql bits 0)
            0
-           (let* ((int (if (minusp x) (- bits) bits))
-                  (digits (float-digits x))
-                  (ex (+ exp digits)))
-             (if (minusp ex)
-                 (integer-/-integer int (ash 1 (+ digits (- ex))))
-                 (integer-/-integer (ash int ex) (ash 1 digits)))))))
+           (let ((int (if (minusp x) (- bits) bits)))
+             (if (minusp exp)
+                 (integer-/-integer int (ash 1 (- exp)))
+                 (ash int exp))))))
     ((rational) x)))
 
 ;;; This algorithm for RATIONALIZE, due to Bruno Haible, is included
