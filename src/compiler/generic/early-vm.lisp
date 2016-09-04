@@ -72,13 +72,13 @@
   "The most positive integer that is of type SB-EXT:WORD.")
 
 (def!constant most-positive-exactly-single-float-fixnum
-  (min #xffffff sb!xc:most-positive-fixnum))
+  (min (expt 2 single-float-digits) sb!xc:most-positive-fixnum))
 (def!constant most-negative-exactly-single-float-fixnum
-  (max #x-ffffff sb!xc:most-negative-fixnum))
+  (max (1- (expt 2 single-float-digits)) sb!xc:most-negative-fixnum))
 (def!constant most-positive-exactly-double-float-fixnum
-  (min #x1fffffffffffff sb!xc:most-positive-fixnum))
+  (min (expt 2 double-float-digits) sb!xc:most-positive-fixnum))
 (def!constant most-negative-exactly-double-float-fixnum
-  (max #x-1fffffffffffff sb!xc:most-negative-fixnum))
+  (max (1- (expt 2 double-float-digits)) sb!xc:most-negative-fixnum))
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space.
