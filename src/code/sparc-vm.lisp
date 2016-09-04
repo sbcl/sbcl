@@ -109,7 +109,7 @@
 ;;;  (pc)
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
-  (show0 "entering INTERNAL-ERROR-ARGS")
+  (/show0 "entering INTERNAL-ERROR-ARGS")
   (let* ((pc (context-pc context))
          (error-number (sap-ref-8 pc 4)))
     (declare (type system-area-pointer pc))
