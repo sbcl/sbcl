@@ -125,8 +125,6 @@
   breakpoint-trap
   fun-end-breakpoint-trap
   after-breakpoint-trap
-  unused-trap
-  pseudo-atomic-trap
   single-step-around-trap
   single-step-before-trap)
 

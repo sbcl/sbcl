@@ -1072,10 +1072,6 @@
          (nt "Function end breakpoint trap"))
         (#.after-breakpoint-trap
          (nt "After breakpoint trap"))
-        ;; KLUDGE: see comment in compiler/generic/genesis regarding
-        ;; the non-exportation of PSEUDO-ATOMIC-TRAP.
-        (#.sb!vm::pseudo-atomic-trap
-         (nt "Pseudo atomic trap"))
         (#.single-step-around-trap
          (nt "Single step around trap"))
         (#.single-step-before-trap
