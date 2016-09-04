@@ -423,38 +423,6 @@
 (!define-const-logop logior 2 ori oris)
 (!define-const-logop logxor 2 xori xoris)
 
-
-;;; Special case fixnum + and - that trap on overflow.  Useful when we
-;;; don't know that the output type is a fixnum.
-;;;
-(define-vop (+/fixnum fast-+/fixnum=>fixnum)
-  (:policy :safe)
-  (:results (r :scs (any-reg descriptor-reg)))
-  (:result-types tagged-num)
-  (:note "safe inline fixnum arithmetic")
-  (:generator 4
-    (let* ((no-overflow (gen-label)))
-      (inst mtxer zero-tn)
-      (inst addo. r x y)
-      (inst bns no-overflow)
-      (inst unimp (logior (ash (reg-tn-encoding r) 5)
-                          fixnum-additive-overflow-trap))
-      (emit-label no-overflow))))
-
-(define-vop (-/fixnum fast--/fixnum=>fixnum)
-  (:policy :safe)
-  (:results (r :scs (any-reg descriptor-reg)))
-  (:result-types tagged-num)
-  (:note "safe inline fixnum arithmetic")
-  (:generator 4
-    (let* ((no-overflow (gen-label)))
-      (inst mtxer zero-tn)
-      (inst subo. r x y)
-      (inst bns no-overflow)
-      (inst unimp (logior (ash (reg-tn-encoding r) 5)
-                          fixnum-additive-overflow-trap))
-      (emit-label no-overflow))))
-
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate *)

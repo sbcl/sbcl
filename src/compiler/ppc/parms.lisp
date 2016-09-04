@@ -163,10 +163,8 @@
   breakpoint-trap
   fun-end-breakpoint-trap
   after-breakpoint-trap
-  fixnum-additive-overflow-trap
   single-step-around-trap
   single-step-before-trap)
-
 
 ;;;; Static symbols.
 
