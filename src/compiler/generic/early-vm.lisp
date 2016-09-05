@@ -74,11 +74,11 @@
 (def!constant most-positive-exactly-single-float-fixnum
   (min (expt 2 single-float-digits) sb!xc:most-positive-fixnum))
 (def!constant most-negative-exactly-single-float-fixnum
-  (max (1- (expt 2 single-float-digits)) sb!xc:most-negative-fixnum))
+  (max (- (expt 2 single-float-digits)) sb!xc:most-negative-fixnum))
 (def!constant most-positive-exactly-double-float-fixnum
   (min (expt 2 double-float-digits) sb!xc:most-positive-fixnum))
 (def!constant most-negative-exactly-double-float-fixnum
-  (max (1- (expt 2 double-float-digits)) sb!xc:most-negative-fixnum))
+  (max (- (expt 2 double-float-digits)) sb!xc:most-negative-fixnum))
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space.
