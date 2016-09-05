@@ -104,7 +104,12 @@
 
 (define-vop (xep-allocate-frame)
   (:info start-lab)
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  ;; KLUDGE: Specify an explicit offset for TEMP because NARGS is a
+  ;; non-descriptor-reg, but is also live, yet the register allocator
+  ;; does not know that it is, and if TEMP collides NARGS and
+  ;; COMPUTE-CODE-FROM-LIP needs TEMP then we run into trouble very
+  ;; quickly.
+  (:temporary (:scs (non-descriptor-reg) :offset nl5-offset) temp)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
     ;; function header.
