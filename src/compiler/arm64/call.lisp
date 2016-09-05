@@ -114,7 +114,6 @@
 
 (define-vop (xep-allocate-frame)
   (:info start-lab)
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
@@ -125,7 +124,7 @@
     (inst simple-fun-header-word)
     (dotimes (i (1- simple-fun-code-offset))
       (inst dword 0))
-    (inst compute-code code-tn lip start-lab temp)))
+    (inst compute-code code-tn lip start-lab)))
 
 (define-vop (xep-setup-sp)
   (:vop-var vop)
@@ -201,7 +200,7 @@
     (note-this-location vop (if (<= nvals 1)
                                 :single-value-return
                                 :unknown-return))
-    (inst compute-code code-tn lip lra-label temp)
+    (inst compute-code code-tn lip lra-label)
     ;; Pick off the single-value case first.
     (sb!assem:without-scheduling ()
 
@@ -274,10 +273,10 @@
 ;;;    Args and Nargs are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with the
 ;;; results Start and Count (also, it's nice to be able to target them).
-(defun receive-unknown-values (args nargs start count lra-label temp lip)
-  (declare (type tn args nargs start count temp))
+(defun receive-unknown-values (args nargs start count lra-label lip)
+  (declare (type tn args nargs start count))
   (assemble ()
-    (inst compute-code code-tn lip lra-label temp)
+    (inst compute-code code-tn lip lra-label)
     (inst b :eq MULTIPLE)
     (move start csp-tn)
     (inst add csp-tn csp-tn n-word-bytes)
@@ -633,7 +632,6 @@
   (:ignore args save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 20
     (let ((label (gen-label))
@@ -651,7 +649,7 @@
       (inst b target)
       (emit-return-pc label)
       (note-this-location vop :unknown-return)
-      (receive-unknown-values values-start nvals start count label temp lip)
+      (receive-unknown-values values-start nvals start count label lip)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
@@ -819,12 +817,12 @@
                          ,name))
                  *register-arg-names* *register-arg-offsets*))
      ,@(when (eq return :fixed)
-         '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
+         '((:temporary (:scs (non-descriptor-reg)) temp)
+           (:temporary (:scs (descriptor-reg) :from :eval) move-temp)
            (:temporary (:sc any-reg :from :eval :offset ocfp-offset) ocfp-temp)))
 
      ,@(unless (eq return :tail)
-         '((:temporary (:scs (non-descriptor-reg)) temp)
-           (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
+         '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
      (:temporary (:scs (interior-reg)) lip)
 
@@ -970,7 +968,7 @@
               '((emit-return-pc lra-label)
                 (note-this-location vop :unknown-return)
                 (receive-unknown-values values-start nvals start count
-                                        lra-label temp lip)
+                                        lra-label lip)
                 (when cur-nfp
                   (load-stack-tn cur-nfp nfp-save))))
              (:tail))))))

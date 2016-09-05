@@ -2652,7 +2652,7 @@
      #'multi-instruction-maybe-shrink
      #'multi-instruction-emitter)))
 
-(define-instruction compute-code (segment code lip object-label temp)
+(define-instruction compute-code (segment code lip object-label)
   (:vop-var vop)
   (:emitter
    (emit-compute segment vop code lip
