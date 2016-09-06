@@ -136,7 +136,7 @@
       (inst cmp type simple-fun-header-widetag)
       (inst b :eq normal-fn)
       (inst move lip function)
-      (inst li lip (make-fixup "closure_tramp" :foreign))
+      (inst li lip (make-fixup 'closure-tramp :assembly-routine))
       (emit-label normal-fn)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
@@ -150,7 +150,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (inst li temp (make-fixup "undefined_tramp" :foreign))
+    (inst li temp (make-fixup 'undefined-tramp :assembly-routine))
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 

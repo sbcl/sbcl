@@ -716,6 +716,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
         printf ' :linkage-table' >> $ltf
     fi
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
+    printf ' :read-only-tramps' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :64-bit-registers' >> $ltf

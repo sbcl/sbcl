@@ -201,65 +201,6 @@ call_into_c:
         ret
         nop
 
-/* Lisp calling convention. notice the first .byte line.
- */		
-        .global undefined_tramp
-	FUNCDEF(undefined_tramp)
-        .align  8
-        .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
-undefined_tramp = . + 1
-	.word	undefined_tramp
-        .word   NIL
-        .word   NIL
-        .word   NIL
-        .word   NIL
-        .word   NIL
-
-	b	1f
-        unimp   trap_Cerror
-        .byte   UNDEFINED_FUN_ERROR
-	.byte	254, sc_DescriptorReg, 6
-	.align	4
-1:
-	ld	[reg_FDEFN+FDEFN_RAW_ADDR_OFFSET], reg_CODE
-	jmp	reg_CODE+SIMPLE_FUN_CODE_OFFSET
-	nop
-
-/* Lisp calling convention. Notice the first .byte line.
- */		
-	.global	closure_tramp
-	FUNCDEF(closure_tramp)
-	.align	8
-	.byte	0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
-closure_tramp = . + 1
-	.word	closure_tramp
-	.word	NIL
-        .word   NIL
-	.word	NIL
-	.word	NIL
-	.word	NIL
-
-	ld	[reg_FDEFN+FDEFN_FUN_OFFSET], reg_LEXENV
-	ld	[reg_LEXENV+CLOSURE_FUN_OFFSET], reg_CODE
-	jmp	reg_CODE+SIMPLE_FUN_CODE_OFFSET
-	nop
-
-	.global funcallable_instance_tramp
-	FUNCDEF(funcallable_instance_tramp)
-	.align 8
-	.word SIMPLE_FUN_HEADER_WIDETAG
-funcallable_instance_tramp = . + 1
-	.word funcallable_instance_tramp
-	.word NIL
-	.word NIL
-	.word NIL
-	.word NIL
-	.word NIL
-
-	ld	[reg_LEXENV+FUNCALLABLE_INSTANCE_FUNCTION_OFFSET], reg_LEXENV
-	ld	[reg_LEXENV+CLOSURE_FUN_OFFSET], reg_CODE
-	jmp	reg_CODE+SIMPLE_FUN_CODE_OFFSET
-	nop
 /*
  * Function-end breakpoint magic.
  */

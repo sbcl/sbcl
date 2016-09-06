@@ -33,7 +33,10 @@
               (ldb (byte 22 10) fixup)))
        (:add
         (setf (ldb (byte 10 0) (sap-ref-32 sap offset))
-              (ldb (byte 10 0) fixup)))))))
+              (ldb (byte 10 0) fixup)))
+       (:absolute
+        (setf (sap-ref-32 sap offset)
+              fixup))))))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from alpha-vm.lisp.

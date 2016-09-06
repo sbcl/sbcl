@@ -2273,7 +2273,9 @@ core and return a descriptor to it."
           (setf (bvref-32 gspace-bytes gspace-byte-offset)
                 (dpb (ldb (byte 10 0) value)
                      (byte 10 0)
-                     (bvref-32 gspace-bytes gspace-byte-offset))))))
+                     (bvref-32 gspace-bytes gspace-byte-offset))))
+         (:absolute
+          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
       ((:x86 :x86-64)
        ;; XXX: Note that un-fixed-up is read via bvref-word, which is
        ;; 64 bits wide on x86-64, but the fixed-up value is written
