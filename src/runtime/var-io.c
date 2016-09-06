@@ -22,7 +22,8 @@ int read_var_integer(unsigned char *source, int *offset) {
     unsigned char *ptr = source + (offset ? *offset : 0);
     int result = 0;
     unsigned char octet;
-    for (int k = 0;; k += 7, ++ptr){
+    int k = 0;
+    for (;; k += 7, ++ptr){
         octet = *ptr;
         result |= (octet & 0x7f) << k;
         if (!(octet & 0x80)) {
