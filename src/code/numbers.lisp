@@ -851,8 +851,41 @@ the first."
       (when (< arg n)
         (setf n arg)))))
 
-(eval-when (:compile-toplevel :execute)
+(defmacro make-fixnum-float-comparer (operation integer float float-type)
+  (multiple-value-bind (min max)
+      (ecase float-type
+        (single-float
+         (values most-negative-fixnum-single-float most-positive-fixnum-single-float))
+        (double-float
+         (values most-negative-fixnum-double-float most-positive-fixnum-double-float)))
+    ` (cond ((> ,float ,max)
+             ,(ecase operation
+                ((= >) nil)
+                (< t)))
+            ((< ,float ,min)
+             ,(ecase operation
+                ((= <) nil)
+                (> t)))
+            (t
+             (let ((quot (%unary-truncate ,float)))
+               ,(ecase operation
+                  (=
+                   `(and (= quot ,integer)
+                         (= (float quot ,float) ,float)))
+                  (>
+                   `(cond ((> ,integer quot))
+                          ((< ,integer quot)
+                           nil)
+                          ((<= ,integer 0)
+                           (> (float quot ,float) ,float))))
+                  (<
+                   `(cond ((< ,integer quot))
+                          ((> ,integer quot)
+                           nil)
+                          ((>= ,integer 0)
+                           (< (float quot ,float) ,float))))))))))
 
+(eval-when (:compile-toplevel :execute)
 ;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how
 ;;; to handle the case when X or Y is a floating-point infinity and
 ;;; the other arg is a rational. (Section 12.1.4.1 of the ANSI spec
@@ -860,65 +893,46 @@ the first."
 ;;; rational when comparing with a rational, but infinities can't be
 ;;; converted to a rational, so we show some initiative and do it this
 ;;; way instead.)
-(defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
-  `(((fixnum fixnum) (,op x y))
+  (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
+    `(((fixnum fixnum) (,op x y))
+      ((single-float single-float) (,op x y))
+      #!+long-float
+      (((foreach single-float double-float long-float) long-float)
+       (,op (coerce x 'long-float) y))
+      #!+long-float
+      ((long-float (foreach single-float double-float))
+       (,op x (coerce y 'long-float)))
+      ((fixnum (foreach single-float double-float))
+       (if (float-infinity-p y)
+           ,infinite-y-finite-x
+           (make-fixnum-float-comparer ,op x y (dispatch-type y))))
+      (((foreach single-float double-float) fixnum)
+       (if (eql y 0)
+           (,op x (coerce 0 '(dispatch-type x)))
+           (if (float-infinity-p x)
+               ,infinite-x-finite-y
+               ;; Likewise
+               (make-fixnum-float-comparer ,(case op
+                                              (> '<)
+                                              (< '>)
+                                              (= '=))
+                                           y x (dispatch-type x)))))
+      (((foreach single-float double-float) double-float)
+       (,op (coerce x 'double-float) y))
+      ((double-float single-float)
+       (,op x (coerce y 'double-float)))
+      (((foreach single-float double-float #!+long-float long-float) rational)
+       (if (eql y 0)
+           (,op x (coerce 0 '(dispatch-type x)))
+           (if (float-infinity-p x)
+               ,infinite-x-finite-y
+               (,op (rational x) y))))
+      (((foreach bignum fixnum ratio) float)
+       (if (float-infinity-p y)
+           ,infinite-y-finite-x
+           (,op x (rational y))))))
+  )                                     ; EVAL-WHEN
 
-    ((single-float single-float) (,op x y))
-    #!+long-float
-    (((foreach single-float double-float long-float) long-float)
-     (,op (coerce x 'long-float) y))
-    #!+long-float
-    ((long-float (foreach single-float double-float))
-     (,op x (coerce y 'long-float)))
-    ((fixnum (foreach single-float double-float))
-     (if (float-infinity-p y)
-         ,infinite-y-finite-x
-         ;; If the fixnum has an exact float representation, do a
-         ;; float comparison. Otherwise do the slow float -> ratio
-         ;; conversion.
-         (multiple-value-bind (lo hi)
-             (case '(dispatch-type y)
-               (single-float
-                (values most-negative-exactly-single-float-fixnum
-                        most-positive-exactly-single-float-fixnum))
-               (double-float
-                (values most-negative-exactly-double-float-fixnum
-                        most-positive-exactly-double-float-fixnum)))
-           (if (<= lo x hi)
-               (,op (coerce x '(dispatch-type y)) y)
-               (,op x (rational y))))))
-    (((foreach single-float double-float) fixnum)
-     (if (eql y 0)
-         (,op x (coerce 0 '(dispatch-type x)))
-         (if (float-infinity-p x)
-             ,infinite-x-finite-y
-             ;; Likewise
-             (multiple-value-bind (lo hi)
-                 (case '(dispatch-type x)
-                   (single-float
-                    (values most-negative-exactly-single-float-fixnum
-                            most-positive-exactly-single-float-fixnum))
-                   (double-float
-                    (values most-negative-exactly-double-float-fixnum
-                            most-positive-exactly-double-float-fixnum)))
-               (if (<= lo y hi)
-                   (,op x (coerce y '(dispatch-type x)))
-                   (,op (rational x) y))))))
-    (((foreach single-float double-float) double-float)
-     (,op (coerce x 'double-float) y))
-    ((double-float single-float)
-     (,op x (coerce y 'double-float)))
-    (((foreach single-float double-float #!+long-float long-float) rational)
-     (if (eql y 0)
-         (,op x (coerce 0 '(dispatch-type x)))
-         (if (float-infinity-p x)
-             ,infinite-x-finite-y
-             (,op (rational x) y))))
-    (((foreach bignum fixnum ratio) float)
-     (if (float-infinity-p y)
-         ,infinite-y-finite-x
-         (,op x (rational y))))))
-) ; EVAL-WHEN
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)

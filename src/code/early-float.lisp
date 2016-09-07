@@ -173,3 +173,18 @@
 (defconstant long-float-negative-epsilon
   (long-from-bits 0 (- sb!vm:long-float-bias sb!vm:long-float-digits)
                   (+ 1 (ash sb!vm:long-float-hidden-bit 32))))
+
+;;; Limits for floats that can be truncated into a fixnum
+(defconstant most-positive-fixnum-single-float
+  (single-from-bits 0 (+ sb!vm:n-fixnum-bits sb!vm:single-float-bias -1)
+                               (ldb (byte (1- sb!vm:single-float-digits) 0) -1)))
+
+(defconstant most-negative-fixnum-single-float
+  (single-from-bits 1 (+ sb!vm:n-fixnum-bits sb!vm:single-float-bias) 0))
+
+(defconstant most-positive-fixnum-double-float
+  (double-from-bits 0 (+ sb!vm:n-fixnum-bits sb!vm:double-float-bias -1)
+                               (ldb (byte (1- sb!vm:double-float-digits) 0) -1)))
+
+(defconstant most-negative-fixnum-double-float
+  (double-from-bits 1 (+ sb!vm:n-fixnum-bits sb!vm:double-float-bias) 0))
