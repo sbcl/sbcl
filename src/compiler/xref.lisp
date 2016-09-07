@@ -202,9 +202,20 @@
 ;;;; into *XREF-KINDS*) of the entries following the integer,
 ;;;;
 ;;;; NAME-INDEX-AND-FORM-NUMBER is a (name-bits+number-bits)-bit integer
-;;;; ii...nn... where i bits encode an index into the name list NAME1
-;;;; NAME2 ... starting at index 1 of the outer vector and n bits
-;;;; encode the form number of the xref entry.
+;;;; ii...nn... where i bits encode a name index (see below) and n
+;;;; bits encode the form number of the xref entry.
+;;;;
+;;;; The name index is either an integer i such that
+;;;;
+;;;;    (< 0 i (length **most-common-xref-names-by-index**))
+;;;;
+;;;; in which case it refers to the i-th name in that vector or
+;;;;
+;;;;    (< 0 (+ i (length **m-c-x-n-b-i**)) (1- (length XREF-DATA)))
+;;;;
+;;;; in which case it is an index (offset by (length **m-c-x-n-b-i**))
+;;;; into the name list NAME1 NAME2 ... starting at index 1 of the
+;;;; outer vector.
 ;;;;
 ;;;; When packing xref information, an initial pass over the entries
 ;;;; that should be packed has to be made to collect unique names and
@@ -212,6 +223,13 @@
 ;;;;
 ;;;;   name-bits   <- (integer-length LARGEST-NAME-INDEX)
 ;;;;   number-bits <- (integer-length LARGEST-FORM-NUMBER)
+
+;;; Will be overwritten with 64 most frequently cross referenced
+;;; names.
+(declaim (type vector **most-common-xref-names-by-index**)
+         (type hash-table **most-common-xref-names-by-name**))
+(defglobal **most-common-xref-names-by-index** #())
+(defglobal **most-common-xref-names-by-name** (make-hash-table :test #'equal))
 
 (flet ((encode-kind-and-count (kind count)
          (logior kind (ash (1- count) 3)))
@@ -225,17 +243,23 @@
            (values (ldb (byte name-bits 0) integer)
                    (ldb (byte number-bits name-bits) integer))))
        (name->index (vector)
-         (lambda (name)
-           (let ((found t))
-             (values (1- (or (position name vector :start 1 :test #'equal)
-                             (progn
-                               (setf found nil)
-                               (vector-push-extend name vector)
-                               (1- (length vector)))))
-                     found))))
+         (let ((common-count (length **most-common-xref-names-by-index**)))
+           (lambda (name)
+             (let ((found t))
+               (values (or (gethash name **most-common-xref-names-by-name**)
+                           (+ (or (position name vector :start 1 :test #'equal)
+                                  (progn
+                                    (setf found nil)
+                                    (vector-push-extend name vector)
+                                    (1- (length vector))))
+                              -1 common-count))
+                       found)))))
        (index->name (vector)
-         (lambda (index)
-           (aref vector (1+ index)))))
+         (let ((common-count (length **most-common-xref-names-by-index**)))
+           (lambda (index)
+             (if (< index common-count)
+                 (aref **most-common-xref-names-by-index** index)
+                 (aref vector (+ index 1 (- common-count))))))))
 
   ;;; Pack the xref table that was stored for a functional into a more
   ;;; space-efficient form, and return that packed form.
