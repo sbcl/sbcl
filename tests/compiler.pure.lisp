@@ -5924,3 +5924,28 @@
    (not (funcall (checked-compile
                   `(lambda ()
                      (car (describe 1 (make-broadcast-stream)))))))))
+
+;; Vestigial exit deletion was a bit too aggressive, causing stack
+;; analysis to decide that the value of (BAR 10) in both cases below
+;; needed to be nipped out from under the dynamic-extent allocation of
+;; Y (or #'Y), which %NIP-VALUES refused to do (DX values must not be
+;; moved once allocated).
+(with-test (:name (:exit-deletion :bug-1563127 :variable))
+  (compile nil '(lambda (x)
+                  (block test
+                    (multiple-value-prog1 (bar 10)
+                      (let ((y (list x)))
+                        (declare (dynamic-extent y))
+                        (bar y)
+                        (if x
+                            (return-from test))))))))
+
+(with-test (:name (:exit-deletion :bug-1563127 :function))
+  (compile nil '(lambda (x)
+                  (block test
+                    (multiple-value-prog1 (bar 10)
+                      (flet ((y () (list x)))
+                        (declare (dynamic-extent #'y))
+                        (bar #'y)
+                        (if x
+                            (return-from test))))))))
