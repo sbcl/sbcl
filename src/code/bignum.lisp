@@ -57,9 +57,6 @@
 ;;;       %LOGNOT
 ;;;    Shifting (in place)
 ;;;       %NORMALIZE-BIGNUM-BUFFER
-;;;    GCD/Relational operators:
-;;;       %DIGIT-COMPARE
-;;;       %DIGIT-GREATER
 ;;;    Relational operators:
 ;;;       %LOGAND
 ;;;       %LOGIOR
@@ -267,14 +264,6 @@
   (declare (type bignum-type bignum)
            (type bignum-length len))
   (%ashr (%bignum-ref bignum (1- len)) (1- digit-size)))
-
-;;; These take two digit-size quantities and compare or contrast them
-;;; without wasting time with incorrect type checking.
-(declaim (inline %digit-compare %digit-greater))
-(defun %digit-compare (x y)
-  (= x y))
-(defun %digit-greater (x y)
-  (> x y))
 
 (declaim (optimize (speed 3) (safety 0)))
 
@@ -856,8 +845,8 @@
               (values a b len-b res 1))
            (let ((a-digit (%bignum-ref a i))
                  (b-digit (%bignum-ref b i)))
-             (cond ((%digit-compare a-digit b-digit))
-                   ((%digit-greater a-digit b-digit)
+             (cond ((= a-digit b-digit))
+                   ((> a-digit b-digit)
                     (return
                      (values a b len-b res
                              (subtract-bignum-buffers a len-a b len-b
@@ -1156,9 +1145,9 @@
              (let ((a-digit (%bignum-ref a i))
                    (b-digit (%bignum-ref b i)))
                (declare (type bignum-element-type a-digit b-digit))
-               (when (%digit-greater a-digit b-digit)
+               (when (> a-digit b-digit)
                  (return 1))
-               (when (%digit-greater b-digit a-digit)
+               (when (> b-digit a-digit)
                  (return -1)))
              (when (zerop i) (return 0))))
           ((> len-a len-b)
@@ -1664,7 +1653,7 @@
         ;;; correct or one too large.
          (bignum-truncate-guess (y1 y2 x-i x-i-1 x-i-2)
            (declare (type bignum-element-type y1 y2 x-i x-i-1 x-i-2))
-           (let ((guess (if (%digit-compare x-i y1)
+           (let ((guess (if (= x-i y1)
                             all-ones-digit
                             (%bigfloor x-i x-i-1 y1))))
              (declare (type bignum-element-type guess))
@@ -1688,13 +1677,10 @@
                                                                 high-guess*y1
                                                                 borrow)))
                          (declare (type bignum-element-type high-digit))
-                         (if (and (%digit-compare high-digit 0)
-                                  (or (%digit-greater high-guess*y2
-                                                      middle-digit)
-                                      (and (%digit-compare middle-digit
-                                                           high-guess*y2)
-                                           (%digit-greater low-guess*y2
-                                                           x-i-2))))
+                         (if (and (= high-digit 0)
+                                  (or (> high-guess*y2 middle-digit)
+                                      (and (= middle-digit high-guess*y2)
+                                           (> low-guess*y2 x-i-2))))
                              (setf guess (%subtract-with-borrow guess 1 1))
                              (return guess)))))))))
         ;;; Divide TRUNCATE-X by TRUNCATE-Y, returning the quotient
