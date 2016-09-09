@@ -189,15 +189,11 @@
 ;;; Print indentation according to the number of trace entries.
 ;;; Entries whose condition was false don't count.
 (defun print-trace-indentation ()
-  (let ((depth 0))
-    (dolist (entry *traced-entries*)
-      (when (cdr entry) (incf depth)))
-    (format t
-            "~V,0@T~W: "
-            (+ (mod (* depth *trace-indentation-step*)
-                    (- *max-trace-indentation* *trace-indentation-step*))
-               *trace-indentation-step*)
-            depth)))
+  (let* ((depth (count-if #'cdr *traced-entries*))
+         (step *trace-indentation-step*)
+         (max *max-trace-indentation*)
+         (indent (+ (mod (* depth step) (- max step)) step)))
+    (format t "~V,0@T~W: " indent depth)))
 
 ;;; Return true if any of the NAMES appears on the stack below FRAME.
 (defun trace-wherein-p (frame names)
