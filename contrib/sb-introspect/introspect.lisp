@@ -638,81 +638,80 @@ value."
      ;; function tries to perform a sanity-check. But here it's safe.
      (let ((functoid (or (sb-int:info :function :macro-function name)
                          (sb-int:info :function :definition name))))
-             (if functoid
-                 (funcall function name functoid))))))
+       (when functoid
+         (funcall function name functoid))))))
 
-(defun collect-xref (kind-index wanted-name)
+(defun collect-xref (wanted-kind wanted-name)
   (let ((ret nil))
-    (flet ((process (info-name value)
-             ;; Get a simple-fun for the definition, and an xref array
+    (flet ((process (name functoid)
+             ;; Get a simple-fun for the definition, and xref data
              ;; from the table if available.
-             (let* ((simple-fun (get-simple-fun value))
+             (let* ((simple-fun (get-simple-fun functoid))
                     (xrefs (when simple-fun
-                             (sb-kernel:%simple-fun-xrefs simple-fun)))
-                    (array (when xrefs
-                             (aref xrefs kind-index))))
-               ;; Loop through the name/path xref entries in the table
-               (loop for i from 0 below (length array) by 2
-                     for xref-name = (aref array i)
-                     for xref-form-number = (aref array (+ i 1))
-                     do (when (equal xref-name wanted-name)
-                          (let ((source-location
-                                  (find-function-definition-source simple-fun)))
-                            ;; Use the more accurate source path from
-                            ;; the xref entry.
-                            (setf (definition-source-form-number source-location)
-                                  xref-form-number)
-                            (push (cons info-name source-location)
-                                  ret)))))))
+                             (sb-kernel:%simple-fun-xrefs simple-fun))))
+               (when xrefs
+                 (sb-c::map-packed-xref-data
+                  (lambda (xref-kind xref-name xref-form-number)
+                    (when (and (eq xref-kind wanted-kind)
+                               (equal xref-name wanted-name))
+                      (let ((source-location
+                              (find-function-definition-source simple-fun)))
+                        ;; Use the more accurate source path from
+                        ;; the xref entry.
+                        (setf (definition-source-form-number source-location)
+                              xref-form-number)
+                        (push (cons name source-location)
+                              ret))))
+                  xrefs)))))
       (call-with-each-global-functoid
-       (lambda (info-name value)
+       (lambda (name functoid)
          ;; Functions with EQL specializers no longer get a fdefinition,
          ;; process all the methods from a generic function
-         (cond ((and (sb-kernel:fdefn-p value)
-                     (typep (sb-kernel:fdefn-fun value) 'generic-function))
-                (loop for method in (sb-mop:generic-function-methods (sb-kernel:fdefn-fun value))
+         (cond ((and (sb-kernel:fdefn-p functoid)
+                     (typep (sb-kernel:fdefn-fun functoid) 'generic-function))
+                (loop for method in (sb-mop:generic-function-methods
+                                     (sb-kernel:fdefn-fun functoid))
                       for fun = (sb-pcl::safe-method-fast-function method)
                       when fun
-                      do
-                      (process (sb-kernel:%fun-name fun) fun)))
+                      do (process (sb-kernel:%fun-name fun) fun)))
                ;; Methods are alredy processed above
-               ((and (sb-kernel:fdefn-p value)
-                     (consp (sb-kernel:fdefn-name value))
-                     (member (car (sb-kernel:fdefn-name value))
-                             '(sb-pcl::slow-method sb-pcl::fast-method))))
+               ((and (sb-kernel:fdefn-p functoid)
+                     (typep (sb-kernel:fdefn-name functoid)
+                            '(cons (member sb-pcl::slow-method
+                                           sb-pcl::fast-method)))))
                (t
-                (process info-name value))))))
+                (process name functoid))))))
     ret))
 
 (defun who-calls (function-name)
   "Use the xref facility to search for source locations where the
 global function named FUNCTION-NAME is called. Returns a list of
 function name, definition-source pairs."
-  (collect-xref #.(position :calls sb-c::*xref-kinds*) function-name))
+  (collect-xref :calls function-name))
 
 (defun who-binds (symbol)
   "Use the xref facility to search for source locations where the
 special variable SYMBOL is rebound. Returns a list of function name,
 definition-source pairs."
-  (collect-xref #.(position :binds sb-c::*xref-kinds*) symbol))
+  (collect-xref :binds symbol))
 
 (defun who-references (symbol)
   "Use the xref facility to search for source locations where the
 special variable or constant SYMBOL is read. Returns a list of function
 name, definition-source pairs."
-  (collect-xref #.(position :references sb-c::*xref-kinds*) symbol))
+  (collect-xref :references symbol))
 
 (defun who-sets (symbol)
   "Use the xref facility to search for source locations where the
 special variable SYMBOL is written to. Returns a list of function name,
 definition-source pairs."
-  (collect-xref #.(position :sets sb-c::*xref-kinds*) symbol))
+  (collect-xref :sets symbol))
 
 (defun who-macroexpands (macro-name)
   "Use the xref facility to search for source locations where the
 macro MACRO-NAME is expanded. Returns a list of function name,
 definition-source pairs."
-  (collect-xref #.(position :macroexpands sb-c::*xref-kinds*) macro-name))
+  (collect-xref :macroexpands macro-name))
 
 (defun who-specializes-directly (class-designator)
   "Search for source locations of methods directly specializing on

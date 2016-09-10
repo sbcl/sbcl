@@ -32,7 +32,6 @@
           ~D (starting at ~D).~@:>"
          source offset start))
 
-#-sb-xc-host
 (macrolet
     ((define-read-var-integer (function-name macro-name source-type accessor)
        `(progn
@@ -59,6 +58,8 @@
 
   (define-read-var-integer read-var-integer read-var-integerf
     (array (unsigned-byte 8) 1) aref)
+
+  #-sb-xc-host
   (define-read-var-integer sap-read-var-integer sap-read-var-integerf
     system-area-pointer sap-ref-8))
 

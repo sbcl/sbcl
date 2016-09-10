@@ -11,6 +11,7 @@
 
 (in-package "SB!C")
 
+(declaim (type list *xref-kinds*))
 (defglobal *xref-kinds* '(:binds :calls :sets :references :macroexpands))
 
 (defun record-component-xrefs (component)
@@ -30,18 +31,17 @@
                      do (record-node-xrefs (ctran-next ctran) functional))
                ;; Properly record the deferred macroexpansion and source
                ;; transform information that's been stored in the block.
-               (dolist (xref-data (block-xrefs block))
-                 (destructuring-bind (kind what path) xref-data
-                   (record-xref kind what
-                                ;; We use the debug-name of the functional
-                                ;; as an identifier. This works quite nicely,
-                                ;; except for (fast/slow)-methods with non-symbol,
-                                ;; non-number eql specializers, for which
-                                ;; the debug-name doesn't map exactly
-                                ;; to the fdefinition of the method.
-                                functional
-                                nil
-                                path)))))
+               (loop for (kind what path) in (block-xrefs block)
+                     do (record-xref kind what
+                                     ;; We use the debug-name of the functional
+                                     ;; as an identifier. This works quite nicely,
+                                     ;; except for (fast/slow)-methods with non-symbol,
+                                     ;; non-number eql specializers, for which
+                                     ;; the debug-name doesn't map exactly
+                                     ;; to the fdefinition of the method.
+                                     functional
+                                     nil
+                                     path))))
         (call-with-block-external-functionals block #'handle-node)))))
 
 (defun call-with-block-external-functionals (block fun)
@@ -173,23 +173,147 @@
   (unless (internal-name-p what)
     (push (list :calls what path) (block-xrefs block))))
 
-;;; Pack the xref table that was stored for a functional into a more
-;;; space-efficient form, and return that packed form.
-(defun pack-xref-data (xref-data)
-  (when xref-data
-    (let ((array (make-array (length *xref-kinds*))))
-      (loop for key in *xref-kinds*
-            for i from 0
-            for values = (remove-duplicates (getf xref-data key)
-                                            :test #'equal)
-            do
-            (setf (aref array i)
-                  (when values
-                    (let* ((length (* (length values) 2))
-                           (data (make-array length)))
-                      (loop for i below length by 2
-                            for (name . number) in values
-                            do (setf (aref data i) name
-                                     (aref data (1+ i)) number))
-                      data))))
-      array)))
+
+;;;; Packing of xref tables
+;;;;
+;;;; xref information can be transformed into the following "packed"
+;;;; form to save space:
+;;;;
+;;;;   #(PACKED-ENTRIES NAME1 NAME2 ...)
+;;;;
+;;;; where NAME1 NAME2 ... are names referred to by the entries
+;;;; encoded in PACKED-ENTRIES. PACKED-ENTRIES is a (simple-array
+;;;; (unsigned-byte 8) 1) containing variable-width integers (see
+;;;; {READ,WRITE}-VAR-INTEGER). The contained sequence of integers is
+;;;; of the following form:
+;;;;
+;;;;   packed-entries        ::= NAME-BITS NUMBER-BITS entries-for-xref-kind+
+;;;;   entries-for-xref-kind ::= XREF-KIND-AND-ENTRY-COUNT entry+
+;;;;   entry                 ::= NAME-INDEX-AND-FORM-NUMBER
+;;;;
+;;;; where NAME-BITS and NUMBER-BITS are variable-width integers that
+;;;; encode the number of bits used for name indices in
+;;;; NAME-INDEX-AND-FORM-NUMBER and the number of bits used for form
+;;;; numbers in NAME-INDEX-AND-FORM-NUMBER respectively,
+;;;;
+;;;; XREF-KIND-AND-ENTRY-COUNT is a variable-width integer cc...kkk
+;;;; where c bits encode the number of integers (encoded entries)
+;;;; following this integer and k bits encode the xref kind (index
+;;;; into *XREF-KINDS*) of the entries following the integer,
+;;;;
+;;;; NAME-INDEX-AND-FORM-NUMBER is a (name-bits+number-bits)-bit integer
+;;;; ii...nn... where i bits encode an index into the name list NAME1
+;;;; NAME2 ... starting at index 1 of the outer vector and n bits
+;;;; encode the form number of the xref entry.
+;;;;
+;;;; When packing xref information, an initial pass over the entries
+;;;; that should be packed has to be made to collect unique names and
+;;;; determine the largest form number that will be encoded. Then:
+;;;;
+;;;;   name-bits   <- (integer-length LARGEST-NAME-INDEX)
+;;;;   number-bits <- (integer-length LARGEST-FORM-NUMBER)
+
+(flet ((encode-kind-and-count (kind count)
+         (logior kind (ash (1- count) 3)))
+       (decode-kind-and-count (integer)
+         (values (ldb (byte 3 0) integer) (1+ (ash integer -3))))
+       (index-and-number-encoder (name-bits number-bits)
+         (lambda (index number)
+           (dpb number (byte number-bits name-bits) index)))
+       (index-and-number-decoder (name-bits number-bits)
+         (lambda (integer)
+           (values (ldb (byte name-bits 0) integer)
+                   (ldb (byte number-bits name-bits) integer))))
+       (name->index (vector)
+         (lambda (name)
+           (let ((found t))
+             (values (1- (or (position name vector :start 1 :test #'equal)
+                             (progn
+                               (setf found nil)
+                               (vector-push-extend name vector)
+                               (1- (length vector)))))
+                     found))))
+       (index->name (vector)
+         (lambda (index)
+           (aref vector (1+ index)))))
+
+  ;;; Pack the xref table that was stored for a functional into a more
+  ;;; space-efficient form, and return that packed form.
+  (defun pack-xref-data (xref-data)
+    (unless xref-data (return-from pack-xref-data))
+    (let* ((result (make-array 1 :adjustable t :fill-pointer 1))
+           (ensure-index (name->index result))
+           (entries '())
+           (max-index 0)
+           (max-number 0))
+      ;; Collect unique names, assigning indices (implicitly via
+      ;; position in RESULT). Determine MAX-INDEX and MAX-NUMBER, the
+      ;; largest name index and form number respectively, occurring in
+      ;; XREF-DATA.
+      (labels ((collect-entries-for-kind (kind records)
+                 (let* ((kind-number (position kind *xref-kinds* :test #'eq))
+                        (kind-entries (cons kind-number '())))
+                   (push kind-entries entries)
+                   (mapc
+                    (lambda (record)
+                      (destructuring-bind (name . number) record
+                        (binding* (((index foundp) (funcall ensure-index name))
+                                   (cell
+                                    (or (when foundp
+                                          (find index (cdr kind-entries) :key #'first))
+                                        (let ((cell (list index)))
+                                          (push cell (cdr kind-entries))
+                                          cell))))
+                          (pushnew number (cdr cell) :test #'=)
+                          (setf max-index (max max-index index)
+                                max-number (max max-number number)))))
+                    records))))
+        (loop for (kind records) on xref-data by #'cddr
+           when records do (collect-entries-for-kind kind records)))
+      ;; Encode the number of index and form number bits followed by
+      ;; chunks of collected entries for all kinds.
+      (let* ((name-bits (integer-length max-index))
+             (number-bits (integer-length max-number))
+             (encoder (index-and-number-encoder name-bits number-bits))
+             (vector (make-array 0 :element-type '(unsigned-byte 8)
+                                 :adjustable t :fill-pointer 0)))
+        (write-var-integer name-bits vector)
+        (write-var-integer number-bits vector)
+        (loop for (kind-number . kind-entries) in entries
+           for kind-count = (reduce #'+ kind-entries
+                                    :key (lambda (entry) (length (cdr entry))))
+           do (write-var-integer
+               (encode-kind-and-count kind-number kind-count) vector)
+             (loop for (index . numbers) in kind-entries
+                do (dolist (number numbers)
+                     (write-var-integer (funcall encoder index number) vector))))
+        (setf (aref result 0) (!make-specialized-array
+                               (length vector) '(unsigned-byte 8) vector)))
+      ;; RESULT is adjustable. Make it simple.
+      (coerce result 'simple-vector)))
+
+  ;;; Call FUNCTION for each entry in XREF-DATA. FUNCTION's
+  ;;; lambda-list has to be compatible to
+  ;;;
+  ;;;   (kind name form-number)
+  ;;;
+  ;;; where KIND is the xref kind (see *XREF-KINDS*), NAME is the name
+  ;;; of the referenced thing and FORM-NUMBER is the number of the
+  ;;; form in which the reference occurred.
+  (defun map-packed-xref-data (function xref-data)
+    (let* ((function (coerce function 'function))
+           (lookup (index->name xref-data))
+           (packed (aref xref-data 0))
+           (offset 0)
+           (decoder (index-and-number-decoder
+                     (read-var-integerf packed offset)
+                     (read-var-integerf packed offset))))
+      (loop while (< offset (length packed))
+         do (binding* (((kind-number record-count)
+                        (decode-kind-and-count (read-var-integerf packed offset)))
+                       (kind (nth kind-number *xref-kinds*)))
+              (loop repeat record-count
+                 do (binding* (((index number)
+                                (funcall decoder (read-var-integerf packed offset)))
+                               (name (funcall lookup index)))
+                      (funcall function kind name number))))))))
