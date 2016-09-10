@@ -90,6 +90,11 @@
     (who-calls 'called-by-traced-fun)
   (traced-fun))
 
+#+sb-eval
+(define-xref-test who-calls.18
+    (who-calls 'called-by-interpreted-fun)
+  nil)
+
 
 (define-xref-test who-macroexpands.1
     (who-macroexpands 'macro/1)

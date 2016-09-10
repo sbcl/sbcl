@@ -166,7 +166,9 @@
                 "SRC;CODE;STEP"
                 "SRC;CODE;WARM-LIB"
                 #+win32 "SRC;CODE;WARM-MSWIN"
-                "SRC;CODE;RUN-PROGRAM"))
+                "SRC;CODE;RUN-PROGRAM"
+
+                "SRC;CODE;REPACK-XREF"))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions
@@ -241,4 +243,3 @@
 #+sb-doc (setf (documentation (find-package "KEYWORD") t)
                "public: home of keywords")
 
-

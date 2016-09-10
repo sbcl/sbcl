@@ -608,80 +608,23 @@ value."
 
 ;;; XREF facility
 
-(defun get-simple-fun (functoid)
-  (etypecase functoid
-    (sb-kernel:fdefn
-     (get-simple-fun (sb-kernel:fdefn-fun functoid)))
-    ((or null sb-kernel:funcallable-instance)
-     nil)
-    (sb-kernel:closure
-     ;; FIXME: should use ENCAPSULATION-INFO instead of hardwiring an index.
-     (let ((fun (sb-kernel:%closure-fun functoid)))
-       (if (and (eq (sb-kernel:%fun-name fun) 'sb-impl::encapsulation)
-                (plusp (sb-kernel:get-closure-length functoid))
-                (typep (sb-kernel:%closure-index-ref functoid 0) 'sb-impl::encapsulation-info))
-           (get-simple-fun
-            (sb-impl::encapsulation-info-definition
-             (sb-kernel:%closure-index-ref functoid 0)))
-           fun)))
-    (function
-     (sb-kernel:%fun-fun functoid))))
-
-;; Call FUNCTION with two args, NAME and VALUE, for each value that is
-;; either the FDEFINITION or MACRO-FUNCTION of some global name.
-;;
-(defun call-with-each-global-functoid (function)
-  (sb-c::call-with-each-globaldb-name
-   (lambda (name)
-     ;; In general it might be unsafe to call INFO with a NAME that is not
-     ;; valid for the kind of info being retrieved, as when the defaulting
-     ;; function tries to perform a sanity-check. But here it's safe.
-     (let ((functoid (or (sb-int:info :function :macro-function name)
-                         (sb-int:info :function :definition name))))
-       (when functoid
-         (funcall function name functoid))))))
-
 (defun collect-xref (wanted-kind wanted-name)
-  (let ((ret nil))
-    (flet ((process (name functoid)
-             ;; Get a simple-fun for the definition, and xref data
-             ;; from the table if available.
-             (let* ((simple-fun (get-simple-fun functoid))
-                    (xrefs (when simple-fun
-                             (sb-kernel:%simple-fun-xrefs simple-fun))))
-               (when xrefs
-                 (sb-c::map-packed-xref-data
-                  (lambda (xref-kind xref-name xref-form-number)
-                    (when (and (eq xref-kind wanted-kind)
-                               (equal xref-name wanted-name))
-                      (let ((source-location
-                              (find-function-definition-source simple-fun)))
-                        ;; Use the more accurate source path from
-                        ;; the xref entry.
-                        (setf (definition-source-form-number source-location)
-                              xref-form-number)
-                        (push (cons name source-location)
-                              ret))))
-                  xrefs)))))
-      (call-with-each-global-functoid
-       (lambda (name functoid)
-         ;; Functions with EQL specializers no longer get a fdefinition,
-         ;; process all the methods from a generic function
-         (cond ((and (sb-kernel:fdefn-p functoid)
-                     (typep (sb-kernel:fdefn-fun functoid) 'generic-function))
-                (loop for method in (sb-mop:generic-function-methods
-                                     (sb-kernel:fdefn-fun functoid))
-                      for fun = (sb-pcl::safe-method-fast-function method)
-                      when fun
-                      do (process (sb-kernel:%fun-name fun) fun)))
-               ;; Methods are alredy processed above
-               ((and (sb-kernel:fdefn-p functoid)
-                     (typep (sb-kernel:fdefn-name functoid)
-                            '(cons (member sb-pcl::slow-method
-                                           sb-pcl::fast-method)))))
-               (t
-                (process name functoid))))))
-    ret))
+  (let ((result '()))
+    (sb-c::map-simple-funs
+     (lambda (name fun)
+       (sb-int:binding* ((xrefs (sb-kernel:%simple-fun-xrefs fun) :exit-if-null))
+         (sb-c::map-packed-xref-data
+          (lambda (xref-kind xref-name xref-form-number)
+            (when (and (eq xref-kind wanted-kind)
+                       (equal xref-name wanted-name))
+              (let ((source-location (find-function-definition-source fun)))
+                ;; Use the more accurate source path from the xref
+                ;; entry.
+                (setf (definition-source-form-number source-location)
+                      xref-form-number)
+                (push (cons name source-location) result))))
+          xrefs))))
+    result))
 
 (defun who-calls (function-name)
   "Use the xref facility to search for source locations where the

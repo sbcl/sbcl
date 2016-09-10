@@ -241,5 +241,17 @@
 
 (defun traced-fun ()
   (called-by-traced-fun))
-
 (trace traced-fun)
+
+#+sb-eval
+(progn
+  (defun called-by-interpreted-funs ())
+
+  (let ((sb-ext:*evaluator-mode* :interpret))
+    (eval '(defun interpreted-fun ()
+             (called-by-interpreted-funs))))
+
+  (let ((sb-ext:*evaluator-mode* :interpret))
+    (eval '(defun traced-interpreted-fun ()
+            (called-by-interpreted-funs))))
+  (trace traced-interpreted-fun))
