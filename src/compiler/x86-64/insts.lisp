@@ -2458,8 +2458,8 @@
       (emit-byte segment #b11101000) ; 32 bit relative
       (emit-dword-displacement-backpatch segment where))
      (fixup
-      ;; There is no CALL rel64...
-      (error "Cannot CALL a fixup: ~S" where))
+      (emit-byte segment #b11101000)
+      (emit-relative-fixup segment where))
      (t
       (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
       (emit-byte segment #b11111111)
