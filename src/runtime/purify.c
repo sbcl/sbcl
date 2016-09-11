@@ -821,7 +821,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                     long nslots = HeaderValue(*addr);
                     int index;
                     if (fixnump(layout->bitmap)) {
-                      long bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS;
+                      long bitmap = (sword_t)layout->bitmap >> N_FIXNUM_TAG_BITS;
                       for (index = 0; index < nslots ; index++, bitmap >>= 1)
                         if (bitmap & 1)
                           pscav(addr + 1 + index, 1, constant);
