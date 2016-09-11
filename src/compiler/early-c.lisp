@@ -46,7 +46,6 @@
 
 ;;; the type of LAYOUT-DEPTHOID slot values
 (def!type layout-depthoid () '(or index (integer -1 -1)))
-(def!type layout-bitmap () '(and integer (not (eql 0))))
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:

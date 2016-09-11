@@ -373,8 +373,7 @@
                     ;; user-defined MAKE-LOAD-FORM methods?
                     (when (emit-make-load-form value)
                       #+sb-xc-host
-                      (aver (eql (layout-bitmap (%instance-layout value))
-                                 sb!kernel::+layout-all-tagged+))
+                      (aver (zerop (layout-bitmap (%instance-layout value))))
                       (do-instance-tagged-slot (i value)
                         (grovel (%instance-ref value i)))))
                    (t

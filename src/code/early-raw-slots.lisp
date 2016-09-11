@@ -43,7 +43,6 @@
 ;; 'signed-word' is here for companionship - slots of that type are not raw.
 (def!type sb!vm:word () `(unsigned-byte ,sb!vm:n-word-bits))
 (def!type sb!vm:signed-word () `(signed-byte ,sb!vm:n-word-bits))
-(defconstant +layout-all-tagged+ -1)
 
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
 (defstruct (raw-slot-data
@@ -166,5 +165,5 @@
        (do ((,index-var sb!vm:instance-data-start (1+ ,index-var)))
            ((>= ,index-var ,limit))
          (declare (type index ,index-var))
-         (when (logbitp ,index-var ,bitmap)
+         (unless (logbitp ,index-var ,bitmap)
            ,@body)))))
