@@ -106,7 +106,7 @@
     ;; unless no instances exist or all raw slots miraculously contained
     ;; bits which were the equivalent of valid Lisp descriptors.
     (setf (layout-equalp-tests layout)
-          (if (zerop (layout-bitmap layout))
+          (if (eql (layout-bitmap layout) +layout-all-tagged+)
               #()
               ;; The initial element of NIL means "do not compare".
               ;; Ignored words (comparator = NIL) fall into two categories:
@@ -157,18 +157,17 @@
         (setf (%instance-layout res) (%instance-layout structure))
         ;; On backends which don't segregate descriptor vs. non-descriptor
         ;; registers, we could speed up this code in an obvious way.
-        (macrolet ((copy-loop (raw-p &optional step)
+        (macrolet ((copy-loop (tagged-p &optional step)
                      `(do ((i sb!vm:instance-data-start (1+ i)))
                           ((>= i len))
                         (declare (index i))
-                        (if ,raw-p
-                            (setf (%raw-instance-ref/word res i)
-                                  (%raw-instance-ref/word structure i))
+                        (if ,tagged-p
                             (setf (%instance-ref res i)
-                                  (%instance-ref structure i)))
+                                  (%instance-ref structure i))
+                            (setf (%raw-instance-ref/word res i)
+                                  (%raw-instance-ref/word structure i)))
                         ,step)))
-          (cond ((zerop bitmap) ; no untagged slots.
-                 (copy-loop nil))
+          (cond ((eql bitmap +layout-all-tagged+) (copy-loop t))
                 ;; The fixnum case uses fixnum operations for ODDP and ASH.
                 ((fixnump bitmap) ; shift and mask is faster than logbitp
                  (copy-loop (oddp (truly-the fixnum bitmap))

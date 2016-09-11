@@ -1285,8 +1285,8 @@
        (dump-non-immediate-object layout file)
        (dump-fop 'fop-struct file length))
     (let* ((obj (if (logbitp index bitmap)
-                    (%raw-instance-ref/word struct index)
-                    (%instance-ref struct index)))
+                    (%instance-ref struct index)
+                    (%raw-instance-ref/word struct index)))
            (ref (gethash obj circ)))
       (sub-dump-object (cond (ref
                               (push (make-circularity :type :struct-set

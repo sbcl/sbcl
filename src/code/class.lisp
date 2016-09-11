@@ -125,8 +125,7 @@
 ;;; preexisting class slot value is OK, and if it's not initialized,
 ;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
 ;;; is no longer true, :UNINITIALIZED used instead.
-(declaim (ftype (function (layout classoid index simple-vector layout-depthoid
-                                  unsigned-byte)
+(declaim (ftype (function (layout classoid index simple-vector layout-depthoid layout-bitmap)
                           layout)
                 %init-or-check-layout))
 (defun %init-or-check-layout (layout classoid length inherits depthoid bitmap)
@@ -192,7 +191,7 @@
                            index
                            simple-vector
                            layout-depthoid
-                           unsigned-byte))
+                           layout-bitmap))
                 redefine-layout-warning))
 (defun redefine-layout-warning (old-context old-layout
                                 context length inherits depthoid bitmap)
@@ -242,8 +241,8 @@ between the ~A definition and the ~A definition"
 
 ;;; Require that LAYOUT data be consistent with CLASSOID, LENGTH,
 ;;; INHERITS, DEPTHOID, and BITMAP.
-(declaim (ftype (function (layout classoid index simple-vector layout-depthoid
-                           unsigned-byte)) check-layout))
+(declaim (ftype (function (layout classoid index simple-vector layout-depthoid layout-bitmap))
+                check-layout))
 (defun check-layout (layout classoid length inherits depthoid bitmap)
   (aver (eq (layout-classoid layout) classoid))
   (when (redefine-layout-warning "current" layout
@@ -271,8 +270,8 @@ between the ~A definition and the ~A definition"
 ;;; Used by the loader to forward-reference layouts for classes whose
 ;;; definitions may not have been loaded yet. This allows type tests
 ;;; to be loaded when the type definition hasn't been loaded yet.
-(declaim (ftype (function (symbol index simple-vector layout-depthoid
-                                  unsigned-byte) layout)
+(declaim (ftype (function (symbol index simple-vector layout-depthoid layout-bitmap)
+                          layout)
                 find-and-init-or-check-layout))
 (defun find-and-init-or-check-layout (name length inherits depthoid bitmap)
   (truly-the ; avoid an "assertion too complex to check" optimizer note
@@ -1266,7 +1265,7 @@ between the ~A definition and the ~A definition"
                                           0
                                           inherits-vector
                                           depthoid
-                                          0)
+                                          +layout-all-tagged+)
            :invalidate nil)))))
   (/show0 "done with loop over *!BUILT-IN-CLASSES*"))
 
@@ -1312,7 +1311,8 @@ between the ~A definition and the ~A definition"
                              (classoid-layout (find-classoid x)))
                            inherits-list)))
         #-sb-xc-host (/show0 "INHERITS=..") #-sb-xc-host (/hexstr inherits)
-        (register-layout (find-and-init-or-check-layout name 0 inherits -1 0)
+        (register-layout (find-and-init-or-check-layout name 0 inherits
+                                                        -1 +layout-all-tagged+)
                          :invalidate nil))))
   (/show0 "done defining temporary STANDARD-CLASSes"))
 

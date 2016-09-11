@@ -173,8 +173,8 @@
           (declare (type index i))
           (let ((val (fop-stack-ref ptr)))
             (if (logbitp i bitmap)
-                (setf (%raw-instance-ref/word res i) val)
-                (setf (%instance-ref res i) val))
+                (setf (%instance-ref res i) val)
+                (setf (%raw-instance-ref/word res i) val))
             (incf ptr)))))
     res))
 
