@@ -723,6 +723,71 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
   }
 }
 
+void bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
+                 void (*proc)(void*, int, int), void* arg)
+{
+    uword_t sense = (flags & BIT_SCAN_INVERT) ? ~0L : 0;
+    int start_word_index = 0;
+    int shift = 0;
+    in_use_marker_t word;
+
+    flags = flags & BIT_SCAN_CLEAR;
+
+    // Rather than bzero'ing we can just clear each nonzero word as it's read,
+    // if so specified.
+#define BITMAP_REF(j) word = bitmap[j]; if(word && flags) bitmap[j] = 0; word ^= sense
+    BITMAP_REF(0);
+    while (1) {
+        int skip_bits, start_bit, start_position, run_length;
+        if (word == 0) {
+            if (++start_word_index >= n_bitmap_words) break;
+            BITMAP_REF(start_word_index);
+            shift = 0;
+            continue;
+        }
+        // On each loop iteration, the lowest 1 bit is a "relative"
+        // bit index, since the word was already shifted. This is 'skip_bits'.
+        // Adding back in the total shift amount gives 'start_bit',
+        // the true absolute index within the current word.
+        // 'start_position' is absolute within the entire bitmap.
+        skip_bits = ffsl(word) - 1;
+        start_bit = skip_bits + shift;
+        start_position = N_WORD_BITS * start_word_index + start_bit;
+        // Compute the number of consecutive 1s in the current word.
+        word >>= skip_bits;
+        run_length = ~word ? ffsl(~word) - 1 : N_WORD_BITS;
+        if (start_bit + run_length < N_WORD_BITS) { // Do not extend to additional words.
+            word >>= run_length;
+            shift += skip_bits + run_length;
+        } else {
+            int end_word_index = 1 + start_word_index;
+            while (1) {
+                if (end_word_index >= n_bitmap_words) {
+                    word = 0;
+                    run_length += (end_word_index - start_word_index - 1) * N_WORD_BITS;
+                    break;
+                }
+                BITMAP_REF(end_word_index);
+                if (~word == 0)
+                    ++end_word_index;
+                else {
+                    // end_word_index is the exclusive bound on contiguous
+                    // words to include in the range. See if the low bits
+                    // from the next word can extend the range.
+                    shift = ffsl(~word) - 1;
+                    word >>= shift;
+                    run_length += (end_word_index - start_word_index - 1)
+                                  * N_WORD_BITS + shift;
+                    break;
+                }
+            }
+            start_word_index = end_word_index;
+        }
+        proc(arg, start_position, run_length);
+    }
+#undef BITMAP_REF
+}
+
 static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
