@@ -707,18 +707,16 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
      On the other hand, this may not be a bottleneck as-is */
 
   ++instance_ptr; // was supplied as the address of the header word
-  if (layout_bitmap == 0) {
-      proc(instance_ptr, n_words);
-  } else if (fixnump(layout_bitmap)) {
-      unsigned long bitmap = fixnum_value(layout_bitmap);
+  if (fixnump(layout_bitmap)) {
+      long bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
       for (index = 0; index < n_words ; index++, bitmap >>= 1)
-          if (!(bitmap & 1))
+          if (bitmap & 1)
               proc(instance_ptr + index, 1);
   } else { /* huge bitmap */
       struct bignum * bitmap;
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
       for (index = 0; index < n_words ; index++)
-          if (!positive_bignum_logbitp(index, bitmap))
+          if (positive_bignum_logbitp(index, bitmap))
               proc(instance_ptr + index, 1);
   }
 }
@@ -803,7 +801,10 @@ scav_instance(lispobj *where, lispobj header)
     if (forwarding_pointer_p(layout))
         layout = native_pointer((lispobj)forwarding_pointer_value(layout));
 
-    instance_scan_interleaved(scavenge, where, ntotal, layout);
+    if (((struct layout*)layout)->bitmap == make_fixnum(-1))
+        scavenge(where+1, ntotal);
+    else
+        instance_scan_interleaved(scavenge, where, ntotal, layout);
 
     return ntotal + 1;
 }

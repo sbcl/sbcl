@@ -401,8 +401,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   `(let ((x-el (%instance-ref x i))
                          (y-el (%instance-ref y i)))
                      (or (eq x-el y-el) (equalp x-el y-el)))))
-       (let ((bitmap (layout-bitmap layout-x)))
-         (if (zerop bitmap)
+         (if (eql (layout-bitmap layout-x) sb!kernel::+layout-all-tagged+)
              (loop for i of-type index from sb!vm:instance-data-start
                    below (layout-length layout-x)
                    always (slot-ref-equalp))
@@ -419,7 +418,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                      always (cond ((eql test 0) (slot-ref-equalp))
                                   ((functionp test)
                                    (funcall test i x y))
-                                  (t))))))))))
+                                  (t)))))))))
 
 ;;; Doesn't work on simple vectors
 (defun array-equal-p (x y)

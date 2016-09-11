@@ -461,13 +461,15 @@ static void brief_struct(lispobj obj)
 }
 
 #include "genesis/layout.h"
-static boolean untagged_slot_p(struct layout * layout,
+static boolean tagged_slot_p(struct layout * layout,
                                int slot_index)
 {
   extern boolean positive_bignum_logbitp(int,struct bignum*);
   lispobj bitmap = layout->bitmap;
+  long fixnum = (sword_t)bitmap >> N_FIXNUM_TAG_BITS; // optimistically
   return fixnump(bitmap)
-         ? (fixnum_value(bitmap) >> slot_index) & 1
+         ? bitmap == make_fixnum(-1) ||
+            (slot_index < N_WORD_BITS && ((fixnum >> slot_index) & 1) != 0)
          : positive_bignum_logbitp(slot_index,
                                    (struct bignum*)native_pointer(bitmap));
 }
@@ -485,11 +487,12 @@ static void print_struct(lispobj obj)
         struct layout * layout = (struct layout*)native_pointer(layout_obj);
         for (i=INSTANCE_DATA_START; i<instance_length(instance->header); i++) {
             sprintf(buffer, "slot %d: ", i);
-            if (layout==NULL || untagged_slot_p(layout, i)) {
+            if (layout != NULL && tagged_slot_p(layout, i)) {
+                print_obj(buffer, instance->slots[i]);
+            } else {
                 newline(NULL);
                 printf("\n\t    %s0x%"OBJ_FMTX" [raw]", buffer, instance->slots[i]);
-            } else
-                print_obj(buffer, instance->slots[i]);
+            }
         }
     }
 }

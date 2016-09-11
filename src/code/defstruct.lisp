@@ -1311,17 +1311,21 @@ or they must be declared locally notinline at each call site.~@:>"
   (values))
 
 (defun dd-bitmap (dd)
-  ;; The bitmap stores a 1 for each untagged word,
-  ;; including any internal padding words for alignment.
-  ;; The 0th bit is initialized to 0 because the LAYOUT is a tagged
+  ;; The bitmap stores a 1 for each tagged word, and a 0 for each raw word.
+  ;; The 0th bit is should always be 1 because the LAYOUT is a tagged
   ;; slot that is not present in DD-SLOTS.
-  ;; All other bits start as 1 and are cleared if the word is tagged.
-  ;; A final padding word, if any, is regarded as tagged.
-  (let ((bitmap (ldb (byte (dd-length dd) 0)
-                     (ash -1 sb!vm:instance-data-start))))
-    (dolist (slot (dd-slots dd) bitmap)
-      (when (eql t (dsd-raw-type slot))
-        (setf (ldb (byte 1 (dsd-index slot)) bitmap) 0)))))
+  (let ((slots (dd-slots dd))
+        (length (dd-length dd)))
+    (if (find t slots :key #'dsd-raw-type :test #'neq)
+        ;; A final padding word, if any, is regarded as tagged.
+        ;; If the length is even, then there is padding, because the
+        ;; header is 1 word, and padding make it even again.
+        (let ((bitmap (logior (if (evenp length) (ash 1 length) 0) 1)))
+          (dolist (slot slots bitmap)
+            (when (eql t (dsd-raw-type slot))
+              (setf bitmap (logior bitmap (ash 1 (dsd-index slot)))))))
+        ;; As a special case, -1 implies that all slots are tagged.
+        -1)))
 
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should

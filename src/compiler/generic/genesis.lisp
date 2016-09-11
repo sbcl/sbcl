@@ -1174,7 +1174,8 @@ core and return a descriptor to it."
                             (error "No target layout for ~S" obj)))
          (result (allocate-struct *dynamic* target-layout))
          (cold-dd-slots (dd-slots-from-core host-type)))
-    (aver (zerop (layout-bitmap (find-layout host-type))))
+    (aver (eql (layout-bitmap (find-layout host-type))
+               sb!kernel::+layout-all-tagged+))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
          (index 1 (1+ index)))
@@ -1203,7 +1204,8 @@ core and return a descriptor to it."
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
-  (aver (= 0 (layout-bitmap *host-layout-of-layout*)))
+  (aver (eql (layout-bitmap *host-layout-of-layout*)
+             sb!kernel::+layout-all-tagged+))
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -2450,15 +2452,15 @@ core and return a descriptor to it."
     ;; Raw slots can not possibly work because dump-struct uses
     ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
     ;; Remove this assertion if that problem is somehow circumvented.
-    (unless (= bitmap 0)
+    (unless (eql bitmap sb!kernel::+layout-all-tagged+)
       (error "Raw slots not working in genesis."))
     (loop for index downfrom (1- size) to sb!vm:instance-data-start
           for val = (pop-stack) then (pop-stack)
           do (write-wordindexed result
                                 (+ index sb!vm:instance-slots-offset)
                                 (if (logbitp index bitmap)
-                                    (descriptor-word-sized-integer val)
-                                    val)))
+                                    val
+                                    (descriptor-word-sized-integer val))))
     result))
 
 (define-cold-fop (fop-layout)
