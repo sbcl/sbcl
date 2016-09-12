@@ -687,6 +687,12 @@ boolean positive_bignum_logbitp(int index, struct bignum* bignum)
   }
 }
 
+// Helper function for helper function below, since lambda isn't a thing
+static void instance_scan_range(void* instance_ptr, int offset, int nwords)
+{
+    scavenge((lispobj*)instance_ptr + offset, nwords);
+}
+
 // Helper function for stepping through the tagged slots of an instance in
 // scav_instance and verify_space (which, as it happens, is not useful).
 void
@@ -699,12 +705,8 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
   lispobj layout_bitmap = layout->bitmap;
   sword_t index;
 
-  /* This code would be more efficient if the Lisp stored an additional format
-     of the same metadata - a vector of ranges of slot offsets to scan.
-     Each pair of vector elements would demarcate the start and end of a range
-     of offsets to be passed to the proc().  The vector could be either
-     (unsigned-byte 8) or (unsigned-byte 16) for compactness.
-     On the other hand, this may not be a bottleneck as-is */
+  /* This code might be made more efficient by run-length-encoding the ranges
+     of words to scan, but probably not by much */
 
   ++instance_ptr; // was supplied as the address of the header word
   if (fixnump(layout_bitmap)) {
@@ -715,9 +717,11 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
   } else { /* huge bitmap */
       struct bignum * bitmap;
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
-      for (index = 0; index < n_words ; index++)
-          if (positive_bignum_logbitp(index, bitmap))
-              proc(instance_ptr + index, 1);
+      if (forwarding_pointer_p((lispobj*)bitmap))
+          bitmap = (struct bignum*)
+            native_pointer((lispobj)forwarding_pointer_value((lispobj*)bitmap));
+      bitmap_scan((uword_t*)bitmap->digits, HeaderValue(bitmap->header), 0,
+                  instance_scan_range, instance_ptr);
   }
 }
 
