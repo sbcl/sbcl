@@ -758,11 +758,11 @@ void bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
             word >>= run_length;
             shift += skip_bits + run_length;
         } else {
-            int end_word_index = 1 + start_word_index;
+            int end_word_index = ++start_word_index;
             while (1) {
                 if (end_word_index >= n_bitmap_words) {
                     word = 0;
-                    run_length += (end_word_index - start_word_index - 1) * N_WORD_BITS;
+                    run_length += (end_word_index - start_word_index) * N_WORD_BITS;
                     break;
                 }
                 BITMAP_REF(end_word_index);
@@ -774,8 +774,8 @@ void bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
                     // from the next word can extend the range.
                     shift = ffsl(~word) - 1;
                     word >>= shift;
-                    run_length += (end_word_index - start_word_index - 1)
-                                  * N_WORD_BITS + shift;
+                    run_length += (end_word_index - start_word_index) * N_WORD_BITS
+                                  + shift;
                     break;
                 }
             }
