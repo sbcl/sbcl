@@ -51,8 +51,7 @@
   (slots () :type list)
   ;; a list of (NAME . INDEX) pairs for accessors of included structures
   (inherited-accessor-alist () :type list)
-  ;; number of elements we've allocated (See also RAW-LENGTH, which is not
-  ;; included in LENGTH.)
+  ;; number of elements including the layout itself (minimum=1)
   (length 0 :type index)
   ;; General kind of implementation.
   (type 'structure :type (member structure vector list
