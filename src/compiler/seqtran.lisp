@@ -742,7 +742,9 @@
                (declare (type index start end))
                ;; WITH-ARRAY-DATA did our range checks once and for all, so
                ;; it'd be wasteful to check again on every AREF...
-               (declare (optimize (safety 0) (speed 3)))
+               ;; Force bounds-checks to 0 even if local policy had it >0.
+               (declare (optimize (safety 0) (speed 3)
+                                  (insert-array-bounds-checks 0)))
                (do ((i start (1+ i)))
                    ((= i end) seq)
                  (declare (type index i))
