@@ -588,17 +588,30 @@
   sequence)
 
 (defun vector-fill* (sequence item start end)
+  (declare (type index start) (type (or index null) end))
   (with-array-data ((data sequence)
                     (start start)
                     (end end)
                     :force-inline t
                     :check-fill-pointer t)
-    (let ((setter (!find-data-vector-setter data)))
-      (declare (optimize (speed 3) (safety 0)))
-      (do ((index start (1+ index)))
-          ((= index end) sequence)
-        (declare (index index))
-        (funcall setter data index item)))))
+    ;; This has vastly different performance for (VECTOR T) and anything else.
+    ;; The rationale is that it is surprising to users that an unoptimized
+    ;; call to MAKE-ARRAY with no keywords, just an integer dimension,
+    ;; pays such a heavy performance penalty - up to 3x slower - merely
+    ;; because you "care" about the size of your code, which causes FILL
+    ;; not to be transformed into a loop.
+    (if (simple-vector-p sequence)
+        (locally
+         (declare (optimize (speed 3) (safety 0))) ; transform will kick in
+         (fill (truly-the simple-vector sequence) item
+               :start start :end end))
+        (let ((setter (!find-data-vector-setter data)))
+          (declare (optimize (speed 3) (safety 0)))
+          (do ((index start (1+ index)))
+              ((= index end))
+            (declare (index index))
+            (funcall setter data index item)))))
+  sequence)
 
 (defun string-fill* (sequence item start end)
   (declare (string sequence))
