@@ -745,10 +745,15 @@
                ;; Force bounds-checks to 0 even if local policy had it >0.
                (declare (optimize (safety 0) (speed 3)
                                   (insert-array-bounds-checks 0)))
-               (do ((i start (1+ i)))
-                   ((= i end) seq)
-                 (declare (type index i))
-                 (setf (aref data i) item)))
+               ,(cond #!+x86-64
+                      ((type= element-ctype *universal-type*)
+                       '(values (%primitive sb!vm::fill-vector/t
+                                            data item start end)))
+                      (t
+                       `(do ((i start (1+ i)))
+                            ((= i end) seq)
+                          (declare (type index i))
+                          (setf (aref data i) item)))))
             ;; ... though we still need to check that the new element can fit
             ;; into the vector in safe code. -- CSR, 2002-07-05
             `((declare (type ,element-type item)))))

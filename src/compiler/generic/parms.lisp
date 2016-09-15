@@ -182,6 +182,10 @@
     #!+(and gencgc (not (or x86 x86-64)))
     *pinned-objects*
 
+    ;; for looking up assembler routine by name
+    ;; and patching them on runtime startup
+    sb!fasl::*assembler-routines*
+
     ;; hash table weaknesses
     :key
     :value

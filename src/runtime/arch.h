@@ -19,6 +19,9 @@
 /* Do anything we need to do when starting up the runtime environment
  * on this architecture. */
 extern void arch_init(void);
+extern void tune_asm_routines_for_microarch(void);
+extern void untune_asm_routines_for_microarch(void);
+extern void asm_routine_poke(const char*, int, char);
 
 /* FIXME: It would be good to document these too! */
 extern void arch_skip_instruction(os_context_t*);

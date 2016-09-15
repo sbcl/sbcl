@@ -706,6 +706,9 @@ main(int argc, char *argv[], char *envp[])
     return_from_lisp_stub = (void *) ((char *)*((unsigned long *)
                  ((char *)initial_function + -1)) + 23);
 #endif
+#ifdef LISP_FEATURE_X86_64
+    tune_asm_routines_for_microarch();
+#endif
 
     gc_initialize_pointers();
 

@@ -126,7 +126,7 @@
 ;;;     have packages and that sort of native Lisp stuff associated
 ;;;     with them. We can compare them with EQ.
 (declaim (type hash-table *assembler-routines*))
-(defvar *assembler-routines* (make-hash-table :test 'eq))
+(defglobal *assembler-routines* (make-hash-table :test 'eq))
 
 
 ;;;; the FOP database

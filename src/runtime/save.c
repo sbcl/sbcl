@@ -34,6 +34,7 @@
 #include "validate.h"
 #include "gc-internal.h"
 #include "thread.h"
+#include "arch.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -223,6 +224,10 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 {
     struct thread *th;
     os_vm_offset_t core_start_pos;
+
+#ifdef LISP_FEATURE_X86_64
+    untune_asm_routines_for_microarch();
+#endif
 
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up

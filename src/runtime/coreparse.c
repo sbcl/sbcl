@@ -540,3 +540,37 @@ load_core_file(char *file, os_vm_offset_t file_offset)
     SHOW("returning from load_core_file(..)");
     return initial_function;
 }
+
+#include "genesis/hash-table.h"
+#include "genesis/vector.h"
+os_vm_address_t get_asm_routine_by_name(const char* name)
+{
+    lispobj routines = SYMBOL(ASSEMBLER_ROUTINES)->value;
+    if (lowtag_of(routines) == INSTANCE_POINTER_LOWTAG) {
+        struct hash_table* ht = (struct hash_table*)native_pointer(routines);
+        struct vector* table = (struct vector*)native_pointer(ht->table);
+        lispobj sym;
+        int i;
+        for (i=2 ; i < fixnum_value(table->length) ; i += 2) {
+          sym = table->data[i];
+          if (sym != EMPTY_HT_SLOT
+              && lowtag_of(sym) == OTHER_POINTER_LOWTAG
+              && widetag_of(SYMBOL(sym)->header) == SYMBOL_HEADER_WIDETAG
+              && !strcmp(name,
+                         (char*)((struct vector*)
+                                 native_pointer(SYMBOL(sym)->name))->data))
+              return (os_vm_address_t)fixnum_value(table->data[i+1]);
+        }
+        // Something is wrong if we have a hashtable but find nothing.
+        fprintf(stderr, "WARNING: get_asm_routine_by_name(%s) failed\n",
+                name);
+    }
+    return NULL;
+}
+
+void asm_routine_poke(const char* routine, int offset, char byte)
+{
+    os_vm_address_t address = get_asm_routine_by_name(routine);
+    if (address)
+        address[offset] = byte;
+}
