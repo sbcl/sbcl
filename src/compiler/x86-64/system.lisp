@@ -329,7 +329,7 @@
   (:generator 2
     (inst mov sap
           (make-ea :qword :base thread-base-tn :index n
-                          :scale (ash 1 (- 3 n-fixnum-tag-bits)))))))
+                          :scale (ash 1 (- word-shift n-fixnum-tag-bits)))))))
 
 (define-vop (halt)
   (:generator 1
