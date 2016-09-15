@@ -1049,7 +1049,7 @@ standard Lisp readtable when NIL."
 
 ;;; Return the character class for CHAR, which might be part of a
 ;;; rational number.
-(defmacro char-class2 (char attarray atthash)
+(defmacro char-class2 (char attarray atthash read-base)
   `(let ((att (if (typep (truly-the character ,char) 'base-char)
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
@@ -1059,7 +1059,7 @@ standard Lisp readtable when NIL."
        ((< att +char-attr-constituent+) att)
        (t (setf att (get-constituent-trait ,char))
           (cond
-            ((digit-char-p ,char *read-base*) +char-attr-constituent-digit+)
+            ((digit-char-p ,char ,read-base) +char-attr-constituent-digit+)
             ((= att +char-attr-constituent-digit+) +char-attr-constituent+)
             ((= att +char-attr-invalid+)
              (simple-reader-error stream "invalid constituent"))
@@ -1068,7 +1068,7 @@ standard Lisp readtable when NIL."
 ;;; Return the character class for a char which might be part of a
 ;;; rational or floating number. (Assume that it is a digit if it
 ;;; could be.)
-(defmacro char-class3 (char attarray atthash)
+(defmacro char-class3 (char attarray atthash read-base)
   `(let ((att (if (typep (truly-the character ,char) 'base-char)
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
@@ -1079,15 +1079,15 @@ standard Lisp readtable when NIL."
        (t (setf att (get-constituent-trait ,char))
           (when possibly-rational
             (setq possibly-rational
-                  (or (digit-char-p ,char *read-base*)
+                  (or (digit-char-p ,char ,read-base)
                       (= att +char-attr-constituent-slash+))))
           (when possibly-float
             (setq possibly-float
                   (or (digit-char-p ,char 10)
                       (= att +char-attr-constituent-dot+))))
           (cond
-            ((digit-char-p ,char (max *read-base* 10))
-             (if (digit-char-p ,char *read-base*)
+            ((digit-char-p ,char (max ,read-base 10))
+             (if (digit-char-p ,char ,read-base)
                  (if (= att +char-attr-constituent-expt+)
                      +char-attr-constituent-digit-or-expt+
                      +char-attr-constituent-digit+)
@@ -1226,6 +1226,7 @@ extended <package-name>::<form-in-package> syntax."
     (internal-read-extended-token stream firstchar nil)
     (return-from read-token nil))
   (let* ((rt *readtable*)
+         (base *read-base*)
          (attribute-array (character-attribute-array rt))
          (attribute-hash-table (character-attribute-hash-table rt))
          (buf *read-buffer*)
@@ -1242,7 +1243,7 @@ extended <package-name>::<form-in-package> syntax."
                  `(when (eq (setq char (read-char stream nil +EOF+)) +EOF+)
                     ,what)))
      (prog ((char firstchar))
-      (case (char-class3 char attribute-array attribute-hash-table)
+      (case (char-class3 char attribute-array attribute-hash-table base)
         (#.+char-attr-constituent-sign+ (go SIGN))
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
         (#.+char-attr-constituent-digit-or-expt+
@@ -1262,7 +1263,7 @@ extended <package-name>::<form-in-package> syntax."
       (getchar-or-else (go RETURN-SYMBOL))
       (setq possibly-rational t
             possibly-float t)
-      (case (char-class3 char attribute-array attribute-hash-table)
+      (case (char-class3 char attribute-array attribute-hash-table base)
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
         (#.+char-attr-constituent-digit-or-expt+
          (setq seen-digit-or-expt t)
@@ -1278,7 +1279,7 @@ extended <package-name>::<form-in-package> syntax."
       (ouch-read-buffer char buf)
       (getchar-or-else (return (make-integer)))
       (setq was-possibly-float possibly-float)
-      (case (char-class3 char attribute-array attribute-hash-table)
+      (case (char-class3 char attribute-array attribute-hash-table base)
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
         (#.+char-attr-constituent-decimal-digit+ (if possibly-float
                                                      (go LEFTDECIMALDIGIT)
@@ -1306,7 +1307,7 @@ extended <package-name>::<form-in-package> syntax."
      LEFTDIGIT-OR-EXPT
       (ouch-read-buffer char buf)
       (getchar-or-else (return (make-integer)))
-      (case (char-class3 char attribute-array attribute-hash-table)
+      (case (char-class3 char attribute-array attribute-hash-table base)
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
         (#.+char-attr-constituent-decimal-digit+ (bug "impossible!"))
         (#.+char-attr-constituent-dot+ (go SYMBOL))
@@ -1422,7 +1423,7 @@ extended <package-name>::<form-in-package> syntax."
      RATIO ; saw "[sign] {digit}+ slash"
       (ouch-read-buffer char buf)
       (getchar-or-else (go RETURN-SYMBOL))
-      (case (char-class2 char attribute-array attribute-hash-table)
+      (case (char-class2 char attribute-array attribute-hash-table base)
         (#.+char-attr-constituent-digit+ (go RATIODIGIT))
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
@@ -1432,7 +1433,7 @@ extended <package-name>::<form-in-package> syntax."
      RATIODIGIT ; saw "[sign] {digit}+ slash {digit}+"
       (ouch-read-buffer char buf)
       (getchar-or-else (return (make-ratio stream)))
-      (case (char-class2 char attribute-array attribute-hash-table)
+      (case (char-class2 char attribute-array attribute-hash-table base)
         (#.+char-attr-constituent-digit+ (go RATIODIGIT))
         (#.+char-attr-delimiter+
          (unread-char char stream)
@@ -1512,8 +1513,7 @@ extended <package-name>::<form-in-package> syntax."
       (casify-read-buffer buf)
       (setq colons 1)
       (setq package-designator
-            (if (or (plusp (token-buf-fill-ptr *read-buffer*))
-                    seen-multiple-escapes)
+            (if (or (plusp (token-buf-fill-ptr buf)) seen-multiple-escapes)
                 (prog1 (sized-token-buf-string buf)
                   (let ((new (acquire-token-buf)))
                     (setf (token-buf-next new) buf ; new points to old
