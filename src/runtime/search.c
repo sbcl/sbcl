@@ -36,7 +36,7 @@ boolean search_for_type(int type, lispobj **start, int *count)
     return 0;
 }
 
-static int strcmp_ucs4_ascii(uint32_t* a, char* b)
+static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, char* b)
 {
   int i = 0;
 
