@@ -1310,22 +1310,35 @@ or they must be declared locally notinline at each call site.~@:>"
                         :destruct-layout old-layout))))
   (values))
 
+;;; Compute DD's bitmap, storing 1 for each tagged word.
+;;; The bitmap should be stored as a negative fixnum in two cases:
+;;;  (1) if the positive value is a bignum but the negative is a fixnum.
+;;;  (2) if there are no raw slots at all.
+;;; Example: given (DEFSTRUCT A B C), the computed bitmap is #b11111 -
+;;; one bit for the layout; one each for A, B, C; and one for padding.
+;;; Whether this is stored as 5 or -1 is mostly immaterial,
+;;; but -1 is preferable because GC has a special case for it.
+;;; Suppose instead we have 1 untagged word followed by N tagged words
+;;; for N > n-fixnum-bits. The computed bitmap is #b111...11101
+;;; but the sign-extended value is -3, which is a fixnum.
+;;; If both the + and - values are fixnums, and raw slots are present,
+;;; we'll choose the positive value.
 (defun dd-bitmap (dd)
-  ;; The bitmap stores a 1 for each tagged word, and a 0 for each raw word.
-  ;; The 0th bit is should always be 1 because the LAYOUT is a tagged
-  ;; slot that is not present in DD-SLOTS.
-  (let ((slots (dd-slots dd))
-        (length (dd-length dd)))
-    (if (find t slots :key #'dsd-raw-type :test #'neq)
-        ;; A final padding word, if any, is regarded as tagged.
-        ;; If the length is even, then there is padding, because the
-        ;; header is 1 word, and padding make it even again.
-        (let ((bitmap (logior (if (evenp length) (ash 1 length) 0) 1)))
-          (dolist (slot slots bitmap)
-            (when (eql t (dsd-raw-type slot))
-              (setf bitmap (logior bitmap (ash 1 (dsd-index slot)))))))
-        ;; As a special case, -1 implies that all slots are tagged.
-        -1)))
+  ;; The 0th bit is always 1. LAYOUT is tagged but not reflected in DD-SLOTS
+  (let ((bitmap 1))
+    (dolist (slot (dd-slots dd))
+      (when (eql t (dsd-raw-type slot))
+        (setf bitmap (logior bitmap (ash 1 (dsd-index slot))))))
+    (let* ((length (dd-length dd))
+           (bitmap ; Add padding word if necessary.
+            (if (evenp length) (logior bitmap (ash 1 length)) bitmap))
+           (n-bits (logior length 1)))
+      (when (logbitp (1- n-bits) bitmap)
+        (let ((sign-ext (logior (ash -1 n-bits) bitmap)))
+          (when (or (and (fixnump sign-ext) (sb!xc:typep bitmap 'bignum))
+                    (eql sign-ext -1))
+            (return-from dd-bitmap sign-ext)))))
+    bitmap))
 
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should
