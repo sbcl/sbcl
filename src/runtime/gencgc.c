@@ -2280,14 +2280,14 @@ maybe_adjust_large_object(lispobj *where)
  * and since that leaves forwarding pointers in the unprotected
  * areas you cannot scavenge it again until those are gone.
  */
-void
-scavenge_pinned_range(void* page_base, int start, int length)
+static void
+scavenge_pinned_range(void* page_base, int start, int count)
 {
-    // 'start' and 'length' are expressed in units of dwords
-    scavenge((lispobj*)page_base + 2*start, 2*length);
+    // 'start' and 'count' are expressed in units of dwords
+    scavenge((lispobj*)page_base + 2*start, 2*count);
 }
 
-void
+static void
 scavenge_pinned_ranges()
 {
     page_index_t page;
@@ -2300,13 +2300,12 @@ scavenge_pinned_ranges()
     }
 }
 
-void wipe_range(void* page_base, int start, int length)
+static void wipe_range(void* page_base, int start, int count)
 {
-    bzero((lispobj*)page_base + 2*start, length*2*N_WORD_BYTES);
+    bzero((lispobj*)page_base + 2*start, count*2*N_WORD_BYTES);
 }
 
-int verbosefixes = 0;
-void
+static void
 wipe_nonpinned_words()
 {
     page_index_t i;
@@ -2330,8 +2329,8 @@ wipe_nonpinned_words()
 #endif
 }
 
-void
-set_page_consi_bit(page_index_t pageindex, lispobj *mark_which_pointer)
+static void
+pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
 {
     struct page *page = &page_table[pageindex];
 
@@ -2457,7 +2456,7 @@ preserve_pointer(void *addr)
             possibly_valid_dynamic_space_pointer_s(addr, first_page,
                                                    &begin_ptr);
         }
-        set_page_consi_bit(first_page, begin_ptr);
+        pin_words(first_page, begin_ptr);
     }
 #endif
 
