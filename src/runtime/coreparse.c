@@ -553,8 +553,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
         int i;
         for (i=2 ; i < fixnum_value(table->length) ; i += 2) {
           sym = table->data[i];
-          if (sym != EMPTY_HT_SLOT
-              && lowtag_of(sym) == OTHER_POINTER_LOWTAG
+          if (lowtag_of(sym) == OTHER_POINTER_LOWTAG
               && widetag_of(SYMBOL(sym)->header) == SYMBOL_HEADER_WIDETAG
               && !strcmp(name,
                          (char*)((struct vector*)
