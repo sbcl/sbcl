@@ -1013,13 +1013,13 @@
                     (:constructor %make-segment)
                     (:copier nil))
   (sap-maker (missing-arg)
-             :type (function () sb!sys:system-area-pointer))
+             :type (function () system-area-pointer))
   ;; Length in bytes of the range of memory covered by this segment.
   (length 0 :type disassem-length)
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   ;; KLUDGE: CODE-COMPONENT is not a type the host understands
-  #-sb-xc-host (code nil :type (or null sb!kernel:code-component))
+  #-sb-xc-host (code nil :type (or null code-component))
   (unboxed-data-range nil :type (or null (cons fixnum fixnum)))
   (hooks nil :type list))
 
@@ -1034,7 +1034,7 @@
   ;; offset of next position
   (next-offs 0 :type offset)
   ;; a sap pointing to our segment
-  (segment-sap nil :type (or null sb!sys:system-area-pointer))
+  (segment-sap nil :type (or null system-area-pointer))
   ;; the current segment
   (segment nil :type (or null segment))
   ;; to avoid buffer overrun at segment end, we might need to copy bytes

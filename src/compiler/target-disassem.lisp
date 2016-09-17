@@ -251,7 +251,7 @@
 
 (defmethod print-object ((seg segment) stream)
   (print-unreadable-object (seg stream :type t)
-    (let ((addr (sb!sys:sap-int (funcall (seg-sap-maker seg)))))
+    (let ((addr (sap-int (funcall (seg-sap-maker seg)))))
       (format stream "#X~X..~X[~W]~:[ (#X~X)~;~*~]~@[ in ~S~]"
               addr (+ addr (seg-length seg)) (seg-length seg)
               (= (seg-virtual-location seg) addr)
@@ -262,65 +262,65 @@
 
 (defun fun-self (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:%simple-fun-self (sb!kernel:%fun-fun fun)))
+  (%simple-fun-self (%fun-fun fun)))
 
 (defun fun-code (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:fun-code-header (fun-self fun)))
+  (fun-code-header (fun-self fun)))
 
 (defun fun-next (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:%simple-fun-next (sb!kernel:%fun-fun fun)))
+  (%simple-fun-next (%fun-fun fun)))
 
 (defun fun-address (fun)
   (declare (type compiled-function fun))
-  (- (sb!kernel:get-lisp-obj-address (sb!kernel:%fun-fun fun)) sb!vm:fun-pointer-lowtag))
+  (- (get-lisp-obj-address (%fun-fun fun)) sb!vm:fun-pointer-lowtag))
 
 ;;; the offset of FUNCTION from the start of its code-component's
 ;;; instruction area
 (defun fun-insts-offset (function)
   (declare (type compiled-function function))
   (- (fun-address function)
-     (sb!sys:sap-int (sb!kernel:code-instructions (fun-code function)))))
+     (sap-int (code-instructions (fun-code function)))))
 
 ;;; the offset of FUNCTION from the start of its code-component
 (defun fun-offset (function)
   (declare (type compiled-function function))
-  (words-to-bytes (sb!kernel:get-closure-length function)))
+  (words-to-bytes (get-closure-length function)))
 
 ;;;; operations on code-components (which hold the instructions for
 ;;;; one or more functions)
 
 ;;; Return the length of the instruction area in CODE-COMPONENT.
 (defun code-inst-area-length (code-component)
-  (declare (type sb!kernel:code-component code-component))
-  (sb!kernel:%code-code-size code-component))
+  (declare (type code-component code-component))
+  (%code-code-size code-component))
 
 (defun segment-offs-to-code-offs (offset segment)
-  (sb!sys:without-gcing
-   (let* ((seg-base-addr (sb!sys:sap-int (funcall (seg-sap-maker segment))))
+  (without-gcing
+   (let* ((seg-base-addr (sap-int (funcall (seg-sap-maker segment))))
           (code-addr
            (logandc1 sb!vm:lowtag-mask
-                     (sb!kernel:get-lisp-obj-address (seg-code segment))))
+                     (get-lisp-obj-address (seg-code segment))))
           (addr (+ offset seg-base-addr)))
      (declare (type address seg-base-addr code-addr addr))
      (- addr code-addr))))
 
 (defun code-offs-to-segment-offs (offset segment)
-  (sb!sys:without-gcing
-   (let* ((seg-base-addr (sb!sys:sap-int (funcall (seg-sap-maker segment))))
+  (without-gcing
+   (let* ((seg-base-addr (sap-int (funcall (seg-sap-maker segment))))
           (code-addr
            (logandc1 sb!vm:lowtag-mask
-                     (sb!kernel:get-lisp-obj-address (seg-code segment))))
+                     (get-lisp-obj-address (seg-code segment))))
           (addr (+ offset code-addr)))
      (declare (type address seg-base-addr code-addr addr))
      (- addr seg-base-addr))))
 
 (defun code-insts-offs-to-segment-offs (offset segment)
-  (sb!sys:without-gcing
-   (let* ((seg-base-addr (sb!sys:sap-int (funcall (seg-sap-maker segment))))
+  (without-gcing
+   (let* ((seg-base-addr (sap-int (funcall (seg-sap-maker segment))))
           (code-insts-addr
-           (sb!sys:sap-int (sb!kernel:code-instructions (seg-code segment))))
+           (sap-int (code-instructions (seg-code segment))))
           (addr (+ offset code-insts-addr)))
      (declare (type address seg-base-addr code-insts-addr addr))
      (- addr seg-base-addr))))
@@ -335,7 +335,7 @@
                            (dstate-cur-offs dstate))
                         (* 2 sb!vm:n-word-bytes))
              ;; Check type.
-             (= (sb!sys:sap-ref-8 (dstate-segment-sap dstate)
+             (= (sap-ref-8 (dstate-segment-sap dstate)
                                   (if (eq (dstate-byte-order dstate)
                                           :little-endian)
                                       (dstate-cur-offs dstate)
@@ -354,21 +354,11 @@
   (unless (null stream)
     (let* ((seg (dstate-segment dstate))
            (code (seg-code seg))
-           (woffs
-            (ash (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)
-                 (- sb!vm:word-shift))) ; bytes -> words
-           (name
-            (sb!kernel:code-header-ref code
-                                       (+ woffs
-                                          sb!vm:simple-fun-name-slot)))
-           (args
-            (sb!kernel:code-header-ref code
-                                       (+ woffs
-                                          sb!vm:simple-fun-arglist-slot)))
-           (type
-            (sb!kernel:code-header-ref code
-                                       (+ woffs
-                                          sb!vm:simple-fun-type-slot))))
+           (woffs (ash (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)
+                       (- sb!vm:word-shift))) ; bytes -> words
+           (name (code-header-ref code (+ woffs sb!vm:simple-fun-name-slot)))
+           (args (code-header-ref code (+ woffs sb!vm:simple-fun-arglist-slot)))
+           (type (code-header-ref code (+ woffs sb!vm:simple-fun-type-slot))))
       ;; if the function's name conveys its args, don't show ARGS too
       (format stream ".~A ~S~:[~:A~;~]" 'entry name
               (and (typep name '(cons (eql lambda) (cons list)))
@@ -471,17 +461,17 @@
       (print-bytes (+ prefix-len alignment) stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
-;;; FIXE: This should be an FLET but it's too big to look at comfortably.
+;;; FIXME: This should be an FLET but it's too big to look at comfortably.
 (declaim (inline !sap-ref-dchunk))
 (defun !sap-ref-dchunk (sap byte-offset byte-order)
-  (declare (type sb!sys:system-area-pointer sap)
+  (declare (type system-area-pointer sap)
            (type offset byte-offset)
            (muffle-conditions compiler-note) ; returns possible bignum
            ;; Not all backends can actually disassemble for either byte order.
            (ignorable byte-order)
            (optimize (speed 3) (safety 0)))
   #!+x86-64
-  (logand (sb!sys:sap-ref-word sap byte-offset) dchunk-one)
+  (logand (sap-ref-word sap byte-offset) dchunk-one)
   #!-x86-64
   (the dchunk
     ;; Why all the noise with hand addition? I have no idea.
@@ -489,31 +479,31 @@
     ;; so probably this should just be SAP-REF-WORD.
        (ecase dchunk-bits
          (32 (if (eq byte-order :big-endian)
-                 (+ (ash (sb!sys:sap-ref-8 sap byte-offset) 24)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 8)
-                    (sb!sys:sap-ref-8 sap (+ 3 byte-offset)))
-                 (+ (sb!sys:sap-ref-8 sap byte-offset)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 8)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 24))))
+                 (+ (ash (sap-ref-8 sap byte-offset) 24)
+                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 16)
+                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 8)
+                    (sap-ref-8 sap (+ 3 byte-offset)))
+                 (+ (sap-ref-8 sap byte-offset)
+                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 8)
+                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 16)
+                    (ash (sap-ref-8 sap (+ 3 byte-offset)) 24))))
          (64 (if (eq byte-order :big-endian)
-                 (+ (ash (sb!sys:sap-ref-8 sap byte-offset) 56)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 48)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 40)
-                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 32)
-                    (ash (sb!sys:sap-ref-8 sap (+ 4 byte-offset)) 24)
-                    (ash (sb!sys:sap-ref-8 sap (+ 5 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 6 byte-offset)) 8)
-                    (sb!sys:sap-ref-8 sap (+ 7 byte-offset)))
-                 (+ (sb!sys:sap-ref-8 sap byte-offset)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 8)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 24)
-                    (ash (sb!sys:sap-ref-8 sap (+ 4 byte-offset)) 32)
-                    (ash (sb!sys:sap-ref-8 sap (+ 5 byte-offset)) 40)
-                    (ash (sb!sys:sap-ref-8 sap (+ 6 byte-offset)) 48)
-                    (ash (sb!sys:sap-ref-8 sap (+ 7 byte-offset)) 56)))))))
+                 (+ (ash (sap-ref-8 sap byte-offset) 56)
+                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 48)
+                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 40)
+                    (ash (sap-ref-8 sap (+ 3 byte-offset)) 32)
+                    (ash (sap-ref-8 sap (+ 4 byte-offset)) 24)
+                    (ash (sap-ref-8 sap (+ 5 byte-offset)) 16)
+                    (ash (sap-ref-8 sap (+ 6 byte-offset)) 8)
+                    (sap-ref-8 sap (+ 7 byte-offset)))
+                 (+ (sap-ref-8 sap byte-offset)
+                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 8)
+                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 16)
+                    (ash (sap-ref-8 sap (+ 3 byte-offset)) 24)
+                    (ash (sap-ref-8 sap (+ 4 byte-offset)) 32)
+                    (ash (sap-ref-8 sap (+ 5 byte-offset)) 40)
+                    (ash (sap-ref-8 sap (+ 6 byte-offset)) 48)
+                    (ash (sap-ref-8 sap (+ 7 byte-offset)) 56)))))))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
@@ -565,7 +555,7 @@
 
       (when (< (dstate-cur-offs dstate) data-end-offset)
         (when stream
-          (sb!sys:without-gcing
+          (without-gcing
            (format stream "~A  #x~v,'0x" '.word
                    (* 2 sb!vm:n-word-bytes)
                    (sap-ref-int (funcall (seg-sap-maker segment))
@@ -580,7 +570,7 @@
         ;; there is something to pin, whereas if you are passing a memory address then
         ;; you are either inside without-gcing anyway for this to be sensible at all,
         ;; or are disassembling foreign code.
-        (sb!sys:without-gcing
+        (without-gcing
          (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
@@ -593,11 +583,11 @@
                      ;; on the exact last page of your heap.
                      (if (< bytes-remaining (/ dchunk-bits 8))
                          (let* ((scratch-buf (dstate-scratch-buf dstate))
-                                (sap (sb!sys:vector-sap scratch-buf)))
+                                (sap (vector-sap scratch-buf)))
                            ;; We're inside a WITHOUT-GCING (up above).
                            ;; Otherwise, put (dstate-scratch-buf dstate) in WPO
                            (fill scratch-buf 0)
-                           (sb!kernel:system-area-ub8-copy
+                           (system-area-ub8-copy
                             (dstate-segment-sap dstate)
                             (dstate-cur-offs dstate)
                             sap 0 bytes-remaining)
@@ -997,7 +987,7 @@
     (let ((sap (dstate-segment-sap dstate))
           (start-offs (+ offset (dstate-cur-offs dstate))))
       (dotimes (offs num)
-        (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))
+        (format stream "~2,'0x" (sap-ref-8 sap (+ offs start-offs))))
       (when trailing-space
         (pad-inst-column stream num)))))
 
@@ -1012,7 +1002,7 @@
     (dotimes (offs num)
       (unless (zerop offs)
         (write-string ", " stream))
-      (format stream "#X~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))))
+      (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
 (defvar *default-dstate-hooks*
   (list*  #!-(or x86 x86-64) #'lra-hook nil))
@@ -1039,7 +1029,7 @@
 
 (defun add-fun-header-hooks (segment)
   (declare (type segment segment))
-  (do ((fun (awhen (seg-code segment) (sb!kernel:%code-entry-points it))
+  (do ((fun (awhen (seg-code segment) (%code-entry-points it))
             (fun-next fun))
        (length (seg-length segment)))
       ((null fun))
@@ -1066,36 +1056,36 @@
 (defun sap-maker (function input offset)
   (declare (optimize (speed 3))
            (muffle-conditions compiler-note)
-           (type (function (t) sb!sys:system-area-pointer) function)
+           (type (function (t) system-area-pointer) function)
            (type offset offset))
-  (let ((old-sap (sb!sys:sap+ (funcall function input) offset)))
-    (declare (type sb!sys:system-area-pointer old-sap))
+  (let ((old-sap (sap+ (funcall function input) offset)))
+    (declare (type system-area-pointer old-sap))
     (lambda ()
       (let ((new-addr
-             (+ (sb!sys:sap-int (funcall function input)) offset)))
+             (+ (sap-int (funcall function input)) offset)))
         ;; Saving the sap like this avoids consing except when the sap
         ;; changes (because the sap-int, arith, etc., get inlined).
         (declare (type address new-addr))
-        (if (= (sb!sys:sap-int old-sap) new-addr)
+        (if (= (sap-int old-sap) new-addr)
             old-sap
-            (setf old-sap (sb!sys:int-sap new-addr)))))))
+            (setf old-sap (int-sap new-addr)))))))
 
 (defun vector-sap-maker (vector offset)
   (declare (optimize (speed 3))
            (type offset offset))
-  (sap-maker #'sb!sys:vector-sap vector offset))
+  (sap-maker #'vector-sap vector offset))
 
 (defun code-sap-maker (code offset)
   (declare (optimize (speed 3))
-           (type sb!kernel:code-component code)
+           (type code-component code)
            (type offset offset))
-  (sap-maker #'sb!kernel:code-instructions code offset))
+  (sap-maker #'code-instructions code offset))
 
 (defun memory-sap-maker (address)
   (declare (optimize (speed 3))
            (muffle-conditions compiler-note)
            (type address address))
-  (let ((sap (sb!sys:int-sap address)))
+  (let ((sap (int-sap address)))
     (lambda () sap)))
 
 (defstruct (source-form-cache (:conc-name sfcache-)
@@ -1117,7 +1107,7 @@
                      code virtual-location
                      debug-fun source-form-cache
                      hooks)
-  (declare (type (function () sb!sys:system-area-pointer) sap-maker)
+  (declare (type (function () system-area-pointer) sap-maker)
            (type disassem-length length)
            (type (or null address) virtual-location)
            (type (or null sb!di:debug-fun) debug-fun)
@@ -1127,13 +1117,13 @@
            :sap-maker sap-maker
            :length length
            :virtual-location (or virtual-location
-                                 (sb!sys:sap-int (funcall sap-maker)))
+                                 (sap-int (funcall sap-maker)))
            :hooks hooks
            :code code
            :unboxed-data-range
            (and code
-                (let ((n-words (sb!kernel:code-n-unboxed-data-words code))
-                      (start (sb!kernel:code-header-words code)))
+                (let ((n-words (code-n-unboxed-data-words code))
+                      (start (code-header-words code)))
                   (and (plusp n-words)
                        (cons (* sb!vm:n-word-bytes start)
                              (* sb!vm:n-word-bytes (+ start n-words)))))))))
@@ -1148,7 +1138,7 @@
   (apply #'make-segment (vector-sap-maker vector offset) args))
 
 (defun make-code-segment (code offset length &rest args)
-  (declare (type sb!kernel:code-component code)
+  (declare (type code-component code)
            (type offset offset)
            (inline make-segment))
   (apply #'make-segment (code-sap-maker code offset) length :code code args))
@@ -1162,20 +1152,18 @@
 (defun print-fun-headers (function)
   (declare (type compiled-function function))
   (let* ((self (fun-self function))
-         (code (sb!kernel:fun-code-header self)))
-    (format t "Code-header ~S: size: ~S~%"
-            code
-            (sb!kernel:%code-code-size code))
-    (do ((fun (sb!kernel:%code-entry-points code) (sb!kernel:%simple-fun-next fun)))
+         (code (fun-code-header self)))
+    (format t "Code-header ~S: size: ~S~%" code (%code-code-size code))
+    (do ((fun (%code-entry-points code) (%simple-fun-next fun)))
         ((null fun))
         ;; There is function header fun-offset words from the
         ;; code header.
       (format t "Fun-header ~S at offset ~W (words):~% ~S ~A => ~S~%"
               fun
-              (sb!kernel:get-closure-length fun)
-              (sb!kernel:%simple-fun-name fun)
-              (sb!kernel:%simple-fun-arglist fun)
-              (sb!kernel:%simple-fun-type fun)))))
+              (get-closure-length fun)
+              (%simple-fun-name fun)
+              (%simple-fun-arglist fun)
+              (%simple-fun-type fun)))))
 
 ;;; getting at the source code...
 
@@ -1204,8 +1192,8 @@
 ;;;; stuff to use debugging info to augment the disassembly
 
 (defun code-fun-map (code)
-  (declare (type sb!kernel:code-component code))
-  (sb!c::compiled-debug-info-fun-map (sb!kernel:%code-debug-info code)))
+  (declare (type code-component code))
+  (sb!c::compiled-debug-info-fun-map (%code-debug-info code)))
 
 (defstruct (location-group (:copier nil) (:predicate nil))
   ;; This was (VECTOR (OR LIST FIXNUM)) but that doesn't have any
@@ -1451,7 +1439,7 @@
   (let* ((function (fun-self function))
          (code (fun-code function))
          (fun-map (code-fun-map code))
-         (fname (sb!kernel:%simple-fun-name function))
+         (fname (%simple-fun-name function))
          (sfcache (make-source-form-cache)))
     (let ((first-block-seen-p nil)
           (nil-block-seen-p nil)
@@ -1514,11 +1502,11 @@
                           &optional
                           (start-offset 0)
                           (length (code-inst-area-length code)))
-  (declare (type sb!kernel:code-component code)
+  (declare (type code-component code)
            (type offset start-offset)
            (type disassem-length length))
   (let ((segments nil))
-    (when (sb!kernel:%code-debug-info code)
+    (when (%code-debug-info code)
       (let ((fun-map (code-fun-map code))
             (sfcache (make-source-form-cache)))
         (let ((last-offset 0)
@@ -1679,7 +1667,7 @@
            (type (or (member t) stream) stream)
            (type (member t nil) use-labels))
   (flet ((disassemble1 (fun)
-           (format stream "~&; disassembly for ~S" (sb!kernel:%fun-name fun))
+           (format stream "~&; disassembly for ~S" (%fun-name fun))
            (disassemble-fun fun
                             :stream stream
                             :use-labels use-labels)))
@@ -1696,22 +1684,22 @@
                            (stream *standard-output*)
                            code-component
                            (use-labels t))
-  (declare (type (or address sb!sys:system-area-pointer) address)
+  (declare (type (or address system-area-pointer) address)
            (type disassem-length length)
            (type stream stream)
-           (type (or null sb!kernel:code-component) code-component)
+           (type (or null code-component) code-component)
            (type (member t nil) use-labels))
   (let* ((address
-          (if (sb!sys:system-area-pointer-p address)
-              (sb!sys:sap-int address)
+          (if (system-area-pointer-p address)
+              (sap-int address)
               address))
          (dstate (make-dstate))
          (segments
           (if code-component
               (let ((code-offs
                      (- address
-                        (sb!sys:sap-int
-                         (sb!kernel:code-instructions code-component)))))
+                        (sap-int
+                         (code-instructions code-component)))))
                 (when (or (< code-offs 0)
                           (> code-offs (code-inst-area-length code-component)))
                   (error "address ~X not in the code component ~S"
@@ -1727,7 +1715,7 @@
 (defun disassemble-code-component (code-component &key
                                                   (stream *standard-output*)
                                                   (use-labels t))
-  (declare (type (or sb!kernel:code-component compiled-function)
+  (declare (type (or code-component compiled-function)
                  code-component)
            (type stream stream)
            (type (member t nil) use-labels))
@@ -1786,7 +1774,7 @@
                (slot-offset (words-to-bytes (car field)))
                (maybe-symbol-addr (- address slot-offset))
                (maybe-symbol
-                (sb!kernel:make-lisp-obj
+                (make-lisp-obj
                  (+ maybe-symbol-addr sb!vm:other-pointer-lowtag))))
           (when (symbolp maybe-symbol)
             (return (values maybe-symbol (cdr field))))))))
@@ -1802,7 +1790,7 @@
 ;;; Return the Lisp object located BYTE-OFFSET from NIL.
 (defun get-nil-indexed-object (byte-offset)
   (declare (type offset byte-offset))
-  (sb!kernel:make-lisp-obj (+ sb!vm::nil-value byte-offset)))
+  (make-lisp-obj (+ sb!vm::nil-value byte-offset)))
 
 ;;; Return two values; the Lisp object located at BYTE-OFFSET in the
 ;;; constant area of the code-object in the current segment and T, or
@@ -1812,12 +1800,10 @@
            (type disassem-state dstate))
   (let ((code (seg-code (dstate-segment dstate))))
     (if code
-        (values
-         (sb!kernel:code-header-ref code
-                                    (ash (+ byte-offset
-                                            sb!vm:other-pointer-lowtag)
-                                         (- sb!vm:word-shift)))
-         t)
+        (values (code-header-ref code
+                                 (ash (+ byte-offset sb!vm:other-pointer-lowtag)
+                                      (- sb!vm:word-shift)))
+                t)
         (values nil nil))))
 
 (defun get-code-constant-absolute (addr dstate &optional width)
@@ -1832,13 +1818,13 @@
     ;; Since ADDR comes in as absolute, CODE must not move between the caller's
     ;; computation and the comparison below. But we're already in WITHOUT-GCING
     ;; in MAP-SEGMENT-INSTRUCTIONS, so, who cares, I guess?
-    (sb!sys:without-gcing
-     (let* ((n-header-bytes (* (sb!kernel:code-header-words code) sb!vm:n-word-bytes))
-            (header-addr (- (sb!kernel:get-lisp-obj-address code)
+    (without-gcing
+     (let* ((n-header-bytes (* (code-header-words code) sb!vm:n-word-bytes))
+            (header-addr (- (get-lisp-obj-address code)
                             sb!vm:other-pointer-lowtag))
             (code-start (+ header-addr n-header-bytes)))
          (cond ((< header-addr addr code-start)
-                (values (sb!sys:sap-ref-lispobj (sb!sys:int-sap addr) 0) t))
+                (values (sap-ref-lispobj (int-sap addr) 0) t))
                (t
                 (values nil nil)))))))
 
@@ -1860,7 +1846,7 @@
           (invert-address-hash sb!fasl:*assembler-routines*))
     #!-sb-dynamic-core
     (setf *assembler-routines-by-addr*
-          (invert-address-hash sb!sys:*static-foreign-symbols*
+          (invert-address-hash *static-foreign-symbols*
                                *assembler-routines-by-addr*))
     (loop for static in sb!vm:*static-funs*
           for address = (+ sb!vm::nil-value
@@ -1879,45 +1865,45 @@
 #!-sb-fluid (declaim (maybe-inline sap-ref-int read-suffix))
 
 (defun sap-ref-int (sap offset length byte-order)
-  (declare (type sb!sys:system-area-pointer sap)
+  (declare (type system-area-pointer sap)
            (type (unsigned-byte 16) offset)
            (type (member 1 2 4 8) length)
            (type (member :little-endian :big-endian) byte-order)
            (muffle-conditions compiler-note) ; integer coercion, oh well
            (optimize (speed 3) (safety 0)))
   (ecase length
-    (1 (sb!sys:sap-ref-8 sap offset))
+    (1 (sap-ref-8 sap offset))
     (2 (if (eq byte-order :big-endian)
-           (+ (ash (sb!sys:sap-ref-8 sap offset) 8)
-              (sb!sys:sap-ref-8 sap (+ offset 1)))
-           (+ (ash (sb!sys:sap-ref-8 sap (+ offset 1)) 8)
-              (sb!sys:sap-ref-8 sap offset))))
+           (+ (ash (sap-ref-8 sap offset) 8)
+              (sap-ref-8 sap (+ offset 1)))
+           (+ (ash (sap-ref-8 sap (+ offset 1)) 8)
+              (sap-ref-8 sap offset))))
     (4 (if (eq byte-order :big-endian)
-           (+ (ash (sb!sys:sap-ref-8 sap offset) 24)
-              (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 16)
-              (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 8)
-              (sb!sys:sap-ref-8 sap (+ 3 offset)))
-           (+ (sb!sys:sap-ref-8 sap offset)
-              (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 8)
-              (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 16)
-              (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 24))))
+           (+ (ash (sap-ref-8 sap offset) 24)
+              (ash (sap-ref-8 sap (+ 1 offset)) 16)
+              (ash (sap-ref-8 sap (+ 2 offset)) 8)
+              (sap-ref-8 sap (+ 3 offset)))
+           (+ (sap-ref-8 sap offset)
+              (ash (sap-ref-8 sap (+ 1 offset)) 8)
+              (ash (sap-ref-8 sap (+ 2 offset)) 16)
+              (ash (sap-ref-8 sap (+ 3 offset)) 24))))
     (8 (if (eq byte-order :big-endian)
-           (+ (ash (sb!sys:sap-ref-8 sap offset) 56)
-              (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 48)
-              (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 40)
-              (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 32)
-              (ash (sb!sys:sap-ref-8 sap (+ 4 offset)) 24)
-              (ash (sb!sys:sap-ref-8 sap (+ 5 offset)) 16)
-              (ash (sb!sys:sap-ref-8 sap (+ 6 offset)) 8)
-              (sb!sys:sap-ref-8 sap (+ 7 offset)))
-           (+ (sb!sys:sap-ref-8 sap offset)
-              (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 8)
-              (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 16)
-              (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 24)
-              (ash (sb!sys:sap-ref-8 sap (+ 4 offset)) 32)
-              (ash (sb!sys:sap-ref-8 sap (+ 5 offset)) 40)
-              (ash (sb!sys:sap-ref-8 sap (+ 6 offset)) 48)
-              (ash (sb!sys:sap-ref-8 sap (+ 7 offset)) 56))))))
+           (+ (ash (sap-ref-8 sap offset) 56)
+              (ash (sap-ref-8 sap (+ 1 offset)) 48)
+              (ash (sap-ref-8 sap (+ 2 offset)) 40)
+              (ash (sap-ref-8 sap (+ 3 offset)) 32)
+              (ash (sap-ref-8 sap (+ 4 offset)) 24)
+              (ash (sap-ref-8 sap (+ 5 offset)) 16)
+              (ash (sap-ref-8 sap (+ 6 offset)) 8)
+              (sap-ref-8 sap (+ 7 offset)))
+           (+ (sap-ref-8 sap offset)
+              (ash (sap-ref-8 sap (+ 1 offset)) 8)
+              (ash (sap-ref-8 sap (+ 2 offset)) 16)
+              (ash (sap-ref-8 sap (+ 3 offset)) 24)
+              (ash (sap-ref-8 sap (+ 4 offset)) 32)
+              (ash (sap-ref-8 sap (+ 5 offset)) 40)
+              (ash (sap-ref-8 sap (+ 6 offset)) 48)
+              (ash (sap-ref-8 sap (+ 7 offset)) 56))))))
 
 (defun read-suffix (length dstate)
   (declare (type (member 8 16 32 64) length)
@@ -2024,7 +2010,7 @@
   (let ((name (or
                (find-assembler-routine address)
                #!+linkage-table
-               (sb!sys:sap-foreign-symbol (sb!sys:int-sap address)))))
+               (sap-foreign-symbol (int-sap address)))))
     (unless (null name)
       (note (lambda (stream)
               (if note-address-p
@@ -2078,7 +2064,7 @@
 
 (defun maybe-note-static-symbol (offset dstate)
   (dolist (symbol sb!vm:*static-symbols*)
-    (when (= (sb!kernel:get-lisp-obj-address symbol) offset)
+    (when (= (get-lisp-obj-address symbol) offset)
       (return (note (lambda (s) (prin1 symbol s)) dstate)))))
 
 (defun get-internal-error-name (errnum)
@@ -2149,10 +2135,10 @@
 ;;; But probably we should just add the conditionalization in here.
 #!-arm64
 (defun snarf-error-junk (sap offset &optional length-only)
-  (let* ((error-number (sb!sys:sap-ref-8 sap offset))
+  (let* ((error-number (sap-ref-8 sap offset))
          (length (sb!kernel::error-length error-number))
          (index (1+ offset)))
-    (declare (type sb!sys:system-area-pointer sap)
+    (declare (type system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
            (loop repeat length do (sb!c:sap-read-var-integerf sap index))

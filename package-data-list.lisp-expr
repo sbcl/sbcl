@@ -498,7 +498,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
    #s(sb-cold:package-data
       :name "SB!DISASSEM"
       :doc "private: stuff related to the implementation of the disassembler"
-      :use ("CL" "SB!EXT" "SB!INT")
+      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL")
       :export ("*DISASSEM-INST-ALIGNMENT-BYTES*"
                "*DISASSEM-NOTE-COLUMN*" "*DISASSEM-OPCODE-COLUMN-WIDTH*"
                "*DISASSEM-LOCATION-COLUMN-WIDTH*"
@@ -2712,8 +2712,7 @@ SB-KERNEL) have been undone, but probably more remain."
                "WITH-INTERRUPTS" "WITH-LOCAL-INTERRUPTS"
                "WITH-PINNED-OBJECTS" "WITHOUT-GCING"
                "WITHOUT-INTERRUPTS"
-               "WITH-INTERRUPT-BINDINGS"
-               "WORDS"))
+               "WITH-INTERRUPT-BINDINGS"))
 
    #s(sb-cold:package-data
       :name "SB!UNICODE"
