@@ -1166,21 +1166,16 @@
     (format t "Code-header ~S: size: ~S~%"
             code
             (sb!kernel:%code-code-size code))
-    (do ((fun (sb!kernel:code-header-ref code sb!vm:code-entry-points-slot)
-              (fun-next fun)))
+    (do ((fun (sb!kernel:%code-entry-points code) (sb!kernel:%simple-fun-next fun)))
         ((null fun))
-      (let ((fun-offset (sb!kernel:get-closure-length fun)))
         ;; There is function header fun-offset words from the
         ;; code header.
-        (format t "Fun-header ~S at offset ~W (words): ~S~A => ~S~%"
-                fun
-                fun-offset
-                (sb!kernel:code-header-ref
-                 code (+ fun-offset sb!vm:simple-fun-name-slot))
-                (sb!kernel:code-header-ref
-                 code (+ fun-offset sb!vm:simple-fun-arglist-slot))
-                (sb!kernel:code-header-ref
-                 code (+ fun-offset sb!vm:simple-fun-type-slot)))))))
+      (format t "Fun-header ~S at offset ~W (words):~% ~S ~A => ~S~%"
+              fun
+              (sb!kernel:get-closure-length fun)
+              (sb!kernel:%simple-fun-name fun)
+              (sb!kernel:%simple-fun-arglist fun)
+              (sb!kernel:%simple-fun-type fun)))))
 
 ;;; getting at the source code...
 
