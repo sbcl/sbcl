@@ -290,15 +290,20 @@
           (merge 'list (list (cons width signedp)) (modular-class-widths class)
                  #'< :key #'car))))
 
-(defmacro define-modular-fun (name lambda-list prototype kind signedp width)
+(defun %check-modular-fun-macro-arguments
+    (name kind &optional (lambda-list nil lambda-list-p))
   (check-type name symbol)
-  (check-type prototype symbol)
   (check-type kind (member :untagged :tagged))
+  (when lambda-list-p
+    (dolist (arg lambda-list)
+      (when (member arg sb!xc:lambda-list-keywords)
+        (error "Lambda list keyword ~S is not supported for modular ~
+                function lambda lists." arg)))))
+
+(defmacro define-modular-fun (name lambda-list prototype kind signedp width)
+  (%check-modular-fun-macro-arguments name kind lambda-list)
+  (check-type prototype symbol)
   (check-type width unsigned-byte)
-  (dolist (arg lambda-list)
-    (when (member arg sb!xc:lambda-list-keywords)
-      (error "Lambda list keyword ~S is not supported for ~
-              modular function lambda lists." arg)))
   `(progn
      (%define-modular-fun ',name ',lambda-list ',prototype ',kind ',signedp ,width)
      (defknown ,name ,(mapcar (constantly 'integer) lambda-list)
@@ -315,19 +320,13 @@
   name)
 
 (defmacro define-good-modular-fun (name kind signedp)
-  (check-type name symbol)
-  (check-type kind (member :untagged :tagged))
+  (%check-modular-fun-macro-arguments name kind)
   `(%define-good-modular-fun ',name ',kind ',signedp))
 
 (defmacro define-modular-fun-optimizer
     (name ((&rest lambda-list) kind signedp &key (width (gensym "WIDTH")))
      &body body)
-  (check-type name symbol)
-  (check-type kind (member :untagged :tagged))
-  (dolist (arg lambda-list)
-    (when (member arg sb!xc:lambda-list-keywords)
-      (error "Lambda list keyword ~S is not supported for ~
-              modular function lambda lists." arg)))
+  (%check-modular-fun-macro-arguments name kind lambda-list)
   (with-unique-names (call args)
     `(setf (gethash ',name (modular-class-funs (find-modular-class ',kind ',signedp)))
            (lambda (,call ,width)
