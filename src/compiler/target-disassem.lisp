@@ -1791,20 +1791,18 @@
           (when (symbolp maybe-symbol)
             (return (values maybe-symbol (cdr field))))))))
 
-(defvar *address-of-nil-object* (sb!kernel:get-lisp-obj-address nil))
-
 ;;; Given a BYTE-OFFSET from NIL, try and figure out which slot of
 ;;; which symbol is being referred to. Of course we can just give up,
 ;;; so it's not a big deal... Return two values, the symbol and the
 ;;; access function.
 (defun grok-nil-indexed-symbol-slot-ref (byte-offset)
   (declare (type offset byte-offset))
-  (grok-symbol-slot-ref (+ *address-of-nil-object* byte-offset)))
+  (grok-symbol-slot-ref (+ sb!vm::nil-value byte-offset)))
 
 ;;; Return the Lisp object located BYTE-OFFSET from NIL.
 (defun get-nil-indexed-object (byte-offset)
   (declare (type offset byte-offset))
-  (sb!kernel:make-lisp-obj (+ *address-of-nil-object* byte-offset)))
+  (sb!kernel:make-lisp-obj (+ sb!vm::nil-value byte-offset)))
 
 ;;; Return two values; the Lisp object located at BYTE-OFFSET in the
 ;;; constant area of the code-object in the current segment and T, or
