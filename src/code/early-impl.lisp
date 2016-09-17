@@ -48,17 +48,6 @@
                   *free-interrupt-context-index*
                   sb!vm::*allocation-pointer*
                   sb!vm::*binding-stack-pointer*
-                  sb!vm::*fp-constant-0d0*
-                  sb!vm::*fp-constant-1d0*
-                  sb!vm::*fp-constant-0f0*
-                  sb!vm::*fp-constant-1f0*
-                  sb!vm::*fp-constant-0l0*
-                  sb!vm::*fp-constant-1l0*
-                  sb!vm::*fp-constant-pi*
-                  sb!vm::*fp-constant-l2t*
-                  sb!vm::*fp-constant-l2e*
-                  sb!vm::*fp-constant-lg2*
-                  sb!vm::*fp-constant-ln2*
                   sb!pcl::..slot-unbound..
                   sb!pcl::*cache-miss-values-stack*
                   sb!pcl::*dfun-miss-gfs-on-stack*))

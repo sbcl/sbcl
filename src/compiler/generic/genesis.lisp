@@ -1714,7 +1714,7 @@ core and return a descriptor to it."
 
   (cold-set '*!initial-debug-sources* *current-debug-sources*)
 
-  #!+(or x86 x86-64)
+  #!+x86
   (progn
     (cold-set 'sb!vm::*fp-constant-0d0* (number-to-core 0d0))
     (cold-set 'sb!vm::*fp-constant-1d0* (number-to-core 1d0))
