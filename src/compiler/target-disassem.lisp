@@ -591,15 +591,16 @@
                      ;; on a function whose code ends in pad bytes that are not an integral
                      ;; number of instructions, and maybe you're so unlucky as to be
                      ;; on the exact last page of your heap.
-                     (if (< bytes-remaining (ash dchunk-bits -8))
+                     (if (< bytes-remaining (/ dchunk-bits 8))
                          (let* ((scratch-buf (dstate-scratch-buf dstate))
-                                (sap (vector-sap scratch-buf)))
+                                (sap (sb!sys:vector-sap scratch-buf)))
                            ;; We're inside a WITHOUT-GCING (up above).
                            ;; Otherwise, put (dstate-scratch-buf dstate) in WPO
                            (fill scratch-buf 0)
-                           (system-area-ub8-copy (dstate-segment-sap dstate)
-                                                 (dstate-cur-offs dstate)
-                                                 sap 0 bytes-remaining)
+                           (sb!kernel:system-area-ub8-copy
+                            (dstate-segment-sap dstate)
+                            (dstate-cur-offs dstate)
+                            sap 0 bytes-remaining)
                            (values sap 0))
                          (values (dstate-segment-sap dstate)
                                  (dstate-cur-offs dstate)))
