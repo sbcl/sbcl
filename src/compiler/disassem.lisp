@@ -78,7 +78,6 @@
 #!-sb-fluid
 (declaim (inline dchunk-or dchunk-and dchunk-clear dchunk-not
                  dchunk-make-mask dchunk-make-field
-                 sap-ref-dchunk
                  dchunk-extract
                  dchunk=
                  dchunk-count-bits))
@@ -135,46 +134,6 @@
 
 (defmacro make-dchunk (value)
   `(the dchunk ,value))
-
-#-sb-xc-host ;; FIXME: function belongs in 'target-disassem'
-(defun sap-ref-dchunk (sap byte-offset byte-order)
-  (declare (type sb!sys:system-area-pointer sap)
-           (type offset byte-offset)
-           (muffle-conditions compiler-note) ; returns possible bignum
-           ;; Not all backends can actually disassemble for either byte order.
-           (ignorable byte-order)
-           (optimize (speed 3) (safety 0)))
-  #!+x86-64
-  (logand (sb!sys:sap-ref-word sap byte-offset) dchunk-one)
-  #!-x86-64
-  (the dchunk
-       (ecase dchunk-bits
-         (32 (if (eq byte-order :big-endian)
-                 (+ (ash (sb!sys:sap-ref-8 sap byte-offset) 24)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 8)
-                    (sb!sys:sap-ref-8 sap (+ 3 byte-offset)))
-                 (+ (sb!sys:sap-ref-8 sap byte-offset)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 8)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 24))))
-         (64 (if (eq byte-order :big-endian)
-                 (+ (ash (sb!sys:sap-ref-8 sap byte-offset) 56)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 48)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 40)
-                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 32)
-                    (ash (sb!sys:sap-ref-8 sap (+ 4 byte-offset)) 24)
-                    (ash (sb!sys:sap-ref-8 sap (+ 5 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 6 byte-offset)) 8)
-                    (sb!sys:sap-ref-8 sap (+ 7 byte-offset)))
-                 (+ (sb!sys:sap-ref-8 sap byte-offset)
-                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 8)
-                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 16)
-                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 24)
-                    (ash (sb!sys:sap-ref-8 sap (+ 4 byte-offset)) 32)
-                    (ash (sb!sys:sap-ref-8 sap (+ 5 byte-offset)) 40)
-                    (ash (sb!sys:sap-ref-8 sap (+ 6 byte-offset)) 48)
-                    (ash (sb!sys:sap-ref-8 sap (+ 7 byte-offset)) 56)))))))
 
 (defun dchunk-corrected-extract (from pos unit-bits byte-order)
   (declare (type dchunk from))
@@ -1078,6 +1037,9 @@
   (segment-sap nil :type (or null sb!sys:system-area-pointer))
   ;; the current segment
   (segment nil :type (or null segment))
+  ;; to avoid buffer overrun at segment end, we might need to copy bytes
+  ;; here first because sap-ref-dchunk reads a fixed length.
+  (scratch-buf (make-array 8 :element-type '(unsigned-byte 8)))
   ;; what to align to in most cases
   (alignment sb!vm:n-word-bytes :type alignment)
   (byte-order :little-endian

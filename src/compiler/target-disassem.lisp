@@ -233,7 +233,7 @@
 ;;; LRA layout (dual word aligned):
 ;;;     header-word
 
-#!-sb-fluid (declaim (inline words-to-bytes bytes-to-words))
+#!-sb-fluid (declaim (inline words-to-bytes))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;;; Convert a word-offset NUM to a byte-offset.
@@ -241,11 +241,6 @@
     (declare (type offset num))
     (ash num sb!vm:word-shift))
   ) ; EVAL-WHEN
-
-;;; Convert a byte-offset NUM to a word-offset.
-(defun bytes-to-words (num)
-  (declare (type offset num))
-  (ash num (- sb!vm:word-shift)))
 
 (defconstant lra-size (words-to-bytes 1))
 
@@ -360,8 +355,8 @@
     (let* ((seg (dstate-segment dstate))
            (code (seg-code seg))
            (woffs
-            (bytes-to-words
-             (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)))
+            (ash (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)
+                 (- sb!vm:word-shift))) ; bytes -> words
            (name
             (sb!kernel:code-header-ref code
                                        (+ woffs
@@ -476,6 +471,50 @@
       (print-bytes (+ prefix-len alignment) stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
+;;; FIXE: This should be an FLET but it's too big to look at comfortably.
+(declaim (inline !sap-ref-dchunk))
+(defun !sap-ref-dchunk (sap byte-offset byte-order)
+  (declare (type sb!sys:system-area-pointer sap)
+           (type offset byte-offset)
+           (muffle-conditions compiler-note) ; returns possible bignum
+           ;; Not all backends can actually disassemble for either byte order.
+           (ignorable byte-order)
+           (optimize (speed 3) (safety 0)))
+  #!+x86-64
+  (logand (sb!sys:sap-ref-word sap byte-offset) dchunk-one)
+  #!-x86-64
+  (the dchunk
+    ;; Why all the noise with hand addition? I have no idea.
+    ;; The target can only disassemble its own instruction set + byte order,
+    ;; so probably this should just be SAP-REF-WORD.
+       (ecase dchunk-bits
+         (32 (if (eq byte-order :big-endian)
+                 (+ (ash (sb!sys:sap-ref-8 sap byte-offset) 24)
+                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 16)
+                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 8)
+                    (sb!sys:sap-ref-8 sap (+ 3 byte-offset)))
+                 (+ (sb!sys:sap-ref-8 sap byte-offset)
+                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 8)
+                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 16)
+                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 24))))
+         (64 (if (eq byte-order :big-endian)
+                 (+ (ash (sb!sys:sap-ref-8 sap byte-offset) 56)
+                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 48)
+                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 40)
+                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 32)
+                    (ash (sb!sys:sap-ref-8 sap (+ 4 byte-offset)) 24)
+                    (ash (sb!sys:sap-ref-8 sap (+ 5 byte-offset)) 16)
+                    (ash (sb!sys:sap-ref-8 sap (+ 6 byte-offset)) 8)
+                    (sb!sys:sap-ref-8 sap (+ 7 byte-offset)))
+                 (+ (sb!sys:sap-ref-8 sap byte-offset)
+                    (ash (sb!sys:sap-ref-8 sap (+ 1 byte-offset)) 8)
+                    (ash (sb!sys:sap-ref-8 sap (+ 2 byte-offset)) 16)
+                    (ash (sb!sys:sap-ref-8 sap (+ 3 byte-offset)) 24)
+                    (ash (sb!sys:sap-ref-8 sap (+ 4 byte-offset)) 32)
+                    (ash (sb!sys:sap-ref-8 sap (+ 5 byte-offset)) 40)
+                    (ash (sb!sys:sap-ref-8 sap (+ 6 byte-offset)) 48)
+                    (ash (sb!sys:sap-ref-8 sap (+ 7 byte-offset)) 56)))))))
+
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
 ;;; Additionally, unless STREAM is NIL, several items are output to it:
@@ -525,24 +564,46 @@
       (call-offs-hooks nil stream dstate)
 
       (when (< (dstate-cur-offs dstate) data-end-offset)
-        (sb!sys:without-gcing
-         (format stream "~A  #x~v,'0x" '.word
-                 (* 2 sb!vm:n-word-bytes)
-                 (sap-ref-int (funcall (seg-sap-maker segment))
-                              (dstate-cur-offs dstate)
-                              sb!vm:n-word-bytes
-                              (dstate-byte-order dstate))))
+        (when stream
+          (sb!sys:without-gcing
+           (format stream "~A  #x~v,'0x" '.word
+                   (* 2 sb!vm:n-word-bytes)
+                   (sap-ref-int (funcall (seg-sap-maker segment))
+                                (dstate-cur-offs dstate)
+                                sb!vm:n-word-bytes
+                                (dstate-byte-order dstate)))))
         (setf (dstate-next-offs dstate)
               (+ (dstate-cur-offs dstate) sb!vm:n-word-bytes)))
 
       (unless (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
+        ;; FIXME: this can probably be WITH-PINNED-OBJECTS. For octet vectors and code
+        ;; there is something to pin, whereas if you are passing a memory address then
+        ;; you are either inside without-gcing anyway for this to be sensible at all,
+        ;; or are disassembling foreign code.
         (sb!sys:without-gcing
          (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
-         (let* ((chunk
-                 (sap-ref-dchunk (dstate-segment-sap dstate)
-                                 (dstate-cur-offs dstate)
-                                 (dstate-byte-order dstate)))
+         (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
+                                    (dstate-cur-offs dstate)))
+                (chunk
+                 (multiple-value-bind (sap offset)
+                     ;; Don't read beyond the segment. This can occur with DISASSEMBLE-MEMORY
+                     ;; on a function whose code ends in pad bytes that are not an integral
+                     ;; number of instructions, and maybe you're so unlucky as to be
+                     ;; on the exact last page of your heap.
+                     (if (< bytes-remaining (ash dchunk-bits -8))
+                         (let* ((scratch-buf (dstate-scratch-buf dstate))
+                                (sap (vector-sap scratch-buf)))
+                           ;; We're inside a WITHOUT-GCING (up above).
+                           ;; Otherwise, put (dstate-scratch-buf dstate) in WPO
+                           (fill scratch-buf 0)
+                           (system-area-ub8-copy (dstate-segment-sap dstate)
+                                                 (dstate-cur-offs dstate)
+                                                 sap 0 bytes-remaining)
+                           (values sap 0))
+                         (values (dstate-segment-sap dstate)
+                                 (dstate-cur-offs dstate)))
+                   (!sap-ref-dchunk sap offset (dstate-byte-order dstate))))
                 (fun-prefix-p (call-fun-hooks chunk stream dstate)))
            (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
                (setf prefix-p fun-prefix-p)
@@ -550,6 +611,16 @@
                  (cond ((null inst)
                         (handle-bogus-instruction stream dstate prefix-len)
                         (setf prefix-p nil))
+                       ;; On x86, the pad bytes at the end of a simple-fun
+                       ;; decode as "ADD [RAX], AL" if there are 2 bytes,
+                       ;; but if there's only 1 byte, it should show "BYTE 0".
+                       ;; There's really nothing we can do about the former.
+                       ((> (inst-length inst) bytes-remaining)
+                        (when stream
+                          (print-inst bytes-remaining stream dstate)
+                          (print-bytes bytes-remaining stream dstate)
+                          (terpri stream))
+                        (return))
                        (t
                         (setf (dstate-next-offs dstate)
                               (+ (dstate-cur-offs dstate)
@@ -941,33 +1012,6 @@
       (unless (zerop offs)
         (write-string ", " stream))
       (format stream "#X~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))))
-
-;;; Disassemble NUM machine-words to STREAM as simple `WORD' instructions.
-(defun print-words (num stream dstate)
-  (declare (type offset num)
-           (type stream stream)
-           (type disassem-state dstate))
-  (format stream "~A~Vt" 'WORD (dstate-argument-column dstate))
-  (let ((sap (dstate-segment-sap dstate))
-        (start-offs (dstate-cur-offs dstate))
-        (byte-order (dstate-byte-order dstate)))
-    (dotimes (word-offs num)
-      (unless (zerop word-offs)
-        (write-string ", " stream))
-      (let ((word 0) (bit-shift 0))
-        (dotimes (byte-offs sb!vm:n-word-bytes)
-          (let ((byte
-                 (sb!sys:sap-ref-8
-                        sap
-                        (+ start-offs
-                           (* word-offs sb!vm:n-word-bytes)
-                           byte-offs))))
-            (setf word
-                  (if (eq byte-order :big-endian)
-                      (+ (ash word sb!vm:n-byte-bits) byte)
-                      (+ word (ash byte bit-shift))))
-            (incf bit-shift sb!vm:n-byte-bits)))
-        (format stream "#X~V,'0X" (ash sb!vm:n-word-bits -2) word)))))
 
 (defvar *default-dstate-hooks*
   (list*  #!-(or x86 x86-64) #'lra-hook nil))
