@@ -116,12 +116,14 @@
            (push (cons fun unpacked) all-unpacked))))
 
       ;; Update **MOST-COMMON-XREF-NAMES-BY-{INDEX,NAME}**.
-      (let ((new-names (subseq (mapcar #'car (stable-sort counts #'> :key #'cdr))
-                               0 compact-name-count)))
+      (let* ((sorted-names (mapcar #'car (stable-sort counts #'> :key #'cdr)))
+             (new-names (subseq sorted-names 0 (min (length sorted-names)
+                                                    compact-name-count))))
         (when verbose
           (format t "; Updating most frequently cross-referenced names~%")
           (pprint-logical-block (*standard-output* new-names :per-line-prefix ";   ")
-            (format t "~{~/sb-impl:print-symbol-with-prefix/~^ ~:_~}"
+            (format t "~:[no cross references~;~:*~
+                       ~{~/sb-impl:print-symbol-with-prefix/~^ ~:_~}~]"
                     (coerce new-names 'list)))
           (terpri))
         (setf **most-common-xref-names-by-index** (coerce new-names 'vector))
