@@ -383,7 +383,11 @@ catch_exception_raise(mach_port_t exception_port,
     struct thread *th;
 
     FSHOW((stderr,"/entering catch_exception_raise with exception: %d\n", exception));
-    th = *(struct thread**)exception_port;
+
+    if (mach_port_get_context(mach_task_self(), exception_port, &th) != KERN_SUCCESS) {
+      lose("Can't find the thread for an exception %p", exception_port);
+    }
+
     /* Get state and info */
     state_count = x86_THREAD_STATE32_COUNT;
     if ((ret = thread_get_state(thread,

@@ -10,6 +10,8 @@ changes in sbcl-1.3.9:
   * bug fix: correctly handle the case of a non-local exit within a function
     terminating the extent of dynamic-extent functions and variables in the
     presence of multiple-values (lp#1463127)
+  * bug fix: restore builds on the latest OSX with the latest Xcode
+    (lp#1470996)
 
 changes in sbcl-1.3.9 relative to sbcl-1.3.8:
   * minor incompatible change: NAMESTRING prefers to return a BASE-STRING

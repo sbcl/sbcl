@@ -105,67 +105,6 @@ setup_mach_exception_handling_thread()
     return mach_exception_handling_thread;
 }
 
-struct exception_port_record
-{
-    struct thread * thread;
-    struct exception_port_record * next;
-};
-
-static OSQueueHead free_records = OS_ATOMIC_QUEUE_INIT;
-
-/* We can't depend on arbitrary addresses to be accepted as mach port
- * names, particularly not on 64-bit platforms.  Instead, we allocate
- * records that point to the thread struct, and loop until one is accepted
- * as a port name.
- *
- * Threads are mapped to exception ports with a slot in the thread struct,
- * and exception ports are casted to records that point to the corresponding
- * thread.
- *
- * The lock-free free-list above is used as a cheap fast path.
- */
-static mach_port_t
-find_receive_port(struct thread * thread)
-{
-    mach_port_t ret;
-    struct exception_port_record * curr, * to_free = NULL;
-    unsigned long i;
-    for (i = 1;; i++) {
-        curr = OSAtomicDequeue(&free_records, offsetof(struct exception_port_record, next));
-        if (curr == NULL) {
-            curr = calloc(1, sizeof(struct exception_port_record));
-            if (curr == NULL)
-                lose("unable to allocate exception_port_record\n");
-        }
-#ifdef LISP_FEATURE_X86_64
-        if ((mach_port_t)curr != (unsigned long)curr)
-            goto skip;
-#endif
-
-        if (mach_port_allocate_name(current_mach_task,
-                                    MACH_PORT_RIGHT_RECEIVE,
-                                    (mach_port_t)curr))
-            goto skip;
-        curr->thread = thread;
-        ret = (mach_port_t)curr;
-        break;
-        skip:
-        curr->next = to_free;
-        to_free = curr;
-        if ((i % 1024) == 0)
-            FSHOW((stderr, "Looped %lu times trying to allocate an exception port\n"));
-    }
-    while (to_free != NULL) {
-        struct exception_port_record * current = to_free;
-        to_free = to_free->next;
-        free(current);
-    }
-
-    FSHOW((stderr, "Allocated exception port %x for thread %p\n", ret, thread));
-
-    return ret;
-}
-
 /* tell the kernel that we want EXC_BAD_ACCESS exceptions sent to the
    exception port (which is being listened to do by the mach
    exception handling thread). */
@@ -175,10 +114,18 @@ mach_lisp_thread_init(struct thread * thread)
     kern_return_t ret;
     mach_port_t current_mach_thread, thread_exception_port;
 
-    /* allocate a named port for the thread */
-    thread_exception_port
-        = thread->mach_port_name
-        = find_receive_port(thread);
+    if (mach_port_allocate(current_mach_task,
+                           MACH_PORT_RIGHT_RECEIVE,
+                           &thread_exception_port) != KERN_SUCCESS) {
+        lose("Cannot allocate thread_exception_port");
+    }
+
+    if (mach_port_set_context(current_mach_task, thread_exception_port,
+                              (mach_port_context_t)thread)
+        != KERN_SUCCESS) {
+        lose("Cannot set thread_exception_port context");
+    }
+    thread->mach_port_name = thread_exception_port;
 
     /* establish the right for the thread_exception_port to send messages */
     ret = mach_port_insert_right(current_mach_task,
@@ -214,20 +161,21 @@ mach_lisp_thread_init(struct thread * thread)
     return ret;
 }
 
-kern_return_t
+void
 mach_lisp_thread_destroy(struct thread *thread) {
-    kern_return_t ret;
     mach_port_t port = thread->mach_port_name;
     FSHOW((stderr, "Deallocating mach port %x\n", port));
-    mach_port_move_member(current_mach_task, port, MACH_PORT_NULL);
-    mach_port_deallocate(current_mach_task, port);
+    if (mach_port_move_member(current_mach_task, port, MACH_PORT_NULL)
+        != KERN_SUCCESS) {
+        lose("Error destroying an exception port");
+    }
+    if (mach_port_deallocate(current_mach_task, port) != KERN_SUCCESS) {
+        lose("Error destroying an exception port");
+    }
 
-    ret = mach_port_destroy(current_mach_task, port);
-    ((struct exception_port_record*)(long)port)->thread = NULL;
-    OSAtomicEnqueue(&free_records, (void*)(long)port,
-                    offsetof(struct exception_port_record, next));
-
-    return ret;
+    if (mach_port_destroy(current_mach_task, port) != KERN_SUCCESS) {
+        lose("Error destroying an exception port");
+    }
 }
 
 void
