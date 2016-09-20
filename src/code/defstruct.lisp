@@ -1330,9 +1330,9 @@ or they must be declared locally notinline at each call site.~@:>"
       (when (eql t (dsd-raw-type slot))
         (setf bitmap (logior bitmap (ash 1 (dsd-index slot))))))
     (let* ((length (dd-length dd))
-           (bitmap ; Add padding word if necessary.
-            (if (evenp length) (logior bitmap (ash 1 length)) bitmap))
            (n-bits (logior length 1)))
+      (when (evenp length) ; Add padding word if necessary.
+        (setq bitmap (logior bitmap (ash 1 length))))
       (when (logbitp (1- n-bits) bitmap)
         (let ((sign-ext (logior (ash -1 n-bits) bitmap)))
           (when (or (and (fixnump sign-ext) (sb!xc:typep bitmap 'bignum))

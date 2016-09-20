@@ -21,9 +21,9 @@
 
 (macrolet ((defbiggy ()
              `(defstruct biggy
-                ,@(loop for i from 1 to 62
+                ,@(loop for i from 1 to 64
                         collect `(,(sb-int:symbolicate "SLOT" (write-to-string i))
-                                  0 :type ,(if (< i 60) 'sb-ext:word t))))))
+                                  0 :type ,(if (= i 64) 'sb-ext:word t))))))
   (defbiggy))
 
 (assert (typep (sb-kernel:layout-bitmap
