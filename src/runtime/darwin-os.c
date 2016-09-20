@@ -75,7 +75,6 @@ mach_exception_handler(void *port)
    signal handlers run in the relevant thread directly. */
 
 mach_port_t mach_exception_handler_port_set = MACH_PORT_NULL;
-mach_port_t current_mach_task = MACH_PORT_NULL;
 
 pthread_t
 setup_mach_exception_handling_thread()
@@ -84,10 +83,8 @@ setup_mach_exception_handling_thread()
     pthread_t mach_exception_handling_thread = NULL;
     pthread_attr_t attr;
 
-    current_mach_task = mach_task_self();
-
     /* allocate a mach_port for this process */
-    ret = mach_port_allocate(current_mach_task,
+    ret = mach_port_allocate(mach_task_self(),
                              MACH_PORT_RIGHT_PORT_SET,
                              &mach_exception_handler_port_set);
 
@@ -114,13 +111,13 @@ mach_lisp_thread_init(struct thread * thread)
     kern_return_t ret;
     mach_port_t current_mach_thread, thread_exception_port;
 
-    if (mach_port_allocate(current_mach_task,
+    if (mach_port_allocate(mach_task_self(),
                            MACH_PORT_RIGHT_RECEIVE,
                            &thread_exception_port) != KERN_SUCCESS) {
         lose("Cannot allocate thread_exception_port");
     }
 
-    if (mach_port_set_context(current_mach_task, thread_exception_port,
+    if (mach_port_set_context(mach_task_self(), thread_exception_port,
                               (mach_port_context_t)thread)
         != KERN_SUCCESS) {
         lose("Cannot set thread_exception_port context");
@@ -128,7 +125,7 @@ mach_lisp_thread_init(struct thread * thread)
     thread->mach_port_name = thread_exception_port;
 
     /* establish the right for the thread_exception_port to send messages */
-    ret = mach_port_insert_right(current_mach_task,
+    ret = mach_port_insert_right(mach_task_self(),
                                  thread_exception_port,
                                  thread_exception_port,
                                  MACH_MSG_TYPE_MAKE_SEND);
@@ -146,12 +143,12 @@ mach_lisp_thread_init(struct thread * thread)
         lose("thread_set_exception_ports failed with return_code %d\n", ret);
     }
 
-    ret = mach_port_deallocate (current_mach_task, current_mach_thread);
+    ret = mach_port_deallocate (mach_task_self(), current_mach_thread);
     if (ret) {
         lose("mach_port_deallocate failed with return_code %d\n", ret);
     }
 
-    ret = mach_port_move_member(current_mach_task,
+    ret = mach_port_move_member(mach_task_self(),
                                 thread_exception_port,
                                 mach_exception_handler_port_set);
     if (ret) {
@@ -165,15 +162,15 @@ void
 mach_lisp_thread_destroy(struct thread *thread) {
     mach_port_t port = thread->mach_port_name;
     FSHOW((stderr, "Deallocating mach port %x\n", port));
-    if (mach_port_move_member(current_mach_task, port, MACH_PORT_NULL)
+    if (mach_port_move_member(mach_task_self(), port, MACH_PORT_NULL)
         != KERN_SUCCESS) {
         lose("Error destroying an exception port");
     }
-    if (mach_port_deallocate(current_mach_task, port) != KERN_SUCCESS) {
+    if (mach_port_deallocate(mach_task_self(), port) != KERN_SUCCESS) {
         lose("Error destroying an exception port");
     }
 
-    if (mach_port_destroy(current_mach_task, port) != KERN_SUCCESS) {
+    if (mach_port_destroy(mach_task_self(), port) != KERN_SUCCESS) {
         lose("Error destroying an exception port");
     }
 }
@@ -209,7 +206,7 @@ void darwin_init(void)
 inline void
 os_sem_init(os_sem_t *sem, unsigned int value)
 {
-    if (KERN_SUCCESS!=semaphore_create(current_mach_task, sem, SYNC_POLICY_FIFO, (int)value))
+    if (KERN_SUCCESS!=semaphore_create(mach_task_self(), sem, SYNC_POLICY_FIFO, (int)value))
         lose("os_sem_init(%p): %s", sem, strerror(errno));
 }
 
@@ -252,7 +249,7 @@ os_sem_post(os_sem_t *sem, char *what)
 void
 os_sem_destroy(os_sem_t *sem)
 {
-    if (-1==semaphore_destroy(current_mach_task, *sem))
+    if (-1==semaphore_destroy(mach_task_self(), *sem))
         lose("os_sem_destroy(%p): %s", sem, strerror(errno));
 }
 
