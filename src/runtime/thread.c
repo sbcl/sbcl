@@ -62,31 +62,16 @@
 # define IMMEDIATE_POST_MORTEM
 #endif
 
-#ifdef LISP_FEATURE_DARWIN
-#define DELAY_THREAD_POST_MORTEM 5
+#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DRAGONFLY) || defined (LISP_FEATURE_DARWIN)
 #define LOCK_CREATE_THREAD
 #endif
 
-#endif
-
-#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DRAGONFLY)
-#define LOCK_CREATE_THREAD
-#endif
-
-#ifdef LISP_FEATURE_SB_THREAD
 struct thread_post_mortem {
-#ifdef DELAY_THREAD_POST_MORTEM
-    struct thread_post_mortem *next;
-#endif
     os_thread_t os_thread;
     pthread_attr_t *os_attr;
     os_vm_address_t os_address;
 };
 
-#ifdef DELAY_THREAD_POST_MORTEM
-static int pending_thread_post_mortem_count = 0;
-pthread_mutex_t thread_post_mortem_lock = PTHREAD_MUTEX_INITIALIZER;
-#endif
 static struct thread_post_mortem * volatile pending_thread_post_mortem = 0;
 #endif
 
@@ -287,9 +272,7 @@ plan_thread_post_mortem(struct thread *corpse)
         post_mortem->os_thread = corpse->os_thread;
         post_mortem->os_attr = corpse->os_attr;
         post_mortem->os_address = corpse->os_address;
-#ifdef DELAY_THREAD_POST_MORTEM
-        post_mortem->next = NULL;
-#endif
+
         return post_mortem;
     } else {
         /* FIXME: When does this happen? */
@@ -305,6 +288,21 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 #endif
     int result;
     if (post_mortem) {
+#if defined(LOCK_CREATE_THREAD) && defined (LISP_FEATURE_DARWIN)
+        /* The thread may exit before pthread_create() has finished
+           initialization and it may write into already unmapped
+           memory. This lock doesn't actually need to protect
+           anything, just to make sure that at least one call to
+           pthread_create() has finished.
+        
+          Possible improvements: stash the address of the thread
+          struct for which a pthread is being created and don't lock
+          here if it's not the one being terminated. */
+        result = pthread_mutex_lock(&create_thread_lock);
+        gc_assert(result == 0);
+        result = pthread_mutex_unlock(&create_thread_lock);
+        gc_assert(result == 0);
+#endif
         if ((result = pthread_join(post_mortem->os_thread, NULL))) {
             lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
                  strerror(result));
@@ -325,32 +323,7 @@ schedule_thread_post_mortem(struct thread *corpse)
     if (corpse) {
         post_mortem = plan_thread_post_mortem(corpse);
 
-#ifdef DELAY_THREAD_POST_MORTEM
-        pthread_mutex_lock(&thread_post_mortem_lock);
-        /* First stick the new post mortem to the end of the queue. */
-        if (pending_thread_post_mortem) {
-            struct thread_post_mortem *next = pending_thread_post_mortem;
-            while (next->next) {
-                next = next->next;
-            }
-            next->next = post_mortem;
-        } else {
-            pending_thread_post_mortem = post_mortem;
-        }
-        /* Then, if there are enough things in the queue, clean up one
-         * from the head -- or increment the count, and null out the
-         * post_mortem we have. */
-        if (pending_thread_post_mortem_count > DELAY_THREAD_POST_MORTEM) {
-            post_mortem = pending_thread_post_mortem;
-            pending_thread_post_mortem = post_mortem->next;
-        } else {
-            pending_thread_post_mortem_count++;
-            post_mortem = NULL;
-        }
-        pthread_mutex_unlock(&thread_post_mortem_lock);
-        /* Finally run, the cleanup, if any. */
-        perform_thread_post_mortem(post_mortem);
-#elif defined(CREATE_POST_MORTEM_THREAD)
+#ifdef CREATE_POST_MORTEM_THREAD
         gc_assert(!pthread_create(&thread, NULL, perform_thread_post_mortem, post_mortem));
 #else
         post_mortem = (struct thread_post_mortem *)
