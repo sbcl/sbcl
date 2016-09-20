@@ -28,11 +28,6 @@
 
 (defconstant +default-operand-size+ :dword)
 
-(defun offset-next (value dstate)
-  (declare (type integer value)
-           (type disassem-state dstate))
-  (+ (dstate-next-addr dstate) value))
-
 (defparameter *default-address-size*
   ;; Actually, :DWORD is the only one really supported.
   :dword)
@@ -125,25 +120,6 @@
     (dstate-put-inst-prop dstate 'operand-size-8))
   value)
 
-;;; This prefilter is used solely for its side effect, namely to put
-;;; the property OPERAND-SIZE-16 into the DSTATE.
-(defun prefilter-x66 (dstate junk)
-  (declare (type disassem-state dstate) (ignore junk))
-  (dstate-put-inst-prop dstate 'operand-size-16))
-
-;;; This prefilter is used solely for its side effect, namely to put
-;;; one of the properties [FG]S-SEGMENT-PREFIX into the DSTATE.
-;;; Unlike PREFILTER-X66, this prefilter only catches the low bit of
-;;; the prefix byte.
-(defun prefilter-seg (dstate value)
-  (declare (type bit value)
-           (type disassem-state dstate))
-  (dstate-put-inst-prop
-   dstate (elt '(fs-segment-prefix gs-segment-prefix) value)))
-
-(defun read-address (dstate)
-  (read-suffix (width-bits *default-address-size*) dstate))
-
 (defun width-bits (width)
   (ecase width
     (:byte 8)
@@ -156,7 +132,7 @@
 
 (define-arg-type displacement
   :sign-extend t
-  :use-label #'offset-next
+  :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
   :printer (lambda (value stream dstate)
              (maybe-note-assembler-routine value nil dstate)
              (print-label value stream dstate)))
@@ -182,7 +158,8 @@
 (define-arg-type word-reg :printer #'print-word-reg)
 
 (define-arg-type imm-addr
-  :prefilter #'read-address
+  :prefilter (lambda (dstate)
+               (read-suffix (width-bits *default-address-size*) dstate))
   :printer #'print-label)
 
 (define-arg-type imm-data
@@ -256,11 +233,18 @@
                     stream)))
 
 ;;; Used to capture the effect of the #x66 operand size override prefix.
-(define-arg-type x66 :prefilter #'prefilter-x66)
+(define-arg-type x66
+  :prefilter (lambda (dstate junk)
+               (declare (ignore junk))
+               (dstate-put-inst-prop dstate 'operand-size-16)))
 
 ;;; Used to capture the effect of the #x64 and #x65 segment override
 ;;; prefixes.
-(define-arg-type seg :prefilter #'prefilter-seg)
+(define-arg-type seg
+  :prefilter (lambda (dstate value)
+               (declare (type bit value))
+               (dstate-put-inst-prop
+                dstate (elt '(fs-segment-prefix gs-segment-prefix) value))))
 
 (defparameter *conditions*
   '((:o . 0)
