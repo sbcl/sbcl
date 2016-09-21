@@ -24,6 +24,7 @@
                           (:res  res    (descriptor-reg) rdx-offset)
                           (:temp count unsigned-reg rcx-offset)
                           (:temp wordpair sse-reg float0-offset))
+  (move res vector) ; to "use" res
   (move count end)
   (inst sub count start)
   ;; 'start' and 'limit' will be interior pointers into 'vector',
