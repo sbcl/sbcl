@@ -294,7 +294,7 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
            memory. This lock doesn't actually need to protect
            anything, just to make sure that at least one call to
            pthread_create() has finished.
-        
+
           Possible improvements: stash the address of the thread
           struct for which a pthread is being created and don't lock
           here if it's not the one being terminated. */
