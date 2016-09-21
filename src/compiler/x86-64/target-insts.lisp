@@ -38,18 +38,12 @@
   )
 
 (defun print-reg (value stream dstate)
-  (declare (type full-reg value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg-with-width value
                         (inst-operand-size dstate)
                         stream
                         dstate))
 
 (defun print-reg-default-qword (value stream dstate)
-  (declare (type full-reg value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg-with-width value
                         (inst-operand-size-default-qword dstate)
                         stream
@@ -58,24 +52,15 @@
 ;; Print a reg that can only be a :DWORD or :QWORD.
 ;; Avoid use of INST-OPERAND-SIZE because it's wrong for this type of operand.
 (defun print-d/q-word-reg (value stream dstate)
-  (declare (type full-reg value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg-with-width value
                         (if (dstate-get-inst-prop dstate +rex-w+) :qword :dword)
                         stream
                         dstate))
 
 (defun print-byte-reg (value stream dstate)
-  (declare (type full-reg value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg-with-width value :byte stream dstate))
 
 (defun print-addr-reg (value stream dstate)
-  (declare (type full-reg value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg-with-width value +default-address-size+ stream dstate))
 
 ;;; Print a register or a memory reference of the given WIDTH.
@@ -84,9 +69,7 @@
 (defun print-reg/mem-with-width (value width sized-p stream dstate)
   (declare (type (or list full-reg) value)
            (type (member :byte :word :dword :qword) width)
-           (type boolean sized-p)
-           (type stream stream)
-           (type disassem-state dstate))
+           (type boolean sized-p))
   (if (typep value 'full-reg)
       (print-reg-with-width value width stream dstate)
       (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)))
@@ -94,46 +77,28 @@
 ;;; Print a register or a memory reference. The width is determined by
 ;;; calling INST-OPERAND-SIZE.
 (defun print-reg/mem (value stream dstate)
-  (declare (type (or list full-reg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg/mem-with-width
    value (inst-operand-size dstate) nil stream dstate))
 
 ;; Same as print-reg/mem, but prints an explicit size indicator for
 ;; memory references.
 (defun print-sized-reg/mem (value stream dstate)
-  (declare (type (or list full-reg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg/mem-with-width
    value (inst-operand-size dstate) t stream dstate))
 
 ;;; Same as print-sized-reg/mem, but with a default operand size of
 ;;; :qword.
 (defun print-sized-reg/mem-default-qword (value stream dstate)
-  (declare (type (or list full-reg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg/mem-with-width
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
 (defun print-sized-byte-reg/mem (value stream dstate)
-  (declare (type (or list full-reg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg/mem-with-width value :byte t stream dstate))
 
 (defun print-sized-word-reg/mem (value stream dstate)
-  (declare (type (or list full-reg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg/mem-with-width value :word t stream dstate))
 
 (defun print-sized-dword-reg/mem (value stream dstate)
-  (declare (type (or list full-reg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (print-reg/mem-with-width value :dword t stream dstate))
 
 (defun print-label (value stream dstate)
@@ -145,9 +110,6 @@
   (format stream "XMM~d" value))
 
 (defun print-xmmreg/mem (value stream dstate)
-  (declare (type (or list xmmreg) value)
-           (type stream stream)
-           (type disassem-state dstate))
   (if (typep value 'xmmreg)
       (print-xmmreg value stream dstate)
       (print-mem-ref :ref value nil stream dstate)))
