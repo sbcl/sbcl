@@ -505,6 +505,21 @@
                     (ash (sap-ref-8 sap (+ 6 byte-offset)) 48)
                     (ash (sap-ref-8 sap (+ 7 byte-offset)) 56)))))))
 
+(defstruct (filtered-arg (:copier nil) (:predicate nil) (:constructor nil))
+  next)
+;;; Return an arbitrary object (one that is a subtype of FILTERD-ARG)
+;;; holding one thing which is automatically returned to the filted-arg-pool
+;;; in dstate after disassembly of the current instruction.
+;;; Any given disassembler backend must use the same constructor for all
+;;; its filtered args.
+(defun new-filtered-arg (dstate constructor)
+  (let ((arg (dstate-filtered-arg-pool-free dstate)))
+    (if arg
+        (setf (dstate-filtered-arg-pool-free dstate) (filtered-arg-next arg))
+        (setf arg (funcall constructor)))
+    (sb!c::push-in filtered-arg-next arg (dstate-filtered-arg-pool-in-use dstate))
+    arg))
+
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
 ;;; Additionally, unless STREAM is NIL, several items are output to it:
@@ -686,6 +701,13 @@
           (print-notes-and-newline stream dstate))
         (setf (dstate-output-state dstate) nil))
       (unless prefix-p
+        (let ((arg (dstate-filtered-arg-pool-in-use dstate)))
+          (loop (unless arg (return))
+                (let ((saved-next (filtered-arg-next arg)))
+                  (sb!c::push-in filtered-arg-next arg
+                                 (dstate-filtered-arg-pool-free dstate))
+                  (setq arg saved-next))))
+        (setf (dstate-filtered-arg-pool-in-use dstate) nil)
         (setf (dstate-inst-properties dstate) nil)))))
 
 

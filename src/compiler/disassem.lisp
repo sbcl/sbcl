@@ -1051,6 +1051,11 @@
   (inst-properties nil :type (or fixnum list))
   (filtered-values (make-array max-filtered-value-index)
                    :type filtered-value-vector)
+  ;; to avoid consing decoded values, a prefilter can keep a chain
+  ;; of objects in these slots. The objects returned here
+  ;; are reusable for the next instruction.
+  (filtered-arg-pool-in-use)
+  (filtered-arg-pool-free)
   ;; used for prettifying printing
   (addr-print-len nil :type (or null (integer 0 20)))
   (argument-column 0 :type column)

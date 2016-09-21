@@ -15,6 +15,12 @@
 
 (in-package "SB!X86-64-ASM")
 
+(defstruct (machine-ea (:include sb!disassem::filtered-arg)
+                       (:copier nil)
+                       (:predicate nil)
+                       (:constructor %make-machine-ea))
+  base disp index scale)
+
 ;;; Print to STREAM the name of the general-purpose register encoded by
 ;;; VALUE and of size WIDTH. For robustness, the high byte registers
 ;;; (AH, BH, CH, DH) are correctly detected, too, although the compiler
@@ -67,7 +73,7 @@
 ;;; If SIZED-P is true, add an explicit size indicator for memory
 ;;; references.
 (defun print-reg/mem-with-width (value width sized-p stream dstate)
-  (declare (type (or list full-reg) value)
+  (declare (type (or machine-ea full-reg) value)
            (type (member :byte :word :dword :qword) width)
            (type boolean sized-p))
   (if (typep value 'full-reg)
@@ -119,6 +125,48 @@
   (maybe-note-static-symbol value dstate)
   (princ value stream))
 
+;;; Return either a MACHINE-EA or a register (a fixnum).
+;;; VALUE is a list of the mod and r/m fields of the instruction's ModRM byte.
+;;; Depending on VALUE, a SIB byte and/or displacement may be read.
+;;; The REX.B and REX.X from dstate are appropriately consumed.
+(defun prefilter-reg/mem (dstate mod r/m)
+  (declare (type disassem-state dstate)
+           (type (unsigned-byte 2) mod)
+           (type (unsigned-byte 3) r/m))
+  (flet ((make-machine-ea (base &optional disp index scale)
+           (let ((ea (the machine-ea
+                       (sb!disassem::new-filtered-arg dstate #'%make-machine-ea))))
+             (setf (machine-ea-base ea) base
+                   (machine-ea-disp ea) disp
+                   (machine-ea-index ea) index
+                   (machine-ea-scale ea) scale)
+             ea))
+         (displacement ()
+           (case mod
+             (#b01 (read-signed-suffix 8 dstate))
+             (#b10 (read-signed-suffix 32 dstate))))
+         (extend (bit-name reg)
+           (logior (if (dstate-get-inst-prop dstate bit-name) 8 0)
+                   reg)))
+    (declare (inline extend))
+    (let ((full-reg (extend +rex-b+ r/m)))
+      (cond ((= mod #b11) full-reg) ; register direct mode
+            ((= r/m #b100) ; SIB byte - rex.b is "don't care"
+             (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
+                    (index-reg (extend +rex-x+ (ldb (byte 3 3) sib)))
+                    (base-reg (ldb (byte 3 0) sib)))
+               ;; mod=0 and base=RBP means no base reg
+               (make-machine-ea (unless (and (= mod #b00) (= base-reg #b101))
+                                  (extend +rex-b+ base-reg))
+                                (cond ((/= mod #b00) (displacement))
+                                      ((= base-reg #b101) (read-signed-suffix 32 dstate)))
+                                (unless (= index-reg #b100) index-reg) ; index can't be RSP
+                                (ash 1 (ldb (byte 2 6) sib)))))
+            ((/= mod #b00) (make-machine-ea full-reg (displacement)))
+            ;; rex.b is not decoded in determining RIP-relative mode
+            ((= r/m #b101) (make-machine-ea :rip (read-signed-suffix 32 dstate)))
+            (t (make-machine-ea full-reg))))))
+
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
 ;;; missing or nil to indicate that it's not used or has the obvious
@@ -133,53 +181,42 @@
 ;;;
 (defun print-mem-ref (mode value width stream dstate)
   ;; :COMPUTE is used for the LEA instruction - it informs this function
-  ;; that the address is not a memory reference below which is confined
-  ;; the disassembly - the heuristic for detecting the start of unboxed data.
-  ;; LEA is sometimes used to compute the start of a local function for
-  ;; allocate-closures, and it points to valid instructions, not data.
+  ;; that we're not loading from the address and that the contents should not
+  ;; be printed. It'll usually be a reference to code within the disasembly
+  ;; segment, as LEA is employed to compute the entry point for local call.
   (declare (type (member :ref :sized-ref :compute) mode)
-           (type list value)
+           (type machine-ea value)
            (type (member nil :byte :word :dword :qword) width)
            (type stream stream)
            (type disassem-state dstate))
-  (when (and width (eq mode :sized-ref))
-    (princ width stream)
-    (princ '| PTR | stream))
-  (write-char #\[ stream)
-  (let ((firstp t) (rip-p nil))
-    (macrolet ((pel ((var val) &body body)
-                 ;; Print an element of the address, maybe with
-                 ;; a leading separator.
-                 `(let ((,var ,val))
-                    ;; Compiler knows that FIRSTP is T in first call to PEL.
-                    #-sb-xc-host
-                    (declare (muffle-conditions code-deletion-note))
-                    (when ,var
-                      (unless firstp
-                        (write-char #\+ stream))
-                      ,@body
-                      (setq firstp nil)))))
-      (pel (base-reg (first value))
-        (cond ((eql 'rip base-reg)
-               (setf rip-p t)
-               (princ base-reg stream))
-              (t
-               (print-addr-reg base-reg stream dstate))))
-      (pel (index-reg (third value))
-        (print-addr-reg index-reg stream dstate)
-        (let ((index-scale (fourth value)))
-          (when (and index-scale (not (= index-scale 1)))
-            (write-char #\* stream)
-            (princ index-scale stream))))
-      (let ((offset (second value)))
-        (when (and offset (or firstp (not (zerop offset))))
-          (unless (or firstp (minusp offset))
-            (write-char #\+ stream))
-          (cond
-            (rip-p
-             (princ offset stream)
+  (let ((base-reg (machine-ea-base value))
+        (disp (machine-ea-disp value))
+        (index-reg (machine-ea-index value))
+        (firstp t))
+    (when (and width (eq mode :sized-ref))
+      (princ width stream)
+      (princ '| PTR | stream))
+    (write-char #\[ stream)
+    (when base-reg
+      (if (eql :rip base-reg)
+          (princ base-reg stream)
+          (print-addr-reg base-reg stream dstate))
+      (setq firstp nil))
+    (when index-reg
+      (unless firstp (write-char #\+ stream))
+      (print-addr-reg index-reg stream dstate)
+      (let ((scale (machine-ea-scale value)))
+        (unless (= scale 1)
+          (write-char #\* stream)
+          (princ scale stream)))
+      (setq firstp nil))
+    (when (and disp (or firstp (not (zerop disp))))
+      (unless (or firstp (minusp disp))
+        (write-char #\+ stream))
+      (cond ((eq (machine-ea-base value) :rip)
+             (princ disp stream)
              (unless (eq mode :compute)
-               (let ((addr (+ offset (dstate-next-addr dstate))))
+               (let ((addr (+ disp (dstate-next-addr dstate))))
                  ;; The origin is zero when disassembling into a trace-file.
                  ;; Don't crash on account of it.
                  (when (plusp addr)
@@ -193,24 +230,23 @@
                                        (:qword
                                         (unboxed-constant-ref
                                          dstate
-                                         (+ (dstate-next-offs dstate) offset)))))
+                                         (+ (dstate-next-offs dstate) disp)))))
                              dstate))))))
             (firstp
-               (princ16 offset stream)
-               (or (minusp offset)
-                   (nth-value 1 (note-code-constant-absolute offset dstate))
-                   (maybe-note-assembler-routine offset nil dstate)
+               (princ16 disp stream)
+               (or (minusp disp)
+                   (nth-value 1 (note-code-constant-absolute disp dstate))
+                   (maybe-note-assembler-routine disp nil dstate)
                    ;; Static symbols coming frorm CELL-REF
-                   (maybe-note-static-symbol (+ offset (- other-pointer-lowtag
-                                                          n-word-bytes))
+                   (maybe-note-static-symbol (+ disp (- other-pointer-lowtag
+                                                        n-word-bytes))
                                              dstate)))
             (t
-             (princ offset stream)))))))
-  (write-char #\] stream)
-  #!+sb-thread
-  (let ((disp (second value)))
-    (when (and (eql (first value) #.(ash (tn-offset sb!vm::thread-base-tn) -1))
-               (not (third value)) ; no index
+             (princ disp stream))))
+    (write-char #\] stream)
+    #!+sb-thread
+    (when (and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
+               (not index-reg) ; no index
                (typep disp '(integer 0 *)) ; positive displacement
                (seg-code (dstate-segment dstate)))
       ;; Try to reverse-engineer which thread-local binding this is
@@ -238,6 +274,13 @@
                       (format stream "thread.~(~A~)" (slot-name slot)))
                     dstate))))))))
 
+(defun lea-compute-label (value dstate)
+  ;; If VALUE should be regarded as a label, return the address.
+  ;; If not, just return VALUE.
+  (if (and (typep value 'machine-ea) (eq (machine-ea-base value) :rip))
+      (+ (dstate-next-addr dstate) (machine-ea-disp value))
+      value))
+
 ;; Figure out whether LEA should print its EA with just the stuff in brackets,
 ;; or additionally show the EA as either a label or a hex literal.
 (defun lea-print-ea (value stream dstate)
@@ -245,11 +288,11 @@
         (addr nil)
         (fmt "= #x~x"))
     (etypecase value
-      (list
+      (machine-ea
        ;; Indicate to PRINT-MEM-REF that this is not a memory access.
        (print-mem-ref :compute value width stream dstate)
-       (when (eq (first value) 'rip)
-         (setq addr (+ (dstate-next-addr dstate) (second value)))))
+       (when (eq (machine-ea-base value) :rip)
+         (setq addr (+ (dstate-next-addr dstate) (machine-ea-disp value)))))
 
       ;; We're robust in allowing VALUE to be an integer (a register),
       ;; though LEA Rx,Ry is an illegal instruction.

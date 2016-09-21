@@ -115,45 +115,6 @@
   (declare (type reg value) (type disassem-state dstate))
   (if (dstate-get-inst-prop dstate +rex-b+) (+ value 8) value))
 
-;;; Returns either an integer, meaning a register, or a list of
-;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
-;;; may be missing or nil to indicate that it's not used or has the
-;;; obvious default value (e.g., 1 for the index-scale). VALUE is a list
-;;; of the mod and r/m field of the ModRM byte of the instruction.
-;;; Depending on VALUE a SIB byte and/or an offset may be read. The
-;;; REX.B bit from DSTATE is used to extend the sole register or the
-;;; BASE-REG to a full register, the REX.X bit does the same for the
-;;; INDEX-REG.
-(defun prefilter-reg/mem (dstate mod r/m)
-  (declare (type disassem-state dstate)
-           (type (unsigned-byte 2) mod)
-           (type (unsigned-byte 3) r/m))
-  (flet ((displacement ()
-           (case mod
-             (#b01 (read-signed-suffix 8 dstate))
-             (#b10 (read-signed-suffix 32 dstate))))
-         (extend (bit-name reg)
-           (logior (if (dstate-get-inst-prop dstate bit-name) 8 0)
-                   reg)))
-    (declare (inline extend))
-    (let ((full-reg (extend +rex-b+ r/m)))
-      (cond ((= mod #b11) full-reg) ; register direct mode
-            ((= r/m #b100) ; SIB byte - rex.b is "don't care"
-             (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
-                    (index-reg (extend +rex-x+ (ldb (byte 3 3) sib)))
-                    (base-reg (ldb (byte 3 0) sib)))
-               ;; mod=0 and base=RBP means no base reg
-               (list (unless (and (= mod #b00) (= base-reg #b101))
-                       (extend +rex-b+ base-reg))
-                     (cond ((/= mod #b00) (displacement))
-                           ((= base-reg #b101) (read-signed-suffix 32 dstate)))
-                     (unless (= index-reg #b100) index-reg) ; index can't be RSP
-                     (ash 1 (ldb (byte 2 6) sib)))))
-            ((/= mod #b00) (list full-reg (displacement)))
-            ;; rex.b is not decoded in determining RIP-relative mode
-            ((= r/m #b101) (list 'rip (read-signed-suffix 32 dstate)))
-            (t (list full-reg))))))
-
 (defun width-bits (width)
   (ecase width
     (:byte 8)
@@ -1832,13 +1793,6 @@
               (xchg-reg-with-something operand2 operand1))
              (t
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
-
-;; If the filtered VALUE (R/M field of LEA) should be treated as a label,
-;; return the virtual address, otherwise the value unchanged.
-(defun lea-compute-label (value dstate)
-  (if (and (listp value) (eq (first value) 'rip))
-      (+ (dstate-next-addr dstate) (second value))
-      value))
 
 (define-instruction lea (segment dst src)
   (:printer
