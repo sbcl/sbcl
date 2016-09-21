@@ -851,7 +851,6 @@
                                  (constant-arg null)))
   (cond ((and (constant-lvar-p string1)
               (equal (lvar-value string1) ""))
-         (lvar-type string2)
          `(and (plusp (length string2))
                0))
         ((and (constant-lvar-p string2)
