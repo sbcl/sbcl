@@ -507,11 +507,11 @@
 
 (defstruct (filtered-arg (:copier nil) (:predicate nil) (:constructor nil))
   next)
-;;; Return an arbitrary object (one that is a subtype of FILTERD-ARG)
-;;; holding one thing which is automatically returned to the filted-arg-pool
-;;; in dstate after disassembly of the current instruction.
-;;; Any given disassembler backend must use the same constructor for all
-;;; its filtered args.
+;;; Return an arbitrary object (one that is a subtype of FILTERED-ARG)
+;;; that is automatically returned to the dstate's filtered-arg-pool
+;;; after disassembly of the current instruction.
+;;; Any given disassembler backend must use the same constructor for
+;;; its filtered args that participate in the pool.
 (defun new-filtered-arg (dstate constructor)
   (let ((arg (dstate-filtered-arg-pool-free dstate)))
     (if arg
@@ -1884,48 +1884,27 @@
 
 ;;;; some handy function for machine-dependent code to use...
 
-#!-sb-fluid (declaim (maybe-inline sap-ref-int read-suffix))
-
 (defun sap-ref-int (sap offset length byte-order)
   (declare (type system-area-pointer sap)
-           (type (unsigned-byte 16) offset)
            (type (member 1 2 4 8) length)
-           (type (member :little-endian :big-endian) byte-order)
-           (muffle-conditions compiler-note) ; integer coercion, oh well
-           (optimize (speed 3) (safety 0)))
-  (ecase length
-    (1 (sap-ref-8 sap offset))
-    (2 (if (eq byte-order :big-endian)
-           (+ (ash (sap-ref-8 sap offset) 8)
-              (sap-ref-8 sap (+ offset 1)))
-           (+ (ash (sap-ref-8 sap (+ offset 1)) 8)
-              (sap-ref-8 sap offset))))
-    (4 (if (eq byte-order :big-endian)
-           (+ (ash (sap-ref-8 sap offset) 24)
-              (ash (sap-ref-8 sap (+ 1 offset)) 16)
-              (ash (sap-ref-8 sap (+ 2 offset)) 8)
-              (sap-ref-8 sap (+ 3 offset)))
-           (+ (sap-ref-8 sap offset)
-              (ash (sap-ref-8 sap (+ 1 offset)) 8)
-              (ash (sap-ref-8 sap (+ 2 offset)) 16)
-              (ash (sap-ref-8 sap (+ 3 offset)) 24))))
-    (8 (if (eq byte-order :big-endian)
-           (+ (ash (sap-ref-8 sap offset) 56)
-              (ash (sap-ref-8 sap (+ 1 offset)) 48)
-              (ash (sap-ref-8 sap (+ 2 offset)) 40)
-              (ash (sap-ref-8 sap (+ 3 offset)) 32)
-              (ash (sap-ref-8 sap (+ 4 offset)) 24)
-              (ash (sap-ref-8 sap (+ 5 offset)) 16)
-              (ash (sap-ref-8 sap (+ 6 offset)) 8)
-              (sap-ref-8 sap (+ 7 offset)))
-           (+ (sap-ref-8 sap offset)
-              (ash (sap-ref-8 sap (+ 1 offset)) 8)
-              (ash (sap-ref-8 sap (+ 2 offset)) 16)
-              (ash (sap-ref-8 sap (+ 3 offset)) 24)
-              (ash (sap-ref-8 sap (+ 4 offset)) 32)
-              (ash (sap-ref-8 sap (+ 5 offset)) 40)
-              (ash (sap-ref-8 sap (+ 6 offset)) 48)
-              (ash (sap-ref-8 sap (+ 7 offset)) 56))))))
+           (type (member :little-endian :big-endian) byte-order))
+  (if (or (eq length 1)
+          (and (eq byte-order #!+big-endian :big-endian #!+little-endian :little-endian)
+               #!-(or arm arm64 ppc x86 x86-64) ; unaligned loads are ok for these
+               (not (logtest (1- size) (sap-int (sap+ sap offset))))))
+      (funcall (case length ; native byte order and acceptable alignment
+                 (8 #'sap-ref-64)
+                 (4 #'sap-ref-32)
+                 (2 #'sap-ref-16)
+                 (t #'sap-ref-8)) sap offset)
+      (binding* (((offset increment)
+                  (cond ((eq byte-order :big-endian) (values offset +1))
+                        (t (values (+ offset (1- length)) -1))))
+                 (val 0))
+        (dotimes (i length val)
+          (declare (index i))
+          (setq val (logior (ash val 8) (sap-ref-8 sap offset)))
+          (incf offset increment)))))
 
 (defun read-suffix (length dstate)
   (declare (type (member 8 16 32 64) length)
