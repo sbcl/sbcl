@@ -461,50 +461,6 @@
       (print-bytes (+ prefix-len alignment) stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
-;;; FIXME: This should be an FLET but it's too big to look at comfortably.
-(declaim (inline !sap-ref-dchunk))
-(defun !sap-ref-dchunk (sap byte-offset byte-order)
-  (declare (type system-area-pointer sap)
-           (type offset byte-offset)
-           (muffle-conditions compiler-note) ; returns possible bignum
-           ;; Not all backends can actually disassemble for either byte order.
-           (ignorable byte-order)
-           (optimize (speed 3) (safety 0)))
-  #!+x86-64
-  (logand (sap-ref-word sap byte-offset) dchunk-one)
-  #!-x86-64
-  (the dchunk
-    ;; Why all the noise with hand addition? I have no idea.
-    ;; The target can only disassemble its own instruction set + byte order,
-    ;; so probably this should just be SAP-REF-WORD.
-       (ecase dchunk-bits
-         (32 (if (eq byte-order :big-endian)
-                 (+ (ash (sap-ref-8 sap byte-offset) 24)
-                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 16)
-                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 8)
-                    (sap-ref-8 sap (+ 3 byte-offset)))
-                 (+ (sap-ref-8 sap byte-offset)
-                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 8)
-                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 16)
-                    (ash (sap-ref-8 sap (+ 3 byte-offset)) 24))))
-         (64 (if (eq byte-order :big-endian)
-                 (+ (ash (sap-ref-8 sap byte-offset) 56)
-                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 48)
-                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 40)
-                    (ash (sap-ref-8 sap (+ 3 byte-offset)) 32)
-                    (ash (sap-ref-8 sap (+ 4 byte-offset)) 24)
-                    (ash (sap-ref-8 sap (+ 5 byte-offset)) 16)
-                    (ash (sap-ref-8 sap (+ 6 byte-offset)) 8)
-                    (sap-ref-8 sap (+ 7 byte-offset)))
-                 (+ (sap-ref-8 sap byte-offset)
-                    (ash (sap-ref-8 sap (+ 1 byte-offset)) 8)
-                    (ash (sap-ref-8 sap (+ 2 byte-offset)) 16)
-                    (ash (sap-ref-8 sap (+ 3 byte-offset)) 24)
-                    (ash (sap-ref-8 sap (+ 4 byte-offset)) 32)
-                    (ash (sap-ref-8 sap (+ 5 byte-offset)) 40)
-                    (ash (sap-ref-8 sap (+ 6 byte-offset)) 48)
-                    (ash (sap-ref-8 sap (+ 7 byte-offset)) 56)))))))
-
 (defstruct (filtered-arg (:copier nil) (:predicate nil) (:constructor nil))
   next)
 ;;; Return an arbitrary object (one that is a subtype of FILTERED-ARG)
@@ -609,7 +565,21 @@
                            (values sap 0))
                          (values (dstate-segment-sap dstate)
                                  (dstate-cur-offs dstate)))
-                   (!sap-ref-dchunk sap offset (dstate-byte-order dstate))))
+                   #!+x86-64 ; a dchunk is 56 bits, making it a fixnum.
+                   ;; No instruction needs more bits than that to locate it
+                   ;; in the inst-space. An optional displacement and/or immediate
+                   ;; operand can extend the overall length, but those aren't
+                   ;; part of the dchunk. We can't use SAP-REF-INT because that
+                   ;; would return a word-sized bignum which is the very thing
+                   ;; this special case tries to avoid.
+                   (logand (sap-ref-word sap offset) dchunk-one)
+
+                   #!-x86-64
+                   (the dchunk
+                     (sap-ref-int sap offset
+                                  (ecase dchunk-bits (32 4) (64 8))
+                                  (dstate-byte-order dstate)))))
+
                 (fun-prefix-p (call-fun-hooks chunk stream dstate)))
            (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
                (setf prefix-p fun-prefix-p)
