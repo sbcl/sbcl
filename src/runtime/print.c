@@ -466,7 +466,7 @@ static boolean tagged_slot_p(struct layout * layout,
 {
   extern boolean positive_bignum_logbitp(int,struct bignum*);
   lispobj bitmap = layout->bitmap;
-  long fixnum = (sword_t)bitmap >> N_FIXNUM_TAG_BITS; // optimistically
+  sword_t fixnum = (sword_t)bitmap >> N_FIXNUM_TAG_BITS; // optimistically
   return fixnump(bitmap)
          ? bitmap == make_fixnum(-1) ||
             (slot_index < N_WORD_BITS && ((fixnum >> slot_index) & 1) != 0)

@@ -710,7 +710,7 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
 
   ++instance_ptr; // was supplied as the address of the header word
   if (fixnump(layout_bitmap)) {
-      long bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
+      sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
       for (index = 0; index < n_words ; index++, bitmap >>= 1)
           if (bitmap & 1)
               proc(instance_ptr + index, 1);
