@@ -2365,7 +2365,7 @@ pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
     unsigned int index;
     in_use_marker_t *bitmap = pinned_dwords(pageindex);
     for (index = begin_dword_index; index < end_dword_index; index++)
-        bitmap[index/N_WORD_BITS] |= 1LU << (index % N_WORD_BITS);
+        bitmap[index/N_WORD_BITS] |= (uword_t)1 << (index % N_WORD_BITS);
 }
 
 /* Take a possible pointer to a Lisp object and mark its page in the
