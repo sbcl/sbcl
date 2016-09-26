@@ -150,7 +150,7 @@ symbol:
         .set    noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x0, 0x10
+	break	0x0, trap_PendingInterrupt
 1:	.set	reorder
 
 	/* Pass in args */
@@ -210,7 +210,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.set	noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x0, 0x10
+	break	0x0, trap_PendingInterrupt
 1:	.set	reorder
 
 	/* Pass one return value back to C land. For a 64bit value, we may
@@ -288,8 +288,8 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	/* Check for interrupt */
 	.set	noreorder
 	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, 0x10
+	subu	reg_ALLOC, 1
+	break	0x0, trap_PendingInterrupt
 1:	.set	reorder
 
 	/* Into C land we go. */
@@ -347,7 +347,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.set	noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x0, 0x10
+	break	0x0, trap_PendingInterrupt
 1:	.set	reorder
 
 	/* Reset the lisp stack. */

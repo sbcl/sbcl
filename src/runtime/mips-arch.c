@@ -399,6 +399,10 @@ static void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     unsigned int code = (os_context_insn(context) >> 6) & 0x1f;
+    if (code == trap_PendingInterrupt) {
+        /* KLUDGE: is this neccessary or will handle_trap do the same? */
+        arch_clear_pseudo_atomic_interrupted(context);
+    }
     handle_trap(context, code);
 }
 

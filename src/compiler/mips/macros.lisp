@@ -282,7 +282,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (let ((label (gen-label)))
          (inst bgez ,flag-tn label)
          (inst addu alloc-tn (1- ,extra))
-         (inst break 0 16)
+         (inst break 0 pending-interrupt-trap)
          (emit-label label)))))
 
 ;;;; memory accessor vop generators
