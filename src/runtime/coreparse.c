@@ -569,7 +569,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
 
 void asm_routine_poke(const char* routine, int offset, char byte)
 {
-    os_vm_address_t address = get_asm_routine_by_name(routine);
+    char *address = (char *)get_asm_routine_by_name(routine);
     if (address)
         address[offset] = byte;
 }
