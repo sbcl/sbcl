@@ -1316,7 +1316,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;  (2) if there are no raw slots at all.
 ;;; Example: given (DEFSTRUCT A B C), the computed bitmap is #b11111 -
 ;;; one bit for the layout; one each for A, B, C; and one for padding.
-;;; Whether this is stored as 5 or -1 is mostly immaterial,
+;;; Whether this is stored as 31 or -1 is mostly immaterial,
 ;;; but -1 is preferable because GC has a special case for it.
 ;;; Suppose instead we have 1 untagged word followed by N tagged words
 ;;; for N > n-fixnum-bits. The computed bitmap is #b111...11101
