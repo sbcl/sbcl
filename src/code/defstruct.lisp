@@ -1314,7 +1314,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; The bitmap should be stored as a negative fixnum in two cases:
 ;;;  (1) if the positive value is a bignum but the negative is a fixnum.
 ;;;  (2) if there are no raw slots at all.
-;;; Example: given (DEFSTRUCT A B C), the computed bitmap is #b11111 -
+;;; Example: given (DEFSTRUCT S A B C), the computed bitmap is #b11111 -
 ;;; one bit for the layout; one each for A, B, C; and one for padding.
 ;;; Whether this is stored as 31 or -1 is mostly immaterial,
 ;;; but -1 is preferable because GC has a special case for it.
