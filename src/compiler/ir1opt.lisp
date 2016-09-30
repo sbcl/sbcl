@@ -2089,7 +2089,6 @@
                            `(lambda (&optional ,@dums &rest ,ignore)
                               (declare (ignore ,ignore))
                               (%funcall ,leaf ,@dums))
-                           :source-name (leaf-%source-name leaf)
                            :debug-name (leaf-%debug-name leaf))))
                 (change-ref-leaf ref fun)
                 (aver (eq (basic-combination-kind node) :full))

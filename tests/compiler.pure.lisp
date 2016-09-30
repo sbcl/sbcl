@@ -5949,3 +5949,26 @@
                         (bar #'y)
                         (if x
                             (return-from test))))))))
+
+(with-test (:name :mv-call-no-let-conversion)
+  (assert (equal
+           (funcall
+            (checked-compile
+             '(lambda ()
+               (locally (declare (optimize (sb-c::let-conversion 0)))
+                 (multiple-value-call #'lisp-implementation-version (values))))))
+           (lisp-implementation-version)))
+  (assert (equal
+           (funcall
+            (checked-compile
+             '(lambda ()
+               (locally (declare (optimize (sb-c::let-conversion 0)))
+                 (multiple-value-call #'lisp-implementation-type (values))))))
+           (lisp-implementation-type)))
+  (assert (equal
+           (funcall
+            (checked-compile
+             '(lambda ()
+               (locally (declare (optimize (sb-c::let-conversion 0)))
+                 (multiple-value-call #'princ-to-string 1)))))
+           "1")))
