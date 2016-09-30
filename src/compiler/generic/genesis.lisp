@@ -743,15 +743,6 @@ core and return a descriptor to it."
     (float (float-to-core number))
     (t (error "~S isn't a cold-loadable number at all!" number))))
 
-(declaim (ftype (function (sb!vm:word) descriptor) sap-int-to-core))
-(defun sap-int-to-core (sap-int)
-  (let ((des (allocate-header+object *dynamic* (1- sb!vm:sap-size)
-                                      sb!vm:sap-widetag)))
-    (write-wordindexed des
-                       sb!vm:sap-pointer-slot
-                       (make-random-descriptor sap-int))
-    des))
-
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
   (let ((dest (allocate-object gspace 2 sb!vm:list-pointer-lowtag)))
@@ -1833,35 +1824,23 @@ core and return a descriptor to it."
                      (if (symbolp name)
                          (values (cold-intern name) name)
                          (values name (warm-fun-name name))))
-                    (fdefn (cold-fdefinition-object cold-name t))
-                    (type (logand (descriptor-bits (read-memory defn))
-                                  sb!vm:widetag-mask)))
+                    (fdefn (cold-fdefinition-object cold-name t)))
     (when (cold-functionp (cold-fdefn-fun fdefn))
       (error "Duplicate DEFUN for ~S" warm-name))
+    ;; There can't be any closures or funcallable instances.
+    (aver (= (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)
+             sb!vm:simple-fun-header-widetag))
     (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (write-wordindexed fdefn
                        sb!vm:fdefn-raw-addr-slot
-                       (ecase type
-                         (#.sb!vm:simple-fun-header-widetag
-                          (/noshow0 "static-fset (simple-fun)")
-                          #!+(or sparc arm)
-                          defn
-                          #!-(or sparc arm)
+                       #!+(or sparc arm) defn
+                       #!-(or sparc arm)
                           (make-random-descriptor
                            (+ (logandc2 (descriptor-bits defn)
                                         sb!vm:lowtag-mask)
                               (ash sb!vm:simple-fun-code-offset
                                    sb!vm:word-shift))))
-                         (#.sb!vm:closure-header-widetag
-                          ;; There's no way to create a closure.
-                          (bug "FSET got closure-header-widetag")
-                          (/show0 "/static-fset (closure)")
-                          (make-random-descriptor
-                           #!+read-only-tramps
-                           (lookup-assembler-reference 'sb!vm::closure-tramp)
-                           #!-read-only-tramps
-                           (cold-foreign-symbol-address "closure_tramp")))))
     fdefn))
 
 (defun initialize-static-fns ()
