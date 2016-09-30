@@ -257,7 +257,7 @@
                             (if (constant-lvar-p lvar)
                                 #+sb-xc-host (bug "Can't call %FUN-NAME")
                                 #-sb-xc-host (%fun-name (lvar-value lvar))
-                                (lvar-fun-debug-name lvar)))
+                                (leaf-debug-name leaf)))
                            ((constant-lvar-p lvar)
                             (lvar-value lvar))
                            (t

@@ -5979,3 +5979,10 @@
               (checked-compile
                '(lambda () (multiple-value-call #'cons 1 2 3))
                :allow-warnings t))))
+
+(with-test (:name :valid-callable-argument-cast)
+  (assert (equal (funcall (checked-compile '(lambda (x)
+                                             (find-if (the function #'oddp)
+                                              x)))
+                          '(2 4 3))
+                 3)))
