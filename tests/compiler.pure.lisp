@@ -5972,3 +5972,10 @@
                (locally (declare (optimize (sb-c::let-conversion 0)))
                  (multiple-value-call #'princ-to-string 1)))))
            "1")))
+
+(with-test (:name :mv-call-argument-mismatch)
+  (assert
+   (nth-value 2
+              (checked-compile
+               '(lambda () (multiple-value-call #'cons 1 2 3))
+               :allow-warnings t))))
