@@ -2026,6 +2026,7 @@ core and return a descriptor to it."
 
 (defun record-cold-assembler-routine (name address)
   (/xhow "in RECORD-COLD-ASSEMBLER-ROUTINE" name address)
+  (aver (not (assoc name *cold-assembler-routines*)))
   (push (cons name address)
         *cold-assembler-routines*))
 
@@ -3831,6 +3832,8 @@ initially undefined function references:~2%")
       ;; *COLD-ASSEMBLER-ROUTINES* above and calling
       ;; INITIALIZE-STATIC-FNS below.
       (when preload-file
+        (setq object-file-names
+              (remove preload-file object-file-names :test 'string-equal))
         (cold-load preload-file))
 
       ;; Prepare for cold load.
