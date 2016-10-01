@@ -77,6 +77,14 @@
 
 ;;;; test TRACE
 
+(defmacro with-traced-function ((name &rest options) &body body)
+  `(with-output-to-string (*trace-output*)
+     (unwind-protect
+          (progn
+            (trace ,name ,@options)
+            ,@body)
+       (ignore-errors (untrace ,name)))))
+
 (defun trace-this ()
   'ok)
 
@@ -86,12 +94,10 @@
       (* n (trace-fact (1- n)))))
 
 (with-test (:name (trace :simple))
-  (let ((out (with-output-to-string (*trace-output*)
-               (trace trace-this)
-               (assert (eq 'ok (trace-this)))
-               (untrace))))
-    (assert (search "TRACE-THIS" out))
-    (assert (search "returned OK" out))))
+  (let ((output (with-traced-function (trace-this)
+                  (assert (eq 'ok (trace-this))))))
+    (assert (search "TRACE-THIS" output))
+    (assert (search "returned OK" output))))
 
 ;;; bug 379
 ;;; This is not a WITH-TEST :FAILS-ON PPC DARWIN since there are
@@ -100,28 +106,24 @@
 (with-test (:name (trace :encapsulate nil)
             :fails-on '(or (and :ppc (not :linux)) :sparc)
             :broken-on '(or :darwin :sunos :hppa))
-  (let ((out (with-output-to-string (*trace-output*)
-               (trace trace-this :encapsulate nil)
-               (assert (eq 'ok (trace-this)))
-               (untrace))))
-    (assert (search "TRACE-THIS" out))
-    (assert (search "returned OK" out))))
+  (let ((output (with-traced-function (trace-this :encapsulate nil)
+                  (assert (eq 'ok (trace-this))))))
+    (assert (search "TRACE-THIS" output))
+    (assert (search "returned OK" output))))
 
-(with-test (:name (:trace-recursive :encapsulate nil)
+(with-test (:name (:trace :encapsulate nil :recursive)
             :fails-on '(or (and :ppc (not :linux)) :sparc :sunos)
             :broken-on '(or :darwin (and :x86 :sunos) :hppa))
-  (let ((out (with-output-to-string (*trace-output*)
-               (trace trace-fact :encapsulate nil)
-               (assert (= 120 (trace-fact 5)))
-               (untrace))))
-    (assert (search "TRACE-FACT" out))
-    (assert (search "returned 1" out))
-    (assert (search "returned 120" out))))
+  (let ((output (with-traced-function (trace-fact :encapsulate nil)
+                  (assert (= 120 (trace-fact 5))))))
+    (assert (search "TRACE-FACT" output))
+    (assert (search "returned 1" output))
+    (assert (search "returned 120" output))))
 
 (defun trace-and-fmakunbound-this (x)
   x)
 
-(with-test (:name :bug-667657)
+(with-test (:name (trace fmakunbound :bug-667657))
   (trace trace-and-fmakunbound-this)
   (fmakunbound 'trace-and-fmakunbound-this)
   (untrace)
