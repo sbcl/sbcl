@@ -559,19 +559,15 @@ global options.
 
 By default, TRACE causes a printout on *TRACE-OUTPUT* each time that
 one of the named functions is entered or returns. (This is the basic,
-ANSI Common Lisp behavior of TRACE.) As an SBCL extension, the
-:REPORT SB-EXT:PROFILE option can be used to instead cause information
-to be silently recorded to be inspected later using the SB-EXT:PROFILE
-function.
+ANSI Common Lisp behavior of TRACE.)
 
 The following options are defined:
 
    :REPORT Report-Type
-       If Report-Type is TRACE (the default) then information is reported
-       by printing immediately. If Report-Type is SB-EXT:PROFILE, information
-       is recorded for later summary by calls to SB-EXT:PROFILE. If
-       Report-Type is NIL, then the only effect of the trace is to execute
-       other options (e.g. PRINT or BREAK).
+       If Report-Type is TRACE (the default) then information is
+       reported by printing immediately. If Report-Type is NIL, then
+       the only effect of the trace is to execute other
+       options (e.g. PRINT or BREAK).
 
    :CONDITION Form
    :CONDITION-AFTER Form
@@ -580,7 +576,6 @@ The following options are defined:
        evaluates to true at the time of the call. :CONDITION-AFTER is
        similar, but suppresses the initial printout, and is tested when the
        function returns. :CONDITION-ALL tries both before and after.
-       This option is not supported with :REPORT PROFILE.
 
    :BREAK Form
    :BREAK-AFTER Form
@@ -601,8 +596,7 @@ The following options are defined:
        If specified, Names is a function name or list of names. TRACE does
        nothing unless a call to one of those functions encloses the call to
        this function (i.e. it would appear in a backtrace.)  Anonymous
-       functions have string names like \"DEFUN FOO\". This option is not
-       supported with :REPORT PROFILE.
+       functions have string names like \"DEFUN FOO\".
 
    :ENCAPSULATE {:DEFAULT | T | NIL}
        If T, the tracing is done via encapsulation (redefining the function
@@ -619,8 +613,7 @@ The following options are defined:
    :FUNCTION Function-Form
        This is a not really an option, but rather another way of specifying
        what function to trace. The Function-Form is evaluated immediately,
-       and the resulting function is instrumented, i.e. traced or profiled
-       as specified in REPORT.
+       and the resulting function is traced.
 
 :CONDITION, :BREAK and :PRINT forms are evaluated in a context which
 mocks up the lexical environment of the called function, so that
