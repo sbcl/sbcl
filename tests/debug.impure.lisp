@@ -129,6 +129,19 @@
   (untrace)
   (assert (not (trace))))
 
+(with-test (:name (trace :report nil :smoke))
+  (let ((output (with-traced-function (trace-this :report nil)
+                  (assert (eq 'ok (trace-this))))))
+    (assert (sequence:emptyp output))))
+
+(with-test (:name (trace :report nil :print))
+  (let ((output (with-traced-function
+                    (trace-fact :report nil :print (sb-debug:arg 0))
+                  (assert (eq '2 (trace-fact 2))))))
+    (assert (string= output (format nil "2~@
+                                         1~@
+                                         0~%")))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (load (compile-file "bug-414.lisp"))
