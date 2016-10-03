@@ -213,17 +213,11 @@
   :prefilter #'prefilter-reg/mem
   :printer #'print-word-reg/mem)
 
-;;; added by jrd
-(defun print-fp-reg (value stream dstate)
-  (declare (ignore dstate))
-  (format stream "FR~D" value))
-(defun prefilter-fp-reg (value dstate)
-  ;; just return it
-  (declare (ignore dstate))
-  value)
-
-(define-arg-type fp-reg :prefilter #'prefilter-fp-reg
-                        :printer #'print-fp-reg)
+(define-arg-type fp-reg
+  :printer
+  (lambda (value stream dstate)
+    (declare (ignore dstate))
+    (format stream "FR~D" value)))
 
 (define-arg-type width
   :prefilter #'prefilter-width
