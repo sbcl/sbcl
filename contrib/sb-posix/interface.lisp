@@ -290,7 +290,7 @@
   (define-call "setuid" int minusp (uid uid-t))
   (define-call "getegid" gid-t never-fails)
   (define-call "getgid" gid-t never-fails)
-  #-sunos
+  #-(or sunos darwin)
   (progn
     (export '(getresgid getresuid) :sb-posix)
     (declaim (inline getresgid getresuid))
