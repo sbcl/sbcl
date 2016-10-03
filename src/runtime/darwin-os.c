@@ -25,11 +25,13 @@
 #include <errno.h>
 #include <dlfcn.h>
 #include <pthread.h>
+#include <mach/mach.h>
+#include <mach/clock.h>
+#include <stdlib.h>
+#include <time.h>
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-#include <mach/mach.h>
 #include <libkern/OSAtomic.h>
-#include <stdlib.h>
 #endif
 
 #if defined(LISP_FEATURE_SB_WTIMER)
@@ -48,6 +50,23 @@ os_get_runtime_executable_path(int external)
         return NULL;
 
     return copied_string(path);
+}
+
+extern int __semwait_signal(int, int, int, int, __int64_t, __int32_t);
+
+semaphore_t clock_sem = MACH_PORT_NULL;
+mach_port_t clock_port = MACH_PORT_NULL;
+
+void init_mach_clock() {
+    if (host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &clock_port)
+        != KERN_SUCCESS) {
+        lose("Error initializing clocks");
+    }
+
+    if (semaphore_create(mach_task_self_, &clock_sem, SYNC_POLICY_FIFO, 0)
+        != KERN_SUCCESS) {
+        lose("Error initializing clocks");
+    }
 }
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
@@ -195,6 +214,7 @@ mach_fork() {
 
 void darwin_init(void)
 {
+    init_mach_clock();
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     setup_mach_exception_handling_thread();
 #endif
@@ -322,3 +342,58 @@ os_cancel_wtimer(int kq)
         perror("os_cancel_wtimer: kevent");
 }
 #endif
+
+/* nanosleep() is not re-entrant on some versions of Darwin,
+ * reimplement it using the underlying syscalls. */
+int
+sb_nanosleep(time_t sec, int nsec) {
+    int ret;
+    mach_timespec_t current_time;
+    mach_timespec_t start_time;
+
+    if (sec < 0 || nsec >= NSEC_PER_SEC) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ret = clock_get_time(clock_port, &start_time);
+    if (ret != KERN_SUCCESS) {
+            lose(mach_error_string(ret));
+    }
+
+    for (;;) {
+        ret = __semwait_signal(clock_sem, MACH_PORT_NULL, 1, 1, sec, nsec);
+        if (ret < 0) {
+            if (errno == ETIMEDOUT) {
+                return 0;
+            }
+            if (errno == EINTR) {
+                ret = clock_get_time(clock_port, &current_time);
+                if (ret != KERN_SUCCESS) {
+                    lose(mach_error_string(ret));
+                }
+                time_t elapsed_sec = current_time.tv_sec - start_time.tv_sec;
+                int elapsed_nsec = current_time.tv_nsec - start_time.tv_nsec;
+                if (elapsed_nsec < 0) {
+                    elapsed_sec--;
+                    elapsed_nsec += NSEC_PER_SEC;
+                }
+                sec -= elapsed_sec;
+                nsec -= elapsed_nsec;
+                if (nsec < 0) {
+                    sec--;
+                    nsec += NSEC_PER_SEC;
+                }
+                if (sec < 0 || (sec == 0 && nsec == 0)) {
+                    return 0;
+                }
+                start_time = current_time;
+            } else {
+                errno = EINVAL;
+                return -1;
+            }
+        } else {
+            return -1;
+        }
+    }
+}

@@ -550,10 +550,12 @@ int sb_gettimeofday(struct timeval *tp, void *tzp)
         return gettimeofday(tp, tzp);
 }
 
+#ifndef LISP_FEATURE_DARWIN /* reimplements nanosleep in darwin-os.c  */
 int sb_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 {
         return nanosleep(rqtp, rmtp);
 }
+#endif
 
 int sb_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     struct timeval *timeout)

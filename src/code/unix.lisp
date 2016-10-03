@@ -946,7 +946,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (when time-t)
   (daylight-savings-p boolean :out))
 
-#!-win32
+#!-(or win32 darwin)
 (defun nanosleep (secs nsecs)
   (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
   (with-alien ((req (struct timespec))
@@ -983,6 +983,15 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                          t)))
           do (setf (slot req 'tv-sec) (slot rem 'tv-sec)
                    (slot req 'tv-nsec) (slot rem 'tv-nsec)))))
+
+;;; nanosleep() is not re-entrant on some versions of Darwin,
+;;; this reimplements it using the underlying syscalls.
+;;; It uses a different interface to avoid copying code with a
+;;; different license.
+#!+darwin
+(defun nanosleep (secs nsecs)
+  (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
+  (int-syscall ("sb_nanosleep" time-t int) secs nsecs))
 
 ;;;; sys/time.h
 
