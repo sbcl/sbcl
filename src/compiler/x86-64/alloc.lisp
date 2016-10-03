@@ -137,6 +137,7 @@
     (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) rcx)
     (:temporary (:sc any-reg :offset eax-offset :from :eval) rax)
     (:temporary (:sc any-reg :offset edi-offset) rdi)
+    (:temporary (:sc complex-double-reg) zero)
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
     (:translate allocate-vector)
@@ -146,28 +147,36 @@
       (let ((size (calc-size-in-bytes words result)))
         (allocation result size node t other-pointer-lowtag)
         (put-header result type length nil)
-    ;; FIXME: It would be good to check for stack overflow here.
-    ;; It would also be good to skip zero-fill of specialized vectors
-    ;; perhaps in a policy-dependent way. At worst you'd see random
-    ;; bits, and CLHS says consequences are undefined.
+        ;; FIXME: It would be good to check for stack overflow here.
+        ;; It would also be good to skip zero-fill of specialized vectors
+        ;; perhaps in a policy-dependent way. At worst you'd see random
+        ;; bits, and CLHS says consequences are undefined.
         (let ((data-addr
-               (make-ea :qword :base result
-                               :disp (- (* vector-data-offset n-word-bytes)
-                                        other-pointer-lowtag))))
+                (make-ea :qword :base result
+                                :disp (- (* vector-data-offset n-word-bytes)
+                                         other-pointer-lowtag))))
           (block zero-fill
-            (if (sc-is words immediate)
-                (let ((n (tn-value words)))
-                  (if (> n 6)
-                      (inst mov rcx (tn-value words))
-                      (let ((zero (if (<= n 2) ; do imm-to-mem moves
-                                      0
-                                      (progn (zeroize rax) rax))))
-                        (dotimes (i n (return-from zero-fill))
-                          (inst mov data-addr zero)
-                          (setq data-addr (copy-structure data-addr))
-                          (incf (ea-disp data-addr) n-word-bytes)))))
-                (progn (move rcx words)
-                       (inst shr rcx n-fixnum-tag-bits)))
+            (cond ((sc-is words immediate)
+                   (let ((n (tn-value words)))
+                     (cond ((> n 8)
+                            (inst mov rcx (tn-value words)))
+                           ((= n 1)
+                            (zeroize rax)
+                            (inst mov data-addr rax)
+                            (return-from zero-fill))
+                           (t
+                            (multiple-value-bind (double single) (truncate n 2)
+                              (inst xorpd zero zero)
+                              (dotimes (i double)
+                                (inst movapd data-addr zero)
+                                (setf data-addr (copy-structure data-addr))
+                                (incf (ea-disp data-addr) (* n-word-bytes 2)))
+                              (unless (zerop single)
+                                (inst movaps data-addr zero))
+                              (return-from zero-fill))))))
+                  (t
+                   (move rcx words)
+                   (inst shr rcx n-fixnum-tag-bits)))
             (inst lea rdi data-addr)
             (inst cld)
             (zeroize rax)
