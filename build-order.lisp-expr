@@ -605,7 +605,6 @@
  ("src/assembly/target/array"      :assem :not-host)
  ("src/assembly/target/arith"      :assem :not-host)
  ("src/assembly/target/alloc"      :assem :not-host)
- #!+read-only-tramps
  ("src/assembly/target/tramps"     :assem :not-host :not-genesis)
 
  ("src/compiler/pseudo-vops")

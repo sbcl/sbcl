@@ -641,7 +641,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :inline-constants :precise-arg-count-error' >> $ltf
     printf ' :memory-barrier-vops :multiply-high-vops :ash-right-vops :symbol-info-vops' >> $ltf
-    printf ' :fp-and-pc-standard-save :read-only-tramps' >> $ltf
+    printf ' :fp-and-pc-standard-save' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
         printf ' :linkage-table' >> $ltf
@@ -661,7 +661,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :precise-arg-count-error :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :cycle-counter :complex-float-vops :read-only-tramps' >> $ltf
+    printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
 
@@ -669,13 +669,12 @@ elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :cheneygc :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :read-only-tramps' >> $ltf
+    printf ' :alien-callbacks' >> $ltf
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
     printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
-    printf ' :read-only-tramps' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between
@@ -716,18 +715,15 @@ elif [ "$sbcl_arch" = "sparc" ]; then
         printf ' :linkage-table' >> $ltf
     fi
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
-    printf ' :read-only-tramps' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :64-bit-registers' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :read-only-tramps' >> $ltf
 elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
-    printf ' :read-only-tramps' >> $ltf
 elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :gencgc :linkage-table :alien-callbacks' >> $ltf
     # As opposed to soft-float or FPA, we support VFP only (and
@@ -738,7 +734,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :fp-and-pc-standard-save :read-only-tramps' >> $ltf
+    printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks :precise-arg-count-error :inline-constants' >> $ltf
@@ -746,7 +742,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unbind-n-vop :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :compare-and-swap-vops :memory-barrier-vops :read-only-tramps' >> $ltf
+    printf ' :compare-and-swap-vops :memory-barrier-vops' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

@@ -195,7 +195,6 @@ is never in the linkage-table."
               (if datap
                   undefined-alien-address
                   (or
-                   #!+read-only-tramps
                    (gethash 'sb!vm::undefined-alien-tramp sb!fasl:*assembler-routines*)
                    (find-foreign-symbol-address "undefined_alien_function"))))
              (addr

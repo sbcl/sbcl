@@ -1797,16 +1797,12 @@ core and return a descriptor to it."
             (write-wordindexed fdefn
                                sb!vm:fdefn-raw-addr-slot
                                (make-random-descriptor
-                                #!+read-only-tramps
                                 (or (lookup-assembler-reference
-                                     'sb!vm::undefined-tramp
-                                     (not (null core-file-name)))
+                                     'sb!vm::undefined-tramp core-file-name)
                                     ;; Our preload for the tramps
                                     ;; doesn't happen during host-1,
                                     ;; so substitute a usable value.
-                                    0)
-                                #!-read-only-tramps
-                                (cold-foreign-symbol-address "undefined_tramp"))))
+                                    0))))
           fdefn))))
 
 (defun cold-functionp (descriptor)
@@ -3729,13 +3725,6 @@ initially undefined function references:~2%")
       (if symbol-table-file-name
           (load-cold-foreign-symbol-table symbol-table-file-name)
           (error "can't output a core file without symbol table file input")))
-
-    #!+(and sb-dynamic-core (not read-only-tramps))
-    (progn
-      (setf (gethash (extern-alien-name "undefined_tramp")
-                     *cold-foreign-symbol-table*)
-            (dyncore-note-symbol "undefined_tramp" nil))
-      (dyncore-note-symbol "undefined_alien_function" nil))
 
     ;; Now that we've successfully read our only input file (by
     ;; loading the symbol table, if any), it's a good time to ensure

@@ -2107,10 +2107,6 @@ register."
               (= (logand val #xff) sb!vm:character-widetag)) ; char tag
          ;; unbound marker
          (= val sb!vm:unbound-marker-widetag)
-         ;; undefined_tramp doesn't validate properly as a pointer, and
-         ;; the actual value can vary by backend (x86oids need not apply)
-         #!-read-only-tramps
-         (= val (maybe-tag-tramp (foreign-symbol-address "undefined_tramp")))
          ;; pointer
          (not (zerop (valid-lisp-pointer-p (int-sap val)))))
         (values (%make-lisp-obj val) t)

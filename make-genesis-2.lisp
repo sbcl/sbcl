@@ -13,8 +13,7 @@
 (host-cload-stem "src/compiler/generic/genesis" nil)
 
 (defparameter *preload-object-file*
-  (or #!+read-only-tramps
-      (stem-remap-target
+  (or (stem-remap-target
        "obj/from-xc/src/assembly/target/tramps.assem-obj")
       nil))
 
