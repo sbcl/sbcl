@@ -337,19 +337,29 @@
             (t
              `(not (zerop (logand x y))))))))
 
-(deftransform logbitp
-    ((index integer) (unsigned-byte (or (signed-byte #.sb!vm:n-word-bits)
-                                        (unsigned-byte #.sb!vm:n-word-bits))))
+(deftransform logbitp ((index integer))
   (flet ((general-case ()
            `(if (>= index #.sb!vm:n-word-bits)
                 (minusp integer)
                 (not (zerop (logand integer (ash 1 index)))))))
-    (if (constant-lvar-p integer)
-        (let ((val (lvar-value integer)))
-          (cond ((eql val 0) nil)
-                ((eql val -1) t)
-                (t (general-case))))
-        (general-case))))
+    (let ((integer-type (lvar-type integer))
+          (word-index-p (csubtypep (lvar-type index)
+                                   (specifier-type '(mod #.sb!vm:n-word-bits))))
+          (constant-integer (and (constant-lvar-p integer)
+                                 (lvar-value integer))))
+      (cond ((eql constant-integer 0)
+             nil)
+            ((eql constant-integer -1)
+             t)
+            ((csubtypep integer-type (specifier-type '(or word
+                                                       sb!vm:signed-word)))
+             (general-case))
+            ((csubtypep integer-type (specifier-type 'bignum))
+             (if word-index-p
+                 `(logbitp index (%bignum-ref integer 0))
+                 `(bignum-logbitp index integer)))
+            (t
+             (give-up-ir1-transform))))))
 
 (define-source-transform byte (size position)
   `(cons ,size ,position))
