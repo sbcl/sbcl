@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -em
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the

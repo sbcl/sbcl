@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -em
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -48,7 +48,7 @@ rm -f output/after-xc.core
 # the fasl files into the new host Lisp, and that doesn't seem to be
 # an enormously important disadvantage, either.)
 echo //running cross-compiler to create target object files
-$SBCL_XC_HOST < make-host-2.lisp
+echo '(load "loader.lisp") (load-sbcl-file "make-host-2.lisp")' | $SBCL_XC_HOST
 
 # Run GENESIS (again) in order to create cold-sbcl.core. (The first
 # time was before we ran the cross-compiler, in order to create the

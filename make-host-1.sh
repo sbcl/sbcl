@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -em
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -31,4 +31,4 @@ export LANG LC_ALL
 # header file sbcl.h which will be needed to create the C runtime
 # environment.
 echo //building cross-compiler, and doing first genesis
-$SBCL_XC_HOST < make-host-1.lisp || exit 1
+echo '(load "loader.lisp") (load-sbcl-file "make-host-1.lisp")' | $SBCL_XC_HOST

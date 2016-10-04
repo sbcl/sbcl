@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -em
 
 # --load argument skips compilation.
 #
@@ -41,12 +41,14 @@ fi
 # for much longer than that, don't worry, it's likely to be normal.
 if [ "$1" != --load ]; then
     echo //doing warm init - compilation phase
+    echo '(load "loader.lisp") (load-sbcl-file "make-host-1.lisp")' | \
     ./src/runtime/sbcl \
         --core output/cold-sbcl.core \
         --lose-on-corruption \
         --no-sysinit --no-userinit < make-target-2.lisp
 fi
 echo //doing warm init - load and dump phase
+echo '(load "loader.lisp") (load-sbcl-file "make-host-1.lisp")' | \
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
 --lose-on-corruption \
@@ -58,12 +60,17 @@ echo //checking for leftover cold-init symbols
 --lose-on-corruption \
 --noinform \
 --no-sysinit --no-userinit \
---eval '(let (l)
-  (sb-vm::map-allocated-objects
-   (lambda (obj type size)
-     (declare (ignore type size))
-     (when (and (symbolp obj) (not (symbol-package obj)) (search "!" (string obj)))
-       (push obj l)))
-   :dynamic)
-  (format t "Found ~D:~%~S~%" (length l) l))' \
+--eval '(restart-case
+      (let (l)
+        (sb-vm::map-allocated-objects
+         (lambda (obj type size)
+           (declare (ignore type size))
+           (when (and (symbolp obj) (not (symbol-package obj))
+                      (search "!" (string obj)))
+             (push obj l)))
+         :dynamic)
+        (format t "Found ~D:~%~S~%" (length l) l))
+    (abort ()
+      :report "Abort building SBCL."
+      (sb-ext:exit :code 1)))' \
 --quit

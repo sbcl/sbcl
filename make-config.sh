@@ -32,7 +32,7 @@ then
 else
     SBCL_PREFIX="/usr/local"
 fi
-SBCL_XC_HOST="sbcl --disable-debugger --no-userinit --no-sysinit"
+SBCL_XC_HOST="sbcl --no-userinit --no-sysinit"
 export SBCL_XC_HOST
 
 # Parse command-line options.
@@ -782,3 +782,4 @@ if [ -n "$SBCL_HOST_LOCATION" ]; then
     rsync --delete-after -a output/ "$SBCL_HOST_LOCATION/output/"
     rsync -a local-target-features.lisp-expr version.lisp-expr "$SBCL_HOST_LOCATION/"
 fi
+
