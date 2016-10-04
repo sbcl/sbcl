@@ -119,7 +119,8 @@ This is SETFable."
   ;;        is allocated at load time, so the same piece of memory is used each time
   ;;        this form executes.
   (/show "entering WITH-ALIEN" bindings)
-  (let (bind-alien-stack-pointer)
+  (let (#!+c-stack-is-control-stack
+        bind-alien-stack-pointer)
     (with-auxiliary-alien-types env
       (dolist (binding (reverse bindings))
         (/show binding)
@@ -179,14 +180,14 @@ This is SETFable."
                                         ,@inner-body))
                                     inner-body)))
                          (/show var initval info)
-                         #!+(or x86 x86-64)
+                         #!+c-stack-is-control-stack
                          (progn (setf bind-alien-stack-pointer t)
                                 `((let ((,var (make-local-alien ',info)))
                                     ,@body-forms)))
                          ;; FIXME: This version is less efficient then it needs to be, since
                          ;; it could just save and restore the number-stack pointer once,
                          ;; instead of doing multiple decrements if there are multiple bindings.
-                         #!-(or x86 x86-64)
+                         #!-c-stack-is-control-stack
                          `((let ((,var (make-local-alien ',info)))
                              (multiple-value-prog1
                                  (progn ,@body-forms)
@@ -203,7 +204,7 @@ This is SETFable."
                            ,(append *new-auxiliary-types*
                                     (auxiliary-type-definitions env))))
          ,@(cond
-             #!+(or x86 x86-64)
+             #!+c-stack-is-control-stack
              (bind-alien-stack-pointer
               `((let ((sb!vm::*alien-stack-pointer* sb!vm::*alien-stack-pointer*))
                   ,@body)))
