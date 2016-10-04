@@ -645,6 +645,7 @@
               (:generator 4
                 (inst ,inst/c (make-ea-for-raw-slot object index) value))))))
     (def word unsigned-reg unsigned-num mov)
+    (def signed-word signed-reg signed-num mov)
     (def single single-reg single-float movss)
     (def double double-reg double-float movsd)
     (def complex-single complex-single-reg complex-single-float movq)

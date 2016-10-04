@@ -503,6 +503,37 @@
   (:generator 5
     (inst mov (make-ea-for-raw-slot object index) value)))
 
+(define-vop (raw-instance-ref/signed-word)
+  (:translate %raw-instance-ref/signed-word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
+  (:arg-types * tagged-num)
+  (:results (value :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 5
+    (inst mov value (make-ea-for-raw-slot object index))))
+
+(define-vop (raw-instance-set/signed-word)
+  (:translate %raw-instance-set/signed-word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg immediate))
+         (value :scs (signed-reg) :target result))
+  (:arg-types * tagged-num signed-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 5
+    (inst mov (make-ea-for-raw-slot object index) value)
+    (move result value)))
+
+(define-vop (raw-instance-init/signed-word)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (signed-reg)))
+  (:arg-types * signed-num)
+  (:info index)
+  (:generator 5
+    (inst mov (make-ea-for-raw-slot object index) value)))
+
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
   (:policy :fast-safe)

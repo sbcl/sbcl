@@ -94,6 +94,12 @@
                            :init-vop 'sb!vm::raw-instance-init/word
                            :n-words 1
                            :comparer (make-comparer %raw-instance-ref/word))
+       #!+raw-signed-word
+       (make-raw-slot-data :raw-type 'sb!vm:signed-word
+                           :accessor-name '%raw-instance-ref/signed-word
+                           :init-vop 'sb!vm::raw-instance-init/signed-word
+                           :n-words 1
+                           :comparer (make-comparer %raw-instance-ref/signed-word))
        (make-raw-slot-data :raw-type 'single-float
                            :accessor-name '%raw-instance-ref/single
                            :init-vop 'sb!vm::raw-instance-init/single

@@ -41,6 +41,8 @@
 (defsetf %instance-ref %instance-set)
 
 (defsetf %raw-instance-ref/word %raw-instance-set/word)
+#!+raw-signed-word
+(defsetf %raw-instance-ref/signed-word %raw-instance-set/signed-word)
 (defsetf %raw-instance-ref/single %raw-instance-set/single)
 (defsetf %raw-instance-ref/double %raw-instance-set/double)
 (defsetf %raw-instance-ref/complex-single %raw-instance-set/complex-single)

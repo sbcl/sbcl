@@ -505,6 +505,7 @@
                 (:temporary (:scs (non-descriptor-reg)) offset)
                 (:generator 5 ,@(emit-generator 'str t))))))))
   (define-raw-slot-vops word unsigned-num unsigned-reg)
+  (define-raw-slot-vops signed-word signed-num signed-reg)
   (define-raw-slot-vops single single-float single-reg
     move-float)
   (define-raw-slot-vops double double-float double-reg

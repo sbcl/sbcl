@@ -641,7 +641,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :inline-constants :precise-arg-count-error' >> $ltf
     printf ' :memory-barrier-vops :multiply-high-vops :ash-right-vops :symbol-info-vops' >> $ltf
-    printf ' :fp-and-pc-standard-save' >> $ltf
+    printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
         printf ' :linkage-table' >> $ltf
@@ -661,7 +661,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :precise-arg-count-error :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
+    printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
 
@@ -741,7 +741,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :unbind-n-vop :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf
     printf ' :compare-and-swap-vops :memory-barrier-vops' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
