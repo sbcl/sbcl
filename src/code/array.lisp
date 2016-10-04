@@ -687,11 +687,11 @@ of specialized arrays is supported."
   (define hairy-data-vector-ref/check-bounds
       slow-hairy-data-vector-ref/check-bounds
     !find-data-vector-reffer/check-bounds
-    nil (check-bound array (array-dimension array 0)))
+    nil (check-bound array (%array-dimension array 0)))
   (define hairy-data-vector-set/check-bounds
       slow-hairy-data-vector-set/check-bounds
     !find-data-vector-setter/check-bounds
-    (new-value) (check-bound array (array-dimension array 0))))
+    (new-value) (check-bound array (%array-dimension array 0))))
 
 (defun hairy-ref-error (array index &optional new-value)
   (declare (ignore index new-value))
