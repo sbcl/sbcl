@@ -5,6 +5,8 @@ changes relative to sbcl-1.3.10:
     documentation string (based on patch by Patrick Stein)
   * enhancement: support unboxed signed-word structure slots on x86, x86-64
     and ARM64. (lp#377616)
+  * optimization: faster logical bit-array operations on multidimensional
+    arrays.
 
 changes in sbcl-1.3.10 relative to sbcl-1.3.9:
   * enhancement: more compact low-level error signaling code
