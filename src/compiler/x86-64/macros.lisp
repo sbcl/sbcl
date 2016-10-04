@@ -262,8 +262,9 @@
     `(maybe-pseudo-atomic ,stack-allocate-p
       (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p
                   other-pointer-lowtag)
-      (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
-              ,result-tn 0 other-pointer-lowtag)
+      (storew* (logior (ash (1- ,size) n-widetag-bits) ,widetag)
+               ,result-tn 0 other-pointer-lowtag
+               (not ,stack-allocate-p))
       ,@forms)))
 
 ;;;; error code
