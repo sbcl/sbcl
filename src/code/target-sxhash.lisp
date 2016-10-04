@@ -354,16 +354,16 @@
     ;; that we must respect fill pointers.
     (vector
      (macrolet ((frob ()
-                  '(let ((result 572539))
+                  `(let ((result 572539))
                      (declare (type fixnum result))
                      (mixf result (length key))
-                    (when (plusp depthoid)
-                      (decf depthoid)
-                      (dotimes (i (length key))
-                       (declare (type fixnum i))
-                       (mixf result
-                             (psxhash (aref key i) depthoid))))
-                    result))
+                     (when (plusp depthoid)
+                       (decf depthoid)
+                       (dotimes (i (length key))
+                         (declare (type fixnum i))
+                         (mixf result
+                               (psxhash (aref key i) depthoid))))
+                     result))
                 (make-dispatch (types)
                   `(typecase key
                      ,@(loop for type in types
@@ -381,12 +381,15 @@
      (let ((result 60828))
        (declare (type fixnum result))
        (dotimes (i (array-rank key))
-         (mixf result (array-dimension key i)))
+         (mixf result (%array-dimension key i)))
        (when (plusp depthoid)
          (decf depthoid)
-         (dotimes (i (array-total-size key))
-          (mixf result
-                (psxhash (row-major-aref key i) depthoid))))
+         (with-array-data ((key key) (start) (end))
+           (let ((getter (truly-the function (svref %%data-vector-reffers%%
+                                                    (%other-pointer-widetag key)))))
+             (loop for i from start below end
+                   do (mixf result
+                            (psxhash (funcall getter key i) depthoid))))))
        result))))
 
 (defun structure-object-psxhash (key depthoid)
