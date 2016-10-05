@@ -432,7 +432,9 @@
                (:vop-var vop)
                (:save-p :compute-only)
                (:generator 5
-                 (inst scvtf y x)))))
+                 (inst ,(if (eq from-type 'signed-num)
+                            'scvtf
+                            'ucvtf) y x)))))
   (frob %single-float/signed %single-float
         signed-reg signed-num single-reg single-float)
   (frob %double-float/signed %double-float

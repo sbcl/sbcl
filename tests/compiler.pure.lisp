@@ -5986,3 +5986,10 @@
                                               x)))
                           '(2 4 3))
                  3)))
+
+(with-test (:name :usigned-word-float-conversion)
+  (assert (= (rational (funcall (checked-compile `(lambda (x)
+                                                    (float (the sb-ext:word x) 1d0)))
+                                sb-ext:most-positive-word))
+             #+32-bit 4294967295
+             #+64-bit 18446744073709551616)))
