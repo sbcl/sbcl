@@ -339,17 +339,27 @@
                     :ok))))))
 
 (with-test (:name :make-alien-string)
-  (flet ((test (null-terminate)
-           (let ((string "This comes from lisp!"))
-             (multiple-value-bind (alien length)
-                 (sb-alien::make-alien-string
-                  string :null-terminate null-terminate)
-               (assert (= length (+ (length string) (if null-terminate 1 0))))
-               (gc :full t)
-               ;; Copy to make sure STRING did not somehow end up in the alien
-               ;; object.
-               (assert (equal (copy-seq string) (cast alien c-string)))
-               (free-alien alien)))))
+  (labels ((content (alien length null-terminate)
+             (if null-terminate
+                 (cast alien c-string)
+                 (let ((buffer (make-array length
+                                           :element-type '(unsigned-byte 8))))
+                   (sb-kernel:copy-ub8-from-system-area
+                    (alien-sap alien) 0 buffer 0 length)
+                   (sb-ext:octets-to-string buffer))))
+           (test (null-terminate)
+             (let* ((string "This comes from lisp!")
+                    (length (length string)))
+               (multiple-value-bind (alien alien-length)
+                   (sb-alien::make-alien-string
+                    string :null-terminate null-terminate)
+                 (assert (= alien-length (+ length (if null-terminate 1 0))))
+                 (gc :full t)
+                 ;; Copy to make sure STRING did not somehow end up in
+                 ;; the alien object.
+                 (assert (equal (copy-seq string)
+                                (content alien length null-terminate)))
+                 (free-alien alien)))))
     (test nil)
     (test t)))
 
