@@ -741,3 +741,7 @@
                           (+ x 2312423423))))
                       12)
              2312423435)))
+
+(with-test (:name :bignum-ashift-left-fixnum)
+  (assert (= (eval '(ash most-negative-fixnum (1- sb-vm:n-word-bits)))
+             (eval '(* most-negative-fixnum (expt 2 (1- sb-vm:n-word-bits)))))))

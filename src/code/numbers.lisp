@@ -1108,7 +1108,7 @@ and the number of 0 bits if INTEGER is negative."
               (cond ((and (plusp count)
                           (>= (+ length count)
                               sb!vm:n-word-bits))
-                     (bignum-ashift-left (make-small-bignum integer) count))
+                     (bignum-ashift-left-fixnum integer count))
                     (t
                      (truly-the (signed-byte #.sb!vm:n-word-bits)
                                 (ash (truly-the fixnum integer) count))))))

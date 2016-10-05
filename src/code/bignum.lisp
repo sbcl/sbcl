@@ -1123,6 +1123,32 @@
             (%logior (%digit-logical-shift-right (%bignum-ref bignum i)
                                                  remaining-bits)
                      (%ashl (%bignum-ref bignum (1+ i)) n-bits))))))
+
+;;; FIXNUM is assumed to be non-zero and the result of the shift should be a bignum
+(defun bignum-ashift-left-fixnum (fixnum count)
+  (declare (bignum-length count)
+           (fixnum fixnum))
+  (multiple-value-bind (right-zero-digits remaining)
+      (truncate count digit-size)
+    (let* ((right-half (ldb (byte digit-size 0)
+                            (ash fixnum remaining)))
+           (sign-bit-p
+             (logbitp (1- digit-size) right-half))
+           (left-half (ash fixnum
+                           (- remaining digit-size)))
+           ;; Even if the left-half is 0 or -1 it might need to be sign
+           ;; extended based on the left-most bit of the right-half
+           (left-half-p (if sign-bit-p
+                            (/= left-half -1)
+                            (/= left-half 0)))
+           (length (+ right-zero-digits
+                      (if left-half-p 2 1)))
+           (result (%allocate-bignum length)))
+      (setf (%bignum-ref result right-zero-digits) right-half)
+      (when left-half-p
+        (setf (%bignum-ref result (1+ right-zero-digits))
+              (ldb (byte digit-size 0) left-half)))
+            result)))
 
 ;;;; relational operators
 
