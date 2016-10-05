@@ -87,6 +87,3 @@
 ) ; END with-compilation-unit
 
 (sb!vm:genesis :c-header-dir-name "src/runtime/genesis")
-#+cmu (ext:quit)
-#+clisp (ext:quit)
-#+abcl (ext:quit)

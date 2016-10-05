@@ -218,6 +218,3 @@ Sample output
   #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
   #+openmcl (ccl::save-application "output/after-xc.core")
   #+clisp (ext:saveinitmem "output/after-xc.core"))
-#+cmu (ext:quit)
-#+clisp (ext:quit)
-#+abcl (ext:quit)
