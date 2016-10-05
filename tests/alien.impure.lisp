@@ -339,10 +339,19 @@
                     :ok))))))
 
 (with-test (:name :make-alien-string)
-  (let ((alien (sb-alien::make-alien-string "This comes from lisp!")))
-    (gc :full t)
-    (assert (equal "This comes from lisp!" (cast alien c-string)))
-    (free-alien alien)))
+  (flet ((test (null-terminate)
+           (let ((string "This comes from lisp!"))
+             (multiple-value-bind (alien length)
+                 (sb-alien::make-alien-string
+                  string :null-terminate null-terminate)
+               (assert (= length (+ (length string) (if null-terminate 1 0))))
+               (gc :full t)
+               ;; Copy to make sure STRING did not somehow end up in the alien
+               ;; object.
+               (assert (equal (copy-seq string) (cast alien c-string)))
+               (free-alien alien)))))
+    (test nil)
+    (test t)))
 
 (with-test (:name :malloc-failure
                   :fails-on :alpha) ;; Alpha has address space to burn

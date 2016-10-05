@@ -365,7 +365,8 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
                  (alien-sap alien))
   nil)
 
-(declaim (type (sfunction * system-area-pointer) %make-alien-string))
+(declaim (type (function * (values system-area-pointer index))
+               %make-alien-string))
 (defun %make-alien-string (string &key (start 0) end
                                        (external-format :default)
                                        (null-terminate t))
@@ -379,7 +380,7 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
          (count (length octets))
          (buf (%make-alien count)))
     (sb!kernel:copy-ub8-to-system-area octets 0 buf 0 count)
-    buf))
+    (values buf count)))
 
 (defun make-alien-string (string &rest rest
                                  &key (start 0) end
