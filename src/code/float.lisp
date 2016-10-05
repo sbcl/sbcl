@@ -624,12 +624,14 @@
              `(defun ,name (x)
                 (number-dispatch ((x real))
                   (((foreach single-float double-float #!+long-float long-float
-                             fixnum))
+                     sb!vm:signed-word
+                     ,@(and (sb!c::template-translates-arg-p '%double-float 0 'word)
+                            '(word))))
                    (coerce x ',type))
-                  ((bignum)
-                   (bignum-to-float x ',type))
                   ((ratio)
-                   (float-ratio x ',type))))))
+                   (float-ratio x ',type))
+                  ((bignum)
+                   (bignum-to-float x ',type))))))
   (frob %single-float single-float)
   (frob %double-float double-float)
   #!+long-float

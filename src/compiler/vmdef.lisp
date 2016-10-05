@@ -231,3 +231,10 @@
                  ,(if (= (length results) 1)
                       (first results)
                       `(values ,@results))))))
+
+(defun template-translates-arg-p (function argument type)
+  (let ((primitive-type (primitive-type (specifier-type type))))
+    (loop for template in (fun-info-templates (info :function :info function))
+          for arg-type = (nth argument (template-arg-types template))
+          thereis (and (consp arg-type)
+                       (memq primitive-type (cdr arg-type))))))

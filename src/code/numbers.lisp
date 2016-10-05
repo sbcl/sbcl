@@ -48,7 +48,8 @@
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
 (defparameter *type-test-ordering*
-  '(fixnum single-float double-float integer #!+long-float long-float bignum
+  '(fixnum single-float double-float integer #!+long-float long-float
+    sb!vm:signed-word word bignum
     complex ratio))
 
 ;;; Should TYPE1 be tested before TYPE2?
