@@ -334,12 +334,14 @@
      ,(invoke-alien-type-method :deport-alloc-gen type 'value)))
 
 (defun compute-extract-lambda (type)
-  `(lambda (sap offset ignore)
-     (declare (type system-area-pointer sap)
-              (type unsigned-byte offset)
-              (ignore ignore))
-     (naturalize ,(invoke-alien-type-method :extract-gen type 'sap 'offset)
-                 ',type)))
+  (let ((extract (invoke-alien-type-method :extract-gen type 'sap 'offset)))
+    `(lambda (sap offset ignore)
+       (declare (type system-area-pointer sap)
+                (type unsigned-byte offset)
+                (ignore ignore))
+       ,(if (eq (alien-type-class type) 'integer)
+            extract
+            `(naturalize ,extract ',type)))))
 
 (defun compute-deposit-lambda (type)
   (declare (type alien-type type))
