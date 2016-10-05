@@ -264,6 +264,11 @@
   (declare (type bignum-type bignum)
            (type bignum-length len))
   (%ashr (%bignum-ref bignum (1- len)) (1- digit-size)))
+
+(declaim (inline bignum-plus-p))
+(defun bignum-plus-p (bignum)
+  (declare (type bignum-type bignum))
+  (%bignum-0-or-plusp bignum (%bignum-length bignum)))
 
 (declaim (optimize (speed 3) (safety 0)))
 
@@ -375,8 +380,8 @@
 
 (defun multiply-bignums (a b)
   (declare (type bignum-type a b))
-  (let* ((a-plusp (%bignum-0-or-plusp a (%bignum-length a)))
-         (b-plusp (%bignum-0-or-plusp b (%bignum-length b)))
+  (let* ((a-plusp (bignum-plus-p a))
+         (b-plusp (bignum-plus-p b))
          (a (if a-plusp a (negate-bignum a)))
          (b (if b-plusp b (negate-bignum b)))
          (len-a (%bignum-length a))
@@ -408,7 +413,7 @@
 
 (defun multiply-bignum-and-fixnum (bignum fixnum)
   (declare (type bignum-type bignum) (type fixnum fixnum))
-  (let* ((bignum-plus-p (%bignum-0-or-plusp bignum (%bignum-length bignum)))
+  (let* ((bignum-plus-p (bignum-plus-p bignum))
          (fixnum-plus-p (not (minusp fixnum)))
          (bignum (if bignum-plus-p bignum (negate-bignum bignum)))
          (bignum-len (%bignum-length bignum))
@@ -684,10 +689,10 @@
 ;;; 21, number 1, March 1995, epp. 111-122.
 (defun bignum-gcd (u0 v0)
   (declare (type bignum-type u0 v0))
-  (let* ((u1 (if (%bignum-0-or-plusp u0 (%bignum-length u0))
+  (let* ((u1 (if (bignum-plus-p u0)
                  u0
                  (negate-bignum u0 nil)))
-         (v1 (if (%bignum-0-or-plusp v0 (%bignum-length v0))
+         (v1 (if (bignum-plus-p v0)
                  v0
                  (negate-bignum v0 nil))))
     (if (zerop v1)
@@ -1120,11 +1125,6 @@
                      (%ashl (%bignum-ref bignum (1+ i)) n-bits))))))
 
 ;;;; relational operators
-
-;;; Return T iff bignum is positive.
-(defun bignum-plus-p (bignum)
-  (declare (type bignum-type bignum))
-  (%bignum-0-or-plusp bignum (%bignum-length bignum)))
 
 ;;; This compares two bignums returning -1, 0, or 1, depending on
 ;;; whether a is less than, equal to, or greater than b.
@@ -1832,8 +1832,8 @@
       ;;; to shift it to account for the initial Y shift. After we
       ;;; multiple bind q and r, we first fix up the signs and then
       ;;; return the normalized results.
-      (let* ((x-plusp (%bignum-0-or-plusp x (%bignum-length x)))
-             (y-plusp (%bignum-0-or-plusp y (%bignum-length y)))
+      (let* ((x-plusp (bignum-plus-p x))
+             (y-plusp (bignum-plus-p y))
              (x (if x-plusp x (negate-bignum x nil)))
              (y (if y-plusp y (negate-bignum y nil)))
              (len-x (%bignum-length x))
