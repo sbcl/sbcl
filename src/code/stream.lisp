@@ -24,29 +24,32 @@
 (defvar *debug-io* () #!+sb-doc "interactive debugging stream")
 
 (defun stream-element-type-stream-element-mode (element-type)
-  (when (eq element-type :default)
-    (return-from stream-element-type-stream-element-mode :bivalent))
-
-  (unless (valid-type-specifier-p element-type)
-    (return-from stream-element-type-stream-element-mode :bivalent))
-
-  (let* ((characterp (subtypep element-type 'character))
-         (unsigned-byte-p (subtypep element-type 'unsigned-byte))
-         ;; Every UNSIGNED-BYTE subtype is a SIGNED-BYTE
-         ;; subtype. Therefore explicitly check for intersection with
-         ;; the negative integers.
-         (signed-byte-p (and (subtypep element-type 'signed-byte)
-                             (not (subtypep `(and ,element-type (integer * -1))
-                                            nil)))))
-    (cond
-      ((and characterp (not unsigned-byte-p) (not signed-byte-p))
-       'character)
-      ((and (not characterp) unsigned-byte-p (not signed-byte-p))
-       'unsigned-byte)
-      ((and (not characterp) (not unsigned-byte-p) signed-byte-p)
-       'signed-byte)
-      (t
-       :bivalent))))
+  (cond ((or (not element-type)
+             (eq element-type t)
+             (eq element-type :default)) :bivalent)
+        ((or (eq element-type 'character)
+             (eq element-type 'base-char))
+         'character)
+        ((memq element-type '(signed-byte unsigned-byte))
+         element-type)
+        ((and (proper-list-of-length-p element-type 2)
+              (memq (car element-type)
+                    '(signed-byte unsigned-byte)))
+         (car element-type))
+        ((not (ignore-errors
+               (setf element-type
+                     (type-or-nil-if-unknown element-type t))))
+         :bivalent)
+        ((eq element-type *empty-type*)
+         :bivalent)
+        ((csubtypep element-type (specifier-type 'character))
+         'character)
+        ((csubtypep element-type (specifier-type 'unsigned-byte))
+         'unsigned-byte)
+        ((csubtypep element-type (specifier-type 'signed-byte))
+         'signed-byte)
+        (t
+         :bivalent)))
 
 (defun ill-in (stream &rest ignore)
   (declare (ignore ignore))
@@ -1305,7 +1308,8 @@
     (:listen (or (/= (the index (string-input-stream-current stream))
                      (the index (string-input-stream-end stream)))
                  :eof))
-    (:element-type (array-element-type (string-input-stream-string stream)))))
+    (:element-type (array-element-type (string-input-stream-string stream)))
+    (:element-mode 'character)))
 
 (defun make-string-input-stream (string &optional (start 0) end)
   #!+sb-doc
@@ -1566,7 +1570,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (:close
      (/noshow0 "/string-out-misc close")
      (set-closed-flame stream))
-    (:element-type (string-output-stream-element-type stream))))
+    (:element-type (string-output-stream-element-type stream))
+    (:element-mode 'character)))
 
 ;;; Return a string of all the characters sent to a stream made by
 ;;; MAKE-STRING-OUTPUT-STREAM since the last call to this function.
