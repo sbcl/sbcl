@@ -280,7 +280,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  core_compression_level);
 #ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(1);
     update_dynamic_space_free_pointer();
 #endif
 #ifdef reg_ALLOC

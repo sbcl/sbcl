@@ -2749,7 +2749,7 @@ scavenge_newspace_generation(generation_index_t generation)
     size_t previous_new_areas_index;
 
     /* Flush the current regions updating the tables. */
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(0);
 
     /* Turn on the recording of new areas by gc_alloc(). */
     new_areas = current_new_areas;
@@ -2773,7 +2773,7 @@ scavenge_newspace_generation(generation_index_t generation)
     scav_weak_hash_tables();
 
     /* Flush the current regions updating the tables. */
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(0);
 
     /* Grab new_areas_index. */
     current_new_areas_index = new_areas_index;
@@ -2823,7 +2823,7 @@ scavenge_newspace_generation(generation_index_t generation)
             scav_weak_hash_tables();
 
             /* Flush the current regions updating the tables. */
-            gc_alloc_update_all_page_tables();
+            gc_alloc_update_all_page_tables(0);
 
         } else {
 
@@ -2839,7 +2839,7 @@ scavenge_newspace_generation(generation_index_t generation)
             scav_weak_hash_tables();
 
             /* Flush the current regions updating the tables. */
-            gc_alloc_update_all_page_tables();
+            gc_alloc_update_all_page_tables(0);
         }
 
         current_new_areas_index = new_areas_index;
@@ -3361,7 +3361,7 @@ void
 gencgc_verify_zero_fill(void)
 {
     /* Flush the alloc regions updating the tables. */
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(1);
     SHOW("verifying zero fill");
     verify_zero_fill();
 }
@@ -3778,7 +3778,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         scavenge_newspace_generation_one_scan(new_space);
 
         /* Flush the current regions, updating the tables. */
-        gc_alloc_update_all_page_tables();
+        gc_alloc_update_all_page_tables(1);
 
         bytes_allocated = bytes_allocated - old_bytes_allocated;
 
@@ -3794,7 +3794,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     wipe_nonpinned_words();
 
     /* Flush the current regions, updating the tables. */
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(0);
 
     /* Free the pages in oldspace, but not those marked dont_move. */
     free_oldspace();
@@ -3941,7 +3941,7 @@ collect_garbage(generation_index_t last_gen)
     }
 
     /* Flush the alloc regions updating the tables. */
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(1);
 
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0) {
@@ -4313,7 +4313,7 @@ gencgc_pickup_dynamic(void)
 
     generations[gen].bytes_allocated = bytes_allocated;
 
-    gc_alloc_update_all_page_tables();
+    gc_alloc_update_all_page_tables(1);
     write_protect_generation_pages(gen);
 }
 
@@ -4581,15 +4581,33 @@ void
 unhandled_sigmemoryfault(void *addr)
 {}
 
-void gc_alloc_update_all_page_tables(void)
+static void
+update_thread_page_tables(struct thread *th)
+{
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+#endif
+}
+
+/* GC is single-threaded and all memory allocations during a
+   collection happen in the GC thread, so it is sufficient to update
+   all the the page tables once at the beginning of a collection and
+   update only page tables of the GC thread during the collection. */
+void gc_alloc_update_all_page_tables(int for_all_threads)
 {
     /* Flush the alloc regions updating the tables. */
     struct thread *th;
-    for_each_thread(th) {
-        gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
-#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-        gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
-#endif
+    if (for_all_threads) {
+        for_each_thread(th) {
+            update_thread_page_tables(th);
+        }
+    }
+    else {
+        th = arch_os_get_current_thread();
+        if (th) {
+            update_thread_page_tables(th);
+        }
     }
     gc_alloc_update_page_tables(UNBOXED_PAGE_FLAG, &unboxed_region);
     gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &boxed_region);
