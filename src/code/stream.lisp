@@ -1767,9 +1767,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (if found
                (- end (the fixnum found))
                current)))))
-     (:element-type
+    (:element-type
       (array-element-type
-       (fill-pointer-output-stream-string stream)))))
+       (fill-pointer-output-stream-string stream)))
+    (:element-mode 'character)))
 
 ;;;; case frobbing streams, used by FORMAT ~(...~)
 
@@ -1822,6 +1823,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (case op
     (:close
      (set-closed-flame stream))
+    (:element-mode 'character)
     (t
      (let ((target (case-frob-stream-target stream)))
        (if (ansi-stream-p target)
