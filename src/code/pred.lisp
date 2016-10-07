@@ -424,31 +424,31 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
 (defun array-equal-p (x y)
   (declare (array x y))
   (let ((rank (array-rank x)))
-    (= rank (array-rank y))
-    (dotimes (axis rank t)
-      (unless (= (%array-dimension x axis)
-                 (%array-dimension y axis))
-        (return nil)))
-    (with-array-data ((x x) (start-x) (end-x) :force-inline t
-                                              :array-header-p t)
-      (with-array-data ((y y) (start-y) (end-y) :force-inline t
-                                                :array-header-p t)
-        (declare (ignore end-y))
-        (let* ((reffers %%data-vector-reffers%%)
-               (getter-x (truly-the function (svref reffers (%other-pointer-widetag x))))
-               (getter-y (truly-the function (svref reffers (%other-pointer-widetag y)))))
-          (loop for x-i fixnum from start-x below end-x
-                for y-i fixnum from start-y
-                for x-el = (funcall getter-x x x-i)
-                for y-el = (funcall getter-y y y-i)
-                always (or (eq x-el y-el)
-                           (equalp x-el y-el))))))))
+    (and
+     (= rank (array-rank y))
+     (dotimes (axis rank t)
+       (unless (= (%array-dimension x axis)
+                  (%array-dimension y axis))
+         (return nil)))
+     (with-array-data ((x x) (start-x) (end-x) :force-inline t
+                                               :array-header-p t)
+       (with-array-data ((y y) (start-y) (end-y) :force-inline t
+                                                 :array-header-p t)
+         (declare (ignore end-y))
+         (let* ((reffers %%data-vector-reffers%%)
+                (getter-x (truly-the function (svref reffers (%other-pointer-widetag x))))
+                (getter-y (truly-the function (svref reffers (%other-pointer-widetag y)))))
+           (loop for x-i fixnum from start-x below end-x
+                 for y-i fixnum from start-y
+                 for x-el = (funcall getter-x x x-i)
+                 for y-el = (funcall getter-y y y-i)
+                 always (or (eq x-el y-el)
+                            (equalp x-el y-el)))))))))
 
 (defun vector-equalp (x y)
   (declare (vector x y))
   (let ((length (length x)))
-    (and (vectorp y)
-         (= length (length y))
+    (and (= length (length y))
          (with-array-data ((x x) (start-x) (end-x) :force-inline t
                                                    :check-fill-pointer t)
            (with-array-data ((y y) (start-y) (end-y) :force-inline t
