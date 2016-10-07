@@ -90,7 +90,7 @@
       (if (fboundp s)
           (when (documentation s 'function)
             (incf n))))
-    (assert (= n 593))))
+    (assert (= n 594))))
 
 ;;; DECLARE should not be a special operator
 (with-test (:name (declare :not special-operator-p))

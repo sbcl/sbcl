@@ -272,24 +272,24 @@ and NIL to suppress normalization."
         entry)))
 
 (defun copy-readtable (&optional (from-readtable *readtable*) to-readtable)
+  #!+sb-doc
+  "Copies FROM-READTABLE and returns the result. Uses TO-READTABLE as a target
+for the copy when provided, otherwise a new readtable is created. The
+FROM-READTABLE defaults to the standard readtable when NIL and to the current
+readtable when not provided."
   (assert-not-standard-readtable to-readtable 'copy-readtable)
   (let ((really-from-readtable (or from-readtable *standard-readtable*))
         (really-to-readtable (or to-readtable (make-readtable))))
     (replace (character-attribute-array really-to-readtable)
              (character-attribute-array really-from-readtable))
     (replace/eql-hash-table
-     (character-attribute-hash-table really-to-readtable)
+     (clrhash (character-attribute-hash-table really-to-readtable))
      (character-attribute-hash-table really-from-readtable))
-    ;; CLHS says that when TO-READTABLE is non-nil "... the readtable specified
-    ;; ... is modified and returned." Is that to imply making TO-READTABLE look
-    ;; exactly like FROM-READTABLE, or does it mean to augment it?
-    ;; We have conflicting behaviors - everything in the base-char range,
-    ;; is overwritten, but above that range it's additive.
     (map-into (character-macro-array really-to-readtable)
               #'copy-cmt-entry
               (character-macro-array really-from-readtable))
     (replace/eql-hash-table
-     (character-macro-hash-table really-to-readtable)
+     (clrhash (character-macro-hash-table really-to-readtable))
      (character-macro-hash-table really-from-readtable)
      #'copy-cmt-entry)
     (setf (readtable-case really-to-readtable)
