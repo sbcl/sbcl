@@ -3646,11 +3646,12 @@ initially undefined function references:~2%")
 
       ;; Write the New Directory entry header.
       (write-word new-directory-core-entry-type-code)
-      (write-word 17) ; length = (5 words/space) * 3 spaces + 2 for header.
-
-      (output-gspace *read-only*)
-      (output-gspace *static*)
-      (output-gspace *dynamic*)
+      (let ((spaces (list *read-only*
+                          *static*
+                          *dynamic*)))
+        ;; length = (5 words/space) * N spaces + 2 for header.
+        (write-word (+ (* (length spaces) 5) 2))
+        (mapc #'output-gspace spaces))
 
       ;; Write the initial function.
       (write-word initial-fun-core-entry-type-code)

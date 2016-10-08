@@ -216,6 +216,7 @@ open_core_for_saving(char *filename)
     return fopen(filename, "wb");
 }
 
+#define N_SPACES_TO_SAVE 3
 boolean
 save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                    boolean make_executable,
@@ -263,9 +264,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     }
 
     write_lispobj(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(/* (word count = 3 spaces described by 5 words each, plus the
+    write_lispobj(/* (word count = N spaces described by 5 words each, plus the
           * entry type code, plus this count itself) */
-         (5*3)+2, file);
+         (5*N_SPACES_TO_SAVE)+2, file);
     output_space(file,
                  READ_ONLY_CORE_SPACE_ID,
                  (lispobj *)READ_ONLY_SPACE_START,
@@ -370,6 +371,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     printf("done]\n");
     exit(0);
 }
+#undef N_SPACES_TO_SAVE
 
 /* Check if the build_id for the current runtime is present in a
  * buffer. */
