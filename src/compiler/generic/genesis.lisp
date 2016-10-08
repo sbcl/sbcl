@@ -2804,17 +2804,20 @@ core and return a descriptor to it."
              ;; Note: we round the number of constants up to ensure
              ;; that the code vector will be properly aligned.
              (round-up raw-header-n-words 2))
+            (toplevel-p (pop-stack))
+            (debug-info (pop-stack))
             (des (allocate-cold-descriptor *dynamic*
                                            (+ (ash header-n-words
                                                    sb!vm:word-shift)
                                               code-size)
                                            sb!vm:other-pointer-lowtag)))
+       (declare (ignore toplevel-p))
        (write-header-word des header-n-words sb!vm:code-header-widetag)
        (write-wordindexed des
                           sb!vm:code-code-size-slot
                           (make-fixnum-descriptor code-size))
        (write-wordindexed des sb!vm:code-entry-points-slot *nil-descriptor*)
-       (write-wordindexed des sb!vm:code-debug-info-slot (pop-stack))
+       (write-wordindexed des sb!vm:code-debug-info-slot debug-info)
        (when (oddp raw-header-n-words)
          (write-wordindexed des raw-header-n-words (make-descriptor 0)))
        (do ((index (1- raw-header-n-words) (1- index)))

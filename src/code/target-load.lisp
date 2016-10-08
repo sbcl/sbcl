@@ -234,10 +234,13 @@
 (defun load-code (box-num code-length stack ptr input-stream)
   (declare (fixnum box-num code-length))
   (declare (simple-vector stack) (type index ptr))
-  (let ((code (sb!c:allocate-code-object box-num code-length)))
-    (setf (%code-debug-info code) (svref stack (+ ptr box-num)))
+  (let* ((debug-info-index (+ ptr box-num))
+         (toplevel-p (svref stack (1+ debug-info-index)))
+         (code (sb!c:allocate-code-object box-num code-length)))
+    (declare (ignore toplevel-p))
+    (setf (%code-debug-info code) (svref stack debug-info-index))
     (loop for i of-type index from sb!vm:code-constants-offset
-          for j of-type index from ptr below (+ ptr box-num)
+          for j of-type index from ptr below debug-info-index
           do (setf (code-header-ref code i) (svref stack j)))
     (without-gcing
       (read-n-bytes input-stream (code-instructions code) 0 code-length))

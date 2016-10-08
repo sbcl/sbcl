@@ -546,7 +546,8 @@
 
 ;; Cold-load calls COLD-LOAD-CODE instead
 (!define-fop #xE0 :not-host (fop-code ((:operands n-boxed-words n-unboxed-bytes)))
-  (with-fop-stack ((stack (operand-stack)) ptr (1+ n-boxed-words))
+  ;; add 1 word for the toplevel-p flag and one for the debug-info
+  (with-fop-stack ((stack (operand-stack)) ptr (+ n-boxed-words 2))
     (load-code n-boxed-words n-unboxed-bytes stack ptr (fasl-input-stream))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)

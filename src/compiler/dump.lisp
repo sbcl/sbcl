@@ -1118,6 +1118,8 @@
         (push (dump-to-table fasl-output)
               (fasl-output-debug-info fasl-output)))
 
+      (dump-object (if (eq (sb!c::component-kind component) :toplevel) :toplevel nil)
+                   fasl-output)
       (let ((num-consts (- header-length sb!vm:code-constants-offset)))
         (dump-fop 'fop-code fasl-output num-consts code-length))
 
