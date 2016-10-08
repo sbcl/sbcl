@@ -238,6 +238,18 @@
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
+(eval-when (:compile-toplevel :execute)
+  ;; Don't use a macro for this, because define-vop is weird.
+  (defun bignum-from-reg (tn signedp)
+    `(aref ',(map 'vector
+                  (lambda (x)
+                    ;; At present R11 can not occur here,
+                    ;; but let's be future-proof and allow for it.
+                    (unless (member x '(rsp rbp) :test 'string=)
+                      (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x)))
+                  sb!x86-64-asm::*qword-reg-names*)
+           (ash (tn-offset ,tn) -1))))
+
 ;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
 ;;; routine.
@@ -262,21 +274,7 @@
             (inst jmp :no DONE)
             (inst mov y x)))
      (inst mov temp-reg-tn
-           (make-fixup (ecase (tn-offset y)
-                         (#.rax-offset 'alloc-signed-bignum-in-rax)
-                         (#.rcx-offset 'alloc-signed-bignum-in-rcx)
-                         (#.rdx-offset 'alloc-signed-bignum-in-rdx)
-                         (#.rbx-offset 'alloc-signed-bignum-in-rbx)
-                         (#.rsi-offset 'alloc-signed-bignum-in-rsi)
-                         (#.rdi-offset 'alloc-signed-bignum-in-rdi)
-                         (#.r8-offset  'alloc-signed-bignum-in-r8)
-                         (#.r9-offset  'alloc-signed-bignum-in-r9)
-                         (#.r10-offset 'alloc-signed-bignum-in-r10)
-                         (#.r12-offset 'alloc-signed-bignum-in-r12)
-                         (#.r13-offset 'alloc-signed-bignum-in-r13)
-                         (#.r14-offset 'alloc-signed-bignum-in-r14)
-                         (#.r15-offset 'alloc-signed-bignum-in-r15))
-                       :assembly-routine))
+           (make-fixup #.(bignum-from-reg 'y "SIGNED") :assembly-routine))
      (inst call temp-reg-tn)
      DONE))
 (define-move-vop move-from-signed :move
@@ -291,42 +289,27 @@
   (:note "unsigned word to integer coercion")
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
-    (aver (not (location= x y)))
-    (let ((done (gen-label)))
-      (inst mov y #.(ash (1- (ash 1 (1+ n-fixnum-tag-bits)))
+     (aver (not (location= x y)))
+     (inst mov y #.(ash (1- (ash 1 (1+ n-fixnum-tag-bits)))
                          n-positive-fixnum-bits))
       ;; The assembly routines test the sign flag from this one, so if
       ;; you change stuff here, make sure the sign flag doesn't get
       ;; overwritten before the CALL!
-      (inst test x y)
+     (inst test x y)
       ;; Using LEA is faster but bigger than MOV+SHL; it also doesn't
       ;; twiddle the sign flag.  The cost of doing this speculatively
       ;; should be noise compared to bignum consing if that is needed
       ;; and saves one branch.
-      (if (= n-fixnum-tag-bits 1)
-          (inst lea y (make-ea :qword :base x :index x))
-          (inst lea y (make-ea :qword :index x
-                               :scale (ash 1 n-fixnum-tag-bits))))
-      (inst jmp :z done)
-      (inst mov y x)
-      (inst mov temp-reg-tn
-            (make-fixup (ecase (tn-offset y)
-                          (#.rax-offset 'alloc-unsigned-bignum-in-rax)
-                          (#.rcx-offset 'alloc-unsigned-bignum-in-rcx)
-                          (#.rdx-offset 'alloc-unsigned-bignum-in-rdx)
-                          (#.rbx-offset 'alloc-unsigned-bignum-in-rbx)
-                          (#.rsi-offset 'alloc-unsigned-bignum-in-rsi)
-                          (#.rdi-offset 'alloc-unsigned-bignum-in-rdi)
-                          (#.r8-offset  'alloc-unsigned-bignum-in-r8)
-                          (#.r9-offset  'alloc-unsigned-bignum-in-r9)
-                          (#.r10-offset 'alloc-unsigned-bignum-in-r10)
-                          (#.r12-offset 'alloc-unsigned-bignum-in-r12)
-                          (#.r13-offset 'alloc-unsigned-bignum-in-r13)
-                          (#.r14-offset 'alloc-unsigned-bignum-in-r14)
-                          (#.r15-offset 'alloc-unsigned-bignum-in-r15))
-                        :assembly-routine))
-      (inst call temp-reg-tn)
-      (emit-label done))))
+     (if (= n-fixnum-tag-bits 1)
+         (inst lea y (make-ea :qword :base x :index x))
+         (inst lea y (make-ea :qword :index x
+                              :scale (ash 1 n-fixnum-tag-bits))))
+     (inst jmp :z done)
+     (inst mov y x)
+     (inst mov temp-reg-tn
+           (make-fixup #.(bignum-from-reg 'y "UNSIGNED") :assembly-routine))
+     (inst call temp-reg-tn)
+     DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
