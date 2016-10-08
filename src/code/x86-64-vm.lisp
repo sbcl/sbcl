@@ -46,12 +46,11 @@
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 (defun fixup-code-object (code offset fixup kind)
-  (declare (type index offset))
+  (declare (type index offset)
+           (type (member :absolute :absolute64 :relative) kind))
   (without-gcing
     (let ((sap (truly-the system-area-pointer
                           (code-instructions code))))
-      (unless (member kind '(:absolute :absolute64 :relative))
-        (error "Unknown code-object-fixup kind ~S." kind))
       (ecase kind
         (:absolute64
          ;; Word at sap + offset contains a value to be replaced by
@@ -60,7 +59,7 @@
         (:absolute
          ;; Word at sap + offset contains a value to be replaced by
          ;; adding that value to fixup.
-         (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset))))
+         (setf (sap-ref-32 sap offset) (+ fixup (signed-sap-ref-32 sap offset))))
         (:relative
          ;; Fixup is the actual address wanted.
          ;; Replace word with value to add to that loc to get there.
