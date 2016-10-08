@@ -1001,7 +1001,7 @@
     (if (eq (ir2-lvar-kind 2lvar) :delayed)
         (let ((name (lvar-fun-name lvar t)))
           (aver name)
-          (values (make-load-time-constant-tn :fdefinition name) t))
+          (values (make-load-time-constant-tn :fdefinition name) name))
         (let* ((locs (ir2-lvar-locs 2lvar))
                (loc (first locs))
                (function-ptype (primitive-type-or-lose 'function)))
