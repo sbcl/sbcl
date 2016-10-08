@@ -240,7 +240,7 @@
 
 (cl:defmethod print-object ((gspace gspace) stream)
   (print-unreadable-object (gspace stream :type t)
-    (format stream "~S" (gspace-name gspace))))
+    (format stream "@#x~X ~S" (gspace-byte-address gspace) (gspace-name gspace))))
 
 (defun make-gspace (name identifier byte-address)
   (unless (zerop (rem byte-address target-space-alignment))
@@ -3473,22 +3473,21 @@ core and return a descriptor to it."
     (dolist (routine (sort (copy-list *cold-assembler-routines*) #'<
                            :key #'cdr))
       (format t "~8,'0X: ~S~%" (cdr routine) (car routine)))
-    (let ((funs nil)
+    (let ((fdefns nil)
+          (funs nil)
           (undefs nil))
-      (maphash (lambda (name fdefn)
-                 (let ((fun (cold-fdefn-fun fdefn)))
-                   (if (cold-null fun)
-                       (push name undefs)
-                       (let ((addr (read-wordindexed
-                                    fdefn sb!vm:fdefn-raw-addr-slot)))
-                         (push (cons name (descriptor-bits addr))
-                               funs)))))
+      (maphash (lambda (name fdefn &aux (fun (cold-fdefn-fun fdefn)))
+                 (push (list (- (descriptor-bits fdefn) (descriptor-lowtag fdefn))
+                             name) fdefns)
+                 (if (cold-null fun)
+                     (push name undefs)
+                     (push (list (- (descriptor-bits fun) (descriptor-lowtag fun))
+                                 name) funs)))
                *cold-fdefn-objects*)
-      (format t "~%~|~%initially defined functions:~2%")
-      (setf funs (sort funs #'< :key #'cdr))
-      (dolist (info funs)
-        (format t "~8,'0X: ~S   #X~8,'0X~%" (cdr info) (car info)
-                (- (cdr info) #x17)))
+      (format t "~%~|~%fdefns (native pointer):
+~:{~%~8,'0X: ~S~}~%" (sort fdefns #'< :key #'car))
+      (format t "~%~|~%initially defined functions (native pointer):
+~:{~%~8,'0X: ~S~}~%" (sort funs #'< :key #'car))
       (format t
 "~%~|
 (a note about initially undefined function references: These functions
