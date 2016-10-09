@@ -5993,3 +5993,22 @@
                                 sb-ext:most-positive-word))
              #+32-bit 4294967295
              #+64-bit 18446744073709551616)))
+
+(with-test (:name :callable-argument-mismatch-on-xep)
+  (assert (= (funcall (checked-compile
+                       `(lambda (s x)
+                          (locally (declare (notinline reduce))
+                            (reduce (lambda (a b)
+                                      (+ a b x))
+                                    s))))
+                      '(1 2) 3)
+             6))
+  (assert (= (funcall (checked-compile
+                       `(lambda (s x)
+                          (locally (declare (notinline reduce))
+                            (reduce (lambda (&optional a b z)
+                                      (declare (ignore z))
+                                      (+ a b x))
+                                    s))))
+                      '(1 2) 3)
+             6)))
