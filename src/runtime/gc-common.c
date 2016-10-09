@@ -25,6 +25,8 @@
  *   <ftp://ftp.cs.utexas.edu/pub/garbage/bigsurv.ps>.
  */
 
+#define _GNU_SOURCE /* for ffsl(3) from string.h */
+
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
