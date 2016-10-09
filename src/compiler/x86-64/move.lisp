@@ -259,6 +259,7 @@
   (:results (y :scs (any-reg descriptor-reg) . #.(and (> n-fixnum-tag-bits 1)
                                                       '(:from :argument))))
   (:note "signed word to integer coercion")
+  (:vop-var vop)
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
      (cond ((= 1 n-fixnum-tag-bits)
@@ -273,9 +274,7 @@
             (inst imul y x #.(ash 1 n-fixnum-tag-bits))
             (inst jmp :no DONE)
             (inst mov y x)))
-     (inst mov temp-reg-tn
-           (make-fixup #.(bignum-from-reg 'y "SIGNED") :assembly-routine))
-     (inst call temp-reg-tn)
+     (invoke-asm-routine 'call #.(bignum-from-reg 'y "SIGNED") vop temp-reg-tn)
      DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -287,6 +286,7 @@
   (:args (x :scs (signed-reg unsigned-reg) :to :result))
   (:results (y :scs (any-reg descriptor-reg) :from :argument))
   (:note "unsigned word to integer coercion")
+  (:vop-var vop)
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
      (aver (not (location= x y)))
@@ -306,9 +306,7 @@
                               :scale (ash 1 n-fixnum-tag-bits))))
      (inst jmp :z done)
      (inst mov y x)
-     (inst mov temp-reg-tn
-           (make-fixup #.(bignum-from-reg 'y "UNSIGNED") :assembly-routine))
-     (inst call temp-reg-tn)
+     (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop temp-reg-tn)
      DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))

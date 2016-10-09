@@ -380,6 +380,7 @@
          ;; as this vop clobbers RCX in the call. If changed to "CALL [ADDR]"
          ;; be sure to update the subroutine to push and pop RCX.
          (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+         (:vop-var vop)
          (:generator ,cost
            (progn
              ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
@@ -401,8 +402,7 @@
              (inst jmp done))
          slow
            (move rdx arg)
-           (inst mov rcx (make-fixup 'logcount :assembly-routine))
-           (inst call rcx)
+           (invoke-asm-routine 'call 'logcount vop rcx)
            (move result rdx)
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)

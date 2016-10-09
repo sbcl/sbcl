@@ -237,6 +237,7 @@
   (:temporary (:sc sap-reg) temp)
   (:temporary (:sc descriptor-reg :offset rbx-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset rax-offset) block)
+  (:vop-var vop)
   (:generator 22
     ;; Store the function into a non-stack location, since we'll be
     ;; unwinding the stack and destroying register contents before we
@@ -257,8 +258,7 @@
     (storew temp-reg-tn block unwind-block-entry-pc-slot)
 
     ;; Run any required UWPs.
-    (inst mov temp-reg-tn (make-fixup 'unwind :assembly-routine))
-    (inst jmp temp-reg-tn)
+    (invoke-asm-routine 'jmp 'unwind vop temp-reg-tn)
     ENTRY-LABEL
 
     ;; Move our saved function to where we want it now.

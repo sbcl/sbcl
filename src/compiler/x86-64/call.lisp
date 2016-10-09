@@ -884,14 +884,14 @@
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 0)) rsi)
   (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1)) rax)
   (:temporary (:sc unsigned-reg) call-target)
+  (:vop-var vop)
   (:generator 75
     (check-ocfp-and-return-pc old-fp return-pc)
     ;; Move these into the passing locations if they are not already there.
     (move rsi args)
     (move rax function)
     ;; And jump to the assembly routine.
-    (inst mov call-target (make-fixup 'tail-call-variable :assembly-routine))
-    (inst jmp call-target)))
+    (invoke-asm-routine 'jmp 'tail-call-variable vop call-target)))
 
 ;;;; unknown values return
 
@@ -1011,6 +1011,7 @@
   (:temporary (:sc descriptor-reg :offset (first *register-arg-offsets*)
                    :from (:eval 0)) a0)
   (:node-var node)
+  (:vop-var vop)
   (:generator 13
     (check-ocfp-and-return-pc old-fp return-pc)
     (unless (policy node (> space speed))
@@ -1031,8 +1032,7 @@
         (emit-label not-single)))
     (move rsi vals)
     (move rcx nvals)
-    (inst mov return-asm (make-fixup 'return-multiple :assembly-routine))
-    (inst jmp return-asm)))
+    (invoke-asm-routine 'jmp 'return-multiple vop return-asm)))
 
 ;;;; XEP hackery
 

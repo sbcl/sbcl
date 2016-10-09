@@ -9,6 +9,13 @@
 
 (in-package "SB!VM")
 
+(defun invoke-asm-routine (inst routine vop temp-reg)
+  (declare (ignore vop))
+  (inst mov temp-reg (make-fixup routine :assembly-routine))
+  (ecase inst
+   (jmp  (inst jmp temp-reg))
+   (call (inst call temp-reg))))
+
 (defun generate-call-sequence (name style vop options)
   ;; It will be nice if we can eliminate the global assumption that
   ;; a certain register (TEMP-REG-TN - currently R11) is always available.
@@ -17,21 +24,18 @@
       (:raw
        (values
         `((note-this-location ,vop :call-site)
-          (inst mov ,call-tn (make-fixup ',name :assembly-routine))
-          (inst call ,call-tn)
+          (invoke-asm-routine 'call ',name ,vop ,call-tn)
           (note-this-location ,vop :single-value-return))
         nil))
       (:full-call
        (values
         `((note-this-location ,vop :call-site)
-          (inst mov ,call-tn (make-fixup ',name :assembly-routine))
-          (inst call ,call-tn)
+          (invoke-asm-routine 'call ',name ,vop ,call-tn)
           (note-this-location ,vop :single-value-return))
         '((:save-p :compute-only))))
       (:none
        (values
-        `((inst mov ,call-tn (make-fixup ',name :assembly-routine))
-          (inst jmp ,call-tn))
+        `((invoke-asm-routine 'jmp ',name ,vop ,call-tn))
         nil)))))
 
 (defun generate-return-sequence (style)
