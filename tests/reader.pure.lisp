@@ -211,9 +211,10 @@
     (let ((*readtable* (copy-readtable nil)))
       (assert (null (loop for c across standard-chars append (frob c)))))))
 
-(with-test (:name :copy-readtable-with-unicode-macro)
+(with-test (:name :copy-readtable-with-unicode-macro
+                  :skipped-on '(not :sb-unicode))
   (let ((rt (copy-readtable)))
-    (set-macro-character #\u100fa #'error nil rt)
+    (set-macro-character (code-char #x100fa) #'error nil rt)
     (assert (plusp (hash-table-count (sb-impl::character-macro-hash-table rt))))
     (copy-readtable nil rt)
     (assert (null (get-macro-character #\UFC rt)))))
