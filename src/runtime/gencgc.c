@@ -3264,6 +3264,8 @@ verify_space(lispobj *start, size_t words)
     }
 }
 
+static void verify_dynamic_space();
+
 static void
 verify_gc(void)
 {
@@ -3288,17 +3290,19 @@ verify_gc(void)
     }
     verify_space((lispobj*)READ_ONLY_SPACE_START, read_only_space_size);
     verify_space((lispobj*)STATIC_SPACE_START   , static_space_size);
+    verify_dynamic_space();
 }
 
 static void
 verify_generation(generation_index_t generation)
 {
     page_index_t i;
+    int genmask = generation >= 0 ? 1 << generation : ~0;
 
     for (i = 0; i < last_free_page; i++) {
         if (page_allocated_p(i)
             && (page_table[i].bytes_used != 0)
-            && (page_table[i].gen == generation)) {
+            && ((1 << page_table[i].gen) & genmask)) {
             page_index_t last_page;
 
             /* This should be the start of a contiguous block */
@@ -3312,7 +3316,7 @@ verify_generation(generation_index_t generation)
             for (last_page = i; ;last_page++)
                 /* Check whether this is the last page in this contiguous
                  * block. */
-                if (page_ends_contiguous_block_p(last_page, generation))
+                if (page_ends_contiguous_block_p(last_page, page_table[i].gen))
                     break;
 
             verify_space(page_address(i),
@@ -3372,11 +3376,7 @@ gencgc_verify_zero_fill(void)
 static void
 verify_dynamic_space(void)
 {
-    generation_index_t i;
-
-    for (i = 0; i <= HIGHEST_NORMAL_GENERATION; i++)
-        verify_generation(i);
-
+    verify_generation(-1);
     if (gencgc_enable_verify_zero_fill)
         verify_zero_fill();
 }
@@ -3826,7 +3826,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
             SHOW("verifying");
         }
         verify_gc();
-        verify_dynamic_space();
     }
 
     /* Set the new gc trigger for the GCed generation. */
@@ -4084,7 +4083,7 @@ collect_garbage(generation_index_t last_gen)
  * PURIFY flush the current gc_alloc() region, as the page_tables are
  * re-initialized, and every page is zeroed to be sure. */
 void
-gc_free_heap(void)
+gc_free_heap(void) // FIXME: remove, not used
 {
     page_index_t page, last_page;
 
