@@ -71,7 +71,7 @@
                     #!+(or x86 x86-64)
                     (:code-object
                      (aver (null name))
-                     (values (get-lisp-obj-address code) t))
+                     (get-lisp-obj-address code))
                     (:symbol-tls-index
                      (aver (symbolp name))
                      (ensure-symbol-tls-index name)))))
