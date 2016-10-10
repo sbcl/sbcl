@@ -44,7 +44,7 @@
           ;; to appear in subsequently forked children.
           (let ((*compile-for-effect-only* t))
             (target-compile-stem stem flags))
-          (unless (find :not-target flags)
+          (unless (find :not-genesis flags)
             (push (stem-object-path stem flags :target-compile)
                   reversed-target-object-file-names))))
       (loop (if (plusp subprocess-count) (wait) (return)))
