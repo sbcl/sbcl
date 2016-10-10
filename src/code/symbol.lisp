@@ -348,7 +348,32 @@ distinct from the global value. Can also be SETF."
   (declare (type string string))
   (%make-symbol (if (simple-string-p string)
                     string
-                    (subseq string 0))))
+                    (subseq string 0))
+                nil))
+
+;;; We try to partition immobile symbols onto separate gc cards based on
+;;; a heuristic, to make them mostly have the same generation per card,
+;;; expecting that:
+;;;  - uninterned symbols become garbage almost immediately
+;;;  - symbols looking like special variables are permanent
+;;;  - other symbols are not touched often, if at all
+;;; It does not really matter if a symbol is on the "wrong" kind of card,
+;;; so there is no problem with (un)interning etc.
+;;; However, it turns out that without a pre-save de-fragmentation pass over
+;;; immobile space, there are many widely separated pages of symbols,
+;;; inhibiting the ability to create pages of other fixed-size allocations.
+;;; So the heuristic is essentially disabled for now, and all symbols except
+;;; for those that look like specials are located in ordinary dynamic space.
+#!+immobile-space
+(defun %make-symbol (name intern) ; intern means "will be interned" or not
+  (declare (type simple-string name))
+  (if (and intern
+           (plusp (length name))
+           (char= (char name 0) #\*)
+           (char= (char name (1- (length name))) #\*))
+      (truly-the (values symbol)
+                 (%primitive sb!vm::alloc-immobile-symbol name 0))
+      (sb!vm::%%make-symbol name)))
 
 (defun get (symbol indicator &optional (default nil))
   #!+sb-doc

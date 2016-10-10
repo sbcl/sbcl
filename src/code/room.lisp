@@ -32,7 +32,7 @@
                (not (eq name 'weak-pointer)))
       (setf (svref *meta-room-info* (symbol-value widetag))
             (make-room-info :name name
-                            :kind (if (eq name 'symbol)
+                            :kind (if (member name '(fdefn symbol))
                                       :tiny-other
                                       :other))))))
 
@@ -124,7 +124,8 @@
                                       ,(position info *specialized-array-element-type-properties*))
                                info))
                          *meta-room-info*))))
-(deftype spaces () '(member :static :dynamic :read-only))
+(deftype spaces ()
+  '(member :static #!+immobile-space :immobile :dynamic :read-only))
 
 ;;;; MAP-ALLOCATED-OBJECTS
 
@@ -151,6 +152,10 @@
     (:read-only
      (values (int-sap read-only-space-start)
              (int-sap (ash *read-only-space-free-pointer* n-fixnum-tag-bits))))
+    #!+immobile-space
+    (:immobile
+     (values (int-sap immobile-space-start)
+             (int-sap (ash *immobile-space-free-pointer* n-fixnum-tag-bits))))
     (:dynamic
      (values (int-sap (current-dynamic-space-start))
              (dynamic-space-free-pointer)))))
@@ -228,7 +233,7 @@
           (:instance
            (values (tagged-object instance-pointer-lowtag)
                    widetag
-                   (boxed-size header-value)))
+                   (boxed-size (logand header-value short-header-max-words))))
 
           (:other
            (values (tagged-object other-pointer-lowtag)
@@ -238,7 +243,7 @@
           (:tiny-other
            (values (tagged-object other-pointer-lowtag)
                    widetag
-                   (boxed-size (logand header-value #xff))))
+                   (boxed-size (logand header-value short-header-max-words))))
 
           (:vector-nil
            (values (tagged-object other-pointer-lowtag)
@@ -256,7 +261,8 @@
            (values (tagged-object other-pointer-lowtag)
                    code-header-widetag
                    (round-to-dualword
-                    (+ (* header-value n-word-bytes)
+                    (+ (* (logand header-value short-header-max-words)
+                          n-word-bytes)
                        (the fixnum
                             (sap-ref-lispobj object-sap
                                              (* code-code-size-slot
@@ -312,6 +318,19 @@
               (flags (unsigned 8))
               (has-dontmove-dwords (unsigned 8))
               (gen (signed 8))))
+  #!+immobile-space
+  (progn
+    (define-alien-type (struct immobile-page)
+        ;; ... and yet another place for Lisp to become out-of-sync with C.
+        (struct immobile-page
+                (flags (unsigned 8))
+                (obj-spacing (unsigned 8))
+                (obj-size (unsigned 8))
+                (generations (unsigned 8))
+                (free-index (unsigned 32))
+                (page-link (unsigned 16))
+                (prior-free-index (unsigned 16))))
+    (define-alien-variable "fixedobj_pages" (* (struct immobile-page))))
   (declaim (inline find-page-index))
   (define-alien-routine "find_page_index" long (index signed))
   (define-alien-variable "last_free_page" sb!kernel::page-index-t)
@@ -344,6 +363,24 @@
          (map-objects-in-range fun
                                (%make-lisp-obj (sap-int start))
                                (%make-lisp-obj (sap-int end)))))
+
+      #!+immobile-space
+      (:immobile
+       ;; Filter out filler objects (code with no functions in it),
+       ;; and apparent cons cells, since there can't be any.
+       (dx-flet ((filter (obj type size)
+                   (unless (or (and (code-component-p obj)
+                                    (not (%code-entry-points obj)))
+                               (consp obj))
+                     (funcall fun obj type size))))
+         (let ((start immobile-space-start)
+               (end *immobile-fixedobj-free-pointer*))
+           (dotimes (pass 2)
+             (map-objects-in-range #'filter
+                                   (ash start (- n-fixnum-tag-bits))
+                                   end)
+             (setq start (+ immobile-space-start immobile-fixedobj-subspace-size)
+                   end *immobile-space-free-pointer*)))))
 
       #!+gencgc
       (:dynamic
@@ -738,7 +775,8 @@
                    #!-stack-grows-downward-not-upward (sap+ sp (- n-word-bytes))))))
 
 (declaim (inline code-header-words))
-(defun code-header-words (code) (get-header-data code))
+(defun code-header-words (code)
+  (logand (get-header-data code) #!+immobile-space short-header-max-words))
 
 (defun map-referencing-objects (fun space object)
   (declare (type spaces space)

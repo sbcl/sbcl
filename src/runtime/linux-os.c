@@ -405,6 +405,9 @@ is_valid_lisp_addr(os_vm_address_t addr)
 
     if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
         || (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
+#if defined LISP_FEATURE_IMMOBILE_SPACE
+        || (IMMOBILE_SPACE_START <= ad && ad < IMMOBILE_SPACE_END)
+#endif
 #if defined LISP_FEATURE_GENCGC
         || (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
 #else

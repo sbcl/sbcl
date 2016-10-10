@@ -47,6 +47,8 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity *backend-page-bytes*)
+;;; The card size for immobile/low space
+#!+immobile-space (def!constant immobile-card-bytes 4096)
 
 #!+sb-safepoint
 (defconstant thread-saved-csp-offset

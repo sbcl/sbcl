@@ -31,7 +31,12 @@
   '(if (< x 0) (- x) x))
 
 (deftransform make-symbol ((string) (simple-string))
-  `(%make-symbol string))
+  `(%make-symbol string nil))
+
+#!-immobile-space
+(define-source-transform %make-symbol (string kind)
+  (declare (ignore kind))
+  `(sb!vm::%%make-symbol ,string))
 
 ;;; We don't want to clutter the bignum code.
 #!+(or x86 x86-64)

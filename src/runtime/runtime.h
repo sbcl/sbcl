@@ -274,14 +274,20 @@ HeaderValue(lispobj obj)
   return obj >> N_WIDETAG_BITS;
 }
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#define HEADER_VALUE_MASKED(x) (header >> N_WIDETAG_BITS) & SHORT_HEADER_MAX_WORDS
+#else
+#define HEADER_VALUE_MASKED(x) (header >> N_WIDETAG_BITS)
+#endif
 static inline uword_t instance_length(lispobj header)
 {
-  return (header >> N_WIDETAG_BITS);
+  return HEADER_VALUE_MASKED(header >> N_WIDETAG_BITS);
 }
 static inline lispobj instance_layout(lispobj* instance_ptr) // native ptr
 {
   return instance_ptr[1]; // the word following the header is the layout
 }
+#undef HEADER_VALUE_MASKED
 
 static inline struct cons *
 CONS(lispobj obj)

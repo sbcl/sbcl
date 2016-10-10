@@ -63,6 +63,9 @@ validate(void)
 
     ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
     ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
+#ifdef IMMOBILE_SPACE_START
+    ensure_space( (lispobj *)IMMOBILE_SPACE_START , IMMOBILE_SPACE_SIZE);
+#endif
 #ifdef LISP_FEATURE_GENCGC
     ensure_space( (lispobj *)DYNAMIC_SPACE_START  , dynamic_space_size);
 #else

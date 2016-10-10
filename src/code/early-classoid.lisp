@@ -107,7 +107,7 @@
 ;;; well, since the initialization of layout slots is hardcoded there.
 ;;;
 ;;; FIXME: ...it would be better to automate this, of course...
-(def!struct (layout)
+(def!struct (layout #-sb-xc-host (:constructor #!+immobile-space nil))
   ;; a pseudo-random hash value for use by CLOS.
   (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
   ;; the class that this is a layout for
@@ -175,6 +175,23 @@
   ;; a single bit that decides whether something is STANDARD-OBJECT.
   (%for-std-class-b 0 :type bit :read-only t))
 (declaim (freeze-type layout))
+
+#!+(and immobile-space (host-feature sb-xc))
+(macrolet ((def-layout-maker ()
+             (let ((slots (dd-slots (find-defstruct-description 'layout))))
+               `(defun make-layout
+                    (&key ,@(mapcar (lambda (s) `(,(dsd-name s) ,(dsd-default s)))
+                                    slots))
+                  (declare ,@(mapcar (lambda (s) `(type ,(dsd-type s) ,(dsd-name s)))
+                                     slots))
+                  ;; After calling into C, registers are trashed,
+                  ;; so we pass everything as a single vector,
+                  ;; and don't rely on Lisp to write the slots of the layout.
+                  (dx-let ((data (vector ,(find-layout 'layout)
+                                         ,@(mapcar #'dsd-name slots))))
+                    (truly-the layout
+                     (values (%primitive sb!vm::alloc-immobile-layout data))))))))
+  (def-layout-maker))
 
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type

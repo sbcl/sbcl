@@ -63,6 +63,7 @@
     (small-spaces-start
           &key ((:dynamic-space-start dynamic-space-start*))
                default-dynamic-space-size
+               #!+immobile-space (immobile-space-size (* 128 1024 1024))
                ;; Smallest os_validate()able alignment; used as safepoint
                ;; page size.  Default suitable for POSIX platforms.
                (alignment            #x1000)
@@ -70,12 +71,22 @@
                (small-space-spread #x100000)
                ;; traditional margin between spaces
                (margin-size          #x1000))
-  (let* ((spaces '(read-only static #!+linkage-table linkage-table))
+  (let* ((spaces '(read-only static
+                   #!+linkage-table linkage-table
+                   #!+immobile-space immobile))
          (ptr small-spaces-start)
          safepoint-address
          (small-space-forms
           (loop for (space next-space) on spaces appending
-                (let* ((next-start (+ ptr small-space-spread))
+                (let* ((next-start
+                        (+ ptr (cond #!+immobile-space
+                                     ((eq space 'immobile)
+                                      ;; We subtract margin-size when
+                                      ;; computing FOO-SPACE-END,
+                                      ;; so add it in here to compensate.
+                                      (+ immobile-space-size margin-size))
+                                     (t
+                                      small-space-spread))))
                        (end next-start))
                   (when (eq next-space 'static)
                     ;; margin becomes safepoint page; substract margin again.
@@ -98,6 +109,8 @@
     `(progn
        ,@safepoint-page-forms
        ,@small-space-forms
+       #!+immobile-space
+       (defconstant immobile-fixedobj-subspace-size (* 24 1024 1024))
        (defconstant dynamic-space-start ,dynamic-space-start*)
        (defconstant dynamic-space-end (!configure-dynamic-space-end
                                        ,@optional-dynamic-space-end)))))
@@ -135,6 +148,9 @@
     ;; bignums.  -- WHN 2000-10-02
     *read-only-space-free-pointer*
     *static-space-free-pointer*
+    *immobile-fixedobj-free-pointer*
+    *immobile-space-free-pointer*
+    *immobile-freelist*
 
     ;; things needed for non-local-exit
     *current-catch-block*

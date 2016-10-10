@@ -180,6 +180,8 @@
      ;; FIXME II: if it doesn't make sense, why is this X86-ish only?
      sb!pcl::..slot-unbound..)))
 
+;;; FIXME: with #!+immobile-space, this should be the empty list,
+;;; because *all* fdefns are permanently placed.
 (defparameter *static-funs*
   '(length
     two-arg-+

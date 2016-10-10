@@ -156,6 +156,7 @@ lispobj  copy_code_object(lispobj object, sword_t nwords);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);
+lispobj *search_immobile_space(void *pointer);
 lispobj *search_dynamic_space(void *pointer);
 
 lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
@@ -193,5 +194,74 @@ typedef uword_t in_use_marker_t;
 extern void
 bitmap_scan(in_use_marker_t* bitmap, int n_bitmap_words, int flags,
             void (*proc)(void*, int, int), void* arg);
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+
+static inline boolean immobile_space_p(lispobj obj)
+{
+  return IMMOBILE_SPACE_START <= obj && obj < IMMOBILE_SPACE_END;
+}
+
+// Note that find_page_index is in gencgc,
+// but because this is inline and needed by 2 files, it's in a header.
+typedef int low_page_index_t;
+static inline low_page_index_t find_immobile_page_index(void *addr)
+{
+  if (addr >= (void*)IMMOBILE_SPACE_START) {
+      // Must use full register size here to avoid truncation of quotient
+      // and bogus result!
+      page_index_t index =
+          ((pointer_sized_uint_t)addr -
+           (pointer_sized_uint_t)IMMOBILE_SPACE_START) / IMMOBILE_CARD_BYTES;
+      if (index < (int)(IMMOBILE_SPACE_SIZE/IMMOBILE_CARD_BYTES))
+          return index;
+  }
+  return -1;
+}
+int immobile_obj_younger_p(lispobj,generation_index_t);
+void promote_immobile_obj(lispobj*);
+
+// Maximum number of boxed words in a code component
+#define CODE_HEADER_COUNT_MASK 0xFFFFFF
+
+#define IMMOBILE_OBJ_VISITED_FLAG    0x10
+#define IMMOBILE_OBJ_GENERATION_MASK 0x0f // mask off the VISITED flag
+
+#define IMMOBILE_VARYOBJ_SUBSPACE_START (IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE)
+
+// Note: this does not work on a SIMPLE-FUN
+// because a simple-fun header does not contain a generation.
+#define __immobile_obj_generation(x) (__immobile_obj_gen_bits(x) & IMMOBILE_OBJ_GENERATION_MASK)
+
+static inline struct code *code_obj_from_simple_fun(struct simple_fun *fun)
+{
+  // The upper 4 bytes of any function header will point to its layout,
+  // so mask those bytes off.
+  uword_t offset = (HeaderValue(fun->header) & CODE_HEADER_COUNT_MASK)
+                   * N_WORD_BYTES;
+  return (struct code *)((uword_t)fun - offset);
+}
+
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
+static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer
+{
+  if (widetag_of(*pointer) == SIMPLE_FUN_HEADER_WIDETAG)
+    pointer = (lispobj*)code_obj_from_simple_fun((struct simple_fun*)pointer);
+  return ((generation_index_t*)pointer)[3];
+}
+// Faster way when we know that the object can't be a simple-fun,
+// such as when walking the immobile space.
+static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
+{
+  return ((generation_index_t*)pointer)[3];
+}
+#else
+#error "Need to define immobile_obj_gen_bits() for big-endian"
+#endif /* little-endian */
+
+static inline boolean immobile_filler_p(lispobj* obj) {
+  return *(int*)obj == (2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG);
+}
+#endif /* immobile space */
 
 #endif /* _GC_INTERNAL_H_ */

@@ -664,7 +664,11 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
-
+    case "$sbcl_os" in
+    linux | darwin)
+        # probably works on *BSD but not tested
+        printf ' :immobile-space' >> $ltf
+    esac
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :cheneygc :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf

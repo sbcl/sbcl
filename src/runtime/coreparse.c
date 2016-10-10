@@ -280,6 +280,7 @@ int merge_core_pages = -1;
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
+    extern void immobile_space_coreparse(uword_t,uword_t);
     struct ndir_entry *entry;
     int compressed;
 
@@ -383,6 +384,27 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
                 lose("core/runtime address mismatch: READ_ONLY_SPACE_START\n");
             }
             break;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+         // Immobile space is subdivided into fixed-size and variable-size.
+         // There is no margin between the two, though for efficiency
+         // they are written separately to eliminate waste in the core file.
+        case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
+            if (addr != (os_vm_address_t)IMMOBILE_SPACE_START) {
+                fprintf(stderr, "in core: %p - in runtime: %p\n",
+                        (void*)addr, (void*)IMMOBILE_SPACE_START);
+                lose("core/runtime address mismatch: IMMOBILE_SPACE_START\n");
+            }
+            immobile_space_coreparse(IMMOBILE_SPACE_START, len);
+            break;
+        case IMMOBILE_VARYOBJ_CORE_SPACE_ID:
+            if (addr != (os_vm_address_t)IMMOBILE_VARYOBJ_SUBSPACE_START) {
+                fprintf(stderr, "in core: %p - in runtime: %p\n",
+                        (void*)addr, (void*)IMMOBILE_VARYOBJ_SUBSPACE_START);
+                lose("core/runtime address mismatch: IMMOBILE_VARYOBJ_SUBSPACE_START\n");
+            }
+            immobile_space_coreparse(IMMOBILE_VARYOBJ_SUBSPACE_START, len);
+            break;
+#endif
         default:
             lose("unknown space ID %ld addr %p\n", id, addr);
         }

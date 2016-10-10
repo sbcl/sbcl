@@ -52,7 +52,11 @@ LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_s
 
 CFLAGS += -arch x86_64 -fno-omit-frame-pointer -pagezero_size 0x100000
 
-GC_SRC = gencgc.c
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = gencgc.c marknsweepgc.c
+else
+  GC_SRC = gencgc.c
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

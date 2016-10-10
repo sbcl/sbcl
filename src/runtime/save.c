@@ -183,7 +183,8 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
              int core_compression_level)
 {
     size_t words, bytes, data, compressed_flag;
-    static char *names[] = {NULL, "dynamic", "static", "read-only"};
+    static char *names[] = {NULL, "dynamic", "static", "read-only",
+                            "immobile", "immobile"};
 
     compressed_flag
             = ((core_compression_level != COMPRESSION_LEVEL_NONE)
@@ -216,7 +217,12 @@ open_core_for_saving(char *filename)
     return fopen(filename, "wb");
 }
 
-#define N_SPACES_TO_SAVE 3
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+extern void prepare_immobile_space_for_save();
+#  define N_SPACES_TO_SAVE 5
+#else
+#  define N_SPACES_TO_SAVE 3
+#endif
 boolean
 save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                    boolean make_executable,
@@ -283,6 +289,21 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     /* Flush the current_region, updating the tables. */
     gc_alloc_update_all_page_tables(1);
     update_dynamic_space_free_pointer();
+#endif
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    prepare_immobile_space_for_save();
+    output_space(file,
+                 IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
+                 (lispobj *)IMMOBILE_SPACE_START,
+                 (lispobj *)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0),
+                 core_start_pos,
+                 core_compression_level);
+    output_space(file,
+                 IMMOBILE_VARYOBJ_CORE_SPACE_ID,
+                 (lispobj *)IMMOBILE_VARYOBJ_SUBSPACE_START,
+                 (lispobj *)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0),
+                 core_start_pos,
+                 core_compression_level);
 #endif
 #ifdef reg_ALLOC
 #ifdef LISP_FEATURE_GENCGC

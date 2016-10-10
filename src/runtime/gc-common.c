@@ -153,6 +153,13 @@ scavenge(lispobj *start, sword_t n_words)
                     object_ptr +=
                         (scavtab[widetag_of(object)])(object_ptr, object);
                 }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            } else if (immobile_space_p(object)) {
+                lispobj *ptr = native_pointer(object);
+                if (immobile_obj_gen_bits(ptr) == from_space)
+                    promote_immobile_obj(ptr);
+                object_ptr++;
+#endif
             } else {
                 /* It points somewhere other than oldspace. Leave it
                  * alone. */
@@ -1698,7 +1705,7 @@ void scan_weak_pointers(void)
         if (next_wp == wp) /* gencgc uses a ref to self for end of list */
             next_wp = NULL;
 
-        if (!(is_lisp_pointer(value) && from_space_p(value)))
+        if (!is_lisp_pointer(value))
             continue;
 
         /* Now, we need to check whether the object has been forwarded. If
@@ -1706,16 +1713,25 @@ void scan_weak_pointers(void)
          * updated. Otherwise, the weak pointer needs to be nil'ed
          * out. */
 
-        first_pointer = (lispobj *)native_pointer(value);
+        if (from_space_p(value)) {
+            first_pointer = (lispobj *)native_pointer(value);
 
-        if (forwarding_pointer_p(first_pointer)) {
-            wp->value=
+            if (forwarding_pointer_p(first_pointer)) {
+              wp->value=
                 (lispobj)LOW_WORD(forwarding_pointer_value(first_pointer));
-        } else {
+            } else {
             /* Break it. */
-            wp->value = NIL;
-            wp->broken = T;
+                wp->value = NIL;
+                wp->broken = T;
+            }
         }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+          else if (immobile_space_p(value) &&
+                   immobile_obj_gen_bits(native_pointer(value)) == from_space) {
+                wp->value = NIL;
+                wp->broken = T;
+        }
+#endif
     }
 }
 
@@ -1745,8 +1761,20 @@ struct hash_table *weak_hash_tables = NULL;
 static inline int
 survived_gc_yet (lispobj obj)
 {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* If an immobile object's generation# is that of 'from_space', but has been
+       visited (i.e. is live), then it is conceptually not in 'from_space'.
+       This can happen when and only when _not_ raising the generation number.
+       Since the gen_bits() accessor returns the visited bit, the byte value
+       is numerically unequal to 'from_space', which is what we want */
+    return !is_lisp_pointer(obj)
+      || (immobile_space_p(obj)
+          ? immobile_obj_gen_bits(native_pointer(obj)) != from_space
+          : (!from_space_p(obj) || forwarding_pointer_p(native_pointer(obj))));
+#else
     return (!is_lisp_pointer(obj) || !from_space_p(obj) ||
             forwarding_pointer_p(native_pointer(obj)));
+#endif
 }
 
 static inline int
@@ -1875,7 +1903,7 @@ scav_vector (lispobj *where, lispobj object)
     /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
      * hash tables in the Lisp HASH-TABLE code to indicate need for
      * special GC support. */
-    if (HeaderValue(object) == subtype_VectorNormal)
+    if ((HeaderValue(object) & 0xFF) == subtype_VectorNormal)
         return 1;
 
     kv_length = fixnum_value(where[1]);
@@ -2369,7 +2397,7 @@ gc_init_tables(void)
     transother[NO_TLS_VALUE_MARKER_WIDETAG] = trans_immediate;
     transother[WEAK_POINTER_WIDETAG] = trans_weak_pointer;
     transother[INSTANCE_HEADER_WIDETAG] = trans_instance;
-    transother[FDEFN_WIDETAG] = trans_boxed;
+    transother[FDEFN_WIDETAG] = trans_tiny_boxed;
 
     /* size table, initialized the same way as scavtab */
     for (i = 0; i < ((sizeof sizetab)/(sizeof sizetab[0])); i++)
@@ -2515,7 +2543,7 @@ gc_init_tables(void)
     sizetab[NO_TLS_VALUE_MARKER_WIDETAG] = size_immediate;
     sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;
     sizetab[INSTANCE_HEADER_WIDETAG] = size_instance;
-    sizetab[FDEFN_WIDETAG] = size_boxed;
+    sizetab[FDEFN_WIDETAG] = size_tiny_boxed;
 }
 
 
@@ -2530,6 +2558,10 @@ component_ptr_from_pc(lispobj *pc)
         ;
     else if ( (object = search_static_space(pc)) )
         ;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    else if ( (object = search_immobile_space(pc)) )
+        ;
+#endif
     else
         object = search_dynamic_space(pc);
 
@@ -2807,6 +2839,9 @@ valid_lisp_pointer_p(lispobj *pointer)
 {
     lispobj *start;
     if (((start=search_dynamic_space(pointer))!=NULL) ||
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        ((start=search_immobile_space(pointer))!=NULL) ||
+#endif
         ((start=search_static_space(pointer))!=NULL) ||
         ((start=search_read_only_space(pointer))!=NULL))
         return looks_like_valid_lisp_pointer_p((lispobj)pointer, start);

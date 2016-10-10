@@ -1018,7 +1018,8 @@ implementation it is ~S." *default-package-use-list*)
                                  name)))
                    (with-single-package-locked-error
                        (:package package "interning ~A" symbol-name)
-                     (let ((symbol (make-symbol symbol-name)))
+                     ;; T is a hint that that symbol will become interned
+                     (let ((symbol (%make-symbol symbol-name t)))
                        (add-symbol (cond ((eq package *keyword-package*)
                                           (%set-symbol-value symbol symbol)
                                           (package-external-symbols package))
@@ -1431,7 +1432,8 @@ it is not already present."
                                          (length symbols) symbols)
                 (setf lock-asserted-p t))
               (unless (present-p w)
-                (setq s (make-symbol name))
+                ;; T is a hint that the symbol will become interned
+                (setq s (%make-symbol name t))
                 (%set-symbol-package s package)
                 (add-symbol internal s))
               (pushnew s (package-%shadowing-symbols package))))))))

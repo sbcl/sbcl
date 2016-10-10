@@ -44,7 +44,11 @@ endif
 
 CFLAGS += -fno-omit-frame-pointer
 
-GC_SRC = gencgc.c
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = gencgc.c marknsweepgc.c
+else
+  GC_SRC = gencgc.c
+endif
 
 # Hardened GCC enables PIE by default
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e nopie),)

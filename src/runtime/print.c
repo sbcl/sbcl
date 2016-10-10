@@ -794,7 +794,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case FDEFN_WIDETAG:
-                print_slots(fdefn_slots, count, ptr);
+                print_slots(fdefn_slots, count & SHORT_HEADER_MAX_WORDS, ptr);
                 break;
 
             default:

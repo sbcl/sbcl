@@ -99,6 +99,15 @@
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
 (def!constant instance-data-start 1)
 
+;; The largest number that may appear in the header-data for an instance,
+;; and some other mostly-boxed objects, such as FDEFNs.
+;; This constraint exists because for objects managed by the immobile GC,
+;; their generation number is stored in the header, so we have to know
+;; how much to mask off to obtain the payload size.
+;; Objects whose payload gets capped to this limit are considered
+;; "tiny_boxed" objects in the sizetab[] array in 'gc-common'.
+(def!constant short-header-max-words #xffff)
+
 ;;; Is X a fixnum in the target Lisp?
 #+sb-xc-host
 (defun fixnump (x)

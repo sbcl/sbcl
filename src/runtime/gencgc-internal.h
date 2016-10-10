@@ -157,6 +157,8 @@ space_matches_p(lispobj obj, generation_index_t space,
     }
 }
 
+// Return true only if 'obj' must be *physically* transported to survive gc.
+// Return false if obj is in the immobile space regardless of its generation.
 static boolean __attribute__((unused))
 from_space_p(lispobj obj)
 {

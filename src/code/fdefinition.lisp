@@ -19,7 +19,14 @@
 ;;;; fdefinition (fdefn) objects
 
 (defun make-fdefn (name)
-  (make-fdefn name))
+  #!-immobile-space (make-fdefn name)
+  ;; This is %primitive because it needs pseudo-atomic,
+  ;; otherwise it would just be an alien-funcall.
+  #!+immobile-space
+  (let ((fdefn (truly-the (values fdefn)
+                 (%primitive sb!vm::alloc-immobile-fdefn name))))
+    (%primitive fdefn-makunbound fdefn)
+    fdefn))
 
 (defun fdefn-name (fdefn)
   (declare (type fdefn fdefn))

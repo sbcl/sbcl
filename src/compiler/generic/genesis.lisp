@@ -206,8 +206,16 @@
 (defvar *read-only*)
 (defconstant read-only-core-space-id 3)
 
-(defconstant max-core-space-id 3)
-(defconstant deflated-core-space-id-flag 4)
+#!+immobile-space
+(progn
+  (defvar *immobile-fixedobj*)
+  (defvar *immobile-varyobj*)
+  (defconstant immobile-fixedobj-core-space-id 4)
+  (defconstant immobile-varyobj-core-space-id 5)
+  (defvar *immobile-space-map* nil))
+
+(defconstant max-core-space-id 5)
+(defconstant deflated-core-space-id-flag 8)
 
 ;; This is somewhat arbitrary as there is no concept of the the
 ;; number of bits in the "low" part of a descriptor any more.
@@ -314,11 +322,17 @@
 ;;; free word index is boosted as necessary, and if additional memory
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
 ;;; pointer of type LOWTAG.
-(defun allocate-cold-descriptor (gspace length lowtag)
-  (let* ((bytes (round-up length (ash 1 sb!vm:n-lowtag-bits)))
-         (old-free-word-index (gspace-free-word-index gspace))
-         (new-free-word-index (+ old-free-word-index
-                                 (ash bytes (- sb!vm:word-shift)))))
+(defun allocate-cold-descriptor (gspace length lowtag &optional page-attributes)
+  (let* ((word-index
+          (gspace-claim-n-bytes gspace length page-attributes))
+         (ptr (+ (gspace-word-address gspace) word-index)))
+    (make-descriptor (logior (ash ptr sb!vm:word-shift) lowtag)
+                     gspace
+                     word-index)))
+
+(defun gspace-claim-n-words (gspace n-words)
+  (let* ((old-free-word-index (gspace-free-word-index gspace))
+         (new-free-word-index (+ old-free-word-index n-words)))
     ;; Grow GSPACE as necessary until it's big enough to handle
     ;; NEW-FREE-WORD-INDEX.
     (do ()
@@ -327,10 +341,52 @@
       (expand-bigvec (gspace-bytes gspace)))
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
-    (let ((ptr (+ (gspace-word-address gspace) old-free-word-index)))
-      (make-descriptor (logior (ash ptr sb!vm:word-shift) lowtag)
-                       gspace
-                       old-free-word-index))))
+    old-free-word-index))
+
+;; align256p is true if we need to force objects on this page to 256-byte
+;; boundaries. This doesn't need to be generalized - everything of type
+;; INSTANCE is either on its natural alignment, or 256-byte.
+;; [See doc/internals-notes/compact-instance for why you might want it at all]
+;; PAGE-KIND is a heuristic for placement of symbols
+;; based on being interned/uninterned/likely-special-variable.
+(defun make-page-attributes (align256p page-kind)
+  (declare (type (or null (integer 0 3)) page-kind))
+  (logior (ash (or page-kind 0) 1) (if align256p 1 0)))
+(defun immobile-obj-spacing-words (page-attributes)
+  (if (logbitp 0 page-attributes)
+      (/ 256 sb!vm:n-word-bytes)))
+
+(defun gspace-claim-n-bytes (gspace specified-n-bytes page-attributes)
+  (declare (ignorable page-attributes))
+  (let* ((n-bytes (round-up specified-n-bytes (ash 1 sb!vm:n-lowtag-bits)))
+         (n-words (ash n-bytes (- sb!vm:word-shift))))
+    (aver (evenp n-words))
+    (cond #!+immobile-space
+          ((eq gspace *immobile-fixedobj*)
+           (aver page-attributes)
+           ;; An immobile fixedobj page can only have one value of object-spacing
+           ;; and size for all objects on it. Different widetags are ok.
+           (let* ((key (cons specified-n-bytes page-attributes))
+                  (found (cdr (assoc key *immobile-space-map* :test 'equal)))
+                  (page-n-words (/ sb!vm:immobile-card-bytes sb!vm:n-word-bytes)))
+             (unless found ; grab one whole GC page from immobile space
+               (let ((free-word-index
+                      (gspace-claim-n-words gspace page-n-words)))
+                 (setf found (cons 0 free-word-index))
+                 (push (cons key found) *immobile-space-map*)))
+             (destructuring-bind (page-word-index . page-base-index) found
+               (let ((next-word
+                      (+ page-word-index
+                         (or (immobile-obj-spacing-words page-attributes)
+                             n-words))))
+                 (if (> next-word (- page-n-words n-words))
+                     ;; no more objects fit on this page
+                     (setf *immobile-space-map*
+                           (delete key *immobile-space-map* :key 'car :test 'equal))
+                     (setf (car found) next-word)))
+               (+ page-word-index page-base-index))))
+          (t
+           (gspace-claim-n-words gspace n-words)))))
 
 (defun descriptor-fixnum (des)
   (unless (is-fixnum-lowtag (descriptor-lowtag des))
@@ -375,7 +431,9 @@
                     (eql lowtag sb!vm:other-pointer-lowtag))
           (error "don't even know how to look for a GSPACE for ~S" des))
 
-        (dolist (gspace (list *dynamic* *static* *read-only*)
+        (dolist (gspace (list *dynamic* *static* *read-only*
+                              #!+immobile-space *immobile-fixedobj*
+                              #!+immobile-space *immobile-varyobj*)
                  (error "couldn't find a GSPACE for ~S" des))
           ;; Bounds-check the descriptor against the allocated area
           ;; within each gspace.
@@ -516,7 +574,16 @@
 ;;;; allocating images of primitive objects in the cold core
 
 (defun write-header-word (des header-data widetag)
-  (write-memory des (make-other-immediate-descriptor header-data widetag)))
+  ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
+  (let ((gen (if (or #!+immobile-space
+                     (let ((gspace (descriptor-gspace des)))
+                       (or (eq gspace *immobile-fixedobj*)
+                           (eq gspace *immobile-varyobj*))))
+                  sb!vm:+pseudo-static-generation+
+                  0)))
+    (write-memory des (make-other-immediate-descriptor
+                       (logior (ash gen 16) header-data)
+                       widetag))))
 
 ;;; There are three kinds of blocks of memory in the type system:
 ;;; * Boxed objects (cons cells, structures, etc): These objects have no
@@ -525,17 +592,19 @@
 ;;;   the length.
 ;;; * Vector objects: There is a header word with the type, then a word for
 ;;;   the length, then the data.
-(defun allocate-object (gspace length lowtag)
+(defun allocate-object (gspace length lowtag &optional align256p)
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
-  (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag))
-(defun allocate-header+object (gspace length widetag)
+  (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag
+                            (make-page-attributes align256p 0)))
+(defun allocate-header+object (gspace length widetag &optional page-kind)
   "Allocate LENGTH words plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
   with the resultant length and WIDETAG."
-  (let ((des (allocate-cold-descriptor gspace
-                                       (ash (1+ length) sb!vm:word-shift)
-                                       sb!vm:other-pointer-lowtag)))
+  (let ((des (allocate-cold-descriptor
+              gspace (ash (1+ length) sb!vm:word-shift)
+              sb!vm:other-pointer-lowtag
+              (make-page-attributes nil page-kind))))
     (write-header-word des length widetag)
     des))
 (defun allocate-vector-object (gspace element-bits length widetag)
@@ -564,10 +633,11 @@
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
 (defun allocate-struct
-    (gspace layout &optional (layout-length (cold-layout-length layout)))
+    (gspace layout &optional (layout-length (cold-layout-length layout))
+                             is-layout)
   ;; Count +1 for the header word when allocating.
   (let ((des (allocate-object gspace (1+ layout-length)
-                              sb!vm:instance-pointer-lowtag)))
+                              sb!vm:instance-pointer-lowtag is-layout)))
     ;; Length as stored in the header is the exact number of useful words
     ;; that follow, as is customary. A padding word, if any is not "useful"
     (write-header-word des layout-length sb!vm:instance-header-widetag)
@@ -883,11 +953,26 @@ core and return a descriptor to it."
 ;;; This is valid because it is an error to modify a print name.
 (defvar *symbol-name-strings* (make-hash-table :test 'equal))
 
+(defvar *cold-symbol-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
+
 ;;; Allocate (and initialize) a symbol.
-(defun allocate-symbol (name &key (gspace *dynamic*))
+(defun allocate-symbol (name interned
+                             &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
-  (let ((symbol (allocate-header+object gspace (1- sb!vm:symbol-size)
-                                        sb!vm:symbol-header-widetag)))
+  (declare (ignore interned))
+  #!+immobile-space
+  (when (and (eq gspace *immobile-fixedobj*) (char/= (char name 0) #\*))
+    ;; immobile symbols that aren't likely to be special vars
+    ;; should go in regular dynamic space until a de-frag pass is
+    ;; implemented for save-lisp-and-die. Otherwise they create
+    ;; tons of holes all over the immobile space.
+    (setq gspace *dynamic*))
+  (let ((symbol (allocate-header+object
+                 gspace (1- sb!vm:symbol-size)
+                 sb!vm:symbol-header-widetag
+                 ;; Tell the allocator what kind of symbol page to prefer.
+                 ;; This only affects gc performance, not correctness.
+                 0)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
     (write-wordindexed symbol sb!vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-info-slot *nil-descriptor*)
@@ -1050,12 +1135,13 @@ core and return a descriptor to it."
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
+(defvar *cold-layout-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name length inherits depthoid bitmap)
-  (let ((result (allocate-struct *dynamic* *layout-layout*
-                                 target-layout-length)))
+  (let ((result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
+                                 target-layout-length t)))
     ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
     ;; Set other slot values.
@@ -1389,7 +1475,7 @@ core and return a descriptor to it."
 ;; - the target compiler doesn't and couldn't - but here it doesn't matter.
 (defun get-uninterned-symbol (name)
   (or (gethash name *uninterned-symbol-table*)
-      (let ((cold-symbol (allocate-symbol name)))
+      (let ((cold-symbol (allocate-symbol name nil)))
         (setf (gethash name *uninterned-symbol-table*) cold-symbol))))
 
 ;;; Dump the target representation of HOST-VALUE,
@@ -1467,7 +1553,7 @@ core and return a descriptor to it."
 ;;; symbol and record its home package.
 (defun cold-intern (symbol
                     &key (access nil)
-                         (gspace *dynamic*)
+                         (gspace (symbol-value *cold-symbol-gspace*))
                     &aux (package (symbol-package-for-target-symbol symbol)))
   (aver (package-ok-for-target-symbol-p package))
 
@@ -1483,7 +1569,7 @@ core and return a descriptor to it."
 
   (or (get symbol 'cold-intern-info)
       (let ((pkg-info (gethash (package-name package) *cold-package-symbols*))
-            (handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
+            (handle (allocate-symbol (symbol-name symbol) t :gspace gspace)))
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
         (unless pkg-info
@@ -1787,7 +1873,9 @@ core and return a descriptor to it."
   (/noshow0 "/cold-fdefinition-object")
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
-        (let ((fdefn (allocate-header+object (or *cold-fdefn-gspace* *dynamic*)
+        (let ((fdefn (allocate-header+object (or *cold-fdefn-gspace*
+                                                 #!+immobile-space *immobile-fixedobj*
+                                                 #!-immobile-space *dynamic*)
                                              (1- sb!vm:fdefn-size)
                                              sb!vm:fdefn-widetag)))
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
@@ -2075,8 +2163,9 @@ core and return a descriptor to it."
 (declaim (ftype (function (descriptor sb!vm:word)) calc-offset))
 (defun calc-offset (code-object offset-from-tail-of-header)
   (let* ((header (read-memory code-object))
-         (header-n-words (ash (descriptor-bits header)
-                              (- sb!vm:n-widetag-bits)))
+         (header-n-words (logand (ash (descriptor-bits header)
+                                      (- sb!vm:n-widetag-bits))
+                                 #!+immobile-space sb!vm:short-header-max-words))
          (header-n-bytes (ash header-n-words sb!vm:word-shift))
          (result (+ offset-from-tail-of-header header-n-bytes)))
     result))
@@ -3106,6 +3195,11 @@ core and return a descriptor to it."
       (check sb!vm:static-space-start sb!vm:static-space-end :static)
       #!+gencgc
       (check sb!vm:dynamic-space-start sb!vm:dynamic-space-end :dynamic)
+      #!+immobile-space
+      ;; Must be a multiple of 32 because it makes the math a nicer
+      ;; when computing word and bit index into the 'touched' bitmap.
+      (assert (zerop (rem sb!vm:immobile-fixedobj-subspace-size
+                          (* 32 sb!vm:immobile-card-bytes))))
       #!-gencgc
       (progn
         (check sb!vm:dynamic-0-space-start sb!vm:dynamic-0-space-end :dynamic-0)
@@ -3244,7 +3338,8 @@ core and return a descriptor to it."
     (dolist (c '(sb!vm:n-word-bits sb!vm:n-word-bytes
                  sb!vm:n-lowtag-bits sb!vm:lowtag-mask
                  sb!vm:n-widetag-bits sb!vm:widetag-mask
-                 sb!vm:n-fixnum-tag-bits sb!vm:fixnum-tag-mask))
+                 sb!vm:n-fixnum-tag-bits sb!vm:fixnum-tag-mask
+                 sb!vm:short-header-max-words))
       (push (list (c-symbol-name c)
                   -1                    ; invent a new priority
                   (symbol-value c)
@@ -3649,9 +3744,10 @@ initially undefined function references:~2%")
 
       ;; Write the New Directory entry header.
       (write-word new-directory-core-entry-type-code)
-      (let ((spaces (list *read-only*
-                          *static*
-                          *dynamic*)))
+      (let ((spaces (nconc (list *read-only* *static*)
+                           #!+immobile-space
+                           (list *immobile-fixedobj* *immobile-varyobj*)
+                           (list *dynamic*))))
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-word (+ (* (length spaces) 5) 2))
         (mapc #'output-gspace spaces))
@@ -3760,6 +3856,15 @@ initially undefined function references:~2%")
            (*static*    (make-gspace :static
                                      static-core-space-id
                                      sb!vm:static-space-start))
+           #!+immobile-space
+           (*immobile-fixedobj* (make-gspace :immobile-fixedobj
+                                             immobile-fixedobj-core-space-id
+                                             sb!vm:immobile-space-start))
+           #!+immobile-space
+           (*immobile-varyobj* (make-gspace :immobile-varyobj
+                                            immobile-varyobj-core-space-id
+                                            (+ sb!vm:immobile-space-start
+                                               sb!vm:immobile-fixedobj-subspace-size)))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
                                      #!+gencgc sb!vm:dynamic-space-start
@@ -3777,7 +3882,8 @@ initially undefined function references:~2%")
                           (gethash "COMMON-LISP" *cold-package-symbols*))
               (setf (gethash name *cold-package-symbols*)
                     (cons (allocate-struct
-                           *dynamic* (make-fixnum-descriptor 0)
+                           (symbol-value *cold-layout-gspace*)
+                           (make-fixnum-descriptor 0)
                            (layout-length (find-layout 'package)))
                           (cons nil nil))))) ; (externals . internals)
            (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
@@ -3869,6 +3975,8 @@ initially undefined function references:~2%")
       (finalize-load-time-value-noise)
 
       ;; Tell the target Lisp how much stuff we've allocated.
+      ;; ALLOCATE-COLD-DESCRIPTOR is a weird trick to locate a space's end,
+      ;; and it doesn't work on immobile space.
       (cold-set 'sb!vm:*read-only-space-free-pointer*
                 (allocate-cold-descriptor *read-only*
                                           0
@@ -3877,6 +3985,29 @@ initially undefined function references:~2%")
                 (allocate-cold-descriptor *static*
                                           0
                                           sb!vm:even-fixnum-lowtag))
+      #!+immobile-space
+      (progn
+        (cold-set 'sb!vm:*immobile-fixedobj-free-pointer*
+                  (make-random-descriptor
+                   (ash (+ (gspace-word-address *immobile-fixedobj*)
+                           (gspace-free-word-index *immobile-fixedobj*))
+                        sb!vm:word-shift)))
+        ;; The upper bound of the varyobj subspace is delimited by
+        ;; a structure with no layout and no slots.
+        ;; This is necessary because 'coreparse' does not have the actual
+        ;; value of the free pointer, but the space must not contain any
+        ;; objects that look like conses (due to the tail of 0 words).
+        (let ((des (allocate-object *immobile-varyobj* 1 ; 1 word in total
+                                    sb!vm:instance-pointer-lowtag nil)))
+          (write-memory des
+                        (make-other-immediate-descriptor 0 sb!vm:instance-header-widetag))
+          (write-wordindexed des sb!vm:instance-slots-offset (make-fixnum-descriptor 0)))
+        (cold-set 'sb!vm:*immobile-space-free-pointer*
+                  (make-random-descriptor
+                   (ash (+ (gspace-word-address *immobile-varyobj*)
+                           (gspace-free-word-index *immobile-varyobj*))
+                        sb!vm:word-shift))))
+
       (/show "done setting free pointers")
 
       ;; Write results to files.

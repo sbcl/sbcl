@@ -268,6 +268,7 @@
         (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
       done)))
 
+#!-immobile-space
 (define-vop (make-fdefn)
   (:policy :fast-safe)
   (:translate make-fdefn)
@@ -358,3 +359,33 @@
      (allocation result bytes node)
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (storew header result 0 lowtag))))
+
+#!+immobile-space
+(macrolet ((def (lisp-name c-name argc &body stuff)
+             `(define-vop (,lisp-name)
+                (:args ,@(if (>= argc 1) '((arg1 :scs (descriptor-reg) :target c-arg1)))
+                       ,@(if (>= argc 2) '((arg2 :scs (any-reg) :target c-arg2))))
+                ,@(if (>= argc 1)
+                      '((:temporary (:sc unsigned-reg :from (:argument 0)
+                                     :to :eval :offset rdi-offset) c-arg1)))
+                ,@(if (>= argc 2)
+                      '((:temporary (:sc unsigned-reg :from (:argument 1)
+                                     :to :eval :offset rsi-offset) c-arg2)))
+                (:temporary (:sc unsigned-reg :from :eval :to (:result 0)
+                             :offset rax-offset) c-result)
+                (:results (result :scs (descriptor-reg)))
+                (:generator 50
+                 (pseudo-atomic
+                  ,@(if (>= argc 1) '((move c-arg1 arg1)))
+                  ,@(if (>= argc 2) '((move c-arg2 arg2)))
+                  (inst and rsp-tn -16)
+                  (inst mov temp-reg-tn (make-fixup ,c-name :foreign))
+                  (inst call temp-reg-tn)
+                  ,@stuff
+                  (move result c-result))))))
+  ;; These VOPs are each used in one place only, and deliberately not
+  ;; specified as transforming the function after which they are named.
+  (def alloc-immobile-layout "alloc_layout" 1)  ; MAKE-LAYOUT
+  (def alloc-immobile-symbol "alloc_sym" 2)     ; MAKE-SYMBOL
+  (def alloc-immobile-fdefn  "alloc_fdefn" 1)   ; MAKE-FDEFN
+  )

@@ -2381,9 +2381,35 @@ pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
+// TODO: there's probably a way to be a little more efficient here.
+// As things are, we start by finding the object that encloses 'addr',
+// then we see if 'addr' was a "valid" Lisp pointer to that object
+// - meaning we expect the correct lowtag on the pointer - except
+// that for code objects we don't require a correct lowtag
+// and we allow a pointer to anywhere in the object.
+//
+// It should be possible to avoid calling search_dynamic_space
+// more of the time. First, check if the page pointed to might hold code.
+// If it does, then we continue regardless of the pointer's lowtag
+// (because of the special allowance). If the page definitely does *not*
+// hold code, then we require up front that the lowtake make sense,
+// by doing the same checks that are in looks_like_valid_lisp_pointer_p.
+//
+// Problem: when code is allocated from a per-thread region,
+// does it ensure that the occupied pages are flagged as having code?
+
 static void
 preserve_pointer(void *addr)
 {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+  /* Immobile space MUST be lower than dynamic space,
+     or else this test needs to be revised */
+    if (addr < (void*)IMMOBILE_SPACE_END) {
+        extern void immobile_space_preserve_pointer(void*);
+        immobile_space_preserve_pointer(addr);
+        return;
+    }
+#endif
     page_index_t addr_page_index = find_page_index(addr);
     page_index_t first_page;
     page_index_t i;
@@ -2501,14 +2527,17 @@ update_page_write_prot(page_index_t page)
      * top temp. generation. */
 
     /* This is conservative: any word satisfying is_lisp_pointer() is
-     * assumed to be a pointer despite that it might be machine code
-     * or part of an unboxed array */
+     * assumed to be a pointer. To do otherwise would require a family
+     * of scavenge-like functions. */
     for (j = 0; j < num_words; j++) {
         void *ptr = *(page_addr+j);
         page_index_t index;
+        lispobj __attribute__((unused)) header;
 
+        if (!is_lisp_pointer((lispobj)ptr))
+            continue;
         /* Check that it's in the dynamic space */
-        if (is_lisp_pointer((lispobj)ptr) && (index = find_page_index(ptr)) != -1)
+        if ((index = find_page_index(ptr)) != -1) {
             if (/* Does it point to a younger or the temp. generation? */
                 (page_allocated_p(index)
                  && (page_table[index].bytes_used != 0)
@@ -2523,6 +2552,39 @@ update_page_write_prot(page_index_t page)
                 wp_it = 0;
                 break;
             }
+        }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        else if ((index = find_immobile_page_index(ptr)) >= 0 &&
+                 other_immediate_lowtag_p(header = *native_pointer((lispobj)ptr))) {
+            // This is *possibly* a pointer to an object in immobile space,
+            // given that above two conditions were satisfied.
+            // But unlike in the dynamic space case, we need to read a byte
+            // from the object to determine its generation, which requires care.
+            // Consider an unboxed word that looks like a pointer to a word that
+            // looks like fun-header-widetag. We can't naively back up to the
+            // underlying code object since the alleged header might not be one.
+            int obj_gen = gen; // Make comparison fail if we fall through
+            if (lowtag_of((lispobj)ptr) != FUN_POINTER_LOWTAG) {
+                obj_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
+            } else if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG) {
+                struct code* code =
+                  code_obj_from_simple_fun((struct simple_fun *)
+                                           ((lispobj)ptr - FUN_POINTER_LOWTAG));
+                // This is a heuristic, since we're not actually looking for
+                // an object boundary. Precise scanning of 'page' would obviate
+                // the guard conditions here.
+                if ((lispobj)code >= IMMOBILE_VARYOBJ_SUBSPACE_START
+                    && widetag_of(code->header) == CODE_HEADER_WIDETAG)
+                    obj_gen = __immobile_obj_generation((lispobj*)code);
+            }
+            // A bogus generation number implies a not-really-pointer,
+            // but it won't cause misbehavior.
+            if (obj_gen < gen || obj_gen == SCRATCH_GENERATION) {
+                wp_it = 0;
+                break;
+           }
+        }
+#endif
     }
 
     if (wp_it == 1) {
@@ -2670,6 +2732,18 @@ scavenge_generations(generation_index_t from, generation_index_t to)
 static struct new_area new_areas_1[NUM_NEW_AREAS];
 static struct new_area new_areas_2[NUM_NEW_AREAS];
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+extern unsigned int immobile_scav_queue_count;
+extern void
+  gc_init_immobile(),
+  update_immobile_nursery_bits(),
+  scavenge_immobile_roots(generation_index_t,generation_index_t),
+  scavenge_immobile_newspace(),
+  sweep_immobile_space(int raise);
+#else
+#define immobile_scav_queue_count 0
+#endif
+
 /* Do one full scan of the new space generation. This is not enough to
  * complete the job as new objects may be added to the generation in
  * the process which are not scavenged. */
@@ -2782,7 +2856,7 @@ scavenge_newspace_generation(generation_index_t generation)
              "The first scan is finished; current_new_areas_index=%d.\n",
              current_new_areas_index));*/
 
-    while (current_new_areas_index > 0) {
+    while (current_new_areas_index > 0 || immobile_scav_queue_count) {
         /* Move the current to the previous new areas */
         previous_new_areas = current_new_areas;
         previous_new_areas_index = current_new_areas_index;
@@ -2801,6 +2875,9 @@ scavenge_newspace_generation(generation_index_t generation)
         new_areas = current_new_areas;
         new_areas_index = 0;
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        scavenge_immobile_newspace();
+#endif
         /* Check whether previous_new_areas had overflowed. */
         if (previous_new_areas_index >= NUM_NEW_AREAS) {
 
@@ -3024,10 +3101,16 @@ is_in_stack_space(lispobj ptr)
 static void
 verify_space(lispobj *start, size_t words)
 {
+    extern int valid_lisp_pointer_p(lispobj);
     int is_in_dynamic_space = (find_page_index((void*)start) != -1);
     int is_in_readonly_space =
         (READ_ONLY_SPACE_START <= (uword_t)start &&
          (uword_t)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    int is_in_immobile_space =
+        (IMMOBILE_SPACE_START <= (uword_t)start &&
+         (uword_t)start < SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+#endif
 
     while (words > 0) {
         size_t count = 1;
@@ -3041,14 +3124,22 @@ verify_space(lispobj *start, size_t words)
             sword_t to_static_space =
                 (STATIC_SPACE_START <= thing &&
                  thing < SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            sword_t to_immobile_space =
+                (IMMOBILE_SPACE_START <= thing &&
+                 thing < SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0)) ||
+                (IMMOBILE_VARYOBJ_SUBSPACE_START <= thing &&
+                 thing < SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+#endif
 
             /* Does it point to the dynamic space? */
             if (page_index != -1) {
-                /* If it's within the dynamic space it should point to a used
-                 * page. XX Could check the offset too. */
-                if (page_allocated_p(page_index)
-                    && (page_table[page_index].bytes_used == 0))
+                /* If it's within the dynamic space it should point to a used page. */
+                if (!page_allocated_p(page_index))
                     lose ("Ptr %p @ %p sees free page.\n", thing, start);
+                if ((char*)thing - (char*)page_address(page_index)
+                    >= page_table[page_index].bytes_used)
+                    lose ("Ptr %p @ %p sees unallocated space.\n", thing, start);
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*((lispobj *)native_pointer(thing)) == 0x01) {
                     lose("Ptr %p @ %p sees forwarding ptr.\n", thing, start);
@@ -3059,6 +3150,12 @@ verify_space(lispobj *start, size_t words)
                     lose("ptr to dynamic space %p from RO space %x\n",
                          thing, start);
                 }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+                // verify all immobile space -> dynamic space pointers
+                if (is_in_immobile_space && !valid_lisp_pointer_p(thing)) {
+                    lose("Ptr %p @ %p sees junk.\n", thing, start);
+                }
+#endif
                 /* Does it point to a plausible object? This check slows
                  * it down a lot (so it's commented out).
                  *
@@ -3073,6 +3170,16 @@ verify_space(lispobj *start, size_t words)
                     lose("ptr %p to invalid object %p\n", thing, start);
                 }
                 */
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            } else if (to_immobile_space) {
+                // the object pointed to must not have been discarded as garbage
+                if (!other_immediate_lowtag_p(*native_pointer(thing))
+                    || immobile_filler_p(native_pointer(thing)))
+                    lose("Ptr %p @ %p sees trashed object.\n", (void*)thing, start);
+                // verify all pointers to immobile space
+                if (!valid_lisp_pointer_p(thing))
+                    lose("Ptr %p @ %p sees junk.\n", thing, start);
+#endif
             } else {
                 extern char __attribute__((unused)) funcallable_instance_tramp;
                 /* Verify that it points to another valid space. */
@@ -3275,6 +3382,20 @@ verify_gc(void)
      * Some counts of lispobjs are called foo_count; it might be good
      * to grep for all foo_size and rename the appropriate ones to
      * foo_count. */
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#  ifdef __linux__
+    // Try this verification if marknsweep was compiled with extra debugging.
+    // But weak symbols don't work on macOS.
+    extern void __attribute__((weak)) check_varyobj_pages();
+    if (&check_varyobj_pages) check_varyobj_pages();
+#  endif
+    verify_space((lispobj*)IMMOBILE_SPACE_START,
+                 (lispobj*)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0)
+                 - (lispobj*)IMMOBILE_SPACE_START);
+    verify_space((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
+                 (lispobj*)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0)
+                 - (lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START);
+#endif
     sword_t read_only_space_size =
         (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0)
         - (lispobj*)READ_ONLY_SPACE_START;
@@ -3543,6 +3664,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
             gc_assert(pinned_dwords(i) == NULL);
         }
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* Immobile space generation bits are lazily updated for gen0
+       (not touched on every object allocation) so do it now */
+    update_immobile_nursery_bits();
+#endif
+
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space
      * which need to be scavenged. It also helps avoid unnecessary page
@@ -3754,6 +3881,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
      * objects may be moved in - it is handled separately below. */
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    scavenge_immobile_roots(generation+1, PSEUDO_STATIC_GENERATION);
+#endif
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
     scavenge_pinned_ranges();
@@ -3795,6 +3925,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
     scan_weak_hash_tables();
     scan_weak_pointers();
     wipe_nonpinned_words();
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // Do this last, because until wipe_nonpinned_words() happens,
+    // not all page table entries have the 'gen' value updated,
+    // which we need to correctly find all old->young pointers.
+    sweep_immobile_space(raise);
+#endif
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables(0);
@@ -4189,6 +4325,10 @@ gc_init(void)
      * unnecessary and did hurt startup time. */
     page_table = calloc(page_table_pages, sizeof(struct page));
     gc_assert(page_table);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    gc_init_immobile();
+#endif
+
     size_t pins_map_size_in_bytes =
       (n_dwords_in_card / N_WORD_BITS) * sizeof (uword_t) * page_table_pages;
     /* We use mmap directly here so that we can use a minimum of
@@ -4518,6 +4658,11 @@ gencgc_handle_wp_violation(void* fault_addr)
 
     /* Check whether the fault is within the dynamic space. */
     if (page_index == (-1)) {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        extern int immobile_space_handle_wp_violation(void*);
+        if (immobile_space_handle_wp_violation(fault_addr))
+            return 1;
+#endif
 
         /* It can be helpful to be able to put a breakpoint on this
          * case to help diagnose low-level problems. */
@@ -4656,6 +4801,10 @@ prepare_for_final_gc ()
 {
     page_index_t i;
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    extern void prepare_immobile_space_for_final_gc();
+    prepare_immobile_space_for_final_gc ();
+#endif
     do_wipe_p = 0;
     for (i = 0; i < last_free_page; i++) {
         page_table[i].large_object = 0;

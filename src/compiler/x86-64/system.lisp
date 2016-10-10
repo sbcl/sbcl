@@ -116,7 +116,9 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst shr res n-widetag-bits)))
+    (inst shr res n-widetag-bits)
+    ;; In case there are closures in immobile space.
+    #!+immobile-space (inst and res short-header-max-words)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -197,6 +199,7 @@
   (:generator 10
     (loadw sap code 0 other-pointer-lowtag)
     (inst shr sap n-widetag-bits)
+    #!+immobile-space (inst and sap short-header-max-words)
     (inst lea sap (make-ea :byte :base code :index sap
                            :scale n-word-bytes
                            :disp (- other-pointer-lowtag)))))

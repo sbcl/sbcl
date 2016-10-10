@@ -219,6 +219,9 @@ is_valid_lisp_addr(os_vm_address_t addr)
 
     if (in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
         in_range_p(addr, STATIC_SPACE_START, STATIC_SPACE_SIZE) ||
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        in_range_p(addr, IMMOBILE_SPACE_START, IMMOBILE_SPACE_SIZE) ||
+#endif
         in_range_p(addr, DYNAMIC_SPACE_START, dynamic_space_size))
         return 1;
     for_each_thread(th) {

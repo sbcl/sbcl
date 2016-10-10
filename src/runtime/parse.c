@@ -223,6 +223,16 @@ static boolean lookup_symbol(char *name, lispobj *result)
         return 1;
     }
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* Search immobile space. */
+    headerptr = (lispobj *)IMMOBILE_SPACE_START;
+    count = IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE / N_WORD_BYTES;
+    if (search_for_symbol(name, &headerptr, &count)) {
+        *result = make_lispobj(headerptr,OTHER_POINTER_LOWTAG);
+        return 1;
+    }
+#endif
+
     /* Search dynamic space. */
 #if defined(LISP_FEATURE_GENCGC)
     headerptr = (lispobj *)DYNAMIC_SPACE_START;

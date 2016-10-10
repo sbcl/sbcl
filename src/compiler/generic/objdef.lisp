@@ -317,7 +317,7 @@
 
 (!define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-header-widetag
-                                 :alloc-trans %make-symbol
+                                 :alloc-trans %%make-symbol
                                  :type symbol)
 
   ;; Beware when changing this definition.  NIL-the-symbol is defined
