@@ -696,7 +696,7 @@ static void instance_scan_range(void* instance_ptr, int offset, int nwords)
 }
 
 // Helper function for stepping through the tagged slots of an instance in
-// scav_instance and verify_space (which, as it happens, is not useful).
+// scav_instance and verify_space.
 void
 instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
                           lispobj *instance_ptr,

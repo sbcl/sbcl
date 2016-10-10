@@ -3018,6 +3018,9 @@ is_in_stack_space(lispobj ptr)
     return 0;
 }
 
+// NOTE: This function can produces false failure indications,
+// usually related to dynamic space pointing to the stack of a
+// dead thread, but there may be other reasons as well.
 static void
 verify_space(lispobj *start, size_t words)
 {
@@ -3028,7 +3031,7 @@ verify_space(lispobj *start, size_t words)
 
     while (words > 0) {
         size_t count = 1;
-        lispobj thing = *(lispobj*)start;
+        lispobj thing = *start;
 
         if (is_lisp_pointer(thing)) {
             page_index_t page_index = find_page_index((void*)thing);
