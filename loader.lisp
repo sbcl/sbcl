@@ -1,6 +1,9 @@
 (defun load-sbcl-file (file)
   (labels ((exit-sbcl (code)
-             #+sbcl (sb-ext:exit :code code)
+             #+sbcl #.(if (eq :external
+                              (nth-value 1 (find-symbol "EXIT" :sb-ext)))
+                          `(,(find-symbol "EXIT" :sb-ext) :code code)
+                          `(,(find-symbol "QUIT" :sb-ext) :unix-status code))
              #+ccl (ccl:quit code)
              #+abcl (ext:quit :status code)
              #+cmucl (unix:unix-exit code)
