@@ -37,7 +37,10 @@
             (when (zerop pid)
               (target-compile-stem stem flags)
               ;; FIXME: convey exit code based on COMPILE result.
-              (sb-sys:os-exit 0))
+              #.(if (eq :external
+                        (nth-value 1 (find-symbol "OS-EXIT" :sb-sys)))
+                    `(,(find-symbol "OS-EXIT" :sb-sys) 0)
+                    `(sb-unix:unix-exit 0)))
             (push pid subprocess-list))
           (incf subprocess-count)
           ;; Cause the compile-time effects from this file
