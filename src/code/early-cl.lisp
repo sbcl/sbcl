@@ -24,3 +24,72 @@
     single-float standard-char stream string base-char symbol t vector))
 
 (defvar sb!sys::*software-version* nil)
+
+;;; The BOOLE function dispaches to any logic operation depending on
+;;; the value of an argument. Presently, legal selector values are [0..15].
+;;; BOOLE is open coded for calls with any of the constants declared below.
+
+(defconstant sb!xc:boole-clr 0
+  #!+sb-doc
+  "Boole function op, makes BOOLE return 0.")
+
+(defconstant sb!xc:boole-set 1
+  #!+sb-doc
+  "Boole function op, makes BOOLE return -1.")
+
+(defconstant sb!xc:boole-1   2
+  #!+sb-doc
+  "Boole function op, makes BOOLE return integer1.")
+
+(defconstant sb!xc:boole-2   3
+  #!+sb-doc
+  "Boole function op, makes BOOLE return integer2.")
+
+(defconstant sb!xc:boole-c1  4
+  #!+sb-doc
+  "Boole function op, makes BOOLE return complement of integer1.")
+
+(defconstant sb!xc:boole-c2  5
+  #!+sb-doc
+  "Boole function op, makes BOOLE return complement of integer2.")
+
+(defconstant sb!xc:boole-and 6
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logand of integer1 and integer2.")
+
+(defconstant sb!xc:boole-ior 7
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logior of integer1 and integer2.")
+
+(defconstant sb!xc:boole-xor 8
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logxor of integer1 and integer2.")
+
+(defconstant sb!xc:boole-eqv 9
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logeqv of integer1 and integer2.")
+
+(defconstant sb!xc:boole-nand  10
+  #!+sb-doc
+  "Boole function op, makes BOOLE return log nand of integer1 and integer2.")
+
+(defconstant sb!xc:boole-nor   11
+  #!+sb-doc
+  "Boole function op, makes BOOLE return lognor of integer1 and integer2.")
+
+(defconstant sb!xc:boole-andc1 12
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logandc1 of integer1 and integer2.")
+
+(defconstant sb!xc:boole-andc2 13
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logandc2 of integer1 and integer2.")
+
+(defconstant sb!xc:boole-orc1  14
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logorc1 of integer1 and integer2.")
+
+(defconstant sb!xc:boole-orc2  15
+  #!+sb-doc
+  "Boole function op, makes BOOLE return logorc2 of integer1 and integer2.")
+

@@ -1230,75 +1230,6 @@ and the number of 0 bits if INTEGER is negative."
 
 ;;;; BOOLE
 
-;;; The boole function dispaches to any logic operation depending on
-;;;     the value of a variable. Presently, legal selector values are [0..15].
-;;;     boole is open coded for calls with a constant selector. or with calls
-;;;     using any of the constants declared below.
-
-(defconstant boole-clr 0
-  #!+sb-doc
-  "Boole function op, makes BOOLE return 0.")
-
-(defconstant boole-set 1
-  #!+sb-doc
-  "Boole function op, makes BOOLE return -1.")
-
-(defconstant boole-1   2
-  #!+sb-doc
-  "Boole function op, makes BOOLE return integer1.")
-
-(defconstant boole-2   3
-  #!+sb-doc
-  "Boole function op, makes BOOLE return integer2.")
-
-(defconstant boole-c1  4
-  #!+sb-doc
-  "Boole function op, makes BOOLE return complement of integer1.")
-
-(defconstant boole-c2  5
-  #!+sb-doc
-  "Boole function op, makes BOOLE return complement of integer2.")
-
-(defconstant boole-and 6
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logand of integer1 and integer2.")
-
-(defconstant boole-ior 7
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logior of integer1 and integer2.")
-
-(defconstant boole-xor 8
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logxor of integer1 and integer2.")
-
-(defconstant boole-eqv 9
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logeqv of integer1 and integer2.")
-
-(defconstant boole-nand  10
-  #!+sb-doc
-  "Boole function op, makes BOOLE return log nand of integer1 and integer2.")
-
-(defconstant boole-nor   11
-  #!+sb-doc
-  "Boole function op, makes BOOLE return lognor of integer1 and integer2.")
-
-(defconstant boole-andc1 12
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logandc1 of integer1 and integer2.")
-
-(defconstant boole-andc2 13
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logandc2 of integer1 and integer2.")
-
-(defconstant boole-orc1  14
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logorc1 of integer1 and integer2.")
-
-(defconstant boole-orc2  15
-  #!+sb-doc
-  "Boole function op, makes BOOLE return logorc2 of integer1 and integer2.")
-
 (defun boole (op integer1 integer2)
   #!+sb-doc
   "Bit-wise boolean function on two integers. Function chosen by OP:

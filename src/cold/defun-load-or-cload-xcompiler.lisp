@@ -168,10 +168,6 @@
                     ;; everything else which needs a separate
                     ;; existence in xc and target
                     "BOOLE"
-                    "BOOLE-CLR" "BOOLE-SET" "BOOLE-1" "BOOLE-2"
-                    "BOOLE-C1" "BOOLE-C2" "BOOLE-AND" "BOOLE-IOR"
-                    "BOOLE-XOR" "BOOLE-EQV" "BOOLE-NAND" "BOOLE-NOR"
-                    "BOOLE-ANDC1" "BOOLE-ANDC2" "BOOLE-ORC1" "BOOLE-ORC2"
                     "BUILT-IN-CLASS"
                     "BYTE" "BYTE-POSITION" "BYTE-SIZE"
                     "CHAR-CODE"
@@ -218,13 +214,7 @@
        (mapcar (lambda (name) (find-symbol name "SB-XC"))
                '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
                  "DPB" "LDB" "LDB-TEST"
-                 "DEPOSIT-FIELD" "MASK-FIELD"
-
-                 "BOOLE"
-                 "BOOLE-CLR" "BOOLE-SET" "BOOLE-1" "BOOLE-2"
-                 "BOOLE-C1" "BOOLE-C2" "BOOLE-AND" "BOOLE-IOR"
-                 "BOOLE-XOR" "BOOLE-EQV" "BOOLE-NAND" "BOOLE-NOR"
-                 "BOOLE-ANDC1" "BOOLE-ANDC2" "BOOLE-ORC1" "BOOLE-ORC2"))
+                 "DEPOSIT-FIELD" "MASK-FIELD"))
        package)))
 
   ;; Build a version of Python to run in the host Common Lisp, to be
