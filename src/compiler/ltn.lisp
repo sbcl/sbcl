@@ -307,12 +307,26 @@
   (declare (type mv-combination call))
   (setf (basic-combination-kind call) :local)
   (setf (node-tail-p call) nil)
-  (annotate-fixed-values-lvar
-   (first (basic-combination-args call))
-   (mapcar (lambda (var)
-             (primitive-type (basic-var-type var)))
-           (lambda-vars
-            (ref-leaf (lvar-use (basic-combination-fun call))))))
+  (let ((args (basic-combination-args call)))
+    (if (singleton-p args)
+        (annotate-fixed-values-lvar
+         (first args)
+         (mapcar (lambda (var)
+                   (primitive-type (basic-var-type var)))
+                 (lambda-vars
+                  (ref-leaf (lvar-use (basic-combination-fun call))))))
+        (let ((types (mapcar (lambda (var)
+                               (primitive-type (basic-var-type var)))
+                             (lambda-vars
+                              (ref-leaf (lvar-use (basic-combination-fun call)))))))
+          (dolist (arg args)
+            (annotate-fixed-values-lvar
+             arg
+             (loop repeat (nth-value 1 (values-types
+                                        (lvar-derived-type arg)))
+                   collect (if types
+                               (pop types)
+                               *wild-type*)))))))
   (values))
 
 ;;; We force all the argument lvars to use the unknown values

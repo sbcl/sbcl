@@ -9,6 +9,8 @@ changes relative to sbcl-1.3.10:
     arrays.
   * optimization: better GC performance in the presence of many threads.
     (patch by Ilya Perminov, lp#1339924)
+  * optimization: multiple-value-call is optimized with multiple argument
+    forms, not just one. (lp#753803)
   * bug fix: MAKE-ALIEN-STRING returns the number of allocated bytes as a
     second value as advertised (reported by Johann 'Myrkraverk' Oskarsson)
   * bug fix: when TO-READTABLE is supplied to COPY-READTABLE, it will

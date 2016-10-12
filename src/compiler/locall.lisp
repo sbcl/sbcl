@@ -498,22 +498,36 @@
   (declare (type ref ref) (type mv-combination call) (type functional fun))
   (when (and (looks-like-an-mv-bind fun)
              (singleton-p (leaf-refs fun))
-             (singleton-p (basic-combination-args call))
              (not (functional-entry-fun fun)))
     (let* ((*current-component* (node-component ref))
            (ep (optional-dispatch-entry-point-fun
-                fun (optional-dispatch-max-args fun))))
-      (when (null (leaf-refs ep))
+                fun (optional-dispatch-max-args fun)))
+           (args (basic-combination-args call)))
+      (when (and (null (leaf-refs ep))
+                 (or (singleton-p args)
+                     (call-all-args-fixed-p call)))
         (aver (= (optional-dispatch-min-args fun) 0))
         (setf (basic-combination-kind call) :local)
         (sset-adjoin ep (lambda-calls-or-closes (node-home-lambda call)))
         (merge-tail-sets call ep)
         (change-ref-leaf ref ep)
-
-        (assert-lvar-type
-         (first (basic-combination-args call))
-         (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
-         (lexenv-policy (node-lexenv call))))))
+        (if (singleton-p args)
+            (assert-lvar-type
+             (first args)
+             (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
+             (lexenv-policy (node-lexenv call)))
+            (let ((vars (lambda-vars ep)))
+              (loop for arg in args
+                    while vars
+                    do
+                    (assert-lvar-type
+                     arg
+                     (make-short-values-type
+                      (and vars
+                       (loop repeat (nth-value 1 (values-types
+                                                  (lvar-derived-type arg)))
+                             collect (leaf-type (pop vars)))))
+                     (lexenv-policy (node-lexenv call)))))))))
   (values))
 
 ;;; Convenience function to mark local calls as known bad.

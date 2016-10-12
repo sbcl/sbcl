@@ -1462,8 +1462,8 @@
 ;;; lvar.
 (defun ir2-convert-mv-bind (node block)
   (declare (type mv-combination node) (type ir2-block block))
-  (let* ((lvar (first (basic-combination-args node)))
-         (fun (ref-leaf (lvar-uses (basic-combination-fun node))))
+  (let* ((fun (ref-leaf (lvar-uses (basic-combination-fun node))))
+         (args (basic-combination-args node))
          (vars (lambda-vars fun)))
     (aver (eq (functional-kind fun) :mv-let))
     (mapc (lambda (src var)
@@ -1473,10 +1473,19 @@
                          (lambda-var-explicit-value-cell var))
                     (emit-make-value-cell node block src dest)
                     (emit-move node block src dest)))))
-          (lvar-tns node block lvar
-                            (mapcar (lambda (x)
-                                      (primitive-type (leaf-type x)))
-                                    vars))
+          (if (singleton-p args)
+              (lvar-tns node block (first args)
+                        (mapcar (lambda (x)
+                                  (primitive-type (leaf-type x)))
+                                vars))
+              (let ((vars vars))
+                (loop for lvar in args
+                      for values = (nth-value 1 (values-types
+                                                 (lvar-derived-type lvar)))
+                      while vars
+                      nconc
+                      (lvar-tns node block lvar (loop repeat values
+                                                      collect (primitive-type (leaf-type (pop vars))))))))
           vars))
   (values))
 
@@ -1592,6 +1601,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (let ((tns (mapcar (lambda (x)
                        (lvar-tn node block x))
                      values)))
+
     (move-lvar-result node block tns (node-lvar node))))
 
 ;;; In the normal case where unknown values are desired, we use the

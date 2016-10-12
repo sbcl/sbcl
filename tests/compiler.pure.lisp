@@ -6012,3 +6012,17 @@
                                     s))))
                       '(1 2) 3)
              6)))
+
+(with-test (:name :mv-call-type-derivation
+                   :fails-on :sbcl)
+  (assert (equal (funcall (checked-compile
+                           `(lambda (list)
+                              (multiple-value-call
+                                  (lambda (&optional a &rest r)
+                                    (declare (cons r)
+                                             (ignore r))
+                                    (list a))
+                                (values-list list)))
+                           :allow-warnings t)
+                          '(1 2))
+                 '(1))))

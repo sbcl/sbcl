@@ -531,7 +531,7 @@
                                (lambda-var-sets var))
                        (return nil)))
                (setf victim node)
-               (flush-dest (first (basic-combination-args node)))
+               (mapc #'flush-dest (basic-combination-args node))
                (delete-let fun)))))
         (exit
          (let ((value (exit-value node)))
@@ -1972,7 +1972,9 @@
          (when (lvar-reoptimize fun)
            (setf (lvar-reoptimize fun) nil)
            (maybe-let-convert (combination-lambda node)))
-         (setf (lvar-reoptimize (first (basic-combination-args node))) nil)
+         (loop for arg in (basic-combination-args node)
+               do
+               (setf (lvar-reoptimize arg) nil))
          (when (eq (functional-kind (combination-lambda node)) :mv-let)
            (unless (convert-mv-bind-to-let node)
              (ir1-optimize-mv-bind node))))
@@ -2001,53 +2003,29 @@
 ;;; Propagate derived type info from the values lvar to the vars.
 (defun ir1-optimize-mv-bind (node)
   (declare (type mv-combination node))
-  (let* ((arg (first (basic-combination-args node)))
+  (let* ((args (basic-combination-args node))
          (vars (lambda-vars (combination-lambda node)))
-         (n-vars (length vars))
-         (types (values-type-in (lvar-derived-type arg)
-                                n-vars)))
+         (types (if (singleton-p args)
+                    (values-type-in (lvar-derived-type (first args))
+                                    (length vars))
+                    (loop for arg in args
+                          append (values-types (lvar-derived-type arg))))))
     (loop for var in vars
           and type in types
           do (if (basic-var-sets var)
                  (propagate-from-sets var type)
                  (propagate-to-refs var type)))
-    (setf (lvar-reoptimize arg) nil))
+    (loop for arg in args
+          do
+          (setf (lvar-reoptimize arg) nil)))
   (values))
 
-;;; If possible, convert a general MV call to an MV-BIND. We can do
-;;; this if:
-;;; -- The call has only one argument, and
-;;; -- The function has a known fixed number of arguments, or
-;;; -- The argument yields a known fixed number of values.
-;;;
-;;; What we do is change the function in the MV-CALL to be a lambda
-;;; that "looks like an MV bind", which allows
-;;; IR1-OPTIMIZE-MV-COMBINATION to notice that this call can be
-;;; converted (the next time around.) This new lambda just calls the
-;;; actual function with the MV-BIND variables as arguments. Note that
-;;; this new MV bind is not let-converted immediately, as there are
-;;; going to be stray references from the entry-point functions until
-;;; they get deleted.
-;;;
-;;; In order to avoid loss of argument count checking, we only do the
-;;; transformation according to a known number of expected argument if
-;;; safety is unimportant. We can always convert if we know the number
-;;; of actual values, since the normal call that we build will still
-;;; do any appropriate argument count checking.
-;;;
-;;; We only attempt the transformation if the called function is a
-;;; constant reference. This allows us to just splice the leaf into
-;;; the new function, instead of trying to somehow bind the function
-;;; expression. The leaf must be constant because we are evaluating it
-;;; again in a different place. This also has the effect of squelching
-;;; multiple warnings when there is an argument count error.
 (defun ir1-optimize-mv-call (node)
   (let ((fun (basic-combination-fun node))
         (*compiler-error-context* node)
         (ref (lvar-uses (basic-combination-fun node)))
         (args (basic-combination-args node)))
-    (when (and (ref-p ref)
-               (constant-reference-p ref))
+    (when (ref-p ref)
       (multiple-value-bind (min max) (fun-type-nargs (lvar-type fun))
         (let ((total-nvals
                 (loop for arg in args
@@ -2069,26 +2047,25 @@
                total-nvals max)
               (setf (basic-combination-kind node) :error)
               (return-from ir1-optimize-mv-call)))
-          (when (singleton-p args)
-            (let ((count (cond (total-nvals)
-                               ((and (policy node (zerop verify-arg-count))
-                                     (eql min max))
-                                min)
-                               (t nil))))
-              (when count
-                (with-ir1-environment-from-node node
-                  (let* ((dums (make-gensym-list count))
-                         (ignore (gensym))
-                         (leaf (ref-leaf ref))
-                         (fun (ir1-convert-lambda
-                               `(lambda (&optional ,@dums &rest ,ignore)
-                                  (declare (ignore ,ignore))
-                                  (%funcall ,leaf ,@dums))
-                               :debug-name (leaf-%debug-name leaf))))
-                    (change-ref-leaf ref fun)
-                    (aver (eq (basic-combination-kind node) :full))
-                    (locall-analyze-component *current-component*)
-                    (aver (eq (basic-combination-kind node) :local)))))))))))
+          (let ((count (cond (total-nvals)
+                             ((and (policy node (zerop verify-arg-count))
+                                   (eql min max))
+                              min)
+                             (t nil))))
+            (when count
+              (with-ir1-environment-from-node node
+                (let* ((dums (make-gensym-list count))
+                       (ignore (gensym))
+                       (leaf (ref-leaf ref))
+                       (fun (ir1-convert-lambda
+                             `(lambda (&optional ,@dums &rest ,ignore)
+                                (declare (ignore ,ignore))
+                                (%funcall ,leaf ,@dums))
+                             :debug-name (leaf-%debug-name leaf))))
+                  (change-ref-leaf ref fun)
+                  (aver (eq (basic-combination-kind node) :full))
+                  (locall-analyze-component *current-component*)
+                  (aver (eq (basic-combination-kind node) :local))))))))))
   (values))
 
 ;;; If we see:
@@ -2107,9 +2084,10 @@
 ;;; lvars. If there are insufficient args, insert references to NIL.
 (defun convert-mv-bind-to-let (call)
   (declare (type mv-combination call))
-  (let* ((arg (first (basic-combination-args call)))
-         (use (lvar-uses arg)))
-    (when (and (combination-p use)
+  (let* ((args (basic-combination-args call))
+         (use (lvar-uses (first args))))
+    (when (and (singleton-p args)
+               (combination-p use)
                (eq (lvar-fun-name (combination-fun use))
                    'values))
       (let* ((fun (combination-lambda call))

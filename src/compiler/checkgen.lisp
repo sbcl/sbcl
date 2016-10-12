@@ -249,7 +249,9 @@
                            ((lvar-single-value-p lvar)
                             1)
                            ((and (mv-combination-p dest)
-                                 (eq (mv-combination-kind dest) :local))
+                                 (eq (mv-combination-kind dest) :local)
+                                 (lvar-uses (mv-combination-fun dest))
+                                 (singleton-p (mv-combination-args dest)))
                             (let ((fun-ref (lvar-use (mv-combination-fun dest))))
                               (length (lambda-vars (ref-leaf fun-ref)))))))
          (n-required (length (values-type-required dtype))))
@@ -276,7 +278,8 @@
                                                  (list (get-type atype))
                                                  n-required))))
           ((and (mv-combination-p dest)
-                (eq (mv-combination-kind dest) :local))
+                (eq (mv-combination-kind dest) :local)
+                (singleton-p (mv-combination-args dest)))
            ;; we know the number of consumed values
            (values :simple (maybe-negate-check value
                                                (adjust-list (values-type-types ctype)

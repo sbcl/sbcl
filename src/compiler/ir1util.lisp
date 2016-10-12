@@ -2049,6 +2049,11 @@ is :ANY, the function name is not checked."
              (t
               (return nil)))))))
 
+(defun call-all-args-fixed-p (call)
+  (loop for arg in (basic-combination-args call)
+        always (numberp (nth-value 1 (values-types
+                                      (lvar-derived-type arg))))))
+
 ;;; Return true if function is an external entry point. This is true
 ;;; of normal XEPs (:EXTERNAL kind) and also of top level lambdas
 ;;; (:TOPLEVEL kind.)
