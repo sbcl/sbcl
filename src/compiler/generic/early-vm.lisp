@@ -97,7 +97,7 @@
 ;; The lowest index that you can pass to %INSTANCE-REF accessing
 ;; a slot of data that is not the instance-layout.
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
-(def!constant instance-data-start 1)
+(def!constant instance-data-start (+ #!-compact-instance-header 1))
 
 ;; The largest number that may appear in the header-data for an instance,
 ;; and some other mostly-boxed objects, such as FDEFNs.

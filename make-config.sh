@@ -667,7 +667,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     case "$sbcl_os" in
     linux | darwin)
         # probably works on *BSD but not tested
-        printf ' :immobile-space' >> $ltf
+        printf ' :immobile-space :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :cheneygc :linkage-table' >> $ltf

@@ -285,7 +285,11 @@ static inline uword_t instance_length(lispobj header)
 }
 static inline lispobj instance_layout(lispobj* instance_ptr) // native ptr
 {
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+  return instance_ptr[0] >> 32; // the high half of the header is the layout
+#else
   return instance_ptr[1]; // the word following the header is the layout
+#endif
 }
 #undef HEADER_VALUE_MASKED
 

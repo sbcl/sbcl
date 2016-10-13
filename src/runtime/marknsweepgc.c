@@ -1388,18 +1388,28 @@ lispobj* find_preceding_object(lispobj* obj)
 }
 
 #include "genesis/vector.h"
-lispobj alloc_layout(lispobj slots)
+#include "genesis/instance.h"
+lispobj alloc_layout(lispobj layout_layout, lispobj slots)
 {
     struct vector* v = (struct vector*)native_pointer(slots);
-    if (fixnum_value(v->length) != (LAYOUT_SIZE - INSTANCE_DATA_START))
+    if (fixnum_value(v->length) != (LAYOUT_SIZE - INSTANCE_DATA_START - 1))
         lose("bad arguments to alloc_layout");
-    struct layout* l = (struct layout*)
+    struct instance* l = (struct instance*)
       alloc_immobile_obj(MAKE_ATTR(256 / N_WORD_BYTES,
                                    CEILING(LAYOUT_SIZE,2),
                                    0),
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+                         (layout_layout << 32) |
+#endif
                          (LAYOUT_SIZE-1)<<8 | INSTANCE_HEADER_WIDETAG,
                          &layout_page_hint);
-    memcpy((char*)l+N_WORD_BYTES, v->data, (LAYOUT_SIZE-1)*N_WORD_BYTES);
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+    l->slots[0] = layout_layout;
+#endif
+    memcpy(&l->slots[INSTANCE_DATA_START],
+           v->data,
+           (LAYOUT_SIZE-1)*N_WORD_BYTES);
+
     // Possible efficiency win: make the "wasted" bytes after the layout into a
     // simple unboxed array so that heap-walking can skip in one step.
     // Probably only a performance issue for MAP-ALLOCATED-OBJECTS,

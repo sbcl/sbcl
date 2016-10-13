@@ -575,6 +575,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
       (structure
        (when (dd-offset dd)
          (error ":OFFSET can't be specified unless :TYPE is specified."))
+       #!-compact-instance-header
        (unless (dd-include dd)
          ;; FIXME: It'd be cleaner to treat no-:INCLUDE as defaulting
          ;; to :INCLUDE STRUCTURE-OBJECT, and then let the general-case
@@ -1324,8 +1325,9 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; If both the + and - values are fixnums, and raw slots are present,
 ;;; we'll choose the positive value.
 (defun dd-bitmap (dd)
-  ;; The 0th bit is always 1. LAYOUT is tagged but not reflected in DD-SLOTS
-  (let ((bitmap 1))
+  ;; Without compact instances, the 0th bit is always 1.
+  ;; LAYOUT is tagged but not reflected in DD-SLOTS
+  (let ((bitmap sb!vm:instance-data-start))
     (dolist (slot (dd-slots dd))
       (when (eql t (dsd-raw-type slot))
         (setf bitmap (logior bitmap (ash 1 (dsd-index slot))))))

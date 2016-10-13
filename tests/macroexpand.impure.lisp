@@ -223,7 +223,9 @@
   e)
 (with-test (:name :macroexpand-of-setf-structure-access)
   (assert (equal (macroexpand-1 '(setf (foo-a x) 3))
-                 '(sb-kernel:%instance-set (the foo x) 1 (the fixnum 3))))
+                 `(sb-kernel:%instance-set (the foo x)
+                                           ,sb-vm:instance-data-start
+                                           (the fixnum 3))))
 
   ;; Lexical definition of (SETF FOO-A) inhibits source-transform.
   ;; This is not required behavior - SETF of structure slots

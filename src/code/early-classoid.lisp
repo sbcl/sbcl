@@ -187,10 +187,10 @@
                   ;; After calling into C, registers are trashed,
                   ;; so we pass everything as a single vector,
                   ;; and don't rely on Lisp to write the slots of the layout.
-                  (dx-let ((data (vector ,(find-layout 'layout)
-                                         ,@(mapcar #'dsd-name slots))))
+                  (dx-let ((data (vector ,@(mapcar #'dsd-name slots))))
                     (truly-the layout
-                     (values (%primitive sb!vm::alloc-immobile-layout data))))))))
+                     (values (%primitive sb!vm::alloc-immobile-layout
+                                         ,(find-layout 'layout) data))))))))
   (def-layout-maker))
 
 ;;; The CLASSOID structure is a supertype of all classoid types.  A

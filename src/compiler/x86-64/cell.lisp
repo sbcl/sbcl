@@ -26,9 +26,13 @@
          (value :scs (descriptor-reg any-reg immediate)))
   (:temporary (:sc descriptor-reg) temp)
   (:info name offset lowtag)
-  (:ignore name)
+ ;(:ignore name)
   (:results)
   (:generator 1
+    (progn name) ; ignore it
+    (generate-set-slot object value temp offset lowtag)))
+
+(defun generate-set-slot (object value temp offset lowtag)
     (if (sc-is value immediate)
         (move-immediate (make-ea :qword
                                  :base object
@@ -37,9 +41,21 @@
                         (encode-value-if-immediate value)
                         temp)
         ;; Else, value not immediate.
-        (storew value object offset lowtag))))
+        (storew value object offset lowtag)))
 
-(define-vop (init-slot set-slot))
+;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
+(define-vop (init-slot set-slot)
+  (:generator 1
+    (progn name)
+    (if (or #!+compact-instance-header
+            (and (eq name '%make-structure-instance) (eql offset :layout)))
+        ;; The layout is in the upper half of the header word.
+        ;; FIXME: It would be nice if FIXED-ALLOC could write the header word
+        ;; in one shot, but this is an acceptable workaround.
+        (inst mov
+              (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
+              (reg-in-size value :dword))
+        (generate-set-slot object value temp offset lowtag))))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
@@ -544,8 +560,32 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (loadw res struct 0 instance-pointer-lowtag)
-    (inst shr res n-widetag-bits)))
+    (inst mov (reg-in-size res :word)
+              (make-ea :word :base struct
+                       :disp (1+ (- instance-pointer-lowtag))))
+    (inst movzx (reg-in-size res :dword) (reg-in-size res :word))))
+
+#!+compact-instance-header
+(progn
+ (define-vop (%instance-layout)
+   (:translate %instance-layout)
+   (:policy :fast-safe)
+   (:args (object :scs (descriptor-reg)))
+   (:results (res :scs (any-reg descriptor-reg)))
+   (:generator 1
+    (inst mov (reg-in-size res :dword)
+          (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag)))))
+ (define-vop (%set-instance-layout)
+   (:translate %set-instance-layout)
+   (:policy :fast-safe)
+   (:args (object :scs (descriptor-reg))
+          (value :scs (any-reg descriptor-reg) :target res))
+   (:results (res :scs (any-reg descriptor-reg)))
+   (:generator 2
+    (inst mov
+          (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
+          (reg-in-size value :dword))
+    (move res value))))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)

@@ -181,7 +181,12 @@
  ;; speed of allocation of those objects is relatively unimportant.
  ;; If unexpected performance regressions are observed,
  ;; consider disabling this feature and reporting a bug.
- ;; :immobile-space
+ ; :immobile-space
+
+ ;; Combine the layout pointer, instance-length, and widetag of INSTANCE
+ ;; into a single machine word. This represents a space savings of anywhere
+ ;; from 4% to 8% in typical applications. (Your mileage may vary).
+ ; :compact-instance-header
 
  ;; Enabled automatically for platforms which implement complex arithmetic
  ;; VOPs. Such platforms should implement real-complex, complex-real and

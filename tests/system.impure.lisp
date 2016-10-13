@@ -12,7 +12,11 @@
 (in-package "SB-VM")
 
 ;;; This file defines a structure, so is an 'impure' test
-(defstruct my-struct one two three four)
+(defstruct my-struct
+  ;; The slots under test have to be naturally aligned for a double-Lispword,
+  ;; at least on x86-64, so add a random slot if there is no layout slot.
+  #+compact-instance-header fluff
+  one two three four)
 
 #-(and (or x86 x86-64) (not interpreter)) (sb-ext:exit :code 104)
 

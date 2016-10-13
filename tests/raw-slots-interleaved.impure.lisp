@@ -102,6 +102,8 @@
 (defstruct foo1
   ;;                                  INDICES:    32-bit  64-bit
   ;;                                  ========   =======  ======
+  #+compact-instance-header
+  (fluff 0 :type sb-ext:word)                    ;             0
   (df 1d0 :type double-float)                    ;   1,2       1
   (a 'aaay)                                      ;     3       2
   (sf 1f0 :type single-float)                    ;     4       3
@@ -136,7 +138,7 @@
 (with-test (:name :structure-obj-equalp-raw-slots)
   ;; these structures are EQUALP even though one of them
   ;; has a word of junk in its padding slot, as could happen
-  ;; if the structure was stack-allocated (I think)
+  ;; if the structure was stack-allocated
   (assert (equalp *anotherfoo* *afoo*)))
 
 (defstruct foo

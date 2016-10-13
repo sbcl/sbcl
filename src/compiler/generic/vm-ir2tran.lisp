@@ -117,7 +117,10 @@
            (:dd
             (vop init-slot node block object
                  (emit-constant (sb!kernel::dd-layout-or-lose slot))
-                 name sb!vm:instance-slots-offset lowtag))
+                 name
+                 ;; Layout has no index if compact headers.
+                 (or #!+compact-instance-header :layout sb!vm:instance-slots-offset)
+                 lowtag))
            (otherwise
             (if (and (eq kind :arg)
                      (zero-init-p (car args)))

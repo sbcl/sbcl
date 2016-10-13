@@ -811,8 +811,13 @@ scav_instance(lispobj *where, lispobj header)
     if (!layout)
         return 1;
     layout = native_pointer((lispobj)layout);
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+    if (__immobile_obj_gen_bits(layout) == from_space)
+        promote_immobile_obj(layout);
+#else
     if (forwarding_pointer_p(layout))
         layout = native_pointer((lispobj)forwarding_pointer_value(layout));
+#endif
 
     if (((struct layout*)layout)->bitmap == make_fixnum(-1))
         scavenge(where+1, ntotal);

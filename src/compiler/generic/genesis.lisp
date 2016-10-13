@@ -640,7 +640,12 @@
                               sb!vm:instance-pointer-lowtag is-layout)))
     ;; Length as stored in the header is the exact number of useful words
     ;; that follow, as is customary. A padding word, if any is not "useful"
-    (write-header-word des layout-length sb!vm:instance-header-widetag)
+    (write-header-word des
+                       (logior layout-length
+                               #!+compact-instance-header
+                               (if layout (ash (descriptor-bits layout) 24) 0))
+                       sb!vm:instance-header-widetag)
+    #!-compact-instance-header
     (write-wordindexed des sb!vm:instance-slots-offset layout)
     des))
 
@@ -1255,7 +1260,7 @@ core and return a descriptor to it."
                sb!kernel::+layout-all-tagged+))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
-         (index 1 (1+ index)))
+         (index sb!vm:instance-data-start (1+ index)))
         ((= index len) result)
       (write-wordindexed
        result
@@ -1271,10 +1276,20 @@ core and return a descriptor to it."
 ;;  - packages, which are made before layout-of-package is made (all of them)
 ;;  - a small number of classoid-cells (probably 3 or 4).
 (defun patch-instance-layout (thing layout)
-  ;; Layout pointer is in the word following the header
+  #!+compact-instance-header
+  ;; High half of the header points to the layout
+  (write-wordindexed thing 0 (make-random-descriptor
+                              (logior (ash (descriptor-bits layout) 32)
+                                      (read-bits-wordindexed thing 0))))
+  #!-compact-instance-header
+  ;; Word following the header is the layout
   (write-wordindexed thing sb!vm:instance-slots-offset layout))
 
 (defun cold-layout-of (cold-struct)
+  #!+compact-instance-header
+  (let ((bits (ash (read-bits-wordindexed cold-struct 0) -32)))
+    (if (zerop bits) *nil-descriptor* (make-random-descriptor bits)))
+  #!-compact-instance-header
   (read-wordindexed cold-struct sb!vm:instance-slots-offset))
 
 (defun initialize-layouts ()
@@ -3506,16 +3521,16 @@ core and return a descriptor to it."
     (format t "    lispobj header; // = word_0_~%")
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
     ;; classoid's expressly declared layout isn't renamed as a special-case.
-    (format t "    lispobj _layout;~%")
+    #!-compact-instance-header (format t "    lispobj _layout;~%")
     ;; Output exactly the number of Lisp words consumed by the structure,
     ;; no more, no less. C code can always compute the padded length from
     ;; the precise length, but the other way doesn't work.
     (let ((names
-           (coerce (loop for i from 1 below (dd-length dd)
+           (coerce (loop for i from sb!vm:instance-data-start below (dd-length dd)
                          collect (list (format nil "word_~D_" (1+ i))))
                    'vector)))
       (dolist (slot (dd-slots dd))
-        (let ((cell (aref names (1- (dsd-index slot))))
+        (let ((cell (aref names (- (dsd-index slot) sb!vm:instance-data-start)))
               (name (cstring (dsd-name slot))))
           (if (eq (dsd-raw-type slot) t)
               (rplaca cell name)

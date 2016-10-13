@@ -361,10 +361,11 @@
      (storew header result 0 lowtag))))
 
 #!+immobile-space
-(macrolet ((def (lisp-name c-name argc &body stuff)
+(macrolet ((def (lisp-name c-name arg-scs &body stuff
+                           &aux (argc (length arg-scs)))
              `(define-vop (,lisp-name)
-                (:args ,@(if (>= argc 1) '((arg1 :scs (descriptor-reg) :target c-arg1)))
-                       ,@(if (>= argc 2) '((arg2 :scs (any-reg) :target c-arg2))))
+                (:args ,@(if (>= argc 1) `((arg1 :scs ,(first arg-scs) :target c-arg1)))
+                       ,@(if (>= argc 2) `((arg2 :scs ,(second arg-scs) :target c-arg2))))
                 ,@(if (>= argc 1)
                       '((:temporary (:sc unsigned-reg :from (:argument 0)
                                      :to :eval :offset rdi-offset) c-arg1)))
@@ -385,7 +386,10 @@
                   (move result c-result))))))
   ;; These VOPs are each used in one place only, and deliberately not
   ;; specified as transforming the function after which they are named.
-  (def alloc-immobile-layout "alloc_layout" 1)  ; MAKE-LAYOUT
-  (def alloc-immobile-symbol "alloc_sym" 2)     ; MAKE-SYMBOL
-  (def alloc-immobile-fdefn  "alloc_fdefn" 1)   ; MAKE-FDEFN
+  (def alloc-immobile-layout "alloc_layout" ; MAKE-LAYOUT
+       ((descriptor-reg) (descriptor-reg)))
+  (def alloc-immobile-symbol "alloc_sym"    ; MAKE-SYMBOL
+       ((descriptor-reg) (any-reg)))
+  (def alloc-immobile-fdefn  "alloc_fdefn"  ; MAKE-FDEFN
+       ((descriptor-reg)))
   )
