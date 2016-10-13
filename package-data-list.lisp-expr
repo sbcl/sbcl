@@ -836,10 +836,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "LONG-FLOAT-NEGATIVE-INFINITY"
                "LONG-FLOAT-POSITIVE-INFINITY"
 
-               ;; hacks to work around system limitations
-               "*INTEXP-MAXIMUM-EXPONENT*" ; since we crash hard when
-                                        ; memory is exhausted
-
                ;; saving Lisp images
                "SAVE-LISP-AND-DIE"
 

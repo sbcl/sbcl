@@ -111,20 +111,12 @@
         (cis (imagpart number))))))
 
 ;;; INTEXP -- Handle the rational base, integer power case.
-
-(declaim (type (or integer null) *intexp-maximum-exponent*))
-(defparameter *intexp-maximum-exponent* nil)
-
 ;;; This function precisely calculates base raised to an integral
 ;;; power. It separates the cases by the sign of power, for efficiency
 ;;; reasons, as powers can be calculated more efficiently if power is
 ;;; a positive integer. Values of power are calculated as positive
 ;;; integers, and inverted if negative.
 (defun intexp (base power)
-  (when (and *intexp-maximum-exponent*
-             (> (abs power) *intexp-maximum-exponent*))
-    (error "The absolute value of ~S exceeds ~S."
-            power '*intexp-maximum-exponent*))
   (cond ((minusp power)
          (/ (intexp base (- power))))
         ((eql base 2)

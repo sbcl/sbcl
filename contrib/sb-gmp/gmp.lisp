@@ -926,10 +926,6 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
          *gmp-disabled*)
      (orig-intexp base power))
     (t
-     (when (and sb-kernel::*intexp-maximum-exponent*
-                (> (abs power) sb-kernel::*intexp-maximum-exponent*))
-       (error "The absolute value of ~S exceeds ~S."
-              power 'sb-kernel::*intexp-maximum-exponent*))
      (cond ((minusp power)
             (/ (the integer (gmp-intexp base (- power)))))
            ((eql base 2)
