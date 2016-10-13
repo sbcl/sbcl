@@ -12,15 +12,11 @@
 (in-package "SB!VM")
 
 (defun zeroize (tn)
-  (let ((offset (tn-offset tn)))
+  (let* ((offset (tn-offset tn))
     ;; Using the 32-bit instruction accomplishes the same thing and is
     ;; one byte shorter.
-    (if (<= offset edi-offset)
-        (let ((tn (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'dword-reg)
-                                  :offset offset)))
-          (inst xor tn tn))
-        (inst xor tn tn))))
+         (tn (if (<= offset edi-offset) (reg-in-size tn :dword) tn)))
+    (inst xor tn tn)))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
