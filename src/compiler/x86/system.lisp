@@ -82,22 +82,6 @@
     (inst movzx result (make-ea :byte :base function
                                       :disp (- fun-pointer-lowtag)))))
 
-(define-vop (set-fun-subtype)
-  (:translate (setf fun-subtype))
-  (:policy :fast-safe)
-  (:args (type :scs (unsigned-reg) :target eax)
-         (function :scs (descriptor-reg)))
-  (:arg-types positive-fixnum *)
-  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)
-                   :to (:result 0) :target result)
-              eax)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (move eax type)
-    (storeb al-tn function 0 fun-pointer-lowtag)
-    (move result eax)))
-
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)

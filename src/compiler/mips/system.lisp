@@ -85,19 +85,6 @@
     (load-type result function (- fun-pointer-lowtag))
     (inst nop)))
 
-(define-vop (set-fun-subtype)
-  (:translate (setf fun-subtype))
-  (:policy :fast-safe)
-  (:args (type :scs (unsigned-reg) :target result)
-         (function :scs (descriptor-reg)))
-  (:arg-types positive-fixnum *)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (inst sb type function (- fun-pointer-lowtag))
-    (move result type)))
-
-
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)

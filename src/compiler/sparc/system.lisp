@@ -76,22 +76,6 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
-;;; Is this VOP dead? I can't see anywhere that it is used... -- CSR,
-;;; 2002-06-21
-(define-vop (set-fun-subtype)
-  (:translate (setf fun-subtype))
-  (:policy :fast-safe)
-  (:args (type :scs (unsigned-reg) :target result)
-         (function :scs (descriptor-reg)))
-  (:arg-types positive-fixnum *)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    ;; FIXME: I don't understand what this hardcoded 3 is doing
-    ;; here. -- CSR, 2002-02-08
-    (inst stb type function (- 3 fun-pointer-lowtag))
-    (move result type)))
-
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)

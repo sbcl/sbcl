@@ -80,24 +80,6 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
-(define-vop (set-fun-subtype)
-  (:translate (setf fun-subtype))
-  (:policy :fast-safe)
-  (:args (type :scs (unsigned-reg) :target eax)
-         (function :scs (descriptor-reg)))
-  (:arg-types positive-fixnum *)
-  (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 0)
-                   :to (:result 0) :target result)
-              eax)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (move eax type)
-    (inst mov
-          (make-ea :byte :base function :disp (- fun-pointer-lowtag))
-          al-tn)
-    (move result eax)))
-
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
