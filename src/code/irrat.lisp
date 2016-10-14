@@ -117,7 +117,27 @@
 ;;; a positive integer. Values of power are calculated as positive
 ;;; integers, and inverted if negative.
 (defun intexp (base power)
-  (cond ((minusp power)
+  (cond ((eql base 1)
+         base)
+        ((eql base -1)
+         (if (evenp power)
+             1
+             base))
+        ((ratiop base)
+         (let ((den (denominator base))
+               (num (numerator base)))
+           (if (minusp power)
+               (let ((negated (- power)))
+                 (cond ((eql num 1)
+                        (intexp den negated))
+                       ((eql num -1)
+                        (intexp (- den) negated))
+                       (t
+                        (build-ratio (intexp den negated)
+                                     (intexp num negated)))))
+               (build-ratio (intexp num power)
+                            (intexp den power)))))
+        ((minusp power)
          (/ (intexp base (- power))))
         ((eql base 2)
          (ash 1 power))
