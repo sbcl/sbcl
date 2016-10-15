@@ -334,9 +334,13 @@
   (declare (explicit-check))
   (if (zerop number)
       number
-      (if (rationalp number)
-          (if (plusp number) 1 -1)
-          (/ number (abs number)))))
+      (number-dispatch ((number number))
+        (((foreach fixnum rational single-float double-float))
+         (if (plusp number)
+             (coerce 1 '(dispatch-type number))
+             (coerce -1 '(dispatch-type number))))
+        ((complex)
+         (/ number (abs number))))))
 
 ;;;; ratios
 
