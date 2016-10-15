@@ -14,60 +14,54 @@
 (fmakunbound 'install-condition-slot-reader)
 (fmakunbound 'install-condition-slot-writer)
 
-(defmacro standard-method-function (lambda &environment env)
-  (let ((proto-gf (load-time-value
-                   (ensure-generic-function (gensym)))))
-    (multiple-value-bind (lambda initargs)
-        (sb-mop:make-method-lambda
-         proto-gf
-         (sb-mop:class-prototype (sb-mop:generic-function-method-class proto-gf))
-         lambda
-         env) ; FIXME: coerce to lexenv?
-      `(values #',lambda ',initargs))))
+(flet ((install-condition-slot-accessor
+           (name slot-name lambda-list specializers
+            access-function-name method-function method-initargs)
+         (let ((gf (apply #'ensure-generic-function name
+                          (unless (fboundp name) (list :lambda-list lambda-list)))))
+           (if (and (eq (class-of gf) (find-class 'standard-generic-function))
+                    (eq (sb-mop:generic-function-method-class gf)
+                        (find-class 'standard-method)))
+               (let ((method (apply #'make-instance
+                                    'standard-method
+                                    :specializers (mapcar #'find-class specializers)
+                                    :lambda-list lambda-list
+                                    :function method-function
+                                    method-initargs)))
 
-(defun install-condition-slot-reader (name condition slot-name)
-  (let ((gf (if (fboundp name)
-                (ensure-generic-function name)
-                (ensure-generic-function name :lambda-list '(condition)))))
-    (if (and (eq (class-of gf) (find-class 'standard-generic-function))
-             (eq (sb-mop:generic-function-method-class gf)
-                 (find-class 'standard-method)))
-        (multiple-value-bind (method-fun initargs)
-              (standard-method-function
-               (lambda (condition)
-                 (condition-reader-function condition slot-name)))
-          (let ((method (apply #'make-instance
-                               'standard-method
-                               :specializers (list (find-class condition))
-                               :lambda-list '(condition)
-                               :function method-fun
-                               initargs)))
-            (add-method gf method)
-            method))
-        (eval
-         `(defmethod ,name ((condition ,condition))
-            (condition-reader-function condition ',slot-name))))))
+                 (add-method gf method)
+                 method)
+               (eval
+                (let ((specialized-lambda-list
+                       (mapcar (lambda (parameter specializer)
+                                 (if (eq specializer t)
+                                     parameter
+                                     `(,parameter ,specializer)))
+                               lambda-list specializers)))
+                  `(defmethod ,name ,specialized-lambda-list
+                     (,access-function-name ,@lambda-list ',slot-name))))))))
 
-(defun install-condition-slot-writer (name condition slot-name)
-  (let ((gf (if (fboundp name)
-                (ensure-generic-function name)
-                (ensure-generic-function name :lambda-list '(new-value condition)))))
-    (if (and (eq (class-of gf) (find-class 'standard-generic-function))
-             (eq (sb-mop:generic-function-method-class gf)
-                 (find-class 'standard-method)))
-        (multiple-value-bind (method-fun initargs)
-              (standard-method-function
-               (lambda (new-value condition)
-                 (condition-writer-function condition new-value slot-name)))
-          (let ((method (apply #'make-instance
-                               'standard-method
-                               :specializers (list (find-class t)
-                                                   (find-class condition))
-                               :lambda-list '(new-value condition)
-                               :function method-fun
-                               initargs)))
-            (add-method gf method)
-            method))
-        (eval
-         `(defmethod ,name (new-value (condition ,condition))
-            (condition-writer-function condition new-value ',slot-name))))))
+  (macrolet
+      ((standard-method-function (lambda &environment env)
+         (binding* ((proto-gf (load-time-value (ensure-generic-function (gensym))))
+                    (proto-method (sb-mop:class-prototype
+                                   (sb-mop:generic-function-method-class proto-gf)))
+                    ((lambda initargs) (sb-mop:make-method-lambda
+                                        proto-gf proto-method lambda env))) ; FIXME: coerce to lexenv?
+           `(values #',lambda ',initargs))))
+
+    (defun install-condition-slot-reader (name condition slot-name)
+      (multiple-value-call #'install-condition-slot-accessor
+        name slot-name '(condition) (list condition)
+        'condition-reader-function
+        (standard-method-function
+         (lambda (condition)
+           (condition-reader-function condition slot-name)))))
+
+    (defun install-condition-slot-writer (name condition slot-name)
+      (multiple-value-call #'install-condition-slot-accessor
+        name slot-name '(new-value condition) (list t condition)
+        'condition-writer-function
+        (standard-method-function
+         (lambda (new-value condition)
+           (condition-writer-function condition new-value slot-name)))))))
