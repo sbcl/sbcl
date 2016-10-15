@@ -414,15 +414,18 @@
   (number-dispatch ((number number))
     (((foreach fixnum bignum ratio))
      (if (minusp number)
-         (complex-sqrt number)
+         (complex 0f0
+                  (coerce (%sqrt (- (coerce number 'double-float))) 'single-float))
          (coerce (%sqrt (coerce number 'double-float)) 'single-float)))
     (((foreach single-float double-float))
      (if (minusp number)
-         (complex-sqrt (complex number))
+         (complex (coerce 0.0 '(dispatch-type number))
+                  (coerce (%sqrt (- (coerce number 'double-float)))
+                          '(dispatch-type number)))
          (coerce (%sqrt (coerce number 'double-float))
                  '(dispatch-type number))))
-     ((complex)
-      (complex-sqrt number))))
+    ((complex)
+     (complex-sqrt number))))
 
 ;;;; trigonometic and related functions
 
