@@ -365,7 +365,7 @@
  ;; Define at most one INTERPRETED-FUNCTION type based on target features
  #!+sb-eval ("src/code/early-full-eval" :not-host)
  #!+sb-fasteval ("src/interpreter/function" :not-host)
- ("src/code/early-condition")
+ ("src/code/early-class")
  ("src/code/condition" :not-host)
  ("src/code/toplevel"  :not-host)
  ("src/code/parse-defmacro-errors")

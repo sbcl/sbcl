@@ -1,4 +1,4 @@
-;;;; Just %COMPILER-DEFINE-CONDITION, moved out of 'condition'
+;;;; Early support routines for class-related things (including conditions).
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
