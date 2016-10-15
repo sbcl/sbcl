@@ -68,8 +68,7 @@
   '(unsigned-byte
     #.(- 62 (floor (log sb!xc:internal-time-units-per-second 2)))))
 
-(sb!xc:deftype bignum-element-type () `(unsigned-byte ,sb!vm:n-word-bits))
-(sb!xc:deftype bignum-type () 'bignum)
+(sb!xc:deftype bignum-element-type () 'sb!vm:word)
 ;;; FIXME: see also DEFCONSTANT MAXIMUM-BIGNUM-LENGTH in
 ;;; src/code/bignum.lisp.  -- CSR, 2004-07-19
 (sb!xc:deftype bignum-index ()

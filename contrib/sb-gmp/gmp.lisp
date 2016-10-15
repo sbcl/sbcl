@@ -126,7 +126,7 @@
 (defun z-to-bignum (b count)
   "Convert GMP integer in the buffer of a pre-allocated bignum."
   (declare (optimize (speed 3) (space 3) (safety 0))
-           (type bignum-type b)
+           (type bignum b)
            (type bignum-length count))
   (if (zerop count)
       0
@@ -136,7 +136,7 @@
   "Convert to twos complement int the buffer of a pre-allocated
 bignum."
   (declare (optimize (speed 3) (space 3) (safety 0))
-           (type bignum-type b)
+           (type bignum b)
            (type bignum-length count))
   (negate-bignum-in-place b)
   (the (integer * 0) (%normalize-bignum b count)))
@@ -149,7 +149,7 @@ bignum."
 pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (declare (optimize (speed 3) (space 3) (safety 0))
            (type (alien (* gmp-limb)) z)
-           (type bignum-type b)
+           (type bignum b)
            (type bignum-length count))
   (dotimes (i count (%normalize-bignum b (1+ count)))
     (%bignum-set b i (deref z i))))
@@ -833,7 +833,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 ;;; integers
 (defun gmp-mul (a b)
   (declare (optimize (speed 3) (space 3))
-           (type bignum-type a b)
+           (type bignum a b)
            (inline mpz-mul))
   (if (or (< (min (%bignum-length a)
                   (%bignum-length b))
@@ -844,7 +844,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 (defun gmp-truncate (a b)
   (declare (optimize (speed 3) (space 3))
-           (type bignum-type a b)
+           (type bignum a b)
            (inline mpz-tdiv))
   (if (or (< (min (%bignum-length a)
                   (%bignum-length b))

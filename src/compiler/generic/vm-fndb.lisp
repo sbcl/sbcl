@@ -310,22 +310,22 @@
 
 ;;;; bignum operations
 
-(defknown %allocate-bignum (bignum-length) bignum-type
+(defknown %allocate-bignum (bignum-length) bignum
   (flushable))
 
-(defknown %bignum-length (bignum-type) bignum-length
+(defknown %bignum-length (bignum) bignum-length
   (foldable flushable movable))
 
-(defknown %bignum-set-length (bignum-type bignum-length) bignum-type
+(defknown %bignum-set-length (bignum bignum-length) bignum
   ())
 
-(defknown %bignum-ref (bignum-type bignum-index) bignum-element-type
+(defknown %bignum-ref (bignum bignum-index) bignum-element-type
   (flushable))
 #!+(or x86 x86-64)
-(defknown %bignum-ref-with-offset (bignum-type fixnum (signed-byte 24))
+(defknown %bignum-ref-with-offset (bignum fixnum (signed-byte 24))
   bignum-element-type (flushable always-translatable))
 
-(defknown %bignum-set (bignum-type bignum-index bignum-element-type)
+(defknown %bignum-set (bignum bignum-index bignum-element-type)
   bignum-element-type
   ())
 

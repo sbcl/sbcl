@@ -19,7 +19,7 @@
 ;;; the result is NIL, too.
 (declaim (inline bignum-lower-bits-zero-p))
 (defun bignum-lower-bits-zero-p (bignum n-bits)
-  (declare (type bignum-type bignum)
+  (declare (type bignum bignum)
            (type bit-index n-bits))
   (multiple-value-bind (n-full-digits n-bits-partial-digit)
       (floor n-bits digit-size)
