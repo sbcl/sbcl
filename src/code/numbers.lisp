@@ -160,21 +160,19 @@
               (tag (gensym)))
           (error-tags tag)
           (errors tag)
-          (errors `(return-from
-                    ,block
-                    (error 'simple-type-error :datum ,var
-                           :expected-type ',type
-                           :format-control
-                           "~@<Argument ~A is not a ~S: ~2I~_~S~:>"
-                           :format-arguments
-                           (list ',var ',type ,var))))))
+          (errors
+           (let ((interr-symbol
+                   (sb!c::%interr-symbol-for-type-spec type)))
+             (if interr-symbol
+                 `(sb!c::%type-check-error/c ,var ',interr-symbol)
+                 `(sb!c::%type-check-error ,var ',type))))))
 
       `(block ,block
          (tagbody
-           (return-from ,block
-                        ,@(generate-number-dispatch vars (error-tags)
-                                                    (cdr res)))
-           ,@(errors))))))
+            (return-from ,block
+              ,@(generate-number-dispatch vars (error-tags)
+                                          (cdr res)))
+            ,@(errors))))))
 
 ;;;; binary operation dispatching utilities
 
