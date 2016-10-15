@@ -443,10 +443,14 @@
       (tagbody
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
-            (if trace-file
-                (funcall compile-file src :output-file tmp-obj
-                         :trace-file t :allow-other-keys t)
-                (funcall compile-file src :output-file tmp-obj))
+             (restart-case
+                 (if trace-file
+                     (funcall compile-file src :output-file tmp-obj
+                                               :trace-file t :allow-other-keys t)
+                     (funcall compile-file src :output-file tmp-obj))
+               (recompile ()
+                 :report report-recompile-restart
+                 (go retry-compile-file)))
            (declare (ignore warnings-p))
            (cond ((not output-truename)
                   (error "couldn't compile ~S" src))
