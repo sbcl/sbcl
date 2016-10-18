@@ -942,33 +942,31 @@
     (let ((type (find-type-restriction env (or binding symbol))))
       (if (eq type *universal-type*) nil (type-checker type)))))
 
-;; Convert compiler env to interpreter env
-(defun env-from-lexenv (lexenv)
-  (when (sb-c::null-lexenv-p lexenv)
-    (return-from env-from-lexenv nil))
-  ;; a lexical environment which includes locally [not]inline
-  ;; declarations about global functions is ok
+;;; Convert compiler env to interpreter env if possible,
+;;; otherwise return :COMPILE.
+;;; A lexical environment which contains only macros and decls is ok.
+;;; Locally [not]inline declarations about global functions are ok.
+(defun env-from-lexenv (lexenv &aux (compiler-funs (sb-c::lexenv-vars lexenv))
+                                    (compiler-vars (sb-c::lexenv-funs lexenv)))
   (flet ((harmless-defined-fun-p (thing)
            (and (typep thing 'sb-c::defined-fun)
                 (eq (sb-c::defined-fun-kind thing) :global-function)))
          (macro-p (thing)
-           (and (consp thing) (eq (car thing) 'sb-sys:macro))))
-    (let ((native-funs (sb-c::lexenv-funs lexenv))
-          (native-vars (sb-c::lexenv-vars lexenv)))
-      (when (or (sb-c::lexenv-blocks lexenv)
-                (sb-c::lexenv-tags lexenv)
-                (sb-c::lexenv-lambda lexenv)
-                (sb-c::lexenv-cleanup lexenv)
-                (sb-c::lexenv-type-restrictions lexenv)
-                (find-if-not (lambda (x) (or (macro-p x)
-                                             (harmless-defined-fun-p x)))
-                             native-funs :key #'cdr)
-                (find-if-not #'macro-p native-vars :key #'cdr))
-        (error 'compiler-environment-too-complex-error
-               :format-control
-               "~@<Lexical environment is too complex to evaluate in: ~S~:@>"
-               :format-arguments (list lexenv)))
-      (let* ((disabled-package-locks
+           (typep thing '(cons (eql sb-sys:macro)))))
+    (if (or (sb-c::lexenv-blocks lexenv)
+            (sb-c::lexenv-tags lexenv)
+            ;; FIXME: why test -LAMBDA here? Isn't that a book-keeping thing,
+            ;; not a semantics thing? (See also similar code in 'full-eval')
+            (sb-c::lexenv-lambda lexenv)
+            (sb-c::lexenv-cleanup lexenv)
+            (sb-c::lexenv-type-restrictions lexenv)
+            (find-if-not (lambda (x)
+                           (or (macro-p x) (harmless-defined-fun-p x)))
+                         compiler-funs :key #'cdr)
+            (find-if-not #'macro-p compiler-vars :key #'cdr))
+        :compile
+        (let*
+            ((disabled-package-locks
               `((declare (disabled-package-locks
                           ,@(sb-c::lexenv-disabled-package-locks lexenv)))))
              (macro-env
@@ -988,17 +986,17 @@
                                              nil ; decls
                                              `((funcall ,expander form env)) nil)
                              nil)))) ; environment for the interpreted fun
-                    (remove-if-not #'macro-p native-funs :key #'cdr))
+                    (remove-if-not #'macro-p compiler-funs :key #'cdr))
                nil ; no free specials vars
                ;; FIXME: type-restrictions, handled-conditions.
-               (make-decl-scope (if native-vars nil disabled-package-locks)
+               (make-decl-scope (if compiler-vars nil disabled-package-locks)
                                 (sb-c::lexenv-policy lexenv)))))
-        (if (not native-vars)
+        (if (not compiler-vars)
             macro-env
             (make-symbol-macro-env
              macro-env
-             (map 'vector #'cddr native-vars)
-             (map 'vector (lambda (x) (list (car x))) native-vars)
+             (map 'vector #'cddr compiler-vars)
+             (map 'vector (lambda (x) (list (car x))) compiler-vars)
              (make-decl-scope disabled-package-locks
                               (sb-c::lexenv-policy lexenv))))))))
 

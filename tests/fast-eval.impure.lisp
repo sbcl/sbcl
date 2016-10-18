@@ -246,3 +246,23 @@
 
 (test-util:with-test (:name :inline-lexenv-not-too-hairy)
   (assert (sb-c::fun-name-inline-expansion 'foo-compare)))
+
+(defmacro use-hairy-env (x &environment e)
+  (list 'list
+        (eql (sb-interpreter::env-from-lexenv e) :compile)
+        (sb-int:eval-in-lexenv x e)))
+
+;;; Assert that USE-HAIRY-ENV can be invoked such that when it calls
+;;; EVAL-IN-LEXENV on an environment object that is too complex,
+;;; it works anyway. Of course don't actually do this :-)
+;;; Arguably the interpreter could be modified such that it only chokes
+;;; if you _actually_ try to reference parts of the complex lexenv
+;;; that you're not allowed to, but that's a whole other ball of wax.
+(test-util:with-test (:name :eval-in-complex-lexenv)
+  (let ((answer
+         (funcall (compile nil '(lambda (a) (cons a (use-hairy-env (+ 1 2)))))
+                  45)))
+    (assert (eql (first answer) 45))
+    ;; ensure that the lambda environment could not be handled by the interpreter
+    (assert (eql (second answer) t))
+    (assert (eql (third answer) 3))))

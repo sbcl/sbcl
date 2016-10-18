@@ -209,11 +209,22 @@
 (fmakunbound 'eval-in-environment)
 (defun eval-in-environment (form env)
   (incf *eval-calls*)
-  ;; Should we pre-test that ENV is one that can be converted both to
-  ;; and from an interpreter environment? If it isn't, we might want to
-  ;; call the compiler now rather than performing an un-invertable step.
-  ;; Can that happen?
-  (%eval form (typecase env (sb-kernel:lexenv (env-from-lexenv env)) (t env))))
+  (let ((interpreter-env
+         (typecase env
+          (sb-kernel:lexenv (if (sb-c::null-lexenv-p env) nil (env-from-lexenv env)))
+          (t env))))
+    (if (eq interpreter-env :compile)
+        (funcall (handler-case
+                     ;; Final arg of T means signal errors immediately rather
+                     ;; than returning a function that signals when called.
+                     (sb-c::actually-compile nil `(lambda () ,form) env nil nil t)
+                  (error ()
+                     ;; Whatever went wrong, just say "too complex"
+                   (error 'compiler-environment-too-complex-error
+                          :format-control
+                          "~@<Lexical environment is too complex to evaluate in: ~S~:@>"
+                          :format-arguments (list env)))))
+        (%eval form interpreter-env))))
 
 (defun unintern-init-only-stuff ()
   (let ((this-pkg (find-package "SB-INTERPRETER")))
