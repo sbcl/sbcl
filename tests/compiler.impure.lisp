@@ -2724,3 +2724,17 @@
        ((function *)                  "(FUNCTION *)")
        ((function (function *))       "(FUNCTION (FUNCTION *))")
        ((function (function (eql 1))) "(FUNCTION (FUNCTION (EQL 1))")))))
+
+#+this-crashes-the-compiler-and-launchpad-is-flaking-out
+(defun foo-node (stuff &optional (pos 0) rule)
+  (loop for child in stuff
+        do (setf pos (multiple-value-call #'foo-node child pos 42))
+        finally (set '*some-var* pos)))
+#|
+* (compile 'foo-node)
+
+debugger invoked on a SB-INT:BUG in thread
+#<THREAD "main thread" RUNNING {10029A6C93}>:
+    failed AVER:
+      (OR (NOT SB-C::ENTRY) (EQ (SB-C::FUNCTIONAL-KIND SB-C::ENTRY) :DELETED))
+|#
