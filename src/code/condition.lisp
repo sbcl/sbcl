@@ -517,9 +517,9 @@
    (expected-type :reader type-error-expected-type :initarg :expected-type))
   (:report
    (lambda (condition stream)
-     (format stream  "~@<The value~
-                      ~@:_~2@T~S~@:_~
-                      is not of type~
+     (format stream  "~@<The value ~
+                      ~@:_~2@T~S~@:_ ~
+                      is not of type ~
                       ~@:_~2@T~/sb!impl:print-type-specifier/~:@>"
              (type-error-datum condition)
              (type-error-expected-type condition)))))
