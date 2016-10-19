@@ -224,6 +224,24 @@
                           :format-control
                           "~@<Lexical environment is too complex to evaluate in: ~S~:@>"
                           :format-arguments (list env)))))
+        ;; FIXME: should this be (OR INTERPTER-ENV (CAPTURE-TOPLEVEL-ENV)) ?
+        ;; Whether we decide to capture the policy here or not, there will always
+        ;; be some use-case that comes out wrong. Capturing it is necessary for
+        ;; the following to work in the interpreter:
+        #|
+        (defmacro some-macro (x &environment e)
+          (if (policy e (= safety 3)) (expand-to-safe-code) (expand-normally)))
+        (with-compilation-unit (:policy '(optimize (safety 3)))
+           (some-macro (whatever)))
+        |#
+        ;; because WITH-COMPILATION-UNIT rebinds *POLICY* and so we need
+        ;; to look at that policy regardless of whether interpreting or compiling.
+        ;; But %COERCE-TO-POLICY as used in the (POLICY) macro would return
+        ;; **BASELINE-POLICY** instead of *POLICY* when given NIL as the env,
+        ;; because the compiler wants that.
+        ;; But if we do capture the policy up front, then we _fail_ to see
+        ;; any changes that are made by PROCLAIM because those _don't_
+        ;; affect the policy in an interpreter environment.
         (%eval form interpreter-env))))
 
 (defun unintern-init-only-stuff ()
