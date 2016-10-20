@@ -384,3 +384,15 @@
         (progn (push 2 result) nil)
       (push 3 result))
     (assert (equal result '(3 2 1)))))
+
+(with-test (:name (type-error print *print-pretty*))
+  (let ((error (make-condition 'type-error :datum 1 :expected-type 'string)))
+    (assert (string= (let ((*print-pretty* nil))
+                       (princ-to-string error))
+                     "The value 1 is not of type STRING"))
+    (assert (string= (let ((*print-pretty* t))
+                       (princ-to-string error))
+                     "The value
+  1
+is not of type
+  STRING"))))
