@@ -37,10 +37,7 @@
                     :error))))))
 
 (with-test (:name :unbound-cannot-be-always-bound)
-  (assert (eq :error
-              (handler-case
-                  (proclaim '(sb-ext:always-bound *foo*))
-                (error () :error)))))
+  (assert-error (proclaim '(sb-ext:always-bound *foo*))))
 
 (set '*foo* t)
 (proclaim '(sb-ext:always-bound *foo*))
@@ -95,57 +92,43 @@
   (assert (= 123 (bar1))))
 
 (with-test (:name :cannot-bind-globals)
-  (assert (eq :nope
-              (handler-case
-                  (eval* '(let ((.bar. 6)) .bar.))
-                (error () :nope))))
-  (assert (eq :nope
-             (handler-case
-                 (funcall (compile nil `(lambda ()
-                                          (let ((.bar. 5)) .bar.))))
-               (error () :nope)))))
+  (assert-error (eval* '(let ((.bar. 6)) .bar.)))
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda ()
+                          (let ((.bar. 5)) .bar.))
+                       :allow-failure t)
+    (assert failure-p)
+    (assert-error (funcall fun))))
 
 (with-test (:name :cannot-define-globals-as-symmacs)
-  (assert (eq :nope
-              (handler-case
-                  (eval* '(define-symbol-macro .bar. 0))
-                (error () :nope))))
-  (assert (eq :nope
-            (handler-case
-                (eval* `(symbol-macrolet ((.bar. 11)) .bar.))
-              (error () :nope))))
-  (assert (eq :nope
-              (handler-case
-                  (funcall (compile nil `(lambda ()
-                                           (symbol-macrolet ((.bar. 11)) .bar.))))
-                (error () :nope)))))
+  (assert-error (eval* '(define-symbol-macro .bar. 0)))
+  (assert-error (eval* `(symbol-macrolet ((.bar. 11)) .bar.)))
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda ()
+                          (symbol-macrolet ((.bar. 11)) .bar.))
+                       :allow-failure t)
+    (assert failure-p)
+    (assert-error (funcall fun))))
 
 ;;; Cannot proclaim or declare a global as special
 (with-test (:name :cannot-declare-global-special)
-  (assert (eq :nope
-              (handler-case (proclaim '(special .bar. 666))
-                (error () :nope))))
-  (assert (eq :nope
-              (handler-case
-                  (funcall (compile nil `(lambda ()
-                                           (declare (special .bar.))
-                                           .bar.)))
-                (error () :nope))))
-  (assert (eq :nope
-              (handler-case (eval `(locally (declare (special .bar.)) .bar.))
-                (error () :nope)))))
+  (assert-error (proclaim '(special .bar. 666)))
+  (assert-error (eval `(locally (declare (special .bar.)) .bar.)))
+  (multiple-value-bind (fun failure-p)
+      (checked-compile `(lambda ()
+                          (declare (special .bar.))
+                          .bar.)
+                       :allow-failure t)
+    (assert failure-p)
+    (assert-error (funcall fun))))
 
 ;;; Dead globals get bound checks
 (declaim (global this-is-unbound))
 (with-test (:name :dead-unbound-global)
-  (assert (eq :error
-              (handler-case
-                  (funcall (compile nil
-                                    '(lambda ()
-                                      this-is-unbound
-                                      42)))
-                (unbound-variable ()
-                  :error)))))
+  (let ((fun (checked-compile '(lambda ()
+                                this-is-unbound
+                                42))))
+    (assert-error (funcall fun) unbound-variable)))
 
 (defun compile-form (form)
   (let* ((lisp "defglobal-impure-tmp.lisp"))
