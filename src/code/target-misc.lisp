@@ -243,6 +243,7 @@
   #!+win32 (sb!win32::get-computer-name)
   #!-win32 (truly-the simple-string (sb!unix:unix-gethostname)))
 
+(declaim (type (or null string) *machine-version*))
 (defvar *machine-version*)
 
 (defun machine-version ()
@@ -259,11 +260,13 @@ are running on, or NIL if we can't find any useful information."
 ;;; from ANSI 11.1.2.1.1 "Constraints on the COMMON-LISP Package
 ;;; for Conforming Implementations" it is kosher to add a SETF function for
 ;;; a symbol in COMMON-LISP..
+(declaim (type (or null string) *short-site-name* *long-site-name*))
 (defvar *short-site-name* nil
   #!+sb-doc
   "The value of SHORT-SITE-NAME.")
 (defvar *long-site-name* nil
-  #!+sb-doc "the value of LONG-SITE-NAME")
+  #!+sb-doc
+  "The value of LONG-SITE-NAME.")
 (defun short-site-name ()
   #!+sb-doc
   "Return a string with the abbreviated site name, or NIL if not known."
@@ -274,7 +277,8 @@ are running on, or NIL if we can't find any useful information."
   *long-site-name*)
 
 ;;;; ED
-(defvar *ed-functions* nil
+(declaim (type list *ed-functions*))
+(defvar *ed-functions* '()
   #!+sb-doc
   "See function documentation for ED.")
 
