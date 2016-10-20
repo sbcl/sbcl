@@ -311,7 +311,7 @@ the file system."
 ;;; and the values of *DRIBBLE-STREAM*, *STANDARD-INPUT*, and
 ;;; *STANDARD-OUTPUT* are popped from *PREVIOUS-DRIBBLE-STREAMS*.
 
-(defvar *previous-dribble-streams* nil)
+(defvar *previous-dribble-streams* '())
 (defvar *dribble-stream* nil)
 
 (defun dribble (&optional pathname &key (if-exists :append))
@@ -319,34 +319,29 @@ the file system."
   "With a file name as an argument, dribble opens the file and sends a
   record of further I/O to that file. Without an argument, it closes
   the dribble file, and quits logging."
-  (cond (pathname
-         (let* ((new-dribble-stream
-                 (open pathname
-                       :direction :output
-                       :if-exists if-exists
-                       :if-does-not-exist :create))
-                (new-standard-output
-                 (make-broadcast-stream *standard-output* new-dribble-stream))
-                (new-error-output
-                 (make-broadcast-stream *error-output* new-dribble-stream))
-                (new-standard-input
-                 (make-echo-stream *standard-input* new-dribble-stream)))
+  (flet ((install-streams (dribble input output error)
+           (setf *dribble-stream* dribble
+                 *standard-input* input
+                 *standard-output* output
+                 *error-output* error)))
+    (cond (pathname
            (push (list *dribble-stream* *standard-input* *standard-output*
                        *error-output*)
                  *previous-dribble-streams*)
-           (setf *dribble-stream* new-dribble-stream)
-           (setf *standard-input* new-standard-input)
-           (setf *standard-output* new-standard-output)
-           (setf *error-output* new-error-output)))
-        ((null *dribble-stream*)
-         (error "not currently dribbling"))
-        (t
-         (let ((old-streams (pop *previous-dribble-streams*)))
+           (let ((new-dribble (open pathname
+                                    :direction :output
+                                    :if-exists if-exists
+                                    :if-does-not-exist :create)))
+             (install-streams
+              new-dribble
+              (make-echo-stream *standard-input* new-dribble)
+              (make-broadcast-stream *standard-output* new-dribble)
+              (make-broadcast-stream *error-output* new-dribble))))
+          ((null *dribble-stream*)
+           (error "not currently dribbling"))
+          (t
            (close *dribble-stream*)
-           (setf *dribble-stream* (first old-streams))
-           (setf *standard-input* (second old-streams))
-           (setf *standard-output* (third old-streams))
-           (setf *error-output* (fourth old-streams)))))
+           (apply #'install-streams (pop *previous-dribble-streams*)))))
   (values))
 
 (defun %byte-blt (src src-start dst dst-start dst-end)
