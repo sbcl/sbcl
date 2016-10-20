@@ -1354,7 +1354,9 @@
       ;; for GLOBAL variables.
       (let ((kind (info :variable :kind name)))
         (unless (member kind '(:special :unknown))
-          (error "Can't declare ~(~A~) variable locally special: ~S" kind name)))
+          (compiler-error
+           "Can't declare ~(~A~) variable locally special: ~S"
+           kind name)))
       (program-assert-symbol-home-package-unlocked
        context name "declaring ~A special")
       (let ((var (find-in-bindings vars name)))
