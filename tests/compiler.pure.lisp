@@ -6026,3 +6026,13 @@
                            :allow-warnings t)
                           '(1 2))
                  '(1))))
+
+(with-test (:name :delete-optional-dispatch-xep)
+  (let ((name (gensym)))
+    (assert (= (funcall (checked-compile `(sb-int:named-lambda ,name
+                                              (&optional x)
+                                            (if (= x 0)
+                                                10
+                                                (multiple-value-call #',name (1- x)))))
+                        3)
+               10))))

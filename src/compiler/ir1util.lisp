@@ -1302,7 +1302,9 @@
 (defun delete-optional-dispatch (leaf)
   (declare (type optional-dispatch leaf))
   (let ((entry (functional-entry-fun leaf)))
-    (unless (and entry (leaf-refs entry))
+    (unless (and entry
+                 (or (leaf-refs entry)
+                     (eq (functional-kind entry) :external)))
       (aver (or (not entry) (eq (functional-kind entry) :deleted)))
       (setf (functional-kind leaf) :deleted)
 
