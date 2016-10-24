@@ -65,39 +65,36 @@
 
 ;;;; various conditional constructs
 
-;;; COND defined in terms of IF
-(sb!xc:defmacro cond (&rest clauses)
-  (if (endp clauses)
-      nil
-      (let ((clause (first clauses))
-            (more (rest clauses)))
-        (if (atom clause)
-            (error 'simple-type-error
-                   :format-control "COND clause is not a ~S: ~S"
-                   :format-arguments (list 'cons clause)
-                   :expected-type 'cons
-                   :datum clause)
-            (let ((test (first clause))
-                  (forms (rest clause)))
-              (if (endp forms)
-                  (let ((n-result (gensym)))
-                    `(let ((,n-result ,test))
-                       (if ,n-result
-                           ,n-result
-                           (cond ,@more))))
-                  (if (and (eq test t)
-                           (not more))
-                      ;; THE to preserve non-toplevelness for FOO in
-                      ;;   (COND (T (FOO)))
-                      `(the t (progn ,@forms))
-                      `(if ,test
-                           (progn ,@forms)
-                           ,(when more `(cond ,@more))))))))))
-
 (flet ((prognify (forms)
          (cond ((singleton-p forms) (car forms))
                ((not forms) nil)
                (t `(progn ,@forms)))))
+  ;; COND defined in terms of IF
+  (sb!xc:defmacro cond (&rest clauses)
+    (named-let make-clauses ((clauses clauses))
+      (if (endp clauses)
+          nil
+          (let ((clause (first clauses))
+                (more (rest clauses)))
+            (if (atom clause)
+                (error 'simple-type-error
+                       :format-control "COND clause is not a ~S: ~S"
+                       :format-arguments (list 'cons clause)
+                       :expected-type 'cons
+                       :datum clause)
+                (let ((test (first clause))
+                      (forms (rest clause)))
+                  (if (endp forms)
+                      `(or ,test ,(make-clauses more))
+                      (if (and (eq test t)
+                               (not more))
+                          ;; THE to preserve non-toplevelness for FOO in
+                          ;;   (COND (T (FOO)))
+                          `(the t ,(prognify forms))
+                          `(if ,test
+                               ,(prognify forms)
+                               ,(when more (make-clauses more)))))))))))
+
   (sb!xc:defmacro when (test &body forms)
   #!+sb-doc
   "If the first argument is true, the rest of the forms are

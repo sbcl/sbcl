@@ -984,11 +984,9 @@ Form: 2   Context: EVAL
              (take-it-out-for-a-test-walk (cond (a b)
                                                 ((foo bar) a (foo a)))))
            "Form: (COND (A B) ((FOO BAR) A (FOO A)))   Context: EVAL
-Form: (IF A (PROGN B) (COND ((FOO BAR) A (FOO A))))   Context: EVAL
+Form: (IF A B (IF (FOO BAR) (PROGN A (FOO A)) NIL))   Context: EVAL
 Form: A   Context: EVAL
-Form: (PROGN B)   Context: EVAL
 Form: B   Context: EVAL
-Form: (COND ((FOO BAR) A (FOO A)))   Context: EVAL
 Form: (IF (FOO BAR) (PROGN A (FOO A)) NIL)   Context: EVAL
 Form: (FOO BAR)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
