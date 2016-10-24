@@ -1392,6 +1392,8 @@ lispobj* find_preceding_object(lispobj* obj)
 lispobj alloc_layout(lispobj layout_layout, lispobj slots)
 {
     struct vector* v = (struct vector*)native_pointer(slots);
+    // If INSTANCE_DATA_START is 0, subtract 1 word for the header.
+    // If 1, subtract 2 words: 1 for the header and 1 for the layout.
     if (fixnum_value(v->length) != (LAYOUT_SIZE - INSTANCE_DATA_START - 1))
         lose("bad arguments to alloc_layout");
     struct instance* l = (struct instance*)
@@ -1406,9 +1408,8 @@ lispobj alloc_layout(lispobj layout_layout, lispobj slots)
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     l->slots[0] = layout_layout;
 #endif
-    memcpy(&l->slots[INSTANCE_DATA_START],
-           v->data,
-           (LAYOUT_SIZE-1)*N_WORD_BYTES);
+    memcpy(&l->slots[INSTANCE_DATA_START], v->data,
+           (LAYOUT_SIZE - INSTANCE_DATA_START - 1)*N_WORD_BYTES);
 
     // Possible efficiency win: make the "wasted" bytes after the layout into a
     // simple unboxed array so that heap-walking can skip in one step.
