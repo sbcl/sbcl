@@ -575,12 +575,13 @@
 
 (defun write-header-word (des header-data widetag)
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
-  (let ((gen (if (or #!+immobile-space
-                     (let ((gspace (descriptor-gspace des)))
-                       (or (eq gspace *immobile-fixedobj*)
-                           (eq gspace *immobile-varyobj*))))
-                  sb!vm:+pseudo-static-generation+
-                  0)))
+  (let ((gen #!+gencgc (if (or #!+immobile-space
+                               (let ((gspace (descriptor-gspace des)))
+                                 (or (eq gspace *immobile-fixedobj*)
+                                     (eq gspace *immobile-varyobj*))))
+                           sb!vm:+pseudo-static-generation+
+                         0)
+             #!-gencgc 0))
     (write-memory des (make-other-immediate-descriptor
                        (logior (ash gen 16) header-data)
                        widetag))))
