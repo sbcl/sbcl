@@ -31,8 +31,7 @@
 #include <errno.h>
 
 #ifdef LISP_FEATURE_OPENBSD
-/* FIXME: there has to be a better way to avoid ./util.h here */
-#include </usr/include/util.h>
+#include <util.h>
 #endif
 
 /* borrowed from detachtty's detachtty.c, in turn borrowed from APUE

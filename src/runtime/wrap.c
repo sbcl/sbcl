@@ -52,7 +52,6 @@
 #endif
 
 #include "runtime.h"
-#include "util.h"
 #include "wrap.h"
 
 /* Although it might seem as though this should be in some standard
