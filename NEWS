@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.3.10:
+changes in sbcl-1.3.11 relative to sbcl-1.3.10:
   * minor incompatible change: SB-EXT:*INTEXP-MAXIMUM-EXPONENT* is removed.
   * enhancement: TRACE ... :REPORT {TRACE,NIL} now work as advertised in the
     documentation string (based on patch by Patrick Stein)
