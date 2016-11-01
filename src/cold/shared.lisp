@@ -490,12 +490,7 @@
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
-  (let ((*features* (cons :sb-xc-host *features*))
-        ;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
-        ;; base-target-features.lisp-expr:
-        (*shebang-features* (set-difference *shebang-features*
-                                            '(:sb-propagate-float-type
-                                              :sb-propagate-fun-type))))
+  (let ((*features* (cons :sb-xc-host *features*)))
     (with-additional-nickname ("SB-XC" "SB!XC")
       (funcall fn))))
 (compile 'in-host-compilation-mode)
