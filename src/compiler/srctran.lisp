@@ -3199,10 +3199,8 @@
     (frob y t)))
 
 ;;; Do the same for MOD.
-(deftransform mod ((x y) (integer integer) *)
+(deftransform mod ((x y) (integer (constant-arg integer)) *)
   "convert remainder mod 2^k to LOGAND"
-  (unless (constant-lvar-p y)
-    (give-up-ir1-transform))
   (let* ((y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
@@ -3214,32 +3212,28 @@
           `(logand x ,mask)))))
 
 ;;; If arg is a constant power of two, turn TRUNCATE into a shift and mask.
-(deftransform truncate ((x y) (integer integer))
+(deftransform truncate ((x y) (integer (constant-arg integer)))
   "convert division by 2^k to shift"
-  (unless (constant-lvar-p y)
-    (give-up-ir1-transform))
   (let* ((y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
-    (let* ((shift (- len))
-           (mask (1- y-abs)))
+    (let ((shift (- len))
+          (mask (1- y-abs)))
       `(if (minusp x)
            (values ,(if (minusp y)
                         `(ash (- x) ,shift)
                         `(- (ash (- x) ,shift)))
                    (- (logand (- x) ,mask)))
            (values ,(if (minusp y)
-                        `(ash (- ,mask x) ,shift)
+                        `(- (ash x ,shift))
                         `(ash x ,shift))
                    (logand x ,mask))))))
 
 ;;; And the same for REM.
-(deftransform rem ((x y) (integer integer) *)
+(deftransform rem ((x y) (integer (constant-arg integer)) *)
   "convert remainder mod 2^k to LOGAND"
-  (unless (constant-lvar-p y)
-    (give-up-ir1-transform))
   (let* ((y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
