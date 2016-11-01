@@ -896,20 +896,16 @@ scav_fdefn(lispobj *where, lispobj object)
     /* FSHOW((stderr, "scav_fdefn, function = %p, raw_addr = %p\n",
        fdefn->fun, fdefn->raw_addr)); */
 
-    if ((char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET) == fdefn->raw_addr) {
-        scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1);
-
+    scavenge(where + 1, 2); // 'name' and 'fun'
+    lispobj raw_fun = (lispobj)fdefn->raw_addr;
+    if (raw_fun > READ_ONLY_SPACE_END) {
+        lispobj simple_fun = raw_fun - FUN_RAW_ADDR_OFFSET;
+        scavenge(&simple_fun, 1);
         /* Don't write unnecessarily. */
-        if (fdefn->raw_addr != (char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET))
-            fdefn->raw_addr = (char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET);
-        /* gc.c has more casts here, which may be relevant or alternatively
-           may be compiler warning defeaters.  try
-        fdefn->raw_addr = ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
-        */
-        return sizeof(struct fdefn) / sizeof(lispobj);
-    } else {
-        return 1;
+        if (simple_fun != raw_fun - FUN_RAW_ADDR_OFFSET)
+            fdefn->raw_addr = (char *)simple_fun + FUN_RAW_ADDR_OFFSET;
     }
+    return 4;
 }
 #endif
 
