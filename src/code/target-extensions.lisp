@@ -19,28 +19,36 @@
 
 ;;;; variables initialization and shutdown sequences
 
-;; (Most of the save-a-core functionality is defined later, in its
-;; own file, but we'd like to have these symbols declared special
-;; and initialized ASAP.)
+;;; (Most of the save-a-core functionality is defined later, in its
+;;; own file, but we'd like to have these symbols declared special and
+;;; initialized ASAP.)
+
+(declaim (type list *save-hooks* *init-hooks* *exit-hooks*))
+
 (defvar *save-hooks* nil
   #!+sb-doc
-  "This is a list of functions which are called in an unspecified
-order before creating a saved core image. Unused by SBCL itself:
-reserved for user and applications.")
+  "A list of function designators which are called in an unspecified
+order before creating a saved core image.
+
+Unused by SBCL itself: reserved for user and applications.")
 
 (defvar *init-hooks* nil
   #!+sb-doc
-  "This is a list of functions which are called in an unspecified
+  "A list of function designators which are called in an unspecified
 order when a saved core image starts up, after the system itself has
-been initialized. Unused by SBCL itself: reserved for user and
-applications.")
+been initialized.
+
+Unused by SBCL itself: reserved for user and applications.")
 
 (defvar *exit-hooks* nil
   #!+sb-doc
-  "This is a list of functions which are called in an unspecified
-order when SBCL process exits. Unused by SBCL itself: reserved for
-user and applications. Using (SB-EXT:EXIT :ABORT T), or calling
-exit(3) directly will circumvent these hooks.")
+  "A list of function designators which are called in an unspecified
+order when SBCL process exits.
+
+Unused by SBCL itself: reserved for user and applications.
+
+Using (SB-EXT:EXIT :ABORT T), or calling exit(3) directly circumvents
+these hooks.")
 
 
 ;;; Binary search for simple vectors
