@@ -56,6 +56,13 @@
   (:generator 3
     (inst neg res x)))
 
+(define-vop (fast-negate/signed-unsigned signed-unop)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate %negate)
+  (:generator 3
+    (inst neg res x)))
+
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:args (x :scs (any-reg)))
   (:arg-types tagged-num)
