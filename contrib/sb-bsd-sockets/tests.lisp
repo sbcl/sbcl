@@ -96,7 +96,7 @@
   (handler-case
       (let ((s (make-instance 'inet6-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
         (> (socket-file-descriptor s) 1))
-    (address-family-not-supported () t))
+    ((or address-family-not-supported protocol-not-supported-error) () t))
   t)
 
 #-win32
@@ -104,7 +104,7 @@
   (handler-case
       (let ((s (make-instance 'inet6-socket :type :stream :protocol :tcp)))
         (> (socket-file-descriptor s) 1))
-    (address-family-not-supported () t))
+    ((or address-family-not-supported protocol-not-supported-error) () t))
   t)
 
 (deftest* (non-block-socket)
@@ -159,7 +159,7 @@
                    (address-in-use-error () t))))
           (socket-close s1)
           (socket-close s2)))
-    (address-family-not-supported () t))
+    ((or address-family-not-supported protocol-not-supported-error) () t))
   t)
 
 (deftest* (simple-sockopt-test)
