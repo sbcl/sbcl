@@ -564,6 +564,20 @@
     (inst mov res (fixnumize 64))
     (inst sub res res (lsl temp n-fixnum-tag-bits))))
 
+(define-vop (unsigned-byte-64-len)
+  (:translate integer-length)
+  (:note "inline (unsigned-byte 64) integer-length")
+  (:policy :fast-safe)
+  (:args (arg :scs (unsigned-reg) :target temp))
+  (:arg-types unsigned-num)
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
+  (:generator 29
+    (inst clz temp arg)
+    (inst mov res (fixnumize 64))
+    (inst sub res res (lsl temp n-fixnum-tag-bits))))
+
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)
   (:note "inline (unsigned-byte 64) logcount")
