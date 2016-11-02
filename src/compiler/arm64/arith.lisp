@@ -589,7 +589,12 @@
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0) :to (:result 0)
                     :target res) num)
   (:temporary (:scs (non-descriptor-reg)) mask temp)
+  (:variant-vars signed)
   (:generator 30
+    (when signed
+      (inst cmp arg 0)
+      (inst csinv num arg arg :ge)
+      (setf arg num))
     (load-immediate-word mask #x5555555555555555)
     (inst and temp mask (lsr arg 1))
     (inst and num arg mask)
@@ -606,6 +611,13 @@
     (inst add num num (lsr num 16))
     (inst add num num (lsr num 32))
     (inst and res num #xff)))
+
+(define-vop (signed-byte-64-count unsigned-byte-64-count)
+  (:note "inline (signed-byte 64) logcount")
+  (:args (arg :scs (signed-reg) :target num))
+  (:arg-types signed-num)
+  (:variant t)
+  (:variant-cost 29))
 
 (defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
   (movable foldable flushable always-translatable))
