@@ -364,7 +364,7 @@
 ;; or the other, chosen at startup - and this is faster.
 #-sb-assembling
 (macrolet
-    ((def-it (name cost arg-sc arg-type)
+    ((def-it (name cost arg-sc arg-type &key signed)
       `(define-vop (,name)
          (:translate logcount)
          (:note ,(format nil "inline ~a logcount" arg-type))
@@ -382,30 +382,37 @@
          (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
          (:vop-var vop)
          (:generator ,cost
-           (progn
-             ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
-             ;; this use of 'rcx' is as the temporary register for performing
-             ;; a reference to foreign data with dynamic core. It has to be
-             ;; a register that conflicts with 'arg' lest we clobber it.
-             (emit-foreign-logbitp 23 "cpuid_fn1_ecx" rcx)
-             (inst jmp :z slow)
-             ;; Intel's implementation of POPCNT on some models treats it as
-             ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
-             ;; it falsely appears to need data from the destination register.
-             ;; The workaround is to clear the destination.
-             ;; See http://stackoverflow.com/questions/25078285
-             (unless (location= result arg)
-               ;; We only break the spurious dep. chain if result isn't the same
-               ;; register as arg. (If they're location=, don't trash the arg!)
-               (inst xor result result))
-             (inst popcnt result arg)
-             (inst jmp done))
+           ,@(when signed
+               `((move rdx arg)
+                 (setf arg rdx)
+                 (inst test rdx rdx)
+                 (inst jmp :ge POSITIVE)
+                 (inst not rdx)
+                 POSITIVE))
+           ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
+           ;; this use of 'rcx' is as the temporary register for performing
+           ;; a reference to foreign data with dynamic core. It has to be
+           ;; a register that conflicts with 'arg' lest we clobber it.
+           (emit-foreign-logbitp 23 "cpuid_fn1_ecx" rcx)
+           (inst jmp :z slow)
+           ;; Intel's implementation of POPCNT on some models treats it as
+           ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
+           ;; it falsely appears to need data from the destination register.
+           ;; The workaround is to clear the destination.
+           ;; See http://stackoverflow.com/questions/25078285
+           (unless (location= result arg)
+             ;; We only break the spurious dep. chain if result isn't the same
+             ;; register as arg. (If they're location=, don't trash the arg!)
+             (inst xor result result))
+           (inst popcnt result arg)
+           (inst jmp done)
          slow
            (move rdx arg)
            (invoke-asm-routine 'call 'logcount vop rcx)
            (move result rdx)
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
+  (def-it signed-byte-64-count 15 signed-reg signed-num :signed t)
   (def-it positive-fixnum-count 13 any-reg positive-fixnum))
 
 ;;; EQL for integers that are either fixnum or bignum
