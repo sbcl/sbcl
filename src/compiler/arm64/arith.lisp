@@ -393,13 +393,14 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:variant-vars variant)
   (:generator 5
-    (move temp amount)
-    (inst cmp temp 0)
+    (inst subs temp amount zr-tn)
     (inst b :ge LEFT)
     (inst neg temp temp)
     (inst cmp temp n-word-bits)
-    (inst b :lt DO)
-    (inst mov temp (1- n-word-bits))
+    ;; Only the first 6 bits count for shifts.
+    ;; This sets all bits to 1 if AMOUNT is larger than 63,
+    ;; cutting the amount to 63.
+    (inst csinv temp temp zr-tn :lt)
     DO
     (ecase variant
       (:signed (inst asr result number temp))
@@ -407,9 +408,7 @@
     (inst b END)
     LEFT
     (inst cmp temp n-word-bits)
-    (inst b :lt DO2)
-    (inst mov temp (1- n-word-bits))
-    DO2
+    (inst csinv temp temp zr-tn :lt)
     (inst lsl result number temp)
     END))
 
