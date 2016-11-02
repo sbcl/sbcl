@@ -533,9 +533,6 @@ scav_list_pointer(lispobj *where, lispobj object)
     first = trans_list(object);
     gc_assert(first != object);
 
-    /* Set forwarding pointer */
-    set_forwarding_pointer(first_pointer, first);
-
     gc_assert(is_lisp_pointer(first));
     gc_assert(!from_space_p(first));
 
