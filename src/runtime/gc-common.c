@@ -86,6 +86,14 @@ forwarding_pointer_value(lispobj *pointer) {
 }
 static inline lispobj
 set_forwarding_pointer(lispobj * pointer, lispobj newspace_copy) {
+  // The object at 'pointer' might already have been forwarded,
+  // but that's ok. Such occurs primarily when dealing with
+  // code components, because code can be forwarded by scavenging any
+  // pointer to a function that resides within the code.
+  // Testing whether the object had been forwarded would just slow
+  // things down, so we blindly stomp on whatever was there.
+  // Unfortunately this also implies we can't assert
+  // that we're operating on a not-yet-forwarded object here.
 #ifdef LISP_FEATURE_GENCGC
     pointer[0]=0x01;
     pointer[1]=newspace_copy;
@@ -396,7 +404,6 @@ trans_return_pc_header(lispobj object)
     struct code *code, *ncode;
 
     return_pc = (struct simple_fun *) native_pointer(object);
-    /* FIXME: was times 4, should it really be N_WORD_BYTES? */
     offset = HeaderValue(return_pc->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
@@ -451,7 +458,6 @@ trans_fun_header(lispobj object)
     struct code *code, *ncode;
 
     fheader = (struct simple_fun *) native_pointer(object);
-    /* FIXME: was times 4, should it really be N_WORD_BYTES? */
     offset = HeaderValue(fheader->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
@@ -523,12 +529,8 @@ static lispobj trans_list(lispobj object);
 static sword_t
 scav_list_pointer(lispobj *where, lispobj object)
 {
-    lispobj first, *first_pointer;
-
+    lispobj first;
     gc_assert(is_lisp_pointer(object));
-
-    /* Object is a pointer into from space - not FP. */
-    first_pointer = (lispobj *) native_pointer(object);
 
     first = trans_list(object);
     gc_assert(first != object);
@@ -612,6 +614,9 @@ scav_other_pointer(lispobj *where, lispobj object)
     first_pointer = (lispobj *) native_pointer(object);
     first = (transother[widetag_of(*first_pointer)])(object);
 
+    // If the object was large, then instead of transporting it,
+    // gencgc might simply promote the pages and return the same pointer.
+    // That decision is made in general_copy_large_object().
     if (first != object) {
         set_forwarding_pointer(first_pointer, first);
 #ifdef LISP_FEATURE_GENCGC
