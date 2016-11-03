@@ -108,26 +108,28 @@ evaluated as a PROGN."
   `(if ,test nil ,(prognify forms))))
 
 (sb!xc:defmacro and (&rest forms)
-  (cond ((endp forms) t)
-        ((endp (rest forms))
-         ;; Preserve non-toplevelness of the form!
-         `(the t ,(first forms)))
-        (t
-         `(if ,(first forms)
-              (and ,@(rest forms))
-              nil))))
+  (named-let expand-forms ((nested nil) (forms forms))
+    (cond ((endp forms) t)
+          ((endp (rest forms))
+           ;; Preserve non-toplevelness of the form!
+           (let ((car (car forms))) (if nested car `(the t ,car))))
+          (t
+           `(if ,(first forms)
+                ,(expand-forms t (rest forms))
+                nil)))))
 
 (sb!xc:defmacro or (&rest forms)
-  (cond ((endp forms) nil)
-        ((endp (rest forms))
-         ;; Preserve non-toplevelness of the form!
-         `(the t ,(first forms)))
-        (t
-         (let ((n-result (gensym)))
-           `(let ((,n-result ,(first forms)))
-              (if ,n-result
-                  ,n-result
-                  (or ,@(rest forms))))))))
+  (named-let expand-forms ((nested nil) (forms forms))
+    (cond ((endp forms) nil)
+          ((endp (rest forms))
+           ;; Preserve non-toplevelness of the form!
+           (let ((car (car forms))) (if nested car `(the t ,car))))
+          (t
+           (let ((n-result (gensym)))
+             `(let ((,n-result ,(first forms)))
+                (if ,n-result
+                    ,n-result
+                    ,(expand-forms t (rest forms)))))))))
 
 ;;;; various sequencing constructs
 
