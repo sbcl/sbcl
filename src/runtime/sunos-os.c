@@ -88,7 +88,7 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 
     if (addr == MAP_FAILED) {
         perror("mmap");
-        lose("Unexpedted mmap(..) failure\n");
+        lose("Unexpected mmap(..) failure\n");
     }
 
     return addr;

@@ -52,9 +52,8 @@ ensure_undefined_alien(void) {
     }
 }
 
-/* what a vague name! Something like create_all_spaces() would be more clear */
 void
-validate(void)
+allocate_spaces(void)
 {
 #ifdef PRINTNOISE
     printf("validating memory ...");

@@ -3235,13 +3235,11 @@ verify_space(lispobj *start, size_t words)
                     }
                 case CODE_HEADER_WIDETAG:
                     {
-                        lispobj object = *start;
-                        struct code *code;
+                        lispobj header = *start;
+                        struct code *code = (struct code *) start;
                         sword_t nheader_words, ncode_words, nwords;
                         lispobj fheaderl;
                         struct simple_fun *fheaderp;
-
-                        code = (struct code *) start;
 
                         /* Check that it's not in the dynamic space.
                          * FIXME: Isn't is supposed to be OK for code
@@ -3257,7 +3255,7 @@ verify_space(lispobj *start, size_t words)
                         }
 
                         ncode_words = code_instruction_words(code->code_size);
-                        nheader_words = code_header_words(object);
+                        nheader_words = code_header_words(header);
                         nwords = ncode_words + nheader_words;
                         nwords = CEILING(nwords, 2);
                         /* Scavenge the boxed section of the code data block */
