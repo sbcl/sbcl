@@ -1291,7 +1291,7 @@
   ())
 (defknown sb!format::args-exhausted (string integer) nil)
 
-(defknown (y-or-n-p yes-or-no-p) (&optional string &rest t) boolean
+(defknown (y-or-n-p yes-or-no-p) (&optional (or string null function) &rest t) boolean
   ())
 
 ;;;; from the "File System Interface" chapter:

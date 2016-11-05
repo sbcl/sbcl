@@ -6036,3 +6036,13 @@
                                                 (multiple-value-call #',name (1- x)))))
                         3)
                10))))
+
+(with-test (:name :yes-or-no-p-type)
+  (checked-compile `(lambda ()
+                      (yes-or-no-p nil)))
+  (checked-compile `(lambda ()
+                      (y-or-n-p nil)))
+  (checked-compile `(lambda ()
+                      (yes-or-no-p #'list)))
+  (checked-compile `(lambda ()
+                      (y-or-n-p #'list))))
