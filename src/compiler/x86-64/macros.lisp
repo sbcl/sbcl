@@ -179,8 +179,9 @@
          (inst push alloc-tn))
         (t
          (inst push size)))
-  (inst mov alloc-tn (make-fixup "alloc_tramp" :foreign))
-  (inst call alloc-tn)
+  (let ((f (make-fixup "alloc_tramp" :foreign)))
+    (inst call (cond #!+immobile-code (sb!c::*code-is-immobile* f)
+                     (t (inst mov alloc-tn f) alloc-tn))))
   (inst pop result-tn)
   (when lowtag
     (inst or (reg-in-size result-tn :byte) lowtag))

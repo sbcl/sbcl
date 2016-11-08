@@ -1912,6 +1912,12 @@ core and return a descriptor to it."
 (defun cold-functionp (descriptor)
   (eql (descriptor-lowtag descriptor) sb!vm:fun-pointer-lowtag))
 
+(defun cold-fun-entry-addr (fun)
+  (aver (= (descriptor-lowtag fun) sb!vm:fun-pointer-lowtag))
+  (+ (descriptor-bits fun)
+     (- sb!vm:fun-pointer-lowtag)
+     (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
+
 ;;; Handle a DEFUN in cold-load.
 (defun cold-fset (name defn source-loc &optional inline-expansion)
   ;; SOURCE-LOC can be ignored, because functions intrinsically store
@@ -2102,6 +2108,7 @@ core and return a descriptor to it."
 (defvar *cold-assembler-routines*)
 
 (defvar *cold-assembler-fixups*)
+(defvar *cold-static-call-fixups*)
 
 (defun record-cold-assembler-routine (name address)
   (/xhow "in RECORD-COLD-ASSEMBLER-ROUTINE" name address)
@@ -2417,7 +2424,15 @@ core and return a descriptor to it."
     (let* ((routine (car fixup))
            (value (lookup-assembler-reference routine)))
       (when value
-        (do-cold-fixup (second fixup) (third fixup) value (fourth fixup))))))
+        (do-cold-fixup (second fixup) (third fixup) value (fourth fixup)))))
+  ;; Static calls are very similar to assembler routine calls,
+  ;; so take care of those too.
+  (dolist (fixup *cold-static-call-fixups*)
+    (destructuring-bind (name kind code offset) fixup
+      (do-cold-fixup code offset
+                     (cold-fun-entry-addr
+                      (cold-fdefn-fun (cold-fdefinition-object name)))
+                     kind))))
 
 #!+sb-dynamic-core
 (progn
@@ -2911,12 +2926,16 @@ core and return a descriptor to it."
              (round-up raw-header-n-words 2))
             (toplevel-p (pop-stack))
             (debug-info (pop-stack))
-            (des (allocate-cold-descriptor *dynamic*
-                                           (+ (ash header-n-words
-                                                   sb!vm:word-shift)
-                                              code-size)
-                                           sb!vm:other-pointer-lowtag)))
-       (declare (ignore toplevel-p))
+            (des (allocate-cold-descriptor
+                  #!-immobile-code *dynamic*
+                  ;; toplevel-p is an indicator of whether the code will
+                  ;; will become garbage. If so, put it in dynamic space,
+                  ;; otherwise immobile space.
+                  #!+immobile-code
+                  (if toplevel-p *dynamic* *immobile-varyobj*)
+                  (+ (ash header-n-words sb!vm:word-shift) code-size)
+                  sb!vm:other-pointer-lowtag)))
+       (declare (ignorable toplevel-p))
        (write-header-word des header-n-words sb!vm:code-header-widetag)
        (write-wordindexed des
                           sb!vm:code-code-size-slot
@@ -3193,6 +3212,16 @@ core and return a descriptor to it."
          (value (descriptor-bits code-object)))
     (do-cold-fixup code-object offset value kind)
     code-object))
+
+#!+immobile-code
+(define-cold-fop (fop-static-call-fixup)
+  (let ((name (pop-stack))
+        (kind (pop-stack))
+        (code-object (pop-stack))
+        (offset (read-word-arg (fasl-input-stream))))
+    (push (list name kind code-object offset) *cold-static-call-fixups*)
+    code-object))
+
 
 ;;;; sanity checking space layouts
 
@@ -3913,6 +3942,7 @@ initially undefined function references:~2%")
            (*unbound-marker* (make-other-immediate-descriptor
                               0
                               sb!vm:unbound-marker-widetag))
+           *cold-static-call-fixups*
            *cold-assembler-fixups*
            *cold-assembler-routines*
            (*deferred-known-fun-refs* nil)

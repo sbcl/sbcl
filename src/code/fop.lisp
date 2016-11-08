@@ -622,6 +622,14 @@ a bug.~@:>")
                            kind)
   code-object)
 
+#!+immobile-code
+(!define-fop 135 :not-host (fop-static-call-fixup (code-object kind name))
+  (sb!vm:fixup-code-object code-object
+                           (read-word-arg (fasl-input-stream))
+                           (sb!vm::function-raw-address name)
+                           kind)
+  code-object)
+
 (!define-fop 147 :not-host (fop-foreign-fixup (code-object kind))
   (let* ((len (read-byte-arg (fasl-input-stream)))
          (sym (make-string len :element-type 'base-char)))

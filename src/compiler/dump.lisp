@@ -1045,6 +1045,10 @@
         (:code-object
          (aver (null name))
          (dump-fop 'fop-code-object-fixup fasl-output))
+        #!+immobile-code
+        (:static-call
+         (dump-non-immediate-object name fasl-output)
+         (dump-fop 'fop-static-call-fixup fasl-output))
         (:symbol-tls-index
          (aver (symbolp name))
          (dump-non-immediate-object name fasl-output)

@@ -149,7 +149,10 @@
                   (sb!c::*policy* sb!c::*policy*))
              (return-from load
                (if faslp
-                   (load-as-fasl stream verbose print)
+                   (prog1 (load-as-fasl stream verbose print)
+                     ;; Try to ameliorate immobile heap fragmentation
+                     ;; in case somehow nontoplevel code is garbage.
+                     #!+immobile-code (gc))
                    (sb!c:with-compiler-error-resignalling
                      (load-as-source stream :verbose verbose
                                             :print print)))))))
@@ -236,8 +239,9 @@
   (declare (simple-vector stack) (type index ptr))
   (let* ((debug-info-index (+ ptr box-num))
          (toplevel-p (svref stack (1+ debug-info-index)))
-         (code (sb!c:allocate-code-object box-num code-length)))
-    (declare (ignore toplevel-p))
+         (code (sb!c:allocate-code-object #!+immobile-code (not toplevel-p)
+                                          box-num code-length)))
+    (declare (ignorable toplevel-p))
     (setf (%code-debug-info code) (svref stack debug-info-index))
     (loop for i of-type index from sb!vm:code-constants-offset
           for j of-type index from ptr below debug-info-index

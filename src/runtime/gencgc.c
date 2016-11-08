@@ -2739,7 +2739,8 @@ extern void
   update_immobile_nursery_bits(),
   scavenge_immobile_roots(generation_index_t,generation_index_t),
   scavenge_immobile_newspace(),
-  sweep_immobile_space(int raise);
+  sweep_immobile_space(int raise),
+  write_protect_immobile_space();
 #else
 #define immobile_scav_queue_count 0
 #endif
@@ -3662,12 +3663,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
             gc_assert(pinned_dwords(i) == NULL);
         }
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    /* Immobile space generation bits are lazily updated for gen0
-       (not touched on every object allocation) so do it now */
-    update_immobile_nursery_bits();
-#endif
-
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space
      * which need to be scavenged. It also helps avoid unnecessary page
@@ -3880,7 +3875,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * scavenged. The new_space generation needs special handling as
      * objects may be moved in - it is handled separately below. */
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    scavenge_immobile_roots(generation+1, PSEUDO_STATIC_GENERATION);
+    scavenge_immobile_roots(generation+1, SCRATCH_GENERATION);
 #endif
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
@@ -4088,6 +4083,12 @@ collect_garbage(generation_index_t last_gen)
     if (gencgc_verbose > 1)
         print_generation_stats();
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* Immobile space generation bits are lazily updated for gen0
+       (not touched on every object allocation) so do it now */
+    update_immobile_nursery_bits();
+#endif
+
     do {
         /* Collect the generation. */
 
@@ -4171,6 +4172,9 @@ collect_garbage(generation_index_t last_gen)
         }
         write_protect_generation_pages(gen_to_wp);
     }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    write_protect_immobile_space();
+#endif
 
     /* Set gc_alloc() back to generation 0. The current regions should
      * be flushed after the above GCs. */

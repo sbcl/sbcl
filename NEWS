@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.3.11:
+  * enhancement: on x86-64, compiled functions can not be moved (but can
+    be freed) by GC. This facilitates examination of running images by
+    external tools. Code locality and performance are improved as well.
   * bug fix: calling a named function (e.g. a DEFUN) concurrently with
     redefining that same function could lead to execution of random bytes.
   * bug fix: yes-or-no-p accepts formatter functions (lp#1639490)

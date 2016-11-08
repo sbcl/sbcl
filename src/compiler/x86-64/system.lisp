@@ -179,9 +179,9 @@
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw sap code 0 other-pointer-lowtag)
-    (inst shr sap n-widetag-bits)
-    #!+immobile-space (inst and sap short-header-max-words)
+    (zeroize sap)
+    (inst mov (reg-in-size sap :word)
+              (make-ea :word :base code :disp (- 1 other-pointer-lowtag)))
     (inst lea sap (make-ea :byte :base code :index sap
                            :scale n-word-bytes
                            :disp (- other-pointer-lowtag)))))
@@ -192,8 +192,9 @@
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
-    (loadw func code 0 other-pointer-lowtag)
-    (inst shr func n-widetag-bits)
+    (zeroize func)
+    (inst mov (reg-in-size func :word)
+              (make-ea :word :base code :disp (- 1 other-pointer-lowtag)))
     (inst lea func
           (make-ea :byte :base offset :index func
                    :scale n-word-bytes

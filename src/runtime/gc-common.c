@@ -165,7 +165,7 @@ scavenge(lispobj *start, sword_t n_words)
             } else if (immobile_space_p(object)) {
                 lispobj *ptr = native_pointer(object);
                 if (immobile_obj_gen_bits(ptr) == from_space)
-                    promote_immobile_obj(ptr);
+                    promote_immobile_obj(ptr, 1);
                 object_ptr++;
 #endif
             } else {
@@ -815,7 +815,7 @@ scav_instance(lispobj *where, lispobj header)
     layout = native_pointer((lispobj)layout);
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     if (__immobile_obj_gen_bits(layout) == from_space)
-        promote_immobile_obj(layout);
+        promote_immobile_obj(layout, 1);
 #else
     if (forwarding_pointer_p(layout))
         layout = native_pointer((lispobj)forwarding_pointer_value(layout));

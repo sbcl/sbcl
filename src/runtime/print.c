@@ -750,6 +750,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case CODE_HEADER_WIDETAG:
+                count &= SHORT_HEADER_MAX_WORDS;
                 print_slots(code_slots, count-1, ptr);
                 break;
 

@@ -219,7 +219,7 @@ static inline low_page_index_t find_immobile_page_index(void *addr)
   return -1;
 }
 int immobile_obj_younger_p(lispobj,generation_index_t);
-void promote_immobile_obj(lispobj*);
+void promote_immobile_obj(lispobj*,int);
 
 // Maximum number of boxed words in a code component
 #define CODE_HEADER_COUNT_MASK 0xFFFFFF

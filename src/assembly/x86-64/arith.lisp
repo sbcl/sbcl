@@ -32,6 +32,8 @@
 
 #+sb-xc-host
 (defmacro static-fun-addr (name)
+  #!+immobile-code `(make-fixup ,name :static-call)
+  #!-immobile-code
   `(make-ea :qword :disp (+ nil-value (static-fun-offset ,name))))
 
 ;;;; addition, subtraction, and multiplication

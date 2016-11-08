@@ -275,13 +275,13 @@ HeaderValue(lispobj obj)
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-#define HEADER_VALUE_MASKED(x) (header >> N_WIDETAG_BITS) & SHORT_HEADER_MAX_WORDS
+#define HEADER_VALUE_MASKED(x) HeaderValue(x) & SHORT_HEADER_MAX_WORDS
 #else
-#define HEADER_VALUE_MASKED(x) (header >> N_WIDETAG_BITS)
+#define HEADER_VALUE_MASKED(x) HeaderValue(x)
 #endif
 static inline uword_t instance_length(lispobj header)
 {
-  return HEADER_VALUE_MASKED(header >> N_WIDETAG_BITS);
+  return HEADER_VALUE_MASKED(header);
 }
 static inline lispobj instance_layout(lispobj* instance_ptr) // native ptr
 {
@@ -291,7 +291,6 @@ static inline lispobj instance_layout(lispobj* instance_ptr) // native ptr
   return instance_ptr[1]; // the word following the header is the layout
 #endif
 }
-#undef HEADER_VALUE_MASKED
 
 static inline struct cons *
 CONS(lispobj obj)
@@ -370,7 +369,7 @@ fixnum_value(lispobj n)
 static inline uword_t
 code_header_words(lispobj header) // given header = code->header
 {
-  return HeaderValue(header);
+  return HEADER_VALUE_MASKED(header);
 }
 
 static inline sword_t
@@ -381,6 +380,7 @@ code_instruction_words(lispobj n) // given n = code->code_size
 
     return x >> WORD_SHIFT;
 }
+#undef HEADER_VALUE_MASKED
 
 #if defined(LISP_FEATURE_WIN32)
 /* KLUDGE: Avoid double definition of boolean by rpcndr.h included via

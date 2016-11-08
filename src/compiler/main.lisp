@@ -634,7 +634,10 @@ necessary, since type inference may take arbitrarily long to converge.")
           (maybe-mumble "code ")
 
           (multiple-value-bind (code-length fixup-notes)
-              (generate-code component)
+              (let (#!+immobile-code
+                    (*code-is-immobile*
+                     (neq (component-kind component) :toplevel)))
+                (generate-code component))
 
             #-sb-xc-host
             (when *compiler-trace-output*

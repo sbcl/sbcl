@@ -183,6 +183,14 @@
  ;; consider disabling this feature and reporting a bug.
  ; :immobile-space
 
+ ;; Allocate most functions in the immobile space.
+ ;; Enabled by default if supported.
+ ;; The down-side of this feature is that the allocator is significantly
+ ;; slower than the allocator for movable code. If a particular application
+ ;; is performance-constrained by speed of creation of compiled functions
+ ;; (not including closures), the feature can be disabled.
+ ; :immobile-code
+
  ;; Combine the layout pointer, instance-length, and widetag of INSTANCE
  ;; into a single machine word. This represents a space savings of anywhere
  ;; from 4% to 8% in typical applications. (Your mileage may vary).

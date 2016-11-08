@@ -1841,8 +1841,9 @@
           (invert-address-hash *static-foreign-symbols*
                                *assembler-routines-by-addr*))
     (loop for name in sb!vm:*static-funs*
-          for address = (+ sb!vm::nil-value
-                           (sb!vm::static-fun-offset name))
+          for address =
+          #!+immobile-code (sb!vm::function-raw-address name)
+          #!-immobile-code (+ sb!vm::nil-value (sb!vm::static-fun-offset name))
           do (setf (gethash address *assembler-routines-by-addr*) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint

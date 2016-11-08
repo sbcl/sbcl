@@ -219,6 +219,8 @@
           ":IMMOBILE-SPACE is supported only on x86-64")
         ("(and compact-instance-header (not immobile-space))"
           ":COMPACT-INSTANCE-HEADER requires :IMMOBILE-SPACE feature")
+        ("(and immobile-code (not immobile-space))"
+          ":IMMOBILE-CODE requires :IMMOBILE-SPACE feature")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))

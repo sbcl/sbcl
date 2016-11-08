@@ -108,6 +108,16 @@
          ;; longer executed? Does it not depend on the
          ;; 1+3=4=fdefn_raw_address_offset relationship above?
          ;; Is something else going on?)
+         #!+immobile-code
+         (cond ((neq (sb!c::component-kind (sb!c::node-component ,node)) :toplevel)
+                (inst call (make-fixup function :static-call)))
+               (t
+                ;; While we could use CALL-INDIRECT here,
+                ;; the fixup allows calling _any_ Lisp function,
+                ;; not just those in *static-funs*.
+                (inst mov temp-reg-tn (make-fixup function :static-call))
+                (inst call temp-reg-tn)))
+         #!-immobile-code
          (call-indirect (+ nil-value (static-fun-offset function)))
          ,(collect ((bindings) (links))
                    (do ((temp (temp-names) (cdr temp))

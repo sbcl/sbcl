@@ -3280,7 +3280,8 @@ register."
            (trap-loc (static-foreign-symbol-sap "fun_end_breakpoint_trap"))
            (length (sap- src-end src-start))
            (code-object
-             (sb!c:allocate-code-object bogus-lra-constants length))
+             (sb!c:allocate-code-object #!+immobile-code nil
+                                        bogus-lra-constants length))
            (dst-start (code-instructions code-object)))
       (declare (type system-area-pointer
                      src-start src-end dst-start trap-loc)

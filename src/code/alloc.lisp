@@ -133,7 +133,7 @@
          (table (cdr freelist))
          (old (gethash (hole-size hole) table)))
     ;; Check for double-free error
-    #+immobile-space-debug (aver (not (member hole (gethash size table))))
+    #!+immobile-space-debug (aver (not (member hole (gethash size table))))
     (unless old
       (setf (car freelist)
             (sorted-list-insert size (car freelist) #'identity)))
@@ -147,7 +147,7 @@
          (old-length (length list))
          (new (delete hole list :count 1)))
     (declare (ignorable old-length))
-    #+immobile-space-debug (aver (= (length new) (1- old-length)))
+    #!+immobile-space-debug (aver (= (length new) (1- old-length)))
     (cond (new
            (setf (gethash key table) new))
           (t
@@ -185,7 +185,7 @@
                  n-fixnum-tag-bits)))))
 
 (defun unallocate (hole)
-  #+immobile-space-debug
+  #!+immobile-space-debug
   (awhen *in-use-bits* (mark-range it hole (hole-size hole) nil))
   (let* ((hole-end (hole-end-address hole))
          (end-is-free-ptr (eql (ash hole-end (- n-fixnum-tag-bits))
@@ -327,7 +327,7 @@
         (when (>= page-start obj-end) (return))
         (setf (deref varyobj-page-scan-start-offset index)
               (ash (- page-end addr) (- (1+ word-shift))))))
-     #+immobile-space-debug ; "address sanitizer"
+     #!+immobile-space-debug ; "address sanitizer"
      (awhen *in-use-bits* (mark-range it addr n-bytes t))
      (setf (sap-ref-word (int-sap addr) 0) word0
            (sap-ref-word (int-sap addr) n-word-bytes) word1)

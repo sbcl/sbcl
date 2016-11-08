@@ -63,11 +63,18 @@
         (:relative
          ;; Fixup is the actual address wanted.
          ;; Replace word with value to add to that loc to get there.
-         (let* ((loc-sap (+ (sap-int sap) offset))
-                (rel-val (- fixup loc-sap (/ n-word-bytes 2))))
-           (declare (type (unsigned-byte 64) loc-sap)
-                    (type (signed-byte 32) rel-val))
-           (setf (signed-sap-ref-32 sap offset) rel-val))))))
+         ;; In the #!-immobile-code case, there's nothing to assert.
+         ;; Relative fixups pretty much can't happen.
+         #!+immobile-code
+         (unless (<= immobile-space-start (get-lisp-obj-address code) immobile-space-end)
+           (error "Can't compute fixup relative to movable object ~S" code))
+         (setf (signed-sap-ref-32 sap offset)
+               (etypecase fixup
+                 (integer
+                  ;; JMP/CALL are relative to the next instruction,
+                  ;; so add 4 bytes for the size of the displacement itself.
+                  (- fixup
+                     (the (unsigned-byte 64) (+ (sap-int sap) offset 4))))))))))
     nil)
 
 ;;;; low-level signal context access functions
