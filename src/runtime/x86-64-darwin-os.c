@@ -330,7 +330,15 @@ catch_exception_raise(mach_port_t exception_port,
                                x86_EXCEPTION_STATE64,
                                (thread_state_t)&exception_state,
                                &exception_state_count);
-        addr = (void*)exception_state.faultvaddr;
+
+        if (code_count && code_vector[0] == EXC_I386_GPFLT) {
+          /* This can happen for addresses larger than 48 bits,
+          resulting in bogus faultvaddr. */
+          addr = NULL;
+        } else {
+          addr = (void*)exception_state.faultvaddr;
+        }
+
         /* note the os_context hackery here.  When the signal handler returns,
          * it won't go back to what it was doing ... */
         if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
@@ -363,7 +371,7 @@ catch_exception_raise(mach_port_t exception_port,
             /* what do we need to put in our fake siginfo?  It looks like
              * the x86 code only uses si_signo and si_adrr. */
             siginfo->si_signo = signal;
-            siginfo->si_addr = (void*)exception_state.faultvaddr;
+            siginfo->si_addr = addr;
 
             call_c_function_in_context(&thread_state,
                                        signal_emulation_wrapper,
@@ -402,7 +410,7 @@ catch_exception_raise(mach_port_t exception_port,
             /* what do we need to put in our fake siginfo?  It looks like
              * the x86 code only uses si_signo and si_adrr. */
             siginfo->si_signo = signal;
-            siginfo->si_addr = (void*)exception_state.faultvaddr;
+            siginfo->si_addr = addr;
 
             call_c_function_in_context(&thread_state,
                                        signal_emulation_wrapper,
@@ -432,7 +440,7 @@ catch_exception_raise(mach_port_t exception_port,
             /* what do we need to put in our fake siginfo?  It looks like
              * the x86 code only uses si_signo and si_adrr. */
             siginfo->si_signo = signal;
-            siginfo->si_addr = (void*)exception_state.faultvaddr;
+            siginfo->si_addr = addr;
 
             call_c_function_in_context(&thread_state,
                                        signal_emulation_wrapper,
