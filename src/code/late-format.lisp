@@ -527,6 +527,7 @@
                  `(if (eq orig-args args)
                       (error 'format-error
                              :complaint "no previous argument"
+                             :control-string ,*default-format-error-control-string*
                              :offset ,(1- end))
                       (do ((arg-ptr orig-args (cdr arg-ptr)))
                           ((eq (cdr arg-ptr) args)
