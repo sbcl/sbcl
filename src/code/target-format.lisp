@@ -880,34 +880,31 @@
 ;;;; format interpreter for ~*
 
 (def-format-interpreter #\* (colonp atsignp params)
-  (if atsignp
-      (if colonp
-          (error 'format-error
-                 :complaint "cannot specify both colon and at-sign")
-          (interpret-bind-defaults ((posn 0)) params
-            (if (<= 0 posn (length orig-args))
-                (setf args (nthcdr posn orig-args))
-                (error 'format-error
-                       :complaint "Index ~W is out of bounds. (It should ~
-                                   have been between 0 and ~W.)"
-                       :args (list posn (length orig-args))))))
-      (if colonp
-          (interpret-bind-defaults ((n 1)) params
-            (do ((cur-posn 0 (1+ cur-posn))
-                 (arg-ptr orig-args (cdr arg-ptr)))
-                ((eq arg-ptr args)
-                 (let ((new-posn (- cur-posn n)))
-                   (if (<= 0 new-posn (length orig-args))
-                       (setf args (nthcdr new-posn orig-args))
-                       (error 'format-error
-                              :complaint
-                              "Index ~W is out of bounds. (It should
-                               have been between 0 and ~W.)"
-                              :args
-                              (list new-posn (length orig-args))))))))
-          (interpret-bind-defaults ((n 1)) params
-            (dotimes (i n)
-              (next-arg))))))
+  (flet ((lose (index)
+           (error 'format-error
+                  :complaint "Index ~W is out of bounds. It should ~
+                              have been between 0 and ~W."
+                  :args (list index (length orig-args)))))
+    (if atsignp
+        (if colonp
+            (error 'format-error
+                   :complaint "cannot specify both colon and at-sign")
+            (interpret-bind-defaults ((posn 0)) params
+              (if (<= 0 posn (length orig-args))
+                  (setf args (nthcdr posn orig-args))
+                  (lose posn))))
+        (if colonp
+            (interpret-bind-defaults ((n 1)) params
+              (do ((cur-posn 0 (1+ cur-posn))
+                   (arg-ptr orig-args (cdr arg-ptr)))
+                  ((eq arg-ptr args)
+                   (let ((new-posn (- cur-posn n)))
+                     (if (<= 0 new-posn (length orig-args))
+                         (setf args (nthcdr new-posn orig-args))
+                         (lose new-posn))))))
+            (interpret-bind-defaults ((n 1)) params
+              (dotimes (i n)
+                (next-arg)))))))
 
 ;;;; format interpreter for indirection
 

@@ -49,3 +49,8 @@
 (with-test (:name (:P-directive :no-previous-argument))
   (with-compiled-and-interpreted-format ()
     (assert-error (format* "~@<~:P~@:>" '()) format-error-with-control-string)))
+
+(with-test (:name (:*-directive :out-of-bounds))
+  (with-compiled-and-interpreted-format ()
+    (assert-error (format* "~2@*" '()) format-error-with-control-string)
+    (assert-error (format* "~1:*" '()) format-error-with-control-string)))

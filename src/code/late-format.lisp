@@ -685,45 +685,43 @@
 ;;;; format directive for ~*
 
 (def-format-directive #\* (colonp atsignp params end)
-  (if atsignp
-      (if colonp
-          (error 'format-error
-                 :complaint
-                 "both colon and atsign modifiers used simultaneously")
-          (expand-bind-defaults ((posn 0)) params
-            (unless *orig-args-available*
-              (/show0 "THROWing NEED-ORIG-ARGS from tilde-@*")
-              (throw 'need-orig-args nil))
-            `(if (<= 0 ,posn (length orig-args))
-                 (setf args (nthcdr ,posn orig-args))
-                 (error 'format-error
-                        :complaint "Index ~W out of bounds. Should have been ~
-                                    between 0 and ~W."
-                        :args (list ,posn (length orig-args))
-                        :offset ,(1- end)))))
-      (if colonp
-          (expand-bind-defaults ((n 1)) params
-            (unless *orig-args-available*
-              (/show0 "THROWing NEED-ORIG-ARGS from tilde-:*")
-              (throw 'need-orig-args nil))
-            `(do ((cur-posn 0 (1+ cur-posn))
-                  (arg-ptr orig-args (cdr arg-ptr)))
-                 ((eq arg-ptr args)
-                  (let ((new-posn (- cur-posn ,n)))
-                    (if (<= 0 new-posn (length orig-args))
-                        (setf args (nthcdr new-posn orig-args))
-                        (error 'format-error
-                               :complaint
-                               "Index ~W is out of bounds; should have been ~
-                                between 0 and ~W."
-                               :args (list new-posn (length orig-args))
-                               :offset ,(1- end)))))))
-          (if params
-              (expand-bind-defaults ((n 1)) params
-                (setf *only-simple-args* nil)
-                `(dotimes (i ,n)
-                   ,(expand-next-arg)))
-              (expand-next-arg)))))
+  (flet ((make-lose (index)
+           `(error 'format-error
+                   :control-string ,*default-format-error-control-string*
+                   :offset ,(1- end)
+                   :complaint "Index ~W is out of bounds. it should have ~
+                               been between 0 and ~W."
+                   :args (list ,index (length orig-args)))))
+    (if atsignp
+        (if colonp
+            (error 'format-error
+                   :complaint
+                   "both colon and atsign modifiers used simultaneously")
+            (expand-bind-defaults ((posn 0)) params
+              (unless *orig-args-available*
+                (/show0 "THROWing NEED-ORIG-ARGS from tilde-@*")
+                (throw 'need-orig-args nil))
+              `(if (<= 0 ,posn (length orig-args))
+                   (setf args (nthcdr ,posn orig-args))
+                   ,(make-lose posn))))
+        (if colonp
+            (expand-bind-defaults ((n 1)) params
+              (unless *orig-args-available*
+                (/show0 "THROWing NEED-ORIG-ARGS from tilde-:*")
+                (throw 'need-orig-args nil))
+              `(do ((cur-posn 0 (1+ cur-posn))
+                    (arg-ptr orig-args (cdr arg-ptr)))
+                   ((eq arg-ptr args)
+                    (let ((new-posn (- cur-posn ,n)))
+                      (if (<= 0 new-posn (length orig-args))
+                          (setf args (nthcdr new-posn orig-args))
+                          ,(make-lose 'new-posn))))))
+            (if params
+                (expand-bind-defaults ((n 1)) params
+                  (setf *only-simple-args* nil)
+                  `(dotimes (i ,n)
+                     ,(expand-next-arg)))
+                (expand-next-arg))))))
 
 ;;;; format directive for indirection
 
