@@ -802,6 +802,7 @@
              (expand-bind-defaults ((index nil)) params
                (setf *only-simple-args* nil)
                (let ((clauses nil)
+                     (case-sym (gensym))
                      (case `(or ,index ,(expand-next-arg))))
                  (when last-semi-with-colon-p
                    (push `(t ,@(expand-directive-list (pop sublists)))
@@ -811,7 +812,15 @@
                      (push `(,(decf count)
                              ,@(expand-directive-list sublist))
                            clauses)))
-                 `(case ,case ,@clauses)))))
+                 `(let ((,case-sym ,case))
+                    (unless (integerp ,case-sym)
+                      (error 'format-error
+                             :control-string ,*default-format-error-control-string*
+                             :offset ,*default-format-error-offset*
+                             :complaint
+                             "the argument to ~~[ is not an integer: ~a"
+                             :args (list ,case-sym)))
+                    (case ,case-sym ,@clauses))))))
      remaining)))
 
 (defun parse-conditional-directive (directives)

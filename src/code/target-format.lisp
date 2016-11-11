@@ -992,14 +992,19 @@
                              :complaint
                              "must specify exactly two sections"))
                   (interpret-bind-defaults ((index (next-arg))) params
-                    (let* ((default (and last-semi-with-colon-p
+                    (let ((default (and last-semi-with-colon-p
                                          (pop sublists)))
-                           (last (1- (length sublists)))
-                           (sublist
-                            (if (<= 0 index last)
-                                (nth (- last index) sublists)
-                                default)))
-                      (interpret-directive-list stream sublist orig-args
+                           (last (1- (length sublists))))
+                      (unless (integerp index)
+                        (error 'format-error
+                               :complaint
+                               "the argument to ~~[ is not an integer: ~a"
+                               :args (list index)))
+                      (interpret-directive-list stream
+                                                (if (<= 0 index last)
+                                                    (nth (- last index) sublists)
+                                                    default)
+                                                orig-args
                                                 args))))))
     remaining))
 
