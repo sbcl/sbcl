@@ -83,9 +83,8 @@
                       (*default-format-error-offset*
                        (1- (format-directive-end directive))))
                  (unless function
-                   (error 'format-error
-                          :complaint "unknown format directive ~@[(character: ~A)~]"
-                          :args (list (char-name character))))
+                   (format-error "Unknown format directive ~@[(character: ~A)~]"
+                                 (char-name character)))
                  (multiple-value-bind (new-directives new-args)
                      (funcall function stream directive
                               (cdr directives) orig-args args)
@@ -103,10 +102,10 @@
 (sb!xc:defmacro next-arg (&optional offset)
   `(progn
      (when (null args)
-       (error 'format-error
-              :complaint "no more arguments"
-              ,@(when offset
-                  `(:offset ,offset))))
+       (,@(if offset
+              `(format-error-at nil ,offset)
+              '(format-error))
+          "No more arguments"))
      (when *logical-block-popper*
        (funcall *logical-block-popper*))
      (pop args)))
@@ -153,11 +152,9 @@
                                (t param)))))))
       `(let* ,(bindings)
          (when ,params
-           (error 'format-error
-                  :complaint
-                  "too many parameters, expected no more than ~W"
-                  :args (list ,(length specs))
-                  :offset (caar ,params)))
+           (format-error-at
+            nil (caar ,params)
+            "Too many parameters, expected no more than ~W" ,(length specs)))
          ,@body))))
 
 ) ; EVAL-WHEN
@@ -166,13 +163,11 @@
 
 (defun format-write-field (stream string mincol colinc minpad padchar padleft)
   (when (and colinc (<= colinc 0))
-    (error 'format-error
-           :complaint "The value of colinc is ~a, should be a positive integer"
-           :args (list colinc)))
+    (format-error "The value of colinc is ~A, should be a positive integer"
+                  colinc))
   (when (and mincol (< mincol 0))
-    (error 'format-error
-           :complaint "The value of mincol is ~a, should be a non-negative integer"
-           :args (list mincol)))
+    (format-error "The value of mincol is ~A, should be a non-negative integer"
+                  mincol))
   (unless padleft
     (write-string string stream))
   (dotimes (i minpad)
@@ -231,9 +226,7 @@
   (interpret-bind-defaults () params
     (let ((arg (next-arg)))
       (unless (typep arg 'character)
-        (error 'format-error
-               :complaint "~s is not of type CHARACTER."
-               :args (list arg)))
+        (format-error "~S is not of type CHARACTER." arg))
       (cond (colonp
              (format-print-named-character arg stream))
             (atsignp
@@ -326,11 +319,8 @@
        (commainterval 3))
       params
     (let ((arg (next-arg)))
-      (unless (or base
-                  (integerp arg))
-        (error 'format-error
-               :complaint "~s is not of type INTEGER."
-               :args (list arg)))
+      (unless (or base (integerp arg))
+        (format-error "~S is not of type INTEGER." arg))
       (if base
           (format-print-integer stream arg colonp atsignp base mincol
                                 padchar commachar commainterval)
@@ -399,7 +389,7 @@
 (defun format-print-cardinal-aux (stream n period err)
   (multiple-value-bind (beyond here) (truncate n 1000)
     (unless (<= period 21)
-      (error "number too large to print in English: ~:D" err))
+      (error "Number too large to print in English: ~:D" err))
     (unless (zerop beyond)
       (format-print-cardinal-aux stream beyond (1+ period) err))
     (unless (zerop here)
@@ -478,8 +468,7 @@
   (interpret-bind-defaults () params
     (let ((arg (if colonp
                    (if (eq orig-args args)
-                       (error 'format-error
-                              :complaint "no previous argument")
+                       (format-error "No previous argument")
                        (do ((arg-ptr orig-args (cdr arg-ptr)))
                            ((eq (cdr arg-ptr) args)
                             (car arg-ptr))))
@@ -494,10 +483,7 @@
   (write-to-string n :base 10 :radix nil :escape nil))
 
 (def-format-interpreter #\F (colonp atsignp params)
-  (when colonp
-    (error 'format-error
-           :complaint
-           "cannot specify the colon modifier with this directive"))
+  (check-modifier "colon" colonp)
   (interpret-bind-defaults ((w nil) (d nil) (k nil) (ovf nil) (pad #\space))
                            params
     (format-fixed stream (next-arg) w d k ovf pad atsignp)))
@@ -569,10 +555,7 @@
                   nil))))))))
 
 (def-format-interpreter #\E (colonp atsignp params)
-  (when colonp
-    (error 'format-error
-           :complaint
-           "cannot specify the colon modifier with this directive"))
+  (check-modifier "colon" colonp)
   (interpret-bind-defaults
       ((w nil) (d nil) (e nil) (k 1) (ovf nil) (pad #\space) (mark nil))
       params
@@ -672,10 +655,7 @@
                            (write-string estr stream))))))))))
 
 (def-format-interpreter #\G (colonp atsignp params)
-  (when colonp
-    (error 'format-error
-           :complaint
-           "cannot specify the colon modifier with this directive"))
+  (check-modifier "colon" colonp)
   (interpret-bind-defaults
       ((w nil) (d nil) (e nil) (k nil) (ovf nil) (pad #\space) (mark nil))
       params
@@ -762,19 +742,15 @@
 ;;;; FORMAT interpreters and support functions for line/page breaks etc.
 
 (def-format-interpreter #\% (colonp atsignp params)
-  (when (or colonp atsignp)
-    (error 'format-error
-           :complaint
-           "cannot specify either colon or atsign for this directive"))
+  (check-modifier "colon" colonp)
+  (check-modifier "at-sign" atsignp)
   (interpret-bind-defaults ((count 1)) params
     (dotimes (i count)
       (terpri stream))))
 
 (def-format-interpreter #\& (colonp atsignp params)
-  (when (or colonp atsignp)
-    (error 'format-error
-           :complaint
-           "cannot specify either colon or atsign for this directive"))
+  (check-modifier "colon" colonp)
+  (check-modifier "at-sign" atsignp)
   (interpret-bind-defaults ((count 1)) params
     (when (plusp count)
       (fresh-line stream)
@@ -782,28 +758,21 @@
        (terpri stream)))))
 
 (def-format-interpreter #\| (colonp atsignp params)
-  (when (or colonp atsignp)
-    (error 'format-error
-           :complaint
-           "cannot specify either colon or atsign for this directive"))
+  (check-modifier "colon" colonp)
+  (check-modifier "at-sign" atsignp)
   (interpret-bind-defaults ((count 1)) params
     (dotimes (i count)
       (write-char (code-char form-feed-char-code) stream))))
 
 (def-format-interpreter #\~ (colonp atsignp params)
-  (when (or colonp atsignp)
-    (error 'format-error
-           :complaint
-           "cannot specify either colon or atsign for this directive"))
+  (check-modifier "colon" colonp)
+  (check-modifier "at-sign" atsignp)
   (interpret-bind-defaults ((count 1)) params
     (dotimes (i count)
       (write-char #\~ stream))))
 
 (def-complex-format-interpreter #\newline (colonp atsignp params directives)
-  (when (and colonp atsignp)
-    (error 'format-error
-           :complaint
-           "cannot specify both colon and atsign for this directive"))
+  (check-modifier '("colon" "at-sign") (and colonp atsignp))
   (interpret-bind-defaults () params
     (when atsignp
       (write-char #\newline stream)))
@@ -871,28 +840,23 @@
                     stream)))
 
 (def-format-interpreter #\I (colonp atsignp params)
-  (when atsignp
-    (error 'format-error
-           :complaint "cannot specify the at-sign modifier"))
+  (check-modifier "at-sign" atsignp)
   (interpret-bind-defaults ((n 0)) params
     (pprint-indent (if colonp :current :block) n stream)))
 
 ;;;; format interpreter for ~*
 
 (def-format-interpreter #\* (colonp atsignp params)
+  (check-modifier '("colon" "at-sign") (and colonp atsignp))
   (flet ((lose (index)
-           (error 'format-error
-                  :complaint "Index ~W is out of bounds. It should ~
-                              have been between 0 and ~W."
-                  :args (list index (length orig-args)))))
+           (format-error "Index ~W is out of bounds. It should have ~
+                          been between 0 and ~W."
+                         index (length orig-args))))
     (if atsignp
-        (if colonp
-            (error 'format-error
-                   :complaint "cannot specify both colon and at-sign")
-            (interpret-bind-defaults ((posn 0)) params
-              (if (<= 0 posn (length orig-args))
-                  (setf args (nthcdr posn orig-args))
-                  (lose posn))))
+        (interpret-bind-defaults ((posn 0)) params
+          (if (<= 0 posn (length orig-args))
+              (setf args (nthcdr posn orig-args))
+              (lose posn)))
         (if colonp
             (interpret-bind-defaults ((n 1)) params
               (do ((cur-posn 0 (1+ cur-posn))
@@ -909,20 +873,15 @@
 ;;;; format interpreter for indirection
 
 (def-format-interpreter #\? (colonp atsignp params string end)
-  (when colonp
-    (error 'format-error
-           :complaint "cannot specify the colon modifier"))
+  (check-modifier "colon" colonp)
   (interpret-bind-defaults () params
     (handler-bind
         ((format-error
           (lambda (condition)
-            (error 'format-error
-                   :complaint
-                   "~A~%while processing indirect format string:"
-                   :args (list condition)
-                   :print-banner nil
-                   :control-string string
-                   :offset (1- end)))))
+            (format-error-at*
+             string (1- end)
+             "~A~%while processing indirect format string:" (list condition)
+             :print-banner nil))))
       (if atsignp
           (setf args (%format stream (next-arg) orig-args args))
           (%format stream (next-arg) (next-arg))))))
@@ -930,10 +889,8 @@
 ;;;; format interpreters for capitalization
 
 (def-complex-format-interpreter #\( (colonp atsignp params directives)
-  (let ((close (find-directive directives #\) nil)))
-    (unless close
-      (error 'format-error
-             :complaint "no corresponding close paren"))
+  (let ((close (or (find-directive directives #\) nil)
+                   (format-error "No corresponding close paren"))))
     (interpret-bind-defaults () params
       (let* ((posn (position close directives))
              (before (subseq directives 0 posn))
@@ -950,82 +907,65 @@
         after))))
 
 (def-complex-format-interpreter #\) ()
-  (error 'format-error
-         :complaint "no corresponding open paren"))
+  (format-error "no corresponding open paren"))
 
 ;;;; format interpreters and support functions for conditionalization
 
 (def-complex-format-interpreter #\[ (colonp atsignp params directives)
+  (check-modifier '("colon" "at-sign") (and atsignp colonp))
   (multiple-value-bind (sublists last-semi-with-colon-p remaining)
       (parse-conditional-directive directives)
     (setf args
-          (if atsignp
-              (if colonp
-                  (error 'format-error
-                         :complaint
-                     "cannot specify both the colon and at-sign modifiers")
-                  (if (cdr sublists)
-                      (error 'format-error
-                             :complaint
-                             "can only specify one section")
-                      (interpret-bind-defaults () params
-                        (let ((prev-args args)
-                              (arg (next-arg)))
-                          (if arg
-                              (interpret-directive-list stream
-                                                        (car sublists)
-                                                        orig-args
-                                                        prev-args)
-                              args)))))
-              (if colonp
-                  (if (= (length sublists) 2)
-                      (interpret-bind-defaults () params
-                        (if (next-arg)
-                            (interpret-directive-list stream (car sublists)
-                                                      orig-args args)
-                            (interpret-directive-list stream (cadr sublists)
-                                                      orig-args args)))
-                      (error 'format-error
-                             :complaint
-                             "must specify exactly two sections"))
-                  (interpret-bind-defaults ((index (next-arg))) params
-                    (let ((default (and last-semi-with-colon-p
-                                         (pop sublists)))
-                           (last (1- (length sublists))))
-                      (unless (integerp index)
-                        (error 'format-error
-                               :complaint
-                               "the argument to ~~[ is not an integer: ~a"
-                               :args (list index)))
-                      (interpret-directive-list stream
-                                                (if (<= 0 index last)
-                                                    (nth (- last index) sublists)
-                                                    default)
-                                                orig-args
-                                                args))))))
+          (cond
+            (atsignp
+             (when (cdr sublists)
+               (format-error "Can only specify one section"))
+             (interpret-bind-defaults () params
+               (let ((prev-args args)
+                     (arg (next-arg)))
+                 (if arg
+                     (interpret-directive-list
+                      stream (car sublists) orig-args prev-args)
+                     args))))
+            (colonp
+             (unless (= (length sublists) 2)
+               (format-error "Must specify exactly two sections"))
+             (interpret-bind-defaults () params
+               (if (next-arg)
+                   (interpret-directive-list stream (car sublists)
+                                             orig-args args)
+                   (interpret-directive-list stream (cadr sublists)
+                                             orig-args args))))
+            (t
+             (interpret-bind-defaults ((index (next-arg))) params
+               (let ((default (and last-semi-with-colon-p
+                                   (pop sublists)))
+                     (last (1- (length sublists))))
+                 (unless (integerp index)
+                   (format-error
+                    "The argument to ~~[ is not an integer: ~A" index))
+                 (interpret-directive-list stream
+                                           (if (<= 0 index last)
+                                               (nth (- last index) sublists)
+                                               default)
+                                           orig-args
+                                           args))))))
     remaining))
 
 (def-complex-format-interpreter #\; ()
-  (error 'format-error
-         :complaint
-         "~~; not contained within either ~~[...~~] or ~~<...~~>"))
+  (format-error "~~; not contained within either ~~[...~~] or ~~<...~~>"))
 
 (def-complex-format-interpreter #\] ()
-  (error 'format-error
-         :complaint
-         "no corresponding open bracket"))
+  (format-error "No corresponding open bracket"))
 
 ;;;; format interpreter for up-and-out
 
 (defvar *outside-args*)
 
 (def-format-interpreter #\^ (colonp atsignp params)
-  (when atsignp
-    (error 'format-error
-           :complaint "cannot specify the at-sign modifier"))
+  (check-modifier "at-sign" atsignp)
   (when (and colonp (not *up-up-and-out-allowed*))
-    (error 'format-error
-           :complaint "attempt to use ~~:^ outside a ~~:{...~~} construct"))
+    (format-error "Attempt to use ~~:^ outside a ~~:{...~~} construct"))
   (when (interpret-bind-defaults ((arg1 nil) (arg2 nil) (arg3 nil)) params
           (cond (arg3 (<= arg1 arg2 arg3))
                 (arg2 (eql arg1 arg2))
@@ -1040,11 +980,8 @@
 
 (def-complex-format-interpreter #\{
                                 (colonp atsignp params string end directives)
-  (let ((close (find-directive directives #\} nil)))
-    (unless close
-      (error 'format-error
-             :complaint
-             "no corresponding close brace"))
+  (let ((close (or (find-directive directives #\} nil)
+                   (format-error "No corresponding close brace"))))
     (interpret-bind-defaults ((max-count nil)) params
       (let* ((closed-with-colon (format-directive-colonp close))
              (posn (position close directives))
@@ -1058,14 +995,11 @@
                    (handler-bind
                        ((format-error
                          (lambda (condition)
-                           (error
-                            'format-error
-                            :complaint
+                           (format-error-at*
+                            string (1- end)
                             "~A~%while processing indirect format string:"
-                            :args (list condition)
-                            :print-banner nil
-                            :control-string string
-                            :offset (1- end)))))
+                            (list condition)
+                            :print-banner nil))))
                      (%format stream insides orig-args args))
                    (interpret-directive-list stream insides
                                              orig-args args)))
@@ -1097,8 +1031,7 @@
           (nthcdr (1+ posn) directives))))))
 
 (def-complex-format-interpreter #\} ()
-  (error 'format-error
-         :complaint "no corresponding open brace"))
+  (format-error "No corresponding open brace"))
 
 ;;;; format interpreters and support functions for justification
 
@@ -1118,20 +1051,20 @@
                 (when (> count 0)
                   ;; ANSI specifies that "an error is signalled" in this
                   ;; situation.
-                  (error 'format-error
-                         :complaint "~D illegal directive~:P found inside justification block"
-                         :args (list count)
-                         :references (list '(:ansi-cl :section (22 3 5 2)))))
+                  (format-error*
+                   "~D illegal directive~:P found inside justification block"
+                   (list count)
+                   :references (list '(:ansi-cl :section (22 3 5 2)))))
                 ;; ANSI does not explicitly say that an error should
                 ;; be signalled, but the @ modifier is not explicitly
                 ;; allowed for ~> either.
                 (when (format-directive-atsignp close)
-                  (error 'format-error
-                         :complaint "@ modifier not allowed in close ~
-                         directive of justification ~
-                         block (i.e. ~~<...~~@>."
-                         :offset (1- (format-directive-end close))
-                         :references (list '(:ansi-cl :section (22 3 6 2)))))
+                  (format-error-at*
+                   nil (1- (format-directive-end close))
+                   "@ modifier not allowed in close directive of ~
+                    justification block (i.e. ~~<...~~@>."
+                   '()
+                   :references (list '(:ansi-cl :section (22 3 6 2)))))
                 (interpret-format-justification stream orig-args args
                                                 segments colonp atsignp
                                                 first-semi params))))

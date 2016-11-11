@@ -4549,12 +4549,14 @@
          ;; Expanding the control string now avoids deferring to FORMATTER
          ;; so that we don't need an internal-only variant of it that
          ;; passes through extra args to %FORMATTER.
+         ;; FIXME: instead of checking the condition report, define a
+         ;; dedicated condition class
          (expr (handler-case ; in case %formatter wants to signal an error
                    (sb!format::%formatter control argc nil)
                  ;; otherwise, let the macro complain
                  (sb!format:format-error (c)
                    (if (string= (sb!format::format-error-complaint c)
-                                "no package named ~S")
+                                "No package named ~S")
                        ;; "~/apackage:afun/" might become legal later.
                        ;; To put it in perspective, "~/f" (no closing slash)
                        ;; *will* be a runtime error, but this only *might* be

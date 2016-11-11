@@ -98,7 +98,7 @@
     (dolist (f '(bug error warn
                  sb!c:compiler-error sb!c:compiler-notify
                  sb!c:compiler-warn sb!c:compiler-style-warn
-                 sb!c::note-lossage))
+                 sb!c::note-lossage sb!format::format-error))
       (setf (sb!xc:compiler-macro-function f) #'uncross))
 
     ;; FORMAT has a macro already. Do what it does, then uncross.

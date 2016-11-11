@@ -34,6 +34,24 @@
           (format-error-control-string condition)
           (format-error-offset condition)
           (format-error-second-relative condition)))
+
+(defun format-error* (complaint args &rest initargs &key &allow-other-keys)
+  (apply #'error 'format-error :complaint complaint :args args initargs))
+
+(defun format-error (complaint &rest args)
+  (format-error* complaint args))
+
+(defun format-error-at* (control-string offset complaint args
+                         &rest initargs &key &allow-other-keys)
+  (apply #'error 'format-error
+         :complaint complaint :args args
+         :control-string (or control-string *default-format-error-control-string*)
+         :offset (or offset *default-format-error-offset*)
+         initargs))
+
+(defun format-error-at (control-string offset complaint &rest args)
+  (format-error-at* control-string offset complaint args))
+
 
 (defstruct format-directive
   (string (missing-arg) :type simple-string)
@@ -49,3 +67,10 @@
                   stream
                   :start (format-directive-start x)
                   :end (format-directive-end x))))
+
+(defun check-modifier (modifier-name value)
+  (when value
+    (let ((modifiers (ensure-list modifier-name)))
+      (format-error "The ~{~A~^ and the ~} modifier~P cannot be used ~
+                     ~:*~[~;~;simultaneously ~]with this directive."
+                    modifiers (length modifiers)))))
