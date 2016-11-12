@@ -13,5 +13,5 @@
 extern boolean more_p(char **ptr);
 extern char *parse_token(char **ptr);
 extern lispobj parse_lispobj(char **ptr);
-extern char *parse_addr(char **ptr);
+extern char *parse_addr(char **ptr,boolean safely);
 extern uword_t parse_number(char **ptr);

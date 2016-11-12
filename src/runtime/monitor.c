@@ -114,9 +114,14 @@ dump_cmd(char **ptr)
 
     char *addr = lastaddr;
     int count = lastcount, displacement;
+    int force = 0;
 
     if (more_p(ptr)) {
-        addr = parse_addr(ptr);
+        if (!strncmp(*ptr, "-f ", 3)) {
+          force = 1;
+          *ptr += 3;
+        }
+        addr = parse_addr(ptr, !force);
 
         if (more_p(ptr))
             count = parse_number(ptr);
@@ -142,7 +147,7 @@ dump_cmd(char **ptr)
 #else
         printf("0x%08X: ", (u32) addr);
 #endif
-        if (is_valid_lisp_addr((os_vm_address_t)addr)) {
+        if (force || is_valid_lisp_addr((os_vm_address_t)addr)) {
 #ifndef LISP_FEATURE_ALPHA
             unsigned long *lptr = (unsigned long *)addr;
 #else
@@ -249,7 +254,7 @@ search_cmd(char **ptr)
             return;
         }
         if (more_p(ptr)) {
-            addr = (lispobj *)native_pointer((uword_t)parse_addr(ptr));
+            addr = (lispobj *)native_pointer((uword_t)parse_addr(ptr, 1));
             if (more_p(ptr)) {
                 count = parse_number(ptr);
             }

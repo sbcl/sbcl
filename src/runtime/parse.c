@@ -171,7 +171,7 @@ uword_t parse_number(char **ptr)
     return 0;
 }
 
-char *parse_addr(char **ptr)
+char *parse_addr(char **ptr, boolean safely)
 {
     char *token = parse_token(ptr);
     lispobj result;
@@ -196,7 +196,7 @@ char *parse_addr(char **ptr)
         result = (value & ~3);
     }
 
-    if (!is_valid_lisp_addr((os_vm_address_t)result)) {
+    if (safely && !is_valid_lisp_addr((os_vm_address_t)result)) {
         printf("invalid Lisp-level address: %p\n", (void *)result);
         throw_to_monitor();
     }
