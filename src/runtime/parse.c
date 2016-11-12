@@ -121,8 +121,7 @@ static boolean lookup_variable(char *name, lispobj *result)
 }
 
 
-boolean more_p(ptr)
-char **ptr;
+boolean more_p(char **ptr)
 {
     skip_ws(ptr);
 
@@ -132,8 +131,7 @@ char **ptr;
         return 1;
 }
 
-char *parse_token(ptr)
-char **ptr;
+char *parse_token(char **ptr)
 {
     char *token;
 
@@ -155,8 +153,7 @@ char **ptr;
     return token;
 }
 
-uword_t parse_number(ptr)
-char **ptr;
+uword_t parse_number(char **ptr)
 {
     char *token = parse_token(ptr);
     uword_t result;
@@ -174,8 +171,7 @@ char **ptr;
     return 0;
 }
 
-char *parse_addr(ptr)
-char **ptr;
+char *parse_addr(char **ptr)
 {
     char *token = parse_token(ptr);
     lispobj result;
@@ -250,8 +246,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
     return 0;
 }
 
-static int
-parse_regnum(char *s)
+static int parse_regnum(char *s)
 {
     if ((s[1] == 'R') || (s[1] == 'r')) {
         int regnum;
@@ -280,8 +275,7 @@ parse_regnum(char *s)
     }
 }
 
-lispobj parse_lispobj(ptr)
-char **ptr;
+lispobj parse_lispobj(char **ptr)
 {
     struct thread *thread=arch_os_get_current_thread();
     char *token = parse_token(ptr);
