@@ -27,14 +27,16 @@
 
 ;;;; utilities to support tests
 
-;;; string equality modulo deletion of TABs and SPACEs (as a crude way
+;;; string equality modulo deletion of consecutive whitespace (as a crude way
 ;;; of washing away irrelevant differences in indentation)
 (defun string-modulo-tabspace (s)
-  (remove-if (lambda (c)
-               (or (char= c #\space)
-                   (char= c #\tab)
-                   (char= c #\newline)))
-             s))
+  (let ((s (string-trim '(#\Space) (substitute #\Space #\Newline
+                                               (substitute #\Space #\Tab s)))))
+    (loop (let ((p (search "  " s)))
+            (if (not p) (return s))
+            ;; Extremely inefficient but simple algorithm.
+            (setq s (concatenate 'string (subseq s 0 p) (subseq s (1+ p))))))))
+
 (defun string=-modulo-tabspace (x y)
   (string= (string-modulo-tabspace x)
            (string-modulo-tabspace y)))
