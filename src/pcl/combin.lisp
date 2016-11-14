@@ -410,6 +410,12 @@
 (defun gf-requires-emf-keyword-checks (generic-function)
   (member '&key (gf-lambda-list generic-function)))
 
+(defconstant-eqx +standard-method-combination-qualifiers+
+    '(:around :before :after) #'equal)
+
+(defun standard-method-combination-qualifier-p (qualifier)
+  (member qualifier +standard-method-combination-qualifiers+))
+
 (defun standard-compute-effective-method
     (generic-function combin applicable-methods)
   (collect ((before) (primary) (after) (around))
@@ -460,6 +466,12 @@
                                (,@(rest (around))
                                   (make-method ,main-effective-method)))
                  main-effective-method))))))
+
+(defun short-method-combination-qualifiers (type-name)
+  (list type-name :around))
+
+(defun short-method-combination-qualifier-p (type-name qualifier)
+  (or (eq qualifier type-name) (eq qualifier :around)))
 
 (defun short-compute-effective-method
     (generic-function combin applicable-methods)

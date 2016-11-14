@@ -718,19 +718,25 @@
 (defmethod no-primary-method (generic-function &rest args)
   (error 'no-primary-method :generic-function generic-function :args args))
 
+;; FIXME shouldn't this specialize on STANDARD-METHOD-COMBINATION?
 (defmethod invalid-qualifiers ((gf generic-function)
                                combin
                                method)
-  (let ((qualifiers (method-qualifiers method)))
-    (let ((why (cond
-                 ((cdr qualifiers) "has too many qualifiers")
-                 (t (aver (not (member (car qualifiers)
-                                       '(:around :before :after))))
-                    "has an invalid qualifier"))))
-      (invalid-method-error
-       method
-       "The method ~S on ~S ~A.~%~
-        Standard method combination requires all methods to have one~%~
-        of the single qualifiers :AROUND, :BEFORE and :AFTER or to~%~
-        have no qualifier at all."
-       method gf why))))
+  (let* ((qualifiers (method-qualifiers method))
+         (qualifier (first qualifiers))
+         (type-name (method-combination-type-name combin))
+         (why (cond
+                ((cdr qualifiers)
+                 "has too many qualifiers")
+                (t
+                 (aver (not (standard-method-combination-qualifier-p
+                             qualifier)))
+                 "has an invalid qualifier"))))
+    (invalid-method-error
+     method
+     "~@<The method ~S on ~S ~A.~
+      ~@:_~@:_~
+      ~@(~A~) method combination requires all methods to have one of ~
+      the single qualifiers ~{~S~#[~; and ~:;, ~]~} or to have no ~
+      qualifier at all.~@:>"
+     method gf why type-name +standard-method-combination-qualifiers+)))

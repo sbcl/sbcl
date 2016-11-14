@@ -582,25 +582,25 @@
               ;; invocation time; I dunno what the rationale was, and it
               ;; sucks.  Nevertheless, it's probably a programmer error, so
               ;; let's warn anyway. -- CSR, 2003-08-20
-              (let ((mc (generic-function-method-combination generic-functioN)))
-                (cond
-                  ((eq mc *standard-method-combination*)
-                   (when (and qualifiers
-                              (or (cdr qualifiers)
-                                  (not (memq (car qualifiers)
-                                             '(:around :before :after)))))
-                     (warn "~@<Invalid qualifiers for standard method ~
-                            combination in method ~S:~2I~_~S.~@:>"
-                           method qualifiers)))
-                  ((short-method-combination-p mc)
-                   (let ((mc-name (method-combination-type-name mc)))
-                     (when (or (null qualifiers)
-                               (cdr qualifiers)
-                               (and (neq (car qualifiers) :around)
-                                    (neq (car qualifiers) mc-name)))
-                       (warn "~@<Invalid qualifiers for ~S method combination ~
-                              in method ~S:~2I~_~S.~@:>"
-                             mc-name method qualifiers))))))
+              (let* ((mc (generic-function-method-combination generic-function))
+                     (type-name (method-combination-type-name mc)))
+                (flet ((invalid ()
+                         (warn "~@<Invalid qualifiers for ~S method ~
+                                combination in method ~S:~2I~_~S.~@:>"
+                               type-name method qualifiers)))
+                  (cond
+                    ((and (eq mc *standard-method-combination*)
+                          qualifiers
+                          (or (cdr qualifiers)
+                              (not (standard-method-combination-qualifier-p
+                                    (car qualifiers)))))
+                     (invalid))
+                    ((and (short-method-combination-p mc)
+                          (or (null qualifiers)
+                              (cdr qualifiers)
+                              (not (short-method-combination-qualifier-p
+                                    type-name (car qualifiers)))))
+                     (invalid)))))
               (unless skip-dfun-update-p
                 (update-ctors 'add-method
                               :generic-function generic-function
