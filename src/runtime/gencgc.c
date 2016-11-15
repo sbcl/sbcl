@@ -2741,6 +2741,10 @@ extern void
   scavenge_immobile_newspace(),
   sweep_immobile_space(int raise),
   write_protect_immobile_space();
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+lispobj code_component_order;
+extern void defrag_immobile_space(lispobj);
+#endif
 #else
 #define immobile_scav_queue_count 0
 #endif
@@ -4858,6 +4862,15 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_for_final_gc();
     gencgc_alloc_start_page = -1;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    if (code_component_order) {
+        printf("\n[defragmenting immobile space... ");
+        fflush(stdout);
+        defrag_immobile_space(code_component_order);
+        printf("done]\n");
+    }
+#endif
 
     if (prepend_runtime)
         save_runtime_to_filehandle(file, runtime_bytes, runtime_size,

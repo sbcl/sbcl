@@ -168,6 +168,7 @@
                 #+win32 "SRC;CODE;WARM-MSWIN"
                 "SRC;CODE;RUN-PROGRAM"
 
+                #+immobile-code "SRC;CODE;IMMOBILE-CODE"
                 "SRC;CODE;REPACK-XREF"))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))

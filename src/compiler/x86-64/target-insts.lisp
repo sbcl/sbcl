@@ -355,3 +355,94 @@
        (nt "single-step trap (before)"))
       (#.invalid-arg-count-trap
        (nt "Invalid argument count trap")))))
+
+;;;;
+
+#!+immobile-code
+(defun sb!vm::collect-immobile-code-relocs ()
+  (let ((code-components
+         (make-array 20000 :element-type '(unsigned-byte 32)
+                           :fill-pointer 0 :adjustable t))
+        (relocs
+         (make-array 100000 :element-type '(unsigned-byte 32)
+                            :fill-pointer 0 :adjustable t))
+        ;; Look for these two instruction formats.
+        (jmp-inst (find-inst #b11101001 (get-inst-space)))
+        (call-inst (find-inst #b11101000 (get-inst-space)))
+        (seg (sb!disassem::%make-segment
+              :sap-maker #'error :virtual-location 0))
+        (dstate (make-dstate)))
+    (flet ((scan-function (fun-entry-addr fun-end-addr predicate)
+             (setf (seg-virtual-location seg) fun-entry-addr
+                   (seg-length seg) (- fun-end-addr fun-entry-addr)
+                   (seg-sap-maker seg)
+                   (let ((sap (int-sap fun-entry-addr))) (lambda () sap)))
+             (map-segment-instructions
+              (lambda (dchunk inst)
+                (when (and (or (eq inst jmp-inst)
+                               (eq inst call-inst))
+                           (funcall predicate
+                                    (+ (sb!disassem::sign-extend
+                                        (ldb (byte 32 8) dchunk) 32)
+                                       (dstate-next-addr dstate))))
+                  (vector-push-extend (dstate-cur-addr dstate) relocs)))
+              seg dstate nil))
+           (finish-component (code start-relocs-index)
+             (when (> (fill-pointer relocs) start-relocs-index)
+               (vector-push-extend (get-lisp-obj-address code) code-components)
+               (vector-push-extend start-relocs-index code-components))))
+
+      ;; Assembler routines are in read-only space, and they can have
+      ;; relative jumps to immobile space.
+      ;; Since these code components do not contain simple-funs,
+      ;; we have to group the routines by looking at addresses.
+      (let ((asm-routines
+             (mapcar #'cdr (%hash-table-alist sb!fasl:*assembler-routines*)))
+            code-components)
+        (sb!vm::map-allocated-objects (lambda (obj type size)
+                                        (declare (ignore type size))
+                                        (push obj code-components))
+                                      :read-only)
+        (dolist (code (nreverse code-components))
+          (let* ((text-origin (sap-int (code-instructions code)))
+                 (text-end (+ text-origin (%code-code-size code)))
+                 (relocs-index (fill-pointer relocs)))
+            (mapl (lambda (list)
+                    (scan-function (car list)
+                                   (if (cdr list) (cadr list) text-end)
+                                   ;; Look for transfers into immobile code
+                                   (lambda (jmp-targ-addr)
+                                     (<= sb!vm:immobile-space-start
+                                         jmp-targ-addr sb!vm:immobile-space-end))))
+                  (sort (remove-if-not (lambda (address)
+                                         (<= text-origin address text-end))
+                                       asm-routines) #'<))
+            (finish-component code relocs-index))))
+
+      ;; Immobile space - code components can jump to immobile space,
+      ;; read-only space, and C runtime routines.
+      (sb!vm::map-allocated-objects
+       (lambda (code type size)
+         (declare (ignore size))
+         (when (= type code-header-widetag)
+           (let* ((text-origin (sap-int (code-instructions code)))
+                  (text-end (+ text-origin (%code-code-size code)))
+                  (relocs-index (fill-pointer relocs)))
+             (do ((fun (%code-entry-points code) (%simple-fun-next fun)))
+                 ((null fun) (finish-component code relocs-index))
+               (scan-function
+                (+ (get-lisp-obj-address fun) (- fun-pointer-lowtag)
+                   (ash simple-fun-code-offset word-shift))
+                (acond ((%simple-fun-next fun)
+                        (- (get-lisp-obj-address it) fun-pointer-lowtag))
+                       (t
+                        text-end))
+                ;; Exclude transfers within this code component
+                (lambda (jmp-targ-addr)
+                  (not (<= text-origin jmp-targ-addr text-end))))))))
+       :immobile))
+
+    ;; Write a delimiter into the array passed to C
+    (vector-push-extend 0 code-components)
+    (vector-push-extend (fill-pointer relocs) code-components)
+    (values code-components relocs)))
