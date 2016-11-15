@@ -231,7 +231,7 @@
     (reference-condition simple-error)
   ()
   (:default-initargs
-      :references (list '(:ansi-cl :macro define-method-combination))))
+   :references (list '(:ansi-cl :macro define-method-combination))))
 
 ;;; NOTE:
 ;;;
