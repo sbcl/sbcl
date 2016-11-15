@@ -3413,8 +3413,9 @@ verify_gc(void)
     verify_dynamic_space();
 }
 
-static void
-verify_generation(generation_index_t generation)
+void
+walk_generation(void (*proc)(lispobj*,size_t),
+                generation_index_t generation)
 {
     page_index_t i;
     int genmask = generation >= 0 ? 1 << generation : ~0;
@@ -3439,14 +3440,17 @@ verify_generation(generation_index_t generation)
                 if (page_ends_contiguous_block_p(last_page, page_table[i].gen))
                     break;
 
-            verify_space(page_address(i),
-                         ((uword_t)
-                          (page_table[last_page].bytes_used
+            proc(page_address(i),
+                 ((uword_t)(page_table[last_page].bytes_used
                            + npage_bytes(last_page-i)))
                          / N_WORD_BYTES);
             i = last_page;
         }
     }
+}
+static void verify_generation(generation_index_t generation)
+{
+  walk_generation(verify_space, generation);
 }
 
 /* Check that all the free space is zero filled. */
