@@ -1478,6 +1478,13 @@
   (array (missing-arg) :type lvar)
   (bound (missing-arg) :type lvar))
 
+;;; Used for marking CALLABLE arguments with unrecognizable LVARS in
+;;; VALID-CALLABLE-ARGUMENT so that it can be rerun in
+;;; IR1-OPTIMIZE-CAST with better information.
+(def!struct (function-designator-cast (:include cast))
+  (arg-count (missing-arg) :type index)
+  (caller nil :type symbol))
+
 
 ;;;; non-local exit support
 ;;;;

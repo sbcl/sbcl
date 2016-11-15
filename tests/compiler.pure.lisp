@@ -6046,3 +6046,8 @@
                       (yes-or-no-p #'list)))
   (checked-compile `(lambda ()
                       (y-or-n-p #'list))))
+
+(with-test (:name :callable-delayed-mismatch)
+  (assert-error
+   (checked-compile
+    '(lambda () (let ((f 'cons)) (find-if f '(10)))))))

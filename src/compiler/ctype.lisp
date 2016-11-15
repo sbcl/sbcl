@@ -55,6 +55,7 @@
 (defvar *lossage-detected*)
 (defvar *unwinnage-detected*)
 (defvar *valid-fun-use-name*)
+(defvar *valid-callable-argument-assert-unknown-lvars* nil)
 
 ;;; Signal a warning if appropriate and set *FOO-DETECTED*.
 (declaim (ftype (function (string &rest t) (values)) note-lossage note-unwinnage))
@@ -263,6 +264,12 @@
                            ((constant-lvar-p lvar)
                             (lvar-value lvar))
                            (t
+                            (when *valid-callable-argument-assert-unknown-lvars*
+                              (assert-function-designator-lvar-type lvar
+                                                                    (specifier-type '(or function symbol))
+                                                                    arg-count
+                                                                    *valid-fun-use-name*
+                                                                    *policy*))
                             (return-from valid-callable-argument nil))))
            (type (cond ((fun-type-p lvar-type)
                         lvar-type)

@@ -323,6 +323,39 @@
         (use-lvar cast internal-lvar)
         t))))
 
+(defun insert-function-designator-cast-before (next lvar type arg-count caller policy)
+  (declare (type node next) (type lvar lvar) (type ctype type))
+  (with-ir1-environment-from-node next
+    (let* ((ctran (node-prev next))
+           (cast (make-function-designator-cast :asserted-type type
+                                                :type-to-check (maybe-weaken-check type policy)
+                                                :value lvar
+                                                :derived-type (coerce-to-values type)
+                                                :arg-count arg-count
+                                                :caller caller))
+           (internal-ctran (make-ctran)))
+      (setf (ctran-next ctran) cast
+            (node-prev cast) ctran)
+      (use-ctran cast internal-ctran)
+      (link-node-to-previous-ctran next internal-ctran)
+      (setf (lvar-dest lvar) cast)
+      (reoptimize-lvar lvar)
+      (when (return-p next)
+        (node-ends-block cast))
+      (setf (block-attributep (block-flags (node-block cast))
+                              type-check type-asserted)
+            t)
+      cast)))
+
+(defun assert-function-designator-lvar-type (lvar type arg-count caller policy)
+  (declare (type lvar lvar) (type ctype type))
+  (let ((internal-lvar (make-lvar))
+        (dest (lvar-dest lvar)))
+    (substitute-lvar internal-lvar lvar)
+    (let ((cast (insert-function-designator-cast-before dest lvar type arg-count
+                                                        caller policy)))
+      (use-lvar cast internal-lvar))))
+
 
 ;;;; IR1-OPTIMIZE
 
@@ -1185,11 +1218,12 @@
                    (assert-call-type call defined-type nil)
                    (maybe-terminate-block call ir1-converting-not-optimizing-p)))))
            (recognize-known-call call ir1-converting-not-optimizing-p))
-          ((valid-fun-use call type
-                          :argument-test #'always-subtypep
-                          :result-test nil
-                          :lossage-fun #'compiler-warn
-                          :unwinnage-fun #'compiler-notify)
+          ((let ((*valid-callable-argument-assert-unknown-lvars* t))
+             (valid-fun-use call type
+                            :argument-test #'always-subtypep
+                            :result-test nil
+                            :lossage-fun #'compiler-warn
+                            :unwinnage-fun #'compiler-notify))
            (assert-call-type call type)
            (maybe-terminate-block call ir1-converting-not-optimizing-p)
            (recognize-known-call call ir1-converting-not-optimizing-p))
@@ -2270,6 +2304,13 @@
                        (bound-cast-derived cast))
                    (values-subtypep (lvar-derived-type value)
                                     (cast-asserted-type cast)))
+          (when (function-designator-cast-p cast)
+            (let ((*valid-fun-use-name* (function-designator-cast-caller cast))
+                  (*lossage-fun* #'compiler-warn)
+                  (*compiler-error-context* cast))
+              (valid-callable-argument lvar
+                                       (function-designator-cast-arg-count cast))))
+
           (delete-cast cast)
           (return-from ir1-optimize-cast t))
 
