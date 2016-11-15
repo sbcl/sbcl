@@ -1525,21 +1525,18 @@ lispobj alloc_fdefn(lispobj name)
 
 static char* tempspace;
 
-static void adjust_words(lispobj *where, size_t n_words)
+static void adjust_words(lispobj *where, sword_t n_words)
 {
     int i;
     for (i=0;i<n_words;++i) {
         lispobj ptr;
         ptr = where[i];
-        if (is_lisp_pointer(ptr) && immobile_space_p(ptr)) {
-            lispobj native_ptr = (lispobj)native_pointer(ptr);
-            if (native_ptr >= IMMOBILE_VARYOBJ_SUBSPACE_START) {
-                int offset_in_space = native_ptr - IMMOBILE_VARYOBJ_SUBSPACE_START;
-                lispobj* fp_where = (lispobj*)(tempspace + offset_in_space);
-                int new = *fp_where;
-                gc_assert(new);
-                where[i] = new;
-            }
+        if (is_lisp_pointer(ptr) && immobile_space_p(ptr)
+            && ptr >= IMMOBILE_VARYOBJ_SUBSPACE_START) {
+            int offset_in_space = (lispobj)native_pointer(ptr) - IMMOBILE_VARYOBJ_SUBSPACE_START;
+            lispobj* fp_where = (lispobj*)(tempspace + offset_in_space);
+            where[i] = *fp_where;
+            gc_assert(where[i]);
         }
     }
 }
@@ -1719,7 +1716,7 @@ void defrag_immobile_space(int* components)
             for ( ; reloc_index < end_reloc_index ; ++reloc_index ) {
                 unsigned char* inst_addr = (unsigned char*)(long)immobile_space_relocs[reloc_index];
                 gc_assert(*inst_addr == 0xE8 || *inst_addr == 0xE9);
-                int target_addr = (int)inst_addr + 5 + *(int*)(inst_addr+1);
+                unsigned int target_addr = (int)(long)inst_addr + 5 + *(int*)(inst_addr+1);
                 int target_adjust = 0;
                 if (target_addr >= IMMOBILE_VARYOBJ_SUBSPACE_START && target_addr < IMMOBILE_SPACE_END) {
                     lispobj* ptarg_fun_header =
