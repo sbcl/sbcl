@@ -76,7 +76,7 @@
 ;;; in the space, which should be better than leaving the
 ;;; organization to random chance.
 ;;; Note that these aren't roots in the GC sense, just a locality sense.
-(defun choose-code-component-ordering
+(defun choose-code-component-order
     (&optional (roots '(read print eval compile)))
   (let ((ordering (make-array 10000 :adjustable t :fill-pointer 0))
         (hashset (make-hash-table :test 'eq)))

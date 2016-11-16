@@ -220,6 +220,10 @@ open_core_for_saving(char *filename)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern void prepare_immobile_space_for_save();
 #  define N_SPACES_TO_SAVE 5
+#  ifdef LISP_FEATURE_IMMOBILE_CODE
+lispobj code_component_order;
+extern void defrag_immobile_space(lispobj);
+#  endif
 #else
 #  define N_SPACES_TO_SAVE 3
 #endif
@@ -248,6 +252,20 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     }
     printf("done]\n");
     fflush(stdout);
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    // It's better to wait to defrag until after the binding stack is undone,
+    // because we explicitly don't fixup code refs from stacks.
+    // i.e. if there *were* something on the binding stack that cared that code
+    // moved, it would be wrong. This way we can be sure we don't care.
+    if (code_component_order) {
+        // Assert that defrag will not move the init_function
+        gc_assert(!immobile_space_p(init_function));
+        printf("[defragmenting immobile space... ");
+        fflush(stdout);
+        defrag_immobile_space(code_component_order);
+        printf("done]\n");
+    }
+#endif
 
     /* (Now we can actually start copying ourselves into the output file.) */
 

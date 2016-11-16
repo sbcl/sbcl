@@ -115,12 +115,17 @@ The following &KEY arguments are defined:
   :ROOT-STRUCTURES
      This should be a list of the main entry points in any newly loaded
      systems. This need not be supplied, but locality and/or GC performance
-     may be better if they are. Meaningless if :PURIFY is NIL. See the
-     PURIFY function.
+     may be better if they are. This has two different but related meanings:
+     If :PURIFY is true - and only for cheneygc - the root structures
+     are those which anchor the set of objects moved into static space.
+     On gencgc - and only on platforms supporting immobile code - these are
+     the functions and/or function-names which commence a depth-first scan
+     of code when reordering based on the statically observable call chain.
+     The complete set of reachable objects is not affected per se.
+     This argument is meaningless if neither enabling precondition holds.
 
   :ENVIRONMENT-NAME
-     This is also passed to the PURIFY function when :PURIFY is T.
-     (rarely used)
+     This has no purpose; it is accepted only for legacy compatibility.
 
   :COMPRESSION
      This is only meaningful if the runtime was built with the :SB-CORE-COMPRESSION
@@ -165,7 +170,7 @@ This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
   #!+gencgc
-  (declare (ignore purify root-structures environment-name))
+  (declare (ignore purify environment-name) (ignorable root-structures))
   #!+sb-core-compression
   (check-type compression (or boolean (integer -1 9)))
   #!-sb-core-compression
@@ -198,22 +203,7 @@ sufficiently motivated to do lengthy fixes."
              (let ((name (native-namestring
                           (physicalize-pathname core-file-name)
                           :as-file t)))
-               (when gc
-                 #!-gencgc (gc)
-                 ;; Do a destructive non-conservative GC, and then save a core.
-                 ;; A normal GC will leave huge amounts of storage unreclaimed
-                 ;; (over 50% on x86). This needs to be done by a single function
-                 ;; since the GC will invalidate the stack.
-                 #!+gencgc (gc-and-save name
-                                        (foreign-bool executable)
-                                        (foreign-bool save-runtime-options)
-                                        (foreign-bool compression)
-                                        (or compression 0)
-                                        #!+win32
-                                        (ecase application-type
-                                          (:console 0)
-                                          (:gui 1))
-                                        #!-win32 0))
+               (when gc (gc))
                (without-gcing
                  (save name
                        (get-lisp-obj-address #'restart-lisp)
@@ -226,12 +216,29 @@ sufficiently motivated to do lengthy fixes."
                          (:console 0)
                          (:gui 1))
                        #!-win32 0)))))
-    ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
-    ;; access to it even after the GC has moved it.
     #!+gencgc
-    (setf sb!vm::*restart-lisp-function* #'restart-lisp)
-    (cond #!-gencgc
-          (purify
+    (progn
+      ;; Scan roots as close as possible to SAVE-CORE, in case anything
+      ;; prior causes compilation to occur into immobile space.
+      ;; Failing to see all immobile code would miss some relocs.
+      #!+immobile-code (sb!kernel::choose-code-component-order root-structures)
+      ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
+      ;; access to it even after the GC has moved it.
+      (setf sb!vm::*restart-lisp-function* #'restart-lisp)
+      ;; Do a destructive non-conservative GC, and then save a core.
+      ;; A normal GC will leave huge amounts of storage unreclaimed
+      ;; (over 50% on x86). This needs to be done by a single function
+      ;; since the GC will invalidate the stack.
+      (gc-and-save (native-namestring (physicalize-pathname core-file-name)
+                                      :as-file t)
+                   (foreign-bool executable)
+                   (foreign-bool save-runtime-options)
+                   (foreign-bool compression)
+                   (or compression 0)
+                   #!+win32 (ecase application-type (:console 0) (:gui 1))
+                   #!-win32 0))
+    #!-gencgc
+    (cond (purify
            (purify :root-structures root-structures
                    :environment-name environment-name)
            (save-core nil))
