@@ -946,7 +946,11 @@ variable: an unreadable object representing the error is printed instead.")
                   (write-char #\" stream)
                   (when coerce-p
                     (write-char #\Space stream)
-                    (write `'(vector ,(array-element-type vector)) :stream stream)
+                    (write (cond #!+sb-unicode
+                                 ((base-string-p vector)
+                                  ''base-string)
+                                 (t
+                                  `'(vector ,(array-element-type vector)))) :stream stream)
                     (write-char #\) stream)))
                  (t
                   (write-string vector stream)))))
