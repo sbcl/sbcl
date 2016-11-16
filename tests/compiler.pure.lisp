@@ -6048,6 +6048,11 @@
                       (y-or-n-p #'list))))
 
 (with-test (:name :callable-delayed-mismatch)
-  (assert-error
-   (checked-compile
-    '(lambda () (let ((f 'cons)) (find-if f '(10)))))))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile '(lambda () (let ((f 'cons)) (find-if f '(10))))
+                       :allow-warnings 'simple-warning)
+    (declare (ignore fun))
+    (assert failure-p)
+    (assert (= (length warnings) 1))
+    (search "The function CONS is called by"
+            (princ-to-string (first warnings)))))
