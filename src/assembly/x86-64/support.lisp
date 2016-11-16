@@ -12,8 +12,7 @@
 (defun invoke-asm-routine (inst routine vop temp-reg)
   (declare (ignorable vop))
   (cond #!+immobile-code
-        ((neq (sb!c::component-kind
-               (sb!c::node-component (sb!c::vop-node vop))) :toplevel)
+        ((sb!c::code-immobile-p (sb!c::vop-node vop))
          (setq temp-reg (make-fixup routine :assembly-routine)))
         (t
          (inst mov temp-reg (make-fixup routine :assembly-routine))))

@@ -565,6 +565,21 @@ necessary, since type inference may take arbitrarily long to converge.")
   (ir1-finalize component)
   (values))
 
+#!+immobile-code
+(progn
+  (declaim (type (member :immobile :dynamic) *compile-to-memory-space*))
+  ;; COMPILE-FILE puts all nontoplevel code in immobile space, but COMPILE
+  ;; offers a choice. If heap fragmentation or speed of allocation is a major
+  ;; concern at runtime, compiling into dynamic space is a possible remedy.
+  (defvar *compile-to-memory-space* :immobile)
+  (defun code-immobile-p (node-or-component)
+    (if (fasl-output-p *compile-object*)
+        (neq (component-kind (if (node-p node-or-component)
+                                 (node-component node-or-component)
+                                 node-or-component))
+             :toplevel)
+        (eq *compile-to-memory-space* :immobile))))
+
 (defun %compile-component (component)
   (let ((*code-segment* nil)
         (*elsewhere* nil)
@@ -635,8 +650,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
           (multiple-value-bind (code-length fixup-notes)
               (let (#!+immobile-code
-                    (*code-is-immobile*
-                     (neq (component-kind component) :toplevel)))
+                    (*code-is-immobile* (code-immobile-p component)))
                 (generate-code component))
 
             #-sb-xc-host

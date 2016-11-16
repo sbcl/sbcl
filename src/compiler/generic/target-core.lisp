@@ -62,8 +62,9 @@
       (let* ((2comp (component-info component))
              (constants (ir2-component-constants 2comp))
              (box-num (- (length constants) sb!vm:code-constants-offset))
-             ;; All compilation into memory favors the immobile space.
-             (code-obj (allocate-code-object #!+immobile-code t box-num length))
+             (code-obj (allocate-code-object
+                        #!+immobile-code (eq *compile-to-memory-space* :immobile)
+                        box-num length))
              (fill-ptr (code-instructions code-obj)))
         (declare (type index box-num length))
 

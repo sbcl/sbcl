@@ -109,7 +109,7 @@
          ;; 1+3=4=fdefn_raw_address_offset relationship above?
          ;; Is something else going on?)
          #!+immobile-code
-         (cond ((neq (sb!c::component-kind (sb!c::node-component ,node)) :toplevel)
+         (cond ((sb!c::code-immobile-p ,node)
                 (inst call (make-fixup function :static-call)))
                (t
                 ;; While we could use CALL-INDIRECT here,
