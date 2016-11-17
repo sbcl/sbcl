@@ -569,9 +569,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 (progn
   (declaim (type (member :immobile :dynamic) *compile-to-memory-space*))
   ;; COMPILE-FILE puts all nontoplevel code in immobile space, but COMPILE
-  ;; offers a choice. If heap fragmentation or speed of allocation is a major
-  ;; concern at runtime, compiling into dynamic space is a possible remedy.
-  (defvar *compile-to-memory-space* :immobile)
+  ;; offers a choice. Because the collector does not run often enough (yet),
+  ;; COMPILE usually places code in the dynamic space managed by our copying GC.
+  ;; Change this variable if your application always demands immobile code.
+  (defvar *compile-to-memory-space* :dynamic)
   (defun code-immobile-p (node-or-component)
     (if (fasl-output-p *compile-object*)
         (neq (component-kind (if (node-p node-or-component)

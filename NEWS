@@ -1,9 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.3.11:
-  * enhancement: on x86-64, compiled functions can not be moved (but can
-    be freed) by GC. This facilitates examination of running images by
-    external tools. Code locality and performance are improved as well.
+  * enhancement: on x86-64, compiled functions loaded from fasl files
+    can not be moved, but can be freed, by GC. Additionally, COMPILE will
+    produce immobile code if SB-C::*COMPILE-TO-MEMORY-SPACE* is set to
+    :IMMOBILE. (Caution: the flag is experimental and subject to change.)
+    The benefits are better physical separation of code from data,
+    and potentially easier examination of live images by external tools.
   * enhancement: the docstring for SAVE-LISP-AND-DIE has been amended to
     say that the :ROOT-STRUCTURES parameter is not meaningless on gencgc,
     depending on the platform.
