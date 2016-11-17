@@ -126,10 +126,10 @@
 
     (let* ((n (length ordering))
            (array (make-alien int (1+ (* n 2)))))
-      (setf (deref array 0) (* n 2))
       (loop for i below n
             do (setf (deref array (* i 2))
                      (get-lisp-obj-address (aref ordering i))))
+      (setf (deref array (* n 2)) 0) ; null-terminate the array
       (setf (extern-alien "code_component_order" unsigned)
             (sap-int (alien-value-sap array)))))
 

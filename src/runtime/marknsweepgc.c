@@ -1655,27 +1655,24 @@ int* immobile_space_relocs;
 
 void defrag_immobile_space(int* components)
 {
-    int i, size;
     long total_size = 0;
     lispobj* addr;
+    int i;
 
     // Compute where each code component will be moved to.
-    lispobj new_vaddr = IMMOBILE_VARYOBJ_SUBSPACE_START;
     for (i=0 ; components[i*2] ; ++i) {
         addr = (lispobj*)(long)components[i*2];
         gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
         addr = native_pointer((lispobj)addr);
         int widetag = widetag_of(*addr);
+        lispobj new_vaddr = 0;
         // FIXME: generalize
         gc_assert(widetag == CODE_HEADER_WIDETAG);
-        if (immobile_filler_p(addr)) {
-          components[i*2+1] = 0;
-        } else {
-          components[i*2+1] = new_vaddr;
-          size = sizetab[widetag](addr);
-          total_size += size << WORD_SHIFT;
-          new_vaddr += size << WORD_SHIFT;
+        if (!immobile_filler_p(addr)) {
+            new_vaddr = IMMOBILE_VARYOBJ_SUBSPACE_START + total_size;
+            total_size += sizetab[widetag](addr) << WORD_SHIFT;
         }
+        components[i*2+1] = new_vaddr;
     }
     // tempspace is the old total size, not the new total size,
     // because forwarding pointers are stashed there prior to defrag.
@@ -1685,6 +1682,7 @@ void defrag_immobile_space(int* components)
     tempspace = calloc(tempspace_bytes, 1);
 
     // Deposit forwarding pointers into the temp space.
+    lispobj new_vaddr;
     for (i=0 ; components[i*2] ; ++i) {
         if ((new_vaddr = components[i*2+1]) != 0) {
             addr = native_pointer(components[i*2]);
