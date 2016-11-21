@@ -71,15 +71,16 @@
 ;;; REX-R            A REX prefix with the "register" bit set was found
 ;;; REX-X            A REX prefix with the "index" bit set was found
 ;;; REX-B            A REX prefix with the "base" bit set was found
-(defconstant +operand-size-8+  #b1000000)
-(defconstant +operand-size-16+ #b0100000)
-(defconstant +rex+             #b0010000)
+(defconstant +allow-qword-imm+ #b10000000)
+(defconstant +operand-size-8+  #b01000000)
+(defconstant +operand-size-16+ #b00100000)
+(defconstant +rex+             #b00010000)
 ;;; The next 4 exactly correspond to the bits in the REX prefix itself,
 ;;; to avoid unpacking and stuffing into inst-properties one at a time.
-(defconstant +rex-w+           #b0001000)
-(defconstant +rex-r+           #b0000100)
-(defconstant +rex-x+           #b0000010)
-(defconstant +rex-b+           #b0000001)
+(defconstant +rex-w+           #b1000)
+(defconstant +rex-r+           #b0100)
+(defconstant +rex-x+           #b0010)
+(defconstant +rex-b+           #b0001)
 
 ;;; Return the operand size depending on the prefixes and width bit as
 ;;; stored in DSTATE.
@@ -185,14 +186,14 @@
   :printer #'print-label)
 
 ;;; Normally, immediate values for an operand size of :qword are of size
-;;; :dword and are sign-extended to 64 bits. For an exception, see the
-;;; argument type definition of SIGNED-IMM-DATA-UPTO-QWORD below.
+;;; :dword and are sign-extended to 64 bits.
+;;; The exception is that opcode group 0xB8 .. 0xBF allows a :qword immediate.
 (define-arg-type signed-imm-data
-  :prefilter (lambda (dstate)
-               (let ((width (width-bits (inst-operand-size dstate))))
-                 (when (= width 64)
-                   (setf width 32))
-                 (read-signed-suffix width dstate)))
+  :prefilter (lambda (dstate &aux (width (inst-operand-size dstate)))
+               (when (and (not (dstate-get-inst-prop dstate +allow-qword-imm+))
+                          (eq width :qword))
+                 (setf width :dword))
+               (read-signed-suffix (width-bits width) dstate))
   :printer (lambda (value stream dstate)
              (maybe-note-static-symbol value dstate)
              (princ value stream)))
@@ -200,20 +201,6 @@
 (define-arg-type signed-imm-data/asm-routine
   :type 'signed-imm-data
   :printer #'print-imm/asm-routine)
-
-;;; Used by the variant of the MOV instruction with opcode B8 which can
-;;; move immediates of all sizes (i.e. including :qword) into a
-;;; register.
-(define-arg-type signed-imm-data-upto-qword
-  :prefilter (lambda (dstate)
-               (read-signed-suffix
-                (width-bits (inst-operand-size dstate))
-                dstate)))
-
-(define-arg-type signed-imm-data-upto-qword/asm-routine
-  :type 'signed-imm-data-upto-qword
-  :printer #'print-imm/asm-routine)
-
 
 ;;; Used by those instructions that have a default operand size of
 ;;; :qword. Nevertheless the immediate is at most of size :dword.
@@ -430,17 +417,6 @@
   (reg   :field (byte 3 0) :type 'reg-b)
   ;; optional fields
   (accum :type 'accum)
-  (imm))
-
-(define-instruction-format (rex-reg 16
-                                        :default-printer '(:name :tab reg))
-  (rex     :field (byte 4 4)    :value #b0100)
-  (wrxb    :field (byte 4 0)    :type 'wrxb)
-  (width   :field (byte 1 11)   :type 'width)
-  (op      :field (byte 4 12))
-  (reg     :field (byte 3 8)    :type 'reg-b)
-  ;; optional fields
-  (accum   :type 'accum)
   (imm))
 
 (define-instruction-format (reg-reg/mem 16
@@ -1537,10 +1513,10 @@
 
 (define-instruction mov (segment dst src)
   ;; immediate to register
-  (:printer reg ((op #b1011) (imm nil :type 'signed-imm-data/asm-routine))
-            '(:name :tab reg ", " imm))
-  (:printer rex-reg ((op #b1011)
-                     (imm nil :type 'signed-imm-data-upto-qword/asm-routine))
+  (:printer reg ((op #b1011 :prefilter (lambda (dstate value)
+                                         (dstate-put-inst-prop dstate +allow-qword-imm+)
+                                         value))
+                 (imm nil :type 'signed-imm-data/asm-routine))
             '(:name :tab reg ", " imm))
   ;; absolute mem to/from accumulator
   (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
