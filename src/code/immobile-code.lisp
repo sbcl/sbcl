@@ -106,13 +106,22 @@
             (mapcar (lambda (x)
                       (fun-code-header (the simple-fun (coerce x 'function))))
                     roots)))
-    ; (format t "~&Roots reached ~D code objects~%" (length ordering))
+
+    ;; Place static funs first so that their addresses are really permanent.
+    ;; This simplifies saving an image when dynamic space functions point to
+    ;; immobile space functions - the x86 call sequence requires two
+    ;; instructions, and the fixupper does not understand that.
+    ;; (It's not too hard to enhance it, but not worth the trouble)
+    (dolist (fun-name sb-vm:*static-funs*)
+      (let ((code (fun-code-header (symbol-function fun-name))))
+        (unless (gethash code hashset)
+          (setf (gethash code hashset) t)
+          (vector-push-extend code ordering))))
 
     (dolist (code (order-by-in-degree))
       (unless (gethash code hashset)
         (setf (gethash code hashset) t)
         (vector-push-extend code ordering)))
-    ; (format t "~&Added ~D code objects by static frequency~%" (length ordering))
 
     (sb-vm::map-allocated-objects
      (lambda (obj type size)
@@ -122,7 +131,6 @@
          (setf (gethash obj hashset) t)
          (vector-push-extend obj ordering)))
      :immobile)
-    ; (format t "~&Total ~D code objects~%" (length ordering))
 
     (let* ((n (length ordering))
            (array (make-alien int (1+ (* n 2)))))
