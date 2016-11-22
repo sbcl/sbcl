@@ -84,6 +84,7 @@
   (loop (multiple-value-bind (winp symbol) (iter)
           (if winp (unintern symbol "CL-USER") (return)))))
 
+#+immobile-code (setq sb-c::*compile-to-memory-space* :dynamic)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 (sb-ext:save-lisp-and-die
  (progn

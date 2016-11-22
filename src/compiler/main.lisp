@@ -572,7 +572,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; offers a choice. Because the collector does not run often enough (yet),
   ;; COMPILE usually places code in the dynamic space managed by our copying GC.
   ;; Change this variable if your application always demands immobile code.
-  (defvar *compile-to-memory-space* :dynamic)
+  ;; The real default is set to :DYNAMIC in make-target-2-load.lisp
+  (defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
   (defun code-immobile-p (node-or-component)
     (if (fasl-output-p *compile-object*)
         (neq (component-kind (if (node-p node-or-component)
