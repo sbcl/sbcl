@@ -1609,7 +1609,9 @@ static void fixup_space(lispobj* where, size_t n_words)
         // All the array header widetags.
         case SIMPLE_VECTOR_WIDETAG:
         case SIMPLE_ARRAY_WIDETAG:
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
         case COMPLEX_CHARACTER_STRING_WIDETAG:
+#endif
         case COMPLEX_BASE_STRING_WIDETAG:
         case COMPLEX_VECTOR_NIL_WIDETAG:
         case COMPLEX_BIT_VECTOR_WIDETAG:
