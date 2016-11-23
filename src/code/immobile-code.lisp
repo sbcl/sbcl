@@ -76,10 +76,20 @@
 ;;; in the space, which should be better than leaving the
 ;;; organization to random chance.
 ;;; Note that these aren't roots in the GC sense, just a locality sense.
-(defun choose-code-component-order
-    (&optional (roots '(read print eval compile)))
+(defun choose-code-component-order (&optional roots)
   (let ((ordering (make-array 10000 :adjustable t :fill-pointer 0))
         (hashset (make-hash-table :test 'eq)))
+
+    ;; Place static funs first so that their addresses are really permanent.
+    ;; This simplifies saving an image when dynamic space functions point to
+    ;; immobile space functions - the x86 call sequence requires two
+    ;; instructions, and the fixupper does not understand that.
+    ;; (It's not too hard to enhance it, but not worth the trouble)
+    (dolist (fun-name sb-vm:*static-funs*)
+      (let ((code (fun-code-header (symbol-function fun-name))))
+        (setf (gethash code hashset) t)
+        (vector-push-extend code ordering)))
+
     (labels ((visit (thing)
                (typecase thing
                  (code-component (visit-code thing))
@@ -103,20 +113,11 @@
                             (symbol (visit obj))
                             (vector (map nil #'visit obj)))))))
       (mapc #'visit
-            (mapcar (lambda (x)
-                      (fun-code-header (the simple-fun (coerce x 'function))))
-                    roots)))
-
-    ;; Place static funs first so that their addresses are really permanent.
-    ;; This simplifies saving an image when dynamic space functions point to
-    ;; immobile space functions - the x86 call sequence requires two
-    ;; instructions, and the fixupper does not understand that.
-    ;; (It's not too hard to enhance it, but not worth the trouble)
-    (dolist (fun-name sb-vm:*static-funs*)
-      (let ((code (fun-code-header (symbol-function fun-name))))
-        (unless (gethash code hashset)
-          (setf (gethash code hashset) t)
-          (vector-push-extend code ordering))))
+            (mapcan (lambda (x)
+                      (let ((f (coerce x 'function)))
+                        (when (simple-fun-p f)
+                          (list (fun-code-header f)))))
+                    (or roots '(read eval print compile)))))
 
     (dolist (code (order-by-in-degree))
       (unless (gethash code hashset)

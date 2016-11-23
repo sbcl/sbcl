@@ -200,6 +200,9 @@ sufficiently motivated to do lengthy fixes."
            (foreign-bool (value)
              (if value 1 0))
            (save-core (gc)
+             ;; FIXME: NATIVE-NAMESTRING can signal an error, and it would
+             ;; be prudent to do that _before_ we've called the user hooks
+             ;; (in DEINIT) or done anything else like tuning for dump.
              (let ((name (native-namestring
                           (physicalize-pathname core-file-name)
                           :as-file t)))
@@ -218,7 +221,7 @@ sufficiently motivated to do lengthy fixes."
                        #!-win32 0)))))
     #!+gencgc
     (progn
-      ;; Scan roots as close as possible to SAVE-CORE, in case anything
+      ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
       ;; prior causes compilation to occur into immobile space.
       ;; Failing to see all immobile code would miss some relocs.
       #!+immobile-code (sb!kernel::choose-code-component-order root-structures)
