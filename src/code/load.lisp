@@ -16,12 +16,6 @@
 
 (in-package "SB!FASL")
 
-;;;; There looks to be an exciting amount of state being modified
-;;;; here: certainly enough that I (dan, 2003.1.22) don't want to mess
-;;;; around deciding how to thread-safetify it.  So we use a Big Lock.
-;;;; Because this code is mutually recursive with the compiler, we use
-;;;; the **WORLD-LOCK**.
-
 ;;;; miscellaneous load utilities
 
 ;;; Output the current number of semicolons after a fresh-line.
@@ -111,14 +105,10 @@
 ;; refilled, then SAP-REF-WORD could work to read 8 bytes.
 ;; But this would only be feasible on machines that are little-endian
 ;; and that allow unaligned reads. (like x86)
-(declaim (inline read-byte-arg read-halfword-arg read-word-arg))
+(declaim (inline read-byte-arg read-word-arg))
 (defun read-byte-arg (stream)
   (declare (optimize (speed 0)))
   (read-arg 1 stream))
-
-(defun read-halfword-arg (stream)
-  (declare (optimize (speed 0)))
-  (read-arg #.(/ sb!vm:n-word-bytes 2) stream)) ; READ-ARG doesn't eval N
 
 (defun read-word-arg (stream)
   (declare (optimize (speed 0)))
