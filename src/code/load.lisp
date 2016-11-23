@@ -99,6 +99,17 @@
       `(with-fast-read-byte ((unsigned-byte 8) ,fasl-input-stream)
          (fast-read-u-integer ,n))))
 
+(defun read-varint-arg (fasl-input)
+  (let ((accumulator 0)
+        (shift 0))
+    (declare (fixnum shift) (type word accumulator))
+    (with-fast-read-byte ((unsigned-byte 8) (%fasl-input-stream fasl-input))
+      (loop
+       (let ((octet (fast-read-byte)))
+         (setq accumulator (logior accumulator (ash (logand octet #x7F) shift)))
+         (incf shift 7)
+         (unless (logbitp 7 octet) (return accumulator)))))))
+
 ;; FIXME: on x86-64, these functions exceed 600, 900, and 1200 bytes of code
 ;; respectively. Either don't inline them, or make a "really" fast inline case
 ;; that punts if inapplicable. e.g. if the fast-read-byte buffer will not be
@@ -391,7 +402,6 @@
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
-(defconstant +2-operand-fops+ #xE0) ; start of the range
 (defun load-fasl-group (fasl-input print)
   ;;
   ;; PRINT causes most tlf-equivalent forms to print their primary value.
@@ -423,26 +433,28 @@
                    byte (aref **fop-names** byte)))
          ;; Actually execute the fop.
          (let ((result
-                (let ((function (svref **fop-funs** byte)))
+                (let ((function (svref **fop-funs** byte))
+                      (n-operands (aref (car **fop-signatures**) byte)))
                   (cond ((not (functionp function))
                          (error "corrupt fasl file: FOP code #x~x" byte))
-                        ((zerop (sbit (car **fop-signatures**) (ash byte -2)))
-                         ;; takes no arguments from the fasl file
+                        ((zerop n-operands)
                          (funcall function fasl-input))
                         (t
-                         ;; one or two arguments come from the fasl file
-                         (let (arg1 arg2) ; See !%DEFINE-FOP for encoding
+                         (let (arg1 arg2 arg3)
                            (with-fast-read-byte ((unsigned-byte 8) stream)
-                             (setq arg1 (fast-read-var-u-integer
-                                         (ash 1 (logand byte 3))))
-                             (when (>= byte +2-operand-fops+)
-                               (setq arg2 (fast-read-var-u-integer
-                                           (ash 1 (ldb (byte 2 2) byte))))))
-                           (tracing
-                             (format *trace-output* "{~D~@[,~D~]}" arg1 arg2))
-                           (if arg2
-                               (funcall function fasl-input arg1 arg2)
-                               (funcall function fasl-input arg1))))))))
+                             ;; The low 2 bits of the opcode determine the
+                             ;; number of octets used for the 1st operand.
+                             (setq arg1 (fast-read-var-u-integer (ash 1 (logand byte 3)))))
+                           (when (>= n-operands 2)
+                             (setq arg2 (read-varint-arg fasl-input))
+                             (when (>= n-operands 3)
+                               (setq arg3 (read-varint-arg fasl-input))))
+                           (tracing (format *trace-output* "{~D~@[,~D~@[,~D~]~]}"
+                                            arg1 arg2 arg3))
+                           (case n-operands
+                             (3 (funcall function fasl-input arg1 arg2 arg3))
+                             (2 (funcall function fasl-input arg1 arg2))
+                             (1 (funcall function fasl-input arg1)))))))))
            (when (plusp (sbit (cdr **fop-signatures**) byte))
              (push-fop-stack result fasl-input))
            (let ((stack (%fasl-input-stack fasl-input)))

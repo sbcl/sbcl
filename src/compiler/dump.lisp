@@ -29,6 +29,10 @@
             (:copier nil))
   ;; the stream we dump to
   (stream (missing-arg) :type stream)
+  ;; scratch space for computing varint encodings
+  ;; FIXME: can't use the theoretical max of 10 bytes
+  ;; due to constraint in WRITE-VAR-INTEGER.
+  (varint-buf (make-array 10 :element-type '(unsigned-byte 8) :fill-pointer t))
   ;; hashtables we use to keep track of dumped constants so that we
   ;; can get them from the table rather than dumping them again. The
   ;; EQUAL-TABLE is used for lists and strings, and the EQ-TABLE is
@@ -136,23 +140,21 @@
     (dump-byte (logand n #xff) fasl-output))
   (values))
 
-(defun dump-fop+operands (fasl-output opcode arg1 &optional (arg2 0 arg2p))
-  (declare (type (unsigned-byte 8) opcode) (type word arg1 arg2))
-  (multiple-value-bind (modifier1 modifier2)
-      (flet ((fop-opcode-modifier (arg)
-               ;; The compiler should be able to figure that 32-bit builds
-               ;; can not use the 8-byte size, I think.
-               (if (< arg #x10000)
-                   (if (< arg #x100) 0 1)
-                   (if (< arg (ash 1 32)) 2 3))))
-        (declare (inline fop-opcode-modifier))
-        (values (fop-opcode-modifier arg1)
-                (if arg2p (fop-opcode-modifier arg2) 0)))
-    (dump-byte (logior opcode (ash modifier2 2) modifier1) fasl-output)
-    ;; special-case code optimized for each size might improve speed here
-    (dump-integer-as-n-bytes arg1 (ash 1 modifier1) fasl-output)
-    (when arg2p
-      (dump-integer-as-n-bytes arg2 (ash 1 modifier2) fasl-output))))
+(defun dump-fop+operands (fasl-output opcode arg1
+                                      &optional (arg2 0 arg2p) (arg3 0 arg3p))
+  (declare (type (unsigned-byte 8) opcode) (type word arg1 arg2 arg3))
+  (let ((opcode-modifier (if (< arg1 #x10000)
+                             (if (< arg1 #x100) 0 1)
+                             (if (< arg1 (ash 1 32)) 2 3))))
+    (dump-byte (logior opcode opcode-modifier) fasl-output)
+    (dump-integer-as-n-bytes arg1 (ash 1 opcode-modifier) fasl-output)
+    (flet ((dump-varint (arg)
+             (let ((buf (fasl-output-varint-buf fasl-output)))
+               (setf (fill-pointer buf) 0)
+               (write-var-integer arg buf)
+               (write-sequence buf (fasl-output-stream fasl-output)))))
+      (when arg2p (dump-varint arg2))
+      (when arg3p (dump-varint arg3)))))
 
 ;;; Setting this variable to an (UNSIGNED-BYTE 32) value causes
 ;;; DUMP-FOP to use it as a counter and emit a FOP-NOP4 with the
@@ -170,15 +172,13 @@
 ;;;
 ;;; FIXME: Compiler macros, frozen classes, inlining, and similar
 ;;; optimizations should be conditional on #!+SB-FROZEN.
-(defmacro dump-fop (fs-expr file &rest args)
+(eval-when (:compile-toplevel :execute)
+(#+sb-xc-host defmacro #-sb-xc-host sb!xc:defmacro dump-fop (fs-expr file &rest args)
   (let* ((fs (eval fs-expr))
          (val (or (get fs 'opcode)
                   (error "compiler bug: ~S is not a legal fasload operator."
                          fs-expr)))
-         (fop-argc
-          (if (>= val +2-operand-fops+)
-              2
-              (sbit (car **fop-signatures**) (ash val -2)))))
+         (fop-argc (aref (car **fop-signatures**) val)))
     (cond
       ((not (eql (length args) fop-argc))
        (error "~S takes ~D argument~:P" fs fop-argc))
@@ -191,7 +191,7 @@
                                     4 ,file))
          ,(if (zerop fop-argc)
               `(dump-byte ,val ,file)
-              `(dump-fop+operands ,file ,val ,@args)))))))
+              `(dump-fop+operands ,file ,val ,@args))))))))
 
 ;;; Push the object at table offset Handle on the fasl stack.
 (defun dump-push (handle fasl-output)
@@ -978,8 +978,9 @@
           ((eq pkg sb!int:*keyword-package*)
            (dump-fop 'fop-keyword-symbol-save file length+flag))
           (t
-           (dump-fop 'fop-symbol-in-package-save file
-                     (dump-package pkg file) length+flag)))
+           (let ((pkg-index (dump-package pkg file)))
+             (dump-fop 'fop-symbol-in-package-save file
+                       length+flag pkg-index))))
 
     (unless dumped-as-copy
       (funcall (if base-string-p

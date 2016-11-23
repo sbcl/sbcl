@@ -142,14 +142,13 @@
 ;;; then loader's main loop is responsible for supplying it.
 (defglobal **fop-funs** (make-array 256 :initial-element 0))
 
-;; Two bitmaps indicate function signature. One tells whether the fop takes
-;; operands (other than from the stack). Each consecutive block of 4 opcodes
-;; either does or doesn't, so the array is 1/4th the size of the opcode space.
-;; The other tells whether the fop wants its result pushed on the stack.
-(declaim (type (cons (simple-bit-vector 64) (simple-bit-vector 256))
+;;; Two arrays indicate fop function signature.
+;;; The first array indicates how many integer operands follow the opcode.
+;;; The second tells whether the fop wants its result pushed on the stack.
+(declaim (type (cons (simple-array (mod 4) (256)) (simple-bit-vector 256))
                **fop-signatures**))
 (defglobal **fop-signatures**
-    (cons (make-array 64 :element-type 'bit :initial-element 0)
+    (cons (make-array 256 :element-type '(mod 4) :initial-element 0)
           (make-array 256 :element-type 'bit :initial-element 0)))
 
 ;;;; variables

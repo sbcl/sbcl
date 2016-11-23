@@ -2496,11 +2496,11 @@ core and return a descriptor to it."
 ;;; instead of creating a new encoding.
 (defmacro define-cold-fop ((name &optional arglist) &rest forms)
   (let* ((code (get name 'opcode))
-         (argp (plusp (sbit (car **fop-signatures**) (ash code -2))))
+         (argc (aref (car **fop-signatures**) code))
          (fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
-    (when (and argp (not (singleton-p arglist)))
+    (when (and (plusp argc) (not (singleton-p arglist)))
       (error "~S must take one argument" name))
     `(progn
        (defun ,fname (.fasl-input. ,@arglist)
@@ -2512,7 +2512,7 @@ core and return a descriptor to it."
            ,@forms))
        ;; We simply overwrite elements of **FOP-FUNS** since the contents
        ;; of the host are never propagated directly into the target core.
-       ,@(loop for i from code to (logior code (if argp 3 0))
+       ,@(loop for i from code to (logior code (if (plusp argc) 3 0))
                collect `(setf (svref **fop-funs** ,i) #',fname)))))
 
 ;;; Cause a fop to be undefined in cold load.
@@ -2618,12 +2618,11 @@ core and return a descriptor to it."
 
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
-(flet ((fop-cold-symbol-in-package-save (fasl-input index length+flag)
-         (cold-load-symbol length+flag (ref-fop-table fasl-input index)
+(flet ((fop-cold-symbol-in-package-save (fasl-input length+flag pkg-index)
+         (cold-load-symbol length+flag (ref-fop-table fasl-input pkg-index)
                            fasl-input)))
-  (dotimes (i 16) ; occupies 16 cells in the dispatch table
-    (setf (svref **fop-funs** (+ (get 'fop-symbol-in-package-save 'opcode) i))
-          #'fop-cold-symbol-in-package-save)))
+  (let ((i (get 'fop-symbol-in-package-save 'opcode)))
+    (fill **fop-funs** #'fop-cold-symbol-in-package-save :start i :end (+ i 4))))
 
 (define-cold-fop (fop-lisp-symbol-save (length+flag))
   (cold-load-symbol length+flag *cl-package* (fasl-input)))
@@ -2971,9 +2970,8 @@ core and return a descriptor to it."
                      (bvref-32 (descriptor-bytes des) i)))))
        des)))
 
-(dotimes (i 16) ; occupies 16 cells in the dispatch table
-  (setf (svref **fop-funs** (+ (get 'fop-code 'opcode) i))
-        #'cold-load-code))
+(let ((i (get 'fop-code 'opcode)))
+  (fill **fop-funs** #'cold-load-code :start i :end (+ i 4)))
 
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)

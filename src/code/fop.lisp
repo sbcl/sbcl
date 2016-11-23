@@ -36,7 +36,7 @@
                   (values nil arglist)
                   (ecase (caar arglist)
                     (:operands (values (cdar arglist) (cdr arglist)))))
-            (assert (<= (length operands) 2))
+            (assert (<= (length operands) 3))
             (values name allowp operands stack-args pushp forms))))
     `(progn
        (defun ,name (.fasl-input. ,@operands)
@@ -61,8 +61,12 @@
        (!%define-fop ',name ,fop-code ,(length operands) ,(if pushp 1 0)))))
 
 (defun !%define-fop (name base-opcode n-operands pushp)
-  (declare (type (mod 3) n-operands)) ; 0, 1, or 2 are allowed
-  (let ((n-slots (expt 4 n-operands)))
+  (declare (type (mod 4) n-operands))
+  ;; If at least one non-stack operand is present, the same fop function
+  ;; appears in 4 consecutive cells in the fop table, with the low 2 bits
+  ;; of the fopcode determining the number of additional bytes to read
+  ;; for the first operand. The second and third operands are varint-encoded.
+  (let ((n-slots (if (plusp n-operands) 4 1)))
     (unless (zerop (mod base-opcode n-slots))
       (error "Opcode for fop ~S must be a multiple of ~D" name n-slots))
     (loop for opcode from base-opcode below (+ base-opcode n-slots)
@@ -77,13 +81,13 @@
                name base-opcode existing-opcode)))
     (setf (get name 'opcode) base-opcode)
     ;; The low 2 bits of the opcode comprise the length modifier if there is
-    ;; exactly one operand. Such opcodes are aligned in blocks of 4.
-    ;; 2-operand fops occupy 16 slots in a reserved range of the function table.
+    ;; at least one non-stack integer operand.
+    ;; If there is more than 1, they follow, using varint encoding.
     (dotimes (j n-slots)
       (let ((opcode (+ base-opcode j)))
         (setf (svref **fop-names** opcode) name
               (svref **fop-funs** opcode) (symbol-function name)
-              (sbit (car **fop-signatures**) (ash opcode -2)) (signum n-operands)
+              (aref (car **fop-signatures**) opcode) n-operands
               (sbit (cdr **fop-signatures**) opcode) pushp))))
   name)
 
@@ -272,7 +276,7 @@
     (aux-fop-intern length+flag *cl-package* (fasl-input)))
   (!define-fop 84 :not-host (fop-keyword-symbol-save ((:operands length+flag)))
     (aux-fop-intern length+flag *keyword-package* (fasl-input)))
-  (!define-fop #xF0 :not-host (fop-symbol-in-package-save ((:operands pkg-index length+flag)))
+  (!define-fop #xF0 :not-host (fop-symbol-in-package-save ((:operands length+flag pkg-index)))
     (aux-fop-intern length+flag (ref-fop-table (fasl-input) pkg-index) (fasl-input)))
 
   (!define-fop 96 :not-host (fop-uninterned-symbol-save ((:operands length+flag)))
