@@ -54,7 +54,7 @@ the debugger.  In this case @code{car} was called on @code{3}, causing
 a @code{type-error}.
 
 This is followed by the ``beginner help line'', which appears only if
-@code{sb-ext:*debug-beginner-help-p*} is true (default).
+@code{sb-debug:*debug-beginner-help-p*} is true (default).
 
 Next comes a listing of the active restart names, along with their
 descriptions -- the ways we can restart execution after this error. In
