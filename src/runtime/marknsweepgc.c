@@ -22,6 +22,29 @@
  *  3. Specify space size on startup
  */
 
+// Work around a bug in some llvm/clang versions affecting the memcpy
+// call in defrag_immobile_space:
+//
+// When compiled with _FORTIFY_SOURCE nonzero, as seems to be the
+// default, memcpy is a macro that expands to
+// __builtin_memcpy_chk(dst, source, size, __builtin_object_size(...)).
+//
+// Now usually if the compiler knows that it does not know
+// __builtin_object_size for the source of the copy, the
+// __builtin_memcpy_chk call becomes plain old memcpy. But in the
+// buggy case, the compiler is convinced that it does know the
+// size. This shows up clearly in the disassembly, where the library
+// routine receives a source size that was erroneously determined to
+// be a compile-time constant 0. Thus the assertion failure is that
+// you are reading from a range with 0 bytes in it.
+//
+// Defining _FORTIFY_LEVEL 0 disables the above macro and thus works
+// around the problem. Since it is unclear which clang versions are
+// affected, only apply the workaround for the known-bad version.
+#if (defined(__clang__) && (__clang_major__ == 6) && (__clang_minor__ == 0))
+#define _FORTIFY_SOURCE 0
+#endif
+
 #include "gc.h"
 #include "gc-internal.h"
 #include "genesis/vector.h"
