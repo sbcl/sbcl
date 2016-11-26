@@ -3236,12 +3236,6 @@ verify_space(lispobj *start, size_t words)
                     }
                 case CODE_HEADER_WIDETAG:
                     {
-                        lispobj header = *start;
-                        struct code *code = (struct code *) start;
-                        sword_t nheader_words, ncode_words, nwords;
-                        lispobj fheaderl;
-                        struct simple_fun *fheaderp;
-
                         /* Check that it's not in the dynamic space.
                          * FIXME: Isn't is supposed to be OK for code
                          * objects to be in the dynamic space these days? */
@@ -3255,18 +3249,16 @@ verify_space(lispobj *start, size_t words)
                                    start));
                         }
 
-                        ncode_words = code_instruction_words(code->code_size);
-                        nheader_words = code_header_words(header);
-                        nwords = ncode_words + nheader_words;
-                        nwords = CEILING(nwords, 2);
+                        struct code *code = (struct code *) start;
+                        sword_t nheader_words = code_header_words(code->header);
                         /* Scavenge the boxed section of the code data block */
                         verify_space(start + 1, nheader_words - 1);
 
                         /* Scavenge the boxed section of each function
                          * object in the code data block. */
-                        fheaderl = code->entry_points;
+                        lispobj fheaderl = code->entry_points;
                         while (fheaderl != NIL) {
-                            fheaderp =
+                            struct simple_fun *fheaderp =
                                 (struct simple_fun *) native_pointer(fheaderl);
                             gc_assert(widetag_of(fheaderp->header) ==
                                       SIMPLE_FUN_HEADER_WIDETAG);
@@ -3274,7 +3266,7 @@ verify_space(lispobj *start, size_t words)
                                          SIMPLE_FUN_SCAV_NWORDS(fheaderp));
                             fheaderl = fheaderp->next;
                         }
-                        count = nwords;
+                        count = nheader_words + code_instruction_words(code->code_size);
                         break;
                     }
 

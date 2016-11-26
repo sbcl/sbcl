@@ -276,27 +276,21 @@ ptrans_vector(lispobj thing, long bits, long extra,
 static lispobj
 ptrans_code(lispobj thing)
 {
-    struct code *code, *new;
-    long nwords;
-    lispobj func, result;
+    struct code *code = (struct code *)native_pointer(thing);
+    long nwords = code_header_words(code->header)
+                + code_instruction_words(code->code_size);
 
-    code = (struct code *)native_pointer(thing);
-    // FIXME: CEILING is likely redundant.
-    //  - The header word count can't be odd
-    //  - The instruction word count is rounded by the accessor macro
-    nwords = CEILING(HeaderValue(code->header) + code_instruction_words(code->code_size),
-                     2);
-
-    new = (struct code *)newspace_alloc(nwords,1); /* constant */
+    struct code *new = (struct code *)newspace_alloc(nwords,1); /* constant */
 
     bcopy(code, new, nwords * sizeof(lispobj));
 
-    result = make_lispobj(new, OTHER_POINTER_LOWTAG);
+    lispobj result = make_lispobj(new, OTHER_POINTER_LOWTAG);
 
     /* Stick in a forwarding pointer for the code object. */
     *(lispobj *)code = result;
 
     /* Put in forwarding pointers for all the functions. */
+    lispobj func;
     for (func = code->entry_points;
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {

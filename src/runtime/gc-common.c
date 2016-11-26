@@ -229,12 +229,6 @@ scav_fun_pointer(lispobj *where, lispobj object)
 static struct code *
 trans_code(struct code *code)
 {
-    struct code *new_code;
-    lispobj l_code, l_new_code;
-    uword_t nheader_words, ncode_words, nwords;
-    uword_t displacement;
-    lispobj fheaderl, *prev_pointer;
-
     /* if object has already been transported, just return pointer */
     if (forwarding_pointer_p((lispobj *)code)) {
 #ifdef DEBUG_CODE_GC
@@ -247,15 +241,12 @@ trans_code(struct code *code)
     gc_assert(widetag_of(code->header) == CODE_HEADER_WIDETAG);
 
     /* prepare to transport the code vector */
-    l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
-
-    ncode_words = code_instruction_words(code->code_size);
-    nheader_words = code_header_words(code->header);
-    nwords = ncode_words + nheader_words;
-    nwords = CEILING(nwords, 2);
-
-    l_new_code = copy_code_object(l_code, nwords);
-    new_code = (struct code *) native_pointer(l_new_code);
+    lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
+    sword_t nheader_words = code_header_words(code->header);
+    sword_t ncode_words = code_instruction_words(code->code_size);
+    sword_t nwords = nheader_words + ncode_words;
+    lispobj l_new_code = copy_code_object(l_code, nwords);
+    struct code *new_code = (struct code *) native_pointer(l_new_code);
 
 #if defined(DEBUG_CODE_GC)
     printf("Old code object at 0x%08x, new code object at 0x%08x.\n",
@@ -268,15 +259,14 @@ trans_code(struct code *code)
         return new_code;
 #endif
 
-    displacement = l_new_code - l_code;
-
     set_forwarding_pointer((lispobj *)code, l_new_code);
 
     /* set forwarding pointers for all the function headers in the */
     /* code object.  also fix all self pointers */
 
-    fheaderl = code->entry_points;
-    prev_pointer = &new_code->entry_points;
+    lispobj fheaderl = code->entry_points;
+    lispobj* prev_pointer = &new_code->entry_points;
+    uword_t displacement = l_new_code - l_code;
 
     while (fheaderl != NIL) {
         struct simple_fun *fheaderp, *nfheaderp;
@@ -324,18 +314,13 @@ trans_code(struct code *code)
 }
 
 static sword_t
-scav_code_header(lispobj *where, lispobj object)
+scav_code_header(lispobj *where, lispobj header)
 {
-    struct code *code;
-    sword_t n_header_words, n_code_words, n_words;
     lispobj entry_point;        /* tagged pointer to entry point */
     struct simple_fun *function_ptr; /* untagged pointer to entry point */
 
-    code = (struct code *) where;
-    n_code_words = code_instruction_words(code->code_size);
-    n_header_words = code_header_words(object);
-    n_words = n_code_words + n_header_words;
-    n_words = CEILING(n_words, 2);
+    struct code *code = (struct code *) where;
+    sword_t n_header_words = code_header_words(header);
 
     /* Scavenge the boxed section of the code data block. */
     scavenge(where + 1, n_header_words - 1);
@@ -356,7 +341,7 @@ scav_code_header(lispobj *where, lispobj object)
                  SIMPLE_FUN_SCAV_NWORDS(function_ptr));
     }
 
-    return n_words;
+    return n_header_words + code_instruction_words(code->code_size);
 }
 
 static lispobj
@@ -372,17 +357,8 @@ trans_code_header(lispobj object)
 static sword_t
 size_code_header(lispobj *where)
 {
-    struct code *code;
-    sword_t nheader_words, ncode_words, nwords;
-
-    code = (struct code *) where;
-
-    ncode_words = code_instruction_words(code->code_size);
-    nheader_words = code_header_words(code->header);
-    nwords = ncode_words + nheader_words;
-    nwords = CEILING(nwords, 2);
-
-    return nwords;
+    return code_header_words(((struct code *)where)->header)
+         + code_instruction_words(((struct code *)where)->code_size);
 }
 
 #if !defined(LISP_FEATURE_X86) && ! defined(LISP_FEATURE_X86_64)
