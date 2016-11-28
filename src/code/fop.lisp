@@ -710,8 +710,6 @@ a bug.~@:>")
   (values))
 
 ;;; Primordial layouts.
-;;; At the rate the opcode space is filling up, it might be wise to
-;;; rethink using 16 each for FOP-CODE and -SYMBOL-IN-PACKAGE-SAVE.
 (macrolet ((frob (&rest specs)
              `(progn
                 (defun known-layout-fop (name)
