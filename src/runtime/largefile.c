@@ -16,7 +16,7 @@
  * files for more information.
  */
 
-#include <genesis/config.h>
+#include "genesis/config.h"
 
 #ifdef LISP_FEATURE_LARGEFILE
 
