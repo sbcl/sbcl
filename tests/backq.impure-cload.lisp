@@ -13,6 +13,9 @@
 
 (in-package "CL-USER")
 
+(eval-when (:compile-toplevel)
+  (load "compiler-test-util.lisp"))
+
 ;; In the expression `(,@l1 a b ,@l2) is it preferable that we expand this
 ;; as (APPEND L1 (LIST* 'A 'B L2)) or as (APPEND L1 '(A) '(B) L2)?
 ;; The IR1 transform is designed to catch the latter case, but the expander
@@ -25,12 +28,6 @@
 
 (defun vector-backq-expr () `#(foo ,char-code-limit)) ; no xform, but folded
 (defun obviously-constant-vector () #(foo #.char-code-limit))
-
-(defun list-fun-referenced-constants (f)
-  (let ((code (sb-kernel:fun-code-header f)))
-    (loop for i from sb-vm:code-constants-offset
-          below (sb-kernel:get-header-data code)
-          collect (sb-kernel:code-header-ref code i))))
 
 (test-util:with-test (:name :backquote-ir1-simplifier)
   ;; The pre-tests show that the backquoted expression did not compress
@@ -49,5 +46,5 @@
 
   ;; Compiled code should reference a constant vector.
   (assert (member (vector 'foo char-code-limit)
-                  (list-fun-referenced-constants #'vector-backq-expr)
+                  (ctu:find-code-constants #'vector-backq-expr)
                   :test #'equalp)))
