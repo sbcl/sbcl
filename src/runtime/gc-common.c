@@ -389,9 +389,8 @@ size_code_header(lispobj *where)
 static sword_t
 scav_return_pc_header(lispobj *where, lispobj object)
 {
-    lose("attempted to scavenge a return PC header where=0x%08x object=0x%08x\n",
-         (uword_t) where,
-         (uword_t) object);
+    lose("attempted to scavenge a return PC header where=%p object=%#lx\n",
+         where, (uword_t) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
 #endif /* LISP_FEATURE_X86 */
@@ -443,9 +442,8 @@ scav_closure_header(lispobj *where, lispobj object)
 static sword_t
 scav_fun_header(lispobj *where, lispobj object)
 {
-    lose("attempted to scavenge a function header where=0x%08x object=0x%08x\n",
-         (uword_t) where,
-         (uword_t) object);
+    lose("attempted to scavenge a function header where=%p object=%#lx\n",
+         where, (uword_t) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
 #endif /* LISP_FEATURE_X86 */
