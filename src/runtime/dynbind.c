@@ -22,6 +22,7 @@
 #include "globals.h"
 #include "dynbind.h"
 #include "thread.h"
+#include "interr.h"
 #include "genesis/symbol.h"
 #include "genesis/binding.h"
 
