@@ -1249,7 +1249,7 @@
       (dolist (var-name (rest decl))
         (unless (symbolp var-name)
           (compiler-error "Variable name is not a symbol: ~S." var-name))
-        (when (boundp var-name)
+        (unless (eq (info :variable :kind var-name) :unknown)
           (program-assert-symbol-home-package-unlocked
            context var-name "declaring the type of ~A"))
         (let* ((bound-var (find-in-bindings vars var-name))

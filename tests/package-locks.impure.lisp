@@ -34,6 +34,8 @@
   (:shadow #:shadowed)
   (:export
    #:*special*
+   #:*unbound-special*
+   #:bound-non-special
    #:car
    #:cdr
    #:class
@@ -96,6 +98,8 @@
     (defun test:function () 'test:function)
     (defmacro test:macro () ''test:macro)
     (defparameter test:*special* 'test:*special*)
+    (defvar test:*unbound-special*)
+    (set 'test:bound-non-special 10)
     (defconstant test:constant 'test:constant)
     (intern "UNUSED" :test)
     (dolist (s '(test:nocondition-slot test:noclass-slot test:nostruct-slot
@@ -649,3 +653,16 @@
     (test '(lambda () (set 'test:car 10)))
     (test '(lambda () (setf test:car 10)))
     (test '(lambda () (setf (symbol-value 'test:car) 10)))))
+
+(with-test (:name :declare-unbound-special)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                        (declare (fixnum test:*unbound-special*)))
+                      :allow-failure t
+                      :allow-warnings t))))
+
+(with-test (:name :declare-bound-non-special)
+  (checked-compile '(lambda (test:bound-non-special)
+                     (declare (fixnum test:bound-non-special))
+                     test:bound-non-special)))
