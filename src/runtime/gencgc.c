@@ -2333,10 +2333,6 @@ static void
 pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
 {
     struct page *page = &page_table[pageindex];
-
-    if (!do_wipe_p)
-      return;
-
     gc_assert(mark_which_pointer);
     if (!page->has_pin_map) {
         page->has_pin_map = 1;
@@ -2349,6 +2345,13 @@ pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
         }
 #endif
     }
+    lispobj *page_base = page_address(pageindex);
+    unsigned int begin_dword_index = (mark_which_pointer - page_base) / 2;
+    in_use_marker_t *bitmap = pinned_dwords(pageindex);
+    if (bitmap[begin_dword_index/N_WORD_BITS]
+        & ((uword_t)1 << (begin_dword_index % N_WORD_BITS)))
+      return; // already seen this object
+
     lispobj header = *mark_which_pointer;
     int size = 2;
     // Don't bother calling a sizing function for fixnums or pointers.
@@ -2359,11 +2362,8 @@ pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
             size = 2;
     }
     gc_assert(size % 2 == 0);
-    lispobj *page_base = page_address(pageindex);
-    unsigned int begin_dword_index = (mark_which_pointer - page_base) / 2;
     unsigned int end_dword_index = begin_dword_index + size / 2;
     unsigned int index;
-    in_use_marker_t *bitmap = pinned_dwords(pageindex);
     for (index = begin_dword_index; index < end_dword_index; index++)
         bitmap[index/N_WORD_BITS] |= (uword_t)1 << (index % N_WORD_BITS);
 }
@@ -2482,7 +2482,7 @@ preserve_pointer(void *addr)
             possibly_valid_dynamic_space_pointer_s(addr, first_page,
                                                    &begin_ptr);
         }
-        pin_words(first_page, begin_ptr);
+        if (do_wipe_p) pin_words(first_page, begin_ptr);
     }
 #endif
 
