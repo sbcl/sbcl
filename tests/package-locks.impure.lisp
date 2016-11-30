@@ -596,8 +596,7 @@
                     :ok))))))
 
 (with-test (:name :assert-symbol-home-package-unlocked)
-  (assert-error                         ; TODO use assert-signals
-                (sb-impl::assert-symbol-home-package-unlocked
+  (assert-error (sb-impl::assert-symbol-home-package-unlocked
                  'cl:cons "trying to foo ~S")
                 symbol-package-locked-error)
   (assert-error
