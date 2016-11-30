@@ -20,7 +20,7 @@ then
     git pull -a origin release)
 else
     (cd ../../obj/
-    git clone --branch release git://common-lisp.net/projects/asdf/asdf.git asdf-upstream)
+    git clone --branch release https://gitlab.common-lisp.net/asdf/asdf.git asdf-upstream)
 fi
 
 ( echo -n ";;; This is UIOP " ; eval echo $(cat ../../obj/asdf-upstream/version.lisp-expr) ;
