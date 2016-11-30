@@ -169,8 +169,9 @@ This implementation is not as polished and painless as you might like:
 This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
+  (declare (ignore environment-name))
   #!+gencgc
-  (declare (ignore purify environment-name) (ignorable root-structures))
+  (declare (ignore purify) (ignorable root-structures))
   #!+sb-core-compression
   (check-type compression (or boolean (integer -1 9)))
   #!-sb-core-compression
@@ -186,39 +187,21 @@ sufficiently motivated to do lengthy fixes."
         (return-from save-lisp-and-die))))
   (when (eql t compression)
     (setf compression -1))
-  (tune-image-for-dump)
-  (deinit)
+  (labels ((restart-lisp ()
+             (handling-end-of-the-world
+              (reinit)
+              #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)
+              (funcall toplevel)))
+           (foreign-bool (value)
+             (if value 1 0)))
+    (let ((name (native-namestring (physicalize-pathname core-file-name)
+                                   :as-file t)))
+      (tune-image-for-dump)
+      (deinit)
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this
   ;; function, and just do a GC :FULL T here? (Then if the user wanted
   ;; a PURIFYed image, he'd just run PURIFY immediately before calling
   ;; SAVE-LISP-AND-DIE.)
-  (labels ((restart-lisp ()
-             (handling-end-of-the-world
-               (reinit)
-               #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)
-               (funcall toplevel)))
-           (foreign-bool (value)
-             (if value 1 0))
-           (save-core (gc)
-             ;; FIXME: NATIVE-NAMESTRING can signal an error, and it would
-             ;; be prudent to do that _before_ we've called the user hooks
-             ;; (in DEINIT) or done anything else like tuning for dump.
-             (let ((name (native-namestring
-                          (physicalize-pathname core-file-name)
-                          :as-file t)))
-               (when gc (gc))
-               (without-gcing
-                 (save name
-                       (get-lisp-obj-address #'restart-lisp)
-                       (foreign-bool executable)
-                       (foreign-bool save-runtime-options)
-                       (foreign-bool compression)
-                       (or compression 0)
-                       #!+win32
-                       (ecase application-type
-                         (:console 0)
-                         (:gui 1))
-                       #!-win32 0)))))
     #!+gencgc
     (progn
       ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
@@ -241,16 +224,22 @@ sufficiently motivated to do lengthy fixes."
                    #!+win32 (ecase application-type (:console 0) (:gui 1))
                    #!-win32 0))
     #!-gencgc
-    (cond (purify
-           (purify :root-structures root-structures
-                   :environment-name environment-name)
-           (save-core nil))
-          (t
-           (save-core t)))
+    (progn
+      (if purify (purify :root-structures root-structures) (gc))
+      (without-gcing
+       (save name
+             (get-lisp-obj-address #'restart-lisp)
+             (foreign-bool executable)
+             (foreign-bool save-runtime-options)
+             (foreign-bool compression)
+             (or compression 0)
+             #!+win32 (ecase application-type (:console 0) (:gui 1))
+             #!-win32 0)))))
+
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.
-    (reinit)
-    (error 'save-error)))
+  (reinit)
+  (error 'save-error))
 
 ;;; REPACK-XREF is defined during warm load of
 ;;; src/code/repack-xref.lisp.
