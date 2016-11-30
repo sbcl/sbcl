@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.3.12:
+  * enhancement: SET triggers package locks on undefined variables.
+    (lp#1645152)
+
 changes in sbcl-1.3.12 relative to sbcl-1.3.11:
   * enhancement: on x86-64, compiled functions loaded from fasl files
     can not be moved, but can be freed, by GC. Additionally, COMPILE will

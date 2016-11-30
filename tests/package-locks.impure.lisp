@@ -631,3 +631,22 @@
                  `((defstruct (a-struct-test.4
                                (:constructor test:nostruct)))))
       symbol-package-locked-error))
+
+(with-test (:name :set-undefined-vars)
+  (assert-error (eval '(set 'test:car 10))
+                symbol-package-locked-error)
+  (assert-error (eval '(setf test:car 10))
+                symbol-package-locked-error)
+  (assert-error (eval '(setf (symbol-value 'test:car) 10))
+                symbol-package-locked-error))
+
+(with-test (:name :set-undefined-vars-warnings)
+  (flet ((test (lambda)
+           (multiple-value-bind (fun failure warnings)
+               (checked-compile lambda :allow-warnings t)
+             (assert (and failure warnings))
+             (assert-error (funcall fun)
+                           symbol-package-locked-error))))
+    (test '(lambda () (set 'test:car 10)))
+    (test '(lambda () (setf test:car 10)))
+    (test '(lambda () (setf (symbol-value 'test:car) 10)))))

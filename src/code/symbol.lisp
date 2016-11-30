@@ -574,7 +574,7 @@ distinct from the global value. Can also be SETF."
              (makunbound "make ~S unbound"))))
     (let ((kind (info :variable :kind symbol)))
       (multiple-value-bind (what continue)
-          (cond ((eq :constant kind)
+          (cond ((eq kind :constant)
                  (cond ((eq symbol t)
                         (values "Veritas aeterna. (can't ~@?)" nil))
                        ((eq symbol nil)
@@ -583,8 +583,13 @@ distinct from the global value. Can also be SETF."
                         (values "Can't ~@?." nil))
                        (t
                         (values "Constant modification: attempt to ~@?." t))))
-                ((and bind (eq :global kind))
-                 (values "Can't ~@? (global variable)." nil)))
+                ((and bind (eq kind :global))
+                 (values "Can't ~@? (global variable)." nil))
+                ((and (eq action 'set)
+                      (eq kind :unknown))
+                 (with-single-package-locked-error
+                     (:symbol symbol "setting the value of ~S"))
+                 nil))
         (when what
           (if continue
               (cerror "Modify the constant." what (describe-action) symbol)

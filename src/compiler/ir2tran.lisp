@@ -1988,6 +1988,19 @@ not stack-allocated LVAR ~S." source-lvar)))))
          (results (lvar-result-tns lvar (list (primitive-type-or-lose t)))))
     (emit-move node block (lvar-tn node block value) (first results))
     (move-lvar-result node block results lvar)))
+
+#-sb-xc-host ;; package-lock-violation-p is not present yet
+(defoptimizer (set ir2-convert) ((symbol value) node block)
+  (declare (ignore value))
+  (when (constant-lvar-p symbol)
+    (let* ((symbol (lvar-value symbol))
+           (kind (info :variable :kind symbol)))
+      (when (and (eq kind :unknown)
+                 (sb!impl::package-lock-violation-p (symbol-package symbol) symbol))
+        (let ((*compiler-error-context* node))
+          (compiler-warn "violating package lock on ~/sb-impl:print-symbol-with-prefix/"
+                         symbol)))))
+  (ir2-convert-full-call node block))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
