@@ -284,10 +284,6 @@
 (declaim (inline descriptor=))
 (defun descriptor= (a b) (eql (descriptor-bits a) (descriptor-bits b)))
 
-;; FIXME: most uses of MAKE-RANDOM-DESCRIPTOR are abuses for writing a raw word
-;; into target memory as if it were a descriptor, because there is no variant
-;; of WRITE-WORDINDEXED taking a non-descriptor value.
-;; As an intermediary step, perhaps this should be renamed to MAKE-RAW-BITS.
 (defun make-random-descriptor (bits)
   (make-descriptor (logand bits sb!ext:most-positive-word)))
 
@@ -461,12 +457,6 @@
 (defun make-character-descriptor (data)
   (make-other-immediate-descriptor data sb!vm:character-widetag))
 
-(defun descriptor-beyond (des offset lowtag)
-  ;; OFFSET is in bytes and relative to the descriptor as a native pointer,
-  ;; not the tagged address. Then we slap on a new lowtag.
-  (make-descriptor
-   (logior (+ offset (logandc2 (descriptor-bits des) sb!vm:lowtag-mask))
-           lowtag)))
 
 ;;;; miscellaneous variables and other noise
 
@@ -550,21 +540,28 @@
   (values))
 
 (declaim (ftype (function (descriptor sb!vm:word (or symbol descriptor))) write-wordindexed))
-(defun write-wordindexed (address index value)
-  "Write VALUE displaced INDEX words from ADDRESS."
-  ;; If we're passed a symbol as a value then it needs to be interned.
-  (let ((value (cond ((symbolp value) (cold-intern value))
-                     (t value))))
-    (if (eql (descriptor-gspace value) :load-time-value)
-        (note-load-time-value-reference address
-                                        (- (ash index sb!vm:word-shift)
-                                           (logand (descriptor-bits address)
-                                                   sb!vm:lowtag-mask))
-                                        value)
-        (let* ((bytes (descriptor-bytes address))
-               (byte-index (ash (+ index (descriptor-word-offset address))
-                                sb!vm:word-shift)))
-          (setf (bvref-word bytes byte-index) (descriptor-bits value))))))
+(macrolet ((write-bits (bits)
+             `(setf (bvref-word (descriptor-bytes address)
+                                (ash (+ index (descriptor-word-offset address))
+                                     sb!vm:word-shift))
+                    ,bits)))
+  (defun write-wordindexed (address index value)
+    "Write VALUE displaced INDEX words from ADDRESS."
+    ;; If we're passed a symbol as a value then it needs to be interned.
+    (let ((value (cond ((symbolp value) (cold-intern value))
+                       (t value))))
+      (if (eql (descriptor-gspace value) :load-time-value)
+          (note-load-time-value-reference address
+                                          (- (ash index sb!vm:word-shift)
+                                             (logand (descriptor-bits address)
+                                                     sb!vm:lowtag-mask))
+                                          value)
+          (write-bits (descriptor-bits value)))))
+
+  (defun write-wordindexed/raw (address index bits)
+    (declare (type descriptor address) (type sb!vm:word index)
+             (type (or sb!vm:word sb!vm:signed-word) bits))
+    (write-bits (logand bits sb!ext:most-positive-word))))
 
 (declaim (ftype (function (descriptor (or symbol descriptor))) write-memory))
 (defun write-memory (address value)
@@ -700,10 +697,8 @@ core and return a descriptor to it."
            ;; FIXME: Shouldn't this be a fatal error?
            (warn "~W words of ~W were written, but ~W bits were left over."
                  words n remainder)))
-        ;; FIXME: this is disgusting. there should be WRITE-BITS-WORDINDEXED.
-      (write-wordindexed handle index
-                         (make-random-descriptor
-                          (ldb (byte sb!vm:n-word-bits 0) remainder))))
+      (write-wordindexed/raw handle index
+                             (ldb (byte sb!vm:n-word-bits 0) remainder)))
     handle))
 
 (defun bignum-from-core (descriptor)
@@ -726,29 +721,25 @@ core and return a descriptor to it."
     des))
 
 (defun write-double-float-bits (address index x)
-  (let ((hi (double-float-high-bits x))
-        (lo (double-float-low-bits x)))
+  (let ((high-bits (double-float-high-bits x))
+        (low-bits (double-float-low-bits x)))
     (ecase sb!vm::n-word-bits
       (32
-       ;; As noted in BIGNUM-TO-CORE, this idiom is unclear - the things
-       ;; aren't descriptors. Same for COMPLEX-foo-TO-CORE
-       (let ((high-bits (make-random-descriptor hi))
-             (low-bits (make-random-descriptor lo)))
-         (ecase sb!c:*backend-byte-order*
-           (:little-endian
-            (write-wordindexed address index low-bits)
-            (write-wordindexed address (1+ index) high-bits))
-           (:big-endian
-            (write-wordindexed address index high-bits)
-            (write-wordindexed address (1+ index) low-bits)))))
+       (ecase sb!c:*backend-byte-order*
+         (:little-endian
+          (write-wordindexed/raw address index low-bits)
+          (write-wordindexed/raw address (1+ index) high-bits))
+         (:big-endian
+          (write-wordindexed/raw address index high-bits)
+          (write-wordindexed/raw address (1+ index) low-bits))))
       (64
-       (let ((bits (make-random-descriptor
-                    (ecase sb!c:*backend-byte-order*
-                      (:little-endian (logior lo (ash hi 32)))
-                      ;; Just guessing.
-                      #+nil (:big-endian (logior (logand hi #xffffffff)
-                                                 (ash lo 32)))))))
-         (write-wordindexed address index bits))))
+       (let ((bits (ecase sb!c:*backend-byte-order*
+                     (:little-endian (logior low-bits (ash high-bits 32)))
+                     ;; Just guessing.
+                     #+nil (:big-endian (logior (logand high-bits #xffffffff)
+                                                (ash low-bits 32))))))
+         (write-wordindexed/raw address index bits))))
+
     address))
 
 (defun float-to-core (x)
@@ -762,9 +753,8 @@ core and return a descriptor to it."
      (let ((des (allocate-header+object *dynamic*
                                          (1- sb!vm:single-float-size)
                                          sb!vm:single-float-widetag)))
-       (write-wordindexed des
-                          sb!vm:single-float-value-slot
-                          (make-random-descriptor (single-float-bits x)))
+       (write-wordindexed/raw des sb!vm:single-float-value-slot
+                              (single-float-bits x))
        des))
     (double-float
      (let ((des (allocate-header+object *dynamic*
@@ -779,15 +769,15 @@ core and return a descriptor to it."
                                       sb!vm:complex-single-float-widetag)))
     #!-64-bit
     (progn
-      (write-wordindexed des sb!vm:complex-single-float-real-slot
-                         (make-random-descriptor (single-float-bits (realpart num))))
-      (write-wordindexed des sb!vm:complex-single-float-imag-slot
-                         (make-random-descriptor (single-float-bits (imagpart num)))))
+      (write-wordindexed/raw des sb!vm:complex-single-float-real-slot
+                             (single-float-bits (realpart num)))
+      (write-wordindexed/raw des sb!vm:complex-single-float-imag-slot
+                             (single-float-bits (imagpart num))))
     #!+64-bit
-    (write-wordindexed des sb!vm:complex-single-float-data-slot
-                       (make-random-descriptor
-                        (logior (ldb (byte 32 0) (single-float-bits (realpart num)))
-                                (ash (single-float-bits (imagpart num)) 32))))
+    (write-wordindexed/raw
+     des sb!vm:complex-single-float-data-slot
+     (logior (ldb (byte 32 0) (single-float-bits (realpart num)))
+             (ash (single-float-bits (imagpart num)) 32)))
     des))
 
 (defun complex-double-float-to-core (num)
@@ -900,13 +890,10 @@ core and return a descriptor to it."
   ;; is to conditionalize by the target features.
   (defun cold-assign-tls-index (symbol index)
     #!+64-bit
-    (let ((header-word
-           (logior (ash index 32)
-                   (descriptor-bits (read-memory symbol)))))
-      (write-wordindexed symbol 0 (make-random-descriptor header-word)))
+    (write-wordindexed/raw
+     symbol 0 (logior (ash index 32) (read-bits-wordindexed symbol 0)))
     #!-64-bit
-    (write-wordindexed symbol sb!vm:symbol-tls-index-slot
-                       (make-random-descriptor index)))
+    (write-wordindexed/raw symbol sb!vm:symbol-tls-index-slot index))
 
   ;; Return SYMBOL's tls-index,
   ;; choosing a new index if it doesn't have one yet.
@@ -914,10 +901,9 @@ core and return a descriptor to it."
     (let* ((cold-sym (cold-intern symbol))
            (tls-index
             #!+64-bit
-            (ldb (byte 32 32) (descriptor-bits (read-memory cold-sym)))
+            (ldb (byte 32 32) (read-bits-wordindexed cold-sym 0))
             #!-64-bit
-            (descriptor-bits
-             (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot))))
+            (read-bits-wordindexed cold-sym sb!vm:symbol-tls-index-slot)))
       (unless (plusp tls-index)
         (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
           (setq tls-index (ash next sb!vm:word-shift))
@@ -1279,9 +1265,8 @@ core and return a descriptor to it."
 (defun patch-instance-layout (thing layout)
   #!+compact-instance-header
   ;; High half of the header points to the layout
-  (write-wordindexed thing 0 (make-random-descriptor
-                              (logior (ash (descriptor-bits layout) 32)
-                                      (read-bits-wordindexed thing 0))))
+  (write-wordindexed/raw thing 0 (logior (ash (descriptor-bits layout) 32)
+                                         (read-bits-wordindexed thing 0)))
   #!-compact-instance-header
   ;; Word following the header is the layout
   (write-wordindexed thing sb!vm:instance-slots-offset layout))
@@ -1898,15 +1883,14 @@ core and return a descriptor to it."
           (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
           (unless leave-fn-raw
             (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
-            (write-wordindexed fdefn
-                               sb!vm:fdefn-raw-addr-slot
-                               (make-random-descriptor
-                                (or (lookup-assembler-reference
-                                     'sb!vm::undefined-tramp core-file-name)
+            (write-wordindexed/raw fdefn
+                                    sb!vm:fdefn-raw-addr-slot
+                                    (or (lookup-assembler-reference
+                                         'sb!vm::undefined-tramp core-file-name)
                                     ;; Our preload for the tramps
                                     ;; doesn't happen during host-1,
                                     ;; so substitute a usable value.
-                                    0))))
+                                         0)))
           fdefn))))
 
 (defun cold-functionp (descriptor)
@@ -2167,8 +2151,7 @@ core and return a descriptor to it."
           (do ((index sb!vm:vector-data-offset (1+ index))
                (fixups fixup-offsets (cdr fixups)))
               ((null fixups))
-            (write-wordindexed fixup-vector index
-                               (make-random-descriptor (car fixups))))
+            (write-wordindexed/raw fixup-vector index (car fixups)))
           ;; KLUDGE: The fixup vector is stored as the first constant,
           ;; not as a separately-named slot.
           (write-wordindexed (make-random-descriptor code-object-address)
@@ -2936,8 +2919,7 @@ core and return a descriptor to it."
                   sb!vm:other-pointer-lowtag)))
        (declare (ignorable toplevel-p))
        (write-header-word des header-n-words sb!vm:code-header-widetag)
-       (write-wordindexed des
-                          sb!vm:code-code-size-slot
+       (write-wordindexed des sb!vm:code-code-size-slot
                           (make-fixnum-descriptor code-size))
        (write-wordindexed des sb!vm:code-entry-points-slot *nil-descriptor*)
        (write-wordindexed des sb!vm:code-debug-info-slot debug-info)
@@ -3050,9 +3032,9 @@ core and return a descriptor to it."
          (name (pop-stack))
          (code-object (pop-stack))
          (offset (calc-offset code-object (read-word-arg (fasl-input-stream))))
-         (fn (descriptor-beyond code-object
-                                offset
-                                sb!vm:fun-pointer-lowtag))
+         (fn (make-descriptor
+              (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
+                         offset) sb!vm:fun-pointer-lowtag)))
          (next (read-wordindexed code-object sb!vm:code-entry-points-slot)))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       (error "unaligned function entry: ~S at #X~X" name offset))
@@ -4043,9 +4025,8 @@ initially undefined function references:~2%")
         ;; objects that look like conses (due to the tail of 0 words).
         (let ((des (allocate-object *immobile-varyobj* 1 ; 1 word in total
                                     sb!vm:instance-pointer-lowtag nil)))
-          (write-memory des
-                        (make-other-immediate-descriptor 0 sb!vm:instance-header-widetag))
-          (write-wordindexed des sb!vm:instance-slots-offset (make-fixnum-descriptor 0)))
+          (write-wordindexed/raw des 0 sb!vm:instance-header-widetag)
+          (write-wordindexed/raw des sb!vm:instance-slots-offset 0))
         (cold-set 'sb!vm:*immobile-space-free-pointer*
                   (make-random-descriptor
                    (ash (+ (gspace-word-address *immobile-varyobj*)
