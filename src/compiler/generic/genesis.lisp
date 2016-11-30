@@ -3043,43 +3043,13 @@ core and return a descriptor to it."
                   (make-other-immediate-descriptor
                    (ash offset (- sb!vm:word-shift))
                    sb!vm:simple-fun-header-widetag))
-    (write-wordindexed fn
-                       sb!vm:simple-fun-self-slot
-                       ;; KLUDGE: Wiring decisions like this in at
-                       ;; this level ("if it's an x86") instead of a
-                       ;; higher level of abstraction ("if it has such
-                       ;; and such relocation peculiarities (which
-                       ;; happen to be confined to the x86)") is bad.
-                       ;; It would be nice if the code were instead
-                       ;; conditional on some more descriptive
-                       ;; feature, :STICKY-CODE or
-                       ;; :LOAD-GC-INTERACTION or something.
-                       ;;
-                       ;; FIXME: The X86 definition of the function
-                       ;; self slot breaks everything object.tex says
-                       ;; about it. (As far as I can tell, the X86
-                       ;; definition makes it a pointer to the actual
-                       ;; code instead of a pointer back to the object
-                       ;; itself.) Ask on the mailing list whether
-                       ;; this is documented somewhere, and if not,
-                       ;; try to reverse engineer some documentation.
-                       #!-(or x86 x86-64)
-                       ;; a pointer back to the function object, as
-                       ;; described in CMU CL
-                       ;; src/docs/internals/object.tex
-                       fn
-                       #!+(or x86 x86-64)
-                       ;; KLUDGE: a pointer to the actual code of the
-                       ;; object, as described nowhere that I can find
-                       ;; -- WHN 19990907
-                       (make-descriptor ; raw bits that look like fixnum
-                        (+ (descriptor-bits fn)
-                           (- (ash sb!vm:simple-fun-code-offset
-                                   sb!vm:word-shift)
-                              ;; FIXME: We should mask out the type
-                              ;; bits, not assume we know what they
-                              ;; are and subtract them out this way.
-                              sb!vm:fun-pointer-lowtag))))
+    #!+(or x86 x86-64) ; store a machine-native pointer to the function entry
+    ;; note that the bit pattern looks like fixnum due to alignment
+    (write-wordindexed/raw fn sb!vm:simple-fun-self-slot
+                           (+ (- (descriptor-bits fn) sb!vm:fun-pointer-lowtag)
+                              (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
+    #!-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
+    (write-wordindexed fn sb!vm:simple-fun-self-slot fn)
     (write-wordindexed fn sb!vm:simple-fun-next-slot next)
     (write-wordindexed fn sb!vm:simple-fun-name-slot name)
     (flet ((coalesce (sexpr) ; a warm symbol or a cold cons tree
