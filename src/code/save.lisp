@@ -215,8 +215,7 @@ sufficiently motivated to do lengthy fixes."
       ;; A normal GC will leave huge amounts of storage unreclaimed
       ;; (over 50% on x86). This needs to be done by a single function
       ;; since the GC will invalidate the stack.
-      (gc-and-save (native-namestring (physicalize-pathname core-file-name)
-                                      :as-file t)
+      (gc-and-save name
                    (foreign-bool executable)
                    (foreign-bool save-runtime-options)
                    (foreign-bool compression)
