@@ -579,9 +579,16 @@
                            sb!vm:+pseudo-static-generation+
                          0)
              #!-gencgc 0))
-    (write-memory des (make-other-immediate-descriptor
-                       (logior (ash gen 16) header-data)
-                       widetag))))
+    (write-wordindexed/raw des 0
+                           (logior (ash (logior (ash gen 16) header-data)
+                                        sb!vm:n-widetag-bits) widetag))))
+
+(defun set-header-data (object data)
+  (write-header-word object data (ldb (byte sb!vm:n-widetag-bits 0)
+                                      (read-bits-wordindexed object 0))))
+
+(defun get-header-data (object)
+  (ash (read-bits-wordindexed object 0) (- sb!vm:n-widetag-bits)))
 
 ;;; There are three kinds of blocks of memory in the type system:
 ;;; * Boxed objects (cons cells, structures, etc): These objects have no
@@ -2158,23 +2165,15 @@ core and return a descriptor to it."
                              sb!vm:code-constants-offset
                              fixup-vector))))))
 
-;;; Given a pointer to a code object and an offset relative to the
-;;; tail of the code object's header, return an offset relative to the
+;;; Given a pointer to a code object and a byte offset relative to the
+;;; tail of the code object's header, return a byte offset relative to the
 ;;; (beginning of the) code object.
 ;;;
-;;; FIXME: It might be clearer to reexpress
-;;;    (LET ((X (CALC-OFFSET CODE-OBJECT OFFSET0))) ..)
-;;; as
-;;;    (LET ((X (+ OFFSET0 (CODE-OBJECT-HEADER-N-BYTES CODE-OBJECT)))) ..).
 (declaim (ftype (function (descriptor sb!vm:word)) calc-offset))
-(defun calc-offset (code-object offset-from-tail-of-header)
-  (let* ((header (read-memory code-object))
-         (header-n-words (logand (ash (descriptor-bits header)
-                                      (- sb!vm:n-widetag-bits))
-                                 #!+immobile-space sb!vm:short-header-max-words))
-         (header-n-bytes (ash header-n-words sb!vm:word-shift))
-         (result (+ offset-from-tail-of-header header-n-bytes)))
-    result))
+(defun calc-offset (code-object insts-offset-bytes)
+  (+ (ash (logand (get-header-data code-object) sb!vm:short-header-max-words)
+          sb!vm:word-shift)
+     insts-offset-bytes))
 
 (declaim (ftype (function (descriptor sb!vm:word sb!vm:word keyword))
                 do-cold-fixup))
