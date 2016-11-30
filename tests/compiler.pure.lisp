@@ -6056,3 +6056,9 @@
     (assert (= (length warnings) 1))
     (search "The function CONS is called by"
             (princ-to-string (first warnings)))))
+
+(with-test (:name :set-type-conflict)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda () (set '// 10))
+                      :allow-warnings t))))

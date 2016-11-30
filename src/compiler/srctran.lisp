@@ -5018,3 +5018,11 @@
    (if element-type
        `(sb!impl::%make-string-output-stream ',element-type)
        (give-up-ir1-transform))))
+
+(deftransform set ((symbol value) ((constant-arg symbol) *))
+  (let* ((symbol (lvar-value symbol)))
+    (case (info :variable :kind symbol)
+      ((:constant :global :special)
+       `(setq ,symbol value))
+      (t
+       (give-up-ir1-transform)))))
