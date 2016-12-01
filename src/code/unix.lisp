@@ -944,7 +944,9 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 (define-alien-routine get-timezone int
   (when time-t)
-  (daylight-savings-p boolean :out))
+  ;; KLUDGE: the runtime `boolean' is defined as `int', but the alien
+  ;; type is N-WORD-BITS wide.
+  (daylight-savings-p (boolean 32) :out))
 
 #!-(or win32 darwin)
 (defun nanosleep (secs nsecs)
