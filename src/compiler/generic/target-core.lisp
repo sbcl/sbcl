@@ -52,7 +52,7 @@
 ;;; vector and node info.
 (defun make-core-component (component segment length fixup-notes object)
   (declare (type component component)
-           (type sb!assem:segment segment)
+           (type segment segment)
            (type index length)
            (list fixup-notes)
            (type core-object object))
@@ -64,14 +64,12 @@
              (box-num (- (length constants) sb!vm:code-constants-offset))
              (code-obj (allocate-code-object
                         #!+immobile-code (eq *compile-to-memory-space* :immobile)
-                        box-num length))
-             (fill-ptr (code-instructions code-obj)))
+                        box-num length)))
         (declare (type index box-num length))
 
-        (let ((v (sb!assem:segment-contents-as-vector segment)))
-          (declare (type (simple-array sb!assem:assembly-unit 1) v))
-          (copy-byte-vector-to-system-area v fill-ptr)
-          (setf fill-ptr (sap+ fill-ptr (length v))))
+         (copy-byte-vector-to-system-area
+          (the (simple-array assembly-unit 1) (segment-contents-as-vector segment))
+          (code-instructions code-obj))
 
         (do-core-fixups code-obj fixup-notes)
 
