@@ -2009,66 +2009,27 @@ search_dynamic_space(void *pointer)
                             (lispobj *)pointer));
 }
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-
-/* Is there any possibility that pointer is a valid Lisp object
- * reference, and/or something else (e.g. subroutine call return
- * address) which should prevent us from moving the referred-to thing?
- * This is called from preserve_pointers() */
-static int
-possibly_valid_dynamic_space_pointer_s(lispobj *pointer,
-                                       page_index_t addr_page_index,
-                                       lispobj **store_here)
-{
-    lispobj *start_addr;
-
-    /* Find the object start address. */
-    start_addr = search_dynamic_space(pointer);
-
-    if (start_addr == NULL) {
-        return 0;
-    }
-    if (store_here) {
-        *store_here = start_addr;
-    }
-
-    /* If the containing object is a code object, presume that the
-     * pointer is valid, simply because it could be an unboxed return
-     * address. */
-    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG)
-        return 1;
-
-    /* Large object pages only contain ONE object, and it will never
-     * be a CONS.  However, arrays and bignums can be allocated larger
-     * than necessary and then shrunk to fit, leaving what look like
-     * (0 . 0) CONSes at the end.  These appear valid to
-     * looks_like_valid_lisp_pointer_p(), so pick them off here. */
-    if (page_table[addr_page_index].large_object &&
-        (lowtag_of((lispobj)pointer) == LIST_POINTER_LOWTAG))
-        return 0;
-
-    return looks_like_valid_lisp_pointer_p((lispobj)pointer, start_addr);
-}
-
-#endif  // defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-
-static int
-valid_conservative_root_p(void *addr, page_index_t addr_page_index,
-                          lispobj **begin_ptr)
+// Return the starting address of the object containing 'addr'
+// if and only if the object is one which would be evacuated from 'from_space'
+// were it allowed to be either discarded as garbage or moved.
+// 'addr_page_index' is the page containing 'addr' and must not be -1.
+// Return 0 if there is no such object - that is, if addr is past the
+// end of the used bytes, or its pages are not in 'from_space' etc.
+static lispobj*
+conservative_root_p(void *addr, page_index_t addr_page_index)
 {
 #ifdef GENCGC_IS_PRECISE
     /* If we're in precise gencgc (non-x86oid as of this writing) then
      * we are only called on valid object pointers in the first place,
      * so we just have to do a bounds-check against the heap, a
      * generation check, and the already-pinned check. */
-    if ((addr_page_index == -1)
-        || (page_table[addr_page_index].gen != from_space)
+    if ((page_table[addr_page_index].gen != from_space)
         || (page_table[addr_page_index].dont_move != 0))
         return 0;
+    return (lispobj*)1;
 #else
     /* quick check 1: Address is quite likely to have been invalid. */
-    if ((addr_page_index == -1)
-        || page_free_p(addr_page_index)
+    if (page_free_p(addr_page_index)
         || (page_table[addr_page_index].bytes_used == 0)
         || (page_table[addr_page_index].gen != from_space))
         return 0;
@@ -2087,12 +2048,31 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index,
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
-    if (!possibly_valid_dynamic_space_pointer_s(addr, addr_page_index,
-                                                begin_ptr))
-        return 0;
-#endif
+    lispobj* object_start = search_dynamic_space(addr);
+    if (!object_start) return 0;
 
-    return 1;
+    /* If the containing object is a code object, presume that the
+     * pointer is valid, simply because it could be an unboxed return
+     * address.
+     * FIXME: only if the addr points to a simple-fun instruction area
+     * should we skip the stronger tests. Otherwise, require a properly
+     * tagged pointer to the code component or an embedded simple-fun
+     * (or LRA?) just as with any other kind of object. */
+    if (widetag_of(*object_start) == CODE_HEADER_WIDETAG)
+      return object_start;
+
+    /* Large object pages only contain ONE object, and it will never
+     * be a CONS.  However, arrays and bignums can be allocated larger
+     * than necessary and then shrunk to fit, leaving what look like
+     * (0 . 0) CONSes at the end.  These appear valid to
+     * properly_tagged_descriptor_p(), so pick them off here. */
+    if (((lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) &&
+         page_table[addr_page_index].large_object)
+        || !properly_tagged_descriptor_p((lispobj)addr, object_start))
+        return 0;
+
+    return object_start;
+#endif
 }
 
 boolean
@@ -2393,7 +2373,7 @@ pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
 // If it does, then we continue regardless of the pointer's lowtag
 // (because of the special allowance). If the page definitely does *not*
 // hold code, then we require up front that the lowtake make sense,
-// by doing the same checks that are in looks_like_valid_lisp_pointer_p.
+// by doing the same checks that are in properly_tagged_descriptor_p.
 //
 // Problem: when code is allocated from a per-thread region,
 // does it ensure that the occupied pages are flagged as having code?
@@ -2411,17 +2391,15 @@ preserve_pointer(void *addr)
     }
 #endif
     page_index_t addr_page_index = find_page_index(addr);
-    page_index_t first_page;
-    page_index_t i;
-    unsigned int region_allocation;
-    lispobj *begin_ptr = NULL;
+    lispobj *object_start;
 
-    if (!valid_conservative_root_p(addr, addr_page_index, &begin_ptr))
+    if (addr_page_index == -1
+        || (object_start = conservative_root_p(addr, addr_page_index)) == 0)
         return;
 
     /* (Now that we know that addr_page_index is in range, it's
      * safe to index into page_table[] with it.) */
-    region_allocation = page_table[addr_page_index].allocated;
+    unsigned int region_allocation = page_table[addr_page_index].allocated;
 
     /* Find the beginning of the region.  Note that there may be
      * objects in the region preceding the one that we were passed a
@@ -2431,9 +2409,9 @@ preserve_pointer(void *addr)
 #if 0
     /* I think this'd work just as well, but without the assertions.
      * -dan 2004.01.01 */
-    first_page = find_page_index(page_scan_start(addr_page_index))
+    page_index_t first_page = find_page_index(page_scan_start(addr_page_index))
 #else
-    first_page = addr_page_index;
+    page_index_t first_page = addr_page_index;
     while (!page_starts_contiguous_block_p(first_page)) {
         --first_page;
         /* Do some checks. */
@@ -2453,6 +2431,7 @@ preserve_pointer(void *addr)
 
     /* Now work forward until the end of this contiguous area is found,
      * marking all pages as dont_move. */
+    page_index_t i;
     for (i = first_page; ;i++) {
         gc_assert(page_table[i].allocated == region_allocation);
 
@@ -2474,16 +2453,8 @@ preserve_pointer(void *addr)
     /* Do not do this for multi-page objects.  Those pages do not need
      * object wipeout anyway.
      */
-    if (i == first_page) {
-        /* We need the pointer to the beginning of the object
-         * We might have gotten it above but maybe not, so make sure
-         */
-        if (begin_ptr == NULL) {
-            possibly_valid_dynamic_space_pointer_s(addr, first_page,
-                                                   &begin_ptr);
-        }
-        if (do_wipe_p) pin_words(first_page, begin_ptr);
-    }
+    if (do_wipe_p && i == first_page) // single-page object
+        pin_words(first_page, object_start);
 #endif
 
     /* Check that the page is now static. */
@@ -3167,7 +3138,7 @@ verify_space(lispobj *start, size_t words)
                  *   FIXME: Add a variable to enable this
                  * dynamically. */
                 /*
-                if (!possibly_valid_dynamic_space_pointer_s((lispobj *)thing, page_index, NULL)) {
+                if (!valid_lisp_pointer_p((lispobj *)thing) {
                     lose("ptr %p to invalid object %p\n", thing, start);
                 }
                 */

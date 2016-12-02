@@ -2587,13 +2587,13 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
 }
 
 /* Helper for valid_lisp_pointer_p (below) and
- * possibly_valid_dynamic_space_pointer (gencgc).
+ * conservative_root_p (gencgc).
  *
- * pointer is the pointer to validate, and start_addr is the address
- * of the enclosing object.
+ * pointer is the pointer to check validity of,
+ * and start_addr is the address of the enclosing object.
  */
 int
-looks_like_valid_lisp_pointer_p(lispobj pointer, lispobj *start_addr)
+properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr)
 {
     if (!is_lisp_pointer(pointer)) {
         return 0;
@@ -2806,7 +2806,7 @@ looks_like_valid_lisp_pointer_p(lispobj pointer, lispobj *start_addr)
  * constructs a reference to a bugs lisp object, and it ends up in a
  * location scavenged by the GC all hell breaks loose.
  *
- * Whereas possibly_valid_dynamic_space_pointer has to be conservative
+ * Whereas conservative_root_p has to be conservative
  * and return true for all valid pointers, this could actually be eager
  * and lie about a few pointers without bad results... but that should
  * be reflected in the name.
@@ -2821,7 +2821,7 @@ valid_lisp_pointer_p(lispobj *pointer)
 #endif
         ((start=search_static_space(pointer))!=NULL) ||
         ((start=search_read_only_space(pointer))!=NULL))
-        return looks_like_valid_lisp_pointer_p((lispobj)pointer, start);
+        return properly_tagged_descriptor_p((lispobj)pointer, start);
     else
         return 0;
 }
