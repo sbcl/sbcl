@@ -41,18 +41,18 @@ fi
 # for much longer than that, don't worry, it's likely to be normal.
 if [ "$1" != --load ]; then
     echo //doing warm init - compilation phase
-    echo '(load "loader.lisp") (load-sbcl-file "make-host-1.lisp")' | \
+    echo '(load "loader.lisp") (load-sbcl-file "make-target-2.lisp")' | \
     ./src/runtime/sbcl \
         --core output/cold-sbcl.core \
         --lose-on-corruption \
-        --no-sysinit --no-userinit < make-target-2.lisp
+        --no-sysinit --no-userinit
 fi
 echo //doing warm init - load and dump phase
-echo '(load "loader.lisp") (load-sbcl-file "make-host-1.lisp")' | \
+echo '(load "loader.lisp") (load-sbcl-file "make-target-2-load.lisp")' | \
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
 --lose-on-corruption \
---no-sysinit --no-userinit < make-target-2-load.lisp
+--no-sysinit --no-userinit
 
 echo //checking for leftover cold-init symbols
 ./src/runtime/sbcl \
