@@ -143,9 +143,7 @@
                  (sb!interpreter:proto-fn-name
                   (sb!interpreter:fun-proto-fn
                    (truly-the sb!interpreter:interpreted-function function)))))
-             ;; Avoid fetching the layout again since we already have it.
-             ((classoid-cell-typep layout
-                                   #.(find-classoid-cell 'standard-generic-function)
+             ((classoid-cell-typep #.(find-classoid-cell 'standard-generic-function)
                                    function)
               (return-from %fun-name
                 (sb!mop:generic-function-name function))))))

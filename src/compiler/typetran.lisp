@@ -709,10 +709,8 @@
 
            (t
             (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
-            `(block typep
-               (classoid-cell-typep ,get-layout-or-return-false
-                                       ',(find-classoid-cell name :create t)
-                                       object)))))))))
+            `(classoid-cell-typep ',(find-classoid-cell name :create t)
+                                  object))))))))
 
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is

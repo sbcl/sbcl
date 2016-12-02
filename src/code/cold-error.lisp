@@ -76,13 +76,9 @@
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
   (let* ((condition
-          (coerce-to-condition datum arguments 'simple-condition 'signal))
+           (coerce-to-condition datum arguments 'simple-condition 'signal))
          (handler-clusters *handler-clusters*)
-         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal))
-         ;; possible FIXME: despite that fndb says COERCE-TO-CONDITION
-         ;; returns CONDITION, compiler doesn't know that CONDITION
-         ;; is an INSTANCE and emits a type-check.
-         (layout (%instance-layout condition)))
+         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
     (when *break-on-signals*
       (maybe-break-on-signal condition))
     (do ((cluster (pop handler-clusters) (pop handler-clusters)))
@@ -109,7 +105,7 @@
                                       `((t (symbol-function f))))))))
             (let ((test (car (truly-the cons handler))))
               (when (if (%instancep test) ; a condition classoid cell
-                        (classoid-cell-typep layout test condition)
+                        (classoid-cell-typep test condition)
                         (funcall (cast-to-fun test nil) condition))
                 (funcall (cast-to-fun (cdr handler) t) condition)))))))))
 

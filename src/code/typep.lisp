@@ -201,16 +201,19 @@
 
 ;;; Do a type test from a class cell, allowing forward reference and
 ;;; redefinition.
-(defun classoid-cell-typep (obj-layout cell object)
-  (let ((classoid (classoid-cell-classoid cell)))
+(defun classoid-cell-typep (cell object)
+  (let ((layout (typecase object
+                  (instance (%instance-layout object))
+                  (funcallable-instance (%funcallable-instance-layout object))
+                  (t (return-from classoid-cell-typep))))
+        (classoid (classoid-cell-classoid cell)))
     (unless classoid
       (error "The class ~S has not yet been defined."
              (classoid-cell-name cell)))
-    (classoid-typep obj-layout classoid object)))
+    (classoid-typep layout classoid object)))
 
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
 (defun classoid-typep (obj-layout classoid object)
-  (declare (optimize speed))
   ;; FIXME & KLUDGE: We could like to grab the *WORLD-LOCK* here (to ensure that
   ;; class graph doesn't change while we're doing the typep test), but in
   ;; pratice that causes trouble -- deadlocking against the compiler
