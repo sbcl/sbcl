@@ -586,26 +586,26 @@ status slot."
               do (write-char #\\ stream)))
   (write-char #\" stream))
 
+#+win32
+(defun prepare-args (args escape)
+  (with-simple-output-to-string (str)
+    (loop for (arg . rest) on args
+          do
+          (cond ((and escape
+                      (find-if (lambda (c) (find c '(#\Space #\Tab #\")))
+                               arg))
+                 (escape-arg arg str))
+                (t
+                 (write-string arg str)))
+          (when rest
+            (write-char #\Space str)))))
+
+#-win32
 (defun prepare-args (args)
-  (cond #-win32
-        ((every #'simple-string-p args)
-         args)
-        #-win32
-        (t
-         (loop for arg in args
-               collect (coerce arg 'simple-string)))
-        #+win32
-        (t
-         (with-simple-output-to-string (str)
-           (loop for (arg . rest) on args
-                 do
-                 (cond ((find-if (lambda (c) (find c '(#\Space #\Tab #\")))
-                                 arg)
-                        (escape-arg arg str))
-                       (t
-                        (princ arg str)))
-                 (when rest
-                   (write-char #\Space str)))))))
+  (if (every #'simple-string-p args)
+      args
+      (loop for arg in args
+            collect (coerce arg 'simple-string))))
 
 ;;; FIXME: There shouldn't be two semiredundant versions of the
 ;;; documentation. Since this is a public extension function, the
@@ -668,7 +668,8 @@ status slot."
                     (if-error-exists :error)
                     status-hook
                     (external-format :default)
-                    directory)
+                    directory
+                    #+win32 (escape-arguments t))
   #+sb-doc
   #.(concatenate
      'base-string
@@ -754,7 +755,11 @@ Users Manual for details about the PROCESS structure.
       The external-format to use for :INPUT, :OUTPUT, and :ERROR :STREAMs.
    :DIRECTORY
       Specifies the directory in which the program should be run.
-      NIL (the default) means the directory is unchanged.")
+      NIL (the default) means the directory is unchanged.
+
+   Windows specific options:
+   :ESCAPE-ARGUMENTS (default T)
+      Controls escaping of the arguments passed to CreateProcess.")
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
@@ -765,7 +770,7 @@ Users Manual for details about the PROCESS structure.
          ;; Establish PROC at this level so that we can return it.
          proc
          (progname (native-namestring program))
-         (args (prepare-args (cons progname args)))
+         (args (prepare-args (cons progname args) #+win32 escape-arguments))
          (directory (and directory (native-namestring directory)))
          ;; Gag.
          (cookie (list 0)))

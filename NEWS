@@ -3,6 +3,8 @@
 changes relative to sbcl-1.3.12:
   * enhancement: SET triggers package locks on undefined variables.
     (lp#1645152)
+  * enhancement: new Windows specific option to run-program, :escape-arguments
+    (lp#1503496)
   * bug fix: get-timezone returns corret DST on 64-bit Windows. (lp#1641058)
 
 changes in sbcl-1.3.12 relative to sbcl-1.3.11:
