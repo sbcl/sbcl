@@ -1989,6 +1989,13 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (emit-move node block (lvar-tn node block value) (first results))
     (move-lvar-result node block results lvar)))
 
+;;; An identity to avoid complaints about constant modification
+(defoptimizer (ltv-wrapper ir2-convert) ((x) node block)
+  (let* ((lvar (node-lvar node))
+         (results (lvar-result-tns lvar (list (primitive-type-or-lose t)))))
+    (emit-move node block (lvar-tn node block x) (first results))
+    (move-lvar-result node block results lvar)))
+
 #-sb-xc-host ;; package-lock-violation-p is not present yet
 (defoptimizer (set ir2-convert) ((symbol value) node block)
   (declare (ignore value))

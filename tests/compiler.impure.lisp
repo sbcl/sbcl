@@ -1261,17 +1261,12 @@
                                     (load-time-value ,form)))
                     (core-fun (checked-compile lambda-form))
                     (core-type (funtype core-fun))
-                    (core-cell (ctu:find-value-cell-values core-fun))
                     (defun-form `(defun ,name ()
                                    (load-time-value ,form)))
                     (file-fun (progn
                                 (ctu:file-compile (list defun-form) :load t)
                                 (symbol-function name)))
-                    (file-type (funtype file-fun))
-                    (file-cell (ctu:find-value-cell-values file-fun)))
-               (if value-cell-p
-                   (assert (and core-cell file-cell))
-                   (assert (not (or core-cell file-cell))))
+                    (file-type (funtype file-fun)))
                (unless (subtypep core-type type1)
                  (error "core: wanted ~S, got ~S" type1 core-type))
                (unless (subtypep file-type type2)

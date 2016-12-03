@@ -1592,6 +1592,11 @@
 (defknown %typep-wrapper (t t (or type-specifier ctype)) t
   (movable flushable always-translatable))
 
+;;; An identity wrapper to avoid complaints about constant modification
+(defknown ltv-wrapper (t) t
+  (movable flushable always-translatable)
+  :derive-type #'result-type-first-arg)
+
 (defknown %cleanup-point () t)
 (defknown %special-bind (t t) t)
 (defknown %special-unbind (index) t)

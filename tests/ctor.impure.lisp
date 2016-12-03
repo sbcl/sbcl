@@ -103,7 +103,7 @@
 (defun find-ctor-caches (fun)
   (remove-if-not (lambda (value)
                    (and (consp value) (eq 'sb-pcl::ctor-cache (car value))))
-                 (find-value-cell-values fun)))
+                 (find-code-constants fun)))
 
 (let* ((transform (sb-int:info :function :source-transform 'make-instance))
         (opt 0)

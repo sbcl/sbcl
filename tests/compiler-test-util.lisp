@@ -18,7 +18,6 @@
            #:assert-no-consing
            #:compiler-derived-type
            #:count-full-calls
-           #:find-value-cell-values
            #:find-code-constants
            #:find-named-callees
            #:find-anonymous-callees
@@ -34,13 +33,6 @@
   (defun compiler-derived-type (x)
     (declare (ignore x))
     (values t nil)))
-
-(defun find-value-cell-values (fun)
-  (let ((code (fun-code-header (%fun-fun fun))))
-    (loop for i from sb-vm:code-constants-offset below (code-header-words code)
-          for c = (code-header-ref code i)
-          when (= sb-vm:value-cell-header-widetag (widetag-of c))
-          collect (sb-vm::value-cell-ref c))))
 
 (defun find-named-callees (fun &key (type t) (name nil namep))
   (let ((code (fun-code-header (%fun-fun fun))))

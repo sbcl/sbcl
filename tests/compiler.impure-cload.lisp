@@ -531,15 +531,10 @@
   (ctu:compiler-derived-type (load-time-value (cons 'foo 0))))
 (defun load-time-value-type-derivation-test-2 ()
   (ctu:compiler-derived-type (load-time-value (+ (or *print-length* 0) 10))))
-(defun load-time-value-auto-read-only-p ()
-  (load-time-value (random most-positive-fixnum)))
-(defun load-time-value-boring ()
-  (load-time-value (cons t t)))
+
 (test-util:with-test (:name (load-time-value :type-smartness/cload))
   (assert (eq 'cons (load-time-value-type-derivation-test-1)))
-  (assert (equal '(integer 10) (load-time-value-type-derivation-test-2)))
-  (assert (not (ctu:find-value-cell-values #'load-time-value-auto-read-only-p)))
-  (assert (ctu:find-value-cell-values #'load-time-value-boring)))
+  (assert (equal '(integer 10) (load-time-value-type-derivation-test-2))))
 
 (defun regression-1.0.29.54 ()
   (logior (1+ most-positive-fixnum)
