@@ -81,7 +81,9 @@
                              ~/sb-impl:print-symbol-with-prefix/.~@:>"
                      (sb-kernel::cell-error-name condition)))))
 
-(defvar *create-classes-from-internal-structure-definitions-p* t)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *create-classes-from-internal-structure-definitions-p* t))
+(declaim (always-bound *create-classes-from-internal-structure-definitions-p*))
 
 (declaim (ftype function ensure-non-standard-class))
 (defun find-class-from-cell (symbol cell &optional (errorp t))
@@ -113,10 +115,10 @@
            (member **boot-state** '(braid complete)))
       (let ((errorp (not (null (constant-form-value errorp))))
             (cell (make-symbol "CLASSOID-CELL")))
-        `(let ((,cell (load-time-value (find-classoid-cell ',symbol :create t))))
+        `(let ((,cell ,(find-classoid-cell symbol :create t)))
            (or (classoid-cell-pcl-class ,cell)
                ,(if errorp
-                    `(find-class-from-cell ',symbol ,cell t)
+                    `(find-class-from-cell ',symbol ,cell)
                     `(when (classoid-cell-classoid ,cell)
                        (find-class-from-cell ',symbol ,cell nil))))))
       form))
