@@ -600,7 +600,8 @@ between the ~A definition and the ~A definition"
                (classoid-cell-pcl-class cell) nil))
        (clear-info :type :kind name)
        (clear-info :type :documentation name)
-       (clear-info :type :compiler-layout name)))))
+       (clear-info :type :compiler-layout name)
+       (values-specifier-type-cache-clear)))))
 
 ;;; Called when we are about to define NAME as a class meeting some
 ;;; predicate (such as a meta-class type test.) The first result is

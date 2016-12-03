@@ -1010,4 +1010,14 @@
 (with-test (:name :redefine-deftype-to-defstruct)
   (defstruct foofa (a nil :type foofa)))
 
-;;; success
+(with-test (:name :undefine-class)
+  (let ((class (gensym "CLASS")))
+    (eval `(progn (defclass ,class () ())
+                  (lambda (x) (typep x ',class))
+                  (setf (find-class ',class) nil)))
+    (let ((fun (checked-compile `(lambda (x) (typep x ',class))
+                                :allow-style-warnings t)))
+      (assert-error (funcall fun 10))
+      (assert (handler-case (not (sb-kernel:specifier-type class))
+                (sb-kernel:parse-unknown-type ()
+                  t))))))
