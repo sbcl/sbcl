@@ -368,7 +368,13 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-c:fun-info-optimizer . sb-c:optimizer)
                             (sb-c:fun-info-ir2-convert . sb-c:ir2-convert)
                             (sb-c::fun-info-stack-allocate-result
-                             . sb-c::stack-allocate-result))))
+                             . sb-c::stack-allocate-result)
+                            (sb-c::fun-info-constraint-propagate
+                             . sb-c::constraint-propagate)
+                            (sb-c::fun-info-constraint-propagate-if
+                             . sb-c::constraint-propagate-if)
+                            (sb-c::fun-info-call-type-deriver
+                             . sb-c::call-type-deriver))))
               (loop for (reader . name) in otypes
                     for fn = (funcall reader fun-info)
                     when fn collect
