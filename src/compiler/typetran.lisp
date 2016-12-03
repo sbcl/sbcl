@@ -308,8 +308,9 @@
            `(let ((object ,object)
                   (cache (load-time-value (cons #'sb!kernel::cached-typep ',spec)
                                           t)))
-              (funcall (truly-the function (car (truly-the cons cache)))
-                       cache object)))
+              (truly-the (values t &optional)
+                         (funcall (truly-the function (car (truly-the cons cache)))
+                                  cache object))))
           (t
            (ecase (first spec)
              (satisfies
