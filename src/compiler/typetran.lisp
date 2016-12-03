@@ -305,7 +305,11 @@
            (when (policy *lexenv* (> speed inhibit-warnings))
              (compiler-notify "can't open-code test of unknown type ~S"
                               (type-specifier type)))
-           `(%typep ,object ',spec))
+           `(let ((object ,object)
+                  (cache (load-time-value (cons #'sb!kernel::cached-typep ',spec)
+                                          t)))
+              (funcall (truly-the function (car (truly-the cons cache)))
+                       cache object)))
           (t
            (ecase (first spec)
              (satisfies

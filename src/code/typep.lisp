@@ -199,6 +199,35 @@
          (and (functionp object)
               (csubtypep (specifier-type (sb!impl::%fun-type object)) type))))))
 
+(defun cached-typep (cache object)
+  (let* ((type (cdr cache))
+         (ctype (if (ctype-p type)
+                    type
+                    (specifier-type type))))
+    (if (unknown-type-p ctype)
+        (%%typep object ctype)
+        ;; Most of the time an undefined type becomes defined is
+        ;; through structure or class definition, optimize that case
+        (let ((fun
+                (if (classoid-p ctype)
+                    (lambda (cache object)
+                      ;; TODO: structures can be optimized even further
+                      (block nil
+                        (classoid-typep
+                         (typecase object
+                           (instance (%instance-layout object))
+                           (funcallable-instance
+                            (%funcallable-instance-layout object))
+                           (t (return)))
+                         (cdr (truly-the cons cache))
+                         object)))
+                    (lambda (cache object)
+                      (%%typep object (cdr (truly-the cons cache)))))))
+          (setf (cdr cache) ctype)
+          (sb!thread:barrier (:write))
+          (setf (car cache) fun)
+          (funcall fun cache object)))))
+
 ;;; Do a type test from a class cell, allowing forward reference and
 ;;; redefinition.
 (defun classoid-cell-typep (cell object)
