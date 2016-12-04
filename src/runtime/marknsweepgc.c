@@ -477,8 +477,10 @@ void immobile_space_preserve_pointer(void* addr)
         if (!header_addr || immobile_filler_p(header_addr))
             return;
         gc_assert(other_immediate_lowtag_p(*header_addr));
-        if (!properly_tagged_descriptor_p((lispobj)addr, header_addr))
-            return;
+        // FIXME: instruction pointers aren't tagged,
+        // but this should be less conservative for everything else.
+        //if (!properly_tagged_descriptor_p((lispobj)addr, header_addr))
+        //    return;
     } else if (fixedobj_pages[page_index].gens & (1<<from_space)) {
         int obj_spacing = (page_obj_align(page_index) << WORD_SHIFT);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
