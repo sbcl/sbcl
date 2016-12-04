@@ -37,11 +37,6 @@
   ;; slot documentation
   (documentation nil :type (or string null)))
 
-;;; KLUDGE: It's not clear to me why CONDITION-CLASS has itself listed
-;;; in its CPL, while other classes derived from CONDITION-CLASS don't
-;;; have themselves listed in their CPLs. This behavior is inherited
-;;; from CMU CL, and didn't seem to be explained there, and I haven't
-;;; figured out whether it's right. -- WHN 19990612
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (/show0 "condition.lisp 103")
   (let ((condition-class (find-classoid 'condition)))
