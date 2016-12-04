@@ -29,6 +29,7 @@
 #include <mach/clock.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/syscall.h>
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 #include <libkern/OSAtomic.h>
@@ -52,7 +53,6 @@ os_get_runtime_executable_path(int external)
     return copied_string(path);
 }
 
-extern int __semwait_signal(int, int, int, int, __int64_t, __int32_t);
 
 semaphore_t clock_sem = MACH_PORT_NULL;
 mach_port_t clock_port = MACH_PORT_NULL;
@@ -137,7 +137,7 @@ mach_lisp_thread_init(struct thread * thread)
     }
 
     if (mach_port_set_context(mach_task_self(), thread_exception_port,
-                              (mach_port_context_t)thread)
+                              (mach_vm_address_t)thread)
         != KERN_SUCCESS) {
         lose("Cannot set thread_exception_port context");
     }
@@ -362,7 +362,10 @@ sb_nanosleep(time_t sec, int nsec) {
     }
 
     for (;;) {
-        ret = __semwait_signal(clock_sem, MACH_PORT_NULL, 1, 1, sec, nsec);
+
+      /* Older version do not have a wrapper. */
+      ret = syscall(SYS___semwait_signal, (int)clock_sem, (int)MACH_PORT_NULL, (int)1, (int)1,
+                    (__int64_t)sec, (__int32_t)nsec);
         if (ret < 0) {
             if (errno == ETIMEDOUT) {
                 return 0;
