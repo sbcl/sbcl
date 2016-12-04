@@ -477,6 +477,8 @@ void immobile_space_preserve_pointer(void* addr)
         if (!header_addr || immobile_filler_p(header_addr))
             return;
         gc_assert(other_immediate_lowtag_p(*header_addr));
+        if (!properly_tagged_descriptor_p((lispobj)addr, header_addr))
+            return;
     } else if (fixedobj_pages[page_index].gens & (1<<from_space)) {
         int obj_spacing = (page_obj_align(page_index) << WORD_SHIFT);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
@@ -484,8 +486,10 @@ void immobile_space_preserve_pointer(void* addr)
                  addr, page_index, obj_index));
         char* page_start_addr = (char*)((uword_t)addr & ~(IMMOBILE_CARD_BYTES-1));
         header_addr = (lispobj*)(page_start_addr + obj_index * obj_spacing);
-        if (fixnump(*header_addr))
-            return;
+        if (fixnump(*header_addr) ||
+            (lispobj*)addr >= header_addr + page_obj_size(page_index) ||
+            !properly_tagged_descriptor_p((lispobj)addr, header_addr))
+           return;
     } else {
         return;
     }
