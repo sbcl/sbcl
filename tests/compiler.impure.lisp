@@ -2719,3 +2719,10 @@
        ((function *)                  "(FUNCTION *)")
        ((function (function *))       "(FUNCTION (FUNCTION *))")
        ((function (function (eql 1))) "(FUNCTION (FUNCTION (EQL 1))")))))
+
+(with-test (:name :setf-special-boxing)
+  (let* ((var (gensym))
+         (fun (checked-compile `(lambda ()
+                                  (declare (special ,var))
+                                  (setf ,var 10d0)))))
+    (ctu:assert-no-consing (funcall fun))))

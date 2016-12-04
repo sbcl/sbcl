@@ -108,6 +108,8 @@
     (cond ((and (basic-combination-p dest)
                 (call-full-like-p dest))
            t)
+          ((and (set-p dest)
+                (global-var-p (set-var dest))))
           ((and (return-p dest) (%return-is-boxed dest)))
           (t
            nil))))
