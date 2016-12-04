@@ -96,23 +96,61 @@
 (defun emit-constant (value)
   (constant-tn (find-constant value) t))
 
-(defun %return-is-boxed (node)
-  (declare (type creturn node))
-  (let* ((fun (return-lambda node))
-         (returns (tail-set-info (lambda-tail-set fun))))
-    (or (xep-p fun)
-        (eq (return-info-kind returns) :unknown))))
+(defun boxed-combination-ref-p (combination lvar)
+  (let ((args (combination-args combination)))
+    (flet ((struct-slot-raw-p (dd index)
+             (let ((slot (and dd
+                              (find index (dd-slots dd) :key #'dsd-index))))
+               (and slot
+                    (= (sb!kernel::dsd-%raw-type slot) -1))))
+           (constant (lvar)
+             (and (constant-lvar-p lvar)
+                  (lvar-value lvar))))
+      (case (combination-fun-source-name combination nil)
+        (data-vector-set-with-offset
+         (and (eq lvar (car (last args)))
+              (csubtypep (lvar-type (car args))
+                         (specifier-type '(array t)))))
+        (initialize-vector
+         (csubtypep (lvar-type (car args))
+                    (specifier-type '(array t))))
+        (%make-structure-instance
+         (let* ((dd (constant (car args)))
+                (slot-specs (constant (cadr args)))
+                (slot (position lvar (cddr args)))
+                (slot (and slot
+                           (nth slot slot-specs))))
+           (struct-slot-raw-p dd
+                              (cddr slot))))
+        (%instance-set
+         (let* ((instance (lvar-type (car args)))
+                (layout (and (structure-classoid-p instance)
+                             (classoid-layout instance))))
+           (and (eq lvar (car (last args)))
+                (struct-slot-raw-p (and layout
+                                        (layout-info layout))
+                                   (constant (cadr args))))))
+        ((%special-bind %set-sap-ref-lispobj
+          %rplaca %rplacd cons list list*
+          values)
+         t)
+        (t
+         (call-full-like-p combination))))))
 
 (defun boxed-ref-p (ref)
-  (let ((dest (lvar-dest (ref-lvar ref))))
-    (cond ((and (basic-combination-p dest)
-                (call-full-like-p dest))
-           t)
-          ((and (set-p dest)
-                (global-var-p (set-var dest))))
-          ((and (return-p dest) (%return-is-boxed dest)))
-          (t
-           nil))))
+  (let* ((lvar (ref-lvar ref))
+         (dest (lvar-dest lvar)))
+    (cond ((basic-combination-p dest)
+           (if (combination-p dest)
+               (boxed-combination-ref-p dest lvar)
+               (call-full-like-p dest)))
+          ((set-p dest)
+           (global-var-p (set-var dest)))
+          ((return-p dest)
+           (let* ((fun (return-lambda dest))
+                  (returns (tail-set-info (lambda-tail-set fun))))
+             (or (xep-p fun)
+                 (eq (return-info-kind returns) :unknown)))))))
 
 ;;; Convert a REF node. The reference must not be delayed.
 (defun ir2-convert-ref (node block)
