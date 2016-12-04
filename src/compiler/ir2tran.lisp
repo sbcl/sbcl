@@ -585,8 +585,8 @@
                              (ir2-lvar-locs 2value)
                              (ir2-lvar-locs 2lvar))))))
 
-(defoptimizer (%check-bound ir2-convert)
-    ((array bound index) node block)
+(defoptimizer (%check-bound ir2-hook) ((array bound index) node block)
+  (declare (ignore block))
   (when (constant-lvar-p bound)
     (let* ((bound-type (specifier-type `(integer 0 (,(lvar-value bound)))))
            (index-type (lvar-type index)))
@@ -595,8 +595,7 @@
         (let ((*compiler-error-context* node))
           (compiler-warn "Derived type ~s is not a suitable index for ~s."
                          (type-specifier index-type)
-                         (type-specifier (lvar-type array)))))))
-  (ir2-convert-template node block))
+                         (type-specifier (lvar-type array))))))))
 
 ;;;; template conversion
 
@@ -1997,8 +1996,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (move-lvar-result node block results lvar)))
 
 #-sb-xc-host ;; package-lock-violation-p is not present yet
-(defoptimizer (set ir2-convert) ((symbol value) node block)
-  (declare (ignore value))
+(defoptimizer (set ir2-hook) ((symbol value) node block)
+  (declare (ignore value block))
   (when (constant-lvar-p symbol)
     (let* ((symbol (lvar-value symbol))
            (kind (info :variable :kind symbol)))
@@ -2006,8 +2005,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                  (sb!impl::package-lock-violation-p (symbol-package symbol) symbol))
         (let ((*compiler-error-context* node))
           (compiler-warn "violating package lock on ~/sb-impl:print-symbol-with-prefix/"
-                         symbol)))))
-  (ir2-convert-full-call node block))
+                         symbol))))))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
@@ -2139,7 +2137,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
               (ir2-convert-full-call node 2block))
              (:known
               (let* ((info (basic-combination-fun-info node))
-                     (fun (fun-info-ir2-convert info)))
+                     (fun (fun-info-ir2-convert info))
+                     (hook (fun-info-ir2-hook info)))
+                (when hook
+                  (funcall hook node 2block))
                 (cond (fun
                        (funcall fun node 2block))
                       ((eq (basic-combination-info node) :full)
