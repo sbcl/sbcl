@@ -527,10 +527,10 @@ write_generation_stats(FILE *file)
         fprintf(file,
                 "   %1d: %5ld %5ld %5ld %5ld",
                 i,
-                generations[i].alloc_start_page,
-                generations[i].alloc_unboxed_start_page,
-                generations[i].alloc_large_start_page,
-                generations[i].alloc_large_unboxed_start_page);
+                (long)generations[i].alloc_start_page,
+                (long)generations[i].alloc_unboxed_start_page,
+                (long)generations[i].alloc_large_start_page,
+                (long)generations[i].alloc_large_unboxed_start_page);
         fprintf(file,
                 " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT
                 " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT,
