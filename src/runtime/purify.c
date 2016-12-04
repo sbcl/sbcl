@@ -287,8 +287,11 @@ ptrans_code(lispobj thing)
     lispobj result = make_lispobj(new, OTHER_POINTER_LOWTAG);
 
     /* Put in forwarding pointers for all the functions. */
-    for_each_simple_fun(func, code,
-        *func = make_lispobj(code_fun_addr(new, index), FUN_POINTER_LOWTAG));
+    uword_t displacement = result - thing;
+    for_each_simple_fun(i, newfunc, new, 1, {
+        lispobj* old = (lispobj*)((char*)newfunc - displacement);
+        *old = make_lispobj(newfunc, FUN_POINTER_LOWTAG);
+    });
 
     /* Stick in a forwarding pointer for the code object. */
     /* This smashes the header, so do it only after reading n_funs */
@@ -303,7 +306,7 @@ ptrans_code(lispobj thing)
           1);
 
     /* Scavenge all the functions. */
-    for_each_simple_fun(func, new, {
+    for_each_simple_fun(i, func, new, 1, {
         gc_assert(!dynamic_pointer_p((lispobj)func));
         pscav(&func->self, 1, 1);
         pscav_later(&func->name, 4);

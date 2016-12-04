@@ -170,7 +170,7 @@ write_and_compress_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file
     return ((data - file_offset) / os_vm_page_size) - 1;
 }
 
-static long
+static long __attribute__((__unused__))
 write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
 {
     return write_and_compress_bytes(file, addr, bytes, file_offset,

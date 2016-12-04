@@ -16,6 +16,7 @@
 #ifndef _GC_INTERNAL_H_
 #define _GC_INTERNAL_H_
 
+#include "genesis/code.h"
 #include "genesis/simple-fun.h"
 #include "thread.h"
 #include "interr.h"
@@ -223,6 +224,9 @@ instance_scan_interleaved(void (*proc)(),
                           lispobj *instance_ptr,
                           sword_t n_words,
                           lispobj *layout_obj);
+
+#include "genesis/bignum.h"
+extern boolean positive_bignum_logbitp(int,struct bignum*);
 
 // Generalization of instance_scan_interleaved
 #define BIT_SCAN_INVERT 1
