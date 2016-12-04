@@ -49,7 +49,7 @@
 
 (eval-when (:compile-toplevel)
   (assert (eql code-code-size-slot 1))
-  (assert (eql code-debug-info-slot 3)))
+  (assert (eql code-debug-info-slot 2)))
 
 (define-alien-variable "varyobj_holes" long)
 (define-alien-variable "varyobj_page_touched_bits" (* (unsigned 32)))
@@ -364,8 +364,7 @@
                 (logior (ash rounded-header-words n-widetag-bits) code-header-widetag)
                 (ash n-unboxed-bytes n-fixnum-tag-bits)
                 other-pointer-lowtag)))
-    (setf (%code-debug-info code) nil
-          (%code-entry-points code) nil)
+    (setf (%code-debug-info code) nil)
     code))
 
 (defun show-fragmentation ()

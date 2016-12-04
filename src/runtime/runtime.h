@@ -369,7 +369,7 @@ fixnum_value(lispobj n)
 static inline uword_t
 code_header_words(lispobj header) // given header = code->header
 {
-  return HEADER_VALUE_MASKED(header);
+  return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
 }
 
 static inline sword_t

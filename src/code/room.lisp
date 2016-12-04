@@ -370,7 +370,7 @@
        ;; and apparent cons cells, since there can't be any.
        (dx-flet ((filter (obj type size)
                    (unless (or (and (code-component-p obj)
-                                    (not (%code-entry-points obj)))
+                                    (eql (code-n-entries obj) 0))
                                (consp obj))
                      (funcall fun obj type size))))
          (let ((start immobile-space-start)
@@ -776,7 +776,7 @@
 
 (declaim (inline code-header-words))
 (defun code-header-words (code)
-  (logand (get-header-data code) #!+immobile-space short-header-max-words))
+  (logand (get-header-data code) short-header-max-words))
 
 (defun map-referencing-objects (fun space object)
   (declare (type spaces space)

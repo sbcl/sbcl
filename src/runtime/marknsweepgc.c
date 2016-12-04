@@ -810,12 +810,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
     lispobj *begin, *end, word = *obj;
     unsigned char widetag = widetag_of(word);
     if (widetag == CODE_HEADER_WIDETAG) { // usual case. Like scav_code_header()
-        lispobj entry_point; /* tagged pointer to entry point */
-        struct simple_fun *function_ptr; /* untagged pointer to entry point */
-        for (entry_point = ((struct code*)obj)->entry_points;
-             entry_point != NIL;
-             entry_point = function_ptr->next) {
-            function_ptr = (struct simple_fun *) native_pointer(entry_point);
+        for_each_simple_fun(i, function_ptr, (struct code*)obj, 0, {
             begin = SIMPLE_FUN_SCAV_START(function_ptr);
             end   = begin + SIMPLE_FUN_SCAV_NWORDS(function_ptr);
             if (page_begin > (os_vm_address_t)begin) begin = (lispobj*)page_begin;
@@ -823,12 +818,12 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
             if (end > begin
                 && range_points_to_younger_p(begin, end, gen, keep_gen, new_gen))
                 return 1;
-        }
-        begin = obj;
-        end = obj + code_header_words(word); // exclusive bound
+        })
+        begin = obj + 1; // skip the header
+        end = obj + code_header_words(word); // exclusive bound on boxed slots
     } else if (widetag == SIMPLE_VECTOR_WIDETAG) {
         sword_t length = fixnum_value(((struct vector *)obj)->length);
-        begin = obj;
+        begin = obj + 2; // skip the header and length
         end = obj + CEILING(length + 2, 2);
     } else if (widetag >= SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG &&
                widetag <= MAXIMUM_STRING_WIDETAG) {
@@ -1087,7 +1082,6 @@ sweep_varyobj_pages(int raise)
                     struct code* code  = (struct code*)obj;
                     code->header       = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
                     code->code_size    = make_fixnum((size - 2) * N_WORD_BYTES);
-                    code->entry_points = NIL;
                     code->debug_info   = varyobj_holes;
                     varyobj_holes      = (lispobj)code;
                 }
@@ -1577,11 +1571,9 @@ static lispobj adjust_fun_entry(lispobj raw_entry)
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
-    lispobj header_word, obj;
+    lispobj header_word;
     int widetag;
     long size;
-    struct simple_fun* f;
-    lispobj next;
 
     while (where < end) {
         header_word = *where;
@@ -1606,16 +1598,13 @@ static void fixup_space(lispobj* where, size_t n_words)
                                     native_pointer(instance_layout(where)));
           break;
         case CODE_HEADER_WIDETAG:
-          // Fixup all embedded simple-funs
-          for ( obj = ((struct code*)where)->entry_points ; obj != NIL ; obj = next ) {
-              f = (struct simple_fun*)(obj - FUN_POINTER_LOWTAG);
-              next = f->next; // Read before adjusting.
-              f->self = adjust_fun_entry(f->self);
-              adjust_words(&f->next, 5);
-          }
-          // Fixup the constant pool. Do this last so that 'entry_points'
-          // is read before adjustment.
+          // Fixup the constant pool.
           adjust_words(where+1, code_header_words(header_word)-1);
+          // Fixup all embedded simple-funs
+          for_each_simple_fun(i, f, (struct code*)where, 1, {
+              f->self = adjust_fun_entry(f->self);
+              adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
+          });
           break;
         case CLOSURE_HEADER_WIDETAG:
           where[1] = adjust_fun_entry(where[1]);
@@ -1712,15 +1701,14 @@ void defrag_immobile_space(int* components)
         if ((new_vaddr = components[i*2+1]) != 0) {
             addr = native_pointer(components[i*2]);
             int displacement = new_vaddr - (lispobj)addr;
-            struct simple_fun* f;
-            lispobj obj;
             set_load_address(addr, new_vaddr);
-            if (widetag_of(*addr) == CODE_HEADER_WIDETAG) {
-                for ( obj = ((struct code*)addr)->entry_points ; obj != NIL ; obj = f->next ) {
-                    set_load_address(native_pointer(obj), obj + displacement);
-                    f = (struct simple_fun*)(obj - FUN_POINTER_LOWTAG);
-                }
-            }
+            // FIXME: what is the 'if' for? Doesn't it _have_ to be code?
+            if (widetag_of(*addr) == CODE_HEADER_WIDETAG)
+                for_each_simple_fun(index, fun, (struct code*)addr, 1, {
+                    set_load_address((lispobj*)fun,
+                                     make_lispobj((char*)fun + displacement,
+                                                  FUN_POINTER_LOWTAG));
+                });
         }
     }
 

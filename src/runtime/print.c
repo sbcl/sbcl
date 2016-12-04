@@ -24,6 +24,7 @@
 #include "sbcl.h"
 #include "print.h"
 #include "runtime.h"
+#include "gc-internal.h"
 #include <stdarg.h>
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include <errno.h>
@@ -590,9 +591,9 @@ static char *symbol_slots[] = {"value: ", "hash: ",
     NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
-static char *code_slots[] = {"bytes: ", "entry: ", "debug: ", NULL};
+static char *code_slots[] = {"bytes: ", "debug: ", NULL};
 static char *fn_slots[] = {
-    "self: ", "next: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
+    "self: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
 static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ", "layout: ", NULL};
 static char *weak_pointer_slots[] = {"value: ", NULL};
@@ -751,6 +752,11 @@ static void print_otherptr(lispobj obj)
 
             case CODE_HEADER_WIDETAG:
                 count &= SHORT_HEADER_MAX_WORDS;
+                // ptr was already bumped up
+                for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
+                    sprintf(buffer, "f[%d]: ", fun_index);
+                    print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG));
+                });
                 print_slots(code_slots, count-1, ptr);
                 break;
 

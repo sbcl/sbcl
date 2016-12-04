@@ -748,7 +748,7 @@
                             (lra-code-header lra)))
               (if code
                   (values code
-                          (* (1+ (- word-offset (get-header-data code)))
+                          (* (1+ (- word-offset (code-header-words code)))
                              sb!vm:n-word-bytes)
                           nil)
                   (values :foreign-function
@@ -933,7 +933,7 @@
                        (list pc-offset
                              (sap-int (sb!vm:context-pc scp))
                              code
-                             (%code-entry-points code)
+                             (%code-entry-point code 0)
                              #!-(or arm arm64)
                              (sb!vm:context-register scp sb!vm::lra-offset)
                              #!+(or arm arm64)
@@ -959,7 +959,7 @@
 For some architectures (such as PPC) this will not be the $LRA
 register."
   (let ((return-machine-address (sb!vm::return-machine-address scp))
-        (code-header-len (* (get-header-data code) sb!vm:n-word-bytes)))
+        (code-header-len (* (code-header-words code) sb!vm:n-word-bytes)))
     (values (- return-machine-address
                (- (get-lisp-obj-address code)
                   sb!vm:other-pointer-lowtag)
@@ -1105,7 +1105,7 @@ register."
                    (offset
                     #!-(or x86 x86-64)
                     (* (- (1+ (get-header-data lra))
-                          (get-header-data component))
+                          (code-header-words component))
                        sb!vm:n-word-bytes)
                     #!+(or x86 x86-64)
                     (- (sap-int ra)
@@ -1217,19 +1217,16 @@ register."
         (setf (debug-fun-%function debug-fun)
               (etypecase debug-fun
                 (compiled-debug-fun
-                 (let ((component
-                        (compiled-debug-fun-component debug-fun))
-                       (start-pc
-                        (sb!c::compiled-debug-fun-start-pc
-                         (compiled-debug-fun-compiler-debug-fun debug-fun))))
-                   (do ((entry (%code-entry-points component)
-                               (%simple-fun-next entry)))
-                       ((null entry) nil)
-                     (when (= start-pc
-                              (sb!c::compiled-debug-fun-start-pc
-                               (compiled-debug-fun-compiler-debug-fun
-                                (fun-debug-fun entry))))
-                       (return entry)))))
+                 (loop with component = (compiled-debug-fun-component debug-fun)
+                       and start-pc = (sb!c::compiled-debug-fun-start-pc
+                                       (compiled-debug-fun-compiler-debug-fun debug-fun))
+                       for i downfrom (1- (code-n-entries component)) to 0
+                       for entry = (%code-entry-point component i)
+                       when (= start-pc
+                                (sb!c::compiled-debug-fun-start-pc
+                                 (compiled-debug-fun-compiler-debug-fun
+                                  (fun-debug-fun entry))))
+                       return entry))
                 (bogus-debug-fun nil)))
         cached-value)))
 

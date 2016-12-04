@@ -286,39 +286,28 @@ ptrans_code(lispobj thing)
 
     lispobj result = make_lispobj(new, OTHER_POINTER_LOWTAG);
 
-    /* Stick in a forwarding pointer for the code object. */
-    *(lispobj *)code = result;
-
     /* Put in forwarding pointers for all the functions. */
-    lispobj func;
-    for (func = code->entry_points;
-         func != NIL;
-         func = ((struct simple_fun *)native_pointer(func))->next) {
+    for_each_simple_fun(func, code,
+        *func = make_lispobj(code_fun_addr(new, index), FUN_POINTER_LOWTAG));
 
-        gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
-
-        *(lispobj *)native_pointer(func) = result + (func - thing);
-    }
+    /* Stick in a forwarding pointer for the code object. */
+    /* This smashes the header, so do it only after reading n_funs */
+    *(lispobj *)code = result;
 
     /* Arrange to scavenge the debug info later. */
     pscav_later(&new->debug_info, 1);
 
     /* Scavenge the constants. */
     pscav(new->constants,
-          HeaderValue(new->header) - (offsetof(struct code, constants) >> WORD_SHIFT),
+          code_header_words(new->header) - (offsetof(struct code, constants) >> WORD_SHIFT),
           1);
 
     /* Scavenge all the functions. */
-    pscav(&new->entry_points, 1, 1);
-    for (func = new->entry_points;
-         func != NIL;
-         func = ((struct simple_fun *)native_pointer(func))->next) {
-        gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
-        gc_assert(!dynamic_pointer_p(func));
-
-        pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
-        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 4);
-    }
+    for_each_simple_fun(func, new, {
+        gc_assert(!dynamic_pointer_p((lispobj)func));
+        pscav(&func->self, 1, 1);
+        pscav_later(&func->name, 4);
+    })
 
     return result;
 }

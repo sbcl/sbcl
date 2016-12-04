@@ -263,22 +263,16 @@ trans_code(struct code *code)
 
     /* set forwarding pointers for all the function headers in the */
     /* code object.  also fix all self pointers */
+    /* Do this by scanning the new code, since the old header is unusable */
 
-    lispobj fheaderl = code->entry_points;
-    lispobj* prev_pointer = &new_code->entry_points;
     uword_t displacement = l_new_code - l_code;
 
-    while (fheaderl != NIL) {
-        struct simple_fun *fheaderp, *nfheaderp;
-        lispobj nfheaderl;
-
-        fheaderp = (struct simple_fun *) native_pointer(fheaderl);
-        gc_assert(widetag_of(fheaderp->header) == SIMPLE_FUN_HEADER_WIDETAG);
-
-        /* Calculate the new function pointer and the new */
-        /* function header. */
-        nfheaderl = fheaderl + displacement;
-        nfheaderp = (struct simple_fun *) native_pointer(nfheaderl);
+    for_each_simple_fun(i, nfheaderp, new_code, 1, {
+        /* Calculate the old raw function pointer */
+        struct simple_fun* fheaderp =
+          (struct simple_fun*)((char*)nfheaderp - displacement);
+        /* Calculate the new lispobj */
+        lispobj nfheaderl = make_lispobj(nfheaderp, FUN_POINTER_LOWTAG);
 
 #ifdef DEBUG_CODE_GC
         printf("fheaderp->header (at %x) <- %x\n",
@@ -292,12 +286,7 @@ trans_code(struct code *code)
             FUN_RAW_ADDR_OFFSET +
 #endif
             nfheaderl;
-
-        *prev_pointer = nfheaderl;
-
-        fheaderl = fheaderp->next;
-        prev_pointer = &nfheaderp->next;
-    }
+    })
 #ifdef LISP_FEATURE_GENCGC
     /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
        spaces once when all copying is done. */
@@ -316,9 +305,6 @@ trans_code(struct code *code)
 static sword_t
 scav_code_header(lispobj *where, lispobj header)
 {
-    lispobj entry_point;        /* tagged pointer to entry point */
-    struct simple_fun *function_ptr; /* untagged pointer to entry point */
-
     struct code *code = (struct code *) where;
     sword_t n_header_words = code_header_words(header);
 
@@ -327,19 +313,10 @@ scav_code_header(lispobj *where, lispobj header)
 
     /* Scavenge the boxed section of each function object in the
      * code data block. */
-    for (entry_point = code->entry_points;
-         entry_point != NIL;
-         entry_point = function_ptr->next) {
-
-        gc_assert_verbose(is_lisp_pointer(entry_point),
-                          "Entry point %lx\n is not a lisp pointer.",
-                          (sword_t)entry_point);
-
-        function_ptr = (struct simple_fun *) native_pointer(entry_point);
-        gc_assert(widetag_of(function_ptr->header)==SIMPLE_FUN_HEADER_WIDETAG);
+    for_each_simple_fun(i, function_ptr, code, 1, {
         scavenge(SIMPLE_FUN_SCAV_START(function_ptr),
                  SIMPLE_FUN_SCAV_NWORDS(function_ptr));
-    }
+    })
 
     return n_header_words + code_instruction_words(code->code_size);
 }

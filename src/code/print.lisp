@@ -1681,11 +1681,8 @@ variable: an unreadable object representing the error is printed instead.")
       (cond ((eq dinfo :bogus-lra)
              (write-string "bogus code object" stream))
             (t
-             (write-string "code object" stream)
-             (do ((n 0 (1+ n))
-                  (f (%code-entry-points component) (%simple-fun-next f)))
-                 ((null f) (format stream " [~D]" n)))
-             (let ((fun-name (awhen (%code-entry-points component)
+             (format stream "code object [~D]" (code-n-entries component))
+             (let ((fun-name (awhen (%code-entry-point component 0)
                                (%simple-fun-name it))))
                (when fun-name
                  (write-char #\Space stream)

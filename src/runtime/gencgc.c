@@ -3227,16 +3227,9 @@ verify_space(lispobj *start, size_t words)
 
                         /* Scavenge the boxed section of each function
                          * object in the code data block. */
-                        lispobj fheaderl = code->entry_points;
-                        while (fheaderl != NIL) {
-                            struct simple_fun *fheaderp =
-                                (struct simple_fun *) native_pointer(fheaderl);
-                            gc_assert(widetag_of(fheaderp->header) ==
-                                      SIMPLE_FUN_HEADER_WIDETAG);
+                        for_each_simple_fun(i, fheaderp, code, 1, {
                             verify_space(SIMPLE_FUN_SCAV_START(fheaderp),
-                                         SIMPLE_FUN_SCAV_NWORDS(fheaderp));
-                            fheaderl = fheaderp->next;
-                        }
+                                         SIMPLE_FUN_SCAV_NWORDS(fheaderp)); });
                         count = nheader_words + code_instruction_words(code->code_size);
                         break;
                     }

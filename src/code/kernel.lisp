@@ -147,8 +147,14 @@
         (sb!ext:typexpand-1 internal-type)
         internal-type)))
 
-(defun %simple-fun-next (simple-fun)
-  (%simple-fun-next simple-fun))
+(defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
+  (%code-entry-point code-obj 0))
+
+(defun %simple-fun-next (simple-fun) ; DO NOT USE IN NEW CODE
+  (let ((code-obj (fun-code-header simple-fun)))
+    (dotimes (i (code-n-entries code-obj))
+      (when (eq simple-fun (%code-entry-point code-obj i))
+        (return (%code-entry-point code-obj (1+ i)))))))
 
 ;; Given either a closure or a simple-fun, return the underlying simple-fun.
 ;; FIXME: %SIMPLE-FUN-SELF is a somewhat poor name for this function.

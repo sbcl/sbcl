@@ -158,16 +158,17 @@
   (code-size :type index
              :ref-known (flushable movable)
              :ref-trans %code-code-size)
-  (entry-points :type (or function null)
-                :ref-known (flushable)
-                :ref-trans %code-entry-points
-                :set-known ()
-                :set-trans (setf %code-entry-points))
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info
               :set-known ()
               :set-trans (setf %code-debug-info))
+  #!-64-bit
+  (n-entries :type fixnum
+             :set-known ()
+             :set-trans (setf %code-n-entries)
+             :ref-trans %code-n-entries
+             :ref-known (flushable foldable))
   (constants :rest-p t))
 
 (!define-primitive-object (fdefn :type fdefn
@@ -204,11 +205,6 @@
           ;; stuff here in order to allow this old hack to work in the
           ;; new world. -- WHN 2001-08-82
           )
-  (next :type (or function null)
-        :ref-known (flushable)
-        :ref-trans %simple-fun-next
-        :set-known ()
-        :set-trans (setf %simple-fun-next))
   (name :ref-known (flushable)
         :ref-trans %simple-fun-name
         :set-known ()

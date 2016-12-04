@@ -260,6 +260,8 @@
 
 ;;;; function ops
 
+;;; This is a stupid name when we really mean fun->simple-fun.
+;;; And what's the point of ruling out some funcallable instances?
 (defun fun-self (fun)
   (declare (type compiled-function fun))
   (%simple-fun-self (%fun-fun fun)))
@@ -267,10 +269,6 @@
 (defun fun-code (fun)
   (declare (type compiled-function fun))
   (fun-code-header (fun-self fun)))
-
-(defun fun-next (fun)
-  (declare (type compiled-function fun))
-  (%simple-fun-next (%fun-fun fun)))
 
 (defun fun-address (fun)
   (declare (type compiled-function fun))
@@ -1021,11 +1019,10 @@
 
 (defun add-fun-header-hooks (segment)
   (declare (type segment segment))
-  (do ((fun (awhen (seg-code segment) (%code-entry-points it))
-            (fun-next fun))
-       (length (seg-length segment)))
-      ((null fun))
-    (let ((offset (code-offs-to-segment-offs (fun-offset fun) segment)))
+  (dotimes (i (or (awhen (seg-code segment) (code-n-entries it)) 0))
+    (let* ((fun (%code-entry-point (seg-code segment) i))
+           (length (seg-length segment))
+           (offset (code-offs-to-segment-offs (fun-offset fun) segment)))
       (when (<= 0 offset length)
         ;; Up to 2 words of zeros might be present to align the next
         ;; simple-fun. Limit on OFFSET is to avoid incorrect triggering
@@ -1146,8 +1143,9 @@
   (let* ((self (fun-self function))
          (code (fun-code-header self)))
     (format t "Code-header ~S: size: ~S~%" code (%code-code-size code))
-    (do ((fun (%code-entry-points code) (%simple-fun-next fun)))
-        ((null fun))
+    (loop for i below (code-n-entries code)
+          for fun = (%code-entry-point code i)
+       do
         ;; There is function header fun-offset words from the
         ;; code header.
       (format t "Fun-header ~S at offset ~W (words):~% ~S ~A => ~S~%"

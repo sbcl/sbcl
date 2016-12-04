@@ -603,13 +603,8 @@ value."
      function
      spaces
      (lambda (code)
-       (let ((entry (sb-kernel:%code-entry-points  code)))
-         (cond ((not entry)
-                (push (princ-to-string code) referrers))
-               (t
-                (loop for e = entry then (sb-kernel::%simple-fun-next e)
-                      while e
-                      do (pushnew e referrers)))))))
+       (dotimes (i (sb-kernel:code-n-entries code))
+         (pushnew (sb-kernel:%code-entry-point code i) referrers))))
     referrers))
 
 ;;; XREF facility
@@ -955,17 +950,16 @@ Experimental: interface subject to change."
                (unless simple
                  (call (sb-kernel::%array-displaced-from object))))))
         (sb-kernel:code-component
-         (call (sb-kernel:%code-entry-points object))
          (call (sb-kernel:%code-debug-info object))
          (loop for i from sb-vm:code-constants-offset
                below (sb-kernel:code-header-words object)
-               do (call (sb-kernel:code-header-ref object i))))
+               do (call (sb-kernel:code-header-ref object i)))
+         (loop for i below (sb-kernel:code-n-entries object)
+               do (call (sb-kernel:%code-entry-point object i))))
         (sb-kernel:fdefn
          (call (sb-kernel:fdefn-name object))
          (call (sb-kernel:fdefn-fun object)))
         (sb-kernel:simple-fun
-         (unless simple
-           (call (sb-kernel:%simple-fun-next object)))
          (call (sb-kernel:fun-code-header object))
          (call (sb-kernel:%simple-fun-name object))
          (call (sb-kernel:%simple-fun-arglist object))

@@ -212,12 +212,43 @@
      (setf (%simple-fun-doc (%fun-fun function)) new-value)))
   new-value)
 
+(defun code-n-entries (code-obj)
+  ;; The internal %n-entries slot is a fixnum storing the number
+  ;; of simple-funs in the low 14 bits (16 bits of the machine word),
+  ;; and the first function's offset in the high 16 bits.
+  #!-64-bit (ldb (byte 14 0) (sb!vm::%code-n-entries code-obj))
+  ;; The header stores the count.
+  #!+64-bit (ldb (byte 16 24) (get-header-data code-obj)))
+
+(defun %code-entry-point (code-obj fun-index)
+  (declare (type (unsigned-byte 16) fun-index))
+  (if (>= fun-index (code-n-entries code-obj))
+      nil
+      (%primitive sb!c:compute-fun
+                  code-obj
+                  (cond ((zerop fun-index) ; special case for the first simple-fun
+                         #!-64-bit (ldb (byte 16 14) (sb!vm::%code-n-entries code-obj))
+                         #!+64-bit (ldb (byte 16 40) (get-header-data code-obj)))
+                        (t
+                         (let ((i (+ (- sb!vm:other-pointer-lowtag)
+                                     (ash (code-header-words code-obj)
+                                          sb!vm:word-shift)
+                                     (ash (1- fun-index) 2))))
+                           (with-pinned-objects (code-obj)
+                            (sap-ref-32 (int-sap (get-lisp-obj-address code-obj))
+                                        i))))))))
+
+(defun code-entry-points (code-obj)
+  (let ((a (make-array (code-n-entries code-obj))))
+    (dotimes (i (length a) a)
+      (setf (aref a i) (%code-entry-point code-obj i)))))
+
 (defun code-n-unboxed-data-words (code-obj)
   ;; If the number of boxed words (from the header) is not the same as
   ;; the displacement backwards from the first simple-fun to the header,
   ;; then there are unboxed constants between the end of the boxed constants
   ;; and the first simple-fun.
-  (let ((f (%code-entry-points code-obj)))
+  (let ((f (%code-entry-point code-obj 0)))
     (or (and f
              (let ((from (code-header-words code-obj))
                    (to (ash (with-pinned-objects (f)

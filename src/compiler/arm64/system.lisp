@@ -169,7 +169,7 @@
   (:result-types system-area-pointer)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    (inst lsr ndescr ndescr n-widetag-bits)
+    (inst ubfm ndescr ndescr n-widetag-bits (+ 15 n-widetag-bits))
     (inst add sap code (lsl ndescr word-shift))
     (inst sub sap sap other-pointer-lowtag)))
 
@@ -181,7 +181,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    (inst lsr ndescr ndescr n-widetag-bits)
+    (inst ubfm ndescr ndescr n-widetag-bits (+ 15 n-widetag-bits))
     (inst add ndescr offset (lsl ndescr word-shift))
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))

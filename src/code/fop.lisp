@@ -549,10 +549,10 @@
 ;;; fasl file header.)
 
 ;; Cold-load calls COLD-LOAD-CODE instead
-(!define-fop #xE0 :not-host (fop-code ((:operands n-boxed-words n-unboxed-bytes)))
+(!define-fop #xE0 :not-host (fop-code ((:operands n-code-bytes n-boxed-words nfuns)))
   ;; add 1 word for the toplevel-p flag and one for the debug-info
   (with-fop-stack ((stack (operand-stack)) ptr (+ n-boxed-words 2))
-    (load-code n-boxed-words n-unboxed-bytes stack ptr (fasl-input-stream))))
+    (load-code nfuns n-boxed-words n-code-bytes stack ptr (fasl-input))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
@@ -584,20 +584,14 @@ a bug.~@:>")
   (setf (code-header-ref code index) value)
   (values))
 
-(!define-fop 139 :not-host (fop-fun-entry (code-object name arglist type info))
-  (let ((offset (read-word-arg (fasl-input-stream))))
-    (declare (type index offset))
-    (unless (zerop (logand offset sb!vm:lowtag-mask))
-      (bug "unaligned function object, offset = #X~X" offset))
-    (let ((fun (%primitive sb!c:compute-fun code-object offset)))
-      (setf (%simple-fun-self fun) fun)
-      (setf (%simple-fun-next fun) (%code-entry-points code-object))
-      (setf (%code-entry-points code-object) fun)
-      (setf (%simple-fun-name fun) name)
-      (setf (%simple-fun-arglist fun) arglist)
-      (setf (%simple-fun-type fun) type)
-      (setf (%simple-fun-info fun) info)
-      fun)))
+(!define-fop #xFC :not-host (fop-fun-entry ((:operands fun-index)
+                                            code-object name arglist type info))
+  (let ((fun (%code-entry-point code-object fun-index)))
+    (setf (%simple-fun-name fun) name)
+    (setf (%simple-fun-arglist fun) arglist)
+    (setf (%simple-fun-type fun) type)
+    (setf (%simple-fun-info fun) info)
+    fun))
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
 ;;;; was sufficiently stale that the functions it called were no

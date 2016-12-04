@@ -41,9 +41,9 @@
                             ;; by address (which = random)
                             (t
                              (let ((name1
-                                    (%simple-fun-name (%code-entry-points (car a))))
+                                    (%simple-fun-name (%code-entry-point (car a) 0)))
                                    (name2
-                                    (%simple-fun-name (%code-entry-points (car b)))))
+                                    (%simple-fun-name (%code-entry-point (car b) 0))))
                                (if (and (symbolp name1) (symbolp name2))
                                    (let ((p1 (package-name (symbol-package name1)))
                                          (p2 (package-name (symbol-package name2))))
@@ -65,7 +65,7 @@
                           (when (immobile-space-p code)
                             (let ((ht (pick-table
                                        (%simple-fun-name
-                                        (%code-entry-points code)))))
+                                        (%code-entry-point code 0)))))
                             (incf (gethash code ht 0))))))))))
        :immobile)
       (append (hashtable-keys-sorted other-stuff)

@@ -19,6 +19,5 @@
   (def %caller-pc ())
   (def %code-code-size)
   (def %code-debug-info)
-  (def %code-entry-points)
   (def %funcallable-instance-layout)
   (def %set-funcallable-instance-layout (x new-value)))

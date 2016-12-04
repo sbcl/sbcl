@@ -156,7 +156,6 @@
       (storew ndescr result 0 other-pointer-lowtag)
       (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
       (inst addu alloc-tn unboxed)
-      (storew null-tn result code-entry-points-slot other-pointer-lowtag)
       (storew null-tn result code-debug-info-slot other-pointer-lowtag))))
 
 (define-vop (make-fdefn)

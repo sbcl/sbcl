@@ -140,6 +140,12 @@
     (dump-byte (logand n #xff) fasl-output))
   (values))
 
+(defun dump-varint (n fasl-output)
+  (let ((buf (fasl-output-varint-buf fasl-output)))
+    (setf (fill-pointer buf) 0)
+    (write-var-integer n buf)
+    (write-sequence buf (fasl-output-stream fasl-output))))
+
 (defun dump-fop+operands (fasl-output opcode arg1
                                       &optional (arg2 0 arg2p) (arg3 0 arg3p))
   (declare (type (unsigned-byte 8) opcode) (type word arg1 arg2 arg3))
@@ -148,13 +154,8 @@
                              (if (< arg1 (ash 1 32)) 2 3))))
     (dump-byte (logior opcode opcode-modifier) fasl-output)
     (dump-integer-as-n-bytes arg1 (ash 1 opcode-modifier) fasl-output)
-    (flet ((dump-varint (arg)
-             (let ((buf (fasl-output-varint-buf fasl-output)))
-               (setf (fill-pointer buf) 0)
-               (write-var-integer arg buf)
-               (write-sequence buf (fasl-output-stream fasl-output)))))
-      (when arg2p (dump-varint arg2))
-      (when arg3p (dump-varint arg3)))))
+    (when arg2p (dump-varint arg2 fasl-output))
+    (when arg3p (dump-varint arg3 fasl-output))))
 
 ;;; Setting this variable to an (UNSIGNED-BYTE 32) value causes
 ;;; DUMP-FOP to use it as a counter and emit a FOP-NOP4 with the
@@ -1070,11 +1071,8 @@
 ;;; constants.
 ;;;
 ;;; We dump trap objects in any unused slots or forward referenced slots.
-(defun dump-code-object (component
-                         code-segment
-                         code-length
-                         fixups
-                         fasl-output)
+(defun dump-code-object (component code-segment code-length fixups
+                         fasl-output entry-offsets)
 
   (declare (type component component)
            (type index code-length)
@@ -1125,10 +1123,12 @@
 
       (dump-object (if (eq (sb!c::component-kind component) :toplevel) :toplevel nil)
                    fasl-output)
-      (let ((num-consts (- header-length sb!vm:code-constants-offset)))
-        (dump-fop 'fop-code fasl-output num-consts code-length))
+      (dump-fop 'fop-code fasl-output code-length
+                (- header-length sb!vm:code-constants-offset)
+                (length entry-offsets))
 
       (dump-segment code-segment code-length fasl-output)
+      (dolist (val entry-offsets) (dump-varint val fasl-output))
 
       ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it
       ;; dumps aren't included in the LENGTH passed to FOP-CODE.
@@ -1161,22 +1161,6 @@
   (dump-fop 'fop-sanctify-for-execution file)
   (dump-pop file))
 
-;;; Dump a function entry data structure corresponding to ENTRY to
-;;; FILE. CODE-HANDLE is the table offset of the code object for the
-;;; component.
-(defun dump-one-entry (entry code-handle file)
-  (declare (type sb!c::entry-info entry) (type index code-handle)
-           (type fasl-output file))
-  (let ((name (sb!c::entry-info-name entry)))
-    (dump-push code-handle file)
-    (dump-object name file)
-    (dump-object (sb!c::entry-info-arguments entry) file)
-    (dump-object (sb!c::entry-info-type entry) file)
-    (dump-object (sb!c::entry-info-info entry) file)
-    (dump-fop 'fop-fun-entry file)
-    (dump-word (label-position (sb!c::entry-info-offset entry)) file)
-    (dump-pop file)))
-
 ;;; Alter the code object referenced by CODE-HANDLE at the specified
 ;;; OFFSET, storing the object referenced by ENTRY-HANDLE.
 (defun dump-alter-code-object (code-handle offset entry-handle file)
@@ -1205,15 +1189,25 @@
     (when info
       (fasl-validate-structure info file)))
 
-  (let ((code-handle (dump-code-object component
-                                       code-segment
-                                       code-length
-                                       fixups
-                                       file))
-        (2comp (component-info component)))
+  (let* ((2comp (component-info component))
+         (entries (sb!c::ir2-component-entries 2comp))
+         (nfuns (length entries))
+         (code-handle (dump-code-object
+                       component code-segment code-length
+                       fixups file
+                       (mapcar (lambda (entry)
+                                 (label-position (sb!c::entry-info-offset entry)))
+                               entries)))
+         (fun-index nfuns))
 
-    (dolist (entry (sb!c::ir2-component-entries 2comp))
-      (let ((entry-handle (dump-one-entry entry code-handle file)))
+    (dolist (entry entries)
+      (dump-push code-handle file)
+      (dump-object (sb!c::entry-info-name entry) file)
+      (dump-object (sb!c::entry-info-arguments entry) file)
+      (dump-object (sb!c::entry-info-type entry) file)
+      (dump-object (sb!c::entry-info-info entry) file)
+      (dump-fop 'fop-fun-entry file (decf fun-index))
+      (let ((entry-handle (dump-pop file)))
         (setf (gethash entry (fasl-output-entry-table file)) entry-handle)
         (let ((old (gethash entry (fasl-output-patch-table file))))
           (when old

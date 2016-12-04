@@ -126,10 +126,13 @@
       (assemble ((constant-segment constant-holder))
         (map nil (lambda (constant)
                    (sb!vm:emit-inline-constant (car constant) (cdr constant)))
-             constants)))
-    (setf *code-segment* (let ((seg (constant-segment constant-holder)))
-                           (sb!assem:append-segment seg *code-segment*)
-                           seg))))
+             constants))))
+  ;; Always append the constant segment, because a zero-length vector
+  ;; does not imply absence of unboxed data.
+  ;; In particular the simple-fun offsets are in there.
+  (setf *code-segment* (let ((seg (constant-segment constant-holder)))
+                         (sb!assem:append-segment seg *code-segment*)
+                         seg)))
 
 ;;; If a constant is already loaded into a register use that register.
 (defun optimize-constant-loads (component)
@@ -224,6 +227,18 @@
       (setf *elsewhere-label* label)
       (sb!assem:assemble (*elsewhere*)
         (sb!assem:emit-label label)))
+    ;; Leave space for the unboxed words containing simple-fun offsets.
+    ;; Each offset is a 32-bit integer. On 64-bit platforms, 1 offset
+    ;; is stored in the header word as a 16-bit integer.
+    ;; On 32-bit platforms there is an extra boxed slot in the code oject.
+    (let* ((n-entries (length (ir2-component-entries (component-info component))))
+           (ptrs-per-word (/ sb!vm:n-word-bytes 4)) ; either 1 or 2
+           (n-words (ceiling (1- n-entries) ptrs-per-word)))
+      (emit-skip #!-inline-constants *code-segment*
+                 #!+inline-constants (constant-segment *unboxed-constants*)
+                 ;; Preserve double-word alignment of the unboxed constants
+                 (sb!vm:pad-data-block n-words)))
+    ;;
     (do-ir2-blocks (block component)
       (let ((1block (ir2-block-block block)))
         (when (and (eq (block-info 1block) block)

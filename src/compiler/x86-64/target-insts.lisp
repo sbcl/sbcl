@@ -428,18 +428,18 @@
            (let* ((text-origin (sap-int (code-instructions code)))
                   (text-end (+ text-origin (%code-code-size code)))
                   (relocs-index (fill-pointer relocs)))
-             (do ((fun (%code-entry-points code) (%simple-fun-next fun)))
-                 ((null fun) (finish-component code relocs-index))
-               (scan-function
-                (+ (get-lisp-obj-address fun) (- fun-pointer-lowtag)
-                   (ash simple-fun-code-offset word-shift))
-                (acond ((%simple-fun-next fun)
-                        (- (get-lisp-obj-address it) fun-pointer-lowtag))
-                       (t
-                        text-end))
+             (dotimes (i (code-n-entries code) (finish-component code relocs-index))
+               (let ((fun (%code-entry-point code i)))
+                 (scan-function
+                  (+ (get-lisp-obj-address fun) (- fun-pointer-lowtag)
+                     (ash simple-fun-code-offset word-shift))
+                  (if (< (1+ i) (code-n-entries code))
+                      (- (get-lisp-obj-address (%code-entry-point code (1+ i)))
+                         fun-pointer-lowtag)
+                      text-end)
                 ;; Exclude transfers within this code component
-                (lambda (jmp-targ-addr)
-                  (not (<= text-origin jmp-targ-addr text-end))))))))
+                  (lambda (jmp-targ-addr)
+                    (not (<= text-origin jmp-targ-addr text-end)))))))))
        :immobile))
 
     ;; Write a delimiter into the array passed to C

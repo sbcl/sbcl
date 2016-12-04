@@ -32,6 +32,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "thread.h"
+#include "gc-internal.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
 # include <dlfcn.h>
@@ -204,20 +205,15 @@ print_entry_name (lispobj name)
 static void
 print_entry_points (struct code *code)
 {
-    lispobj function = code->entry_points;
-
-    while (function != NIL) {
-        if (lowtag_of(function) != FUN_POINTER_LOWTAG) {
-            printf("%p: bogus function entry", (void *) function);
+    int n_funs = code_n_funs(code);
+    for_each_simple_fun(index, fun, code, 0, {
+        if (widetag_of(fun->header) != SIMPLE_FUN_HEADER_WIDETAG) {
+            printf("%p: bogus function entry", fun);
             return;
         }
-        struct simple_fun *header = (struct simple_fun *) native_pointer(function);
-        print_entry_name(header->name);
-
-        function = header->next;
-        if (function != NIL)
-            printf (", ");
-    }
+        print_entry_name(fun->name);
+        if ((index + 1) < n_funs) printf (", ");
+    });
 }
 
 

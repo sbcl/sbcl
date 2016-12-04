@@ -52,7 +52,6 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed) {
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
     code->header = boxed | CODE_HEADER_WIDETAG;
     code->code_size = make_fixnum(unboxed);
-    code->entry_points = NIL;
     code->debug_info = NIL;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
