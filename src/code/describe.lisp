@@ -315,7 +315,7 @@
       (pprint-logical-block (stream nil)
         (format stream "~%Symbol-plist:")
         (pprint-indent :block 2 stream)
-        (sb-pcl::doplist (key value) plist
+        (doplist (key value) plist
           (format stream "~@:_~A -> ~A"
                   (prin1-to-line key :columns 2 :reserve 5)
                   (prin1-to-line value :columns 2 :reserve 5))))
@@ -456,7 +456,7 @@
     (flet ((describe-slot (name value)
              (format stream "~%  ~A~VT = ~A" name max-slot-name-length
                      (prin1-to-line value))))
-      (sb-pcl::doplist (allocation slots) plist
+      (doplist (allocation slots) plist
         (format stream "~%Slots with ~S allocation:" allocation)
         (dolist (slotd (nreverse slots))
           (describe-slot
