@@ -240,14 +240,9 @@ sufficiently motivated to do lengthy fixes."
   (reinit)
   (error 'save-error))
 
-;;; REPACK-XREF is defined during warm load of
-;;; src/code/repack-xref.lisp.
-(declaim (ftype (sfunction (&key (:verbose t) (:compact-name-count (integer 0))) null)
-                sb!c::repack-xref))
 (defun tune-image-for-dump ()
   #!+sb-fasteval (sb!interpreter::flush-everything)
-  (tune-hashtable-sizes-of-all-packages)
-  (sb!c::repack-xref :verbose nil))
+  (tune-hashtable-sizes-of-all-packages))
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)

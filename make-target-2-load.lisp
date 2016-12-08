@@ -83,6 +83,19 @@
   (loop (multiple-value-bind (winp symbol) (iter)
           (if winp (unintern symbol "CL-USER") (return)))))
 
+;;; In case there is xref data for internals, repack it here to
+;;; achieve a more compact encoding.
+;;;
+;;; However, repacking changes
+;;; SB-C::**MOST-COMMON-XREF-NAMES-BY-{INDEX,NAME}** thereby changing
+;;; the interpretation of xref data written into and loaded from
+;;; fasls. Since fasls should be compatible between images originating
+;;; from the same SBCL build, REPACK-XREF is of no use after the
+;;; target image has been built.
+#+sb-xref-for-internals (sb-c::repack-xref :verbose t)
+(with-unlocked-packages (#:sb-c)
+  (fmakunbound 'sb-c::repack-xref))
+
 #+immobile-code (setq sb-c::*compile-to-memory-space* :dynamic)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 (sb-ext:save-lisp-and-die
