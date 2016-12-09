@@ -1132,7 +1132,8 @@
   (character character &optional readtable (or readtable null)) (eql t)
   ())
 
-(defknown set-macro-character (character (callable 2) &optional t (or readtable null))
+(defknown set-macro-character (character (callable 2 no-function-conversion)
+                               &optional t (or readtable null))
   (eql t)
   (call))
 (defknown get-macro-character (character &optional (or readtable null))
@@ -1141,8 +1142,9 @@
 (defknown make-dispatch-macro-character (character &optional t readtable)
   (eql t) ())
 (defknown set-dispatch-macro-character
-  (character character callable &optional (or readtable null)) (eql t)
-  ())
+  (character character (callable 3 no-function-conversion)
+   &optional (or readtable null)) (eql t)
+  (call))
 (defknown get-dispatch-macro-character
   (character character &optional (or readtable null)) (or callable null)
   ())
@@ -1177,10 +1179,10 @@
   null
   ())
 (defknown set-pprint-dispatch
-  (type-specifier (or null callable)
+  (type-specifier (callable 2 no-function-conversion)
    &optional real sb!pretty:pprint-dispatch-table)
   null
-  ())
+  (call))
 
 ;;; may return any type due to eof-value...
 ;;; and because READ generally returns anything.

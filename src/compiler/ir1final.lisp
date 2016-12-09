@@ -140,6 +140,34 @@
                (aver (basic-combination-p dest))
                (delete-filter node lvar (cast-value node))))))))
 
+;;; Convert function designators to functions in calls to known functions
+(defun ir1-optimize-functional-arguments (component)
+  (do-blocks (block component)
+    (do-nodes (node nil block)
+      (when (and (combination-p node)
+                 (eq (combination-kind node) :known))
+        (let* ((name (lvar-fun-name (combination-fun node) t))
+               (type (info :function :type name))
+               (info (info :function :info name)))
+          (when (and info
+                     (fun-info-functional-args info))
+            (let ((fun-lvars (apply (fun-info-functional-args info)
+                                    (resolve-key-args (combination-args node) type))))
+              (loop for (fun . args) in fun-lvars
+                    for ref = (lvar-uses fun)
+                    for fun-name = (and (constant-lvar-p fun)
+                                        (lvar-value fun))
+                    when (and (constant-lvar-p fun)
+                              (ref-p ref))
+                    do
+                    (let ((value (lvar-value fun)))
+                      (when (and value
+                                 (symbolp value))
+                        (change-ref-leaf
+                         ref
+                         (let ((*compiler-error-context* node))
+                           (find-free-fun value  "ir1-finalize")))))))))))))
+
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:
 ;;;  -- Record the derived result type before the back-end trashes the
@@ -163,5 +191,5 @@
            *free-funs*)
 
   (ir1-merge-casts component)
-
+  (ir1-optimize-functional-arguments component)
   (values))

@@ -166,7 +166,8 @@
   ;; passed to CALLABLE arguments have the right argument counts.
   (callable-check nil :type (or function null))
   ;; Customizing behavior of ASSERT-CALL-TYPE
-  (call-type-deriver nil :type (or function null)))
+  (call-type-deriver nil :type (or function null))
+  (functional-args nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

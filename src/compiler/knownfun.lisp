@@ -66,23 +66,13 @@
 
 ;;; Make a FUN-INFO structure with the specified type, attributes
 ;;; and optimizers.
-(declaim (ftype (function (list list attributes t &key
-                                (:derive-type (or function null))
-                                (:optimizer (or function null))
-                                (:destroyed-constant-args (or function null))
-                                (:result-arg (or index null))
-                                (:overwrite-fndb-silently boolean)
-                                (:foldable-call-check (or function null))
-                                (:callable-check (or function null))
-                                (:call-type-deriver (or function null)))
-                          *)
-                %defknown))
 (defun %defknown (names type attributes location
                   &key derive-type optimizer destroyed-constant-args result-arg
                        overwrite-fndb-silently
                        foldable-call-check
                        callable-check
-                       call-type-deriver)
+                       call-type-deriver
+                       functional-args)
   (let ((ctype (specifier-type type)))
     (dolist (name names)
       (unless overwrite-fndb-silently
@@ -111,7 +101,8 @@
                            :result-arg result-arg
                            :foldable-call-check foldable-call-check
                            :callable-check callable-check
-                           :call-type-deriver call-type-deriver))
+                           :call-type-deriver call-type-deriver
+                           :functional-args functional-args))
       (if location
           (setf (getf (info :source-location :declaration name) 'defknown)
                 location)

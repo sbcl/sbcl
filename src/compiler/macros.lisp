@@ -374,7 +374,7 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  (multiple-value-bind (foldable-call callable arg-types)
+  (multiple-value-bind (foldable-call callable functional-args arg-types)
       (make-foldable-call-check arg-types attributes)
     `(%defknown ',(if (and (consp name)
                            (not (legal-fun-name-p name)))
@@ -385,13 +385,14 @@
                 (source-location)
                 :foldable-call-check ,foldable-call
                 :callable-check ,callable
+                :functional-args ,functional-args
                 ,@keys)))
 
 (defun make-foldable-call-check (arg-types attributes)
   (let ((call (member 'call attributes))
         (fold (member 'foldable attributes)))
     (if (not call)
-        (values nil nil arg-types)
+        (values nil nil nil arg-types)
         (multiple-value-bind (llks required optional rest keys)
             (parse-lambda-list
              arg-types
@@ -408,10 +409,10 @@
                      (if (callable-p (if (consp x)
                                          (car x)
                                          x))
-                         (push (cons name
-                                     (cond ((consp x)
-                                            (setf arg-count-specified t)
-                                            (cadr x))))
+                         (push (list* name
+                                      (cond ((consp x)
+                                             (setf arg-count-specified t)
+                                             (cdr x))))
                                call-vars)
                          (push name vars))
                      name)
@@ -454,11 +455,24 @@
                  (and arg-count-specified
                       `(lambda ,lambda-list
                          (declare (ignore ,@vars))
-                         ,@(loop for (x . arg-count) in call-vars
+                         ,@(loop for (x arg-count) in call-vars
                                  when arg-count
                                  collect (if (eq arg-count '&rest)
                                              `(valid-callable-argument ,x (length ,rest-var))
                                              `(valid-callable-argument ,x ,arg-count)))))
+                 (let ((tests (loop for (x arg-count no-conversion) in call-vars
+                                    unless (eq no-conversion 'no-function-conversion)
+                                    collect `(when ,x
+                                               (push (cons ,x ,(if (eq arg-count '&rest)
+                                                                   `(length ,rest-var)
+                                                                   arg-count) )
+                                                     result)))))
+                   (when tests
+                     `(lambda ,lambda-list
+                        (declare (ignore ,@vars))
+                        (let (result)
+                          ,@tests
+                          result))))
                  `(,@(mapcar #'process-type required)
                    ,@(and optional
                           `(&optional ,@(mapcar #'process-type optional)))
