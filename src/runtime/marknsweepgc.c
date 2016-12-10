@@ -1128,7 +1128,7 @@ static void compute_immobile_space_bound()
 
     for (max = (IMMOBILE_SPACE_SIZE/IMMOBILE_CARD_BYTES)-1 ;
          max >= FIRST_VARYOBJ_PAGE ; --max)
-        if (VARYOBJ_PAGE_GENS(max))
+        if (varyobj_page_gens_augmented(max))
             break;
      max_used_varyobj_page = max; // this is a page index, not the number of pages.
 }
@@ -1376,6 +1376,8 @@ int immobile_space_handle_wp_violation(void* fault_addr)
     low_page_index_t page_index = find_immobile_page_index(fault_addr);
     if (page_index < 0) return 0;
 
+    os_protect((os_vm_address_t)((lispobj)fault_addr & ~(IMMOBILE_CARD_BYTES-1)),
+               IMMOBILE_CARD_BYTES, OS_VM_PROT_ALL);
     if (page_index >= FIRST_VARYOBJ_PAGE) {
         // The free pointer can move up or down. Attempting to insist that a WP
         // fault not occur above the free pointer (plus some slack) is not
@@ -1391,8 +1393,6 @@ int immobile_space_handle_wp_violation(void* fault_addr)
             return 0;
         SET_WP_FLAG(page_index, WRITE_PROTECT_CLEARED);
     }
-    os_protect((os_vm_address_t)((lispobj)fault_addr & ~(IMMOBILE_CARD_BYTES-1)),
-               IMMOBILE_CARD_BYTES, OS_VM_PROT_ALL);
     return 1;
 }
 
