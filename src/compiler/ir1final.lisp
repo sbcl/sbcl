@@ -227,7 +227,14 @@
                           (change-ref-leaf
                            ref
                            (let ((*compiler-error-context* node))
-                             (find-free-fun replacement "ir1-finalize"))))))))))))))
+                             (find-free-fun replacement "ir1-finalize")))))))))
+          (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
+                (ref (principal-lvar-use (combination-fun node))))
+            (when (and two-arg
+                       (ref-p ref))
+              (change-ref-leaf
+               ref
+               (find-free-fun two-arg "ir1-finalize")))))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:
