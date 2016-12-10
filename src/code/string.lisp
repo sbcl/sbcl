@@ -464,7 +464,7 @@
   (string-not-lessp* string1 string2 start1 end1 start2 end2))
 
 (defun two-arg-string-not-lessp (string1 string2)
-  (string-lessp* string1 string2 0 nil 0 nil))
+  (string-not-lessp* string1 string2 0 nil 0 nil))
 
 (defun string-not-greaterp (string1 string2 &key (start1 0) end1 (start2 0)
                                     end2)

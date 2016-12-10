@@ -6068,3 +6068,8 @@
         do
         (assert (fboundp x))
         (assert (sb-int:info :function :info x))))
+
+(with-test (:name :two-arg-with-two-arguments-only)
+  (assert (funcall (checked-compile `(lambda (x y) (string-lessp x y :start1 0)))
+                   "a"
+                   "b")))

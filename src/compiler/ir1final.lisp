@@ -199,11 +199,12 @@
                  (eq (combination-kind node) :known))
         (let* ((comination-name (lvar-fun-name (combination-fun node) t))
                (type (info :function :type comination-name))
-               (info (info :function :info comination-name)))
+               (info (info :function :info comination-name))
+               (args (combination-args node)))
           (when (and info
                      (fun-info-functional-args info))
             (let ((fun-lvars (apply (fun-info-functional-args info)
-                                    (resolve-key-args (combination-args node) type))))
+                                    (resolve-key-args args type))))
               (loop for (fun . arg-count) in fun-lvars
                     for ref = (principal-lvar-use fun)
                     when (ref-p ref)
@@ -231,7 +232,8 @@
           (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
                 (ref (principal-lvar-use (combination-fun node))))
             (when (and two-arg
-                       (ref-p ref))
+                       (ref-p ref)
+                       (= (length args) 2))
               (change-ref-leaf
                ref
                (find-free-fun two-arg "ir1-finalize")))))))))
