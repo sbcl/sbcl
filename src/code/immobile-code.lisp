@@ -44,7 +44,8 @@
                                     (%simple-fun-name (%code-entry-point (car a) 0)))
                                    (name2
                                     (%simple-fun-name (%code-entry-point (car b) 0))))
-                               (if (and (symbolp name1) (symbolp name2))
+                               (if (and (symbolp name1) (symbol-package name1)
+                                        (symbolp name2) (symbol-package name2))
                                    (let ((p1 (package-name (symbol-package name1)))
                                          (p2 (package-name (symbol-package name2))))
                                      (cond ((string< p1 p2) t)

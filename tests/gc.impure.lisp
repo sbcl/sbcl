@@ -130,3 +130,14 @@
     (assert (not (setf (gc-logfile) nil)))
     (assert (not (gc-logfile)))
     (delete-file p)))
+
+(with-test (:name (sb-kernel::order-by-in-degree :uninterned-function-names))
+  ;; This creates two functions whose names are uninterned symbols and
+  ;; that are both referenced once, resulting in a tie
+  ;; w.r.t. ORDER-BY-IN-DEGREE. Uninterned symbols used to cause an
+  ;; error in the tie-breaker.
+  (let* ((sb-c::*compile-to-memory-space* :immobile)
+         (f (eval `(defun ,(gensym) ())))
+         (g (eval `(defun ,(gensym) ()))))
+    (eval `(defun h () (,f) (,g))))
+  (sb-kernel::order-by-in-degree))
