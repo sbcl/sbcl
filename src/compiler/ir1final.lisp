@@ -140,33 +140,94 @@
                (aver (basic-combination-p dest))
                (delete-filter node lvar (cast-value node))))))))
 
+(defglobal *two-arg-functions*
+    '((* two-arg-*)
+      (+ two-arg-+)
+      (- two-arg--)
+      (/ two-arg-/)
+      (< two-arg-<)
+      (= two-arg-=)
+      (> two-arg->)
+      (char-equal two-arg-char-equal)
+      (char-greaterp two-arg-char-greaterp)
+      (char-lessp two-arg-char-lessp)
+      (char-not-equal two-arg-char-not-equal)
+      (char-not-greaterp two-arg-char-not-greaterp)
+      (char-not-lessp two-arg-char-not-lessp)
+      (gcd two-arg-gcd)
+      (lcm two-arg-lcm)
+      (logand two-arg-and)
+      (logior two-arg-ior)
+      (logxor two-arg-xor)
+      (logeqv two-arg-eqv)
+      (string= two-arg-string=)
+      (string-equal two-arg-string-equal)
+      (string< two-arg-string<)
+      (string> two-arg-string>)
+      (string<= two-arg-string<=)
+      (string>= two-arg-string>=)
+      (string/= two-arg-string/=)
+      (string-lessp two-arg-string-lessp)
+      (string-greaterp two-arg-string-greaterp)
+      (string-not-lessp two-arg-string-not-lessp)
+      (string-not-greaterp two-arg-string-not-greaterp)
+      (string-not-equal two-arg-string-not-equal)))
+
+(defmacro def-two-arg-fun (function)
+  (let ((name (symbolicate 'two-arg- function)))
+    `(progn
+       (defknown ,name (t t) t ())
+       (defun ,name (a b)
+         (,function a b))
+       (pushnew (list ',function ',name) *two-arg-functions* :key #'car))))
+
+(defmacro def-two-arg-funs (&body functions)
+  `(progn
+     ,@(loop for fun in functions
+             collect `(def-two-arg-fun ,fun))))
+
+(def-two-arg-funs
+  char= char/= char< char> char<= char>=
+  >= <= /=)
+
 ;;; Convert function designators to functions in calls to known functions
+;;; Also convert to TWO-ARG- variants
 (defun ir1-optimize-functional-arguments (component)
   (do-blocks (block component)
     (do-nodes (node nil block)
       (when (and (combination-p node)
                  (eq (combination-kind node) :known))
-        (let* ((name (lvar-fun-name (combination-fun node) t))
-               (type (info :function :type name))
-               (info (info :function :info name)))
+        (let* ((comination-name (lvar-fun-name (combination-fun node) t))
+               (type (info :function :type comination-name))
+               (info (info :function :info comination-name)))
           (when (and info
                      (fun-info-functional-args info))
             (let ((fun-lvars (apply (fun-info-functional-args info)
                                     (resolve-key-args (combination-args node) type))))
-              (loop for (fun . args) in fun-lvars
-                    for ref = (lvar-uses fun)
-                    for fun-name = (and (constant-lvar-p fun)
-                                        (lvar-value fun))
-                    when (and (constant-lvar-p fun)
-                              (ref-p ref))
+              (loop for (fun . arg-count) in fun-lvars
+                    for ref = (principal-lvar-use fun)
+                    when (ref-p ref)
                     do
-                    (let ((value (lvar-value fun)))
-                      (when (and value
-                                 (symbolp value))
-                        (change-ref-leaf
-                         ref
-                         (let ((*compiler-error-context* node))
-                           (find-free-fun value  "ir1-finalize")))))))))))))
+                    (flet ((translate-two-args (name)
+                             (and (eql arg-count 2)
+                                  (neq comination-name 'reduce)
+                                  (cadr (assoc name *two-arg-functions*)))))
+                      (let* ((leaf (ref-leaf ref))
+                             (fun-name (and (constant-p leaf)
+                                            (constant-value leaf)))
+                             (replacement
+                               (cond ((and fun-name
+                                           (symbolp fun-name))
+                                      (or (translate-two-args fun-name)
+                                          fun-name))
+                                     ((and (global-var-p leaf)
+                                           (eq (global-var-kind leaf) :global-function))
+                                      (translate-two-args (global-var-%source-name leaf))))))
+                        (when replacement
+                          (change-ref-leaf
+                           ref
+                           (let ((*compiler-error-context* node))
+                             (find-free-fun replacement "ir1-finalize"))))))))))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:

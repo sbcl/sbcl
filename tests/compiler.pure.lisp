@@ -6062,3 +6062,9 @@
                      (checked-compile
                       '(lambda () (set '// 10))
                       :allow-warnings t))))
+
+(with-test (:name :two-arg-funs-check)
+  (loop for (nil x) in sb-c::*two-arg-functions*
+        do
+        (assert (fboundp x))
+        (assert (sb-int:info :function :info x))))

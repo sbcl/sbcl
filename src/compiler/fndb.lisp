@@ -259,6 +259,18 @@
 (defknown (1+ 1-) (number) number
   (movable foldable flushable))
 
+(defknown (two-arg-* two-arg-+ two-arg-- two-arg-/)
+  (number number) number
+  ())
+
+(defknown (two-arg-< two-arg-= two-arg->)
+  (number number) boolean
+  ())
+
+(defknown (two-arg-gcd two-arg-lcm two-arg-and two-arg-ior two-arg-xor two-arg-eqv)
+  (integer integer) integer
+  ())
+
 (defknown conjugate (number) number
   (movable foldable flushable))
 
@@ -1051,6 +1063,18 @@
                    string-not-equal)
   (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
               (:start2 index) (:end2 sequence-end))
+  (or index null)
+  (foldable flushable))
+
+(defknown (two-arg-string= two-arg-string-equal)
+  (string-designator string-designator)
+  boolean
+  (foldable flushable))
+
+(defknown (two-arg-string< two-arg-string> two-arg-string<= two-arg-string>=
+           two-arg-string/= two-arg-string-lessp two-arg-string-greaterp
+           two-arg-string-not-lessp two-arg-string-not-greaterp two-arg-string-not-equal)
+  (string-designator string-designator)
   (or index null)
   (foldable flushable))
 
