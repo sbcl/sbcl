@@ -131,6 +131,7 @@
     (assert (not (gc-logfile)))
     (delete-file p)))
 
+#+immobile-code
 (with-test (:name (sb-kernel::order-by-in-degree :uninterned-function-names))
   ;; This creates two functions whose names are uninterned symbols and
   ;; that are both referenced once, resulting in a tie
