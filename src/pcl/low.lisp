@@ -180,7 +180,7 @@
 ;;; weakening of STD-INSTANCE-P.
 ;;; FIXME: what does the preceding comment mean? You can't use instance-slots
 ;;; on a structure. (Consider especially a structure of 0 slots.)
-(defmacro std-instance-slots (x) `(%instance-ref ,x 1))
+(defmacro std-instance-slots (x) `(%instance-ref ,x sb!vm:instance-data-start))
 (defmacro std-instance-wrapper (x) `(%instance-layout ,x))
 
 ;;; FIXME: These functions are called every place we do a

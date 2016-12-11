@@ -130,8 +130,12 @@
   (flushable))
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
-    (t (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))) t
-  ())
+    (t (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))) t)
+#!+64-bit
+(progn
+(defknown sb!vm::get-header-data-high (t) (unsigned-byte 32) (flushable))
+(defknown sb!vm::cas-header-data-high
+    (t (unsigned-byte 32) (unsigned-byte 32)) (unsigned-byte 32)))
 
 (defknown %array-dimension (t index) index
   (flushable))

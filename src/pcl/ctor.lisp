@@ -799,7 +799,7 @@
          (allocation-function (raw-instance-allocator class))
          (slots-fetcher (slots-fetcher class)))
     (if (eq allocation-function 'allocate-standard-instance)
-        `(let ((.instance. (%make-standard-instance nil 0))
+        `(let ((.instance. (%make-standard-instance nil #-compact-instance-header 00))
                (.slots. (make-array
                          ,(layout-length wrapper)
                          ,@(when early-unbound-markers-p

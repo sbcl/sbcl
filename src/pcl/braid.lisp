@@ -35,7 +35,7 @@
   (let* ((no-of-slots (wrapper-no-of-instance-slots wrapper))
          (instance (%make-standard-instance (make-array no-of-slots
                                                         :initial-element +slot-unbound+)
-                                            0)))
+                                            #-compact-instance-header 0)))
     (setf (std-instance-wrapper instance) wrapper)
     instance))
 

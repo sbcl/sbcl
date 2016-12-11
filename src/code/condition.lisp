@@ -192,7 +192,13 @@
                      (class (lookup (class-name designator)))
                      (t designator)))))
     (if (condition-classoid-p classoid)
-        (let ((instance (%make-condition-object initargs '())))
+        ;; Interestingly we fail to validate the actual-initargs,
+        ;; allowing any random initarg names.  Is this permissible?
+        ;; And why is lazily filling in ASSIGNED-SLOTS beneficial anyway?
+        (let ((instance (%make-condition-object '()
+                                                #!+compact-instance-header
+                                                (sb!impl::new-instance-hash-code)
+                                                initargs)))
           (setf (%instance-layout instance) (classoid-layout classoid))
           (values instance classoid))
         (error 'simple-type-error

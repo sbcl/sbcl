@@ -117,6 +117,39 @@
     (inst mov al-tn (make-ea :byte :base x :disp (- other-pointer-lowtag)))
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
+
+(define-vop (get-header-data-high)
+  (:translate get-header-data-high)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (inst mov (reg-in-size res :dword)
+          (make-ea :dword :base x :disp (- 4 other-pointer-lowtag)))
+    (inst shl res n-fixnum-tag-bits)))
+
+;;; Swap the high half of the header word of an object
+;;; that has OTHER-POINTER-LOWTAG
+(define-vop (cas-header-data-high)
+  (:args (object :scs (descriptor-reg) :to :eval)
+         (old :scs (unsigned-reg) :target rax)
+         (new :scs (unsigned-reg)))
+  (:policy :fast-safe)
+  (:translate cas-header-data-high)
+  (:temporary (:sc descriptor-reg :offset rax-offset
+               :from (:argument 1) :to :result :target result) rax)
+  (:arg-types * unsigned-num unsigned-num)
+  (:results (result :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 5
+     (move rax old)
+     (inst cmpxchg (make-ea :dword :base object
+                            :disp (- 4 other-pointer-lowtag))
+           (reg-in-size new :dword) :lock)
+     (inst lea result
+           (make-ea :qword :index rax
+                    :scale (ash 1 n-fixnum-tag-bits)))))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)

@@ -1734,21 +1734,14 @@ or they must be declared locally notinline at each call site.~@:>"
                                               slot-names)
   (let* ((dd (make-defstruct-description t class-name))
          (conc-name (string (gensymify* class-name "-")))
-         ;; FIXME: base this on #!+compact-instance-header
-         (slot-index 1)
-                         ;; The index starts at 1 for ordinary named
-                         ;; slots because slot 0 is magical, used for
-                         ;; the LAYOUT in CONDITIONs and
-                         ;; FUNCALLABLE-INSTANCEs.  (This is the same
-                         ;; in ordinary structures too: see (INCF
-                         ;; DD-LENGTH) in
-                         ;; PARSE-DEFSTRUCT-NAME-AND-OPTIONS).
-         (dd-slots (mapcar (lambda (slot-name)
-                             (make-defstruct-slot-description
-                              :name slot-name
-                              :index (prog1 slot-index (incf slot-index))
-                              :accessor-name (symbolicate conc-name slot-name)))
-                           slot-names)))
+         ;; Without compact instance headers, the index starts at 1 for
+         ;; named slots, because slot 0 is the LAYOUT.
+         ;; This is the same in ordinary structures too: see (INCF DD-LENGTH)
+         ;; in PARSE-DEFSTRUCT-NAME-AND-OPTIONS.
+         ;; With compact instance headers, slot 0 is a data slot, except that
+         ;; funcallable instances do not (yet) put the layout in the header.
+         (slot-index
+          (if (eq dd-type 'funcallable-structure) 1 sb!vm:instance-data-start)))
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
     ;; because none of the magical alternate-metaclass structures
     ;; have copiers and predicates that "Just work"
@@ -1764,7 +1757,13 @@ or they must be declared locally notinline at each call site.~@:>"
     (setf (dd-alternate-metaclass dd) (list superclass-name
                                             metaclass-name
                                             metaclass-constructor)
-          (dd-slots dd) dd-slots
+          (dd-slots dd)
+          (mapcar (lambda (slot-name)
+                    (make-defstruct-slot-description
+                     :name slot-name
+                     :index (prog1 slot-index (incf slot-index))
+                     :accessor-name (symbolicate conc-name slot-name)))
+                  slot-names)
           (dd-length dd) slot-index
           (dd-type dd) dd-type)
     dd))

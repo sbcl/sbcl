@@ -124,7 +124,8 @@
 ;;;; PCL instances
 
 (sb!kernel::!defstruct-with-alternate-metaclass standard-instance
-  :slot-names (slots hash-code)
+  ;; KLUDGE: arm64 needs to have CAS-HEADER-DATA-HIGH implemented
+  :slot-names (slots #!-(and compact-instance-header x86-64) hash-code)
   :boa-constructor %make-standard-instance
   :superclass-name t
   :metaclass-name standard-classoid
@@ -151,6 +152,9 @@
   ;; (!) as of sbcl-0.pre7.63, so for now it's academic.)
   :runtime-type-checks-p nil)
 
+#!+(and compact-instance-header (not x86-64))
+(defconstant std-instance-hash-slot-index 1)
+#!-compact-instance-header
 (defconstant std-instance-hash-slot-index 2)
 (defconstant fsc-instance-hash-slot-index 2)
 

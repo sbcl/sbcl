@@ -25,6 +25,11 @@
   (make-instance 'no-slots))
 (compile 'make-no-slots)
 
+;; Note: this test may no longer be relevant. It asserted laziness of
+;; the hash computation, since it was slow at some point, and it was
+;; the root cause of slow instance creation. But that was fixed,
+;; and we really don't care per se that hashing is lazy.
+#-compact-instance-header ; can't create symbols in SB-PCL
 (with-test (:name :instance-hash-starts-as-0)
   ;; These first two tests look the same but they aren't:
   ;; the second one uses a CTOR function.

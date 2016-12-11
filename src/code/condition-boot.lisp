@@ -10,7 +10,12 @@
 (in-package "SB!KERNEL")
 
 (!defstruct-with-alternate-metaclass condition
-  :slot-names (actual-initargs assigned-slots)
+  ;; The idea of putting 'actual-initargs' at the end is that we could possibly
+  ;; speed up creation of condition objects by making the initargs into trailing
+  ;; slots of the primitive object with %instance-length reflecting the number
+  ;; of arguments (including the keywords) supplied to ALLOCATE-CONDITION.
+  ;; This should be better than the implicit copy-list done by the XEP.
+  :slot-names (assigned-slots #!+compact-instance-header hash actual-initargs)
   :boa-constructor %make-condition-object
   :superclass-name t
   :metaclass-name condition-classoid
