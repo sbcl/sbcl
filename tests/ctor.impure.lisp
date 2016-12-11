@@ -325,5 +325,72 @@
 (with-test (:name :bug-1397454)
   (assert (equal (slot-value (fancy-cnm-in-ii-test 'hi) 'a)
                  '(expect-this hi))))
-
-;;;; success
+
+(with-test (:name (make-instance :ctor
+                   :constant-initarg :constant-redefinition
+                   :bug-1644944))
+  (let ((class-name (gensym))
+        (slot-name (gensym))
+        (all-specs '()))
+    (eval `(defclass ,class-name () ((,slot-name :initarg :s
+                                                 :reader ,slot-name))))
+    (flet ((define-constant (name value)
+             (handler-bind ((sb-ext:defconstant-uneql #'continue))
+               (eval `(defconstant ,name ',value))))
+           (make (value)
+             (checked-compile
+              `(lambda ()
+                 (make-instance ',class-name :s ,value))))
+           (check (&rest specs)
+             (setf all-specs (append all-specs specs))
+             (loop :for (fun expected) :on all-specs :by #'cddr
+                :do (assert (eql (funcall (symbol-function slot-name)
+                                          (funcall fun))
+                                 expected)))))
+      ;; Test constructors using the constant symbol and the relevant
+      ;; constant values.
+      (let ((constant-name (gensym)))
+        (define-constant constant-name 1)
+        (destructuring-bind (f-1-c f-1-1 f-1-2)
+            (mapcar #'make `(,constant-name 1 2))
+          (check f-1-c 1 f-1-1 1 f-1-2 2))
+
+        ;; Redefining the constant must not affect the existing
+        ;; constructors. New constructors must use the new value.
+        (define-constant constant-name 2)
+        (destructuring-bind (f-2-c f-2-1 f-2-2)
+            (mapcar #'make `(,constant-name 1 2))
+          (check f-2-c 2 f-2-1 1 f-2-2 2))
+
+        ;; Same for non-atom values, with the additional complication of
+        ;; preserving (non-)same-ness.
+        (let ((a1 '(:a)) (a2 '(:a)) (b '(:b)))
+          (define-constant constant-name a1)
+          (destructuring-bind (f-3-c f-3-a1 f-3-a2 f-3-b)
+              (mapcar #'make (list constant-name `',a1 `',a2 `',b))
+            (check f-3-c a1 f-3-a1 a1 f-3-a2 a2 f-3-b b))
+          (define-constant constant-name b)
+          (destructuring-bind (f-4-c f-4-a1 f-4-a2 f-4-b)
+              (mapcar #'make (list constant-name `',a1 `',a2 `',b))
+            (check f-4-c b f-4-a1 a1 f-4-a2 a2 f-4-b b))))
+
+      ;; A different constant with the same value must not cause
+      ;; aliasing.
+      (let ((constant-name-1 (gensym))
+            (constant-name-2 (gensym)))
+        (define-constant constant-name-1 1)
+        (define-constant constant-name-2 1)
+        (destructuring-bind (f-5-d-c f-5-d-1 f-5-d-2)
+            (mapcar #'make `(,constant-name-1 1 2))
+          (check f-5-d-c 1 f-5-d-1 1 f-5-d-2 2))
+        (destructuring-bind (f-5-e-c f-5-e-1 f-5-e-2)
+            (mapcar #'make `(,constant-name-2 1 2))
+          (check f-5-e-c 1 f-5-e-1 1 f-5-e-2 2))
+        (define-constant constant-name-1 2)
+        (destructuring-bind (f-6-d-c f-6-d-1 f-6-d-2)
+            (mapcar #'make `(,constant-name-1 1 2))
+          (check f-6-d-c 2 f-6-d-1 1 f-6-d-2 2))
+        (destructuring-bind (f-6-e-c f-6-e-1 f-6-e-2)
+            (mapcar #'make `(,constant-name-2 1 2))
+          (check f-6-e-c 1 f-6-e-1 1 f-6-e-2 2))))))
+
