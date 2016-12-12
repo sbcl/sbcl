@@ -422,13 +422,8 @@
   (declare (optimize speed))
   (declare (type structure-object key))
   (declare (type (integer 0 #.+max-hash-depthoid+) depthoid))
-  (let* ((layout (%instance-layout key)) ; i.e. slot #0
-         ;; Is there some reason the name of the layout's classoid
-         ;; should be preferred as the seed, instead of using the CLOS-HASH
-         ;; just like SXHASH does?
-         (classoid (layout-classoid layout))
-         (name (classoid-name classoid))
-         (result (mix (sxhash name) (the fixnum 79867))))
+  (let* ((layout (%instance-layout key))
+         (result (layout-clos-hash layout)))
     (declare (type fixnum result))
     (when (plusp depthoid)
       (let ((max-iterations depthoid)
