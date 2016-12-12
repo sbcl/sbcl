@@ -12,6 +12,7 @@ changes relative to sbcl-1.3.12:
     class definitions. (lp#1082967)
   * optimization: memory consumption of each STANDARD-OBJECT instance is
     reduced by 2 words if the compact-instance-header feature is enabled.
+  * optimization: CONDITION instances are quicker to allocate.
   * bug fix: get-timezone returns corret DST on 64-bit Windows. (lp#1641058)
   * bug fix: cross reference information in fasls is no longer incompatible
     between different cores (lp#1648186)

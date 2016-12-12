@@ -110,8 +110,11 @@
 ;;; because any conditions signaled are not printable otherwise,
 ;;; except by the method on type T which is completely unhelpful.
 (defmethod print-object ((x condition) stream)
-  (print-unreadable-object (x stream :type t :identity t)
-    (write (%instance-ref x 1) :stream stream :escape t)))
+  (let ((initargs (loop for i from (+ sb!vm:instance-data-start 2)
+                        below (%instance-length x)
+                        collect (%instance-ref x i))))
+    (print-unreadable-object (x stream :type t :identity t)
+      (write initargs :stream stream :escape t))))
 
 ;;;; slots of CONDITION objects
 
@@ -154,33 +157,45 @@
     (when (eq (condition-slot-name cslot) name)
       (return (setf (car (condition-slot-cell cslot)) new-value)))))
 
+;;; FIXME: this doesn't return a reader function. It *is* the reader function.
+;;; So why does it have "-function" in the name? That's stupid, because every
+;;; other function that is just a function, and not a meta-function, does *not*
+;;; have "-function" in the name. It should be CONDITION-SLOT-VALUE.
 (defun condition-reader-function (condition name)
   (let ((class (layout-classoid (%instance-layout condition))))
     (dolist (cslot (condition-classoid-class-slots class))
       (when (eq (condition-slot-name cslot) name)
         (return-from condition-reader-function
                      (car (condition-slot-cell cslot)))))
+    ;; FIXME: how many representations of an unbound slot do we need?
+    ;; Why not use the PCL marker? (Too much is never enough?)
     (let ((val (getf (condition-assigned-slots condition) name
                      *empty-condition-slot*)))
       (if (eq val *empty-condition-slot*)
-          (let ((actual-initargs (condition-actual-initargs condition))
+          (let ((instance-length (%instance-length condition))
                 (slot (find-condition-class-slot class name)))
             (unless slot
               (error "missing slot ~S of ~S" name condition))
-            (do ((initargs actual-initargs (cddr initargs)))
-                ((endp initargs)
-                 (setf (getf (condition-assigned-slots condition) name)
-                       (find-slot-default class slot)))
-              (when (member (car initargs) (condition-slot-initargs slot))
-                (return-from condition-reader-function
-                  (setf (getf (condition-assigned-slots condition)
-                              name)
-                        (cadr initargs))))))
+            (setf (getf (condition-assigned-slots condition) name)
+                  (do ((i (+ sb!vm:instance-data-start 2) (+ i 2)))
+                      ((>= i instance-length) (find-slot-default class slot))
+                    (when (member (%instance-ref condition i)
+                                  (condition-slot-initargs slot))
+                      (return (%instance-ref condition (1+ i)))))))
           val))))
 
 ;;;; MAKE-CONDITION
 
 (defun allocate-condition (designator &rest initargs)
+  (when (oddp (length initargs))
+    (error 'simple-error
+           :format-control "odd-length initializer list: ~S."
+           :format-arguments
+           (let (list)
+             ;; avoid direct reference to INITARGS as a list
+             ;; so that it is not reified unless we reach here.
+             (do-rest-arg ((arg) initargs) (push arg list))
+             (nreverse list))))
   ;; I am going to assume that people are not somehow getting to here
   ;; with a CLASSOID, which is not strictly legal as a designator,
   ;; but which is accepted because it is actually the desired thing.
@@ -195,11 +210,14 @@
         ;; Interestingly we fail to validate the actual-initargs,
         ;; allowing any random initarg names.  Is this permissible?
         ;; And why is lazily filling in ASSIGNED-SLOTS beneficial anyway?
-        (let ((instance (%make-condition-object '()
-                                                #!+compact-instance-header
-                                                (sb!impl::new-instance-hash-code)
-                                                initargs)))
-          (setf (%instance-layout instance) (classoid-layout classoid))
+        (let ((instance (%make-instance (+ sb!vm:instance-data-start
+                                           2 ; ASSIGNED-SLOTS and HASH
+                                           (length initargs))))) ; rest
+          (setf (%instance-layout instance) (classoid-layout classoid)
+                (condition-assigned-slots instance) nil
+                (condition-hash instance) (sb!impl::new-instance-hash-code))
+          (do-rest-arg ((val index) initargs)
+            (setf (%instance-ref instance (+ sb!vm:instance-data-start index 2)) val))
           (values instance classoid))
         (error 'simple-type-error
                :datum designator
@@ -215,6 +233,9 @@
   ;; ALLOCATE-CONDITION will signal a type error if TYPE does not designate
   ;; a condition class. This seems fair enough.
   (declare (explicit-check))
+  ;; FIXME: the compiler should have a way to make GETF operate on a &MORE arg
+  ;; so that the initargs are never listified.
+  (declare (dynamic-extent initargs))
   (multiple-value-bind (condition classoid)
       (apply #'allocate-condition type initargs)
 
