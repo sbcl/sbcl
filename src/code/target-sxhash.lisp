@@ -309,17 +309,13 @@
                    ;; simply returning the same value for all LAYOUT
                    ;; objects, as the next branch would do.
                    (layout-clos-hash x))
-                  #!+compact-instance-header
-                  (condition (sb!kernel::condition-hash x))
-                  ;; Too bad the compiler isn't able to automatically
-                  ;; eliminate the possibility of being a CONDITION here
-                  ;; if CONDITION was previously tested. So be explicit.
-                  ((or structure-object #!-compact-instance-header condition)
+                  (structure-object
                    (logxor 422371266
                            ;; FIXME: why not (LAYOUT-CLOS-HASH ...) ?
                            (sxhash      ; through DEFTRANSFORM
                             (classoid-name
                              (layout-classoid (%instance-layout x))))))
+                  (condition (sb!kernel::condition-hash x))
                   (t (std-instance-hash x))))
                (symbol (sxhash x))      ; through DEFTRANSFORM
                (array
