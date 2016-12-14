@@ -13,6 +13,8 @@ changes relative to sbcl-1.3.12:
   * optimization: memory consumption of each STANDARD-OBJECT instance is
     reduced by 2 words if the compact-instance-header feature is enabled.
   * optimization: CONDITION instances are quicker to allocate.
+  * optimization: unoptimized calls to FILL on specialized vectors are now
+    just as fast as T vectors. 
   * bug fix: get-timezone returns corret DST on 64-bit Windows. (lp#1641058)
   * bug fix: cross reference information in fasls is no longer incompatible
     between different cores (lp#1648186)

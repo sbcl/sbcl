@@ -612,6 +612,95 @@
                     (list t &key (:start t) (:end t)))
   '(list-fill* seq item start end))
 
+(defun find-basher (saetp &optional item node)
+  (let* ((element-type (sb!vm:saetp-specifier saetp))
+         (element-ctype (sb!vm:saetp-ctype saetp))
+         (n-bits (sb!vm:saetp-n-bits saetp))
+         (basher-name (format nil "UB~D-BASH-FILL" n-bits))
+         (basher (or (find-symbol basher-name
+                                  (load-time-value
+                                   (find-package "SB!KERNEL") t))
+                     (abort-ir1-transform
+                      "Unknown fill basher, please report to sbcl-devel: ~A"
+                      basher-name)))
+         (kind (cond ((sb!vm:saetp-fixnum-p saetp) :tagged)
+                     ((member element-type '(character base-char)) :char)
+                     ((eq element-type 'single-float) :single-float)
+                     #!+64-bit
+                     ((eq element-type 'double-float) :double-float)
+                     #!+64-bit
+                     ((equal element-type '(complex single-float))
+                      :complex-single-float)
+                     (t
+                      (aver (integer-type-p element-ctype))
+                      :bits)))
+         ;; BASH-VALUE is a word that we can repeatedly smash
+         ;; on the array: for less-than-word sized elements it
+         ;; contains multiple copies of the fill item.
+         (bash-value
+           (if (constant-lvar-p item)
+               (let ((tmp (lvar-value item)))
+                 (unless (ctypep tmp element-ctype)
+                   (abort-ir1-transform "~S is not ~S" tmp element-type))
+                 (let* ((bits
+                          (ldb (byte n-bits 0)
+                               (ecase kind
+                                 (:tagged
+                                  (ash tmp sb!vm:n-fixnum-tag-bits))
+                                 (:char
+                                  (char-code tmp))
+                                 (:bits
+                                  tmp)
+                                 (:single-float
+                                  (single-float-bits tmp))
+                                 #!+64-bit
+                                 (:double-float
+                                  (logior (ash (double-float-high-bits tmp) 32)
+                                          (double-float-low-bits tmp)))
+                                 #!+64-bit
+                                 (:complex-single-float
+                                  (logior (ash (single-float-bits (imagpart tmp)) 32)
+                                          (ldb (byte 32 0)
+                                               (single-float-bits (realpart tmp))))))))
+                        (res bits))
+                   (loop for i of-type sb!vm:word from n-bits by n-bits
+                         until (= i sb!vm:n-word-bits)
+                         do (setf res (ldb (byte sb!vm:n-word-bits 0)
+                                           (logior res (ash bits i)))))
+                   res))
+               (progn
+                 (when node
+                   (delay-ir1-transform node :constraint))
+                 `(let* ((bits (ldb (byte ,n-bits 0)
+                                    ,(ecase kind
+                                       (:tagged
+                                        `(ash item ,sb!vm:n-fixnum-tag-bits))
+                                       (:char
+                                        `(char-code item))
+                                       (:bits
+                                        `item)
+                                       (:single-float
+                                        `(single-float-bits item))
+                                       #!+64-bit
+                                       (:double-float
+                                        `(logior (ash (double-float-high-bits item) 32)
+                                                 (double-float-low-bits item)))
+                                       #!+64-bit
+                                       (:complex-single-float
+                                        `(logior (ash (single-float-bits (imagpart item)) 32)
+                                                 (ldb (byte 32 0)
+                                                      (single-float-bits (realpart item))))))))
+                         (res bits))
+                    (declare (type sb!vm:word res))
+                    ,@(unless (= sb!vm:n-word-bits n-bits)
+                        `((loop for i of-type sb!vm:word from ,n-bits by ,n-bits
+                                until (= i sb!vm:n-word-bits)
+                                do (setf res
+                                         (ldb (byte ,sb!vm:n-word-bits 0)
+                                              (logior res (ash bits (truly-the (integer 0 ,(- sb!vm:n-word-bits n-bits)) i))))))))
+                    res)))))
+    (values basher bash-value)))
+
 (deftransform fill ((seq item &key (start 0) (end nil))
                     (vector t &key (:start t) (:end t))
                     *
@@ -624,90 +713,8 @@
     (cond ((eq *wild-type* element-ctype)
            (delay-ir1-transform node :constraint)
            `(vector-fill* seq item start end))
-          ((and saetp (sb!vm::valid-bit-bash-saetp-p saetp))
-           (let* ((n-bits (sb!vm:saetp-n-bits saetp))
-                  (basher-name (format nil "UB~D-BASH-FILL" n-bits))
-                  (basher (or (find-symbol basher-name
-                                           (load-time-value
-                                            (find-package "SB!KERNEL") t))
-                              (abort-ir1-transform
-                               "Unknown fill basher, please report to sbcl-devel: ~A"
-                               basher-name)))
-                  (kind (cond ((sb!vm:saetp-fixnum-p saetp) :tagged)
-                              ((member element-type '(character base-char)) :char)
-                              ((eq element-type 'single-float) :single-float)
-                              #!+64-bit
-                              ((eq element-type 'double-float) :double-float)
-                              #!+64-bit
-                              ((equal element-type '(complex single-float))
-                               :complex-single-float)
-                              (t
-                               (aver (integer-type-p element-ctype))
-                               :bits)))
-                  ;; BASH-VALUE is a word that we can repeatedly smash
-                  ;; on the array: for less-than-word sized elements it
-                  ;; contains multiple copies of the fill item.
-                  (bash-value
-                   (if (constant-lvar-p item)
-                       (let ((tmp (lvar-value item)))
-                         (unless (ctypep tmp element-ctype)
-                           (abort-ir1-transform "~S is not ~S" tmp element-type))
-                         (let* ((bits
-                                 (ldb (byte n-bits 0)
-                                      (ecase kind
-                                        (:tagged
-                                         (ash tmp sb!vm:n-fixnum-tag-bits))
-                                        (:char
-                                         (char-code tmp))
-                                        (:bits
-                                         tmp)
-                                        (:single-float
-                                         (single-float-bits tmp))
-                                        #!+64-bit
-                                        (:double-float
-                                         (logior (ash (double-float-high-bits tmp) 32)
-                                                 (double-float-low-bits tmp)))
-                                        #!+64-bit
-                                        (:complex-single-float
-                                         (logior (ash (single-float-bits (imagpart tmp)) 32)
-                                                 (ldb (byte 32 0)
-                                                      (single-float-bits (realpart tmp))))))))
-                                (res bits))
-                           (loop for i of-type sb!vm:word from n-bits by n-bits
-                                 until (= i sb!vm:n-word-bits)
-                                 do (setf res (ldb (byte sb!vm:n-word-bits 0)
-                                                   (logior res (ash bits i)))))
-                           res))
-                       (progn
-                         (delay-ir1-transform node :constraint)
-                        `(let* ((bits (ldb (byte ,n-bits 0)
-                                           ,(ecase kind
-                                                   (:tagged
-                                                    `(ash item ,sb!vm:n-fixnum-tag-bits))
-                                                   (:char
-                                                    `(char-code item))
-                                                   (:bits
-                                                    `item)
-                                                   (:single-float
-                                                    `(single-float-bits item))
-                                                   #!+64-bit
-                                                   (:double-float
-                                                    `(logior (ash (double-float-high-bits item) 32)
-                                                             (double-float-low-bits item)))
-                                                   #!+64-bit
-                                                   (:complex-single-float
-                                                    `(logior (ash (single-float-bits (imagpart item)) 32)
-                                                             (ldb (byte 32 0)
-                                                                  (single-float-bits (realpart item))))))))
-                                (res bits))
-                           (declare (type sb!vm:word res))
-                           ,@(unless (= sb!vm:n-word-bits n-bits)
-                                     `((loop for i of-type sb!vm:word from ,n-bits by ,n-bits
-                                             until (= i sb!vm:n-word-bits)
-                                             do (setf res
-                                                      (ldb (byte ,sb!vm:n-word-bits 0)
-                                                           (logior res (ash bits (truly-the (integer 0 ,(- sb!vm:n-word-bits n-bits)) i))))))))
-                           res)))))
+          ((and saetp (sb!vm:valid-bit-bash-saetp-p saetp))
+           (multiple-value-bind (basher bash-value) (find-basher saetp item node)
              (values
               ;; KLUDGE: WITH-ARRAY data in its full glory is going to mess up
               ;; dynamic-extent for MAKE-ARRAY :INITIAL-ELEMENT initialization.
@@ -722,15 +729,15 @@
                               (check-bound seq bound start)
                               (- (if end (check-bound seq bound end) len)
                                  start)))
-               `(with-array-data ((data seq)
-                                  (start start)
-                                  (end end)
-                                  :check-fill-pointer t)
-                  (declare (type (simple-array ,element-type 1) data))
-                  (declare (type index start end))
-                  (declare (optimize (safety 0) (speed 3)))
-                  (,basher ,bash-value data start (- end start))
-                  seq))
+                  `(with-array-data ((data seq)
+                                     (start start)
+                                     (end end)
+                                     :check-fill-pointer t)
+                     (declare (type (simple-array ,element-type 1) data))
+                     (declare (type index start end))
+                     (declare (optimize (safety 0) (speed 3)))
+                     (,basher ,bash-value data start (- end start))
+                     seq))
               `((declare (type ,element-type item))))))
           ((policy node (> speed space))
            (values
@@ -748,7 +755,7 @@
                ,(cond #!+x86-64
                       ((type= element-ctype *universal-type*)
                        '(values (%primitive sb!vm::fill-vector/t
-                                            data item start end)))
+                                 data item start end)))
                       (t
                        `(do ((i start (1+ i)))
                             ((= i end) seq)
