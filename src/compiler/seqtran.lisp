@@ -671,34 +671,34 @@
                (progn
                  (when node
                    (delay-ir1-transform node :constraint))
-                 `(let* ((bits (ldb (byte ,n-bits 0)
-                                    ,(ecase kind
-                                       (:tagged
-                                        `(ash item ,sb!vm:n-fixnum-tag-bits))
-                                       (:char
-                                        `(char-code item))
-                                       (:bits
-                                        `item)
-                                       (:single-float
-                                        `(single-float-bits item))
-                                       #!+64-bit
-                                       (:double-float
-                                        `(logior (ash (double-float-high-bits item) 32)
-                                                 (double-float-low-bits item)))
-                                       #!+64-bit
-                                       (:complex-single-float
-                                        `(logior (ash (single-float-bits (imagpart item)) 32)
-                                                 (ldb (byte 32 0)
-                                                      (single-float-bits (realpart item))))))))
-                         (res bits))
-                    (declare (type sb!vm:word res))
-                    ,@(unless (= sb!vm:n-word-bits n-bits)
-                        `((loop for i of-type sb!vm:word from ,n-bits by ,n-bits
+                 (if (and (eq kind :bits)
+                          (= n-bits 1))
+                     `(ldb (byte ,sb!vm:n-word-bits 0) (- item))
+                     `(let ((res (ldb (byte ,n-bits 0)
+                                      ,(ecase kind
+                                         (:tagged
+                                          `(ash item ,sb!vm:n-fixnum-tag-bits))
+                                         (:char
+                                          `(char-code item))
+                                         (:bits
+                                          `item)
+                                         (:single-float
+                                          `(single-float-bits item))
+                                         #!+64-bit
+                                         (:double-float
+                                          `(logior (ash (double-float-high-bits item) 32)
+                                                   (double-float-low-bits item)))
+                                         #!+64-bit
+                                         (:complex-single-float
+                                          `(logior (ash (single-float-bits (imagpart item)) 32)
+                                                   (ldb (byte 32 0)
+                                                        (single-float-bits (realpart item)))))))))
+                        (declare (type sb!vm:word res))
+                        ,@(loop for i of-type sb!vm:word = n-bits then (* 2 i)
                                 until (= i sb!vm:n-word-bits)
-                                do (setf res
-                                         (ldb (byte ,sb!vm:n-word-bits 0)
-                                              (logior res (ash bits (truly-the (integer 0 ,(- sb!vm:n-word-bits n-bits)) i))))))))
-                    res)))))
+                                collect
+                                `(setf res (dpb res (byte ,i ,i) res)))
+                        res))))))
     (values basher bash-value)))
 
 (deftransform fill ((seq item &key (start 0) (end nil))
