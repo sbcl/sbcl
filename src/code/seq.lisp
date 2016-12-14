@@ -611,7 +611,8 @@
            else do
            ;; vector-fill* depends on this assertion
            (assert (member et '(t (complex double-float)
-                                #!-64-bit (complex single-float))
+                                #!-64-bit (complex single-float)
+                                #!-64-bit double-float)
                            :test #'equal))))
 
 (defun vector-fill* (vector item start end)
@@ -629,11 +630,11 @@
                 :start start :end end))
         (let* ((widetag (%other-pointer-widetag vector))
                (bashers (svref %%fill-bashers%% widetag)))
-          (macrolet ((fill-complex (type)
+          (macrolet ((fill-float (type)
                        `(locally
                             (declare (optimize (speed 3) (safety 0))
-                                     (type (complex ,type) item)
-                                     (type (simple-array (complex ,type) (*))
+                                     (type ,type item)
+                                     (type (simple-array ,type (*))
                                            vector))
                           (do ((index start (1+ index)))
                               ((= index end))
@@ -644,10 +645,13 @@
                             (funcall (truly-the function (cdr bashers)) item)
                             vector start (- end start)))
                   #!-64-bit
-                  ((eq widetag sb!vm:simple-array-single-float-widetag)
-                   (fill-complex single-float))
+                  ((eq widetag sb!vm:simple-array-double-float-widetag)
+                   (fill-float double-float))
+                  #!-64-bit
+                  ((eq widetag sb!vm:simple-array-complex-single-float-widetag)
+                   (fill-float (complex single-float)))
                   (t
-                   (fill-complex double-float)))))))
+                   (fill-float (complex double-float))))))))
   vector)
 
 (defun string-fill* (sequence item start end)
