@@ -780,60 +780,29 @@ scav_instance(lispobj *where, lispobj header)
     return ntotal + 1;
 }
 
-static lispobj
-trans_boxed(lispobj object)
+static lispobj trans_boxed(lispobj object)
 {
-    lispobj header;
-    uword_t length;
-
     gc_assert(is_lisp_pointer(object));
-
-    header = *((lispobj *) native_pointer(object));
-    length = HeaderValue(header) + 1;
-    length = CEILING(length, 2);
-
-    return copy_object(object, length);
+    sword_t length = HeaderValue(*native_pointer(object)) + 1;
+    return copy_object(object, CEILING(length, 2));
 }
 
-static sword_t
-size_boxed(lispobj *where)
+static sword_t size_boxed(lispobj *where)
 {
-    lispobj header;
-    uword_t length;
-
-    header = *where;
-    length = HeaderValue(header) + 1;
-    length = CEILING(length, 2);
-
-    return length;
+    sword_t length = HeaderValue(*where) + 1;
+    return CEILING(length, 2);
 }
 
-static lispobj
-trans_tiny_boxed(lispobj object)
+static lispobj trans_tiny_boxed(lispobj object)
 {
-    lispobj header;
-    uword_t length;
-
-    gc_assert(is_lisp_pointer(object));
-
-    header = *((lispobj *) native_pointer(object));
-    length = (HeaderValue(header) & 0xFF) + 1;
-    length = CEILING(length, 2);
-
-    return copy_object(object, length);
+    sword_t length = (HeaderValue(*native_pointer(object)) & 0xFF) + 1;
+    return copy_object(object, CEILING(length, 2));
 }
 
-static sword_t
-size_tiny_boxed(lispobj *where)
+static sword_t size_tiny_boxed(lispobj *where)
 {
-    lispobj header;
-    uword_t length;
-
-    header = *where;
-    length = (HeaderValue(header) & 0xFF) + 1;
-    length = CEILING(length, 2);
-
-    return length;
+    sword_t length = (HeaderValue(*where) & 0xFF) + 1;
+    return CEILING(length, 2);
 }
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
@@ -865,41 +834,23 @@ scav_fdefn(lispobj *where, lispobj object)
 static sword_t
 scav_unboxed(lispobj *where, lispobj object)
 {
-    uword_t length;
-
-    length = HeaderValue(object) + 1;
-    length = CEILING(length, 2);
-
-    return length;
+    sword_t length = HeaderValue(object) + 1;
+    return CEILING(length, 2);
 }
 
 static lispobj
 trans_unboxed(lispobj object)
 {
-    lispobj header;
-    uword_t length;
-
-
     gc_assert(is_lisp_pointer(object));
-
-    header = *((lispobj *) native_pointer(object));
-    length = HeaderValue(header) + 1;
-    length = CEILING(length, 2);
-
-    return copy_unboxed_object(object, length);
+    sword_t length = HeaderValue(*native_pointer(object)) + 1;
+    return copy_unboxed_object(object, CEILING(length, 2));
 }
 
 static sword_t
 size_unboxed(lispobj *where)
 {
-    lispobj header;
-    uword_t length;
-
-    header = *where;
-    length = HeaderValue(header) + 1;
-    length = CEILING(length, 2);
-
-    return length;
+    sword_t length = HeaderValue(*where) + 1;
+    return CEILING(length, 2);
 }
 
 
@@ -907,134 +858,88 @@ size_unboxed(lispobj *where)
 static sword_t
 scav_base_string(lispobj *where, lispobj object)
 {
-    struct vector *vector;
-    sword_t length, nwords;
-
     /* NOTE: Strings contain one more byte of data than the length */
     /* slot indicates. */
 
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 8) + 2, 2);
-
-    return nwords;
+    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
+    return CEILING(NWORDS(length, 8) + 2, 2);
 }
 static lispobj
 trans_base_string(lispobj object)
 {
-    struct vector *vector;
-    sword_t length, nwords;
-
     gc_assert(is_lisp_pointer(object));
 
     /* NOTE: A string contains one more byte of data (a terminating
      * '\0' to help when interfacing with C functions) than indicated
      * by the length slot. */
 
-    vector = (struct vector *) native_pointer(object);
-    length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 8) + 2, 2);
-
-    return copy_large_unboxed_object(object, nwords);
+    sword_t length =
+        fixnum_value(((struct vector*)native_pointer(object))->length) + 1;
+    return copy_large_unboxed_object(object, CEILING(NWORDS(length, 8) + 2, 2));
 }
 
 static sword_t
 size_base_string(lispobj *where)
 {
-    struct vector *vector;
-    sword_t length, nwords;
-
     /* NOTE: A string contains one more byte of data (a terminating
      * '\0' to help when interfacing with C functions) than indicated
      * by the length slot. */
 
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 8) + 2, 2);
-
-    return nwords;
+    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
+    return CEILING(NWORDS(length, 8) + 2, 2);
 }
 
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
 static sword_t
 scav_character_string(lispobj *where, lispobj object)
 {
-    struct vector *vector;
-    int length, nwords;
-
     /* NOTE: Strings contain one more byte of data than the length */
     /* slot indicates. */
 
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 32) + 2, 2);
-
-    return nwords;
+    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
+    return CEILING(NWORDS(length, 32) + 2, 2);
 }
 static lispobj
 trans_character_string(lispobj object)
 {
-    struct vector *vector;
-    int length, nwords;
-
     gc_assert(is_lisp_pointer(object));
 
     /* NOTE: A string contains one more byte of data (a terminating
      * '\0' to help when interfacing with C functions) than indicated
      * by the length slot. */
 
-    vector = (struct vector *) native_pointer(object);
-    length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 32) + 2, 2);
-
-    return copy_large_unboxed_object(object, nwords);
+    sword_t length =
+        fixnum_value(((struct vector*)native_pointer(object))->length) + 1;
+    return copy_large_unboxed_object(object, CEILING(NWORDS(length, 32) + 2, 2));
 }
 
 static sword_t
 size_character_string(lispobj *where)
 {
-    struct vector *vector;
-    int length, nwords;
-
     /* NOTE: A string contains one more byte of data (a terminating
      * '\0' to help when interfacing with C functions) than indicated
      * by the length slot. */
 
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 32) + 2, 2);
-
-    return nwords;
+    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
+    return CEILING(NWORDS(length, 32) + 2, 2);
 }
 #endif
 
 static lispobj
 trans_vector(lispobj object)
 {
-    struct vector *vector;
-    sword_t length, nwords;
-
     gc_assert(is_lisp_pointer(object));
 
-    vector = (struct vector *) native_pointer(object);
-
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
-
-    return copy_large_object(object, nwords);
+    sword_t length =
+        fixnum_value(((struct vector*)native_pointer(object))->length);
+    return copy_large_object(object, CEILING(length + 2, 2));
 }
 
 static sword_t
 size_vector(lispobj *where)
 {
-    struct vector *vector;
-    sword_t length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
-
-    return nwords;
+    sword_t length = fixnum_value(((struct vector*)where)->length);
+    return CEILING(length + 2, 2);
 }
 
 static sword_t
@@ -1079,6 +984,7 @@ DEF_SCAV_TRANS_SIZE_UB(8)
 DEF_SCAV_TRANS_SIZE_UB(16)
 DEF_SCAV_TRANS_SIZE_UB(32)
 DEF_SCAV_TRANS_SIZE_UB(64)
+DEF_SCAV_TRANS_SIZE_UB(128)
 
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
 static long
@@ -1123,50 +1029,6 @@ size_vector_long_float(lispobj *where)
     return nwords;
 }
 #endif
-
-#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-static sword_t
-scav_vector_complex_double_float(lispobj *where, lispobj object)
-{
-    struct vector *vector;
-    sword_t length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 128) + 2, 2);
-
-    return nwords;
-}
-
-static lispobj
-trans_vector_complex_double_float(lispobj object)
-{
-    struct vector *vector;
-    sword_t length, nwords;
-
-    gc_assert(is_lisp_pointer(object));
-
-    vector = (struct vector *) native_pointer(object);
-    length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 128) + 2, 2);
-
-    return copy_large_unboxed_object(object, nwords);
-}
-
-static sword_t
-size_vector_complex_double_float(lispobj *where)
-{
-    struct vector *vector;
-    sword_t length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 128) + 2, 2);
-
-    return nwords;
-}
-#endif
-
 
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
 static long
@@ -1780,8 +1642,7 @@ gc_init_tables(void)
     scavtab[SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG] = scav_vector_unsigned_byte_64;
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-    scavtab[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] =
-        scav_vector_complex_double_float;
+    scavtab[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] = scav_vector_unsigned_byte_128;
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
     scavtab[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
@@ -1919,8 +1780,7 @@ gc_init_tables(void)
     transother[SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG] = trans_vector_unsigned_byte_64;
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-    transother[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] =
-        trans_vector_complex_double_float;
+    transother[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] = trans_vector_unsigned_byte_128;
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
     transother[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
@@ -2061,8 +1921,7 @@ gc_init_tables(void)
     sizetab[SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG] = size_vector_unsigned_byte_64;
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-    sizetab[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] =
-        size_vector_complex_double_float;
+    sizetab[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] = size_vector_unsigned_byte_128;
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
     sizetab[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
