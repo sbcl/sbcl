@@ -220,33 +220,30 @@
         (when old-free-fun
           (clear-invalid-functionals old-free-fun)
           old-free-fun))
-      (ecase (info :function :kind name)
-        ;; FIXME: The :MACRO and :SPECIAL-FORM cases could be merged.
-        (:macro
-         (compiler-error "The macro name ~S was found ~A." name context))
-        (:special-form
-         (compiler-error "The special form name ~S was found ~A."
-                         name
-                         context))
-        ((:function nil)
-         (check-fun-name name)
-         (let ((expansion (fun-name-inline-expansion name))
-               (inlinep (info :function :inlinep name)))
-           (setf (gethash name *free-funs*)
-                 (if (or expansion inlinep)
-                     (let ((where (info :function :where-from name)))
-                       (make-defined-fun
-                        :%source-name name
-                        :inline-expansion expansion
-                        :inlinep inlinep
-                        :where-from (if (eq inlinep :notinline)
-                                        where
-                                        (maybe-defined-here name where))
-                        :type (if (and (eq inlinep :notinline)
-                                       (neq where :declared))
-                                  (specifier-type 'function)
-                                  (proclaimed-ftype name))))
-                     (find-global-fun name nil))))))))
+      (let ((kind (info :function :kind name)))
+        (ecase kind
+          ((:macro :special-form)
+           (compiler-error "The ~(~S~) name ~S was found ~A."
+                           kind name context))
+          ((:function nil)
+           (check-fun-name name)
+           (let ((expansion (fun-name-inline-expansion name))
+                 (inlinep (info :function :inlinep name)))
+             (setf (gethash name *free-funs*)
+                   (if (or expansion inlinep)
+                       (let ((where (info :function :where-from name)))
+                         (make-defined-fun
+                          :%source-name name
+                          :inline-expansion expansion
+                          :inlinep inlinep
+                          :where-from (if (eq inlinep :notinline)
+                                          where
+                                          (maybe-defined-here name where))
+                          :type (if (and (eq inlinep :notinline)
+                                         (neq where :declared))
+                                    (specifier-type 'function)
+                                    (proclaimed-ftype name))))
+                       (find-global-fun name nil)))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
 ;;; definition of NAME.
