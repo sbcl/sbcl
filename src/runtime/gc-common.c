@@ -940,26 +940,6 @@ size_vector(lispobj *where)
     return CEILING(length + 2, 2);
 }
 
-static sword_t
-scav_vector_nil(lispobj *where, lispobj object)
-{
-    return 2;
-}
-
-static lispobj
-trans_vector_nil(lispobj object)
-{
-    gc_assert(is_lisp_pointer(object));
-    return copy_unboxed_object(object, 2);
-}
-
-static sword_t
-size_vector_nil(lispobj *where)
-{
-    /* Just the header word and the length word */
-    return 2;
-}
-
 #define DEF_SCAV_TRANS_SIZE_UB(nbits) \
   DEF_SPECIALIZED_VECTOR(unsigned_byte_##nbits, NWORDS(length, nbits))
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
@@ -977,6 +957,7 @@ size_vector_nil(lispobj *where)
     return CEILING(nwords + 2, 2); \
   }
 
+DEF_SPECIALIZED_VECTOR(nil, 0)
 DEF_SPECIALIZED_VECTOR(bit, NWORDS(length,1))
 DEF_SCAV_TRANS_SIZE_UB(2)
 DEF_SCAV_TRANS_SIZE_UB(4)
