@@ -1744,7 +1744,7 @@ With those caveats in mind, what you need to know when using it:
    which may cause them to misbehave. (Consider binding of special variables,
    values of global variables, etc.)
 
-Take together, these two restrict the \"safe\" things to do using
+Taken together, these two restrict the \"safe\" things to do using
 INTERRUPT-THREAD to a fairly minimal set. One useful one -- exclusively for
 interactive development use is using it to force entry to debugger to inspect
 the state of a thread:

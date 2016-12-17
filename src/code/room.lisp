@@ -754,7 +754,7 @@
 (defun sb!di::descriptor-sap (x)
   (int-sap (get-lisp-obj-address x)))
 
-;;; Calls FUNCTION with all object that have (possibly conservative)
+;;; Calls FUNCTION with all objects that have (possibly conservative)
 ;;; references to them on current stack.
 (defun map-stack-references (function)
   (let ((end

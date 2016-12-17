@@ -1057,7 +1057,7 @@ care."
 ;;;; CATCH, THROW and UNWIND-PROTECT
 
 ;;; We turn THROW into a MULTIPLE-VALUE-CALL of a magical function,
-;;; since as as far as IR1 is concerned, it has no interesting
+;;; since as far as IR1 is concerned, it has no interesting
 ;;; properties other than receiving multiple-values.
 (def-ir1-translator throw ((tag result) start next result-lvar)
   #!+sb-doc

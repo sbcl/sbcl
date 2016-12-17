@@ -1940,8 +1940,8 @@
   (release-fd-stream-buffers fd-stream))
 
 ;;; Flushes the current input buffer and any supplied replacements,
-;;; and returns the input buffer, and the amount of of flushed input
-;;; in bytes.
+;;; and returns the input buffer, and the amount of flushed input in
+;;; bytes.
 (defun flush-input-buffer (stream)
   (let ((unread (length (fd-stream-instead stream))))
     (setf (fill-pointer (fd-stream-instead stream)) 0)

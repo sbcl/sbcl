@@ -245,7 +245,7 @@
 (defun classoid-typep (obj-layout classoid object)
   ;; FIXME & KLUDGE: We could like to grab the *WORLD-LOCK* here (to ensure that
   ;; class graph doesn't change while we're doing the typep test), but in
-  ;; pratice that causes trouble -- deadlocking against the compiler
+  ;; practice that causes trouble -- deadlocking against the compiler
   ;; if compiler output (or macro, or compiler-macro expansion) causes
   ;; another thread to do stuff. Not locking is a shoddy bandaid as it is remains
   ;; easy to trigger the same problem using a different code path -- but in practice

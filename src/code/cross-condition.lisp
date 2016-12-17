@@ -88,7 +88,7 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
                      (duplicate-definition-name c))))
   (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
 
-;;; These are should never be instantiated before the real definitions
+;;; These should never be instantiated before the real definitions
 ;;; come in.
 (deftype package-lock-violation () nil)
 (deftype package-locked-error () nil)

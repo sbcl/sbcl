@@ -4343,7 +4343,7 @@
     (aver (eq :rest (arg-info-kind info)))
     (setf (arg-info-default info) t)))
 
-;;; This determines of we the REF to a &REST variable is headed towards
+;;; This determines if the REF to a &REST variable is headed towards
 ;;; parts unknown, or if we can really use the context.
 (defun rest-var-more-context-ok (lvar)
   (let* ((use (lvar-use lvar))

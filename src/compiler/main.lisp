@@ -1686,8 +1686,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                          (lexenv-handled-conditions *lexenv*))))
       (and ctype (handle-p condition (car ctype))))))
 
-;;; Read all forms from INFO and compile them, with output to OBJECT.
-;;; Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
+;;; Read all forms from INFO and compile them, with output to
+;;; *COMPILE-OBJECT*. Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
   (declare (type source-info info))
   (let ((*package* (sane-package))
