@@ -48,10 +48,8 @@
 
 #ifdef LISP_FEATURE_SPARC
 #define LONG_FLOAT_SIZE 4
-#else
-#ifdef LISP_FEATURE_X86
+#elif defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 #define LONG_FLOAT_SIZE 3
-#endif
 #endif
 
 os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
@@ -963,21 +961,23 @@ size_vector_nil(lispobj *where)
 }
 
 #define DEF_SCAV_TRANS_SIZE_UB(nbits) \
-  static sword_t scav_vector_unsigned_byte_##nbits(lispobj *where, lispobj header) { \
+  DEF_SPECIALIZED_VECTOR(unsigned_byte_##nbits, NWORDS(length, nbits))
+#define DEF_SPECIALIZED_VECTOR(name, nwords) \
+  static sword_t __attribute__((unused)) scav_vector_##name(lispobj *where, lispobj header) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
-    return CEILING(NWORDS(length, nbits) + 2, 2); \
+    return CEILING(nwords + 2, 2); \
   } \
-  static lispobj trans_vector_unsigned_byte_##nbits(lispobj object) { \
+  static lispobj __attribute__((unused)) trans_vector_##name(lispobj object) { \
     gc_assert(lowtag_of(object)==OTHER_POINTER_LOWTAG); \
     sword_t length = fixnum_value(((struct vector*)(object-OTHER_POINTER_LOWTAG))->length); \
-    return copy_large_unboxed_object(object, CEILING(NWORDS(length, nbits) + 2, 2)); \
+    return copy_large_unboxed_object(object, CEILING(nwords + 2, 2)); \
   } \
-  static sword_t size_vector_unsigned_byte_##nbits(lispobj *where) { \
+  static sword_t __attribute__((unused)) size_vector_##name(lispobj *where) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
-    return CEILING(NWORDS(length, nbits) + 2, 2); \
+    return CEILING(nwords + 2, 2); \
   }
 
-DEF_SCAV_TRANS_SIZE_UB(1)
+DEF_SPECIALIZED_VECTOR(bit, NWORDS(length,1))
 DEF_SCAV_TRANS_SIZE_UB(2)
 DEF_SCAV_TRANS_SIZE_UB(4)
 DEF_SCAV_TRANS_SIZE_UB(8)
@@ -985,92 +985,9 @@ DEF_SCAV_TRANS_SIZE_UB(16)
 DEF_SCAV_TRANS_SIZE_UB(32)
 DEF_SCAV_TRANS_SIZE_UB(64)
 DEF_SCAV_TRANS_SIZE_UB(128)
-
-#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
-static long
-scav_vector_long_float(lispobj *where, lispobj object)
-{
-    struct vector *vector;
-    long length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length *
-                     LONG_FLOAT_SIZE
-                     + 2, 2);
-    return nwords;
-}
-
-static lispobj
-trans_vector_long_float(lispobj object)
-{
-    struct vector *vector;
-    long length, nwords;
-
-    gc_assert(is_lisp_pointer(object));
-
-    vector = (struct vector *) native_pointer(object);
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length * LONG_FLOAT_SIZE + 2, 2);
-
-    return copy_large_unboxed_object(object, nwords);
-}
-
-static long
-size_vector_long_float(lispobj *where)
-{
-    struct vector *vector;
-    sword_t length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length * LONG_FLOAT_SIZE + 2, 2);
-
-    return nwords;
-}
-#endif
-
-#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
-static long
-scav_vector_complex_long_float(lispobj *where, lispobj object)
-{
-    struct vector *vector;
-    sword_t length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length * (2* LONG_FLOAT_SIZE) + 2, 2);
-
-    return nwords;
-}
-
-static lispobj
-trans_vector_complex_long_float(lispobj object)
-{
-    struct vector *vector;
-    long length, nwords;
-
-    gc_assert(is_lisp_pointer(object));
-
-    vector = (struct vector *) native_pointer(object);
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length * (2*LONG_FLOAT_SIZE) + 2, 2);
-
-    return copy_large_unboxed_object(object, nwords);
-}
-
-static long
-size_vector_complex_long_float(lispobj *where)
-{
-    struct vector *vector;
-    long length, nwords;
-
-    vector = (struct vector *) where;
-    length = fixnum_value(vector->length);
-    nwords = CEILING(length * (2*LONG_FLOAT_SIZE) + 2, 2);
-
-    return nwords;
-}
+#ifdef LONG_FLOAT_SIZE
+DEF_SPECIALIZED_VECTOR(long_float, length * LONG_FLOAT_SIZE)
+DEF_SPECIALIZED_VECTOR(complex_long_float, length * (2 * LONG_FLOAT_SIZE))
 #endif
 
 #define WEAK_POINTER_NWORDS \
@@ -1576,7 +1493,7 @@ gc_init_tables(void)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     scavtab[SIMPLE_CHARACTER_STRING_WIDETAG] = scav_character_string;
 #endif
-    scavtab[SIMPLE_BIT_VECTOR_WIDETAG] = scav_vector_unsigned_byte_1;
+    scavtab[SIMPLE_BIT_VECTOR_WIDETAG] = scav_vector_bit;
     scavtab[SIMPLE_ARRAY_NIL_WIDETAG] = scav_vector_nil;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
         scav_vector_unsigned_byte_2;
@@ -1711,7 +1628,7 @@ gc_init_tables(void)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     transother[SIMPLE_CHARACTER_STRING_WIDETAG] = trans_character_string;
 #endif
-    transother[SIMPLE_BIT_VECTOR_WIDETAG] = trans_vector_unsigned_byte_1;
+    transother[SIMPLE_BIT_VECTOR_WIDETAG] = trans_vector_bit;
     transother[SIMPLE_VECTOR_WIDETAG] = trans_vector;
     transother[SIMPLE_ARRAY_NIL_WIDETAG] = trans_vector_nil;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
@@ -1854,7 +1771,7 @@ gc_init_tables(void)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     sizetab[SIMPLE_CHARACTER_STRING_WIDETAG] = size_character_string;
 #endif
-    sizetab[SIMPLE_BIT_VECTOR_WIDETAG] = size_vector_unsigned_byte_1;
+    sizetab[SIMPLE_BIT_VECTOR_WIDETAG] = size_vector_bit;
     sizetab[SIMPLE_VECTOR_WIDETAG] = size_vector;
     sizetab[SIMPLE_ARRAY_NIL_WIDETAG] = size_vector_nil;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
