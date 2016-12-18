@@ -110,10 +110,6 @@ generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 1;
 /* Should we do a pre-scan verify of generation 0 before it's GCed? */
 boolean pre_verify_gen_0 = 0;
 
-/* Should we check for bad pointers after gc_free_heap is called
- * from Lisp PURIFY? */
-boolean verify_after_free_heap = 0;
-
 /* Should we print a note when code objects are found in the dynamic space
  * during a heap verify? */
 boolean verify_dynamic_code_check = 0;
@@ -128,10 +124,6 @@ boolean gencgc_zero_check = 0;
 
 /* Should we check that the free space is zero filled? */
 boolean gencgc_enable_verify_zero_fill = 0;
-
-/* Should we check that free pages are zero filled during gc_free_heap
- * called after Lisp PURIFY? */
-boolean gencgc_zero_check_during_free_heap = 0;
 
 /* When loading a core, don't do a full scan of the memory for the
  * memory region boundaries. (Set to true by coreparse.c if the core
@@ -4173,92 +4165,6 @@ collect_garbage(generation_index_t last_gen)
     log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");
 }
-
-/* This is called by Lisp PURIFY when it is finished. All live objects
- * will have been moved to the RO and Static heaps. The dynamic space
- * will need a full re-initialization. We don't bother having Lisp
- * PURIFY flush the current gc_alloc() region, as the page_tables are
- * re-initialized, and every page is zeroed to be sure. */
-void
-gc_free_heap(void) // FIXME: remove, not used
-{
-    page_index_t page, last_page;
-
-    if (gencgc_verbose > 1) {
-        SHOW("entering gc_free_heap");
-    }
-
-    for (page = 0; page < page_table_pages; page++) {
-        /* Skip free pages which should already be zero filled. */
-        if (page_allocated_p(page)) {
-            void *page_start;
-            for (last_page = page;
-                 (last_page < page_table_pages) && page_allocated_p(last_page);
-                 last_page++) {
-                /* Mark the page free. The other slots are assumed invalid
-                 * when it is a FREE_PAGE_FLAG and bytes_used is 0 and it
-                 * should not be write-protected -- except that the
-                 * generation is used for the current region but it sets
-                 * that up. */
-                page_table[page].allocated = FREE_PAGE_FLAG;
-                page_table[page].bytes_used = 0;
-                page_table[page].write_protected = 0;
-            }
-
-#ifndef LISP_FEATURE_WIN32 /* Pages already zeroed on win32? Not sure
-                            * about this change. */
-            page_start = (void *)page_address(page);
-            os_protect(page_start, npage_bytes(last_page-page), OS_VM_PROT_ALL);
-            remap_free_pages(page, last_page-1, 1);
-            page = last_page-1;
-#endif
-        } else if (gencgc_zero_check_during_free_heap) {
-            /* Double-check that the page is zero filled. */
-            sword_t *page_start;
-            page_index_t i;
-            gc_assert(page_free_p(page));
-            gc_assert(page_table[page].bytes_used == 0);
-            page_start = (sword_t *)page_address(page);
-            for (i=0; i<(long)(GENCGC_CARD_BYTES/sizeof(sword_t)); i++) {
-                if (page_start[i] != 0) {
-                    lose("free region not zero at %x\n", page_start + i);
-                }
-            }
-        }
-    }
-
-    bytes_allocated = 0;
-
-    /* Initialize the generations. */
-    for (page = 0; page < NUM_GENERATIONS; page++) {
-        generations[page].alloc_start_page = 0;
-        generations[page].alloc_unboxed_start_page = 0;
-        generations[page].alloc_large_start_page = 0;
-        generations[page].alloc_large_unboxed_start_page = 0;
-        generations[page].bytes_allocated = 0;
-        generations[page].gc_trigger = 2000000;
-        generations[page].num_gc = 0;
-        generations[page].cum_sum_bytes_allocated = 0;
-    }
-
-    if (gencgc_verbose > 1)
-        print_generation_stats();
-
-    /* Initialize gc_alloc(). */
-    gc_alloc_generation = 0;
-
-    gc_set_region_empty(&boxed_region);
-    gc_set_region_empty(&unboxed_region);
-
-    last_free_page = 0;
-    set_alloc_pointer((lispobj)((char *)heap_base));
-
-    if (verify_after_free_heap) {
-        /* Check whether purify has left any bad pointers. */
-        FSHOW((stderr, "checking after free_heap\n"));
-        verify_gc();
-    }
-}
 
 void
 gc_init(void)
@@ -4342,9 +4248,7 @@ gc_init(void)
 
     bytes_allocated = 0;
 
-    /* Initialize the generations.
-     *
-     * FIXME: very similar to code in gc_free_heap(), should be shared */
+    /* Initialize the generations. */
     for (i = 0; i < NUM_GENERATIONS; i++) {
         generations[i].alloc_start_page = 0;
         generations[i].alloc_unboxed_start_page = 0;
