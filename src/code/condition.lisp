@@ -1632,7 +1632,7 @@ conditions."))
   ;; which drives home the point that you can't print the conditions
   ;; until much later anyway, making them basically not helpful.
   (define-deprecation-warning early-deprecation-warning style-warning nil
-     "~%~@<~:@_In future ~A versions ~
+     "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~
       at compile-time.~:@>"
     #!+sb-doc
@@ -1642,7 +1642,7 @@ compile-time. The use will work at run-time with no warning or
 error.")
 
   (define-deprecation-warning late-deprecation-warning warning t
-     "~%~@<~:@_In future ~A versions ~
+     "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-impl:print-symbol-with-prefix/ will signal a runtime ~
       error.~:@>"
     #!+sb-doc
