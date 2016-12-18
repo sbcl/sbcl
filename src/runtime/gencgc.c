@@ -3419,9 +3419,8 @@ verify_zero_fill(void)
         if (page_free_p(page)) {
             /* The whole page should be zero filled. */
             sword_t *start_addr = (sword_t *)page_address(page);
-            sword_t size = 1024;
             sword_t i;
-            for (i = 0; i < size; i++) {
+            for (i = 0; i < (sword_t)GENCGC_CARD_BYTES/N_WORD_BYTES; i++) {
                 if (start_addr[i] != 0) {
                     lose("free page not zero at %x\n", start_addr + i);
                 }
