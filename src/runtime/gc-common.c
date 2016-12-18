@@ -193,7 +193,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
     lispobj *first_pointer;
     lispobj copy;
 
-    gc_assert(is_lisp_pointer(object));
+    gc_assert(lowtag_of(object) == FUN_POINTER_LOWTAG);
 
     /* Object is a pointer into from_space - not a FP. */
     first_pointer = (lispobj *) native_pointer(object);
@@ -215,7 +215,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
         set_forwarding_pointer(first_pointer,copy);
     }
 
-    gc_assert(is_lisp_pointer(copy));
+    gc_assert(lowtag_of(copy) == FUN_POINTER_LOWTAG);
     gc_assert(!from_space_p(copy));
 
     *where = copy;
@@ -424,29 +424,18 @@ trans_fun_header(lispobj object)
 static lispobj
 trans_instance(lispobj object)
 {
-    lispobj header;
-    uword_t length;
-
-    gc_assert(is_lisp_pointer(object));
-
-    header = *((lispobj *) native_pointer(object));
-    length = instance_length(header) + 1;
-    length = CEILING(length, 2);
-
-    return copy_object(object, length);
+    gc_assert(lowtag_of(object) == INSTANCE_POINTER_LOWTAG);
+    lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
+    sword_t length = instance_length(header) + 1;
+    return copy_object(object, CEILING(length, 2));
 }
 
 static sword_t
 size_instance(lispobj *where)
 {
-    lispobj header;
-    uword_t length;
-
-    header = *where;
-    length = instance_length(header) + 1;
-    length = CEILING(length, 2);
-
-    return length;
+    lispobj header = *where;
+    sword_t length = instance_length(header) + 1;
+    return CEILING(length, 2);
 }
 
 static sword_t
@@ -479,12 +468,12 @@ static sword_t
 scav_list_pointer(lispobj *where, lispobj object)
 {
     lispobj first;
-    gc_assert(is_lisp_pointer(object));
+    gc_assert(lowtag_of(object) == LIST_POINTER_LOWTAG);
 
     first = trans_list(object);
     gc_assert(first != object);
 
-    gc_assert(is_lisp_pointer(first));
+    gc_assert(lowtag_of(first) == LIST_POINTER_LOWTAG);
     gc_assert(!from_space_p(first));
 
     *where = first;
@@ -506,7 +495,7 @@ trans_list(lispobj object)
         gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
     new_cons->car = cons->car;
     new_cons->cdr = cons->cdr; /* updated later */
-    new_list_pointer = make_lispobj(new_cons,lowtag_of(object));
+    new_list_pointer = make_lispobj(new_cons, LIST_POINTER_LOWTAG);
 
     /* Grab the cdr: set_forwarding_pointer will clobber it in GENCGC  */
     cdr = cons->cdr;
@@ -531,7 +520,7 @@ trans_list(lispobj object)
             gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
         new_cdr_cons->car = cdr_cons->car;
         new_cdr_cons->cdr = cdr_cons->cdr;
-        new_cdr = make_lispobj(new_cdr_cons, lowtag_of(cdr));
+        new_cdr = make_lispobj(new_cdr_cons, LIST_POINTER_LOWTAG);
 
         /* Grab the cdr before it is clobbered. */
         cdr = cdr_cons->cdr;
@@ -557,10 +546,10 @@ scav_other_pointer(lispobj *where, lispobj object)
 {
     lispobj first, *first_pointer;
 
-    gc_assert(is_lisp_pointer(object));
+    gc_assert(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     /* Object is a pointer into from space - not FP. */
-    first_pointer = (lispobj *) native_pointer(object);
+    first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
     first = (transother[widetag_of(*first_pointer)])(object);
 
     // If the object was large, then instead of transporting it,
@@ -575,7 +564,7 @@ scav_other_pointer(lispobj *where, lispobj object)
 #ifndef LISP_FEATURE_GENCGC
     *where = first;
 #endif
-    gc_assert(is_lisp_pointer(first));
+    gc_assert(lowtag_of(first) == OTHER_POINTER_LOWTAG);
     gc_assert(!from_space_p(first));
 
     return 1;
@@ -839,7 +828,7 @@ scav_unboxed(lispobj *where, lispobj object)
 static lispobj
 trans_unboxed(lispobj object)
 {
-    gc_assert(is_lisp_pointer(object));
+    gc_assert(lowtag_of(object) == OTHER_POINTER_LOWTAG);
     sword_t length = HeaderValue(*native_pointer(object)) + 1;
     return copy_unboxed_object(object, CEILING(length, 2));
 }
@@ -856,7 +845,7 @@ size_unboxed(lispobj *where)
 static lispobj
 trans_vector(lispobj object)
 {
-    gc_assert(is_lisp_pointer(object));
+    gc_assert(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     sword_t length =
         fixnum_value(((struct vector*)native_pointer(object))->length);
@@ -917,7 +906,7 @@ trans_weak_pointer(lispobj object)
 #ifndef LISP_FEATURE_GENCGC
     struct weak_pointer *wp;
 #endif
-    gc_assert(is_lisp_pointer(object));
+    gc_assert(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
 #if defined(DEBUG_WEAK)
     printf("Transporting weak pointer from 0x%08x\n", object);
