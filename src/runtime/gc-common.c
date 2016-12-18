@@ -853,76 +853,6 @@ size_unboxed(lispobj *where)
 
 
 /* vector-like objects */
-static sword_t
-scav_base_string(lispobj *where, lispobj object)
-{
-    /* NOTE: Strings contain one more byte of data than the length */
-    /* slot indicates. */
-
-    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
-    return CEILING(NWORDS(length, 8) + 2, 2);
-}
-static lispobj
-trans_base_string(lispobj object)
-{
-    gc_assert(is_lisp_pointer(object));
-
-    /* NOTE: A string contains one more byte of data (a terminating
-     * '\0' to help when interfacing with C functions) than indicated
-     * by the length slot. */
-
-    sword_t length =
-        fixnum_value(((struct vector*)native_pointer(object))->length) + 1;
-    return copy_large_unboxed_object(object, CEILING(NWORDS(length, 8) + 2, 2));
-}
-
-static sword_t
-size_base_string(lispobj *where)
-{
-    /* NOTE: A string contains one more byte of data (a terminating
-     * '\0' to help when interfacing with C functions) than indicated
-     * by the length slot. */
-
-    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
-    return CEILING(NWORDS(length, 8) + 2, 2);
-}
-
-#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-static sword_t
-scav_character_string(lispobj *where, lispobj object)
-{
-    /* NOTE: Strings contain one more byte of data than the length */
-    /* slot indicates. */
-
-    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
-    return CEILING(NWORDS(length, 32) + 2, 2);
-}
-static lispobj
-trans_character_string(lispobj object)
-{
-    gc_assert(is_lisp_pointer(object));
-
-    /* NOTE: A string contains one more byte of data (a terminating
-     * '\0' to help when interfacing with C functions) than indicated
-     * by the length slot. */
-
-    sword_t length =
-        fixnum_value(((struct vector*)native_pointer(object))->length) + 1;
-    return copy_large_unboxed_object(object, CEILING(NWORDS(length, 32) + 2, 2));
-}
-
-static sword_t
-size_character_string(lispobj *where)
-{
-    /* NOTE: A string contains one more byte of data (a terminating
-     * '\0' to help when interfacing with C functions) than indicated
-     * by the length slot. */
-
-    sword_t length = fixnum_value(((struct vector*)where)->length) + 1;
-    return CEILING(NWORDS(length, 32) + 2, 2);
-}
-#endif
-
 static lispobj
 trans_vector(lispobj object)
 {
@@ -941,24 +871,30 @@ size_vector(lispobj *where)
 }
 
 #define DEF_SCAV_TRANS_SIZE_UB(nbits) \
-  DEF_SPECIALIZED_VECTOR(unsigned_byte_##nbits, NWORDS(length, nbits))
+  DEF_SPECIALIZED_VECTOR(vector_unsigned_byte_##nbits, NWORDS(length, nbits))
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
-  static sword_t __attribute__((unused)) scav_vector_##name(lispobj *where, lispobj header) { \
+  static sword_t __attribute__((unused)) scav_##name(lispobj *where, lispobj header) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
     return CEILING(nwords + 2, 2); \
   } \
-  static lispobj __attribute__((unused)) trans_vector_##name(lispobj object) { \
+  static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_assert(lowtag_of(object)==OTHER_POINTER_LOWTAG); \
     sword_t length = fixnum_value(((struct vector*)(object-OTHER_POINTER_LOWTAG))->length); \
     return copy_large_unboxed_object(object, CEILING(nwords + 2, 2)); \
   } \
-  static sword_t __attribute__((unused)) size_vector_##name(lispobj *where) { \
+  static sword_t __attribute__((unused)) size_##name(lispobj *where) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
     return CEILING(nwords + 2, 2); \
   }
 
-DEF_SPECIALIZED_VECTOR(nil, 0)
-DEF_SPECIALIZED_VECTOR(bit, NWORDS(length,1))
+DEF_SPECIALIZED_VECTOR(vector_nil, 0*length)
+DEF_SPECIALIZED_VECTOR(vector_bit, NWORDS(length,1))
+/* NOTE: strings contain one more element of data (a terminating '\0'
+ * to help interface with C functions) than indicated by the length slot.
+ * This is true even for UCS4 strings, despite that C APIs are unlikely
+ * to have a convention that expects 4 zero bytes. */
+DEF_SPECIALIZED_VECTOR(base_string, NWORDS((length+1), 8))
+DEF_SPECIALIZED_VECTOR(character_string, NWORDS((length+1), 32))
 DEF_SCAV_TRANS_SIZE_UB(2)
 DEF_SCAV_TRANS_SIZE_UB(4)
 DEF_SCAV_TRANS_SIZE_UB(8)
@@ -967,8 +903,8 @@ DEF_SCAV_TRANS_SIZE_UB(32)
 DEF_SCAV_TRANS_SIZE_UB(64)
 DEF_SCAV_TRANS_SIZE_UB(128)
 #ifdef LONG_FLOAT_SIZE
-DEF_SPECIALIZED_VECTOR(long_float, length * LONG_FLOAT_SIZE)
-DEF_SPECIALIZED_VECTOR(complex_long_float, length * (2 * LONG_FLOAT_SIZE))
+DEF_SPECIALIZED_VECTOR(vector_long_float, length * LONG_FLOAT_SIZE)
+DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE))
 #endif
 
 #define WEAK_POINTER_NWORDS \
