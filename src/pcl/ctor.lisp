@@ -439,9 +439,7 @@
     (if constant-class
         (let* ((class-or-name constant-class)
                (function-name (list 'ctor 'allocator class-or-name)))
-          (sb-int:check-deprecated-type (if (classp class-or-name)
-                                            (class-name class-or-name)
-                                            class-or-name))
+          (sb-int:check-deprecated-type class-or-name)
           ;; Return code constructing a ctor at load time, which,
           ;; when called, will set its funcallable instance
           ;; function to an optimized constructor function.
@@ -507,9 +505,7 @@
             (let* ((class-or-name (constant-form-value class-arg))
                    (function-name (make-ctor-function-name class-or-name keys
                                                            safe-code-p)))
-              (sb-int:check-deprecated-type (if (classp class-or-name)
-                                                (class-name class-or-name)
-                                                class-or-name))
+              (sb-int:check-deprecated-type class-or-name)
               ;; Return code constructing a ctor at load time, which,
               ;; when called, will set its funcallable instance
               ;; function to an optimized constructor function.

@@ -28,8 +28,9 @@
            (search-string/documentation (string)
              (search-string
               string `(,(string-downcase namespace) ,(string name)
-                        "deprecated" "as" "of" "some-lib" "version" "1.2.3"
-                        "Use" ,@replacements "instead")))
+                        "deprecated" "as" "of" "some-lib" "version" "1.2.3"))
+             (when replacements
+               (search-string string `("Use" ,@replacements "instead"))))
            (search-string/describe (string)
              (search-string
               string `(,(string name) ,(string state)
@@ -46,11 +47,12 @@
                        (compile nil `(lambda ()
                                        ,@(funcall make-body name))))))
       (assert (typep count expected-warning-count))
-      (assert (typep condition (ecase state
-                                 (:early 'early-deprecation-warning)
-                                 (:late 'late-deprecation-warning)
-                                 (:final 'final-deprecation-warning))))
-      (search-string/documentation (princ-to-string condition))
+      (when condition
+        (assert (typep condition (ecase state
+                                   (:early 'early-deprecation-warning)
+                                   (:late 'late-deprecation-warning)
+                                   (:final 'final-deprecation-warning))))
+        (search-string/documentation (princ-to-string condition)))
       (when call
         (ecase state
           ((:early :late)
@@ -231,7 +233,7 @@
                                         (append '(#:type.)
                                                 (sb-int:ensure-list tag)
                                                 (list '#:. state (gensym)))))
-                      (replacement   'replacement))
+                      (replacement 'replacement))
                   `(,@(unless (eq state :final)
                         `((,definition-name ,type-name)))
                     (declaim (deprecated
@@ -266,6 +268,27 @@
   (define-type-tests defclass              definition.defclass)
   (define-type-tests defstruct             definition.defstruct)
   (define-type-tests define-condition      definition.define-condition))
+
+(with-test (:name (deprecated type :unrelated-class))
+  (let ((name (gensym)))
+    (eval `(progn
+             (deftype ,name () 'integer)
+             (declaim (deprecated :early ("some-lib" "1.2.3") (type ,name)))))
+    ;; Make sure the deprecation declaration works.
+    (check-deprecated-thing
+     'type name :early
+     (lambda (name)
+       `((typep x ',name)))
+     :call nil)
+    ;; Check that the declaration does not apply to an unrelated class
+    ;; of the same name.
+    (check-deprecated-thing
+     'type name :early
+     (lambda (name)
+       `((make-instance ,(make-instance 'standard-class :name name))))
+     :call                   nil
+     :expected-warning-count '(eql 0))))
+
 
 ;;;; Loader deprecation warnings
 
