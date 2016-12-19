@@ -206,7 +206,10 @@
             (let ((fun-lvars (apply (fun-info-functional-args info)
                                     (resolve-key-args args type))))
               (loop for (fun . arg-count) in fun-lvars
-                    for ref = (principal-lvar-use fun)
+                    ;; TODO: handle CASTS.
+                    ;; principal-lvar-use will return the REF but the
+                    ;; CAST itself needs to be replaced.
+                    for ref = (lvar-uses fun)
                     when (ref-p ref)
                     do
                     (flet ((translate-two-args (name)
@@ -230,7 +233,7 @@
                            (let ((*compiler-error-context* node))
                              (find-free-fun replacement "ir1-finalize")))))))))
           (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
-                (ref (principal-lvar-use (combination-fun node))))
+                (ref (lvar-uses (combination-fun node))))
             (when (and two-arg
                        (ref-p ref)
                        (= (length args) 2))

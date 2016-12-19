@@ -6073,3 +6073,13 @@
   (assert (funcall (checked-compile `(lambda (x y) (string-lessp x y :start1 0)))
                    "a"
                    "b")))
+
+(with-test (:name :optimize-functional-arguments-casts)
+  (let ((fun (checked-compile
+              '(lambda (list key)
+                (declare (type atom key))
+                (find 1 list :key (the (member car) key))))))
+    (assert (equal (funcall fun '((a b) (1 a)) 'car)
+                   '(1 a)))
+    (assert-error (equal (funcall fun '((a b) (1 a)) 'cdr)
+                   '(1 a)))))
