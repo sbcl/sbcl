@@ -306,25 +306,26 @@
 ;;; STRING-NOT-EQUAL-LOOP is used to generate character comparison loops for
 ;;; STRING-EQUAL and STRING-NOT-EQUAL.
 (sb!xc:defmacro string-not-equal-loop (end
-                                         end-value
-                                         &optional (abort-value nil abortp))
+                                       end-value
+                                       &optional (abort-value nil abortp))
   (declare (fixnum end))
   (let ((end-test (if (= end 1)
                       `(= index1 (the fixnum end1))
                       `(= index2 (the fixnum end2)))))
-    `(do ((index1 start1 (1+ index1))
-          (index2 start2 (1+ index2)))
-         (,(if abortp
-               end-test
-               `(or ,end-test
-                    (not (char-equal (schar string1 index1)
-                                     (schar string2 index2)))))
-          ,end-value)
-       (declare (fixnum index1 index2))
-       ,@(if abortp
-             `((if (not (char-equal (schar string1 index1)
-                                    (schar string2 index2)))
-                   (return ,abort-value)))))))
+    `(locally (declare (inline two-arg-char-equal))
+       (do ((index1 start1 (1+ index1))
+            (index2 start2 (1+ index2)))
+           (,(if abortp
+                 end-test
+                 `(or ,end-test
+                      (not (char-equal (schar string1 index1)
+                                       (schar string2 index2)))))
+            ,end-value)
+         (declare (fixnum index1 index2))
+         ,@(if abortp
+               `((if (not (char-equal (schar string1 index1)
+                                      (schar string2 index2)))
+                     (return ,abort-value))))))))
 
 ) ; EVAL-WHEN
 
@@ -399,23 +400,24 @@
 (sb!xc:defmacro string-less-greater-equal (lessp equalp)
   (multiple-value-bind (length-test character-test)
       (string-less-greater-equal-tests lessp equalp)
-    `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
-       (let ((slen1 (- (the fixnum end1) start1))
-             (slen2 (- (the fixnum end2) start2)))
-         (declare (fixnum slen1 slen2))
-         (do ((index1 start1 (1+ index1))
-              (index2 start2 (1+ index2))
-              (char1)
-              (char2))
-             ((or (= index1 (the fixnum end1)) (= index2 (the fixnum end2)))
-              (if (,length-test slen1 slen2) (- index1 offset1)))
-           (declare (fixnum index1 index2))
-           (setq char1 (schar string1 index1))
-           (setq char2 (schar string2 index2))
-           (if (not (char-equal char1 char2))
-               (if ,character-test
-                   (return (- index1 offset1))
-                   (return ()))))))))
+    `(locally (declare (inline two-arg-char-equal))
+       (with-two-strings string1 string2 start1 end1 offset1 start2 end2
+         (let ((slen1 (- (the fixnum end1) start1))
+               (slen2 (- (the fixnum end2) start2)))
+           (declare (fixnum slen1 slen2))
+           (do ((index1 start1 (1+ index1))
+                (index2 start2 (1+ index2))
+                (char1)
+                (char2))
+               ((or (= index1 (the fixnum end1)) (= index2 (the fixnum end2)))
+                (if (,length-test slen1 slen2) (- index1 offset1)))
+             (declare (fixnum index1 index2))
+             (setq char1 (schar string1 index1))
+             (setq char2 (schar string2 index2))
+             (if (not (char-equal char1 char2))
+                 (if ,character-test
+                     (return (- index1 offset1))
+                     (return ())))))))))
 
 ) ; EVAL-WHEN
 
@@ -512,6 +514,31 @@ new string COUNT long filled with the fill character."
   (%upcase string start end))
 ) ; FLET
 
+(flet ((%capitalize (string start end)
+         (declare (string string) (index start) (type sequence-end end))
+         (let ((saved-header string))
+           (with-one-string (string start end)
+             (do ((index start (1+ index))
+                  (new-word? t)
+                  (char nil))
+                 ((= index (the fixnum end)))
+               (declare (fixnum index))
+               (setq char (schar string index))
+               (cond ((not (alphanumericp char))
+                      (setq new-word? t))
+                     (new-word?
+                      ;; CHAR is the first case-modifiable character after
+                      ;; a sequence of non-case-modifiable characters.
+                      (setf (schar string index) (char-upcase char))
+                      (setq new-word? nil))
+                     (t
+                      (setf (schar string index) (char-downcase char))))))
+           saved-header)))
+  (defun string-capitalize (string &key (start 0) end)
+    (%capitalize (copy-seq (string string)) start end))
+  (defun nstring-capitalize (string &key (start 0) end)
+    (%capitalize string start end)))
+
 (flet ((%downcase (string start end)
          (declare (string string) (index start) (type sequence-end end))
          (let ((saved-header string))
@@ -527,6 +554,32 @@ new string COUNT long filled with the fill character."
 (defun nstring-downcase (string &key (start 0) end)
   (%downcase string start end))
 ) ; FLET
+(flet ((%capitalize (string start end)
+         (declare (string string) (index start) (type sequence-end end))
+         (let ((saved-header string))
+           (with-one-string (string start end)
+             (do ((index start (1+ index))
+                  (new-word? t)
+                  (char nil))
+                 ((= index (the fixnum end)))
+               (declare (fixnum index))
+               (setq char (schar string index))
+               (cond ((not (alphanumericp char))
+                      (setq new-word? t))
+                     (new-word?
+                      ;; CHAR is the first case-modifiable character after
+                      ;; a sequence of non-case-modifiable characters.
+                      (setf (schar string index) (char-upcase char))
+                      (setq new-word? nil))
+                     (t
+                      (setf (schar string index) (char-downcase char))))))
+           saved-header)))
+  (defun string-capitalize (string &key (start 0) end)
+    (%capitalize (copy-seq (string string)) start end))
+  (defun nstring-capitalize (string &key (start 0) end)
+    (%capitalize string start end))
+  )                                     ; FLET
+
 
 (defun generic-string-trim (char-bag string left-p right-p)
   (let ((header (%string string)))

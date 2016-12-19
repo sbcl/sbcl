@@ -220,6 +220,10 @@
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
  ("src/code/coerce" :not-host)
 
+ ("src/code/char")
+ ("src/code/huffman")
+ ("src/code/target-char"    :not-host)
+ ("src/code/target-unicode" :not-host)
  ("src/code/string"     :not-host)
  ("src/code/mipsstrops" :not-host)
 
@@ -265,10 +269,6 @@
  ("src/code/float"      :not-host)
  ("src/code/irrat"      :not-host)
 
- ("src/code/char")
- ("src/code/huffman")
- ("src/code/target-char"    :not-host)
- ("src/code/target-unicode" :not-host)
  ("src/code/misc")
 
  ("src/code/symbol"        :not-host)
