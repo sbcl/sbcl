@@ -446,3 +446,11 @@
                                       :initial-contents
                                       `((,z ,z 1) (,z ,z ,z)))))))
     (assert (and f warningp errorp))))
+
+(with-test (:name :adjust-array-element-type)
+  (let ((fun (checked-compile '(lambda (array)
+                                (adjust-array array 3 :element-type '(signed-byte 2))))))
+    (assert-error (funcall fun #(1 2 3))))
+  (let ((fun (checked-compile '(lambda (array)
+                                (adjust-array array 5 :displaced-to #(1 2 3))))))
+    (assert-error (funcall fun (make-array 5 :adjustable t :element-type 'fixnum)))))

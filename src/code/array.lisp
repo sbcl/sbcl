@@ -1205,24 +1205,25 @@ of specialized arrays is supported."
   "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
   (when (invalid-array-p array)
     (invalid-array-error array))
-  (binding* ((dimensions (ensure-list dimensions))
+  (binding* ((dimensions-rank (if (listp dimensions)
+                                  (length dimensions)
+                                  1))
              (array-rank (array-rank array))
              (()
-              (unless (= (length dimensions) array-rank)
+              (unless (= dimensions-rank array-rank)
                 (error "The number of dimensions not equal to rank of array.")))
              ((initialize initial-data)
               (validate-array-initargs initial-element-p initial-element
                                        initial-contents-p initial-contents
-                                       displaced-to)))
+                                       displaced-to))
+             (widetag (array-underlying-widetag array)))
     (cond ((and element-type-p
-                (not (subtypep element-type (array-element-type array))))
-           ;; This is weird. Should check upgraded type against actual
-           ;; array element type I think. See lp#1331299. CLHS says that
-           ;; "consequences are unspecified" so current behavior isn't wrong.
+                (/= (%vector-widetag-and-n-bits element-type)
+                    widetag))
            (error "The new element type, ~
-                    ~/sb!impl:print-type-specifier/, is incompatible ~
-                    with old type."
-                  element-type))
+                   ~/sb-impl:print-type-specifier/, is incompatible ~
+                   with old type, ~/sb-impl:print-type-specifier/."
+                  element-type (array-element-type array)))
           ((and fill-pointer (/= array-rank 1))
            (error "Only vectors can have fill pointers."))
           ((and fill-pointer (not (array-has-fill-pointer-p array)))
@@ -1233,33 +1234,36 @@ of specialized arrays is supported."
            (fill-pointer-error array)))
     (cond (initial-contents-p
              ;; array former contents replaced by INITIAL-CONTENTS
-             (let* ((array-size (apply #'* dimensions))
-                    (array-data (data-vector-from-inits
-                                 dimensions array-size element-type nil nil
-                                 initialize initial-data)))
-               (cond ((adjustable-array-p array)
-                      (set-array-header array array-data array-size
-                                        (get-new-fill-pointer array array-size
-                                                              fill-pointer)
-                                        0 dimensions nil nil))
-                     ((array-header-p array)
-                      ;; simple multidimensional or single dimensional array
-                       (make-array dimensions
-                                   :element-type element-type
-                                   :initial-contents initial-contents))
-                     (t
-                      array-data))))
+           (let* ((array-size (if (listp dimensions)
+                                  (apply #'* dimensions)
+                                  dimensions))
+                  (array-data (data-vector-from-inits
+                               dimensions array-size element-type nil nil
+                               initialize initial-data)))
+             (cond ((adjustable-array-p array)
+                    (set-array-header array array-data array-size
+                                      (get-new-fill-pointer array array-size
+                                                            fill-pointer)
+                                      0 dimensions nil nil))
+                   ((array-header-p array)
+                    ;; simple multidimensional or single dimensional array
+                    (%make-array dimensions widetag
+                                 (aref %%simple-array-n-bits%% widetag)
+                                 :initial-contents initial-contents))
+                   (t
+                    array-data))))
           (displaced-to
              ;; We already established that no INITIAL-CONTENTS was supplied.
-             (unless (or (eql element-type (array-element-type displaced-to))
-                         (subtypep element-type (array-element-type displaced-to)))
+             (when (/= (array-underlying-widetag displaced-to) widetag)
                ;; See lp#1331299 again. Require exact match on upgraded type?
                (error "can't displace an array of type ~
                         ~/sb!impl:print-type-specifier/ into another ~
                         of type ~/sb!impl:print-type-specifier/"
-                        element-type (array-element-type displaced-to)))
+                      element-type (array-element-type displaced-to)))
              (let ((displacement (or displaced-index-offset 0))
-                   (array-size (apply #'* dimensions)))
+                   (array-size  (if (listp dimensions)
+                                    (apply #'* dimensions)
+                                    dimensions)))
                (declare (fixnum displacement array-size))
                (if (< (the fixnum (array-total-size displaced-to))
                       (the fixnum (+ displacement array-size)))
@@ -1271,14 +1275,16 @@ of specialized arrays is supported."
                                                            fill-pointer)
                                      displacement dimensions t nil)
                    ;; simple multidimensional or single dimensional array
-                   (make-array dimensions
-                               :element-type element-type
-                               :displaced-to displaced-to
-                               :displaced-index-offset
-                               displaced-index-offset))))
+                   (%make-array dimensions widetag
+                                (aref %%simple-array-n-bits%% widetag)
+                                :displaced-to displaced-to
+                                :displaced-index-offset
+                                displaced-index-offset))))
           ((= array-rank 1)
              (let ((old-length (array-total-size array))
-                   (new-length (car dimensions))
+                   (new-length (if (listp dimensions)
+                                   (car dimensions)
+                                   dimensions))
                    new-data)
                (declare (fixnum old-length new-length))
                (with-array-data ((old-data array) (old-start)
