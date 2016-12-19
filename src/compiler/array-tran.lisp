@@ -883,7 +883,7 @@
                             ,(if saetp
                                  (sb!vm:saetp-typecode saetp)
                                  (give-up-ir1-transform))
-                            ,(sb!vm:saetp-n-bits saetp)
+                            ,(sb!vm:saetp-n-bits-shift saetp)
                             ,@(maybe-arg initial-contents)
                             ,@(maybe-arg adjustable)
                             ,@(maybe-arg fill-pointer)

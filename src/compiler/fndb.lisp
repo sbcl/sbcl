@@ -946,7 +946,7 @@
 
 (defknown %make-array ((or index list)
                        (unsigned-byte #.sb!vm:n-widetag-bits)
-                       (unsigned-byte 16)
+                       (mod #.sb!vm:n-word-bits)
                        &key
                        (:element-type type-specifier)
                        (:initial-element t)
