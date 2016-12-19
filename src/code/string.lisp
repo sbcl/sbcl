@@ -50,7 +50,7 @@
 ;;; WITH-TWO-STRINGS is used to set up string comparison operations. The
 ;;; keywords are parsed, and the strings are hacked into SIMPLE-STRINGs.
 (sb!xc:defmacro with-two-strings (string1 string2 start1 end1 cum-offset-1
-                                            start2 end2 &rest forms)
+                                  start2 end2 &rest forms)
   `(let ((,string1 (%string ,string1))
          (,string2 (%string ,string2)))
      (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
@@ -63,22 +63,19 @@
                          :check-fill-pointer t)
          ,@forms))))
 
-(sb!xc:defmacro with-two-arg-strings (string1 string2 end1 end2 cum-offset-1
-                                      &rest forms)
-  (let ((start-var (gensym)))
-   `(let ((,string1 (%string ,string1))
-          (,string2 (%string ,string2)))
-      (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
-                        (,start-var)
-                        (,end1)
-                        :check-fill-pointer t)
-        (declare (ignore ,start-var))
-        (with-array-data ((,string2 ,string2)
-                          (,start-var)
-                          (,end2)
-                          :check-fill-pointer t)
-          (declare (ignore ,start-var))
-          ,@forms)))))
+(sb!xc:defmacro with-two-arg-strings (string1 string2 start1 end1 cum-offset-1
+                                      start2 end2 &rest forms)
+  `(let ((,string1 (%string ,string1))
+         (,string2 (%string ,string2)))
+     (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
+                       (,start1)
+                       (,end1)
+                       :check-fill-pointer t)
+       (with-array-data ((,string2 ,string2)
+                         (,start2)
+                         (,end2)
+                         :check-fill-pointer t)
+         ,@forms))))
 
 ) ; EVAL-WHEN
 
@@ -346,10 +343,11 @@
         (string-not-equal-loop 1 t nil)))))
 
 (defun two-arg-string-equal (string1 string2)
-  (let ((start1 0)
-        (start2 0))
-    (with-two-arg-strings string1 string2 end1 end2 nil
-      (when (= end1 end2)
+  (with-two-arg-strings string1 string2 start1 end1 nil start2 end2
+    (let ((slen1 (- (the fixnum end1) start1))
+          (slen2 (- (the fixnum end2) start2)))
+      (declare (fixnum slen1 slen2))
+      (when (= slen1 slen2)
         (string-not-equal-loop 1 t nil)))))
 
 (defun string-not-equal (string1 string2 &key (start1 0) end1 (start2 0) end2)
@@ -369,12 +367,13 @@
              (string-not-equal-loop 2 (- index1 offset1)))))))
 
 (defun two-arg-string-not-equal (string1 string2)
-  (let ((start1 0)
-        (start2 0))
-    (with-two-arg-strings string1 string2 end1 end2 offset1
-      (cond ((= end1 end2)
+  (with-two-arg-strings string1 string2 start1 end1 offset1 start2 end2
+    (let ((slen1 (- end1 start1))
+          (slen2 (- end2 start2)))
+      (declare (fixnum slen1 slen2))
+      (cond ((= slen1 slen2)
              (string-not-equal-loop 1 nil (- index1 offset1)))
-            ((< end1 end2)
+            ((< slen1 slen2)
              (string-not-equal-loop 1 (- index1 offset1)))
             (t
              (string-not-equal-loop 2 (- index1 offset1)))))))
