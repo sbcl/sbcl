@@ -636,10 +636,16 @@ boolean positive_bignum_logbitp(int index, struct bignum* bignum)
   }
 }
 
+struct instance_scanner {
+  lispobj* base;
+  void (*proc)(lispobj*, sword_t);
+};
+
 // Helper function for helper function below, since lambda isn't a thing
-static void instance_scan_range(void* instance_ptr, int offset, int nwords)
+static void instance_scan_range(void* arg, int offset, int nwords)
 {
-    scavenge((lispobj*)instance_ptr + offset, nwords);
+    struct instance_scanner *scanner = (struct instance_scanner*)arg;
+    scanner->proc(scanner->base + offset, nwords);
 }
 
 // Helper function for stepping through the tagged slots of an instance in
@@ -669,8 +675,11 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
       if (forwarding_pointer_p((lispobj*)bitmap))
           bitmap = (struct bignum*)
             native_pointer((lispobj)forwarding_pointer_value((lispobj*)bitmap));
+      struct instance_scanner scanner;
+      scanner.base = instance_ptr;
+      scanner.proc = proc;
       bitmap_scan((uword_t*)bitmap->digits, HeaderValue(bitmap->header), 0,
-                  instance_scan_range, instance_ptr);
+                  instance_scan_range, &scanner);
   }
 }
 
