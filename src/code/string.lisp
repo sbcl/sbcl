@@ -514,31 +514,6 @@ new string COUNT long filled with the fill character."
   (%upcase string start end))
 ) ; FLET
 
-(flet ((%capitalize (string start end)
-         (declare (string string) (index start) (type sequence-end end))
-         (let ((saved-header string))
-           (with-one-string (string start end)
-             (do ((index start (1+ index))
-                  (new-word? t)
-                  (char nil))
-                 ((= index (the fixnum end)))
-               (declare (fixnum index))
-               (setq char (schar string index))
-               (cond ((not (alphanumericp char))
-                      (setq new-word? t))
-                     (new-word?
-                      ;; CHAR is the first case-modifiable character after
-                      ;; a sequence of non-case-modifiable characters.
-                      (setf (schar string index) (char-upcase char))
-                      (setq new-word? nil))
-                     (t
-                      (setf (schar string index) (char-downcase char))))))
-           saved-header)))
-  (defun string-capitalize (string &key (start 0) end)
-    (%capitalize (copy-seq (string string)) start end))
-  (defun nstring-capitalize (string &key (start 0) end)
-    (%capitalize string start end)))
-
 (flet ((%downcase (string start end)
          (declare (string string) (index start) (type sequence-end end))
          (let ((saved-header string))
