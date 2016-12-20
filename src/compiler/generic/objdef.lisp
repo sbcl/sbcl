@@ -253,6 +253,12 @@
                           :widetag funcallable-instance-header-widetag
                           :alloc-trans %make-funcallable-instance)
   (trampoline :init :funcallable-instance-tramp)
+  ;; TODO: if we can switch places of 'function' and 'fsc-instance-slots'
+  ;; (at least for the builds with compact-instance-header)
+  ;; then for both funcallable and non-funcallable instances,
+  ;; the CLOS slot vector will be in the word 5 bytes past the tagged pointer.
+  ;; This shouldn't be too hard to arrange, since nothing needs to know where
+  ;; the tagged function lives except the funcallable instance trampoline.
   (function :ref-known (flushable) :ref-trans %funcallable-instance-function
             :set-known () :set-trans (setf %funcallable-instance-function))
   (info :rest-p t))

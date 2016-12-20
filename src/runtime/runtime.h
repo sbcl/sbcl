@@ -275,7 +275,7 @@ HeaderValue(lispobj obj)
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-#define HEADER_VALUE_MASKED(x) HeaderValue(x) & SHORT_HEADER_MAX_WORDS
+#define HEADER_VALUE_MASKED(x) (HeaderValue(x) & SHORT_HEADER_MAX_WORDS)
 #else
 #define HEADER_VALUE_MASKED(x) HeaderValue(x)
 #endif

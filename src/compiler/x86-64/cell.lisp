@@ -572,20 +572,27 @@
    (:policy :fast-safe)
    (:args (object :scs (descriptor-reg)))
    (:results (res :scs (any-reg descriptor-reg)))
+   (:variant-vars lowtag)
+   (:variant instance-pointer-lowtag)
    (:generator 1
-    (inst mov (reg-in-size res :dword)
-          (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag)))))
+    (inst mov (reg-in-size res :dword) (make-ea :dword :base object :disp (- 4 lowtag)))))
  (define-vop (%set-instance-layout)
    (:translate %set-instance-layout)
    (:policy :fast-safe)
    (:args (object :scs (descriptor-reg))
           (value :scs (any-reg descriptor-reg) :target res))
    (:results (res :scs (any-reg descriptor-reg)))
+   (:variant-vars lowtag)
+   (:variant instance-pointer-lowtag)
    (:generator 2
-    (inst mov
-          (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
-          (reg-in-size value :dword))
-    (move res value))))
+    (inst mov (make-ea :dword :base object :disp (- 4 lowtag)) (reg-in-size value :dword))
+    (move res value)))
+ (define-vop (%funcallable-instance-layout %instance-layout)
+   (:translate %funcallable-instance-layout)
+   (:variant fun-pointer-lowtag))
+ (define-vop (%set-funcallable-instance-layout %set-instance-layout)
+   (:translate %set-funcallable-instance-layout)
+   (:variant fun-pointer-lowtag)))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)

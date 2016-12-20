@@ -156,6 +156,8 @@
 (defconstant std-instance-hash-slot-index 1)
 #!-compact-instance-header
 (defconstant std-instance-hash-slot-index 2)
-(defconstant fsc-instance-hash-slot-index 2)
+;; The first data slot (either index 0 or 1) in the primitive funcallable
+;; instance is the vector of CLOS slots. Following that is the hash.
+(defconstant fsc-instance-hash-slot-index (1+ sb!vm:instance-data-start))
 
 (/show0 "finished with early-low.lisp")

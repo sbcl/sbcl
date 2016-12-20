@@ -91,11 +91,11 @@
   (define-source-transform %instance-layout (x)
     `(truly-the layout (%instance-ref ,x 0)))
   (define-source-transform %set-instance-layout (x val)
-    `(%instance-set ,x 0 (the layout ,val))))
-(define-source-transform %funcallable-instance-layout (x)
-  `(truly-the layout (%funcallable-instance-info ,x 0)))
-(define-source-transform %set-funcallable-instance-layout (x val)
-  `(setf (%funcallable-instance-info ,x 0) (the layout ,val)))
+    `(%instance-set ,x 0 (the layout ,val)))
+  (define-source-transform %funcallable-instance-layout (x)
+    `(truly-the layout (%funcallable-instance-info ,x 0)))
+  (define-source-transform %set-funcallable-instance-layout (x val)
+    `(setf (%funcallable-instance-info ,x 0) (the layout ,val))))
 
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 

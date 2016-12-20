@@ -185,7 +185,7 @@ scavenge(lispobj *start, sword_t n_words)
 }
 
 static lispobj trans_fun_header(lispobj object); /* forward decls */
-static lispobj trans_boxed(lispobj object);
+static lispobj trans_short_boxed(lispobj object);
 
 static sword_t
 scav_fun_pointer(lispobj *where, lispobj object)
@@ -206,7 +206,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
         copy = trans_fun_header(object);
         break;
     default:
-        copy = trans_boxed(object);
+        copy = trans_short_boxed(object);
         break;
     }
 
@@ -779,6 +779,18 @@ static lispobj trans_boxed(lispobj object)
 static sword_t size_boxed(lispobj *where)
 {
     sword_t length = HeaderValue(*where) + 1;
+    return CEILING(length, 2);
+}
+
+static lispobj trans_short_boxed(lispobj object) // 2 byte size
+{
+    sword_t length = (HeaderValue(*native_pointer(object)) & 0xFFFF) + 1;
+    return copy_object(object, CEILING(length, 2));
+}
+
+static sword_t size_short_boxed(lispobj *where)
+{
+    sword_t length = (HeaderValue(*where) & 0xFFFF) + 1;
     return CEILING(length, 2);
 }
 
@@ -1622,8 +1634,8 @@ gc_init_tables(void)
     transother[CODE_HEADER_WIDETAG] = trans_code_header;
     transother[SIMPLE_FUN_HEADER_WIDETAG] = trans_fun_header;
     transother[RETURN_PC_HEADER_WIDETAG] = trans_return_pc_header;
-    transother[CLOSURE_HEADER_WIDETAG] = trans_boxed;
-    transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_boxed;
+    transother[CLOSURE_HEADER_WIDETAG] = trans_short_boxed;
+    transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_short_boxed;
     transother[VALUE_CELL_HEADER_WIDETAG] = trans_boxed;
     transother[SYMBOL_HEADER_WIDETAG] = trans_tiny_boxed;
     transother[CHARACTER_WIDETAG] = trans_immediate;
@@ -1766,8 +1778,8 @@ gc_init_tables(void)
     sizetab[SIMPLE_FUN_HEADER_WIDETAG] = size_function_header;
     sizetab[RETURN_PC_HEADER_WIDETAG] = size_return_pc_header;
 #endif
-    sizetab[CLOSURE_HEADER_WIDETAG] = size_boxed;
-    sizetab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = size_boxed;
+    sizetab[CLOSURE_HEADER_WIDETAG] = size_short_boxed;
+    sizetab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = size_short_boxed;
     sizetab[VALUE_CELL_HEADER_WIDETAG] = size_boxed;
     sizetab[SYMBOL_HEADER_WIDETAG] = size_tiny_boxed;
     sizetab[CHARACTER_WIDETAG] = size_immediate;

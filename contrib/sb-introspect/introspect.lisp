@@ -971,8 +971,9 @@ Experimental: interface subject to change."
            (call x)))
         (sb-kernel:funcallable-instance
          (call (sb-kernel:%funcallable-instance-function object))
-         (loop for i from 1 below (- (1+ (sb-kernel:get-closure-length object))
-                                     sb-vm::funcallable-instance-info-offset)
+         (loop for i from sb-vm:instance-data-start
+               below (- (1+ (sb-kernel:get-closure-length object))
+                        sb-vm:funcallable-instance-info-offset)
                do (call (sb-kernel:%funcallable-instance-info object i))))
         (symbol
          (when ext

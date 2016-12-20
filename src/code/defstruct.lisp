@@ -1738,10 +1738,8 @@ or they must be declared locally notinline at each call site.~@:>"
          ;; named slots, because slot 0 is the LAYOUT.
          ;; This is the same in ordinary structures too: see (INCF DD-LENGTH)
          ;; in PARSE-DEFSTRUCT-NAME-AND-OPTIONS.
-         ;; With compact instance headers, slot 0 is a data slot, except that
-         ;; funcallable instances do not (yet) put the layout in the header.
-         (slot-index
-          (if (eq dd-type 'funcallable-structure) 1 sb!vm:instance-data-start)))
+         ;; With compact instance headers, slot 0 is a data slot.
+         (slot-index sb!vm:instance-data-start))
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
     ;; because none of the magical alternate-metaclass structures
     ;; have copiers and predicates that "Just work"
@@ -1848,7 +1846,10 @@ or they must be declared locally notinline at each call site.~@:>"
                    '%instance-ref))
           (funcallable-structure
            (values `(let ((,object-gensym
-                           (%make-funcallable-instance ,dd-length)))
+                           ;; TRULY-THE should not be needed. But it is, to avoid
+                           ;; a type check on the next SETF. Why???
+                           (truly-the funcallable-instance
+                            (%make-funcallable-instance ,dd-length))))
                       (setf (%funcallable-instance-layout ,object-gensym)
                             ,delayed-layout-form)
                       ,object-gensym)

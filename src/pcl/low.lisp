@@ -92,7 +92,7 @@
 (defmacro fsc-instance-wrapper (fin)
   `(%funcallable-instance-layout ,fin))
 (defmacro fsc-instance-slots (fin)
-  `(%funcallable-instance-info ,fin 1))
+  `(%funcallable-instance-info ,fin sb!vm:instance-data-start))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))

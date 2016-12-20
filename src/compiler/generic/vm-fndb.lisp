@@ -155,7 +155,11 @@
   (flushable always-translatable))
 (defknown %instance-layout (instance) layout
   (foldable flushable))
+(defknown %funcallable-instance-layout (funcallable-instance) layout
+  (foldable flushable))
 (defknown %set-instance-layout (instance layout) layout
+  ())
+(defknown %set-funcallable-instance-layout (funcallable-instance layout) layout
   ())
 (defknown %instance-length (instance) index
   (foldable flushable))

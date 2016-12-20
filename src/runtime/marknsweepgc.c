@@ -1615,7 +1615,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Fallthrough intended.
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
           // skip the trampoline word at where[1]
-          adjust_words(where+2, HeaderValue(header_word)-1);
+          adjust_words(where+2, (HeaderValue(header_word)&0xFFFF) - 1);
           break;
         case FDEFN_WIDETAG:
           adjust_words(where+1, 2);

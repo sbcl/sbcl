@@ -225,10 +225,10 @@
                    list-pointer-lowtag
                    (* 2 n-word-bytes)))
 
-          (:closure
+          (:closure ; also funcallable-instance
            (values (tagged-object fun-pointer-lowtag)
                    widetag
-                   (boxed-size header-value)))
+                   (boxed-size (logand header-value short-header-max-words))))
 
           (:instance
            (values (tagged-object instance-pointer-lowtag)
@@ -243,7 +243,7 @@
           (:tiny-other
            (values (tagged-object other-pointer-lowtag)
                    widetag
-                   (boxed-size (logand header-value short-header-max-words))))
+                   (boxed-size (logand header-value #xFF))))
 
           (:vector-nil
            (values (tagged-object other-pointer-lowtag)
