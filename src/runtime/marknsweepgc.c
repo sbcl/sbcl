@@ -1597,7 +1597,7 @@ static void fixup_space(lispobj* where, size_t n_words)
             lose("Unhandled widetag in fixup_range: %p\n", (void*)header_word);
           break;
         case INSTANCE_HEADER_WIDETAG:
-          instance_scan_interleaved(adjust_words, where,
+          instance_scan_interleaved(adjust_words, where+1,
                                     instance_length(header_word) | 1,
                                     native_pointer(instance_layout(where)));
           break;

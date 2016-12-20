@@ -801,24 +801,24 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case INSTANCE_HEADER_WIDETAG:
                 {
-                    struct instance *instance = (struct instance *) addr;
                     struct layout *layout
-                        = (struct layout *) native_pointer(instance->slots[0]);
-                    long nslots = HeaderValue(*addr);
+                        = (struct layout *)native_pointer(instance_layout(addr));
+                    lispobj* slots = addr + 1;
+                    long nslots = instance_length(*addr) | 1;
                     int index;
                     if (fixnump(layout->bitmap)) {
                       sword_t bitmap = (sword_t)layout->bitmap >> N_FIXNUM_TAG_BITS;
                       for (index = 0; index < nslots ; index++, bitmap >>= 1)
                         if (bitmap & 1)
-                          pscav(addr + 1 + index, 1, constant);
+                          pscav(slots + index, 1, constant);
                     } else {
                       struct bignum * bitmap;
                       bitmap = (struct bignum*)native_pointer(layout->bitmap);
                       for (index = 0; index < nslots ; index++)
                         if (positive_bignum_logbitp(index, bitmap))
-                          pscav(addr + 1 + index, 1, constant);
+                          pscav(slots + index, 1, constant);
                     }
-                    count = CEILING(1 + nslots, 2);
+                    count = 1 + nslots;
                 }
                 break;
 

@@ -3185,16 +3185,15 @@ verify_space(lispobj *start, size_t words)
 
                 case INSTANCE_HEADER_WIDETAG:
                     {
-                        sword_t ntotal = instance_length(thing);
                         lispobj layout = instance_layout(start);
                         if (!layout) {
                             count = 1;
                             break;
                         }
-                        instance_scan_interleaved(verify_space,
-                                                  start, ntotal,
+                        sword_t nslots = instance_length(thing) | 1;
+                        instance_scan_interleaved(verify_space, start+1, nslots,
                                                   native_pointer(layout));
-                        count = ntotal + 1;
+                        count = 1 + nslots;
                         break;
                     }
                 case CODE_HEADER_WIDETAG:

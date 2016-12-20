@@ -426,16 +426,13 @@ trans_instance(lispobj object)
 {
     gc_assert(lowtag_of(object) == INSTANCE_POINTER_LOWTAG);
     lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
-    sword_t length = instance_length(header) + 1;
-    return copy_object(object, CEILING(length, 2));
+    return copy_object(object, 1 + (instance_length(header)|1));
 }
 
 static sword_t
 size_instance(lispobj *where)
 {
-    lispobj header = *where;
-    sword_t length = instance_length(header) + 1;
-    return CEILING(length, 2);
+    return 1 + (instance_length(*where)|1);
 }
 
 static sword_t
@@ -663,7 +660,6 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
   /* This code might be made more efficient by run-length-encoding the ranges
      of words to scan, but probably not by much */
 
-  ++instance_ptr; // was supplied as the address of the header word
   if (fixnump(layout_bitmap)) {
       sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
       for (index = 0; index < n_words ; index++, bitmap >>= 1)
@@ -751,12 +747,7 @@ void bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
 static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
-    // instance_length() is the number of words following the header including
-    // the layout. If this is an even number, it should be made odd so that
-    // scav_instance() always consumes an even number of words in total.
-    sword_t ntotal = instance_length(header) | 1;
     lispobj* layout = (lispobj*)instance_layout(where);
-
     if (!layout)
         return 1;
     layout = native_pointer((lispobj)layout);
@@ -768,12 +759,14 @@ scav_instance(lispobj *where, lispobj header)
         layout = native_pointer((lispobj)forwarding_pointer_value(layout));
 #endif
 
+    sword_t nslots = instance_length(header) | 1;
+    ++where;
     if (((struct layout*)layout)->bitmap == make_fixnum(-1))
-        scavenge(where+1, ntotal);
+        scavenge(where, nslots);
     else
-        instance_scan_interleaved(scavenge, where, ntotal, layout);
+        instance_scan_interleaved(scavenge, where, nslots, layout);
 
-    return ntotal + 1;
+    return 1 + nslots;
 }
 
 static lispobj trans_boxed(lispobj object)
