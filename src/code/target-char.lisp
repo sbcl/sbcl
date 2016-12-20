@@ -15,8 +15,7 @@
 #!-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
                  upper-case-p lower-case-p both-case-p alphanumericp))
-(declaim (maybe-inline digit-char-p
-                       two-arg-char-equal))
+(declaim (maybe-inline digit-char-p two-arg-char-equal))
 
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))
@@ -27,13 +26,6 @@
 (defun pack-3-codepoints (first &optional (second 0) (third 0))
   (declare (type (unsigned-byte 21) first second third))
   (sb!c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
-
-(define-load-time-global **character-misc-database** nil)
-(declaim (type (simple-array (unsigned-byte 8) (*)) **character-misc-database**))
-(declaim (inline both-case-index-p))
-(defun both-case-index-p (misc-index)
-  (declare (type (unsigned-byte 16) misc-index))
-  (logbitp 7 (aref **character-misc-database** (+ 5 misc-index))))
 
 (macrolet ((frob ()
              (flet ((coerce-it (array)
@@ -52,15 +44,15 @@
                                        length :element-type '(unsigned-byte 8))))
                           (read-sequence array stream)
                           array)))
-                    (init-global (name type)
+                    (init-global (name type &optional length)
                       `(progn
                          (defglobal ,name
                              ,(if (eql type 'hash-table)
                                   `(make-hash-table)
-                                  `(make-array 0 :element-type ',type)))
+                                  `(make-array ,length :element-type ',type)))
                          (declaim (type ,(if (eql type 'hash-table)
                                              'hash-table
-                                             `(simple-array ,type (*))) ,name)))))
+                                             `(simple-array ,type (,length))) ,name)))))
                (let ((misc-database (coerce-it (read-ub8-vector (file "ucdmisc" "dat"))))
                      (ucd-high-pages (coerce-it (read-ub8-vector (file "ucdhigh" "dat"))))
                      (ucd-low-pages (coerce-it (read-ub8-vector (file "ucdlow" "dat"))))
@@ -71,19 +63,24 @@
                      (collations (coerce-it (read-ub8-vector (file "collation" "dat")))))
                  `(progn
                     ;; KLUDGE: All temporary values, fixed up in cold-load
-                    ,(init-global '**character-misc-database** '(unsigned-byte 8))
-                    ,(init-global '**character-high-pages** '(unsigned-byte 16))
-                    ,(init-global '**character-low-pages** '(unsigned-byte 16))
-                    ,(init-global '**character-decompositions** '(unsigned-byte 21))
-                    ,(init-global '**character-case-pages** '(unsigned-byte 8))
+                    ,(init-global '**character-misc-database** '(unsigned-byte 8)
+                                  (length misc-database))
+                    ,(init-global '**character-high-pages** '(unsigned-byte 16)
+                                  (/ (length ucd-high-pages) 2))
+                    ,(init-global '**character-low-pages** '(unsigned-byte 16)
+                                  (/ (length ucd-low-pages) 2))
+                    ,(init-global '**character-decompositions** '(unsigned-byte 21)
+                                  (/ (length decompositions) 3))
+                    ,(init-global '**character-case-pages** '(unsigned-byte 8)
+                                  (length case-pages))
                     ,(init-global '**character-primary-compositions** 'hash-table)
-                    ,(init-global '**character-cases** '(unsigned-byte 32))
-                    ,(init-global '**character-unicode-cases** t)
+                    ,(init-global '**character-unicode-cases** t
+                                  (* 64 (1+ (aref case-pages
+                                                  (1- (length case-pages))))))
+                    ,(init-global '**character-cases** '(unsigned-byte 32)
+                                  (* 2 64 (1+ (aref case-pages
+                                                    (1- (length case-pages))))))
                     ,(init-global '**character-collations** 'hash-table)
-                    ,(init-global '**unicode-char-name-database** t)
-                    ,(init-global '**unicode-name-char-database** t)
-                    ,(init-global '**unicode-1-char-name-database** t)
-                    ,(init-global '**unicode-1-name-char-database** t)
 
                     (defun !character-database-cold-init ()
                       (flet ((make-ubn-vector (raw-bytes n)
@@ -154,14 +151,18 @@
                                   for i = (+ (ash page 6) (ldb (byte 6 0) key))
                                   do
                                   (setf (aref unicode-table i) (cons upper lower))
-                                  when (and (atom upper)
-                                            (atom lower)
-                                            ;; Some characters are only equal under unicode rules,
-                                            ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
-                                            #!+sb-unicode
-                                            (both-case-index-p (misc-index (code-char lower)))
-                                            #!+sb-unicode
-                                            (both-case-index-p (misc-index (code-char upper))))
+                                  when
+                                  (locally
+                                      ;; Those pesky inlining warnings
+                                      (declare (notinline both-case-index-p))
+                                    (and (atom upper)
+                                         (atom lower)
+                                         ;; Some characters are only equal under unicode rules,
+                                         ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
+                                         #!+sb-unicode
+                                         (both-case-index-p (misc-index (code-char lower)))
+                                         #!+sb-unicode
+                                         (both-case-index-p (misc-index (code-char upper)))))
                                   do
                                   (setf (aref table (* i 2)) lower
                                         (aref table (1+ (* i 2))) upper)))
@@ -251,24 +252,32 @@
                                            code->u1-name))
                                         u1-names)
                                (setf name->code
-                                     (sort (copy-seq code->name) #'< :key #'cdr))
-                               (setf code->name
-                                     (sort (copy-seq name->code) #'< :key #'car))
-                               (setf u1-name->code
-                                     (sort (copy-seq code->u1-name) #'< :key #'cdr))
-                               (setf code->u1-name
+                                     (sort (copy-seq code->name) #'< :key #'cdr)
+                                     code->name
+                                     (sort (copy-seq name->code) #'< :key #'car)
+                                     u1-name->code
+                                     (sort (copy-seq code->u1-name) #'< :key #'cdr)
+                                     code->u1-name
                                      (sort (copy-seq u1-name->code) #'< :key #'car))
-                               (setf names nil u1-names nil)
-                               `(defun !character-name-database-cold-init ()
-                                  (setf **unicode-character-name-huffman-tree** ',tree
-                                        **unicode-char-name-database**
-                                        ',(convert-to-double-vector code->name)
-                                        **unicode-name-char-database**
-                                        ',(convert-to-double-vector name->code t)
-                                        **unicode-1-char-name-database**
-                                        ',(convert-to-double-vector code->u1-name)
-                                        **unicode-1-name-char-database**
-                                        ',(convert-to-double-vector u1-name->code t)))))))))))))
+                               `(progn
+                                  ,(init-global '**unicode-char-name-database** t
+                                                (* 2 (length code->name)))
+                                  ,(init-global '**unicode-name-char-database** t
+                                                (* 2 (length name->code)))
+                                  ,(init-global '**unicode-1-char-name-database** t
+                                                (* 2 (length code->u1-name)))
+                                  ,(init-global '**unicode-1-name-char-database** t
+                                                (* 2 (length u1-name->code)))
+                                  (defun !character-name-database-cold-init ()
+                                    (setf **unicode-character-name-huffman-tree** ',tree
+                                          **unicode-char-name-database**
+                                          ',(convert-to-double-vector code->name)
+                                          **unicode-name-char-database**
+                                          ',(convert-to-double-vector name->code t)
+                                          **unicode-1-char-name-database**
+                                          ',(convert-to-double-vector code->u1-name)
+                                          **unicode-1-name-char-database**
+                                          ',(convert-to-double-vector u1-name->code t))))))))))))))
 
   (frob))
 #+sb-xc-host (!character-name-database-cold-init)
@@ -558,6 +567,11 @@ NIL."
   "The argument must be a character object. ALPHA-CHAR-P returns T if the
 argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (< (ucd-general-category char) 5))
+
+(declaim (inline both-case-index-p))
+(defun both-case-index-p (misc-index)
+  (declare (type (unsigned-byte 16) misc-index))
+  (logbitp 7 (aref **character-misc-database** (+ 5 misc-index))))
 
 (defun both-case-p (char)
   #!+sb-doc
