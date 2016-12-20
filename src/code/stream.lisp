@@ -1761,11 +1761,12 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
      (let* ((buffer (fill-pointer-output-stream-string stream))
             (current (fill-pointer buffer)))
        (with-array-data ((string buffer) (start) (end current))
-         (declare (simple-string string) (ignore start))
+         (declare (simple-string string))
          (let ((found (position #\newline string :test #'char=
-                                :end end :from-end t)))
+                                                 :start start :end end
+                                                 :from-end t)))
            (if found
-               (- end (the fixnum found))
+               (1- (- end found))
                current)))))
     (:element-type
       (array-element-type

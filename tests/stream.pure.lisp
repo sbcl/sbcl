@@ -427,3 +427,20 @@
 
   (with-test (:name (write-sequence sequence type-error))
     (test `(write-sequence 1 (make-string-output-stream)))))
+
+(with-test (:name :fill-pointer-stream-charpos)
+  (let ((string (make-array 3  :initial-contents (format nil "~%ab")
+                               :element-type 'character :fill-pointer 1)))
+    (with-output-to-string (stream string)
+      (fresh-line stream))
+    (assert (equal string (string #\Newline)))))
+
+(with-test (:name (:fill-pointer-stream-charpos :displaced))
+  (let ((string (make-array 3 :displaced-to (format nil "~%abc")
+                              :displaced-index-offset 1
+                              :element-type 'character :fill-pointer 0)))
+    (with-output-to-string (stream string)
+      (fresh-line stream))
+    (assert (equal string ""))))
+
+
