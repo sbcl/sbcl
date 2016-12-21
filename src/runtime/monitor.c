@@ -357,9 +357,8 @@ print_context(os_context_t *context)
 
     for (i = 0; i < NREGS; i++) {
         printf("%s:\t", lisp_register_names[i]);
-#ifdef LISP_FEATURE_X86
-        brief_print((lispobj)(*os_context_register_addr(context,
-                                                        i*2)));
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+        brief_print((lispobj)(*os_context_register_addr(context, i*2)));
 #else
         brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
