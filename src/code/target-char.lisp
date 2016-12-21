@@ -706,7 +706,8 @@ is either numeric or alphabetic."
       (eq reverse-case-char x)))
 
 (defun two-arg-char-not-equal (c1 c2)
-  (/= (equal-char-code c1) (equal-char-code c2)))
+  (declare (inline two-arg-char-equal))
+  (not (two-arg-char-equal c1 c2)))
 
 (macrolet ((def (name test doc)
              (declare (ignorable doc))
