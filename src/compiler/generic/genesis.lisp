@@ -3576,8 +3576,8 @@ core and return a descriptor to it."
                              (list (byte-size byte) (byte-position byte)))
                            bytes))))
     (format t "struct sc_offset_byte {
-    int position;
     int size;
+    int position;
 };~2%")
     (write-array "sc_offset_sc_number_bytes" sb!c::+sc-offset-scn-bytes+)
     (write-array "sc_offset_offset_bytes"    sb!c::+sc-offset-offset-bytes+)))
