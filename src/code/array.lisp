@@ -68,7 +68,7 @@
 
 
 ;;;; MAKE-ARRAY
-(defun %integer-vector-widetag-and-n-bits (signed high)
+(defun %integer-vector-widetag-and-n-bits-shift (signed high)
   (let ((unsigned-table
           #.(let ((map (make-array (1+ sb!vm:n-word-bits))))
               (loop for saetp across
@@ -105,7 +105,7 @@
 
 ;;; This is a bit complicated, but calling subtypep over all
 ;;; specialized types is exceedingly slow
-(defun %vector-widetag-and-n-bits (type)
+(defun %vector-widetag-and-n-bits-shift (type)
   (macrolet ((with-parameters ((arg-type &key intervals)
                                (&rest args) &body body)
                (let ((type-sym (gensym)))
@@ -148,10 +148,10 @@
                     type))
            (integer-interval-widetag (low high)
              (if (minusp low)
-                 (%integer-vector-widetag-and-n-bits
+                 (%integer-vector-widetag-and-n-bits-shift
                   t
                   (1+ (max (integer-length low) (integer-length high))))
-                 (%integer-vector-widetag-and-n-bits
+                 (%integer-vector-widetag-and-n-bits-shift
                   nil
                   (max (integer-length low) (integer-length high))))))
       (let* ((consp (consp type))
@@ -184,12 +184,12 @@
            (with-parameters ((integer 1)) (high)
              (if (eq high '*)
                  (result sb!vm:simple-vector-widetag)
-                 (%integer-vector-widetag-and-n-bits nil high))))
+                 (%integer-vector-widetag-and-n-bits-shift nil high))))
           (signed-byte
            (with-parameters ((integer 1)) (high)
              (if (eq high '*)
                  (result sb!vm:simple-vector-widetag)
-                 (%integer-vector-widetag-and-n-bits t high))))
+                 (%integer-vector-widetag-and-n-bits-shift t high))))
           (double-float
            (with-parameters (double-float :intervals t) (low high)
              (if (and (not (eq low '*))
@@ -213,7 +213,7 @@
                     (consp (cdr type))
                     (null (cddr type))
                     (typep (cadr type) '(integer 1)))
-               (%integer-vector-widetag-and-n-bits
+               (%integer-vector-widetag-and-n-bits-shift
                 nil (integer-length (1- (cadr type))))
                (ill-type)))
           #!+long-float
@@ -313,7 +313,7 @@
                   (let ((expansion (type-specifier ctype)))
                     (if (equal expansion type)
                         (result sb!vm:simple-vector-widetag)
-                        (%vector-widetag-and-n-bits expansion)))))))))))))
+                        (%vector-widetag-and-n-bits-shift expansion)))))))))))))
 
 (defun %complex-vector-widetag (widetag)
   (macrolet ((make-case ()
@@ -342,6 +342,8 @@
                   (1- (integer-length sb!vm:n-word-bits)))))
     (ash (+ length mask) shift)))
 
+;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into bits
+;;; or NIL, %%simple-array-n-bits-shifts%% will be used in that case.
 (defun allocate-vector-with-widetag (widetag length n-bits-shift)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))
@@ -518,8 +520,8 @@
                    initial-contents adjustable
                    fill-pointer displaced-to displaced-index-offset))
   (declare (explicit-check))
-  (multiple-value-bind (widetag n-bits) (%vector-widetag-and-n-bits element-type)
-    (apply #'%make-array dimensions widetag n-bits args)))
+  (multiple-value-bind (widetag shift) (%vector-widetag-and-n-bits-shift element-type)
+    (apply #'%make-array dimensions widetag shift args)))
 
 (defun make-static-vector (length &key
                            (element-type '(unsigned-byte 8))
@@ -557,7 +559,7 @@ of specialized arrays is supported."
   ;;
   ;; Allocate and possibly initialize the vector.
   (multiple-value-bind (type n-bits-shift)
-      (%vector-widetag-and-n-bits element-type)
+      (%vector-widetag-and-n-bits-shift element-type)
     (let ((vector
             (allocate-static-vector type length
                                     (vector-length-in-words length
@@ -1224,7 +1226,7 @@ of specialized arrays is supported."
                                        displaced-to))
              (widetag (array-underlying-widetag array)))
     (cond ((and element-type-p
-                (/= (%vector-widetag-and-n-bits element-type)
+                (/= (%vector-widetag-and-n-bits-shift element-type)
                     widetag))
            (error "The new element type, ~
                    ~/sb-impl:print-type-specifier/, is incompatible ~
