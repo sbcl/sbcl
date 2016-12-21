@@ -672,16 +672,33 @@ is either numeric or alphabetic."
                      (and (< 415 sum 461))
                      (and (< 463 sum 477))))))))
     (declare (inline base-char-equal-p))
-    (or (eq c1 c2)
-        #!-sb-unicode
-        (base-char-equal-p)
-        #!+sb-unicode
-        (typecase c1
-          (base-char
+    (cond ((eq c1 c2))
+          #!-sb-unicode
+          (t
+           (base-char-equal-p))
+          #!+sb-unicode
+          ((base-char-p c1)
            (and (base-char-p c2)
                 (base-char-equal-p)))
+          #!+sb-unicode
+          ((base-char-p c2)
+           nil)
+          #!+sb-unicode
           (t
-           (= (equal-char-code c1) (equal-char-code c2)))))))
+           (locally (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+             (let* ((code1 (char-code c1))
+                    (code2 (char-code c2))
+                    (shifted (ash code1 -6))
+                    (page (if (>= shifted (length **character-case-pages**))
+                              (return-from two-arg-char-equal nil)
+                              (aref **character-case-pages** shifted))))
+               (unless (= page 255)
+                 (let ((cases **character-cases**)
+                       (index (* (+ (ash page 6)
+                                    (ldb (byte 6 0) code1))
+                                 2)))
+                   (or (= (aref cases index) code2) ;; lower case
+                       (= (aref cases (1+ index)) code2))))))))))
 
 (defun char-equal-constant (x char reverse-case-char)
   (declare (type character x) (explicit-check))
