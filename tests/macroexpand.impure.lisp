@@ -240,3 +240,41 @@
   (assert (equal-mod-gensyms
            (macroexpand-1 '(setf (bar-a x) 3))
            '(let* ((#2=#:x x) (new 3)) (funcall #'(setf bar-a) new #2#)))))
+
+;;; WITH-CURRENT-SOURCE-FORM tests
+
+(defmacro warnings-in-subforms (a b)
+  (with-current-source-form (a)
+    (warn "a warning"))
+  (with-current-source-form (b)
+    (warn "a warning"))
+  `(progn ,a ,b))
+
+(with-test (:name (with-current-source-form :smoke))
+  (labels ((call-capturing-source-paths (thunk)
+             (let ((source-paths '()))
+               (handler-bind
+                   ((condition (lambda (condition)
+                                 (let ((context (sb-c::find-error-context nil)))
+                                   (push (sb-c::compiler-error-context-original-source-path
+                                          context)
+                                         source-paths))
+                                 (muffle-warning condition))))
+                 (funcall thunk))
+               (nreverse source-paths)))
+           (compile-capturing-source-paths (form)
+             (call-capturing-source-paths
+              (lambda () (compile nil form)))))
+
+    (assert (equal (compile-capturing-source-paths
+                    '(lambda () (warnings-in-subforms 1 2)))
+                   '((2 0) (2 0))))
+    (assert (equal (compile-capturing-source-paths
+                    '(lambda () (warnings-in-subforms (progn 1) (progn 2))))
+                   '((1 2 0) (2 2 0))))
+    (assert (equal (compile-capturing-source-paths
+                    '(lambda ()
+                      (warnings-in-subforms
+                       (warnings-in-subforms (progn 1) (progn 2))
+                       (progn 3))))
+                   '((1 2 0) (2 2 0) (1 1 2 0) (2 1 2 0))))))

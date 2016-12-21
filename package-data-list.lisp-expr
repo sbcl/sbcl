@@ -702,6 +702,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; and for dedicated users who really want to customize
                ;; error reporting, we have
                "DEFINE-SOURCE-CONTEXT"
+               "WITH-CURRENT-SOURCE-FORM"
 
                ;; and given how many users dislike strict treatment of
                ;; DEFCONSTANT, let's give them enough rope to escape by
