@@ -29,6 +29,8 @@ OS_SRC = linux-os.c x86-linux-os.c
 # working on one and it would be a nice thing to have.)
 LINKFLAGS += -Wl,--export-dynamic -m32
 OS_LIBS = -ldl
+__LDFLAGS__ = -m elf_i386
+
 
 ifdef LISP_FEATURE_LARGEFILE
   CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -40,6 +42,10 @@ ifdef LISP_FEATURE_SB_THREAD
 endif
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
+endif
+ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
+  LIBSBCL = sbcl.o
+  USE_LIBSBCL = sbcl.o
 endif
 
 GC_SRC = gencgc.c

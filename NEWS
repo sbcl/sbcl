@@ -6,6 +6,9 @@ changes relative to sbcl-1.3.14:
     variable is being bound, which slot of which structure is being set.
   * defaults change: sb-ext:*disassemble-annotate* default to NIL, due to its
     poor reliability.
+  * new feature: SB-LINKABLE-RUNTIME, allowing linking with extra object
+    files to help with delivery of executables.  (Thanks to François-René
+    Rideau)
 
 changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes

@@ -211,6 +211,12 @@
           ;; updated to take the additional indirection into account.
           ;; Let's avoid this unusual combination.
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE and :SB-THREAD")
+         ("(and sb-linkable-runtime (not sb-dynamic-core))"
+          ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
+         ("(and sb-linkable-runtime (not (or x86 x86-64)))"
+          ":SB-LINKABLE-RUNTIME not supported on selected architecture")
+         ("(and sb-linkable-runtime (not (or darwin linux win32)))"
+          ":SB-LINKABLE-RUNTIME not supported on selected operating system")
          ("(and sb-eval sb-fasteval)"
           ;; It sorta kinda works to have both, but there should be no need,
           ;; and it's not really supported.

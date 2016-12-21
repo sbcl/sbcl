@@ -463,6 +463,7 @@ fi
 original_dir=`pwd`
 cd ./src/runtime/
 rm -f Config target-arch-os.h target-arch.h target-os.h target-lispregs.h
+rm -f sbcl.mk sbcl.o libsbcl.a
 # KLUDGE: these two logically belong in the previous section
 # ("architecture-dependent"); it seems silly to enforce this in terms
 # of the shell script, though. -- CSR, 2002-02-03

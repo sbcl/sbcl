@@ -21,6 +21,12 @@ LINKFLAGS = -g
 NM = nm -gp
 DEPEND_FLAGS = -MM
 GREP = grep
+LD = ld
+
+# By default, don't make and use a library, just use the object files.
+LIBSBCL = $(OBJS)
+USE_LIBSBCL = $(OBJS)
+__LDFLAGS__ =
 
 include ../../output/prefix.def
 
@@ -44,11 +50,13 @@ ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e no-pie),)
 CFLAGS += -fno-pie
 LINKFLAGS += -no-pie
 LDFLAGS += -no-pie
+__LDFLAGS__ += -no-pie
 endif
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e -nopie),)
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e nopie),)
 CFLAGS += -fno-pie
 LINKFLAGS += -nopie
 LDFLAGS += -nopie
+__LDFLAGS__ += -nopie
 endif
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c dynbind.c     \
@@ -66,10 +74,34 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 
-targets: $(TARGET) sbcl.nm
+targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
 
-$(TARGET): $(OBJS)
-	$(CC) ${LINKFLAGS} -o $@ $^ $(LIBS)
+$(TARGET): $(LIBSBCL)
+	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
+
+# ld -r -o sbcl.o works on Linux, but not on other platforms.
+# On macOS, it fails to keep debug sections.
+# On mingw64, it leads to an executable that cannot be executed.
+sbcl.o: $(OBJS)
+	$(LD) $(__LDFLAGS__) -r -o $@ $^
+
+libsbcl.a: $(OBJS)
+	rm -f $@ ; ar rcs $@ $^
+
+sbcl.mk:
+	( echo 'CC=$(CC)' ; \
+	  echo 'LD=$(LD)' ; \
+	  echo 'CFLAGS=$(CFLAGS)' ; \
+	  echo 'ASFLAGS=$(ASFLAGS)' ; \
+	  echo 'LINKFLAGS=$(LINKFLAGS)' ; \
+	  echo 'LDFLAGS=$(LDFLAGS)' ; \
+	  echo '__LDFLAGS__=$(__LDFLAGS__)' ; \
+	  echo 'LIBS=$(LIBS)' ; \
+	  if [ -n '$(LISP_FEATURE_SB_LINKABLE_RUNTIME)' ] ; then \
+	    echo 'LIBSBCL=$(LIBSBCL)' ; \
+	    echo 'USE_LIBSBCL=$(USE_LIBSBCL)' ; \
+	  fi ; \
+	  : ) > $@
 
 sbcl.nm: $(TARGET)
 	$(NM) $(TARGET) | $(GREP) -v " [FUw] " > ,$@
