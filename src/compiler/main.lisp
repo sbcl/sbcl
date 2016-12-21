@@ -1049,18 +1049,19 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Note that this function is _only_ for processing of toplevel forms.
 ;;; Non-toplevel forms use IR1-CONVERT-FUNCTOID which considers compiler macros.
 (defun preprocessor-macroexpand-1 (form)
-  (if (listp form)
-      (let ((expansion (expand-compiler-macro form)))
-        (if (neq expansion form)
-            (return-from preprocessor-macroexpand-1
-              (values expansion t)))))
-  (handler-case (%macroexpand-1 form *lexenv*)
-    (error (condition)
-      (compiler-error "(during macroexpansion of ~A)~%~A"
-                      (let ((*print-level* 2)
-                            (*print-length* 2))
-                        (format nil "~S" form))
-                      condition))))
+  (when (listp form)
+    (let ((expansion (expand-compiler-macro form)))
+      (unless (eq expansion form)
+        (return-from preprocessor-macroexpand-1
+          (values expansion t)))))
+  (handler-bind
+      ((error (lambda (condition)
+                (compiler-error "(during macroexpansion of ~A)~%~A"
+                                (let ((*print-level* 2)
+                                      (*print-length* 2))
+                                  (format nil "~S" form))
+                                condition))))
+    (%macroexpand-1 form *lexenv*)))
 
 ;;; Process a PROGN-like portion of a top level form. FORMS is a list of
 ;;; the forms, and PATH is the source path of the FORM they came out of.
