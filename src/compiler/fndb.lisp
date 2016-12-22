@@ -1701,7 +1701,7 @@
   (values t (or index null))
   (flushable call))
 (defknown (%find-position-if %find-position-if-not)
-  ((function 1) sequence t index sequence-end (function 2))
+  ((function 1) sequence t index sequence-end (function 1))
   (values t (or index null))
   (call))
 (defknown effective-find-position-test (callable callable)

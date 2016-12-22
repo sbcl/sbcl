@@ -6082,4 +6082,12 @@
     (assert (equal (funcall fun '((a b) (1 a)) 'car)
                    '(1 a)))
     (assert-error (equal (funcall fun '((a b) (1 a)) 'cdr)
-                   '(1 a)))))
+                         '(1 a)))))
+
+(with-test (:name :two-arg-rewriting-find-if)
+  (assert (= (funcall (checked-compile
+                       `(lambda (x)
+                          (declare (type vector x))
+                          (find-if #'oddp x :key '-)))
+                      #(1))
+             1)))
