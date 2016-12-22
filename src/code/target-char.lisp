@@ -14,8 +14,9 @@
 ;;; We compile some trivial character operations via inline expansion.
 #!-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
-                 upper-case-p lower-case-p both-case-p alphanumericp))
-(declaim (maybe-inline digit-char-p two-arg-char-equal))
+                 alphanumericp))
+(declaim (maybe-inline upper-case-p lower-case-p both-case-p
+                       digit-char-p two-arg-char-equal))
 
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))
@@ -152,17 +153,18 @@
                                   do
                                   (setf (aref unicode-table i) (cons upper lower))
                                   when
-                                  (locally
-                                      ;; Those pesky inlining warnings
-                                      (declare (notinline both-case-index-p))
+                                  (flet (#!+sb-unicode
+                                         (both-case-p (code)
+                                           (logbitp 7 (aref **character-misc-database**
+                                                            (+ 5 (misc-index (code-char code)))))))
                                     (and (atom upper)
                                          (atom lower)
                                          ;; Some characters are only equal under unicode rules,
                                          ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
                                          #!+sb-unicode
-                                         (both-case-index-p (misc-index (code-char lower)))
+                                         (both-case-p lower)
                                          #!+sb-unicode
-                                         (both-case-index-p (misc-index (code-char upper)))))
+                                         (both-case-p upper)))
                                   do
                                   (setf (aref table (* i 2)) lower
                                         (aref table (1+ (* i 2))) upper)))
@@ -568,55 +570,72 @@ NIL."
 argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (< (ucd-general-category char) 5))
 
-(declaim (inline both-case-index-p))
-(defun both-case-index-p (misc-index)
-  (declare (type (unsigned-byte 16) misc-index))
-  (logbitp 7 (aref **character-misc-database** (+ 5 misc-index))))
+(defmacro with-case-info ((char index-var cases-var
+                           &key miss-value)
+                          &body body)
+  (let ((code-var (gensym "CODE"))
+        (shifted-var (gensym "SHIFTED"))
+        (page-var (gensym "PAGE")))
+    `(block nil
+       (locally
+           (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+         (let ((,code-var (char-code ,char)))
+           (let* ((,shifted-var (ash ,code-var -6))
+                  (,page-var (if (>= ,shifted-var (length **character-case-pages**))
+                                 (return ,miss-value)
+                                 (aref **character-case-pages** ,shifted-var))))
+             (if (= ,page-var 255)
+                 ,miss-value
+                 (let ((,index-var (* (+ (ash ,page-var 6)
+                                         (ldb (byte 6 0) ,code-var))
+                                      2))
+                       (,cases-var **character-cases**))
+                   ,@body))))))))
 
 (defun both-case-p (char)
   #!+sb-doc
   "The argument must be a character object. BOTH-CASE-P returns T if the
 argument is an alphabetic character and if the character exists in both upper
 and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
-  (both-case-index-p (misc-index char)))
+  (with-case-info (char index cases)
+    (plusp (aref cases index))))
 
 (defun upper-case-p (char)
   #!+sb-doc
   "The argument must be a character object; UPPER-CASE-P returns T if the
 argument is an upper-case character, NIL otherwise."
-  (let ((index (misc-index char)))
-    (and
-     (both-case-index-p index)
-     (= (aref **character-misc-database** index) 0))))
+  (with-case-info (char index cases)
+    (= (aref cases (1+ index))
+       (char-code char))))
 
 (defun lower-case-p (char)
   #!+sb-doc
   "The argument must be a character object; LOWER-CASE-P returns T if the
 argument is a lower-case character, NIL otherwise."
-  (let ((index (misc-index char)))
-    (and
-     (both-case-index-p index)
-     (= (aref **character-misc-database** index) 1))))
+  (with-case-info (char index cases)
+    (= (aref cases index)
+       (char-code char))))
 
-(defun digit-char-p (char &optional (radix 10.))
+(defun char-upcase (char)
   #!+sb-doc
-  "If char is a digit in the specified radix, returns the fixnum for which
-that digit stands, else returns NIL."
-  (if (<= (char-code char) 127)
-      (let ((weight (- (char-code char) 48)))
-        (cond ((minusp weight) nil)
-              ((<= radix 10.)
-               ;; Special-case ASCII digits in decimal and smaller radices.
-               (if (< weight radix) weight nil))
-              ;; Digits 0 - 9 are used as is, since radix is larger.
-              ((< weight 10) weight)
-              ;; Check for upper case A - Z.
-              ((and (>= (decf weight 7) 10) (< weight radix)) weight)
-              ;; Also check lower case a - z.
-              ((and (>= (decf weight 32) 10) (< weight radix)) weight)))
-      (let ((number (ucd-decimal-digit char)))
-        (when (and number (< (truly-the fixnum number) radix))
-          number))))
+  "Return CHAR converted to upper-case if that is possible. Don't convert
+lowercase eszet (U+DF)."
+  (with-case-info (char index cases
+                   :miss-value char)
+    (let ((code (aref cases (1+ index))))
+      (if (zerop code)
+          char
+          (code-char code)))))
+
+(defun char-downcase (char)
+  #!+sb-doc
+  "Return CHAR converted to lower-case if that is possible."
+  (with-case-info (char index cases
+                   :miss-value char)
+    (let ((code (aref cases index)))
+      (if (zerop code)
+          char
+          (code-char code)))))
 
 (defun alphanumericp (char)
   #!+sb-doc
@@ -685,20 +704,9 @@ is either numeric or alphabetic."
            nil)
           #!+sb-unicode
           (t
-           (locally (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-             (let* ((code1 (char-code c1))
-                    (code2 (char-code c2))
-                    (shifted (ash code1 -6))
-                    (page (if (>= shifted (length **character-case-pages**))
-                              (return-from two-arg-char-equal nil)
-                              (aref **character-case-pages** shifted))))
-               (unless (= page 255)
-                 (let ((cases **character-cases**)
-                       (index (* (+ (ash page 6)
-                                    (ldb (byte 6 0) code1))
-                                 2)))
-                   (or (= (aref cases index) code2) ;; lower case
-                       (= (aref cases (1+ index)) code2))))))))))
+           (with-case-info (c1 index cases)
+             (or (= (aref cases index) (char-code c2)) ;; lower case
+                 (= (aref cases (1+ index)) (char-code c2))))))))
 
 (defun char-equal-constant (x char reverse-case-char)
   (declare (type character x) (explicit-check))
@@ -782,45 +790,25 @@ Case is ignored." t)
 Case is ignored." t))
 
 
-;;;; miscellaneous functions
-
-(defun char-upcase (char)
+(defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
-  "Return CHAR converted to upper-case if that is possible. Don't convert
-lowercase eszet (U+DF)."
-  (let* ((code (char-code char))
-         (shifted (ash code -6))
-         (page (if (>= shifted (length **character-case-pages**))
-                   (return-from char-upcase char)
-                   (aref **character-case-pages** shifted))))
-    (if (= page 255)
-        char
-        (let ((code
-                (aref **character-cases**
-                      (1+ (* (+ (ash page 6)
-                                (ldb (byte 6 0) code))
-                             2)))))
-          (if (zerop code)
-              char
-              (code-char code))))))
-
-(defun char-downcase (char)
-  #!+sb-doc
-  "Return CHAR converted to lower-case if that is possible."
-  (let* ((code (char-code char))
-         (shifted (ash code -6))
-         (page (if (< shifted (length **character-case-pages**))
-                   (aref **character-case-pages** shifted)
-                   (return-from char-downcase char))))
-    (if (= page 255)
-        char
-        (let ((code
-                (aref **character-cases**
-                      (* 2 (+ (ash page 6)
-                              (ldb (byte 6 0) code))))))
-          (if (zerop code)
-              char
-              (code-char code))))))
+  "If char is a digit in the specified radix, returns the fixnum for which
+that digit stands, else returns NIL."
+  (if (<= (char-code char) 127)
+      (let ((weight (- (char-code char) 48)))
+        (cond ((minusp weight) nil)
+              ((<= radix 10.)
+               ;; Special-case ASCII digits in decimal and smaller radices.
+               (if (< weight radix) weight nil))
+              ;; Digits 0 - 9 are used as is, since radix is larger.
+              ((< weight 10) weight)
+              ;; Check for upper case A - Z.
+              ((and (>= (decf weight 7) 10) (< weight radix)) weight)
+              ;; Also check lower case a - z.
+              ((and (>= (decf weight 32) 10) (< weight radix)) weight)))
+      (let ((number (ucd-decimal-digit char)))
+        (when (and number (< (truly-the fixnum number) radix))
+          number))))
 
 (defun digit-char (weight &optional (radix 10))
   #!+sb-doc
