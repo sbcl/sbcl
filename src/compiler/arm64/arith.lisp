@@ -684,7 +684,9 @@
   (:policy :fast-safe)
   (:generator 3
     (move res y)
-    (inst bfm res x (- n-word-bits posn) (1- size))))
+    (inst bfm res x (if (= posn 0)
+                        0
+                        (- n-word-bits posn)) (1- size))))
 
 (define-vop (dpb-c/unsigned)
   (:translate %%dpb)
@@ -699,7 +701,9 @@
   (:policy :fast-safe)
   (:generator 3
     (move res y)
-    (inst bfm res x (- n-word-bits posn) (1- size))))
+    (inst bfm res x (if (= posn 0)
+                        0
+                        (- n-word-bits posn)) (1- size))))
 
 ;;; Modular functions
 (define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
