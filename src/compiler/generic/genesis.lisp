@@ -1044,8 +1044,6 @@ core and return a descriptor to it."
 
 ;;; the descriptor for layout's layout (needed when making layouts)
 (defvar *layout-layout*)
-;;; the descriptor for PACKAGE's layout (needed when making packages)
-(defvar *package-layout*)
 
 (defvar *known-structure-classoids*)
 
@@ -1265,10 +1263,9 @@ core and return a descriptor to it."
                            obj)
                   obj-to-core-helper)))))))
 
-;; This is called to backpatch three small sets of objects:
-;;  - layouts which are made before layout-of-layout is made (4 of them)
-;;  - packages, which are made before layout-of-package is made (all of them)
-;;  - a small number of classoid-cells (probably 3 or 4).
+;; This is called to backpatch two small sets of objects:
+;;  - layouts created before layout-of-layout is made (3 counting LAYOUT itself)
+;;  - a small number of classoid-cells (~ 4).
 (defun patch-instance-layout (thing layout)
   #!+compact-instance-header
   ;; High half of the header points to the layout
@@ -1306,12 +1303,10 @@ core and return a descriptor to it."
               (number-to-core (layout-bitmap warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout)))
-      (setf *layout-layout*
-            (chill-layout 'layout t-layout s-o-layout))
+      (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
       (dolist (layout (list t-layout s-o-layout *layout-layout*))
         (patch-instance-layout layout *layout-layout*))
-      (setf *package-layout*
-            (chill-layout 'package t-layout s-o-layout)))))
+      (chill-layout 'package t-layout s-o-layout))))
 
 ;;;; interning symbols in the cold image
 
@@ -1347,13 +1342,25 @@ core and return a descriptor to it."
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
 
-(defun initialize-packages (package-data-list)
-  (let ((package-layout (find-layout 'package))
+(defun initialize-packages ()
+  (let ((package-data-list
+         ;; docstrings are set in src/cold/warm. It would work to do it here,
+         ;; but seems preferable not to saddle Genesis with such responsibility.
+         (list* (sb-cold:make-package-data :name "COMMON-LISP" :doc nil)
+                (sb-cold:make-package-data :name "KEYWORD" :doc nil)
+                ;; ANSI encourages us to put extension packages
+                ;; in the USE list of COMMON-LISP-USER.
+                (sb-cold:make-package-data
+                 :name "COMMON-LISP-USER" :doc nil
+                 :use '("COMMON-LISP" "SB!ALIEN" "SB!DEBUG" "SB!EXT" "SB!GRAY" "SB!PROFILE"))
+                (sb-cold::package-list-for-genesis)))
+        (package-layout (find-layout 'package))
         (target-pkg-list nil))
     (labels ((init-cold-package (name &optional docstring)
-               (let ((cold-package (car (gethash name *cold-package-symbols*))))
-                 ;; patch in the layout
-                 (patch-instance-layout cold-package *package-layout*)
+               (let ((cold-package (allocate-struct (symbol-value *cold-layout-gspace*)
+                                                    (gethash 'package *cold-layouts*))))
+                 (setf (gethash name *cold-package-symbols*)
+                       (list* cold-package nil nil))
                  ;; Initialize string slots
                  (write-slots cold-package package-layout
                               :%name (base-string-to-core
@@ -1576,15 +1583,16 @@ core and return a descriptor to it."
       (setf symbol (intern (symbol-name symbol) *cl-package*))))
 
   (or (get symbol 'cold-intern-info)
-      (let ((pkg-info (gethash (package-name package) *cold-package-symbols*))
-            (handle (allocate-symbol (symbol-name symbol) t :gspace gspace)))
+      (let ((handle (allocate-symbol (symbol-name symbol) t :gspace gspace)))
+        (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
-        (unless pkg-info
-          (error "No target package descriptor for ~S" package))
-        (record-accessibility
-         (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
-         handle pkg-info symbol package t)
+        (let ((pkg-info (or (gethash (package-name package) *cold-package-symbols*)
+                            (error "No target package descriptor for ~S" package))))
+          (write-wordindexed handle sb!vm:symbol-package-slot (car pkg-info))
+          (record-accessibility
+           (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
+           pkg-info handle package symbol))
         #!+sb-thread
         (assign-tls-index symbol handle)
         (acond ((eq package *keyword-package*)
@@ -1593,13 +1601,10 @@ core and return a descriptor to it."
                ((assoc symbol sb-cold:*symbol-values-for-genesis*)
                 (cold-set handle (destructuring-bind (expr . package) (cdr it)
                                    (emulate-target-eval expr package)))))
-        (setf (get symbol 'cold-intern-info) handle))))
+        handle)))
 
-(defun record-accessibility (accessibility symbol-descriptor target-pkg-info
-                             host-symbol host-package &optional set-home-p)
-  (when set-home-p
-    (write-wordindexed symbol-descriptor sb!vm:symbol-package-slot
-                       (car target-pkg-info)))
+(defun record-accessibility (accessibility target-pkg-info symbol-descriptor
+                             &optional host-package host-symbol)
   (let ((access-lists (cdr target-pkg-info)))
     (case accessibility
       (:external (push symbol-descriptor (car access-lists)))
@@ -1609,7 +1614,7 @@ core and return a descriptor to it."
 ;;; Construct and return a value for use as *NIL-DESCRIPTOR*.
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
-(defun make-nil-descriptor (target-cl-pkg-info)
+(defun make-nil-descriptor ()
   (let* ((des (allocate-header+object *static* sb!vm:symbol-size 0))
          (result (make-descriptor (+ (descriptor-bits des)
                                      (* 2 sb!vm:n-word-bytes)
@@ -1635,19 +1640,19 @@ core and return a descriptor to it."
                        ;; bytes allocated in static space would need to
                        ;; be accounted for by STATIC-SYMBOL-OFFSET.
                        (base-string-to-core "NIL" *dynamic*))
-    ;; RECORD-ACCESSIBILITY can't assign to the package slot
-    ;; due to NIL's base address and lowtag being nonstandard.
-    (write-wordindexed des
-                       (+ 1 sb!vm:symbol-package-slot)
-                       (car target-cl-pkg-info))
-    (record-accessibility :external result target-cl-pkg-info nil *cl-package*)
     (setf (gethash (descriptor-bits result) *cold-symbols*) nil
           (get nil 'cold-intern-info) result)))
 
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
-(defun initialize-non-nil-symbols ()
+(defun initialize-static-symbols ()
   "Initialize the cold load symbol-hacking data structures."
+  ;; NIL did not have its package assigned. Do that now.
+  (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
+    ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
+    (write-wordindexed *nil-descriptor* (- sb!vm:symbol-package-slot 1)
+                       (car target-cl-pkg-info))
+    (record-accessibility :external target-cl-pkg-info *nil-descriptor*))
   ;; Intern the others.
   (dolist (symbol sb!vm:*static-symbols*)
     (let* ((des (cold-intern symbol :gspace *static*))
@@ -1785,8 +1790,8 @@ core and return a descriptor to it."
                         (push (cons sym accessibility) syms)))))
             (dolist (symcons (sort syms #'string< :key #'car))
               (destructuring-bind (sym . accessibility) symcons
-                (record-accessibility accessibility (cold-intern sym)
-                                      pkg-info sym host-pkg)))))
+                (record-accessibility accessibility pkg-info (cold-intern sym)
+                                      host-pkg sym)))))
         (cold-push (cold-cons (car pkg-info)
                               (cold-cons (vector-in-core (cadr pkg-info))
                                          (vector-in-core (cddr pkg-info))))
@@ -3873,7 +3878,6 @@ initially undefined function references:~2%")
            (*cold-fdefn-objects* (make-hash-table :test 'equal))
            (*cold-symbols* (make-hash-table :test 'eql)) ; integer keys
            (*cold-package-symbols* (make-hash-table :test 'equal)) ; string keys
-           (pkg-metadata (sb-cold::package-list-for-genesis))
            (*read-only* (make-gspace :read-only
                                      read-only-core-space-id
                                      sb!vm:read-only-space-start))
@@ -3893,24 +3897,7 @@ initially undefined function references:~2%")
                                      dynamic-core-space-id
                                      #!+gencgc sb!vm:dynamic-space-start
                                      #!-gencgc sb!vm:dynamic-0-space-start))
-           ;; There's a cyclic dependency here: NIL refers to a package;
-           ;; a package needs its layout which needs others layouts
-           ;; which refer to NIL, which refers to a package ...
-           ;; Break the cycle by preallocating packages without a layout.
-           ;; This avoids having to track any symbols created prior to
-           ;; creation of packages, since packages are primordial.
-           (target-cl-pkg-info
-            (dolist (name (list* "COMMON-LISP" "COMMON-LISP-USER" "KEYWORD"
-                                 (mapcar #'sb-cold:package-data-name
-                                         pkg-metadata))
-                          (gethash "COMMON-LISP" *cold-package-symbols*))
-              (setf (gethash name *cold-package-symbols*)
-                    (cons (allocate-struct
-                           (symbol-value *cold-layout-gspace*)
-                           (make-fixnum-descriptor 0)
-                           (layout-length (find-layout 'package)))
-                          (cons nil nil))))) ; (externals . internals)
-           (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
+           (*nil-descriptor* (make-nil-descriptor))
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
@@ -3936,19 +3923,9 @@ initially undefined function references:~2%")
         (cold-load preload-file))
 
       ;; Prepare for cold load.
-      (initialize-non-nil-symbols)
       (initialize-layouts)
-      (initialize-packages
-       ;; docstrings are set in src/cold/warm. It would work to do it here,
-       ;; but seems preferable not to saddle Genesis with such responsibility.
-       (list* (sb-cold:make-package-data :name "COMMON-LISP" :doc nil)
-              (sb-cold:make-package-data :name "KEYWORD" :doc nil)
-              (sb-cold:make-package-data :name "COMMON-LISP-USER" :doc nil
-               :use '("COMMON-LISP"
-                      ;; ANSI encourages us to put extension packages
-                      ;; in the USE list of COMMON-LISP-USER.
-                      "SB!ALIEN" "SB!DEBUG" "SB!EXT" "SB!GRAY" "SB!PROFILE"))
-              pkg-metadata))
+      (initialize-packages)
+      (initialize-static-symbols)
       (initialize-static-fns)
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
