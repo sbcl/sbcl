@@ -245,7 +245,7 @@ with that condition (or with no condition) will be returned."
   (finish-output *query-io*)
   (list (eval (read *query-io*))))
 
-(defun check-type-error (place place-value type type-string)
+(defun check-type-error (place place-value type &optional type-string)
   (let ((condition
          (make-condition
           'simple-type-error

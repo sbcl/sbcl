@@ -135,12 +135,16 @@ invoked. In that case it will store into PLACE and start over."
     (if (symbolp expanded)
         `(do ()
              ((typep ,place ',type))
-          (setf ,place (check-type-error ',place ,place ',type ,type-string)))
+           (setf ,place (check-type-error ',place ,place ',type
+                                          ,@(and type-string
+                                                 `(,type-string)))))
         (let ((value (gensym)))
           `(do ((,value ,place ,place))
                ((typep ,value ',type))
-            (setf ,place
-                  (check-type-error ',place ,value ',type ,type-string)))))))
+             (setf ,place
+                   (check-type-error ',place ,value ',type
+                                     ,@(and type-string
+                                            `(,type-string)))))))))
 
 ;;;; DEFINE-SYMBOL-MACRO
 
