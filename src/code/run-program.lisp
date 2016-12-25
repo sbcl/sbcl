@@ -1111,20 +1111,22 @@ Users Manual for details about the PROCESS structure.
              ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
              ;; than munge the &rest list for OPEN, just disable keyword
              ;; validation there.
-             (with-open-stream (file (apply #'open object
-                                            :allow-other-keys t
-                                            #+win32 :overlapped #+win32 nil
-                                            keys))
-               (when file
-                 (multiple-value-bind
-                       (fd errno)
-                     (sb-unix:unix-dup (fd-stream-fd file))
-                   (cond (fd
-                          (push fd *close-in-parent*)
-                          (values fd nil))
-                         (t
-                          (fail "couldn't duplicate file descriptor: ~A"
-                                (strerror errno))))))))
+             (with-open-stream (file (or (apply #'open object
+                                                :allow-other-keys t
+                                                #+win32 :overlapped #+win32 nil
+                                                keys)
+                                         ;; :if-input-does-not-exist nil
+                                         ;; can result in this
+                                         (return-from get-descriptor-for)))
+               (multiple-value-bind
+                     (fd errno)
+                   (sb-unix:unix-dup (fd-stream-fd file))
+                 (cond (fd
+                        (push fd *close-in-parent*)
+                        (values fd nil))
+                       (t
+                        (fail "couldn't duplicate file descriptor: ~A"
+                              (strerror errno)))))))
           ((streamp object)
            (ecase direction
              (:input

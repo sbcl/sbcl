@@ -429,23 +429,27 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; WITH-FOO i/o-related macros
 
-(sb!xc:defmacro with-open-stream ((var stream) &body forms-decls)
-  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
+(sb!xc:defmacro with-open-stream ((var stream) &body body)
+  (multiple-value-bind (forms decls) (parse-body body nil)
+    `(let ((,var ,stream))
+       ,@decls
+       (unwind-protect
+            (progn ,@forms)
+         (close ,var)))))
+
+(sb!xc:defmacro with-open-file ((stream filespec &rest options)
+                                &body body)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (let ((abortp (gensym)))
-      `(let ((,var ,stream)
+      `(let ((,stream (open ,filespec ,@options))
              (,abortp t))
          ,@decls
          (unwind-protect
-             (multiple-value-prog1
-              (progn ,@forms)
-              (setq ,abortp nil))
-           (when ,var
-             (close ,var :abort ,abortp)))))))
-
-(sb!xc:defmacro with-open-file ((stream filespec &rest options)
-                                    &body body)
-  `(with-open-stream (,stream (open ,filespec ,@options))
-     ,@body))
+              (multiple-value-prog1
+                  (progn ,@forms)
+                (setq ,abortp nil))
+           (when ,stream
+             (close ,stream :abort ,abortp)))))))
 
 (sb!xc:defmacro with-input-from-string ((var string &key index start end)
                                             &body forms-decls)

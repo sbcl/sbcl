@@ -163,10 +163,10 @@
       ;; Case 2: Open as binary, try to process as a fasl.
       (with-open-stream
           (stream (or (open pathspec :element-type '(unsigned-byte 8)
-                            :if-does-not-exist nil)
+                                     :if-does-not-exist nil)
                       (when (null (pathname-type pathspec))
                         (let ((defaulted-pathname
-                               (probe-load-defaults pathspec)))
+                                (probe-load-defaults pathspec)))
                           (if defaulted-pathname
                               (progn (setq pathname defaulted-pathname)
                                      (open pathname
@@ -178,9 +178,8 @@
                                  :pathname pathspec
                                  :format-control
                                  "~@<Couldn't load ~S: file does not exist.~@:>"
-                                 :format-arguments (list pathspec)))))
-        (unless stream
-          (return-from load nil))
+                                 :format-arguments (list pathspec))
+                          (return-from load nil))))
         (let* ((real (probe-file stream))
                (should-be-fasl-p
                 (and real (string-equal (pathname-type real) *fasl-file-type*))))
