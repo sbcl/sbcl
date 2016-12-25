@@ -1465,8 +1465,7 @@
 (defknown cerror (format-control t &rest t) null)
 (defknown invalid-method-error (t format-control &rest t) *) ; FIXME: first arg is METHOD
 (defknown method-combination-error (format-control &rest t) *)
-(defknown signal (t &rest t) null)
-(defknown warn (t &rest t) null)
+(defknown (signal warn assert-error) (t &rest t) null)
 (defknown invoke-debugger (condition) nil)
 (defknown break (&optional format-control &rest t) null)
 (defknown make-condition (type-specifier &rest t) condition ())

@@ -214,7 +214,7 @@ with that condition (or with no condition) will be returned."
     (apply (restart-function real-restart) args)))
 
 
-(defun assert-error (assertion args-and-values places datum &rest arguments)
+(defun assert-error (assertion &optional args-and-values places datum &rest arguments)
   (let ((cond (if datum
                   (coerce-to-condition
                    datum arguments 'simple-error 'error)

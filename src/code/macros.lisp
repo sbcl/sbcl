@@ -75,8 +75,18 @@
           (let ,(bindings)
             (when ,new-test
               (go ,done))
-            (assert-error ',test-form (list ,@(infos))
-                          ',places ,datum ,@arguments))
+
+            (assert-error ',test-form
+                          ,@(and (or (infos) places datum
+                                     arguments)
+                                 `((list ,@(infos))))
+                          ,@(and (or places datum
+                                     arguments)
+                                 `(',places))
+                          ,@(and (or places datum
+                                     arguments)
+                                 `(,datum))
+                          ,@arguments))
           ,@(mapcar (lambda (place)
                       `(setf ,place (assert-prompt ',place ,place)))
                     places)
