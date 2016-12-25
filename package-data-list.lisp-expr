@@ -2101,9 +2101,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "INSURED-FIND-CLASSOID" "ORDER-LAYOUT-INHERITS"
                "STD-COMPUTE-CLASS-PRECEDENCE-LIST"
 
-               ;; symbols from former SB!CONDITIONS
                "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
-
+               "WITH-SIMPLE-CONDITION-RESTARTS"
                "CASE-FAILURE" "ECASE-FAILURE" "ETYPECASE-FAILURE"
                "NAMESTRING-PARSE-ERROR"
                "NAMESTRING-PARSE-ERROR-OFFSET"

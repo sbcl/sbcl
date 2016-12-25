@@ -488,28 +488,19 @@ evaluated as a PROGN."
        (declare (truly-dynamic-extent *restart-clusters*))
        ,@forms)))
 
-;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if
-;;; appropriate. Gross, but it's what the book seems to say...
+;;; Transform into WITH-SIMPLE-CONDITION-RESTARTS when appropriate
 (defun munge-restart-case-expression (expression env)
   (let ((exp (%macroexpand expression env)))
     (if (consp exp)
         (let* ((name (car exp))
                (args (if (eq name 'cerror) (cddr exp) (cdr exp))))
           (if (member name '(signal error cerror warn))
-              (once-only ((n-cond `(coerce-to-condition
-                                    ,(first args)
-                                    (list ,@(rest args))
-                                    ',(case name
-                                        (warn 'simple-warning)
-                                        (signal 'simple-condition)
-                                        (t 'simple-error))
-                                    ',name)))
-                `(with-condition-restarts
-                     ,n-cond
-                     (car *restart-clusters*)
-                   ,(if (eq name 'cerror)
-                        `(cerror ,(second exp) ,n-cond)
-                        `(,name ,n-cond))))
+              `(with-simple-condition-restarts
+                 ',name
+                 ,(and (eq name 'cerror)
+                       (second exp))
+                 ,(first args)
+                 ,@(rest args))
               expression))
         expression)))
 
@@ -621,7 +612,9 @@ evaluated as a PROGN."
         ,(if (= (length forms) 1) (car forms) `(progn ,@forms))
       (,restart-name ()
         :report (lambda (,stream)
-                  (declare (type stream ,stream))
+                  (declare (type stream ,stream)
+                           ;; No need to optimize FORMAT for error reporting
+                           (optimize (speed 1) (space 3)))
                   (format ,stream ,format-string ,@format-arguments))
         (values nil t)))))
 
