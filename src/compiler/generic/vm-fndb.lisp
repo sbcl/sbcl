@@ -428,10 +428,6 @@
           #.sb!vm:closure-header-widetag
           #.sb!vm:funcallable-instance-header-widetag)
   (flushable))
-(defknown ((setf fun-subtype))
-          ((unsigned-byte #.sb!vm:n-widetag-bits) function)
-  (unsigned-byte #.sb!vm:n-widetag-bits)
-  ())
 
 (defknown make-fdefn (t) fdefn (flushable movable))
 (defknown fdefn-p (t) boolean (movable foldable flushable))

@@ -72,8 +72,6 @@
 ;;; Return the header typecode for FUNCTION. Can be set with SETF.
 (defun fun-subtype (function)
   (fun-subtype function))
-(defun (setf fun-subtype) (type function)
-  (setf (fun-subtype function) type))
 
 ;;;; SIMPLE-FUN and accessors
 
