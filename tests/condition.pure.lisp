@@ -402,3 +402,13 @@
   1
 is not of type
   STRING"))))
+
+;;; Instances of LAYOUT for condition classoids created by genesis
+;;; should resemble ones created normally. Due to a bug, they did not.
+(with-test (:name :condition-layout-lengths)
+  (loop for layout being each hash-value of (sb-kernel:classoid-subclasses
+                                             (sb-kernel:find-classoid 'condition))
+        for len = (sb-kernel:layout-length layout)
+        minimize len into min
+        maximize len into max
+        finally (assert (= min max))))

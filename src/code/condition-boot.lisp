@@ -30,7 +30,8 @@
                    :classoid (make-undefined-classoid name)
                    :inherits (map 'vector #'find-layout (cons t inherits))
                    :depthoid -1
-                   :length 3)
+                   ;; 2 declared slots, plus the layout if it takes a slot
+                   :length (+ sb!vm:instance-data-start 2))
                  nil nil))))
   ;; These are grotesquely OAOO-violating, but on the bright side,
   ;; compilation will fail if the subsequent real definition differs,
