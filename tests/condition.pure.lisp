@@ -340,7 +340,7 @@
       (checked-compile '(lambda ()
                          (handler-bind ((no-such-condition-class #'print))))
                        :allow-style-warnings t)
-    (declare (ignore fun failure-p warings))
+    (declare (ignore fun failure-p warnings))
     (assert (= (length style-warnings) 1))))
 
 ;; Empty bindings in HANDLER-BIND pushed an empty cluster onto
