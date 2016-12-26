@@ -590,7 +590,11 @@ static char *symbol_slots[] = {"value: ", "hash: ",
     NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
-static char *code_slots[] = {"bytes: ", "debug: ", NULL};
+static char *code_slots[] = {"bytes: ", "debug: ",
+#ifndef LISP_FEATURE_64_BIT
+                             "n_entries: ",
+#endif
+                             NULL};
 static char *fn_slots[] = {
     "self: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
