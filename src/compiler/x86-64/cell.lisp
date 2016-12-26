@@ -571,7 +571,7 @@
    (:translate %instance-layout)
    (:policy :fast-safe)
    (:args (object :scs (descriptor-reg)))
-   (:results (res :scs (any-reg descriptor-reg)))
+   (:results (res :scs (descriptor-reg)))
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
    (:generator 1
