@@ -294,9 +294,6 @@
                   ,@(and defun-only
                          doc
                          `(,doc))
-                  ,@(if policy
-                        `((unless (policy ,n-node ,policy)
-                            (give-up-ir1-transform))))
                   ;; What purpose does it serve to allow the transform's body
                   ;; to return decls as a second value? They would go in the
                   ;; right place if simply returned as part of the expression.
@@ -318,7 +315,10 @@
                 (named-lambda ,(if eval-name "xform" `(deftransform ,name))
                   ,@stuff)
                 ,doc
-                ,important)))))))
+                ,important
+                ,(and policy
+                      `(lambda (,n-node)
+                         (policy ,n-node ,policy))))))))))
 
 (defmacro deftransforms (names (lambda-list &optional (arg-types '*)
                                                       (result-type '*)
@@ -336,9 +336,14 @@
          ,@body-decls-doc)
        ,@(loop for name in names
                collect
-               `(%deftransform ',name ',type #',transform-name
-                               ,doc
-                               ,important)))))
+               `(let ((policy ,(and policy
+                                    (let ((node-sym (gensym "NODE")))
+                                      `(lambda (,node-sym)
+                                         (policy ,node-sym ,policy))))))
+                  (%deftransform ',name ',type #',transform-name
+                                 ,doc
+                                 ,important
+                                 policy))))))
 
 ;;;; DEFKNOWN and DEFOPTIMIZER
 

@@ -6091,3 +6091,12 @@
                           (find-if #'oddp x :key '-)))
                       #(1))
              1)))
+
+(with-test (:name :transforms-check-policy-first)
+  (assert (eql (funcall (checked-compile
+                         `(lambda (x)
+                            (declare (optimize speed space))
+                            (find x "a b c" :test #'char-equal))
+                         :allow-notes nil)
+                        #\B)
+               #\b)))

@@ -1311,8 +1311,11 @@
          (flame (case (transform-important transform)
                   ((t) (policy node (>= speed inhibit-warnings)))
                   (:slightly (policy node (> speed inhibit-warnings)))))
-         (*compiler-error-context* node))
-    (cond ((or (not constrained)
+         (*compiler-error-context* node)
+         (policy-test (transform-policy transform)))
+    (cond ((and policy-test
+                (not (funcall policy-test node))))
+          ((or (not constrained)
                (valid-fun-use node type))
            (multiple-value-bind (severity args)
                (catch 'give-up-ir1-transform
@@ -1338,8 +1341,8 @@
                           (remove transform (gethash node table) :key #'car)))
                 t)
                (:delayed
-                 (remhash node table)
-                 nil))))
+                (remhash node table)
+                nil))))
           ((and flame
                 (valid-fun-use node
                                type

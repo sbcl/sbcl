@@ -34,17 +34,20 @@
   ;; string used in efficiency notes
   (note (missing-arg) :type string)
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
-  (important nil :type (member nil :slightly t)))
+  (important nil :type (member nil :slightly t))
+  ;; A function with NODE as an argument that checks wheteher the
+  ;; transform applies in its policy.
+  ;; It used to be checked in the FUNCTION body but it would produce
+  ;; notes about failed transformation due to types even though it
+  ;; wouldn't have been applied with the right types anyway,
+  ;; or if another transform could be applied with the right policy.
+  (policy nil :type (or null function)))
 
 (defprinter (transform) type note important)
 
 ;;; Grab the FUN-INFO and enter the function, replacing any old
 ;;; one with the same type and note.
-(declaim (ftype (function (t list function &optional (or string null)
-                             (member nil :slightly t))
-                          *)
-                %deftransform))
-(defun %deftransform (name type fun &optional note important)
+(defun %deftransform (name type fun &optional note important policy)
   (let* ((ctype (specifier-type type))
          (note (or note "optimize"))
          (info (fun-info-or-lose name))
@@ -60,7 +63,8 @@
                  (transform-note old) note))
           (t
            (push (make-transform :type ctype :function fun :note note
-                                 :important important)
+                                 :important important
+                                 :policy policy)
                  (fun-info-transforms info))))
     name))
 
