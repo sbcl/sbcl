@@ -87,11 +87,8 @@
   nil
   (inst word simple-fun-header-widetag) ;;header
   (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine)) ;; self
-  (inst word nil-value) ;; next
-  (inst word nil-value) ;; name
-  (inst word nil-value) ;; arglist
-  (inst word nil-value) ;; type
-  (inst word nil-value) ;; info
+  (dotimes (i (- simple-fun-code-offset 2))
+    (inst word nil-value))
   (loadw lexenv-tn lexenv-tn
          funcallable-instance-function-slot
          fun-pointer-lowtag)
