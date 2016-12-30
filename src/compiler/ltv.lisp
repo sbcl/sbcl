@@ -90,12 +90,25 @@ guaranteed to never be modified, so it can be put in read-only storage."
       (setf read-only-p t))
     (if (producing-fasl-file)
         (multiple-value-bind (handle type)
-            (compile-load-time-value form)
+            (compile-load-time-value
+             ;; KLUDGE: purify on cheneygc moves everything in code
+             ;; constants into read-only space, value-cell breaks the
+             ;; chain.
+             (cond #!-gencgc
+                   ((not read-only-p)
+                    `(make-value-cell ,form))
+                   (t
+                    form)))
           (unless (csubtypep type source-type)
             (setf type source-type))
-          (the-in-policy type `(%load-time-value ',handle)
-                         **zero-typecheck-policy**
-                         start next result))
+          (let ((value-form
+                  (cond #!-gencgc
+                        ((not read-only-p)
+                         `(value-cell-ref (%load-time-value ',handle)))
+                        (t
+                         `(%load-time-value ',handle)))))
+            (the-in-policy type value-form **zero-typecheck-policy**
+                           start next result)))
         (let ((value
                 (flet ((eval-it (operator thing)
                          (handler-case (funcall operator thing)
@@ -106,11 +119,16 @@ guaranteed to never be modified, so it can be put in read-only storage."
                       ;; This call to EVAL actually means compile+eval.
                       (eval-it 'eval form)
                       (eval-it 'funcall (compile nil `(lambda () ,form)))))))
-          (ir1-convert start next result
-                       (if read-only-p
-                           `',value
-                           ;; Avoid complaints about constant modification
-                           `(ltv-wrapper ',value)))))))
+          (if read-only-p
+              (ir1-convert start next result `',value)
+              #!-gencgc
+              (the-in-policy (ctype-of value)
+                             `(value-cell-ref ,(make-value-cell value))
+                             **zero-typecheck-policy**
+                             start next result)
+              #!+gencgc
+              ;; Avoid complaints about constant modification
+              (ir1-convert start next result `(ltv-wrapper ',value)))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)
   (aver (constant-lvar-p handle))

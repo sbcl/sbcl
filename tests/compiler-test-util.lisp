@@ -56,8 +56,11 @@
   (let ((code (fun-code-header (%fun-fun fun))))
     (loop for i from sb-vm:code-constants-offset below (code-header-words code)
           for c = (code-header-ref code i)
-          when (typep c type)
-          collect c)))
+          for value = (if (= (widetag-of c) sb-vm:value-cell-header-widetag)
+                          (value-cell-ref c)
+                          c)
+          when (typep value type)
+          collect value)))
 
 (defun collect-consing-stats (thunk times)
   (declare (type function thunk))
