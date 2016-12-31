@@ -639,18 +639,18 @@
          (info (slot-definition-info slotd)))
     (setf (slot-info-reader info)
           (lambda (x)
-            (handler-case (condition-reader-function x slot-name)
+            (handler-case (condition-slot-value x slot-name)
               ;; FIXME: FIND-SLOT-DEFAULT throws an error if the slot
               ;; is unbound; maybe it should be a CELL-ERROR of some
               ;; sort?
               (error () (values (slot-unbound class x slot-name))))))
     (setf (slot-info-writer info)
           (lambda (v x)
-            (condition-writer-function x v slot-name)))
+            (set-condition-slot-value x v slot-name)))
     (setf (slot-info-boundp info)
           (lambda (x)
             (multiple-value-bind (v c)
-                (ignore-errors (condition-reader-function x slot-name))
+                (ignore-errors (condition-slot-value x slot-name))
               (declare (ignore v))
               (null c))))
     slotd))

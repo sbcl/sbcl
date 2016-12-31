@@ -118,8 +118,6 @@
 
 ;;;; slots of CONDITION objects
 
-(defvar *empty-condition-slot* '(empty))
-
 (defun find-slot-default (class slot)
   (let ((initargs (condition-slot-initargs slot))
         (cpl (condition-classoid-cpl class)))
@@ -149,7 +147,7 @@
       (when (eq (condition-slot-name slot) slot-name)
         (return-from find-condition-class-slot slot)))))
 
-(defun condition-writer-function (condition new-value name)
+(defun set-condition-slot-value (condition new-value name)
   (dolist (cslot (condition-classoid-class-slots
                   (layout-classoid (%instance-layout condition)))
                  (setf (getf (condition-assigned-slots condition) name)
@@ -157,32 +155,24 @@
     (when (eq (condition-slot-name cslot) name)
       (return (setf (car (condition-slot-cell cslot)) new-value)))))
 
-;;; FIXME: this doesn't return a reader function. It *is* the reader function.
-;;; So why does it have "-function" in the name? That's stupid, because every
-;;; other function that is just a function, and not a meta-function, does *not*
-;;; have "-function" in the name. It should be CONDITION-SLOT-VALUE.
-(defun condition-reader-function (condition name)
-  (let ((class (layout-classoid (%instance-layout condition))))
-    (dolist (cslot (condition-classoid-class-slots class))
-      (when (eq (condition-slot-name cslot) name)
-        (return-from condition-reader-function
-                     (car (condition-slot-cell cslot)))))
-    ;; FIXME: how many representations of an unbound slot do we need?
-    ;; Why not use the PCL marker? (Too much is never enough?)
-    (let ((val (getf (condition-assigned-slots condition) name
-                     *empty-condition-slot*)))
-      (if (eq val *empty-condition-slot*)
-          (let ((instance-length (%instance-length condition))
-                (slot (find-condition-class-slot class name)))
-            (unless slot
-              (error "missing slot ~S of ~S" name condition))
-            (setf (getf (condition-assigned-slots condition) name)
-                  (do ((i (+ sb!vm:instance-data-start 2) (+ i 2)))
-                      ((>= i instance-length) (find-slot-default class slot))
-                    (when (member (%instance-ref condition i)
-                                  (condition-slot-initargs slot))
-                      (return (%instance-ref condition (1+ i)))))))
-          val))))
+(defun condition-slot-value (condition name)
+  (let ((val (getf (condition-assigned-slots condition) name sb!pcl:+slot-unbound+)))
+    (if (eq val sb!pcl:+slot-unbound+)
+        (let ((class (layout-classoid (%instance-layout condition))))
+          (dolist (cslot
+                   (condition-classoid-class-slots class)
+                   (let ((instance-length (%instance-length condition))
+                         (slot (or (find-condition-class-slot class name)
+                                   (error "missing slot ~S of ~S" name condition))))
+                     (setf (getf (condition-assigned-slots condition) name)
+                           (do ((i (+ sb!vm:instance-data-start 2) (+ i 2)))
+                               ((>= i instance-length) (find-slot-default class slot))
+                               (when (member (%instance-ref condition i)
+                                             (condition-slot-initargs slot))
+                                 (return (%instance-ref condition (1+ i))))))))
+            (when (eq (condition-slot-name cslot) name)
+              (return (car (condition-slot-cell cslot))))))
+        val)))
 
 ;;;; MAKE-CONDITION
 
@@ -242,15 +232,15 @@
     ;; Set any class slots with initargs present in this call.
     (dolist (cslot (condition-classoid-class-slots classoid))
       (dolist (initarg (condition-slot-initargs cslot))
-        (let ((val (getf initargs initarg *empty-condition-slot*)))
-          (unless (eq val *empty-condition-slot*)
+        (let ((val (getf initargs initarg sb!pcl:+slot-unbound+)))
+          (unless (eq val sb!pcl:+slot-unbound+)
             (setf (car (condition-slot-cell cslot)) val)))))
 
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots classoid))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
-              (unless (eq (getf initargs initarg *empty-condition-slot*)
-                          *empty-condition-slot*)
+              (unless (eq (getf initargs initarg sb!pcl:+slot-unbound+)
+                          sb!pcl:+slot-unbound+)
                 (return nil)))
         (setf (getf (condition-assigned-slots condition)
                     (condition-slot-name hslot))
@@ -305,12 +295,12 @@
   (declare (ignore condition))
   (setf (fdefinition name)
         (lambda (condition)
-          (condition-reader-function condition slot-name))))
+          (condition-slot-value condition slot-name))))
 (defun install-condition-slot-writer (name condition slot-name)
   (declare (ignore condition))
   (setf (fdefinition name)
         (lambda (new-value condition)
-          (condition-writer-function condition new-value slot-name))))
+          (set-condition-slot-value condition new-value slot-name))))
 
 (!defvar *define-condition-hooks* nil)
 
@@ -358,7 +348,7 @@
                                 (let ((initfun (condition-slot-initfunction slot)))
                                   (aver (functionp initfun))
                                   (funcall initfun))
-                                *empty-condition-slot*))))
+                                sb!pcl:+slot-unbound+))))
               (push slot (condition-classoid-class-slots classoid)))
              ((:instance nil)
               (setf (condition-slot-allocation slot) :instance)

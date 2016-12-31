@@ -2111,8 +2111,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
                "ALLOCATE-CONDITION"
 
-               "CONDITION-READER-FUNCTION"
-               "CONDITION-WRITER-FUNCTION"
+               "CONDITION-SLOT-VALUE"
+               "SET-CONDITION-SLOT-VALUE"
 
                "CONDITION-SLOT-ALLOCATION"
                "CONDITION-SLOT-DOCUMENTATION"

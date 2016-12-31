@@ -53,15 +53,15 @@
     (defun install-condition-slot-reader (name condition slot-name)
       (multiple-value-call #'install-condition-slot-accessor
         name slot-name '(condition) (list condition)
-        'condition-reader-function
+        'condition-slot-value
         (standard-method-function
          (lambda (condition)
-           (condition-reader-function condition slot-name)))))
+           (condition-slot-value condition slot-name)))))
 
     (defun install-condition-slot-writer (name condition slot-name)
       (multiple-value-call #'install-condition-slot-accessor
         name slot-name '(new-value condition) (list t condition)
-        'condition-writer-function
+        'set-condition-slot-value
         (standard-method-function
          (lambda (new-value condition)
-           (condition-writer-function condition new-value slot-name)))))))
+           (set-condition-slot-value condition new-value slot-name)))))))
