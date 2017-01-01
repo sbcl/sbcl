@@ -300,13 +300,13 @@
 ;;; are actually defined.
 
 ;;; Each entry in *EARLY-CLASS-DEFINITIONS* is an EARLY-CLASS-DEFINITION.
-(defparameter *early-class-definitions* ())
+(defparameter *!early-class-definitions* ())
 
-(defun early-class-definition (class-name)
-  (or (find class-name *early-class-definitions* :key #'ecd-class-name)
+(defun !early-class-definition (class-name)
+  (or (find class-name *!early-class-definitions* :key #'ecd-class-name)
       (error "~S is not a class in *early-class-definitions*." class-name)))
 
-(defun make-early-class-definition
+(defun !make-early-class-definition
        (name source-location metaclass
         superclass-names canonical-slots other-initargs)
   (list 'early-class-definition
@@ -320,36 +320,36 @@
 (defun ecd-canonical-slots   (ecd) (nth 5 ecd))
 (defun ecd-other-initargs    (ecd) (nth 6 ecd))
 
-(defvar *early-class-slots* nil)
+(defvar *!early-class-slots* nil)
 
 (defun canonical-slot-name (canonical-slot)
   (getf canonical-slot :name))
 
-(defun early-class-slots (class-name)
-  (cdr (or (assoc class-name *early-class-slots*)
+(defun !early-class-slots (class-name)
+  (cdr (or (assoc class-name *!early-class-slots*)
            (let ((a (cons class-name
                           (mapcar #'canonical-slot-name
-                                  (early-collect-inheritance class-name)))))
-             (push a *early-class-slots*)
+                                  (!early-collect-inheritance class-name)))))
+             (push a *!early-class-slots*)
              a))))
 
-(defun early-class-size (class-name)
-  (length (early-class-slots class-name)))
+(defun !early-class-size (class-name)
+  (length (!early-class-slots class-name)))
 
-(defun early-collect-inheritance (class-name)
+(defun !early-collect-inheritance (class-name)
   ;;(declare (values slots cpl default-initargs direct-subclasses))
-  (let ((cpl (early-collect-cpl class-name)))
-    (values (early-collect-slots cpl)
+  (let ((cpl (!early-collect-cpl class-name)))
+    (values (!early-collect-slots cpl)
             cpl
-            (early-collect-default-initargs cpl)
+            (!early-collect-default-initargs cpl)
             (let (collect)
-              (dolist (definition *early-class-definitions*)
+              (dolist (definition *!early-class-definitions*)
                 (when (memq class-name (ecd-superclass-names definition))
                   (push (ecd-class-name definition) collect)))
               (nreverse collect)))))
 
-(defun early-collect-slots (cpl)
-  (let* ((definitions (mapcar #'early-class-definition cpl))
+(defun !early-collect-slots (cpl)
+  (let* ((definitions (mapcar #'!early-class-definition cpl))
          (super-slots (mapcar #'ecd-canonical-slots definitions))
          (slots (apply #'append (reverse super-slots))))
     (dolist (s1 slots)
@@ -363,18 +363,18 @@
                    name1)))))
     slots))
 
-(defun early-collect-cpl (class-name)
+(defun !early-collect-cpl (class-name)
   (labels ((walk (c)
-             (let* ((definition (early-class-definition c))
+             (let* ((definition (!early-class-definition c))
                     (supers (ecd-superclass-names definition)))
                (cons c
-                     (apply #'append (mapcar #'early-collect-cpl supers))))))
+                     (apply #'append (mapcar #'!early-collect-cpl supers))))))
     (remove-duplicates (walk class-name) :from-end nil :test #'eq)))
 
-(defun early-collect-default-initargs (cpl)
+(defun !early-collect-default-initargs (cpl)
   (let ((default-initargs ()))
     (dolist (class-name cpl)
-      (let* ((definition (early-class-definition class-name))
+      (let* ((definition (!early-class-definition class-name))
              (others (ecd-other-initargs definition)))
         (loop (when (null others) (return nil))
               (let ((initarg (pop others)))
@@ -387,7 +387,7 @@
     (reverse default-initargs)))
 
 (defun !bootstrap-slot-index (class-name slot-name)
-  (or (position slot-name (early-class-slots class-name))
+  (or (position slot-name (!early-class-slots class-name))
       (error "~S not found" slot-name)))
 
 ;;; !BOOTSTRAP-GET-SLOT and !BOOTSTRAP-SET-SLOT are used to access and
@@ -450,14 +450,14 @@
   ;; during the bootstrap we won't have (SAFETY 3).
   (declare (ignore safe-p))
   (sb-kernel::%%compiler-defclass name readers writers slot-names)
-  (let ((ecd (make-early-class-definition name
+  (let ((ecd (!make-early-class-definition name
                                           source-location
                                           metaclass
                                           (copy-tree supers)
                                           (copy-tree canonical-slots)
                                           (copy-tree canonical-options)))
         (existing
-         (find name *early-class-definitions* :key #'ecd-class-name)))
-    (setq *early-class-definitions*
-          (cons ecd (remove existing *early-class-definitions*)))
+         (find name *!early-class-definitions* :key #'ecd-class-name)))
+    (setq *!early-class-definitions*
+          (cons ecd (remove existing *!early-class-definitions*)))
     ecd))

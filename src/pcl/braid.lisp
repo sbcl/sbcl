@@ -106,7 +106,7 @@
                    `(setf ,wr ,(if (eq class 'standard-generic-function)
                                    '*sgf-wrapper*
                                    `(!boot-make-wrapper
-                                     (early-class-size ',class)
+                                     (!early-class-size ',class)
                                      ',class))
                           ,class (allocate-standard-instance
                                   ,(if (eq class 'standard-generic-function)
@@ -141,7 +141,7 @@
     ;; First, make a class metaobject for each of the early classes. For
     ;; each metaobject we also set its wrapper. Except for the class T,
     ;; the wrapper is always that of STANDARD-CLASS.
-    (dolist (definition *early-class-definitions*)
+    (dolist (definition *!early-class-definitions*)
       (let* ((name (ecd-class-name definition))
              (meta (ecd-metaclass definition))
              (wrapper (ecase meta
@@ -156,7 +156,7 @@
              (class (or (find-class name nil)
                         (allocate-standard-instance wrapper))))
         (setf (find-class name) class)))
-    (dolist (definition *early-class-definitions*)
+    (dolist (definition *!early-class-definitions*)
       (let ((name (ecd-class-name definition))
             (meta (ecd-metaclass definition))
             (source (ecd-source-location definition))
@@ -166,7 +166,7 @@
         (let ((direct-default-initargs
                (getf other-initargs :direct-default-initargs)))
           (multiple-value-bind (slots cpl default-initargs direct-subclasses)
-              (early-collect-inheritance name)
+              (!early-collect-inheritance name)
             (let* ((class (find-class name))
                    (wrapper (cond ((eq class slot-class)
                                    slot-class-wrapper)
@@ -422,7 +422,7 @@
 
 (defun !bootstrap-accessor-definitions (early-p)
   (let ((*early-p* early-p))
-    (dolist (definition *early-class-definitions*)
+    (dolist (definition *!early-class-definitions*)
       (let ((name (ecd-class-name definition))
             (meta (ecd-metaclass definition)))
         (unless (or (eq meta 'built-in-class) (eq meta 'system-class))

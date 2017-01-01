@@ -1826,7 +1826,7 @@ generic function lambda list ~S~:>"
           :format-arguments (list fun-name)))
 
 (defvar *sgf-wrapper*
-  (!boot-make-wrapper (early-class-size 'standard-generic-function)
+  (!boot-make-wrapper (!early-class-size 'standard-generic-function)
                       'standard-generic-function))
 
 (defvar *sgf-slots-init*
@@ -1837,7 +1837,7 @@ generic function lambda list ~S~:>"
                   (if initfunction
                       (funcall initfunction)
                       +slot-unbound+))))
-          (early-collect-inheritance 'standard-generic-function)))
+          (!early-collect-inheritance 'standard-generic-function)))
 
 (defconstant +sgf-method-class-index+
   (!bootstrap-slot-index 'standard-generic-function 'method-class))
