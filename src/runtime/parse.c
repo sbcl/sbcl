@@ -204,7 +204,7 @@ char *parse_addr(char **ptr, boolean safely)
     return (char *)result;
 }
 
-static boolean lookup_symbol(char *name, lispobj *result)
+static lispobj lookup_symbol(char *name)
 {
     int count;
     lispobj *headerptr;
@@ -214,19 +214,15 @@ static boolean lookup_symbol(char *name, lispobj *result)
     count =
         (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
         (lispobj *)STATIC_SPACE_START;
-    if (search_for_symbol(name, &headerptr, &count)) {
-        *result = make_lispobj(headerptr,OTHER_POINTER_LOWTAG);
-        return 1;
-    }
+    if (search_for_symbol(name, &headerptr, &count))
+        return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Search immobile space. */
     headerptr = (lispobj *)IMMOBILE_SPACE_START;
     count = IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE / N_WORD_BYTES;
-    if (search_for_symbol(name, &headerptr, &count)) {
-        *result = make_lispobj(headerptr,OTHER_POINTER_LOWTAG);
-        return 1;
-    }
+    if (search_for_symbol(name, &headerptr, &count))
+        return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 #endif
 
     /* Search dynamic space. */
@@ -237,11 +233,8 @@ static boolean lookup_symbol(char *name, lispobj *result)
     headerptr = (lispobj *)current_dynamic_space;
     count = dynamic_space_free_pointer - headerptr;
 #endif
-
-    if (search_for_symbol(name, &headerptr, &count)) {
-        *result = make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
-        return 1;
-    }
+    if (search_for_symbol(name, &headerptr, &count))
+        return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 
     return 0;
 }
@@ -329,7 +322,7 @@ lispobj parse_lispobj(char **ptr)
     }
     else if (string_to_long(token, &value))
         result = value;
-    else if (lookup_symbol(token, &result))
+    else if ((result = lookup_symbol(token)) != 0)
         ;
     else {
         printf("invalid Lisp object: ``%s''\n", token);
