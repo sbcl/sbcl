@@ -305,6 +305,7 @@
 (defun memq (item list)
   #!+sb-doc
   "Return tail of LIST beginning with first element EQ to ITEM."
+  (declare (explicit-check))
   ;; KLUDGE: These could be and probably should be defined as
   ;;   (MEMBER ITEM LIST :TEST #'EQ)),
   ;; but when I try to cross-compile that, I get an error from
@@ -321,6 +322,7 @@
 ;;;   Return the first pair of ALIST where ITEM is EQ to the key of
 ;;;   the pair.
 (defun assq (item alist)
+  (declare (explicit-check))
   ;; KLUDGE: CMU CL defined this with
   ;;   (DECLARE (INLINE ASSOC))
   ;;   (ASSOC ITEM ALIST :TEST #'EQ))
@@ -343,14 +345,15 @@
 ;;;   Delete all LIST entries EQ to ITEM (destructively modifying
 ;;;   LIST), and return the modified LIST.
 (defun delq (item list)
+  (declare (explicit-check))
   (let ((list list))
     (do ((x list (cdr x))
          (splice '()))
         ((endp x) list)
       (cond ((eq item (car x))
              (if (null splice)
-               (setq list (cdr x))
-               (rplacd splice (cdr x))))
+                 (setq list (cdr x))
+                 (rplacd splice (cdr x))))
             (t (setq splice x)))))) ; Move splice along to include element.
 
 
