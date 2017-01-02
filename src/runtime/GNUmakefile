@@ -39,6 +39,18 @@ include genesis/Makefile.features
 # OS_SRC, OS_LIBS, OS_CLEAN_FILES
 include Config
 
+# Disable PIE when possible
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e no-pie),)
+CFLAGS += -fno-pie
+LINKFLAGS += -no-pie
+LDFLAGS += -no-pie
+endif
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e -nopie),)
+CFLAGS += -fno-pie
+LINKFLAGS += -nopie
+LDFLAGS += -nopie
+endif
+
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c dynbind.c     \
 	funcall.c gc-common.c globals.c interr.c interrupt.c            \
 	largefile.c monitor.c os-common.c parse.c print.c purify.c      \
