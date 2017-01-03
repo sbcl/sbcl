@@ -87,7 +87,10 @@ types for the Common Lisp expression reader."
    :read-only t)
   (character-macro-hash-table (make-hash-table) :type hash-table
    :read-only t)
-  (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert))
+  (%readtable-case 0 :type (mod 4))
   (%readtable-normalization #!+sb-unicode t #!-sb-unicode nil :type boolean))
+
+(defconstant +readtable-upcase+ 0)
+(defconstant +readtable-downcase+ 1)
 
 (declaim (freeze-type readtable))

@@ -1459,10 +1459,6 @@ session."
          (sb!impl::*step-out* nil)
          ;; internal reader variables
          (sb!impl::*token-buf-pool* nil)
-         ;; internal printer variables
-         (sb!impl::*previous-case* nil)
-         (sb!impl::*previous-readtable-case* nil)
-         (sb!impl::*internal-symbol-output-fun* #'error)
          (sb!impl::*ignored-package-locks* :invalid)
          (sb!impl::*descriptor-handlers* nil)) ; serve-event
     (declare (inline make-restart)) ;; to allow DX-allocation

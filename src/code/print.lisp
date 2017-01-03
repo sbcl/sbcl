@@ -206,7 +206,6 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; The few ...-TO-STRING functions above call this.
 (defun stringify-object (object)
   (with-simple-output-to-string (stream)
-    (setup-printer-state)
     (output-object object stream)))
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
@@ -442,16 +441,6 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; symbols
 
-;;; values of *PRINT-CASE* and (READTABLE-CASE *READTABLE*) the last
-;;; time the printer was called
-(defvar *previous-case* nil)
-(defvar *previous-readtable-case* nil)
-
-;;; This variable contains the current definition of one of three
-;;; symbol printers. SETUP-PRINTER-STATE sets this variable.
-(defvar *internal-symbol-output-fun* nil)
-(declaim (function *internal-symbol-output-fun*))
-
 ;;; Output PNAME (a symbol-name or package-name) surrounded with |'s,
 ;;; and with any embedded |'s or \'s escaped.
 (defun output-quoted-symbol-name (pname stream)
@@ -507,14 +496,16 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; READTABLE-CASE.
 (defun output-symbol-name (name stream &optional (maybe-quote t))
   (declare (type simple-string name))
-  (let ((*readtable* (if *print-readably* *standard-readtable* *readtable*)))
-    (setup-printer-state)
+  (let* ((readtable (if *print-readably* *standard-readtable* *readtable*))
+         (output-fun
+          (choose-symbol-out-fun *print-case* (%readtable-case readtable)))
+         (*readtable* readtable))
     (if (and maybe-quote (or
                           (and (readtable-normalization *readtable*)
                                (not (sb!unicode:normalized-p name :nfkc)))
                           (symbol-quotep name)))
         (output-quoted-symbol-name name stream)
-        (funcall *internal-symbol-output-fun* name stream))))
+        (funcall (truly-the function output-fun) name stream))))
 
 ;;;; escaping symbols
 
@@ -649,8 +640,8 @@ variable: an unreadable object representing the error is printed instead.")
            (base *print-base*)
            (letter-attribute
             (case (%readtable-case *readtable*)
-              (:upcase uppercase-attribute)
-              (:downcase lowercase-attribute)
+              (#.+readtable-upcase+ uppercase-attribute)
+              (#.+readtable-downcase+ lowercase-attribute)
               (t (logior lowercase-attribute uppercase-attribute))))
            (index 0)
            (bits 0)
@@ -771,11 +762,8 @@ variable: an unreadable object representing the error is printed instead.")
       (when (test letter) (advance OTHER nil))
       (go DIGIT))))
 
-;;;; *INTERNAL-SYMBOL-OUTPUT-FUN*
-;;;;
-;;;; case hackery: These functions are stored in
-;;;; *INTERNAL-SYMBOL-OUTPUT-FUN* according to the values of
-;;;; *PRINT-CASE* and READTABLE-CASE.
+;;;; case hackery: One of these functions is chosen to output symbol
+;;;; names according to the values of *PRINT-CASE* and READTABLE-CASE.
 
 ;;; called when:
 ;;; READTABLE-CASE      *PRINT-CASE*
@@ -811,7 +799,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun output-capitalize-symbol (pname stream)
   (declare (simple-string pname))
   (let ((prev-not-alphanum t)
-        (up (eq (%readtable-case *readtable*) :upcase)))
+        (up (eql (%readtable-case *readtable*) +readtable-upcase+)))
     (dotimes (i (length pname))
       (let ((char (char pname i)))
         (write-char (if up
@@ -842,33 +830,37 @@ variable: an unreadable object representing the error is printed instead.")
           (t
            (write-string pname stream)))))
 
-;;; Set the internal global symbol *INTERNAL-SYMBOL-OUTPUT-FUN*
-;;; to the right function depending on the values of *PRINT-CASE*
-;;; and (%READTABLE-CASE *READTABLE*).
-(defun setup-printer-state ()
-  (let ((readtable-case (%readtable-case *readtable*))
-        (print-case *print-case*))
-    (unless (and (eq print-case *previous-case*)
-                 (eq readtable-case *previous-readtable-case*))
-      (setq *previous-case* print-case)
-      (setq *previous-readtable-case* readtable-case)
-      (setq *internal-symbol-output-fun*
-            ;; a morally equivalent reformulation of FOP-KNOWN-FUN
-            (macrolet ((load-time-fn (name) `(load-time-value #',name t)))
-             (case readtable-case
-               (:upcase
-                (case print-case
-                  (:upcase (load-time-fn output-preserve-symbol))
-                  (:downcase (load-time-fn output-lowercase-symbol))
-                  (:capitalize (load-time-fn output-capitalize-symbol))))
-               (:downcase
-                (case print-case
-                  (:upcase (load-time-fn output-uppercase-symbol))
-                  (:downcase (load-time-fn output-preserve-symbol))
-                  (:capitalize (load-time-fn output-capitalize-symbol))))
-               (:preserve (load-time-fn output-preserve-symbol))
-               (:invert (load-time-fn output-invert-symbol))))))))
-
+(defun choose-symbol-out-fun (print-case readtable-case)
+  (macrolet
+      ((compute-fun-vector (&aux (vector (make-array 12)))
+         ;; Pack a 2D array of functions into a simple-vector.
+         ;; Major axis is *PRINT-CASE*, minor axis is %READTABLE-CASE.
+         (dotimes (readtable-case-index 4)
+           (dotimes (print-case-index 3)
+             (let ((readtable-case
+                    (elt '(:upcase :downcase :preserve :invert) readtable-case-index))
+                   (print-case
+                    (elt '(:upcase :downcase :capitalize) print-case-index)))
+               (setf (aref vector (logior (ash print-case-index 2)
+                                          readtable-case-index))
+                     (case readtable-case
+                       (:upcase
+                        (case print-case
+                          (:upcase 'output-preserve-symbol)
+                          (:downcase 'output-lowercase-symbol)
+                          (:capitalize 'output-capitalize-symbol)))
+                       (:downcase
+                        (case print-case
+                          (:upcase 'output-uppercase-symbol)
+                          (:downcase 'output-preserve-symbol)
+                          (:capitalize 'output-capitalize-symbol)))
+                       (:preserve 'output-preserve-symbol)
+                       (:invert 'output-invert-symbol))))))
+         `(load-time-value (vector ,@(map 'list (lambda (x) `(function ,x)) vector))
+                           t)))
+    (aref (compute-fun-vector)
+          (logior (case print-case (:upcase 0) (:downcase 4) (t 8))
+                  (truly-the (mod 4) readtable-case)))))
 #|
 (defun test1 ()
   (let ((*readtable* (copy-readtable nil)))

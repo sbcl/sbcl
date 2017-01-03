@@ -803,3 +803,7 @@
 
 (with-test (:name (format :no-overeager-compile-time-processing))
   (checked-compile '(lambda (x) (format t "~/nopackage:nofun/" x))))
+
+(with-test (:name :print-case-capitalize)
+  (assert (string= (write-to-string 'fluffy-bunny-count :case :capitalize)
+                   "Fluffy-Bunny-Count")))

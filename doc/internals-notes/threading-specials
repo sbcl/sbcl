@@ -1023,7 +1023,6 @@ SB-IMPL::*AVAILABLE-BUFFERS*
 SB-IMPL::*BQ-DOT-FLAG*                          ; readonly
 SB-IMPL::*CIRCULARITY-COUNTER* 
 SB-IMPL::*DIGITS* 
-SB-IMPL::*PREVIOUS-READTABLE-CASE* ;  bound per-thread
 SB-IMPL::*BQ-VECTOR-FLAG*                       ; readonly
 SB-IMPL::*ABBREV-WEEKDAY-TABLE* 
 SB-IMPL::*LOGICAL-HOSTS* 
@@ -1050,7 +1049,6 @@ SB-IMPL::*BQ-AT-FLAG*                           ; readonly
 SB-IMPL::*MACHINE-VERSION*   ; unset/unbound ?  are we using this?
 SB-IMPL::*IGNORE-WILDCARDS* 
 SB-IMPL::*SHARP-EQUAL-ALIST* 
-SB-IMPL::*PREVIOUS-CASE* ; bound per-thread
 
 *INLINE-EXPANSION-LIMIT* 
 *DERIVE-FUNCTION-TYPES* 

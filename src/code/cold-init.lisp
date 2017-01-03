@@ -160,15 +160,13 @@
      (dolist (f wrapped-functions) (unencapsulate f '!cold-init))))
 
 ;;; called when a cold system starts up
-(defun !cold-init ()
+(defun !cold-init (&aux real-choose-symbol-out-fun)
   #!+sb-doc "Give the world a shove and hope it spins."
 
   #!+sb-show
   (sb!int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
   (/show0 "entering !COLD-INIT")
   (setq *readtable* (make-readtable)
-        *previous-case* nil
-        *previous-readtable-case* nil
         *print-length* 6 *print-level* 3)
   #!-win32
   (write-string "COLD-INIT... "
@@ -191,6 +189,11 @@
   ;; If Genesis could write constant arrays into a target core,
   ;; that would be nice, and would tidy up some other things too.
   (show-and-call !printer-cold-init)
+  ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
+  (setf real-choose-symbol-out-fun #'choose-symbol-out-fun)
+  (setf (symbol-function 'choose-symbol-out-fun)
+        (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))
+
   #!-win32
   (progn (prin1 `(package = ,(package-name *package*)))
          (terpri))
@@ -281,6 +284,9 @@
         (t
          (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
+
+  ;; Now that L-T-V forms have executed, the symbol output chooser works.
+  (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
 
   (show-and-call time-reinit)
 
