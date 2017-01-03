@@ -847,9 +847,3 @@ specification."
 (sb!xc:defmacro named-lambda (&whole whole name args &body body)
   (declare (ignore name args body))
   `#',whole)
-
-(sb!xc:defmacro lambda-with-lexenv (&whole whole
-                                        declarations macros symbol-macros
-                                        &body body)
-  (declare (ignore declarations macros symbol-macros body))
-  `#',whole)
