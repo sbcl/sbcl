@@ -441,23 +441,44 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; symbols
 
-;;; Output PNAME (a symbol-name or package-name) surrounded with |'s,
-;;; and with any embedded |'s or \'s escaped.
-(defun output-quoted-symbol-name (pname stream)
-  (declare (string pname))
-  (write-char #\| stream)
-  (dotimes (index (length pname))
-    (let ((char (schar pname index)))
-      (when (or (char= char #\\) (char= char #\|))
-        (write-char #\\ stream))
-      (write-char char stream)))
-  (write-char #\| stream))
-
 (defun output-symbol (object stream)
   (declare (symbol object))
   (if (or *print-escape* *print-readably*)
-      (let ((package (symbol-package object))
-            (name (symbol-name object))
+      ;; Write so that reading back works
+      (output-symbol* object (symbol-package object) stream)
+      ;; Write only the characters of the name, never the package
+      (funcall (truly-the function
+                          (choose-symbol-out-fun *print-case*
+                                                 (%readtable-case *readtable*)))
+               (symbol-name object) stream)))
+
+(defun output-symbol* (symbol package stream)
+  (let* ((readably *print-readably*)
+         (readtable (if readably *standard-readtable* *readtable*))
+         (out-fun (choose-symbol-out-fun *print-case* (%readtable-case readtable)))
+         ;; FIXME: we can avoid rebinding *READTABLE* in most cases, which would
+         ;; be more stylish, except that OUTPUT-CAPITALIZE-SYMBOL would need to
+         ;; receive the local variable READTABLE bound above.
+         (*readtable* readtable))
+    (flet ((output-token (name)
+             (declare (type simple-string name))
+             (cond ((or (and (readtable-normalization readtable)
+                             (not (sb!unicode:normalized-p name :nfkc)))
+                        (symbol-quotep name readtable))
+                    ;; Output NAME surrounded with |'s,
+                    ;; and with any embedded |'s or \'s escaped.
+                    (write-char #\| stream)
+                    (dotimes (index (length name))
+                      (let ((char (char name index)))
+                        ;; Hmm. Should these depend on what characters
+                        ;; are actually escapes in the *readtable* ?
+                        (when (or (char= char #\\) (char= char #\|))
+                          (write-char #\\ stream))
+                        (write-char char stream)))
+                    (write-char #\| stream))
+                   (t
+                    (funcall (truly-the function out-fun) name stream)))))
+      (let ((name (symbol-name symbol))
             (current (sane-package)))
         (cond
          ;; The ANSI spec "22.1.3.3.1 Package Prefixes for Symbols"
@@ -470,42 +491,24 @@ variable: an unreadable object representing the error is printed instead.")
          ((eq package current))
          ;; Uninterned symbols print with a leading #:.
          ((null package)
-          (when (or *print-gensym* *print-readably*)
+          (when (or *print-gensym* readably)
             (write-string "#:" stream)))
          (t
-          (multiple-value-bind (symbol accessible)
-              (find-symbol name current)
+          (multiple-value-bind (found accessible) (find-symbol name current)
             ;; If we can find the symbol by looking it up, it need not
             ;; be qualified. This can happen if the symbol has been
             ;; inherited from a package other than its home package.
             ;;
             ;; To preserve print-read consistency, use the local nickname if
             ;; one exists.
-            (unless (and accessible (eq symbol object))
+            (unless (and accessible (eq found symbol))
               (let ((prefix (or (car (rassoc package (package-%local-nicknames current)))
                                 (package-name package))))
-                (output-symbol-name prefix stream))
+                (output-token prefix))
               (if (nth-value 1 (find-external-symbol name package))
                   (write-char #\: stream)
                   (write-string "::" stream))))))
-        (output-symbol-name name stream))
-      (output-symbol-name (symbol-name object) stream nil)))
-
-;;; Output the string NAME as if it were a symbol name. In other
-;;; words, diddle its case according to *PRINT-CASE* and
-;;; READTABLE-CASE.
-(defun output-symbol-name (name stream &optional (maybe-quote t))
-  (declare (type simple-string name))
-  (let* ((readtable (if *print-readably* *standard-readtable* *readtable*))
-         (output-fun
-          (choose-symbol-out-fun *print-case* (%readtable-case readtable)))
-         (*readtable* readtable))
-    (if (and maybe-quote (or
-                          (and (readtable-normalization *readtable*)
-                               (not (sb!unicode:normalized-p name :nfkc)))
-                          (symbol-quotep name)))
-        (output-quoted-symbol-name name stream)
-        (funcall (truly-the function output-fun) name stream))))
+        (output-token name)))))
 
 ;;;; escaping symbols
 
@@ -604,7 +607,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; A FSM-like thingie that determines whether a symbol is a potential
 ;;; number or has evil characters in it.
-(defun symbol-quotep (name)
+(defun symbol-quotep (name readtable)
   (declare (simple-string name))
   (macrolet ((advance (tag &optional (at-end t))
                `(progn
@@ -639,7 +642,7 @@ variable: an unreadable object representing the error is printed instead.")
            (bases *digit-bases*)
            (base *print-base*)
            (letter-attribute
-            (case (%readtable-case *readtable*)
+            (case (%readtable-case readtable)
               (#.+readtable-upcase+ uppercase-attribute)
               (#.+readtable-downcase+ lowercase-attribute)
               (t (logior lowercase-attribute uppercase-attribute))))
