@@ -108,6 +108,12 @@
   `(or (simple-array character (,size))
        (simple-array nil (,size))
        (simple-base-string ,size)))
+;;; On Unicode builds, SIMPLE-CHARACTER-STRING is a builtin type.
+;;; For non-Unicode it is convenient to be able to use the type name
+;;; as an alias of SIMPLE-BASE-STRING.
+#!-sb-unicode
+(sb!xc:deftype simple-character-string (&optional size)
+  `(simple-base-string ,size))
 
 (sb!xc:deftype bit-vector (&optional size)
   `(array bit (,size)))

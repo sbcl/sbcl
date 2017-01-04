@@ -1469,13 +1469,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (tagbody
      :more
        (when (plusp here)
-         (etypecase string
-           ((simple-array character (*))
+         (string-dispatch
+              (simple-character-string simple-base-string sb!kernel::simple-array-nil)
+              string
             (replace buffer string :start1 pointer :start2 start :end2 stop))
-           (simple-base-string
-            (replace buffer string :start1 pointer :start2 start :end2 stop))
-           ((simple-array nil (*))
-            (replace buffer string :start1 pointer :start2 start :end2 stop)))
          (setf (string-output-stream-pointer stream) (+ here pointer)))
        (when (plusp overflow)
          (setf start stop
@@ -1677,10 +1674,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (current+1 (1+ current)))
     (declare (fixnum current))
     (with-array-data ((workspace buffer) (start) (end))
-      (string-dispatch
-          ((simple-array character (*))
-           (simple-array base-char (*)))
-          workspace
+      (string-dispatch (simple-character-string simple-base-string) workspace
         (let ((offset-current (+ start current)))
           (declare (fixnum offset-current))
           (if (= offset-current end)
@@ -1702,10 +1696,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 (defun fill-pointer-sout (stream string start end)
   (declare (fixnum start end))
-  (string-dispatch
-      ((simple-array character (*))
-       (simple-array base-char (*)))
-      string
+  (string-dispatch (simple-character-string simple-base-string) string
     (let* ((buffer (fill-pointer-output-stream-string stream))
            (current (fill-pointer buffer))
            (string-len (- end start))
@@ -2174,8 +2165,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                         (len (min (- end %frc-index%)
                                   (- needed read))))
                    (declare (type index end len read needed))
-                   (string-dispatch (simple-base-string
-                                     (simple-array character (*)))
+                   (string-dispatch (simple-base-string simple-character-string)
                        seq
                      (replace seq %frc-buffer%
                               :start1 (+ start read)
