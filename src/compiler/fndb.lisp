@@ -1165,6 +1165,9 @@
 
 (defknown make-dispatch-macro-character (character &optional t readtable)
   (eql t) ())
+;;; FIXME: (CALLABLE 3 ...) causes a style warning in the :UNICODE-DISPATCH-MACROS
+;;; test in reader.impure.lisp
+;;;   The function NIL is called by SET-DISPATCH-MACRO-CHARACTER with three arguments, but wants exactly two.
 (defknown set-dispatch-macro-character
   (character character (callable 3 no-function-conversion)
    &optional (or readtable null)) (eql t)
