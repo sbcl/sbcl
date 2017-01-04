@@ -88,7 +88,7 @@
 (defun describe (object &optional (stream-designator *standard-output*))
   #+sb-doc
   "Print a description of OBJECT to STREAM-DESIGNATOR."
-  (let ((stream (out-synonym-of stream-designator))
+  (let ((stream (out-stream-from-designator stream-designator))
         (*print-right-margin* (or *print-right-margin* 72))
         (*print-circle* t)
         (*suppress-print-errors*

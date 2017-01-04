@@ -341,7 +341,7 @@
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)
   (declare (explicit-check))
-  (let ((stream (in-synonym-of stream)))
+  (let ((stream (in-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-read-line stream eof-error-p eof-value recursive-p)
         ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -367,7 +367,7 @@
                             eof-value
                             recursive-p)
   (declare (explicit-check))
-  (let ((stream (in-synonym-of stream)))
+  (let ((stream (in-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
         ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -395,7 +395,7 @@
 
 (defun unread-char (character &optional (stream *standard-input*))
   (declare (explicit-check))
-  (let ((stream (in-synonym-of stream)))
+  (let ((stream (in-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-unread-char character stream)
         ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -414,7 +414,7 @@
 
 (defun listen (&optional (stream *standard-input*))
   (declare (explicit-check))
-  (let ((stream (in-synonym-of stream)))
+  (let ((stream (in-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-listen stream)
         ;; Fall through to Gray streams FUNDAMENTAL-STREAM case.
@@ -432,7 +432,7 @@
                                     eof-value
                                     recursive-p)
   (declare (explicit-check))
-  (let ((stream (in-synonym-of stream)))
+  (let ((stream (in-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-read-char-no-hang stream eof-error-p eof-value
                                        recursive-p)
@@ -449,7 +449,7 @@
 
 (defun clear-input (&optional (stream *standard-input*))
   (declare (explicit-check))
-  (let ((stream (in-synonym-of stream)))
+  (let ((stream (in-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-clear-input stream)
         ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -660,7 +660,7 @@
 
 (defun fresh-line (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-fresh-line stream)
         ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -675,7 +675,7 @@
              stream data offset-start offset-end)))
 
 (defun %write-string (string stream start end)
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (if (ansi-stream-p stream)
         (ansi-stream-write-string string stream start end)
         ;; must be Gray streams FUNDAMENTAL-STREAM
@@ -694,7 +694,7 @@
   (declare (type string string))
   (declare (type stream-designator stream))
   (declare (explicit-check))
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (cond ((ansi-stream-p stream)
            (ansi-stream-write-string string stream start end)
            (funcall (ansi-stream-out stream) stream #\newline))
@@ -730,8 +730,8 @@
 
 (defun write-byte (integer stream)
   (declare (explicit-check))
-  (with-out-stream/no-synonym stream (ansi-stream-bout integer)
-                              (stream-write-byte integer))
+  ;; The STREAM argument is not allowed to be a designator.
+  (%with-out-stream stream (ansi-stream-bout integer) (stream-write-byte integer))
   integer)
 
 

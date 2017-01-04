@@ -602,7 +602,7 @@
   (declare (type (member :linear :miser :fill :mandatory) kind)
            (type stream-designator stream)
            (values null))
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (when (print-pretty-on-stream-p stream)
       (enqueue-newline stream kind)))
   nil)
@@ -626,7 +626,7 @@ line break."
            (type real n)
            (type stream-designator stream)
            (values null))
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (when (print-pretty-on-stream-p stream)
       (enqueue-indent stream relative-to (truncate n))))
   nil)
@@ -648,7 +648,7 @@ line break."
            (type unsigned-byte colnum colinc)
            (type stream-designator stream)
            (values null))
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (when (print-pretty-on-stream-p stream)
       (enqueue-tab stream kind colnum colinc)))
   nil)
@@ -1376,7 +1376,7 @@ line break."
   ;; a non-list object which bypasses START-LOGICAL-BLOCK.
   ;; Also, START-LOGICAL-BLOCK could become an FLET inside here.
   (declare (function proc))
-  (with-pretty-stream (stream (out-synonym-of stream))
+  (with-pretty-stream (stream (out-stream-from-designator stream))
     (if (or (not (listp object)) ; implies obj-supplied-p
             (and (eq (car object) 'quasiquote)
                  ;; We can only bail out from printing this logical block

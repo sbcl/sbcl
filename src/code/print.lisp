@@ -134,7 +134,7 @@ variable: an unreadable object representing the error is printed instead.")
                ,@forms)))
   (def write
        "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*."
-       (output-object object (out-synonym-of stream))
+       (output-object object (out-stream-from-designator stream))
        object)
   (def write-to-string
        "Return the printed representation of OBJECT as a string."
@@ -143,7 +143,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Same as a call to (WRITE OBJECT :STREAM STREAM), but returning OBJECT.
 (defun %write (object stream)
   (declare (explicit-check))
-  (output-object object (out-synonym-of stream))
+  (output-object object (out-stream-from-designator stream))
   object)
 
 (defun prin1 (object &optional stream)
@@ -152,7 +152,7 @@ variable: an unreadable object representing the error is printed instead.")
   STREAM."
   (declare (explicit-check))
   (let ((*print-escape* t))
-    (output-object object (out-synonym-of stream)))
+    (output-object object (out-stream-from-designator stream)))
   object)
 
 (defun princ (object &optional stream)
@@ -162,7 +162,7 @@ variable: an unreadable object representing the error is printed instead.")
   (declare (explicit-check))
   (let ((*print-escape* nil)
         (*print-readably* nil))
-    (output-object object (out-synonym-of stream)))
+    (output-object object (out-stream-from-designator stream)))
   object)
 
 (defun print (object &optional stream)
@@ -170,7 +170,7 @@ variable: an unreadable object representing the error is printed instead.")
   "Output a newline, the mostly READable printed representation of OBJECT, and
   space to the specified STREAM."
   (declare (explicit-check))
-  (let ((stream (out-synonym-of stream)))
+  (let ((stream (out-stream-from-designator stream)))
     (terpri stream)
     (prin1 object stream)
     (write-char #\space stream)
@@ -182,7 +182,7 @@ variable: an unreadable object representing the error is printed instead.")
   (declare (explicit-check))
   (let ((*print-pretty* t)
         (*print-escape* t)
-        (stream (out-synonym-of stream)))
+        (stream (out-stream-from-designator stream)))
     (terpri stream)
     (output-object object stream))
   (values))

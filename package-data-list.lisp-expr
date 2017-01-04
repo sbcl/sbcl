@@ -1340,7 +1340,7 @@ possibly temporarily, because it might be used internally."
                "%INTERN"
                "WITH-FAST-READ-BYTE"
                "PREPARE-FOR-FAST-READ-CHAR"
-               "OUT-SYNONYM-OF"
+               "OUT-STREAM-FROM-DESIGNATOR"
                "STRINGIFY-OBJECT"
                "%WRITE"
 
