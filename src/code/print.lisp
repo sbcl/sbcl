@@ -864,34 +864,6 @@ variable: an unreadable object representing the error is printed instead.")
     (aref (compute-fun-vector)
           (logior (case print-case (:upcase 0) (:downcase 4) (t 8))
                   (truly-the (mod 4) readtable-case)))))
-#|
-(defun test1 ()
-  (let ((*readtable* (copy-readtable nil)))
-    (format t "READTABLE-CASE  Input   Symbol-name~@
-               ----------------------------------~%")
-    (dolist (readtable-case '(:upcase :downcase :preserve :invert))
-      (setf (readtable-case *readtable*) readtable-case)
-      (dolist (input '("ZEBRA" "Zebra" "zebra"))
-        (format t "~&:~A~16T~A~24T~A"
-                (string-upcase readtable-case)
-                input
-                (symbol-name (read-from-string input)))))))
-
-(defun test2 ()
-  (let ((*readtable* (copy-readtable nil)))
-    (format t "READTABLE-CASE  *PRINT-CASE*  Symbol-name  Output  Princ~@
-               --------------------------------------------------------~%")
-    (dolist (readtable-case '(:upcase :downcase :preserve :invert))
-      (setf (readtable-case *readtable*) readtable-case)
-      (dolist (*print-case* '(:upcase :downcase :capitalize))
-        (dolist (symbol '(|ZEBRA| |Zebra| |zebra|))
-          (format t "~&:~A~15T:~A~29T~A~42T~A~50T~A"
-                  (string-upcase readtable-case)
-                  (string-upcase *print-case*)
-                  (symbol-name symbol)
-                  (prin1-to-string symbol)
-                  (princ-to-string symbol)))))))
-|#
 
 ;;;; recursive objects
 

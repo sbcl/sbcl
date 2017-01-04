@@ -438,3 +438,81 @@
 
 (with-test (:name :sharp-star-reader-error)
   (assert-error (read-from-string (format nil "#~D*" (1+ most-positive-fixnum))) reader-error))
+
+(defun test1 (print &optional expect)
+  (let ((*readtable* (copy-readtable nil)))
+    (when print
+      (format t "READTABLE-CASE  Input   Symbol-name~@
+                 ----------------------------------~%"))
+    (dolist (readtable-case '(:upcase :downcase :preserve :invert))
+      (setf (readtable-case *readtable*) readtable-case)
+      (dolist (input '("ZEBRA" "Zebra" "zebra"))
+        (if print
+            (format t "~&:~A~16T~A~24T~A"
+                    (string-upcase readtable-case)
+                    input
+                    (symbol-name (read-from-string input)))
+            (assert (string= (symbol-name (read-from-string input))
+                             (pop expect))))))))
+
+(defun test2 (print &optional expect)
+  (let ((*readtable* (copy-readtable nil)))
+    (when print
+      (format t "READTABLE-CASE *PRINT-CASE*  Symbol-name  Output  Princ~@
+                 --------------------------------------------------------~%"))
+    (dolist (readtable-case '(:upcase :downcase :preserve :invert))
+      (setf (readtable-case *readtable*) readtable-case)
+      (dolist (*print-case* '(:upcase :downcase :capitalize))
+        (dolist (symbol '(|ZEBRA| |Zebra| |zebra|))
+          (if print
+              (format t "~&:~A~15T:~A~29T~A~42T~A~50T~A"
+                      (string-upcase readtable-case)
+                      (string-upcase *print-case*)
+                      (symbol-name symbol)
+                      (prin1-to-string symbol)
+                      (princ-to-string symbol))
+              (progn
+                (assert (string= (prin1-to-string symbol) (pop expect)))
+                (assert (string= (princ-to-string symbol) (pop expect))))))))))
+
+(with-test (:name :readtable-cases)
+  (test1 nil '("ZEBRA" "ZEBRA" "ZEBRA"
+               "zebra" "zebra" "zebra"
+               "ZEBRA" "Zebra" "zebra"
+               "zebra" "Zebra" "ZEBRA"))
+  (test2 nil '("ZEBRA"   "ZEBRA"
+               "|Zebra|" "Zebra"
+               "|zebra|" "zebra"
+               "zebra"   "zebra"
+               "|Zebra|" "zebra"
+               "|zebra|" "zebra"
+               "Zebra"   "Zebra"
+               "|Zebra|" "Zebra"
+               "|zebra|" "zebra"
+               "|ZEBRA|" "ZEBRA"
+               "|Zebra|" "ZEBRA"
+               "ZEBRA"   "ZEBRA"
+               "|ZEBRA|" "ZEBRA"
+               "|Zebra|" "Zebra"
+               "zebra"   "zebra"
+               "|ZEBRA|" "ZEBRA"
+               "|Zebra|" "Zebra"
+               "Zebra"   "Zebra"
+               "ZEBRA"   "ZEBRA"
+               "Zebra"   "Zebra"
+               "zebra"   "zebra"
+               "ZEBRA"   "ZEBRA"
+               "Zebra"   "Zebra"
+               "zebra"   "zebra"
+               "ZEBRA"   "ZEBRA"
+               "Zebra"   "Zebra"
+               "zebra"   "zebra"
+               "zebra"   "zebra"
+               "Zebra"   "Zebra"
+               "ZEBRA"   "ZEBRA"
+               "zebra"   "zebra"
+               "Zebra"   "Zebra"
+               "ZEBRA"   "ZEBRA"
+               "zebra"   "zebra"
+               "Zebra"   "Zebra"
+               "ZEBRA"   "ZEBRA")))
