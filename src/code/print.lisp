@@ -447,19 +447,15 @@ variable: an unreadable object representing the error is printed instead.")
       ;; Write so that reading back works
       (output-symbol* object (symbol-package object) stream)
       ;; Write only the characters of the name, never the package
-      (funcall (truly-the function
-                          (choose-symbol-out-fun *print-case*
-                                                 (%readtable-case *readtable*)))
-               (symbol-name object) stream)))
+      (let ((rt *readtable*))
+        (funcall (truly-the function
+                  (choose-symbol-out-fun *print-case* (%readtable-case rt)))
+                 (symbol-name object) stream rt))))
 
 (defun output-symbol* (symbol package stream)
   (let* ((readably *print-readably*)
          (readtable (if readably *standard-readtable* *readtable*))
-         (out-fun (choose-symbol-out-fun *print-case* (%readtable-case readtable)))
-         ;; FIXME: we can avoid rebinding *READTABLE* in most cases, which would
-         ;; be more stylish, except that OUTPUT-CAPITALIZE-SYMBOL would need to
-         ;; receive the local variable READTABLE bound above.
-         (*readtable* readtable))
+         (out-fun (choose-symbol-out-fun *print-case* (%readtable-case readtable))))
     (flet ((output-token (name)
              (declare (type simple-string name))
              (cond ((or (and (readtable-normalization readtable)
@@ -471,13 +467,14 @@ variable: an unreadable object representing the error is printed instead.")
                     (dotimes (index (length name))
                       (let ((char (char name index)))
                         ;; Hmm. Should these depend on what characters
-                        ;; are actually escapes in the *readtable* ?
+                        ;; are actually escapes in the readtable ?
+                        ;; (See similar remark at DEFUN QUOTE-STRING)
                         (when (or (char= char #\\) (char= char #\|))
                           (write-char #\\ stream))
                         (write-char char stream)))
                     (write-char #\| stream))
                    (t
-                    (funcall (truly-the function out-fun) name stream)))))
+                    (funcall (truly-the function out-fun) name stream readtable)))))
       (let ((name (symbol-name symbol))
             (current (sane-package)))
         (cond
@@ -773,15 +770,15 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; :UPCASE             :UPCASE
 ;;; :DOWNCASE           :DOWNCASE
 ;;; :PRESERVE           any
-(defun output-preserve-symbol (pname stream)
-  (declare (simple-string pname))
+(defun output-preserve-symbol (pname stream readtable)
+  (declare (ignore readtable))
   (write-string pname stream))
 
 ;;; called when:
 ;;; READTABLE-CASE      *PRINT-CASE*
 ;;; :UPCASE             :DOWNCASE
-(defun output-lowercase-symbol (pname stream)
-  (declare (simple-string pname))
+(defun output-lowercase-symbol (pname stream readtable)
+  (declare (simple-string pname) (ignore readtable))
   (dotimes (index (length pname))
     (let ((char (schar pname index)))
       (write-char (char-downcase char) stream))))
@@ -789,8 +786,8 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; called when:
 ;;; READTABLE-CASE      *PRINT-CASE*
 ;;; :DOWNCASE           :UPCASE
-(defun output-uppercase-symbol (pname stream)
-  (declare (simple-string pname))
+(defun output-uppercase-symbol (pname stream readtable)
+  (declare (simple-string pname) (ignore readtable))
   (dotimes (index (length pname))
     (let ((char (schar pname index)))
       (write-char (char-upcase char) stream))))
@@ -799,10 +796,10 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; READTABLE-CASE      *PRINT-CASE*
 ;;; :UPCASE             :CAPITALIZE
 ;;; :DOWNCASE           :CAPITALIZE
-(defun output-capitalize-symbol (pname stream)
+(defun output-capitalize-symbol (pname stream readtable)
   (declare (simple-string pname))
   (let ((prev-not-alphanum t)
-        (up (eql (%readtable-case *readtable*) +readtable-upcase+)))
+        (up (eql (%readtable-case readtable) +readtable-upcase+)))
     (dotimes (i (length pname))
       (let ((char (char pname i)))
         (write-char (if up
@@ -818,8 +815,8 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; called when:
 ;;; READTABLE-CASE      *PRINT-CASE*
 ;;; :INVERT             any
-(defun output-invert-symbol (pname stream)
-  (declare (simple-string pname))
+(defun output-invert-symbol (pname stream readtable)
+  (declare (simple-string pname) (ignore readtable))
   (let ((all-upper t)
         (all-lower t))
     (dotimes (i (length pname))
@@ -828,8 +825,8 @@ variable: an unreadable object representing the error is printed instead.")
           (if (upper-case-p ch)
               (setq all-lower nil)
               (setq all-upper nil)))))
-    (cond (all-upper (output-lowercase-symbol pname stream))
-          (all-lower (output-uppercase-symbol pname stream))
+    (cond (all-upper (output-lowercase-symbol pname stream nil))
+          (all-lower (output-uppercase-symbol pname stream nil))
           (t
            (write-string pname stream)))))
 
