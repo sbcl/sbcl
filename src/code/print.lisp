@@ -1121,7 +1121,6 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defun output-complex (complex stream)
   (write-string "#C(" stream)
-  ;; FIXME: Could this just be OUTPUT-NUMBER?
   (output-object (realpart complex) stream)
   (write-char #\space stream)
   (output-object (imagpart complex) stream)
