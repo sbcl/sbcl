@@ -235,6 +235,7 @@
              :set-trans (setf %simple-fun-debug-fun))
   (code :rest-p t :c-type "unsigned char"))
 
+#!-(or x86 x86-64)
 (!define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 

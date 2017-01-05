@@ -800,7 +800,8 @@ between the ~A definition and the ~A definition"
 (declaim (type cons **non-instance-classoid-types**))
 (defglobal **non-instance-classoid-types**
   '(symbol system-area-pointer weak-pointer code-component
-    lra fdefn random-class))
+    #!-(or x86 x86-64) lra
+    fdefn random-class))
 
 (defun classoid-non-instance-p (classoid)
   (declare (type classoid classoid))
@@ -875,8 +876,7 @@ between the ~A definition and the ~A definition"
      (weak-pointer :codes (#.sb!vm:weak-pointer-widetag)
       :prototype-form (make-weak-pointer (find-package "CL")))
      (code-component :codes (#.sb!vm:code-header-widetag))
-     ;; should this be #!-(or x86 x86-64) ?
-     (lra :codes (#.sb!vm:return-pc-header-widetag))
+     #!-(or x86 x86-64) (lra :codes (#.sb!vm:return-pc-header-widetag))
      (fdefn :codes (#.sb!vm:fdefn-widetag)
             :prototype-form (make-fdefn "42"))
      (random-class) ; used for unknown type codes

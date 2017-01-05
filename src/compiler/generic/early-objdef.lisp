@@ -188,7 +188,10 @@
   closure-header-widetag                    ;  2E   35  2E   35
   funcallable-instance-header-widetag       ;  32   39  32   39
 
+  ;; x86[-64] does not have objects with this widetag,
+  ;; but conditionalizing it would disturb this lovely table.
   return-pc-header-widetag                  ;  36   3D  36   3D
+
   value-cell-header-widetag                 ;  3A   41  3A   41
   symbol-header-widetag                     ;  3E   45  3E   45
   character-widetag                         ;  42   49  42   49
