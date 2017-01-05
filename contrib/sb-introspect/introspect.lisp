@@ -383,10 +383,12 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (list name))
                       source))))))
        (:vop
-        (let ((loc (sb-int:info :source-location type name)))
+        (let ((loc (sb-int:info :source-location type name))
+              (translated (find-vop-source name)))
           (if loc
-              (translate-source-location loc)
-              (find-vop-source name))))
+              (cons (translate-source-location loc)
+                    translated)
+              translated)))
        (:alien-type
         (let ((loc (sb-int:info :source-location type name)))
           (and loc
