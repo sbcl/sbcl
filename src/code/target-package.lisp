@@ -755,9 +755,8 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (defun %enter-new-nicknames (package nicknames)
   (declare (type list nicknames))
   (dolist (n nicknames)
-    (let* ((n (stringify-string-designator n))
-           (found (with-package-names (names)
-                    (or (gethash n names)
+    (let ((found (with-package-names (names)
+                    (or (gethash (the simple-string n) names)
                         (progn
                           (setf (gethash n names) package)
                           (push n (package-%nicknames package))
@@ -788,7 +787,9 @@ list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are estimates for the number of
 internal and external symbols which will ultimately be present in the package.
 The default value of USE is implementation-dependent, and in this
 implementation it is ~S." *default-package-use-list*)
-  (prog (clobber)
+  (prog ((name (stringify-string-designator name))
+         (nicks (stringify-string-designators nicknames))
+         clobber)
    :restart
      (when (find-package name)
        ;; ANSI specifies that this error is correctable.
@@ -801,8 +802,7 @@ implementation it is ~S." *default-package-use-list*)
        ;; Check for race, signal the error outside the lock.
        (when (and (not clobber) (find-package name))
          (go :restart))
-       (let* ((name (stringify-string-designator name))
-              (package
+       (let ((package
                (%make-package
                 name
                 (make-package-hashtable internal-symbols)
@@ -819,7 +819,7 @@ implementation it is ~S." *default-package-use-list*)
          ;; Perhaps this can be solved by just moving ENTER-NEW-NICKNAMES before
          ;; USE-PACKAGE, but I need to check what kinds of errors can be caused by
          ;; USE-PACKAGE, too.
-         (%enter-new-nicknames package nicknames)
+         (%enter-new-nicknames package nicks)
          (return (setf (gethash name *package-names*) package))))
      (bug "never")))
 
@@ -835,11 +835,13 @@ implementation it is ~S." *default-package-use-list*)
 (defun rename-package (package-designator name &optional (nicknames ()))
   #!+sb-doc
   "Changes the name and nicknames for a package."
-  (prog () :restart
+  (prog ((nicks (stringify-string-designators nicknames)))
+   :restart
      (let ((package (find-undeleted-package-or-lose package-designator))
+           ;; This is the "weirdness" alluded to. Do it in the loop in case
+           ;; the stringified value changes on restart when NAME is a package.
            (name (stringify-package-designator name))
-           (found (find-package name))
-           (nicks (mapcar #'string nicknames)))
+           (found (find-package name)))
        (unless (or (not found) (eq found package))
          (signal-package-error name
                                "A package named ~S already exists." name))
@@ -861,7 +863,7 @@ implementation it is ~S." *default-package-use-list*)
            (setf (package-%name package) name
                  (gethash name names) package
                  (package-%nicknames package) ()))
-         (%enter-new-nicknames package nicknames))
+         (%enter-new-nicknames package nicks))
        (return package))))
 
 (defun delete-package (package-designator)

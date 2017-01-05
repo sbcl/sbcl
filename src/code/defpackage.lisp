@@ -60,7 +60,8 @@
         (imports nil)
         (interns nil)
         (exports nil)
-        (implement (stringify-package-designators (list package)))
+        (package (stringify-string-designator package))
+        (implement (list package))
         (implement-p nil)
         (lock nil)
         (doc nil))
@@ -156,7 +157,7 @@
                     `(:shadowing-import-from
                       ,@(apply #'append (mapcar #'rest shadowing-imports))))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%defpackage ,(stringify-string-designator package) ',nicknames ',size
+       (%defpackage ,package ',nicknames ',size
                     ',shadows ',shadowing-imports ',(if use-p use :default)
                     ',imports ',interns ',exports ',implement ',local-nicknames
                     ',lock (sb!c:source-location)
