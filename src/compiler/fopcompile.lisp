@@ -41,13 +41,9 @@
                always (and (symbolp name)
                            (member (info :variable :kind name)
                                    '(:special :global))
-                           (fopcompilable-p value))))
-       (cold-svset-fopcompilable-p (args)
-         (destructuring-bind (thing index value) args
-           (and (symbolp thing)
-                (integerp index)
-                (eq (info :variable :kind thing) :global)
-                (typep value '(cons (member lambda named-lambda function)))))))
+                           (fopcompilable-p value)))))
+
+ #-sb-xc-host
  (defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
@@ -70,37 +66,6 @@
   ;; were handled, then it would probably automatically work in
   ;; the cold loader too, providing definitions for A and B before
   ;; executing all other toplevel forms.
-  #+sb-xc-host
-  (and expand
-       (or (and (self-evaluating-p form)
-                (constant-fopcompilable-p form))
-           (and (listp form)
-                (let ((function (car form)))
-                  ;; It is assumed that uses of recognized functions are
-                  ;; carefully controlled, and recursion on fopcompilable-p
-                  ;; would say "yes".
-                  (or (member function '(sb!impl::%defun
-                                         sb!kernel::%defstruct))
-                      (and (eq function 'sb!c::%defconstant)
-                           ;; %DEFCONSTANT is fopcompilable only if the value
-                           ;; is trivially a compile-time constant,
-                           ;; and not, e.g. (COMPLICATED-FOLDABLE-EXPR),
-                           ;; because we can't compute that with fasl ops.
-                           (let ((val (third form)))
-                             (and (typep val '(or rational (cons (eql quote))))
-                                  (constant-fopcompilable-p
-                                   (constant-form-value val)))))
-                      (and (symbolp function) ; no ((lambda ...) ...)
-                           (get-properties (symbol-plist function)
-                                           '(:sb-cold-funcall-handler/for-effect
-                                             :sb-cold-funcall-handler/for-value)))
-                      (and (eq function 'setf)
-                           (fopcompilable-p (%macroexpand form *lexenv*)))
-                      (and (eq function 'sb!kernel:%svset)
-                           (cold-svset-fopcompilable-p (cdr form)))
-                      (and (eq function 'setq)
-                           (setq-fopcompilable-p (cdr form))))))))
-  #-sb-xc-host
   (flet ((expand (form)
            (if expand
                (%macroexpand form *lexenv*)
@@ -203,7 +168,49 @@
                              ;; calling LIST, which is probably more
                              ;; trouble than it's worth).
                              (<= (length args) 255)
-                             (every #'fopcompilable-p args))))))))))))
+                             (every #'fopcompilable-p args)))))))))))
+
+ ;; Special version of FOPCOMPILABLE-P which recognizes toplevel calls
+ ;; that the cold loader is able to perform in the host to create the
+ ;; desired effect upon the target core.
+ ;; If an effect should occur "sooner than cold-init",
+ ;; this is probably where you need to make it happen.
+ #+sb-xc-host
+ (defun fopcompilable-p (form &optional (expand t))
+  (and expand
+       (or (and (self-evaluating-p form)
+                (constant-fopcompilable-p form))
+           (and (listp form)
+                (let ((function (car form)))
+                  ;; It is assumed that uses of recognized functions are
+                  ;; carefully controlled, and recursion on fopcompilable-p
+                  ;; would say "yes".
+                  (or (member function '(sb!impl::%defun
+                                         sb!kernel::%defstruct))
+                      (and (eq function 'sb!c::%defconstant)
+                           ;; %DEFCONSTANT is fopcompilable only if the value
+                           ;; is trivially a compile-time constant,
+                           ;; and not, e.g. (COMPLICATED-FOLDABLE-EXPR),
+                           ;; because we can't compute that with fasl ops.
+                           (let ((val (third form)))
+                             (and (typep val '(or rational (cons (eql quote))))
+                                  (constant-fopcompilable-p
+                                   (constant-form-value val)))))
+                      (and (symbolp function) ; no ((lambda ...) ...)
+                           (get-properties (symbol-plist function)
+                                           '(:sb-cold-funcall-handler/for-effect
+                                             :sb-cold-funcall-handler/for-value)))
+                      (and (eq function 'setf)
+                           (fopcompilable-p (%macroexpand form *lexenv*)))
+                      (and (eq function 'sb!kernel:%svset)
+                           (destructuring-bind (thing index value) (cdr form)
+                             (and (symbolp thing)
+                                  (integerp index)
+                                  (eq (info :variable :kind thing) :global)
+                                  (typep value '(cons (member lambda function
+                                                              named-lambda))))))
+                      (and (eq function 'setq)
+                           (setq-fopcompilable-p (cdr form))))))))))
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
