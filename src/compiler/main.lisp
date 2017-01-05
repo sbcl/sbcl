@@ -215,8 +215,8 @@ Examples:
            (let ((succeeded-p nil)
                  (*source-plist* (append source-plist *source-plist*))
                  (*source-namestring*
-                  (possibly-base-stringize
-                   (or source-namestring *source-namestring*))))
+                  (awhen (or source-namestring *source-namestring*)
+                    (possibly-base-stringize it))))
              (if (and *in-compilation-unit* (not override))
                  ;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is
                  ;; ordinarily (unless OVERRIDE) basically a no-op.
