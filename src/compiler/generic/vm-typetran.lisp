@@ -109,7 +109,7 @@
 (define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
-(define-type-predicate lra-p lra)
+#!-(or x86 x86-64) (define-type-predicate lra-p lra)
 (define-type-predicate fdefn-p fdefn)
 (macrolet
     ((def ()

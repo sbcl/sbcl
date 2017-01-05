@@ -131,7 +131,7 @@
   (def-type-predicate-wrapper integerp)
   (def-type-predicate-wrapper listp)
   (def-type-predicate-wrapper long-float-p)
-  (def-type-predicate-wrapper lra-p)
+  #!-(or x86 x86-64) (def-type-predicate-wrapper lra-p)
   (def-type-predicate-wrapper null)
   (def-type-predicate-wrapper numberp)
   (def-type-predicate-wrapper rationalp)
