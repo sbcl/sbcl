@@ -1716,6 +1716,9 @@ to :INTERPRET, an interpreter will be used.")
 
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
+  ;;; FIXME FIXME FIXME: Who is calling this with NIL as the argument ???
+  (when (null s)
+    (return-from possibly-base-stringize s))
   (cond #!+(and sb-unicode (host-feature sb-xc))
         ((and (typep s '(array character (*))) (every #'base-char-p s))
          (coerce s 'base-string))
