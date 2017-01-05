@@ -342,12 +342,6 @@ variable: an unreadable object representing the error is printed instead.")
           (t
            (handle-it stream)))))
 
-;;; a hack to work around recurring gotchas with printing while
-;;; DEFGENERIC PRINT-OBJECT is being built
-;;;
-;;; (hopefully will go away naturally when CLOS moves into cold init)
-(defvar *print-object-is-disabled-p* nil) ; real soon now
-
 ;;; Output OBJECT to STREAM observing all printer control variables
 ;;; except for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL,
 ;;; then the pretty printer will be used for any components of OBJECT,
@@ -359,20 +353,12 @@ variable: an unreadable object representing the error is printed instead.")
       ;; If an instance has no layout, it has no PRINT-OBJECT method.
       ;; Additionally, if the object is an obsolete CONDITION, don't crash.
       ;; (There is no update-instance protocol for conditions)
-      (cond ((or (sb!kernel::undefined-classoid-p classoid)
-                 (and (layout-invalid layout) (condition-classoid-p classoid)))
-             ;; not only is this unreadable, it's unprintable too.
-             (return-from output-ugly-object
-               (print-unreadable-object (object stream :identity t)
-                 (format stream "UNPRINTABLE instance of ~W" classoid))))
-             ((not (and (boundp '*print-object-is-disabled-p*)
-                        *print-object-is-disabled-p*)))
-             ((typep object 'structure-object)
-              (return-from output-ugly-object
-                (default-structure-print object stream *current-level-in-print*)))
-             (t
-              (return-from output-ugly-object
-                (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream))))))
+      (when (or (sb!kernel::undefined-classoid-p classoid)
+                (and (layout-invalid layout) (condition-classoid-p classoid)))
+        ;; not only is this unreadable, it's unprintable too.
+        (return-from output-ugly-object
+          (print-unreadable-object (object stream :identity t)
+            (format stream "UNPRINTABLE instance of ~W" classoid))))))
   (print-object object stream))
 
 ;;; Note: Now that PRINT-OBJECT works right away, indirections could be removed.
@@ -1632,8 +1618,6 @@ variable: an unreadable object representing the error is printed instead.")
           (format stream "(~{~S~^ ~})" name)
           (output-object name stream)))))
 
-;;; Making this a DEFMETHOD defers its compilation until after the inline
-;;; functions %SIMD-PACK-{SINGLES,DOUBLES,UB64S} get defined.
 #!+sb-simd-pack
 (defmethod print-object ((pack simd-pack) stream)
   (cond ((and *print-readably* *read-eval*)
@@ -1683,16 +1667,6 @@ variable: an unreadable object representing the error is printed instead.")
                           (split-num high 0) (split-num high 32))))))))))
 
 ;;;; functions
-
-;;; Output OBJECT as using PRINT-OBJECT if it's a
-;;; FUNCALLABLE-STANDARD-CLASS, or return NIL otherwise.
-;;;
-;;; The definition here is a simple temporary placeholder. It will be
-;;; overwritten by a smarter version (capable of calling generic
-;;; PRINT-OBJECT when appropriate) when CLOS is installed.
-(defun printed-as-funcallable-standard-class (object stream)
-  (declare (ignore object stream))
-  nil)
 
 (defun output-fun (object stream)
   (let* ((name (%fun-name object))

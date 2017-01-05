@@ -161,9 +161,12 @@
 (defun !incorporate-cross-compiled-methods (gf-name &key except)
   (assert (generic-function-p (fdefinition gf-name)))
   (loop for (predicate fmf specializer lambda-list source-loc)
-        across (remove-if (lambda (x) (member x except))
-                          (cdr (assoc gf-name *!trivial-methods*))
-                          :key #'third)
+        ;; Reversing installs less-specific methods first,
+        ;; so that if perchance we crash mid way through the loop,
+        ;; there is (hopefully) at least some installed method that works.
+        across (nreverse (remove-if (lambda (x) (member x except))
+                                    (cdr (assoc gf-name *!trivial-methods*))
+                                    :key #'third))
         do (multiple-value-bind (specializers arg-info)
                (ecase gf-name
                  (print-object

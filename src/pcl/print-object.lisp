@@ -33,35 +33,13 @@
 ;;; by the printer doing bootstrapping, and immediately replace it
 ;;; with some new printing logic, so that the Lisp printer stays
 ;;; crippled only for the shortest necessary time.
-(/show0 "about to replace placeholder PRINT-OBJECT with DEFGENERIC")
-(let (;; (If we don't suppress /SHOW printing while the printer is
-      ;; crippled here, it becomes really easy to crash the bootstrap
-      ;; sequence by adding /SHOW statements e.g. to the compiler,
-      ;; which kinda defeats the purpose of /SHOW being a harmless
-      ;; tracing-style statement.)
-      #+sb-show (*/show* nil)
-      ;; (another workaround for the problem of debugging while the
-      ;; printer is disabled here)
-      ;; FIXME: the way to do this is bind print-pprint-dispatch
-      ;; to an "emergency fallback" table. Give it sane entries for
-      ;; CONDITION, STRUCTURE-OBJECT, INSTANCE, and T.
-      ;; Bind *print-pretty* to T for the duration of these forms,
-      ;; and then we no longer need this extra state variable.
-      (sb-impl::*print-object-is-disabled-p* t))
+(write-string "; Removing placeholder PRINT-OBJECT ...") (force-output)
+(let ((*print-pretty* t)) ; use pretty printer dispatch table, not PRINT-OBJECT
   (fmakunbound 'print-object)
-  (defgeneric print-object (object stream)))
-(/show0 "done replacing placeholder PRINT-OBJECT with DEFGENERIC")
-
-;;;; a hook called by the printer to take care of dispatching to PRINT-OBJECT
-;;;; for appropriate FUNCALLABLE-INSTANCE objects
-
-;;; Now that CLOS is working, we can replace our old temporary placeholder code
-;;; for writing funcallable instances with permanent code:
-(fmakunbound 'sb-impl::printed-as-funcallable-standard-class)
-(defun sb-impl::printed-as-funcallable-standard-class (object stream)
-  (when (funcallable-standard-class-p (class-of object))
-    (print-object object stream)
-    t))
+  (defgeneric print-object (object stream))
+  (!incorporate-cross-compiled-methods 'print-object :except '(condition)))
+(write-string " done
+")
 
 ;;;; PRINT-OBJECT methods for objects from PCL classes
 ;;;;
@@ -180,8 +158,6 @@ sb-c::
       (call-next-method)
       (print-unreadable-object (self stream :type t)
         (write (policy-to-decl-spec self) :stream stream))))
-
-(!incorporate-cross-compiled-methods 'print-object :except '(condition))
 
 ;;; Print-object methods on subtypes of CONDITION can't be cross-compiled
 ;;; until CLOS is fully working. Compile them now.
