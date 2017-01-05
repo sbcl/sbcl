@@ -1714,12 +1714,13 @@ to :INTERPRET, an interpreter will be used.")
            (truly-the (simple-array character (*))
                       (get-output-stream-string ,var))))))
 
+;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
   (cond #!+(and sb-unicode (host-feature sb-xc))
         ((and (typep s '(array character (*))) (every #'base-char-p s))
          (coerce s 'base-string))
         (t
-         s)))
+         (coerce s 'simple-string))))
 
 (defun self-evaluating-p (x)
   (typecase x

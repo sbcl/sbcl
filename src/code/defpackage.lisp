@@ -178,27 +178,27 @@
                                         but have common elements ~%   ~S"
                        :format-arguments (list (car x)(car y) z)))))
 
-(defun stringify-string-designator (string-designator)
-  (typecase string-designator
-    (simple-string string-designator)
-    (string (coerce string-designator 'simple-string))
-    (symbol (symbol-name string-designator))
-    (character (string string-designator))
-    (t
-     (error "~S does not designate a string" string-designator))))
+(flet ((designator-to-string (kind designator)
+         (cond ((and (eq kind 'package) (packagep designator))
+                (package-name designator)) ; already simple and basic if possible
+               (t
+                (possibly-base-stringize
+                 (cond ((stringp designator) designator)
+                       ((symbolp designator) (symbol-name designator))
+                       ((characterp designator) (string designator))
+                       (t (error 'simple-type-error
+                                 :datum designator
+                                 :expected-type
+                                 (if (eq kind 'package) 'package-designator 'string-designator)
+                                 :format-control "~S does not designate a ~(~A~)"
+                                 :format-arguments (list designator kind)))))))))
+  (defun stringify-string-designator (string-designator)
+    (designator-to-string 'string string-designator))
+  (defun stringify-package-designator (package-designator)
+    (designator-to-string 'package package-designator)))
 
 (defun stringify-string-designators (string-designators)
   (mapcar #'stringify-string-designator string-designators))
-
-(defun stringify-package-designator (package-designator)
-  (typecase package-designator
-    (simple-string package-designator)
-    (string (coerce package-designator 'simple-string))
-    (symbol (symbol-name package-designator))
-    (character (string package-designator))
-    (package (package-name package-designator))
-    (t
-     (error "~S does not designate a package" package-designator))))
 
 (defun stringify-package-designators (package-designators)
   (mapcar #'stringify-package-designator package-designators))
