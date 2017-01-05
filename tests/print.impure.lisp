@@ -379,9 +379,7 @@
                       (assert (not (eql r (read-from-string (prin1-to-string r)))))
                       (let ((*print-radix* t))
                         (assert (= r (read-from-string
-                                      (princ-to-string r)))))))))
-         (write-char #\.)
-         (finish-output))))
+                                      (princ-to-string r))))))))))))
 
 ;;;; Bugs, found by PFD
 ;;; NIL parameter for ~^ means `not supplied'
@@ -804,7 +802,7 @@
 
 (define-condition foo () (a))
 (defvar *ccc* (make-condition 'foo))
-(define-condition foo (warning) (a))
+(handler-bind ((warning #'muffle-warning)) (define-condition foo (warning) (a)))
 (with-test (:name :write-obsolete-condition)
   (assert (search "UNPRINTABLE" (write-to-string *ccc*))))
 
