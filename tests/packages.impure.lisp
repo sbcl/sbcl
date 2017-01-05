@@ -21,6 +21,13 @@
   (set-bad-package :cl-user)
   (assert-error (intern "FRED") type-error))
 
+;;; Expect an error about the nickname not being a string designator,
+;;; not about the nickname being taken by another package.
+(with-test (:name :nickname-is-string-designator)
+  (let ((errmsg (handler-case (make-package "X" :nicknames (list (find-package "CL")))
+                  (error (c) (princ-to-string c)))))
+    (assert (search "does not designate a string" errmsg))))
+
 (with-test (:name :packages-sanely-nicknamed)
   (dolist (p (list-all-packages))
     (let* ((nicks (package-nicknames p))

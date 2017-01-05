@@ -76,7 +76,7 @@
          (setf nicknames
                (append
                 nicknames
-                (stringify-package-designators (cdr option)))))
+                (stringify-string-designators (cdr option)))))
         (:local-nicknames
          (setf local-nicknames
                (append local-nicknames

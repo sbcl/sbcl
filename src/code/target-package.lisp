@@ -755,7 +755,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (defun %enter-new-nicknames (package nicknames)
   (declare (type list nicknames))
   (dolist (n nicknames)
-    (let* ((n (stringify-package-designator n))
+    (let* ((n (stringify-string-designator n))
            (found (with-package-names (names)
                     (or (gethash n names)
                         (progn
@@ -801,7 +801,7 @@ implementation it is ~S." *default-package-use-list*)
        ;; Check for race, signal the error outside the lock.
        (when (and (not clobber) (find-package name))
          (go :restart))
-       (let* ((name (stringify-package-designator name))
+       (let* ((name (stringify-string-designator name))
               (package
                (%make-package
                 name
