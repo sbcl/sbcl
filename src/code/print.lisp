@@ -379,12 +379,6 @@ variable: an unreadable object representing the error is printed instead.")
 (defmethod print-object ((object code-component) stream) (output-code-component object stream))
 (defmethod print-object ((object fdefn) stream) (output-fdefn object stream))
 #!-(or x86 x86-64) (defmethod print-object ((object lra) stream) (output-lra object stream))
-
-(defmethod print-object ((x t) stream)
-  (if *print-pretty*
-      (pprint-logical-block (stream nil)
-        (print-unreadable-object (x stream :type t :identity t)))
-      (output-random x stream)))
 
 ;;;; symbols
 
@@ -1676,7 +1670,8 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; catch-all for unknown things
 
-(defun output-random (object stream)
+(defmethod print-object ((object t) stream)
+ (flet ((output-it (stream)
   (print-unreadable-object (object stream :identity t)
     (let ((lowtag (lowtag-of object)))
       (case lowtag
@@ -1706,4 +1701,8 @@ variable: an unreadable object representing the error is printed instead.")
               (output-integer lowtag stream))
             (write-string ", widetag=" stream)
             (let ((*print-base* 16) (*print-radix* t))
-              (output-integer (widetag-of object) stream)))))))))
+              (output-integer (widetag-of object) stream))))))))))
+  (if *print-pretty*
+      ;; This block might not be necessary. Not sure, probably can't hurt.
+      (pprint-logical-block (stream nil) (output-it stream))
+      (output-it stream))))

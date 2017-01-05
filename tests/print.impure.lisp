@@ -32,6 +32,13 @@
   (assert-readable-output x)
   (assert-unreadable-output x))
 
+;;; Ensure that we don't print a value cell as #S(RANDOM-CLASS ...)
+(defun f (x) (lambda (y) (+ (incf x) y)))
+(compile 'f)
+(with-test (:name :output-value-cell)
+  (assert (search "#<value cell"
+                  (write-to-string (sb-kernel:%closure-index-ref (f 3) 0)))))
+
 ;;; Nathan Froyd reported that sbcl-0.6.11.34 screwed up output of
 ;;; floating point infinities.
 (with-test (:name (write float :infinities))
