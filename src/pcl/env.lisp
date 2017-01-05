@@ -160,10 +160,10 @@
 
 (defun !incorporate-cross-compiled-methods (gf-name &key except)
   (assert (generic-function-p (fdefinition gf-name)))
-  (loop for (specializer lambda-list fmf source-loc)
+  (loop for (predicate fmf specializer lambda-list source-loc)
         across (remove-if (lambda (x) (member x except))
                           (cdr (assoc gf-name *!trivial-methods*))
-                          :key #'car)
+                          :key #'third)
         do (multiple-value-bind (specializers arg-info)
                (ecase gf-name
                  (print-object

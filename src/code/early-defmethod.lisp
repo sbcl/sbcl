@@ -47,20 +47,7 @@
       (sb!c::source-location))))
 
 (defvar *!trivial-methods* '())
-(defun !trivial-defmethod (name specializer lambda-list lambda source-loc)
-  (let ((gf (assoc name *!trivial-methods*)))
-    (unless gf
-      (setq gf (cons name #()))
-      (push gf *!trivial-methods*))
-    (let ((entry (list specializer lambda-list lambda source-loc)))
-      (setf (cdr gf)
-            (merge '(simple-array t (*)) ; SIMPLE-VECTOR not DEFTYPEd yet!
-                   (list entry) (cdr gf) #'>
-                   ;; We only use hierarchical objects in self-build,
-                   ;; so sorting by LAYOUT-DEPTHOID is an accurate indicator
-                   ;; of what precedes what in the precedence list.
-                   :key (lambda (x) (layout-depthoid (find-layout (car x))))))
-      entry)))
+(defun !trivial-defmethod (&rest args) (error "Not reached: ~S" args))
 
 ;;; Slow-but-correct logic for single-dispatch sans method combination,
 ;;; allowing exactly one primary method. Methods are sorted most-specific-first,
@@ -70,21 +57,18 @@
                     (cdr (or (assoc gf-name *!trivial-methods*)
                              (error "No methods on ~S" gf-name)))))
          (applicable-method
-          ;; First try matching the type name exactly. Failing that, use TYPEP.
-          (or (find (type-of specialized-arg) methods :key #'car :test #'eq)
-              (find-if (lambda (x) (typep specialized-arg (car x))) methods))))
+          (find specialized-arg methods
+                :test (lambda (arg method &aux (guard (car method)))
+                        (and (fboundp guard) (funcall guard arg))))))
     (assert applicable-method)
-    ;; no permutation-vector / no precomputed next method
-    (apply (third applicable-method) nil nil specialized-arg rest)))
+    ;; The "method" is a list: (GUARD LAMBDA SPECIALIZER LL SOURCE-LOC)
+    ;; Call using no permutation-vector / no precomputed next method.
+    (apply (cadr applicable-method) nil nil specialized-arg rest)))
 
 (defun make-load-form (object &optional environment)
   (!call-a-method 'make-load-form object environment))
 (defun print-object (object stream)
   (!call-a-method 'print-object object stream))
-
-;;; This method gets removed by force-delayed-methods
-(defmethod print-object ((self t) stream)
-  (print-unreadable-object (self stream :type t :identity t)))
 
 ;;;; Complete DEFMETHOD, not usable until CLOS works.
 

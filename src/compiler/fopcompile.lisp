@@ -186,6 +186,7 @@
                   ;; carefully controlled, and recursion on fopcompilable-p
                   ;; would say "yes".
                   (or (member function '(sb!impl::%defun
+                                         sb!pcl::!trivial-defmethod
                                          sb!kernel::%defstruct))
                       (and (eq function 'sb!c::%defconstant)
                            ;; %DEFCONSTANT is fopcompilable only if the value

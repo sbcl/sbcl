@@ -49,12 +49,7 @@
       ;; and then we no longer need this extra state variable.
       (sb-impl::*print-object-is-disabled-p* t))
   (fmakunbound 'print-object)
-  (defgeneric print-object (object stream))
-  (defmethod print-object ((x t) stream)
-    (if *print-pretty*
-        (pprint-logical-block (stream nil)
-          (print-unreadable-object (x stream :type t :identity t)))
-        (print-unreadable-object (x stream :type t :identity t)))))
+  (defgeneric print-object (object stream)))
 (/show0 "done replacing placeholder PRINT-OBJECT with DEFGENERIC")
 
 ;;;; a hook called by the printer to take care of dispatching to PRINT-OBJECT
@@ -186,7 +181,7 @@ sb-c::
       (print-unreadable-object (self stream :type t)
         (write (policy-to-decl-spec self) :stream stream))))
 
-(!incorporate-cross-compiled-methods 'print-object :except '(t condition))
+(!incorporate-cross-compiled-methods 'print-object :except '(condition))
 
 ;;; Print-object methods on subtypes of CONDITION can't be cross-compiled
 ;;; until CLOS is fully working. Compile them now.

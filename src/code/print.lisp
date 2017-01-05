@@ -353,91 +353,54 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; then the pretty printer will be used for any components of OBJECT,
 ;;; just not for OBJECT itself.
 (defun output-ugly-object (stream object)
-  (typecase object
-    ;; KLUDGE: The TYPECASE approach here is non-ANSI; the ANSI definition of
-    ;; PRINT-OBJECT says it provides printing and we're supposed to provide
-    ;; PRINT-OBJECT methods covering all classes. We deviate from this
-    ;; by using PRINT-OBJECT only when we print instance values. However,
-    ;; ANSI makes it hard to tell that we're deviating from this:
-    ;;   (1) ANSI specifies that the user isn't supposed to call PRINT-OBJECT
-    ;;       directly.
-    ;;   (2) ANSI (section 11.1.2.1.2) says it's undefined to define
-    ;;       a method on an external symbol in the CL package which is
-    ;;       applicable to arg lists containing only direct instances of
-    ;;       standardized classes.
-    ;; Thus, in order for the user to detect our sleaziness in conforming
-    ;; code, he has to do something relatively obscure like
-    ;;   (1) actually use tools like FIND-METHOD to look for PRINT-OBJECT
-    ;;       methods, or
-    ;;   (2) define a PRINT-OBJECT method which is specialized on the stream
-    ;;       value (e.g. a Gray stream object).
-    ;; As long as no one comes up with a non-obscure way of detecting this
-    ;; sleaziness, fixing this nonconformity will probably have a low
-    ;; priority. -- WHN 2001-11-25
-    (list
-     (if (null object)
-         (output-symbol object stream)
-         (output-list object stream)))
-    (instance
-     ;; The first case takes the above idea one step further: If an instance
-     ;; isn't a citizen yet, it has no right to a print-object method.
-     ;; Additionally, if the object is an obsolete CONDITION, don't crash.
-     ;; (There is no update-instance protocol for conditions)
-     (let* ((layout (layout-of object))
-            (classoid (layout-classoid layout)))
-       (cond ((or (sb!kernel::undefined-classoid-p classoid)
-                  (and (layout-invalid layout) (condition-classoid-p classoid)))
-              ;; not only is this unreadable, it's unprintable too.
-              (print-unreadable-object (object stream :identity t)
-                (format stream "UNPRINTABLE instance of ~W" classoid)))
+  (when (%instancep object)
+    (let* ((layout (layout-of object))
+           (classoid (layout-classoid layout)))
+      ;; If an instance has no layout, it has no PRINT-OBJECT method.
+      ;; Additionally, if the object is an obsolete CONDITION, don't crash.
+      ;; (There is no update-instance protocol for conditions)
+      (cond ((or (sb!kernel::undefined-classoid-p classoid)
+                 (and (layout-invalid layout) (condition-classoid-p classoid)))
+             ;; not only is this unreadable, it's unprintable too.
+             (return-from output-ugly-object
+               (print-unreadable-object (object stream :identity t)
+                 (format stream "UNPRINTABLE instance of ~W" classoid))))
              ((not (and (boundp '*print-object-is-disabled-p*)
-                        *print-object-is-disabled-p*))
-              (print-object object stream))
+                        *print-object-is-disabled-p*)))
              ((typep object 'structure-object)
-              (default-structure-print object stream *current-level-in-print*))
+              (return-from output-ugly-object
+                (default-structure-print object stream *current-level-in-print*)))
              (t
-              (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream)))))
-    (funcallable-instance
-     (cond
-       ((not (and (boundp '*print-object-is-disabled-p*)
-                  *print-object-is-disabled-p*))
-        (print-object object stream))
-       (t (output-fun object stream))))
-    (function
-     (output-fun object stream))
-    (symbol
-     (output-symbol object stream))
-    (number
-     (etypecase object
-       (integer
-        (output-integer object stream))
-       (float
-        (output-float object stream))
-       (ratio
-        (output-ratio object stream))
-       (complex
-        (output-complex object stream))))
-    (character
-     (output-character object stream))
-    (vector
-     (output-vector object stream))
-    (array
-     (output-array object stream))
-    (system-area-pointer
-     (output-sap object stream))
-    (weak-pointer
-     (output-weak-pointer object stream))
-    (lra
-     (output-lra object stream))
-    (code-component
-     (output-code-component object stream))
-    (fdefn
-     (output-fdefn object stream))
-    #!+sb-simd-pack
-    (simd-pack
-     (print-object object stream))
-    (t
-     (output-random object stream))))
+              (return-from output-ugly-object
+                (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream))))))
+  (print-object object stream))
+
+;;; Note: Now that PRINT-OBJECT works right away, indirections could be removed.
+;;; i.e. do (DEFMETHOD PRINT-OBJECT ((X CONS) STREAM) (ACTUAL-PRINTER-GUTS))
+;;; But in a bootstrap situation you might wish to call a named printer directly.
+(defmethod print-object ((object function) stream) (output-fun object stream))
+(defmethod print-object ((object symbol) stream) (output-symbol object stream))
+(defmethod print-object ((object cons) stream) (output-list object stream))
+(defmethod print-object ((object integer) stream) (output-integer object stream))
+(defmethod print-object ((object float) stream) (output-float object stream))
+(defmethod print-object ((object ratio) stream) (output-ratio object stream))
+(defmethod print-object ((object complex) stream) (output-complex object stream))
+(defmethod print-object ((object character) stream) (output-character object stream))
+(defmethod print-object ((object vector) stream) (output-vector object stream))
+(defmethod print-object ((object array) stream) (output-array object stream))
+(defmethod print-object ((object system-area-pointer) stream) (output-sap object stream))
+(defmethod print-object ((object weak-pointer) stream) (output-weak-pointer object stream))
+(defmethod print-object ((object lra) stream) (output-lra object stream))
+(defmethod print-object ((object code-component) stream) (output-code-component object stream))
+(defmethod print-object ((object fdefn) stream) (output-fdefn object stream))
+#!-(or x86 x86-64)
+(defmethod print-object ((object lra) stream) (output-lra object stream))
+
+(defmethod print-object ((x t) stream)
+  (if *print-pretty*
+      (pprint-logical-block (stream nil)
+        (print-unreadable-object (x stream :type t :identity t)))
+      (output-random x stream)))
 
 ;;;; symbols
 

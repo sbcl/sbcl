@@ -488,7 +488,8 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(declaim (special *!cold-toplevels* *!cold-defconstants* *!cold-defuns*))
+(declaim (special *!cold-toplevels* *!cold-defconstants*
+                  *!cold-defuns* *cold-methods*))
 
 ;;; the head of a list of DEBUG-SOURCEs which need to be patched when
 ;;; the cold core starts up
@@ -634,6 +635,8 @@
 
 (defun cold-layout-length (layout)
   (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
+(defun cold-layout-depthoid (layout)
+  (descriptor-fixnum (read-slot layout *host-layout-of-layout* :depthoid)))
 
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
@@ -1052,12 +1055,30 @@ core and return a descriptor to it."
   ;; including the layout itself as 1 word
   (layout-length *host-layout-of-layout*))
 
+;;; Trivial methods [sic] require that we sort possible methods by the depthoid.
+;;; Most of the objects printed in cold-init are ordered hierarchically in our
+;;; type lattice; the major exceptions are ARRAY and VECTOR at depthoid -1.
+;;; Of course we need to print VECTORs because a STRING is a vector,
+;;; and vector has to precede ARRAY. Kludge it for now.
+(defun layout-depthoid* (class-name) ; DEPTHOID-ish thing, any which way you can
+  (case class-name
+    (vector 0.5)
+    (array  0.25)
+    (t
+     (let ((target-layout (gethash class-name *cold-layouts*)))
+       (if target-layout
+           (cold-layout-depthoid target-layout)
+           (let ((host-layout (find-layout class-name)))
+             (if (layout-invalid host-layout)
+                 (error "~S has neither a host not target layout" class-name)
+                 (layout-depthoid host-layout))))))))
+
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.
 (defun listify-cold-inherits (x)
-  (map 'list (lambda (des)
-               (or (gethash (descriptor-bits des) *cold-layout-names*)
-                   (error "~S is not the descriptor of a cold-layout" des)))
+  (map 'list (lambda (cold-layout)
+               (or (gethash (descriptor-bits cold-layout) *cold-layout-names*)
+                   (error "~S is not the descriptor of a cold-layout" cold-layout)))
        (vector-from-core x)))
 
 ;;; COLD-DD-SLOTS is a cold descriptor for the list of slots
@@ -1175,6 +1196,22 @@ core and return a descriptor to it."
 
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name
           (gethash name *cold-layouts*) result)))
+
+(defun predicate-for-specializer (type-name)
+  (let ((classoid (find-classoid type-name nil)))
+    (typecase classoid
+      (structure-classoid
+       (dd-predicate-name (layout-info (classoid-layout classoid))))
+      (built-in-classoid
+       (let ((translation (specifier-type type-name)))
+         (aver (not (contains-unknown-type-p translation)))
+         (let ((predicate (find translation sb!c::*backend-type-predicates*
+                                :test #'type= :key #'car)))
+           (cond (predicate (cdr predicate))
+                 ((eq type-name 't) 'sb!int:constantly-t)
+                 ;; Let's just hope we don't need this
+                 ((eq type-name 'structure-object) nil)
+                 (t (error "No predicate for builtin: ~S" type-name)))))))))
 
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
 ;;; in the cold core.
@@ -1944,6 +1981,14 @@ core and return a descriptor to it."
                               (ash sb!vm:simple-fun-code-offset
                                    sb!vm:word-shift))))
     fdefn))
+
+;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
+(defun cold-defmethod (name specializer lambda-list lambda source-loc)
+  (let ((gf (assoc name *cold-methods*)))
+    (unless gf
+      (setq gf (cons name nil))
+      (push gf *cold-methods*))
+    (push (list specializer lambda-list lambda source-loc) (cdr gf))))
 
 (defun initialize-static-fns ()
   (let ((*cold-fdefn-gspace* *static*))
@@ -2821,6 +2866,7 @@ core and return a descriptor to it."
           (push fun *!cold-toplevels*)
           (case fun
             (sb!impl::%defun (apply #'cold-fset args))
+            (sb!pcl::!trivial-defmethod (apply #'cold-defmethod args))
             (sb!kernel::%defstruct
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
@@ -3903,6 +3949,9 @@ initially undefined function references:~2%")
            (*ctype-cache* (make-hash-table :test 'equal))
            (*!cold-defconstants* nil)
            (*!cold-defuns* nil)
+           ;; '*COLD-METHODS* is never seen in the target, so does not need
+           ;; to adhere to the #\! convention for automatic uninterning.
+           (*cold-methods* nil)
            (*!cold-toplevels* nil)
            (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
@@ -3957,15 +4006,39 @@ initially undefined function references:~2%")
                    (layout (gethash name *cold-layouts*)))
               (aver layout)
               (write-slots layout *host-layout-of-layout* :info dd))))
-        (format t "~&; SB!Loader: (~D+~D+~D+~D) structs/consts/funs/other~%"
+        (format t "~&; SB!Loader: (~D~@{+~D~}) structs/consts/funs/methods/other~%"
                 (length *known-structure-classoids*)
                 (length *!cold-defconstants*)
                 (length *!cold-defuns*)
+                (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
                 (length *!cold-toplevels*)))
 
       (dolist (symbol '(*!cold-defconstants* *!cold-defuns* *!cold-toplevels*))
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
+
+      ;; Assign SB!PCL::*!TRIVIAL-METHODS*
+      (loop with gfs = *nil-descriptor*
+            for (gf-name . methods) in *cold-methods*
+            ;; METHOD is (SPECIALIZER LAMBDA-LIST LAMBDA SOURCE-LOC)
+            ;; SPECIALIZER is a symbol, the others are descriptors.
+            ;; These must be sorted! If not, the method on T could be invoked,
+            ;; which makes debugging impossible.
+            do (loop with list = nil
+                     for (specializer lambda-list lambda source-loc)
+                     ;; Sort by ascending depthoid, but PUSH, thereby ending up
+                     ;; with a resulting list with higher depthoids at the front.
+                     in (stable-sort methods #'<
+                                     :key (lambda (method)
+                                            (layout-depthoid* (car method))))
+                     for predicate = (predicate-for-specializer specializer)
+                     do (push (cold-list (cold-intern predicate)
+                                         lambda
+                                         (cold-intern specializer)
+                                         lambda-list source-loc) list)
+                     finally (cold-push (cold-cons (cold-intern gf-name)
+                                                   (vector-in-core list)) gfs))
+            finally (cold-set 'sb!pcl::*!trivial-methods* gfs))
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-deferred-known-funs)
@@ -4088,6 +4161,8 @@ initially undefined function references:~2%")
     (when (is-fixnum-lowtag (descriptor-lowtag x))
       (return-from recurse (descriptor-fixnum x)))
     (ecase (descriptor-lowtag x)
+      (#.sb!vm:instance-pointer-lowtag
+       (if strictp (error "Can't invert INSTANCE type") "#<instance>"))
       (#.sb!vm:list-pointer-lowtag
        (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
       (#.sb!vm:fun-pointer-lowtag
