@@ -376,11 +376,9 @@ variable: an unreadable object representing the error is printed instead.")
 (defmethod print-object ((object array) stream) (output-array object stream))
 (defmethod print-object ((object system-area-pointer) stream) (output-sap object stream))
 (defmethod print-object ((object weak-pointer) stream) (output-weak-pointer object stream))
-(defmethod print-object ((object lra) stream) (output-lra object stream))
 (defmethod print-object ((object code-component) stream) (output-code-component object stream))
 (defmethod print-object ((object fdefn) stream) (output-fdefn object stream))
-#!-(or x86 x86-64)
-(defmethod print-object ((object lra) stream) (output-lra object stream))
+#!-(or x86 x86-64) (defmethod print-object ((object lra) stream) (output-lra object stream))
 
 (defmethod print-object ((x t) stream)
   (if *print-pretty*
