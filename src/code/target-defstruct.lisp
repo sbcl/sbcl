@@ -89,7 +89,8 @@
 (defun %target-defstruct (dd)
   (declare (type defstruct-description dd))
 
-  (/show0 "entering %TARGET-DEFSTRUCT")
+  #!+(and sb-show (host-feature sb-xc) (not win32))
+  (progn (write `(%target-defstruct ,(dd-name dd))) (terpri))
 
   (when (dd-doc dd)
     (setf (fdocumentation (dd-name dd) 'structure)
@@ -132,7 +133,6 @@
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))
 
-  (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
 
 ;;; Copy any old kind of structure.

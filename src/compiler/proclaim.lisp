@@ -337,10 +337,9 @@
            (compiler-warn "unrecognized declaration ~S" raw-form)))))))
 
 (defun sb!xc:proclaim (raw-form)
-  #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
-  #+sb-xc (/hexstr raw-form)
+  #!+(and sb-show (host-feature sb-xc) (not win32))
+  (progn (write-string "* ") (write `(declaim ,raw-form) :level nil) (terpri))
   (%proclaim raw-form nil)
-  #+sb-xc (/show0 "returning from PROCLAIM")
   (values))
 
 ;; Issue a style warning if there are any repeated OPTIMIZE declarations

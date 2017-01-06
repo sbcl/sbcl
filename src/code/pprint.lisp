@@ -846,8 +846,8 @@ line break."
            (type real priority)
            (type pprint-dispatch-table table))
   (declare (explicit-check))
-  (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
-  (/hexstr type)
+  #!+(and sb-show (host-feature sb-xc) (not win32))
+  (format t "* SET-PPRINT-DISPATCH ~S~%" type)
   (assert-not-standard-pprint-dispatch-table table 'set-pprint-dispatch)
   (let* ((ctype (or (handler-bind
                         ((parse-unknown-type
@@ -885,7 +885,6 @@ line break."
                     ;; (COMPLEMENT #'entry<) is unstable wrt insertion order.
                     (merge 'list list (list entry) (lambda (a b) (entry< b a)))
                     list)))))
-  (/show0 "about to return NIL from SET-PPRINT-DISPATCH")
   nil)
 
 ;;;; standard pretty-printing routines
