@@ -194,10 +194,6 @@
   (setf (symbol-function 'choose-symbol-out-fun)
         (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))
 
-  #!-win32
-  (progn (prin1 `(package = ,(package-name *package*)))
-         (terpri))
-
   ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
   (show-and-call sb!kernel::!raw-slot-data-init)

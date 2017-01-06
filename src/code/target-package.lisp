@@ -1632,14 +1632,7 @@ PACKAGE."
             (map 'vector #'package-external-symbols (package-%use-list pkg)))))
 
   (/show0 "about to MAKUNBOUND *!INITIAL-SYMBOLS*")
-  (%makunbound '*!initial-symbols*)       ; (so that it gets GCed)
-
-  ;; For the kernel core image wizards, set the package to *CL-PACKAGE*.
-  ;;
-  ;; FIXME: We should just set this to (FIND-PACKAGE
-  ;; "COMMON-LISP-USER") once and for all here, instead of setting it
-  ;; once here and resetting it later.
-  (setq *package* *cl-package*))
+  (%makunbound '*!initial-symbols*))      ; (so that it gets GCed)
 
 ;;; support for WITH-PACKAGE-ITERATOR
 
