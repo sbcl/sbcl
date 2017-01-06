@@ -812,3 +812,8 @@
 (with-test (:name :print-case-capitalize)
   (assert (string= (write-to-string 'fluffy-bunny-count :case :capitalize)
                    "Fluffy-Bunny-Count")))
+
+(defclass foo2 () ())
+(with-test (:name :print-random-standard-object) ; lp# 1654550
+  (assert (search "#<FOO2 {" (write-to-string (make-instance 'foo2) :pretty nil)))
+  (assert (search "#<FOO2 {" (write-to-string (make-instance 'foo2) :pretty t))))
