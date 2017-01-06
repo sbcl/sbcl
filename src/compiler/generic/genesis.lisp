@@ -1201,7 +1201,9 @@ core and return a descriptor to it."
   (let ((classoid (find-classoid type-name nil)))
     (typecase classoid
       (structure-classoid
-       (dd-predicate-name (layout-info (classoid-layout classoid))))
+       (cond ((dd-predicate-name (layout-info (classoid-layout classoid))))
+             ;; All early INSTANCEs should be STRUCTURE-OBJECTs.
+             ((eq type-name 'structure-object) 'sb!kernel:%instancep)))
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
          (aver (not (contains-unknown-type-p translation)))
@@ -1209,9 +1211,10 @@ core and return a descriptor to it."
                                 :test #'type= :key #'car)))
            (cond (predicate (cdr predicate))
                  ((eq type-name 't) 'sb!int:constantly-t)
-                 ;; Let's just hope we don't need this
-                 ((eq type-name 'structure-object) nil)
-                 (t (error "No predicate for builtin: ~S" type-name)))))))))
+                 (t (error "No predicate for builtin: ~S" type-name))))))
+      (null
+       #+nil (format t "~&; PREDICATE-FOR-SPECIALIZER: no classoid for ~S~%"
+                     type-name)))))
 
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
 ;;; in the cold core.
