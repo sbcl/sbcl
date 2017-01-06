@@ -61,23 +61,35 @@
         (interns nil)
         (exports nil)
         (package (stringify-string-designator package))
-        (implement (list package))
+        (implement nil)
         (implement-p nil)
         (lock nil)
-        (doc nil))
-    #!-sb-package-locks
-    (declare (ignore implement-p))
+        (doc nil)
+        (optname nil)
+        (optval nil)
+        (seen nil))
     (dolist (option options)
       (unless (consp option)
         (error 'simple-program-error
                :format-control "bogus DEFPACKAGE option: ~S"
                :format-arguments (list option)))
-      (case (car option)
+      (setq optname (car option) optval (cdr option))
+      (case optname
+        ((:documentation :size #!+sb-package-locks :lock)
+         (when (memq optname seen)
+           (error 'simple-program-error
+                  :format-control "can't specify ~S more than once."
+                  :format-arguments (list optname)))
+         (unless (typep optval '(cons t null))
+           (error 'simple-program-error
+                  :format-control "~S expects a single argument. Got ~S"
+                  :format-arguments (list (cdr option))))
+         (push optname seen)
+         (setq optval (car optval))))
+      (case optname
         (:nicknames
          (setf nicknames
-               (append
-                nicknames
-                (stringify-string-designators (cdr option)))))
+               (append nicknames (stringify-string-designators optval))))
         (:local-nicknames
          (setf local-nicknames
                (append local-nicknames
@@ -85,66 +97,46 @@
                                  (destructuring-bind (nick name) spec
                                    (cons (stringify-package-designator nick)
                                          (stringify-package-designator name))))
-                               (cdr option)))))
+                               optval))))
         (:size
-         (cond (size
-                (error 'simple-program-error
-                       :format-control "can't specify :SIZE twice."))
-               ((and (consp (cdr option))
-                     (typep (second option) 'unsigned-byte))
-                (setf size (second option)))
-               (t
-                (error
-                 'simple-program-error
-                 :format-control ":SIZE is not a positive integer: ~S"
-                 :format-arguments (list (second option))))))
+         (if (typep optval 'unsigned-byte)
+             (setf size optval)
+             (error 'simple-program-error
+                    :format-control ":SIZE is not a positive integer: ~S"
+                    :format-arguments (cdr option))))
         (:shadow
-         (let ((new (stringify-string-designators (cdr option))))
-           (setf shadows (append shadows new))))
+         (setf shadows (append shadows (stringify-string-designators optval))))
         (:shadowing-import-from
-         (let ((package-name (stringify-package-designator (second option)))
-               (names (stringify-string-designators (cddr option))))
-           (let ((assoc (assoc package-name shadowing-imports
-                               :test #'string=)))
+         (let ((package-name (stringify-package-designator (car optval)))
+               (names (stringify-string-designators (cdr optval))))
+           (let ((assoc (assoc package-name shadowing-imports :test #'string=)))
              (if assoc
                  (setf (cdr assoc) (append (cdr assoc) names))
                  (setf shadowing-imports
                        (acons package-name names shadowing-imports))))))
         (:use
-         (setf use (append use (stringify-package-designators (cdr option)) )
+         (setf use (append use (stringify-package-designators optval))
                use-p t))
         (:import-from
-         (let ((package-name (stringify-package-designator (second option)))
-               (names (stringify-string-designators (cddr option))))
-           (let ((assoc (assoc package-name imports
-                               :test #'string=)))
+         (let ((package-name (stringify-package-designator (car optval)))
+               (names (stringify-string-designators (cdr optval))))
+           (let ((assoc (assoc package-name imports :test #'string=)))
              (if assoc
                  (setf (cdr assoc) (append (cdr assoc) names))
                  (setf imports (acons package-name names imports))))))
         (:intern
-         (let ((new (stringify-string-designators (cdr option))))
-           (setf interns (append interns new))))
+         (setf interns (append interns (stringify-string-designators optval))))
         (:export
-         (let ((new (stringify-string-designators (cdr option))))
-           (setf exports (append exports new))))
+         (setf exports (append exports (stringify-string-designators optval))))
         #!+sb-package-locks
         (:implement
-         (unless implement-p
-           (setf implement nil))
-         (let ((new (stringify-package-designators (cdr option))))
-           (setf implement (append implement new)
-                 implement-p t)))
+         (setf implement (append implement (stringify-package-designators optval))
+               implement-p t))
         #!+sb-package-locks
         (:lock
-         (when lock
-           (error 'simple-program-error
-                  :format-control "multiple :LOCK options"))
-         (setf lock (coerce (second option) 'boolean)))
+         (setf lock (coerce optval 'boolean)))
         (:documentation
-         (when doc
-           (error 'simple-program-error
-                  :format-control "multiple :DOCUMENTATION options"))
-         (setf doc (coerce (second option) 'simple-string)))
+         (setf doc (possibly-base-stringize optval)))
         (t
          (error 'simple-program-error
                 :format-control "bogus DEFPACKAGE option: ~S"
@@ -159,7 +151,14 @@
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%defpackage ,package ',nicknames ',size
                     ',shadows ',shadowing-imports ',(if use-p use :default)
-                    ',imports ',interns ',exports ',implement ',local-nicknames
+                    ',imports ',interns ',exports
+                    ;; FIXME: the default singleton list seems unnecessary.
+                    ;; PACKAGE-LOCK-VIOLATION-P considers every package to implement
+                    ;; itself. Additionally there's an obvious inconsistency:
+                    ;; * (package-implements-list (defpackage "A")) => (#<PACKAGE "A">)
+                    ;; * (package-implements-list (make-package "B")) => NIL
+                    ',(if implement-p implement (list package))
+                    ',local-nicknames
                     ',lock (sb!c:source-location)
                     ,@(and doc
                            `(,doc))))))

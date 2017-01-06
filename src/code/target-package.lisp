@@ -562,8 +562,13 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; making this a generic function then packages with custom package classes
 ;;; could hook into this to provide their own resolution.
 (defun find-package-using-package (package-designator base)
-  (flet ((find-package-from-string (string)
-           (declare (type string string))
+  (typecase package-designator
+    (package package-designator)
+    ;; Rather than use STRINGIFY-STRING-DESIGNATOR, we check type by hand
+    ;; to avoid consing a new simple-base-string if the designator is one
+    ;; that would undergo coercion entailing allocation.
+    ((or symbol string character)
+         (let ((string (string package-designator)))
            (let* ((nicknames (when base
                                (package-%local-nicknames base)))
                   (nicknamed (when nicknames
@@ -581,14 +586,11 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                          (find-package
                           (substitute #\- #\! string :count 1)))))
                  packageoid))))
-    (typecase package-designator
-      (package package-designator)
-      (symbol (find-package-from-string (symbol-name package-designator)))
-      (string (find-package-from-string package-designator))
-      (character (find-package-from-string (string package-designator)))
-      (t (error 'type-error
+    ;; Is there a fundamental reason we don't declare the FTYPE
+    ;; of FIND-PACKAGE-USING-PACKAGE letting the compiler do the checking?
+    (t (error 'type-error
                 :datum package-designator
-                :expected-type '(or character package string symbol))))))
+                :expected-type '(or character package string symbol)))))
 
 ;;; Return a list of packages given a package designator or list of
 ;;; package designators, or die trying.
@@ -1620,7 +1622,7 @@ PACKAGE."
               (package-source-location pkg) nil
               (gethash (package-%name pkg) names) pkg)
         (dolist (nick (package-%nicknames pkg))
-          (setf (gethash nick *package-names*) pkg))
+          (setf (gethash nick names) pkg))
         #!+sb-package-locks
         (setf (package-lock pkg) nil
               (package-%implementation-packages pkg) nil))))
