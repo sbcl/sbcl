@@ -1,5 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes in sbcl-1.3.14
+  * enhancement: for several macros such as MULTIPLE-VALUE-{BIND,SETQ}, COND,
+    DO{,*,LIST}, {RESTART,HANDLER}-{BIND,CASE}, *CASE, conditions signaled
+    during macroexpansion point to the form that caused the problem more
+    accurately.
+
 changes in sbcl-1.3.13 relative to sbcl-1.3.12:
   * enhancement: SET triggers package locks on undefined variables.
     (lp#1645152)
@@ -14,7 +20,7 @@ changes in sbcl-1.3.13 relative to sbcl-1.3.12:
     reduced by 2 words if the compact-instance-header feature is enabled.
   * optimization: CONDITION instances are quicker to allocate.
   * optimization: unoptimized calls to FILL on specialized vectors are now
-    just as fast as T vectors. 
+    just as fast as T vectors.
   * bug fix: get-timezone returns corret DST on 64-bit Windows. (lp#1641058)
   * bug fix: cross reference information in fasls is no longer incompatible
     between different cores (lp#1648186)

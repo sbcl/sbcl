@@ -1710,11 +1710,9 @@
       (dolist (decl decls)
         (dolist (spec (rest decl))
           (if (eq context :compile)
-              (let ((*current-path* (or (get-source-path spec)
-                                        (get-source-path decl)
-                                        *current-path*)))
+              (with-current-source-form (spec decl) ; TODO this is a slight change to the previous code. make sure the behavior is identical
                 (process-it spec decl))
-            ;; Kludge: EVAL calls this function to deal with LOCALLY.
+              ;; Kludge: EVAL calls this function to deal with LOCALLY.
               (process-it spec decl)))))
     (warn-repeated-optimize-qualities (lexenv-policy lexenv) optimize-qualities)
     (values lexenv result-type *post-binding-variable-lexenv*

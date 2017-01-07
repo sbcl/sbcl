@@ -32,8 +32,9 @@
 ;;;; MULTIPLE-VALUE-FOO
 
 (flet ((validate-vars (vars)
-         (unless (and (listp vars) (every #'symbolp vars))
-           (error "Vars is not a list of symbols: ~S" vars))))
+         (with-current-source-form (vars)
+           (unless (and (listp vars) (every #'symbolp vars))
+             (error "Vars is not a list of symbols: ~S" vars)))))
 
 (sb!xc:defmacro multiple-value-bind (vars value-form &body body)
   (validate-vars vars)
@@ -76,24 +77,25 @@
           nil
           (let ((clause (first clauses))
                 (more (rest clauses)))
-            (if (atom clause)
-                (error 'simple-type-error
-                       :format-control "COND clause is not a ~S: ~S"
-                       :format-arguments (list 'cons clause)
-                       :expected-type 'cons
-                       :datum clause)
-                (let ((test (first clause))
-                      (forms (rest clause)))
-                  (if (endp forms)
-                      `(or ,test ,(make-clauses more))
-                      (if (and (eq test t)
-                               (not more))
-                          ;; THE to preserve non-toplevelness for FOO in
-                          ;;   (COND (T (FOO)))
-                          `(the t ,(prognify forms))
-                          `(if ,test
-                               ,(prognify forms)
-                               ,(when more (make-clauses more)))))))))))
+            (with-current-source-form (clauses)
+              (if (atom clause)
+                  (error 'simple-type-error
+                         :format-control "COND clause is not a ~S: ~S"
+                         :format-arguments (list 'cons clause)
+                         :expected-type 'cons
+                         :datum clause)
+                  (let ((test (first clause))
+                        (forms (rest clause)))
+                    (if (endp forms)
+                        `(or ,test ,(make-clauses more))
+                        (if (and (eq test t)
+                                 (not more))
+                            ;; THE to preserve non-toplevelness for FOO in
+                            ;;   (COND (T (FOO)))
+                            `(the t ,(prognify forms))
+                            `(if ,test
+                                 ,(prognify forms)
+                                 ,(when more (make-clauses more))))))))))))
 
   (sb!xc:defmacro when (test &body forms)
   #!+sb-doc
@@ -294,23 +296,33 @@ evaluated as a PROGN."
 (flet
     ((frob-do-body (varlist endlist decls-and-code bind step name block)
        ;; Check for illegal old-style DO.
-       (when (or (not (listp varlist)) (atom endlist))
-         (error "ill-formed ~S -- possibly illegal old style DO?" name))
+       (when (not (listp varlist))
+         (with-current-source-form (varlist)
+           (error "~@<Ill-formed ~S variable list -- possibly illegal ~
+                   old style DO?~@:>"
+                  name)))
+       (when (atom endlist)
+         (with-current-source-form (endlist)
+           (error "~@<Ill-formed ~S end test list -- possibly illegal ~
+                  old style DO?~@:>"
+                  name)))
        (collect ((steps))
          (let ((inits
-                (mapcar (lambda (var)
-                          (or (cond ((symbolp var) var)
-                                    ((listp var)
-                                     (unless (symbolp (first var))
-                                       (error "~S step variable is not a symbol: ~S"
-                                              name (first var)))
-                                     (case (length var)
-                                       ((1 2) var)
-                                       (3 (steps (first var) (third var))
-                                          (list (first var) (second var))))))
-                              (error "~S is an illegal form for a ~S varlist."
-                                     var name)))
-                        varlist)))
+                (with-current-source-form (varlist)
+                  (mapcar (lambda (var)
+                            (with-current-source-form (var)
+                              (or (cond ((symbolp var) var)
+                                        ((listp var)
+                                         (unless (symbolp (first var))
+                                           (error "~S step variable is not a symbol: ~S"
+                                                  name (first var)))
+                                         (case (length var)
+                                           ((1 2) var)
+                                           (3 (steps (first var) (third var))
+                                              (list (first var) (second var))))))
+                                  (error "~S is an illegal form for a ~S varlist."
+                                         var name))))
+                          varlist))))
            (multiple-value-bind (code decls) (parse-body decls-and-code nil)
              (let ((label-1 (sb!xc:gensym)) (label-2 (sb!xc:gensym)))
                `(block ,block
@@ -372,48 +384,50 @@ evaluated as a PROGN."
   ;; environment. We spuriously reference the gratuitous variable,
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (let* ((n-list (gensym "N-LIST"))
-           (start (gensym "START")))
-      (multiple-value-bind (clist members clist-ok)
-          (cond ((sb!xc:constantp list env)
-                 (let ((value (constant-form-value list env)))
-                   (multiple-value-bind (all dot) (list-members value :max-length 20)
+  (binding* (((forms decls) (parse-body body nil))
+             (n-list (gensym "N-LIST"))
+             (start (gensym "START"))
+             ((clist members clist-ok)
+              (with-current-source-form (list)
+                (cond
+                  ((sb!xc:constantp list env)
+                   (binding* ((value (constant-form-value list env))
+                              ((all dot) (list-members value :max-length 20)))
                      (when (eql dot t)
                        ;; Full warning is too much: the user may terminate the loop
                        ;; early enough. Contents are still right, though.
                        (style-warn "Dotted list ~S in DOLIST." value))
                      (if (eql dot :maybe)
                          (values value nil nil)
-                         (values value all t)))))
-                ((and (consp list) (eq 'list (car list))
-                      (every (lambda (arg) (sb!xc:constantp arg env)) (cdr list)))
-                 (let ((values (mapcar (lambda (arg) (constant-form-value arg env)) (cdr list))))
-                   (values values values t)))
-                (t
-                 (values nil nil nil)))
-        `(block nil
-           (let ((,n-list ,(if clist-ok (list 'quote clist) list)))
-             (tagbody
-                ,start
-                (unless (endp ,n-list)
-                  (let ((,var ,(if clist-ok
-                                   `(truly-the (member ,@members) (car ,n-list))
-                                   `(car ,n-list))))
-                    ,@decls
-                    (setq ,n-list (cdr ,n-list))
-                    (tagbody ,@forms))
-                  (go ,start))))
-           ,(if result
-                `(let ((,var nil))
-                   ;; Filter out TYPE declarations (VAR gets bound to NIL,
-                   ;; and might have a conflicting type declaration) and
-                   ;; IGNORE (VAR might be ignored in the loop body, but
-                   ;; it's used in the result form).
-                   ,@(filter-dolist-declarations decls)
-                   ,var
-                   ,result)
-                nil))))))
+                         (values value all t))))
+                  ((and (consp list) (eq 'list (car list))
+                        (every (lambda (arg) (sb!xc:constantp arg env)) (cdr list)))
+                   (let ((values (mapcar (lambda (arg) (constant-form-value arg env)) (cdr list))))
+                     (values values values t)))
+                  (t
+                   (values nil nil nil))))))
+    `(block nil
+       (let ((,n-list ,(if clist-ok (list 'quote clist) list)))
+         (tagbody
+            ,start
+            (unless (endp ,n-list)
+              (let ((,var ,(if clist-ok
+                               `(truly-the (member ,@members) (car ,n-list))
+                               `(car ,n-list))))
+                ,@decls
+                (setq ,n-list (cdr ,n-list))
+                (tagbody ,@forms))
+              (go ,start))))
+       ,(if result
+            `(let ((,var nil))
+               ;; Filter out TYPE declarations (VAR gets bound to NIL,
+               ;; and might have a conflicting type declaration) and
+               ;; IGNORE (VAR might be ignored in the loop body, but
+               ;; it's used in the result form).
+               ,@(filter-dolist-declarations decls)
+               ,var
+               ,result)
+            nil))))
 
 ;;;; conditions, handlers, restarts
 
@@ -464,29 +478,30 @@ evaluated as a PROGN."
    indicates an anonymous restart. When bindings contain the same
    restart name, FIND-RESTART will find the first such binding."
   (flet ((parse-binding (binding)
-           (unless (>= (length binding) 2)
-             (error "ill-formed restart binding: ~S" binding))
-           (destructuring-bind (name function
-                                &key interactive-function
-                                     test-function
-                                     report-function)
-               binding
-             (unless (or name report-function)
-               (warn "Unnamed restart does not have a report function: ~
-                      ~S" binding))
-             `(make-restart ',name ,function
-                            ,@(and (or report-function
-                                       interactive-function
-                                       test-function)
-                                   `(,report-function))
-                            ,@(and (or interactive-function
-                                       test-function)
-                                   `(,interactive-function))
-                            ,@(and test-function
-                                   `(,test-function))))))
+           (with-current-source-form (binding)
+             (unless (>= (length binding) 2)
+               (error "ill-formed restart binding: ~S" binding))
+             (destructuring-bind (name function
+                                       &key interactive-function
+                                       test-function
+                                       report-function)
+                 binding
+               (unless (or name report-function)
+                 (warn "Unnamed restart does not have a report function: ~
+                        ~S" binding))
+               `(make-restart ',name ,function
+                              ,@(and (or report-function
+                                         interactive-function
+                                         test-function)
+                                     `(,report-function))
+                              ,@(and (or interactive-function
+                                         test-function)
+                                     `(,interactive-function))
+                              ,@(and test-function
+                                     `(,test-function)))))))
     `(let ((*restart-clusters*
-             (cons (list ,@(mapcar #'parse-binding bindings))
-                   *restart-clusters*)))
+            (cons (list ,@(mapcar #'parse-binding bindings))
+                  *restart-clusters*)))
        (declare (truly-dynamic-extent *restart-clusters*))
        ,@forms)))
 
@@ -551,14 +566,15 @@ evaluated as a PROGN."
                              (return (values result form))))
                           result)))))
              (parse-clause (clause)
-               (unless (and (listp clause) (>= (length clause) 2)
-                            (listp (second clause)))
-                 (error "ill-formed ~S clause, no lambda-list:~%  ~S"
-                        'restart-case clause))
-               (destructuring-bind (name lambda-list &body body) clause
-                 (multiple-value-bind (keywords body)
-                     (parse-keywords-and-body body)
-                   (list name (sb!xc:gensym "TAG") keywords lambda-list body))))
+               (with-current-source-form (clause)
+                 (unless (and (listp clause) (>= (length clause) 2)
+                              (listp (second clause)))
+                   (error "ill-formed ~S clause, no lambda-list:~%  ~S"
+                          'restart-case clause))
+                 (destructuring-bind (name lambda-list &body body) clause
+                   (multiple-value-bind (keywords body)
+                       (parse-keywords-and-body body)
+                     (list name (sb!xc:gensym "TAG") keywords lambda-list body)))))
              (make-binding (clause-data)
                (destructuring-bind (name tag keywords lambda-list body) clause-data
                  (declare (ignore body))
@@ -688,60 +704,67 @@ evaluated as a PROGN."
                  `(load-time-value (list ,@(mapcar #'second items)) t)
                  `(list ,@items))))
 
-      (dolist (binding bindings)
-        (unless (proper-list-of-length-p binding 2)
-          (error "ill-formed handler binding: ~S" binding))
-        (destructuring-bind (type handler) binding
-          (setq type (typexpand type env))
-          ;; Simplify a singleton AND or OR.
-          (when (typep type '(cons (member and or) (cons t null)))
-            (setf type (second type)))
-          (cluster-entries
-           (const-cons
-            ;; Compute the test expression
-            (cond ((member type '(t condition))
-                   ;; Every signal is necesarily a CONDITION, so whether you
-                   ;; wrote T or CONDITION, this is always an eligible handler.
-                   '#'constantly-t)
-                  ((typep type '(cons (eql satisfies) (cons t null)))
-                   ;; (SATISFIES F) => #'F but never a local definition of F.
-                   ;; The predicate is used only if needed - it's not an error
-                   ;; if not fboundp (though dangerously stupid) - so just
-                   ;; reference #'F for the compiler to see the use of the name.
-                   ;; But (KLUDGE): since the ref is to force a compile-time
-                   ;; effect, the interpreter should not see that form,
-                   ;; because there is no way for it to perform an unsafe ref,
-                   ;; (and it wouldn't signal a style-warning anyway),
-                   ;; and so it would actually fail immediately if predicate
-                   ;; were not defined.
-                   (let ((name (second type)))
-                     (when (typep env 'lexenv)
-                       (dummy-forms `#',name))
-                     `(find-or-create-fdefn ',name)))
-                  ((and (symbolp type)
-                        (condition-classoid-p (find-classoid type nil)))
-                   ;; It's debatable whether we need to go through a
-                   ;; classoid-cell instead of just using load-time-value
-                   ;; on FIND-CLASS, but the extra indirection is
-                   ;; safer, and no slower than what TYPEP does.
-                   `(find-classoid-cell ',type :create t))
-                  (t ; No runtime consing here- this is not a closure.
-                   `(named-lambda (%handler-bind ,type) (c)
-                      (declare (optimize (sb!c::verify-arg-count 0)))
-                      (typep c ',type))))
-            ;; Compute the handler expression
-            (let ((lexpr (typecase handler
-                          ((cons (eql lambda)) handler)
-                          ((cons (eql function)
-                                 (cons (cons (eql lambda)) null))
-                           (cadr handler)))))
-              (if lexpr
-                  (let ((name (let ((sb!xc:*gensym-counter*
-                                     (length (cluster-entries))))
-                                (sb!xc:gensym "H"))))
-                    (local-functions `(,name ,@(rest lexpr)))
-                    `#',name)
-                  handler))))))
+      (with-current-source-form (bindings)
+        (dolist (binding bindings)
+          (with-current-source-form (binding)
+            (unless (proper-list-of-length-p binding 2)
+              (error "ill-formed handler binding: ~S" binding))
+            (destructuring-bind (type handler) binding
+              (setq type (typexpand type env))
+              ;; Simplify a singleton AND or OR.
+              (when (typep type '(cons (member and or) (cons t null)))
+                (setf type (second type)))
+              (cluster-entries
+               (const-cons
+                ;; Compute the test expression
+                (cond ((member type '(t condition))
+                       ;; Every signal is necesarily a CONDITION, so
+                       ;; whether you wrote T or CONDITION, this is
+                       ;; always an eligible handler.
+                       '#'constantly-t)
+                      ((typep type '(cons (eql satisfies) (cons t null)))
+                       ;; (SATISFIES F) => #'F but never a local
+                       ;; definition of F.  The predicate is used only
+                       ;; if needed - it's not an error if not fboundp
+                       ;; (though dangerously stupid) - so just
+                       ;; reference #'F for the compiler to see the
+                       ;; use of the name.  But (KLUDGE): since the
+                       ;; ref is to force a compile-time effect, the
+                       ;; interpreter should not see that form,
+                       ;; because there is no way for it to perform an
+                       ;; unsafe ref, (and it wouldn't signal a
+                       ;; style-warning anyway), and so it would
+                       ;; actually fail immediately if predicate were
+                       ;; not defined.
+                       (let ((name (second type)))
+                         (when (typep env 'lexenv)
+                           (dummy-forms `#',name))
+                         `(find-or-create-fdefn ',name)))
+                      ((and (symbolp type)
+                            (condition-classoid-p (find-classoid type nil)))
+                       ;; It's debatable whether we need to go through
+                       ;; a classoid-cell instead of just using
+                       ;; load-time-value on FIND-CLASS, but the extra
+                       ;; indirection is safer, and no slower than
+                       ;; what TYPEP does.
+                       `(find-classoid-cell ',type :create t))
+                      (t ; No runtime consing here- not a closure.
+                       `(named-lambda (%handler-bind ,type) (c)
+                          (declare (optimize (sb!c::verify-arg-count 0)))
+                          (typep c ',type))))
+                ;; Compute the handler expression
+                (let ((lexpr (typecase handler
+                               ((cons (eql lambda)) handler)
+                               ((cons (eql function)
+                                      (cons (cons (eql lambda)) null))
+                                (cadr handler)))))
+                  (if lexpr
+                      (let ((name (let ((sb!xc:*gensym-counter*
+                                         (length (cluster-entries))))
+                                    (sb!xc:gensym "H"))))
+                        (local-functions `(,name ,@(rest lexpr)))
+                        `#',name)
+                      handler))))))))
 
       `(dx-flet ,(local-functions)
          ,@(dummy-forms)
@@ -790,10 +813,11 @@ specification."
         (let* ((local-funs nil)
                (annotated-cases
                 (mapcar (lambda (case)
-                          (with-unique-names (tag fun)
-                            (destructuring-bind (type ll &body body) case
-                              (push `(,fun ,ll ,@body) local-funs)
-                              (list tag type ll fun))))
+                          (with-current-source-form (case)
+                            (with-unique-names (tag fun)
+                              (destructuring-bind (type ll &body body) case
+                                (push `(,fun ,ll ,@body) local-funs)
+                                (list tag type ll fun)))))
                         cases)))
           (with-unique-names (block cell form-fun)
             `(dx-flet ((,form-fun ()

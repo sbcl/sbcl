@@ -497,10 +497,11 @@ generic function lambda list ~S~:>"
              (specializers-form
               (make-method-specializers-form
                proto-gf proto-method specializers env)))
-    (mapc (lambda (specializer)
+    (mapc (lambda (specializer parameter)
             (when (typep specializer 'type-specifier)
-              (check-deprecated-type specializer)))
-          specializers)
+              (with-current-source-form (parameter)
+                (check-deprecated-type specializer))))
+          specializers lambda-list)
     ;; Note: We could DECLAIM the ftype of the generic function here,
     ;; since ANSI specifies that we create it if it does not
     ;; exist. However, I chose not to, because I think it's more

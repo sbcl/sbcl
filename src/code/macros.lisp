@@ -254,77 +254,74 @@ invoked. In that case it will store into PLACE and start over."
          ((null cases) nil)
       (flet ((check-clause (case-keys)
                (loop for k in case-keys
-                     for existing = (gethash k keys-seen)
-                     do (when existing
-                          (let ((sb!c::*current-path*
-                                  (when (boundp 'sb!c::*source-paths*)
-                                    (or (sb!c::get-source-path case)
-                                        (and (boundp 'sb!c::*current-path*)
-                                             sb!c::*current-path*)))))
-                            (warn 'duplicate-case-key-warning
-                                  :key k
-                                  :case-kind name
-                                  :occurrences `(,existing (,case-position (,case)))))))
+                  for existing = (gethash k keys-seen)
+                  do (when existing
+                       (warn 'duplicate-case-key-warning
+                             :key k
+                             :case-kind name
+                             :occurrences `(,existing (,case-position (,case))))))
                (let ((record (list case-position (list case))))
                  (dolist (k case-keys)
                    (setf (gethash k keys-seen) record)))))
         (unless (list-of-length-at-least-p case 1)
-          (error "~S -- bad clause in ~S" case name))
-        (destructuring-bind (keyoid &rest forms) case
-          (cond (;; an OTHERWISE-CLAUSE
-                 ;;
-                 ;; By the way... The old code here tried gave
-                 ;; STYLE-WARNINGs for normal-clauses which looked as
-                 ;; though they might've been intended to be
-                 ;; otherwise-clauses. As Tony Martinez reported on
-                 ;; sbcl-devel 2004-11-09 there are sometimes good
-                 ;; reasons to write clauses like that; and as I noticed
-                 ;; when trying to understand the old code so I could
-                 ;; understand his patch, trying to guess which clauses
-                 ;; don't have good reasons is fundamentally kind of a
-                 ;; mess. SBCL does issue style warnings rather
-                 ;; enthusiastically, and I have often justified that by
-                 ;; arguing that we're doing that to detect issues which
-                 ;; are tedious for programmers to detect for by
-                 ;; proofreading (like small typoes in long symbol
-                 ;; names, or duplicate function definitions in large
-                 ;; files). This doesn't seem to be an issue like that,
-                 ;; and I can't think of a comparably good justification
-                 ;; for giving STYLE-WARNINGs for legal code here, so
-                 ;; now we just hope the programmer knows what he's
-                 ;; doing. -- WHN 2004-11-20
-                 (and (not errorp) ; possible only in CASE or TYPECASE,
-                                   ; not in [EC]CASE or [EC]TYPECASE
-                      (memq keyoid '(t otherwise))
-                      (null (cdr cases)))
-                 (push `(t nil ,@forms) clauses))
-                ((and multi-p (listp keyoid))
-                 (setf keys (nconc (reverse keyoid) keys))
-                 (check-clause keyoid)
-                 (push `((or ,@(mapcar (lambda (key)
-                                         `(,test ,keyform-value ',key))
-                                       keyoid))
-                         nil
-                         ,@forms)
-                       clauses))
-                (t
-                 (when (and (eq name 'case)
-                            (cdr cases)
-                            (memq keyoid '(t otherwise)))
-                   (error 'simple-reference-error
-                          :format-control
-                          "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
+          (with-current-source-form (cases)
+            (error "~S -- bad clause in ~S" case name)))
+        (with-current-source-form (case)
+          (destructuring-bind (keyoid &rest forms) case
+            (cond (;; an OTHERWISE-CLAUSE
+                   ;;
+                   ;; By the way... The old code here tried gave
+                   ;; STYLE-WARNINGs for normal-clauses which looked as
+                   ;; though they might've been intended to be
+                   ;; otherwise-clauses. As Tony Martinez reported on
+                   ;; sbcl-devel 2004-11-09 there are sometimes good
+                   ;; reasons to write clauses like that; and as I noticed
+                   ;; when trying to understand the old code so I could
+                   ;; understand his patch, trying to guess which clauses
+                   ;; don't have good reasons is fundamentally kind of a
+                   ;; mess. SBCL does issue style warnings rather
+                   ;; enthusiastically, and I have often justified that by
+                   ;; arguing that we're doing that to detect issues which
+                   ;; are tedious for programmers to detect for by
+                   ;; proofreading (like small typoes in long symbol
+                   ;; names, or duplicate function definitions in large
+                   ;; files). This doesn't seem to be an issue like that,
+                   ;; and I can't think of a comparably good justification
+                   ;; for giving STYLE-WARNINGs for legal code here, so
+                   ;; now we just hope the programmer knows what he's
+                   ;; doing. -- WHN 2004-11-20
+                   (and (not errorp) ; possible only in CASE or TYPECASE,
+                                        ; not in [EC]CASE or [EC]TYPECASE
+                        (memq keyoid '(t otherwise))
+                        (null (cdr cases)))
+                   (push `(t nil ,@forms) clauses))
+                  ((and multi-p (listp keyoid))
+                   (setf keys (nconc (reverse keyoid) keys))
+                   (check-clause keyoid)
+                   (push `((or ,@(mapcar (lambda (key)
+                                           `(,test ,keyform-value ',key))
+                                         keyoid))
+                           nil
+                           ,@forms)
+                         clauses))
+                  (t
+                   (when (and (eq name 'case)
+                              (cdr cases)
+                              (memq keyoid '(t otherwise)))
+                     (error 'simple-reference-error
+                            :format-control
+                            "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
                            designator only in the final otherwise-clause, not in a ~
                            normal-clause. Use (~S) instead, or move the clause the ~
                            correct position.~:@>"
-                          :format-arguments (list 'case case keyoid keyoid)
-                          :references `((:ansi-cl :macro case))))
-                 (push keyoid keys)
-                 (check-clause (list keyoid))
-                 (push `((,test ,keyform-value ',keyoid)
-                         nil
-                         ,@forms)
-                       clauses))))))
+                            :format-arguments (list 'case case keyoid keyoid)
+                            :references `((:ansi-cl :macro case))))
+                   (push keyoid keys)
+                   (check-clause (list keyoid))
+                   (push `((,test ,keyform-value ',keyoid)
+                           nil
+                           ,@forms)
+                         clauses)))))))
     (setq keys
           (nreverse (mapcon (lambda (tail)
                               (unless (member (car tail) (cdr tail))
