@@ -251,30 +251,15 @@
   `(progn ,a ,b))
 
 (with-test (:name (with-current-source-form :smoke))
-  (labels ((call-capturing-source-paths (thunk)
-             (let ((source-paths '()))
-               (handler-bind
-                   ((condition (lambda (condition)
-                                 (let ((context (sb-c::find-error-context nil)))
-                                   (push (sb-c::compiler-error-context-original-source-path
-                                          context)
-                                         source-paths))
-                                 (muffle-warning condition))))
-                 (funcall thunk))
-               (nreverse source-paths)))
-           (compile-capturing-source-paths (form)
-             (call-capturing-source-paths
-              (lambda () (compile nil form)))))
-
-    (assert (equal (compile-capturing-source-paths
-                    '(lambda () (warnings-in-subforms 1 2)))
-                   '((2 0) (2 0))))
-    (assert (equal (compile-capturing-source-paths
-                    '(lambda () (warnings-in-subforms (progn 1) (progn 2))))
-                   '((1 2 0) (2 2 0))))
-    (assert (equal (compile-capturing-source-paths
-                    '(lambda ()
-                      (warnings-in-subforms
-                       (warnings-in-subforms (progn 1) (progn 2))
-                       (progn 3))))
-                   '((1 2 0) (2 2 0) (1 1 2 0) (2 1 2 0))))))
+  (assert (equal (checked-compile-condition-source-paths
+                  '(lambda () (warnings-in-subforms 1 2)))
+                 '((2 0) (2 0))))
+  (assert (equal (checked-compile-condition-source-paths
+                  '(lambda () (warnings-in-subforms (progn 1) (progn 2))))
+                 '((1 2 0) (2 2 0))))
+  (assert (equal (checked-compile-condition-source-paths
+                  '(lambda ()
+                    (warnings-in-subforms
+                     (warnings-in-subforms (progn 1) (progn 2))
+                     (progn 3))))
+                 '((1 2 0) (2 2 0) (1 1 2 0) (2 1 2 0)))))

@@ -4,7 +4,8 @@
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
            #:make-kill-thread #:make-join-thread
-           #:checked-compile
+           #:checked-compile #:checked-compile-capturing-source-paths
+           #:checked-compile-condition-source-paths
            #:runtime #:split-string))
 
 (in-package :test-util)
@@ -248,6 +249,41 @@
             (values function (when (or failure-p warnings) t)
                     warnings style-warnings notes compiler-errors)))))))
 
+;;; Like CHECKED-COMPILE, but for each captured condition, capture and
+;;; later return a cons
+;;;
+;;;   (CONDITION . SOURCE-PATH)
+;;;
+;;; instead. SOURCE-PATH is the path of the source form associated to
+;;; CONDITION.
+(defun checked-compile-capturing-source-paths (form &rest args)
+  (labels ((context-source-path ()
+             (let ((context (sb-c::find-error-context nil)))
+               (sb-c::compiler-error-context-original-source-path
+                context)))
+           (add-source-path (condition)
+             (cons condition (context-source-path))))
+    (apply #'checked-compile form :condition-transform #'add-source-path
+           args)))
+
+;;; Similar to CHECKED-COMPILE, but allow compilation failure and
+;;; warnings and only return source paths associated to those
+;;; conditions.
+(defun checked-compile-condition-source-paths (form)
+  (let ((source-paths '()))
+    (labels ((context-source-path ()
+               (let ((context (sb-c::find-error-context nil)))
+                 (sb-c::compiler-error-context-original-source-path
+                  context)))
+             (push-source-path (condition)
+               (declare (ignore condition))
+               (push (context-source-path) source-paths)))
+      (checked-compile form
+                       :allow-failure t
+                       :allow-warnings t
+                       :allow-style-warnings t
+                       :condition-transform #'push-source-path))
+    (nreverse source-paths)))
 
 ;;; Repeat calling THUNK until its cumulated runtime, measured using
 ;;; GET-INTERNAL-RUN-TIME, is larger than PRECISION. Repeat this
