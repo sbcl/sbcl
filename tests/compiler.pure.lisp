@@ -513,7 +513,8 @@
                                             (bar (&environment env)
                                               `',(macro-function 'foo env)))
                                    (bar)))
-                              :allow-style-warnings t))))
+                              ;; FIXME  :allow-failure is for the annotated case above
+                              :allow-failure t :allow-style-warnings t))))
       (assert style-warnings))))
 
 ;; Uh, this test is semi-bogus - it's trying to test that you can't

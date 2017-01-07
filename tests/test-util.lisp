@@ -154,80 +154,100 @@
   (sb-impl::featurep skipped-on))
 
 ;;; Compile FORM capturing and muffling all [style-]warnings and notes
-;;; and return five values: 1) the compiled function 2) a Boolean
+;;; and return six values: 1) the compiled function 2) a Boolean
 ;;; indicating whether compilation failed 3) a list of warnings 4) a
-;;; list of style-warnigns 5) a list of notes.
+;;; list of style-warnings 5) a list of notes 6) a list of
+;;; SB-C:COMPILER-ERROR conditions.
 ;;;
 ;;; An error can be signaled when COMPILE indicates failure as well as
 ;;; in case [style-]warning or note conditions are signaled. The
-;;; keyword parameters ALLOW-{FAILURE,[STYLE-]WARNINGS,NOTES} control
+;;; keyword parameters
+;;; ALLOW-{FAILURE,[STYLE-]WARNINGS,NOTES,COMPILER-ERRORS} control
 ;;; this behavior. All but ALLOW-NOTES default to NIL.
 ;;;
-;;; Arguments to the ALLOW-{FAILURE,[STYLE-]WARNINGS,NOTES} keyword
+;;; Arguments to the
+;;; ALLOW-{FAILURE,[STYLE-]WARNINGS,NOTES,COMPILER-ERRORS} keyword
 ;;; parameters are interpreted as type specifiers restricting the
 ;;; allowed conditions of the respective kind.
+;;;
+;;; When supplied, the value of CONDITION-TRANSFORM has to be a
+;;; function of one argument, the condition currently being
+;;; captured. The returned value is captured and later returned in
+;;; place of the condition.
 (defun checked-compile (form
                         &key
                         name
                         allow-failure
                         allow-warnings
                         allow-style-warnings
-                        (allow-notes t))
+                        (allow-notes t)
+                        (allow-compiler-errors allow-failure)
+                        condition-transform)
   (let ((warnings '())
         (style-warnings '())
         (notes '())
+        (compiler-errors '())
         (error-output (make-string-output-stream)))
-    (handler-bind ((sb-ext:compiler-note
-                    (lambda (condition)
-                      (push condition notes)
-                      (muffle-warning condition)))
-                   (style-warning
-                    (lambda (condition)
-                      (push condition style-warnings)
-                      (muffle-warning condition)))
-                   (warning
-                    (lambda (condition)
-                      (push condition warnings)
-                      (muffle-warning condition))))
-      (multiple-value-bind (function warnings-p failure-p)
-          (let ((*error-output* error-output))
-            (compile name form))
-        (declare (ignore warnings-p))
-        (labels ((fail (kind conditions &optional allowed-type)
-                   (error "~@<Compilation of ~S signaled ~A~P:~
-                           ~{~@:_~@:_~{~/sb-impl:print-symbol-with-prefix/: ~A~}~}~
-                           ~@[~@:_~@:_Allowed type is ~S.~]~@:>"
-                          form kind (length conditions)
-                          (mapcar (lambda (condition)
-                                    (list (type-of condition) condition))
-                                  conditions)
-                          allowed-type))
-                 (check-conditions (kind conditions allow)
-                   (cond
-                     (allow
-                      (let ((offenders (remove-if (lambda (condition)
-                                                    (typep condition allow))
-                                                  conditions)))
-                        (when offenders
-                          (fail kind offenders allow))))
-                     (conditions
-                      (fail kind conditions)))))
+    (flet ((maybe-transform (condition)
+             (if condition-transform
+                 (funcall condition-transform condition)
+                 condition)))
+      (handler-bind ((sb-ext:compiler-note
+                      (lambda (condition)
+                        (push (maybe-transform condition) notes)
+                        (muffle-warning condition)))
+                     (style-warning
+                      (lambda (condition)
+                        (push (maybe-transform condition) style-warnings)
+                        (muffle-warning condition)))
+                     (warning
+                      (lambda (condition)
+                        (push (maybe-transform condition) warnings)
+                        (muffle-warning condition)))
+                     (sb-c:compiler-error
+                      (lambda (condition)
+                        (push (maybe-transform condition) compiler-errors))))
+        (multiple-value-bind (function warnings-p failure-p)
+            (let ((*error-output* error-output))
+              (compile name form))
+          (declare (ignore warnings-p))
+          (labels ((fail (kind conditions &optional allowed-type)
+                     (error "~@<Compilation of ~S signaled ~A~P:~
+                             ~{~@:_~@:_~{~/sb-impl:print-symbol-with-prefix/: ~A~}~}~
+                             ~@[~@:_~@:_Allowed type is ~S.~]~@:>"
+                            form kind (length conditions)
+                            (mapcar (lambda (condition)
+                                      (list (type-of condition) condition))
+                                    conditions)
+                            allowed-type))
+                   (check-conditions (kind conditions allow)
+                     (cond
+                       (allow
+                        (let ((offenders (remove-if (lambda (condition)
+                                                      (typep condition allow))
+                                                    conditions)))
+                          (when offenders
+                            (fail kind offenders allow))))
+                       (conditions
+                        (fail kind conditions)))))
 
-          (when (and (not allow-failure) failure-p)
-            (let ((output (get-output-stream-string error-output)))
-              (error "~@<Compilation of ~S failed~@[ with ~
-                      output~@:_~@:_~A~@:_~@:_~].~@:>"
-                     form (when (plusp (length output)) output))))
+            (when (and (not allow-failure) failure-p)
+              (let ((output (get-output-stream-string error-output)))
+                (error "~@<Compilation of ~S failed~@[ with ~
+                        output~@:_~@:_~A~@:_~@:_~].~@:>"
+                       form (when (plusp (length output)) output))))
 
-          (check-conditions "warning"       warnings       allow-warnings)
-          (check-conditions "style-warning" style-warnings allow-style-warnings)
-          (check-conditions "note"          notes          allow-notes)
+            (check-conditions "warning"        warnings        allow-warnings)
+            (check-conditions "style-warning"  style-warnings  allow-style-warnings)
+            (check-conditions "note"           notes           allow-notes)
+            (check-conditions "compiler-error" compiler-errors allow-compiler-errors)
 
-          ;; Since we may have prevented warnings from being taken
-          ;; into account for FAILURE-P by muffling them, adjust the
-          ;; second return value accordingly.
-          (values function (when (or failure-p warnings) t)
-                  warnings style-warnings notes))))))
+            ;; Since we may have prevented warnings from being taken
+            ;; into account for FAILURE-P by muffling them, adjust the
+            ;; second return value accordingly.
+            (values function (when (or failure-p warnings) t)
+                    warnings style-warnings notes compiler-errors)))))))
+
 
 ;;; Repeat calling THUNK until its cumulated runtime, measured using
 ;;; GET-INTERNAL-RUN-TIME, is larger than PRECISION. Repeat this
