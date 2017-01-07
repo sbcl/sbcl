@@ -37,7 +37,7 @@
 (let ((*print-pretty* t)) ; use pretty printer dispatch table, not PRINT-OBJECT
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
-  (!incorporate-cross-compiled-methods 'print-object :except '(condition)))
+  (!incorporate-cross-compiled-methods 'print-object))
 (write-string " done
 ")
 
@@ -162,13 +162,44 @@ sb-c::
       (print-unreadable-object (self stream :type t)
         (write (policy-to-decl-spec self) :stream stream))))
 
-;;; Print-object methods on subtypes of CONDITION can't be cross-compiled
-;;; until CLOS is fully working. Compile them now.
-#.`(progn
-     ,@(mapcar (lambda (args)
-                 `(setf (slot-value (defmethod ,@(cdr args)) 'source)
-                        ,(car args)))
-               *!delayed-defmethod-args*))
+sb-kernel::(progn
+(defmethod print-object ((condition type-error) stream)
+  (if (and *print-escape*
+           (slot-boundp condition 'expected-type)
+           (slot-boundp condition 'datum))
+      (flet ((maybe-string (thing)
+               (ignore-errors
+                 (write-to-string thing :lines 1 :readably nil :array nil :pretty t))))
+        (let ((type (maybe-string (type-error-expected-type condition)))
+              (datum (maybe-string (type-error-datum condition))))
+          (if (and type datum)
+              (print-unreadable-object (condition stream :type t)
+                (format stream "~@<expected-type: ~
+                                 ~/sb-impl:print-type-specifier/~_datum: ~
+                                 ~A~:@>"
+                        type datum))
+              (call-next-method))))
+      (call-next-method)))
+
+(defmethod print-object ((condition cell-error) stream)
+  (if (and *print-escape* (slot-boundp condition 'name))
+      (print-unreadable-object (condition stream :type t :identity t)
+        (princ (cell-error-name condition) stream))
+      (call-next-method)))
+
+(defmethod print-object :around ((o reference-condition) s)
+  (call-next-method)
+  (unless (or *print-escape* *print-readably*)
+    (when (and *print-condition-references*
+               (reference-condition-references o))
+      (format s "~&See also:~%")
+      (pprint-logical-block (s nil :per-line-prefix "  ")
+        (do* ((rs (reference-condition-references o) (cdr rs))
+              (r (car rs) (car rs)))
+             ((null rs))
+          (print-reference r s)
+          (unless (null (cdr rs))
+            (terpri s)))))))) ; end PROGN
 
 ;;; Ordinary DEFMETHOD should be used from here on out.
 ;;; This variable actually has some semantics to being unbound.

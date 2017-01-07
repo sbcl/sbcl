@@ -88,7 +88,7 @@
 ;;;     (defmethod print-object ((x c) stream)
 ;;;       (if *print-escape* (call-next-method) (report-name x stream)))
 ;;; The current code doesn't seem to quite match that.
-(def*method print-object ((object condition) stream)
+(defmethod print-object ((object condition) stream)
   (cond
     ((not *print-escape*)
      ;; KLUDGE: A comment from CMU CL here said
@@ -99,22 +99,12 @@
                   (error "no REPORT? shouldn't happen!"))
               object stream))
     ((and (typep object 'simple-condition)
-          (slot-value object 'format-control))
+          (condition-slot-value object 'format-control))
      (print-unreadable-object (object stream :type t :identity t)
        (write (simple-condition-format-control object)
               :stream stream :lines 1)))
     (t
      (print-unreadable-object (object stream :type t :identity t)))))
-
-;;; It is essential that there be a method that works in warm load
-;;; because any conditions signaled are not printable otherwise,
-;;; except by the method on type T which is completely unhelpful.
-(defmethod print-object ((x condition) stream)
-  (let ((initargs (loop for i from (+ sb!vm:instance-data-start 2)
-                        below (%instance-length x)
-                        collect (%instance-ref x i))))
-    (print-unreadable-object (x stream :type t :identity t)
-      (write initargs :stream stream :escape t))))
 
 ;;;; slots of CONDITION objects
 
@@ -536,24 +526,6 @@
              (type-error-datum condition)
              (type-error-expected-type condition)))))
 
-(def*method print-object ((condition type-error) stream)
-  (if (and *print-escape*
-           (slot-boundp condition 'expected-type)
-           (slot-boundp condition 'datum))
-      (flet ((maybe-string (thing)
-               (ignore-errors
-                 (write-to-string thing :lines 1 :readably nil :array nil :pretty t))))
-        (let ((type (maybe-string (type-error-expected-type condition)))
-              (datum (maybe-string (type-error-datum condition))))
-          (if (and type datum)
-              (print-unreadable-object (condition stream :type t)
-                (format stream "~@<expected-type: ~
-                                 ~/sb-impl:print-type-specifier/~_datum: ~
-                                 ~A~:@>"
-                        type datum))
-              (call-next-method))))
-      (call-next-method)))
-
 ;;; not specified by ANSI, but too useful not to have around.
 (define-condition simple-style-warning (simple-condition style-warning) ())
 (define-condition simple-type-error (simple-condition type-error) ())
@@ -587,12 +559,6 @@
 
 (define-condition cell-error (error)
   ((name :reader cell-error-name :initarg :name)))
-
-(def*method print-object ((condition cell-error) stream)
-  (if (and *print-escape* (slot-boundp condition 'name))
-      (print-unreadable-object (condition stream :type t :identity t)
-        (princ (cell-error-name condition) stream))
-      (call-next-method)))
 
 (define-condition unbound-variable (cell-error) ()
   (:report
@@ -789,19 +755,6 @@
 (define-condition reference-condition ()
   ((references :initarg :references :reader reference-condition-references)))
 (defvar *print-condition-references* t)
-(def*method print-object :around ((o reference-condition) s)
-  (call-next-method)
-  (unless (or *print-escape* *print-readably*)
-    (when (and *print-condition-references*
-               (reference-condition-references o))
-      (format s "~&See also:~%")
-      (pprint-logical-block (s nil :per-line-prefix "  ")
-        (do* ((rs (reference-condition-references o) (cdr rs))
-              (r (car rs) (car rs)))
-             ((null rs))
-          (print-reference r s)
-          (unless (null (cdr rs))
-            (terpri s)))))))
 
 (define-condition simple-reference-error (reference-condition simple-error)
   ())
@@ -1608,7 +1561,7 @@ conditions."))
                   ,@(when documentation
                       `((:documentation ,documentation))))
 
-                (def*method print-object :after ((condition ,name) stream)
+                (defmethod print-object :after ((condition ,name) stream)
                   (when (and (not *print-escape*)
                              ,@(when check-runtime-error
                                 `((deprecation-condition-runtime-error condition))))
@@ -1616,11 +1569,9 @@ conditions."))
                             (deprecation-condition-software condition)
                             (deprecation-condition-name condition)))))))
 
-  ;; These print methods aren't defined until after PCL is compiled,
-  ;; at which point FORMAT has no auto-uncrossing macro.
-  ;; Better to just write PRINT-SYMBOL-WITH-PREFIX with a target package
-  ;; which drives home the point that you can't print the conditions
-  ;; until much later anyway, making them basically not helpful.
+  ;; PRINT-SYMBOL-WITH-PREFIX is spelled using its target package name,
+  ;; not its cold package name, because these methods aren't unsable until
+  ;; warm load. (!CALL-A-METHOD does not understand method qualifiers)
   (define-deprecation-warning early-deprecation-warning style-warning nil
      "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~

@@ -39,6 +39,7 @@
   ;; As has been suggested in 'cross-condition', a DEF!CONDITION macro
   ;; might help, but still that's possibly not a complete solution,
   ;; because DEBUG-CONDITION is defined in a file with the :NOT-HOST flag.
+  (def simple-condition (condition) condition)
   (def warning (condition) condition)
   (def style-warning (warning) condition warning)
   (def compiler-note (condition) condition)
@@ -50,3 +51,6 @@
   (def stream-error (error) condition serious-condition error)
   (def reference-condition (condition) condition)
   )
+
+;;; Needed for !CALL-A-METHOD to pick out CONDITIONs
+(defun !condition-p (x) (typep x 'condition))

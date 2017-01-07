@@ -1060,10 +1060,16 @@ core and return a descriptor to it."
 ;;; type lattice; the major exceptions are ARRAY and VECTOR at depthoid -1.
 ;;; Of course we need to print VECTORs because a STRING is a vector,
 ;;; and vector has to precede ARRAY. Kludge it for now.
-(defun layout-depthoid* (class-name) ; DEPTHOID-ish thing, any which way you can
+(defun class-depthoid (class-name) ; DEPTHOID-ish thing, any which way you can
   (case class-name
     (vector 0.5)
     (array  0.25)
+    ;; The depthoid of CONDITION has to be faked. The proper value is 1.
+    ;; But STRUCTURE-OBJECT is also at depthoid 1, and its predicate
+    ;; is %INSTANCEP (which is too weak), so to select the correct method
+    ;; we have to make CONDITION more specific.
+    ;; In reality it is type disjoint from structure-object.
+    (condition 2)
     (t
      (let ((target-layout (gethash class-name *cold-layouts*)))
        (if target-layout
@@ -1214,7 +1220,9 @@ core and return a descriptor to it."
                  (t (error "No predicate for builtin: ~S" type-name))))))
       (null
        #+nil (format t "~&; PREDICATE-FOR-SPECIALIZER: no classoid for ~S~%"
-                     type-name)))))
+                     type-name)
+       (case type-name
+         (condition 'sb!kernel::!condition-p))))))
 
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
 ;;; in the cold core.
@@ -1986,12 +1994,12 @@ core and return a descriptor to it."
     fdefn))
 
 ;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
-(defun cold-defmethod (name specializer lambda-list lambda source-loc)
+(defun cold-defmethod (name &rest stuff)
   (let ((gf (assoc name *cold-methods*)))
     (unless gf
       (setq gf (cons name nil))
       (push gf *cold-methods*))
-    (push (list specializer lambda-list lambda source-loc) (cdr gf))))
+    (push stuff (cdr gf))))
 
 (defun initialize-static-fns ()
   (let ((*cold-fdefn-gspace* *static*))
@@ -4020,28 +4028,27 @@ initially undefined function references:~2%")
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 
-      ;; Assign SB!PCL::*!TRIVIAL-METHODS*
-      (loop with gfs = *nil-descriptor*
-            for (gf-name . methods) in *cold-methods*
-            ;; METHOD is (SPECIALIZER LAMBDA-LIST LAMBDA SOURCE-LOC)
-            ;; SPECIALIZER is a symbol, the others are descriptors.
-            ;; These must be sorted! If not, the method on T could be invoked,
-            ;; which makes debugging impossible.
-            do (loop with list = nil
-                     for (specializer lambda-list lambda source-loc)
-                     ;; Sort by ascending depthoid, but PUSH, thereby ending up
-                     ;; with a resulting list with higher depthoids at the front.
-                     in (stable-sort methods #'<
-                                     :key (lambda (method)
-                                            (layout-depthoid* (car method))))
-                     for predicate = (predicate-for-specializer specializer)
-                     do (push (cold-list (cold-intern predicate)
-                                         lambda
-                                         (cold-intern specializer)
-                                         lambda-list source-loc) list)
-                     finally (cold-push (cold-cons (cold-intern gf-name)
-                                                   (vector-in-core list)) gfs))
-            finally (cold-set 'sb!pcl::*!trivial-methods* gfs))
+      (cold-set
+       'sb!pcl::*!trivial-methods*
+       (list-to-core
+        (loop for (gf-name . methods) in *cold-methods*
+              collect
+              (cold-cons
+               (cold-intern gf-name)
+               (vector-in-core
+                (loop for (class qual lambda-list fun source-loc)
+                      ;; Methods must be sorted because we invoke
+                      ;; only the first applicable one.
+                      in (stable-sort methods #'> ; highest depthoid first
+                                      :key (lambda (method)
+                                             (class-depthoid (car method))))
+                      collect
+                      (cold-list (cold-intern
+                                  (and (null qual) (predicate-for-specializer class)))
+                                 fun
+                                 (cold-intern class)
+                                 (cold-intern qual)
+                                 lambda-list source-loc)))))))
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-deferred-known-funs)

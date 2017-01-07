@@ -160,7 +160,7 @@
 
 (defun !incorporate-cross-compiled-methods (gf-name &key except)
   (assert (generic-function-p (fdefinition gf-name)))
-  (loop for (predicate fmf specializer lambda-list source-loc)
+  (loop for (predicate fmf specializer qualifier lambda-list source-loc)
         ;; Reversing installs less-specific methods first,
         ;; so that if perchance we crash mid way through the loop,
         ;; there is (hopefully) at least some installed method that works.
@@ -176,7 +176,8 @@
                   (values (list (find-class specializer))
                           '(:arg-info (1 . t)))))
              (load-defmethod
-              'standard-method gf-name '() specializers lambda-list
+              'standard-method gf-name
+              (if qualifier (list qualifier)) specializers lambda-list
               `(:function
                 ,(let ((mf (%make-method-function fmf nil)))
                    (sb-mop:set-funcallable-instance-function

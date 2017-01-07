@@ -11,7 +11,12 @@
 
 ;;;; Rudimentary DEFMETHOD
 
-(sb!xc:defmacro defmethod (name lambda-list &rest body)
+(sb!xc:defmacro defmethod (name lambda-list &rest body &aux qualifier)
+  (when (keywordp lambda-list)
+    ;; Allow an :AFTER method in 'condition.lisp'.
+    ;; It's ignored during cold-init, but eventually takes effect.
+    (assert (eq lambda-list :after))
+    (setq qualifier lambda-list lambda-list (pop body)))
   (ecase name
     (make-load-form
      ;; Expect one mandatory class-name and the optional environment.
@@ -26,8 +31,10 @@
              (unspecialized-ll `(,(caar lambda-list) ,@(cdr lambda-list)))
              ((forms decls) (parse-body body nil))) ; Note: disallowing docstring
     `(!trivial-defmethod
-      ',name ',specializer ',unspecialized-ll
-      (named-lambda (fast-method ,name (,specializer))
+      ',name ',specializer ,qualifier ',unspecialized-ll
+      ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
+      (named-lambda (fast-method ,name
+                     (,specializer ,@(if (eq name 'print-object) '(t))))
           (.pv. .next-method-call. .arg0. ,@(cdr unspecialized-ll)
                 ;; Rebind specialized arg with unchecked type assertion.
                 &aux (,(car unspecialized-ll) (truly-the ,specializer .arg0.)))
@@ -61,7 +68,7 @@
                 :test (lambda (arg method &aux (guard (car method)))
                         (and (fboundp guard) (funcall guard arg))))))
     (assert applicable-method)
-    ;; The "method" is a list: (GUARD LAMBDA SPECIALIZER LL SOURCE-LOC)
+    ;; The "method" is a list: (GUARD LAMBDA . OTHER-STUFF)
     ;; Call using no permutation-vector / no precomputed next method.
     (apply (cadr applicable-method) nil nil specialized-arg rest)))
 
@@ -70,10 +77,6 @@
 (defun print-object (object stream)
   (!call-a-method 'print-object object stream))
 
-;;;; Complete DEFMETHOD, not usable until CLOS works.
-
+;;; FIXME: this no longer holds methods, but it seems to have an effect
+;;; on the caching of a discriminating function for PRINT-OBJECT
 (defvar *!delayed-defmethod-args* nil)
-;;; By our convention, "DEF!METHOD" would imply behavior in both the
-;;; host and target, but this is only for the target, so ...
-(defmacro def*method (&rest args)
-  `(push (cons (sb!c:source-location) ',args) *!delayed-defmethod-args*))
