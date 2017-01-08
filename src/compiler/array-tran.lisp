@@ -811,13 +811,17 @@
                   ;; elements before he reads elements (or to read manuals before
                   ;; he writes code:-), we'll signal a STYLE-WARNING in case he
                   ;; didn't realize this.
-                  (if initial-element
-                      (compiler-warn "~S ~S is not a ~S"
-                                     :initial-element default-initial-element
-                                     elt-spec)
-                      (compiler-style-warn "The default initial element ~S is not a ~S."
-                                           default-initial-element
-                                           elt-spec)))
+                  (cond
+                    (initial-element
+                     (compiler-warn "~S ~S is not a ~S"
+                                    :initial-element default-initial-element
+                                    elt-spec))
+                    ;; For the default initial element, only warn if
+                    ;; any array elements are initialized using it.
+                    ((not (eql c-length 0))
+                     (compiler-style-warn "The default initial element ~S is not a ~S."
+                                          default-initial-element
+                                          elt-spec))))
              (let ((lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))

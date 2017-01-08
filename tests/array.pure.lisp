@@ -160,12 +160,42 @@
     (assert fail)
     (assert-error (funcall fun) sb-int:invalid-array-index-error)))
 
-(with-test (:name (make-array :element-type :compile-time-error))
+(with-test (:name (make-array :element-type :compile-time error))
   (multiple-value-bind (fun fail warnings style-warnings)
       (checked-compile `(lambda () (make-array 5 :element-type 'undefined-type))
                        :allow-style-warnings t)
     (declare (ignore fun fail warnings))
     (assert style-warnings)))
+
+(with-test (:name (make-array :default :element-type :supplied :compile-time warning))
+  ;; Supplied :initial-element, EQL to the default initial element,
+  ;; results in full warning, even if not "used" due to 0 array total
+  ;; size.
+  (flet ((check (dimensions)
+           (multiple-value-bind (fun fail warnings)
+               (checked-compile
+                `(lambda ()
+                   (make-array ,dimensions
+                               :initial-element 0 :element-type 'string))
+                :allow-warnings t)
+             (declare (ignore fun fail))
+             (assert (= (length warnings) 1)))))
+    (check 1)
+    (check 0)))
+
+(with-test (:name (make-array :default :element-type :implicit :compile-time style-warning))
+  ;; Implicit default initial element used to initialize array
+  ;; elements results in a style warning.
+  (multiple-value-bind (fun fail warnings style-warnings)
+      (checked-compile `(lambda () (make-array 5 :element-type 'string))
+                       :allow-style-warnings t)
+    (declare (ignore fun fail warnings))
+    (assert (= (length style-warnings) 1)))
+
+  ;; But not if the default initial-element is not actually used to
+  ;; initialize any elements due to 0 array total size.
+  (checked-compile `(lambda () (make-array 0 :element-type 'string)))
+  (checked-compile `(lambda () (make-array '(0 2) :element-type 'string))))
 
 (flet ((opaque-identity (x) x))
   (declare (notinline opaque-identity))
