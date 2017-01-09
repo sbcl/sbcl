@@ -662,10 +662,11 @@
 
 (defun walk-declarations (body fn env
                                &optional doc-string-p declarations old-body
-                               &aux (form (car body)) macrop new-form)
+                               &aux (form (car body)))
   (cond ((and (stringp form)                    ;might be a doc string
               (cdr body)                        ;isn't the returned value
               (null doc-string-p)               ;no doc string yet
+              ;; FIXME: {decl}+ doc {decl}+ is supposed to be valid.
               (null declarations))              ;no declarations yet
          (recons body
                  form
@@ -688,18 +689,6 @@
                  form
                  (walk-declarations
                    (cdr body) fn env doc-string-p declarations)))
-        ((and form
-              (listp form)
-              (null (get-walker-template (car form) form))
-              (progn
-                (multiple-value-setq (new-form macrop)
-                                     (%macroexpand-1 form env))
-                macrop))
-         ;; This form was a call to a macro. Maybe it expanded
-         ;; into a declare?  Recurse to find out.
-         (walk-declarations (recons body new-form (cdr body))
-                            fn env doc-string-p declarations
-                            (or old-body body)))
         (t
          ;; Now that we have walked and recorded the declarations,
          ;; call the function our caller provided to expand the body.
