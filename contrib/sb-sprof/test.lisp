@@ -1,6 +1,7 @@
 (in-package :cl-user)
 
 (require :sb-sprof)
+;#+sb-fasteval (setq sb-ext:*evaluator-mode* :compile)
 
 ;;; silly examples
 
