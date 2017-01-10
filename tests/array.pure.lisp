@@ -11,6 +11,8 @@
 
 (in-package :cl-user)
 
+(load "compiler-test-util.lisp")
+
 ;;; Array initialization has complicated defaulting for :ELEMENT-TYPE,
 ;;; and both compile-time and run-time logic takes a whack at it.
 (with-test (:name (make-array :element-type :bug-126))
@@ -484,3 +486,20 @@
   (let ((fun (checked-compile '(lambda (array)
                                 (adjust-array array 5 :displaced-to #(1 2 3))))))
     (assert-error (funcall fun (make-array 5 :adjustable t :element-type 'fixnum)))))
+
+(with-test (:name :make-array-transform-fill-pointer-nil)
+  (let ((fun (checked-compile '(lambda ()
+                                (make-array 3 :fill-pointer nil)))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array))))
+  (let ((fun (checked-compile '(lambda ()
+                                (make-array 3 :fill-pointer t)))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array))))
+  (let ((fun (checked-compile '(lambda ()
+                                (make-array 3 :adjustable nil)))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array))))
+  (let ((fun (checked-compile '(lambda ()
+                                (make-array '(3 3) :adjustable nil)))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array))))
+  (let ((fun (checked-compile '(lambda ()
+                                (make-array '(3 3) :fill-pointer nil)))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array)))))

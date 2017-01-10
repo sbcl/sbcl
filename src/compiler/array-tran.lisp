@@ -604,18 +604,21 @@
   (let* ((c-length (if (lvar-p length)
                        (if (constant-lvar-p length) (lvar-value length))
                        length))
-         (complex (cond ((and (not adjustable) (not fill-pointer))
+         (complex (cond ((and (or
+                               (not fill-pointer)
+                               (and (constant-lvar-p fill-pointer)
+                                    (null (lvar-value fill-pointer))))
+                              (or
+                               (not adjustable)
+                               (and
+                                (constant-lvar-p adjustable)
+                                (null (lvar-value adjustable)))))
                          nil)
                         ((and (constant-lvar-p adjustable)
                               (lvar-value adjustable)))
                         ((and fill-pointer
                               (constant-lvar-p fill-pointer)
                               (lvar-value fill-pointer)))
-                        ((and (constant-lvar-p fill-pointer)
-                              (constant-lvar-p adjustable)
-                              (not (lvar-value fill-pointer))
-                              (not (lvar-value adjustable)))
-                         nil)
                         (t
                          ;; Deciding between complex and simple at
                          ;; run-time would be too much hassle
@@ -981,7 +984,10 @@
                                           initial-element initial-contents call
                                           :adjustable adjustable
                                           :fill-pointer fill-pointer))
-            (fill-pointer
+            ((and fill-pointer
+                  (not (and
+                        (constant-lvar-p fill-pointer)
+                        (null (lvar-value fill-pointer)))))
              (give-up-ir1-transform))
             (t
              (let* ((total-size (reduce #'* dims))
