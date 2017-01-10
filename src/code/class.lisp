@@ -1270,53 +1270,6 @@ between the ~A definition and the ~A definition"
            :invalidate nil)))))
   (/show0 "done with loop over *!BUILT-IN-CLASSES*"))
 
-;;; Define temporary PCL STANDARD-CLASSes. These will be set up
-;;; correctly and the Lisp layout replaced by a PCL wrapper after PCL
-;;; is loaded and the class defined.
-(!cold-init-forms
-  (/show0 "about to define temporary STANDARD-CLASSes")
-  ;; You'd think with all the pedantic explanation in here it would at least
-  ;; be right, but it isn't: layout-inherits for FUNDAMENTAL-STREAM
-  ;; ends up as (T SLOT-OBJECT STREAM STANDARD-OBJECT)
-  (dolist (x '(;; Why is STREAM duplicated in this list? Because, when
-               ;; the inherits-vector of FUNDAMENTAL-STREAM is set up,
-               ;; a vector containing the elements of the list below,
-               ;; i.e. '(T STREAM STREAM), is created, and
-               ;; this is what the function ORDER-LAYOUT-INHERITS
-               ;; would do, too.
-               ;;
-               ;; So, the purpose is to guarantee a valid layout for
-               ;; the FUNDAMENTAL-STREAM class, matching what
-               ;; ORDER-LAYOUT-INHERITS would do.
-               ;; ORDER-LAYOUT-INHERITS would place STREAM at index 2
-               ;; in the INHERITS(-VECTOR). Index 1 would not be
-               ;; filled, so STREAM is duplicated there (as
-               ;; ORDER-LAYOUTS-INHERITS would do). Maybe the
-               ;; duplicate definition could be removed (removing a
-               ;; STREAM element), because FUNDAMENTAL-STREAM is
-               ;; redefined after PCL is set up, anyway. But to play
-               ;; it safely, we define the class with a valid INHERITS
-               ;; vector.
-               (fundamental-stream (t stream stream))))
-    (/show0 "defining temporary STANDARD-CLASS")
-    (let* ((name (first x))
-           (inherits-list (second x))
-           (classoid (make-standard-classoid :name name))
-           (classoid-cell (find-classoid-cell name :create t)))
-      ;; Needed to open-code the MAP, below
-      (declare (type list inherits-list))
-      (setf (classoid-cell-classoid classoid-cell) classoid
-            (info :type :kind name) :instance)
-      (let ((inherits (map 'simple-vector
-                           (lambda (x)
-                             (classoid-layout (find-classoid x)))
-                           inherits-list)))
-        #-sb-xc-host (/show0 "INHERITS=..") #-sb-xc-host (/hexstr inherits)
-        (register-layout (find-and-init-or-check-layout name 0 inherits
-                                                        -1 +layout-all-tagged+)
-                         :invalidate nil))))
-  (/show0 "done defining temporary STANDARD-CLASSes"))
-
 ;;; Now that we have set up the class heterarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.
 (!cold-init-forms

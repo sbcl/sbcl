@@ -55,12 +55,6 @@
        :classoid (make-standard-classoid
                   :name name :pcl-class class))))))
 
-;;; The following variable may be set to a STANDARD-CLASS that has
-;;; already been created by the lisp code and which is to be redefined
-;;; by PCL. This allows STANDARD-CLASSes to be defined and used for
-;;; type testing and dispatch before PCL is loaded.
-(defvar *pcl-class-boot* nil)
-
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
 ;;; don't necessarily always make a wrapper. Also, we help maintain
@@ -79,18 +73,9 @@
               ((or (*subtypep (class-of class) *the-class-standard-class*)
                    (*subtypep (class-of class) *the-class-funcallable-standard-class*)
                    (typep class 'forward-referenced-class))
-               (cond ((and *pcl-class-boot*
-                           (eq (slot-value class 'name) *pcl-class-boot*))
-                      (let ((found (find-classoid
-                                    (slot-value class 'name))))
-                        (unless (classoid-pcl-class found)
-                          (setf (classoid-pcl-class found) class))
-                        (aver (eq (classoid-pcl-class found) class))
-                        found))
-                     (t
-                      (let ((name (slot-value class 'name)))
-                        (make-standard-classoid :pcl-class class
-                                                :name (and (symbolp name) name))))))
+               (let ((name (slot-value class 'name)))
+                 (make-standard-classoid :pcl-class class
+                                         :name (and (symbolp name) name))))
               (t
                (bug "Got to T branch in ~S" 'make-wrapper))))))
     (t

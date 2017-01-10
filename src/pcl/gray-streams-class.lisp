@@ -10,13 +10,10 @@
 
 (in-package "SB-GRAY")
 
-;;; Bootstrap the FUNDAMENTAL-STREAM class.
-(let ((sb-pcl::*pcl-class-boot* 'fundamental-stream))
-  (defclass fundamental-stream (standard-object stream)
-    ((open-p :initform t
-             :accessor stream-open-p))
-    #+sb-doc
-    (:documentation "Base class for all Gray streams.")))
+(defclass fundamental-stream (standard-object stream)
+  ((open-p :initform t :accessor stream-open-p))
+  #+sb-doc
+  (:documentation "Base class for all Gray streams."))
 
 ;;; Define the stream classes.
 (defclass fundamental-input-stream (fundamental-stream) nil

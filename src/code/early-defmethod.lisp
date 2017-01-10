@@ -56,9 +56,6 @@
 (defvar *!trivial-methods* '())
 (defun !trivial-defmethod (name specializer qualifier lambda-list lambda source-loc)
   (let ((gf (assoc name *!trivial-methods*)))
-    (unless gf
-      (setq gf (cons name #()))
-      (push gf *!trivial-methods*))
     ;; Append the method but don't bother finding a predicate for it.
     ;; Methods occurring in early warm load (notably from SB-FASTEVAL)
     ;; wil be properly installed when 'pcl/print-object.lisp' is loaded.
