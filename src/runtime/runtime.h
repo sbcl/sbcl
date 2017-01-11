@@ -440,4 +440,8 @@ extern char *copied_string (char *string);
 
 void *os_dlsym_default(char *name);
 
+struct lisp_startup_options {
+    boolean noinform;
+};
+
 #endif /* _SBCL_RUNTIME_H_ */

@@ -426,6 +426,7 @@ void print_environment(int argc, char *argv[])
     }
 }
 
+struct lisp_startup_options lisp_startup_options;
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -442,7 +443,6 @@ main(int argc, char *argv[], char *envp[])
     char *runtime_path = 0;
 
     /* other command line options */
-    boolean noinform = 0;
     boolean end_runtime_options = 0;
     boolean disable_lossage_handler_p = 0;
     boolean debug_environment_p = 0;
@@ -501,13 +501,13 @@ main(int argc, char *argv[], char *envp[])
                  * runtime option, it is equivalent to --noinform.
                  * This exits, and does not increment argi, so that
                  * TOPLEVEL-INIT sees the option. */
-                noinform = 1;
+                lisp_startup_options.noinform = 1;
                 end_runtime_options = 1;
                 disable_lossage_handler_p = 1;
                 lose_on_corruption_p = 1;
                 break;
             } else if (0 == strcmp(arg, "--noinform")) {
-                noinform = 1;
+                lisp_startup_options.noinform = 1;
                 ++argi;
             } else if (0 == strcmp(arg, "--core")) {
                 if (core) {
@@ -663,7 +663,7 @@ main(int argc, char *argv[], char *envp[])
         free(copied_core);
     }
 
-    if (!noinform && embedded_core_offset == 0) {
+    if (!lisp_startup_options.noinform && embedded_core_offset == 0) {
         print_banner();
         fflush(stdout);
     }

@@ -177,6 +177,8 @@ write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
                                     COMPRESSION_LEVEL_NONE);
 }
 
+extern struct lisp_startup_options lisp_startup_options;
+
 static void
 output_space(FILE *file, int id, lispobj *addr, lispobj *end,
              os_vm_offset_t file_offset,
@@ -196,8 +198,9 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
 
     bytes = words * sizeof(lispobj);
 
-    printf("writing %lu bytes from the %s space at %p\n",
-           (uword_t)bytes, names[id], addr);
+    if (!lisp_startup_options.noinform)
+        printf("writing %lu bytes from the %s space at %p\n",
+               (uword_t)bytes, names[id], addr);
 
     data = write_and_compress_bytes(file, (char *)addr, bytes, file_offset,
                                     core_compression_level);
@@ -235,6 +238,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 {
     struct thread *th;
     os_vm_offset_t core_start_pos;
+    boolean verbose = !lisp_startup_options.noinform;
 
 #ifdef LISP_FEATURE_X86_64
     untune_asm_routines_for_microarch();
@@ -243,15 +247,16 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up
      * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
-    printf("[undoing binding stack and other enclosing state... ");
-    fflush(stdout);
+    if (verbose) {
+        printf("[undoing binding stack and other enclosing state... ");
+        fflush(stdout);
+    }
     for_each_thread(th) {       /* XXX really? */
         unbind_to_here((lispobj *)th->binding_stack_start,th);
         SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
         SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
     }
-    printf("done]\n");
-    fflush(stdout);
+    if (verbose) printf("done]\n");
 #ifdef LISP_FEATURE_IMMOBILE_CODE
     // It's better to wait to defrag until after the binding stack is undone,
     // because we explicitly don't fixup code refs from stacks.
@@ -260,17 +265,21 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     if (code_component_order) {
         // Assert that defrag will not move the init_function
         gc_assert(!immobile_space_p(init_function));
-        printf("[defragmenting immobile space... ");
-        fflush(stdout);
+        if (verbose) {
+            printf("[defragmenting immobile space... ");
+            fflush(stdout);
+        }
         defrag_immobile_space(code_component_order);
-        printf("done]\n");
+        if (verbose) printf("done]\n");
     }
 #endif
 
     /* (Now we can actually start copying ourselves into the output file.) */
 
-    printf("[saving current Lisp image into %s:\n", filename);
-    fflush(stdout);
+    if (verbose) {
+        printf("[saving current Lisp image into %s:\n", filename);
+        fflush(stdout);
+    }
 
     core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
@@ -407,7 +416,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         chmod (filename, 0755);
 #endif
 
-    printf("done]\n");
+    if (verbose) printf("done]\n");
     exit(0);
 }
 #undef N_SPACES_TO_SAVE
