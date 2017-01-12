@@ -175,20 +175,9 @@
 
 ;; lispobj-sized word, whatever that may be
 ;; hopefully nobody ever wants a 128-bit SBCL...
-#!+64-bit
-(progn
-  (defun bvref-word (bytes index)
-    (bvref-64 bytes index))
-  (defun (setf bvref-word) (new-val bytes index)
-    (setf (bvref-64 bytes index) new-val)))
-
-#!-64-bit
-(progn
-  (defun bvref-word (bytes index)
-    (bvref-32 bytes index))
-  (defun (setf bvref-word) (new-val bytes index)
-    (setf (bvref-32 bytes index) new-val)))
-
+(macrolet ((acc (bv index) `(#!+64-bit bvref-64 #!-64-bit bvref-32 ,bv ,index)))
+  (defun (setf bvref-word) (new-val bytes index) (setf (acc bytes index) new-val))
+  (defun bvref-word (bytes index) (acc bytes index)))
 
 ;;;; representation of spaces in the core
 
