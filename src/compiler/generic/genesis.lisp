@@ -122,9 +122,7 @@
   (let* ((old-outer-vector (bigvec-outer-vector bigvec))
          (length-old-outer-vector (length old-outer-vector))
          (new-outer-vector (make-array (* 2 length-old-outer-vector))))
-    (dotimes (i length-old-outer-vector)
-      (setf (svref new-outer-vector i)
-            (svref old-outer-vector i)))
+    (replace new-outer-vector old-outer-vector)
     (loop for i from length-old-outer-vector below (length new-outer-vector) do
           (setf (svref new-outer-vector i)
                 (make-smallvec)))
