@@ -1023,14 +1023,11 @@ core and return a descriptor to it."
 ;;; itself.
 
 ;;; a map from name as a host symbol to the descriptor of its target layout
-(defvar *cold-layouts* (make-hash-table :test 'equal))
+(defvar *cold-layouts*)
 
 ;;; a map from DESCRIPTOR-BITS of cold layouts to the name, for inverting
 ;;; mapping
-(defvar *cold-layout-names* (make-hash-table :test 'eql))
-
-;;; FIXME: *COLD-LAYOUTS* and *COLD-LAYOUT-NAMES* should be
-;;; initialized by binding in GENESIS.
+(defvar *cold-layout-names*)
 
 ;;; the descriptor for layout's layout (needed when making layouts)
 (defvar *layout-layout*)
@@ -3927,6 +3924,8 @@ initially undefined function references:~2%")
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
+           (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
+           (*cold-layout-names* (make-hash-table :test 'eql)) ; addr -> symbol
            (*!cold-defconstants* nil)
            (*!cold-defuns* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
