@@ -1695,8 +1695,7 @@ core and return a descriptor to it."
            (offset-found (- (descriptor-bits des)
                             (descriptor-bits *nil-descriptor*))))
       (unless (= offset-wanted offset-found)
-        ;; FIXME: should be fatal
-        (warn "Offset from ~S to ~S is ~W, not ~W"
+        (error "Offset from ~S to ~S is ~W, not ~W"
               symbol
               nil
               offset-found
@@ -1998,7 +1997,6 @@ core and return a descriptor to it."
                         (descriptor-bits *nil-descriptor*)))
              (desired (sb!vm:static-fun-offset sym)))
         (unless (= offset desired)
-          ;; FIXME: should be fatal
           (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
                  sym nil offset desired))))))
 
