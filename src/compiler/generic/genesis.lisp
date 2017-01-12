@@ -464,8 +464,8 @@
 (defvar *foreign-symbol-placeholder-value*)
 
 ;;; a handle on the trap object
-(defvar *unbound-marker*)
-;; was:  (make-other-immediate-descriptor 0 sb!vm:unbound-marker-widetag)
+(defvar *unbound-marker*
+  (make-other-immediate-descriptor 0 sb!vm:unbound-marker-widetag))
 
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
@@ -3940,9 +3940,6 @@ initially undefined function references:~2%")
            (*cold-methods* nil)
            (*!cold-toplevels* nil)
            (*current-debug-sources* *nil-descriptor*)
-           (*unbound-marker* (make-other-immediate-descriptor
-                              0
-                              sb!vm:unbound-marker-widetag))
            *cold-static-call-fixups*
            *cold-assembler-fixups*
            *cold-assembler-routines*
