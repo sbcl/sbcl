@@ -4092,9 +4092,7 @@ initially undefined function references:~2%")
         #!+sb-ldb
         (out-to "tagnames" (write-tagnames-h))
         (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
-                             :key (lambda (obj)
-                                    (symbol-name
-                                     (sb!vm:primitive-object-name obj))))))
+                             :key #'sb!vm:primitive-object-name)))
           (dolist (obj structs)
             (out-to (string-downcase (sb!vm:primitive-object-name obj))
               (write-primitive-object obj)))
