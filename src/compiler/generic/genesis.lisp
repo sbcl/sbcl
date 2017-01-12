@@ -4060,6 +4060,16 @@ initially undefined function references:~2%")
       (/show "done setting free pointers")
 
       ;; Write results to files.
+      (when map-file-name
+        (with-open-file (*standard-output* map-file-name
+                                           :direction :output
+                                           :if-exists :supersede)
+          (write-map)))
+      (let ((fn (format nil "~A/Makefile.features" c-header-dir-name)))
+        (ensure-directories-exist fn)
+        (with-open-file (*standard-output* fn :direction :output
+                                              :if-exists :supersede)
+          (write-makefile-features)))
       ;;
       ;; FIXME: I dislike this approach of redefining
       ;; *STANDARD-OUTPUT* instead of putting the new stream in a
@@ -4068,7 +4078,6 @@ initially undefined function references:~2%")
       ;; (to a stream explicitly passed as an argument).
       (macrolet ((out-to (name &body body)
                    `(let ((fn (format nil "~A/~A.h" c-header-dir-name ,name)))
-                     (ensure-directories-exist fn)
                      (with-open-file (*standard-output* fn
                                       :if-exists :supersede :direction :output)
                        (write-boilerplate)
@@ -4081,11 +4090,6 @@ initially undefined function references:~2%")
                        (format t
                         "#endif /* SBCL_GENESIS_~A */~%"
                         (string-upcase ,name))))))
-        (when map-file-name
-          (with-open-file (*standard-output* map-file-name
-                                             :direction :output
-                                             :if-exists :supersede)
-            (write-map)))
         (out-to "config" (write-config-h))
         (out-to "constants" (write-constants-h))
         #!+sb-ldb
@@ -4114,16 +4118,10 @@ initially undefined function references:~2%")
            (write-structure-object
             (layout-info (find-layout class)))))
         (out-to "static-symbols" (write-static-symbols))
-        (out-to "sc-offset" (write-sc-offset-coding))
+        (out-to "sc-offset" (write-sc-offset-coding)))
 
-        (let ((fn (format nil "~A/Makefile.features" c-header-dir-name)))
-          (ensure-directories-exist fn)
-          (with-open-file (*standard-output* fn :if-exists :supersede
-                                             :direction :output)
-            (write-makefile-features)))
-
-        (when core-file-name
-          (write-initial-core-file core-file-name))))))
+      (when core-file-name
+        (write-initial-core-file core-file-name)))))
 
 ;;; Invert the action of HOST-CONSTANT-TO-CORE. If STRICTP is given as NIL,
 ;;; then we can produce a host object even if it is not a faithful rendition.
