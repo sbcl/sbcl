@@ -2006,19 +2006,6 @@ void check_varyobj_pages()
               gc_assert(0 <= gen && gen <= PSEUDO_STATIC_GENERATION);
               mask |= 1 << gen;
           }
-          if (widetag_of(*obj) == CODE_HEADER_WIDETAG) {
-              lispobj entry_point; /* tagged pointer to entry point */
-              struct simple_fun *function_ptr; /* untagged pointer to entry point */
-              for (entry_point = ((struct code*)obj)->entry_points;
-                   entry_point != NIL;
-                   entry_point = function_ptr->next) {
-                  function_ptr = (struct simple_fun *) native_pointer(entry_point);
-                  gc_assert_verbose(is_lisp_pointer(entry_point),
-                                    "Code %p entry point %p is not a lisp pointer.",
-                                    obj, (void*)entry_point);
-                  gc_assert(widetag_of(function_ptr->header)==SIMPLE_FUN_HEADER_WIDETAG);
-              }
-          }
       }
       gc_assert(mask == VARYOBJ_PAGE_GENS(page));
   }
