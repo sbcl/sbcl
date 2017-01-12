@@ -3723,12 +3723,6 @@ initially undefined function references:~2%")
                    *core-file*))))
   num)
 
-(defun advance-to-page ()
-  (force-output *core-file*)
-  (file-position *core-file*
-                 (round-up (file-position *core-file*)
-                           sb!c:*backend-page-bytes*)))
-
 (defun output-gspace (gspace)
   (force-output *core-file*)
   (let* ((posn (file-position *core-file*))
