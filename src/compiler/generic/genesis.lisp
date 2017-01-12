@@ -3773,9 +3773,7 @@ initially undefined function references:~2%")
   (let ((filenamestring (namestring filename))
         (*data-page* 0))
 
-    (format t
-            "[building initial core file in ~S: ~%"
-            filenamestring)
+    (format t "[building initial core file in ~S: ~%" filenamestring)
     (force-output)
 
     (with-open-file (*core-file* filenamestring
@@ -4097,15 +4095,11 @@ initially undefined function references:~2%")
             (out-to (string-downcase (sb!vm:primitive-object-name obj))
               (write-primitive-object obj)))
           (out-to "primitive-objects"
-                  (dolist (obj structs)
-                    (format t "~&#include \"~A.h\"~%"
-                            (string-downcase (sb!vm:primitive-object-name obj))))))
-        (dolist (class '(hash-table
-                         classoid
-                         layout
-                         sb!c::compiled-debug-info
-                         sb!c::compiled-debug-fun
-                         package))
+            (dolist (obj structs)
+              (format t "~&#include \"~A.h\"~%"
+                      (string-downcase (sb!vm:primitive-object-name obj))))))
+        (dolist (class '(classoid hash-table layout package
+                         sb!c::compiled-debug-info sb!c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class)))))
         (out-to "static-symbols" (write-static-symbols))
