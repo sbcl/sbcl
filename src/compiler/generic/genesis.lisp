@@ -400,7 +400,7 @@
         (read-wordindexed des 1))))
 
 ;;; common idioms
-(defun descriptor-bytes (des)
+(defun descriptor-mem (des)
   (gspace-bytes (descriptor-intuit-gspace des)))
 (defun descriptor-byte-offset (des)
   (ash (descriptor-word-offset des) sb!vm:word-shift))
@@ -510,7 +510,7 @@
 
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
 (macrolet ((read-bits ()
-             `(bvref-word (descriptor-bytes address)
+             `(bvref-word (descriptor-mem address)
                           (ash (+ index (descriptor-word-offset address))
                                sb!vm:word-shift))))
   (defun read-bits-wordindexed (address index)
@@ -540,7 +540,7 @@
 
 (declaim (ftype (function (descriptor sb!vm:word (or symbol descriptor))) write-wordindexed))
 (macrolet ((write-bits (bits)
-             `(setf (bvref-word (descriptor-bytes address)
+             `(setf (bvref-word (descriptor-mem address)
                                 (ash (+ index (descriptor-word-offset address))
                                      sb!vm:word-shift))
                     ,bits)))
@@ -684,7 +684,7 @@ core and return a descriptor to it."
   (let* ((len (descriptor-fixnum
                (read-wordindexed descriptor sb!vm:vector-length-slot)))
          (str (make-string len))
-         (bytes (descriptor-bytes descriptor)))
+         (bytes (descriptor-mem descriptor)))
     (dotimes (i len str)
       (setf (aref str i)
             (code-char (bvref bytes
@@ -1312,7 +1312,7 @@ core and return a descriptor to it."
 ;; This is called to backpatch two small sets of objects:
 ;;  - layouts created before layout-of-layout is made (3 counting LAYOUT itself)
 ;;  - a small number of classoid-cells (~ 4).
-(defun patch-instance-layout (thing layout)
+(defun set-instance-layout (thing layout)
   #!+compact-instance-header
   ;; High half of the header points to the layout
   (write-wordindexed/raw thing 0 (logior (ash (descriptor-bits layout) 32)
@@ -1351,7 +1351,7 @@ core and return a descriptor to it."
            (s-o-layout (chill-layout 'structure-object t-layout)))
       (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
       (dolist (layout (list t-layout s-o-layout *layout-layout*))
-        (patch-instance-layout layout *layout-layout*))
+        (set-instance-layout layout *layout-layout*))
       (chill-layout 'package t-layout s-o-layout))))
 
 ;;;; interning symbols in the cold image
@@ -2027,7 +2027,7 @@ core and return a descriptor to it."
                ;; so that it could make a note to itself to do those ASAP
                ;; after the cold layout became known.
                (when (cold-null (cold-layout-of cold-classoid-cell))
-                 (patch-instance-layout cold-classoid-cell layout))
+                 (set-instance-layout cold-classoid-cell layout))
                (setf (gethash symbol hashtable)
                      (packed-info-insert
                       (gethash symbol hashtable +nil-packed-infos+)
@@ -2238,7 +2238,7 @@ core and return a descriptor to it."
                 do-cold-fixup))
 (defun do-cold-fixup (code-object after-header value kind)
   (let* ((offset-within-code-object (calc-offset code-object after-header))
-         (gspace-bytes (descriptor-bytes code-object))
+         (gspace-bytes (descriptor-mem code-object))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
                                 offset-within-code-object))
          (gspace-byte-address (gspace-byte-address
@@ -2775,7 +2775,7 @@ core and return a descriptor to it."
          (end (+ start
                  (ceiling (* len sizebits)
                           sb!vm:n-byte-bits))))
-    (read-bigvec-as-sequence-or-die (descriptor-bytes result)
+    (read-bigvec-as-sequence-or-die (descriptor-mem result)
                                     (fasl-input-stream)
                                     :start start
                                     :end end)
@@ -2989,7 +2989,7 @@ core and return a descriptor to it."
        (let* ((start (+ (descriptor-byte-offset des)
                         (ash header-n-words sb!vm:word-shift)))
               (end (+ start code-size)))
-         (read-bigvec-as-sequence-or-die (descriptor-bytes des)
+         (read-bigvec-as-sequence-or-die (descriptor-mem des)
                                          (%fasl-input-stream fasl-input)
                                          :start start
                                          :end end)
@@ -2998,7 +2998,7 @@ core and return a descriptor to it."
          (loop for fun-index from (1- nfuns) downto 0
                do (let ((offset (read-varint-arg fasl-input)))
                     (if (> fun-index 0)
-                        (let ((bytes (descriptor-bytes des))
+                        (let ((bytes (descriptor-mem des))
                               (index (+ (descriptor-byte-offset des)
                                         (calc-offset des (ash (1- fun-index) 2)))))
                           (aver (eql (bvref-32 bytes index) 0))
@@ -3026,7 +3026,7 @@ core and return a descriptor to it."
              (format *trace-output*
                      "/#X~8,'0x: #X~8,'0x~%"
                      (+ i (gspace-byte-address (descriptor-gspace des)))
-                     (bvref-32 (descriptor-bytes des) i)))))
+                     (bvref-32 (descriptor-mem des) i)))))
        des)))
 
 (let ((i (get 'fop-code 'opcode)))
@@ -3104,7 +3104,7 @@ core and return a descriptor to it."
 
 (defun fun-offset (code-object fun-index)
   (if (> fun-index 0)
-      (bvref-32 (descriptor-bytes code-object)
+      (bvref-32 (descriptor-mem code-object)
                 (+ (descriptor-byte-offset code-object)
                    (calc-offset code-object (ash (1- fun-index) 2))))
       (ldb (byte 16 16)
@@ -3221,7 +3221,7 @@ core and return a descriptor to it."
     (let* ((start (+ (descriptor-byte-offset des)
                      (ash header-n-words sb!vm:word-shift)))
            (end (+ start length)))
-      (read-bigvec-as-sequence-or-die (descriptor-bytes des)
+      (read-bigvec-as-sequence-or-die (descriptor-mem des)
                                       (fasl-input-stream)
                                       :start start
                                       :end end))
