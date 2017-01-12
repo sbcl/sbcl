@@ -3541,15 +3541,13 @@ core and return a descriptor to it."
 (defun write-primitive-object (obj)
   ;; writing primitive object layouts
   (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
-  (format t
-          "struct ~A {~%"
-          (c-name (string-downcase (string (sb!vm:primitive-object-name obj)))))
+  (format t "struct ~A {~%" (c-name (string-downcase (sb!vm:primitive-object-name obj))))
   (when (sb!vm:primitive-object-widetag obj)
     (format t "    lispobj header;~%"))
   (dolist (slot (sb!vm:primitive-object-slots obj))
     (format t "    ~A ~A~@[[1]~];~%"
             (getf (sb!vm:slot-options slot) :c-type "lispobj")
-            (c-name (string-downcase (string (sb!vm:slot-name slot))))
+            (c-name (string-downcase (sb!vm:slot-name slot)))
             (sb!vm:slot-rest-p slot)))
   (format t "};~2%")
   (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
@@ -3567,8 +3565,7 @@ core and return a descriptor to it."
   (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
 (defun write-structure-object (dd)
-  (flet ((cstring (designator)
-           (c-name (string-downcase (string designator)))))
+  (flet ((cstring (designator) (c-name (string-downcase designator))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
     (format t "    lispobj header; // = word_0_~%")
@@ -4099,24 +4096,20 @@ initially undefined function references:~2%")
                                     (symbol-name
                                      (sb!vm:primitive-object-name obj))))))
           (dolist (obj structs)
-            (out-to
-             (string-downcase (string (sb!vm:primitive-object-name obj)))
-             (write-primitive-object obj)))
+            (out-to (string-downcase (sb!vm:primitive-object-name obj))
+              (write-primitive-object obj)))
           (out-to "primitive-objects"
                   (dolist (obj structs)
                     (format t "~&#include \"~A.h\"~%"
-                            (string-downcase
-                             (string (sb!vm:primitive-object-name obj)))))))
+                            (string-downcase (sb!vm:primitive-object-name obj))))))
         (dolist (class '(hash-table
                          classoid
                          layout
                          sb!c::compiled-debug-info
                          sb!c::compiled-debug-fun
                          package))
-          (out-to
-           (string-downcase (string class))
-           (write-structure-object
-            (layout-info (find-layout class)))))
+          (out-to (string-downcase class)
+            (write-structure-object (layout-info (find-layout class)))))
         (out-to "static-symbols" (write-static-symbols))
         (out-to "sc-offset" (write-sc-offset-coding)))
 
