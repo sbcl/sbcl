@@ -17,7 +17,7 @@
        "obj/from-xc/src/assembly/target/tramps.assem-obj")
       nil))
 
-(sb!vm:genesis :object-file-names *target-object-file-names*
+(sb-cold:genesis :object-file-names *target-object-file-names*
                :preload-file *preload-object-file*
                :c-header-dir-name "output/genesis-2"
                :symbol-table-file-name "src/runtime/sbcl.nm"

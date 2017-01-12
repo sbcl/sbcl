@@ -86,4 +86,4 @@
  (host-cload-stem "src/compiler/generic/genesis" nil)
 ) ; END with-compilation-unit
 
-(sb!vm:genesis :c-header-dir-name "src/runtime/genesis")
+(sb-cold:genesis :c-header-dir-name "src/runtime/genesis")

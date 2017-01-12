@@ -3874,21 +3874,11 @@ initially undefined function references:~2%")
 ;;;
 ;;; output files arguments (any of which may be NIL to suppress output):
 ;;;   CORE-FILE-NAME gets a Lisp core.
-;;;   C-HEADER-FILE-NAME gets a C header file, traditionally called
-;;;     internals.h, which is used by the C compiler when constructing
-;;;     the executable which will load the core.
-;;;   MAP-FILE-NAME gets (?) a map file. (dunno about this -- WHN 19990815)
-;;;
-;;; FIXME: GENESIS doesn't belong in SB!VM. Perhaps in %KERNEL for now,
-;;; perhaps eventually in SB-LD or SB-BOOT.
-(defun sb!vm:genesis (&key
-                      object-file-names
-                      preload-file
-                      symbol-table-file-name
-                      core-file-name
-                      map-file-name
-                      c-header-dir-name
-                      #+nil (list-objects t))
+;;;   C-HEADER-DIR-NAME gets the path in which to place generated headers
+;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
+(defun sb-cold:genesis (&key object-file-names preload-file
+                             core-file-name c-header-dir-name map-file-name
+                             symbol-table-file-name)
   #!+sb-dynamic-core
   (declare (ignorable symbol-table-file-name))
   (declare (special core-file-name))

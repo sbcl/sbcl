@@ -14,7 +14,8 @@
 ;;;
 ;;; We make no attempt to be fully general; our table doesn't need to be
 ;;; able to express features which we don't happen to use.
-(export '(package-data
+(export '(genesis
+          package-data
           make-package-data
           package-data-name
           package-data-export
