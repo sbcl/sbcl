@@ -129,9 +129,6 @@ copy_code_object(lispobj object, sword_t nwords)
 
 static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 
-/* FIXME: Most calls end up going to some trouble to compute an
- * 'n_words' value for this function. The system might be a little
- * simpler if this function used an 'end' parameter instead. */
 void
 scavenge(lispobj *start, sword_t n_words)
 {
