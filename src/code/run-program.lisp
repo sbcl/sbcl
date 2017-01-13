@@ -275,15 +275,11 @@ PROCESS."
                 (process-pid process))
                (:pty-process-group
                 (find-current-foreground-process process)))))
-    (multiple-value-bind
-          (okay errno)
-        (case whom
-          ((:process-group)
-           (sb-unix:unix-killpg pid signal))
-          (t
-           (sb-unix:unix-kill pid signal)))
-      (cond ((not okay)
-             (values nil errno))
+    (let ((result (if (eq whom :process-group)
+                      (sb-unix:unix-killpg pid signal)
+                      (sb-unix:unix-kill pid signal))))
+      (cond ((not (eql result 0))
+             (values nil (sb-unix::get-errno)))
             ((and (eql pid (process-pid process))
                   (= signal sb-unix:sigcont))
              (setf (process-%status process) :running)
