@@ -220,15 +220,10 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
-  (with-compilation-unit ()
-    (let ((*compile-print* nil))
-      (do-srcs interpreter-srcs)))
-  (with-compilation-unit ()
-    (let ((*compile-print* nil))
-      (do-srcs pcl-srcs)))
-  (when *compile-files-p*
-    (format t "~&; Done with PCL compilation~2%"))
-  (do-srcs other-srcs)))
+  (let ((*compile-print* nil))
+    (with-compilation-unit () (do-srcs interpreter-srcs))
+    (with-compilation-unit () (do-srcs pcl-srcs))
+    (do-srcs other-srcs))))
 
 ;;;; setting package documentation
 
