@@ -2301,7 +2301,7 @@ wipe_nonpinned_words()
 #endif
 }
 
-static void
+static void __attribute__((unused))
 pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
 {
     struct page *page = &page_table[pageindex];
@@ -3715,7 +3715,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         while (pin_list != NIL) {
             struct cons *list_entry =
                 (struct cons *)native_pointer(pin_list);
-            preserve_pointer(list_entry->car);
+            preserve_pointer((void*)list_entry->car);
             pin_list = list_entry->cdr;
         }
     }

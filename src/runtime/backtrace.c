@@ -375,7 +375,7 @@ previous_info(struct call_info *info)
             }
         }
     } else if (fixnump(lra)) {
-        info->code = native_pointer(this_frame->code);
+        info->code = (struct code*)native_pointer(this_frame->code);
         info->pc = (uword_t)(info->code + lra);
         info->lra = NIL;
     } else {
@@ -414,7 +414,7 @@ lisp_backtrace(int nframes)
             else
                 print_entry_points((struct code *)info.code);
 
-            printf(" %p", (uword_t) info.code | OTHER_POINTER_LOWTAG);
+            printf(" %p", (void*)((uword_t) info.code | OTHER_POINTER_LOWTAG));
         }
         else
             printf("CODE = ???");
@@ -422,12 +422,12 @@ lisp_backtrace(int nframes)
                info.frame);
 
         if (info.lra != NIL)
-            printf(" LRA = %p", info.lra);
+            printf(" LRA = %p", (void*)info.lra);
         else
             printf(" <no LRA>");
 
         if (info.pc)
-            printf(" pc = %p", info.pc);
+            printf(" pc = %p", (void*)(long)info.pc);
         putchar('\n');
 
     } while (i++ < nframes && previous_info(&info));
