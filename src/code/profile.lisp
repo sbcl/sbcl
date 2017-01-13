@@ -154,6 +154,7 @@
 ;;; counts built into the lexical environment, is that we hope this
 ;;; will minimize profiling overhead.)
 (defun profile-encapsulation-lambdas ()
+  (declare (muffle-conditions compiler-note))
   (let* ((count (make-counter))
          (ticks (make-counter))
          (consing (make-counter))
