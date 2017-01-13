@@ -236,11 +236,10 @@
 ;;; be portable and not overwrite the doc strings for the standard
 ;;; packages. But now the cross-compilation host is only a receding
 ;;; memory, and we can have our way with the doc strings.
-(sb-int:/show "setting package documentation")
-#+sb-doc (setf (documentation (find-package "COMMON-LISP") t)
-"public: home of symbols defined by the ANSI language specification")
-#+sb-doc (setf (documentation (find-package "COMMON-LISP-USER") t)
-               "public: the default package for user code and data")
-#+sb-doc (setf (documentation (find-package "KEYWORD") t)
-               "public: home of keywords")
-
+#+sb-doc
+(setf (documentation (find-package "COMMON-LISP") t)
+      "public: home of symbols defined by the ANSI language specification"
+      (documentation (find-package "COMMON-LISP-USER") t)
+      "public: the default package for user code and data"
+      (documentation (find-package "KEYWORD") t)
+      "public: home of keywords")
