@@ -3281,7 +3281,7 @@ core and return a descriptor to it."
   (and (>= (length string) (length tail))
        (string= string tail :start1 (- (length string) (length tail)))))
 
-(defun write-boilerplate ()
+(defun write-boilerplate (*standard-output*)
   (format t "/*~%")
   (dolist (line
            '("This is a machine-generated file. Please do not edit it by hand."
@@ -3306,14 +3306,14 @@ core and return a descriptor to it."
 (defun c-symbol-name (symbol &optional strip)
   (c-name (symbol-name symbol) strip))
 
-(defun write-makefile-features ()
+(defun write-makefile-features (*standard-output*)
   ;; propagating *SHEBANG-FEATURES* into the Makefiles
   (dolist (shebang-feature-name (sort (mapcar #'c-symbol-name
                                               sb-cold:*shebang-features*)
                                       #'string<))
     (format t "LISP_FEATURE_~A=1~%" shebang-feature-name)))
 
-(defun write-config-h ()
+(defun write-config-h (*standard-output*)
   ;; propagating *SHEBANG-FEATURES* into C-level #define's
   (dolist (shebang-feature-name (sort (mapcar #'c-symbol-name
                                               sb-cold:*shebang-features*)
@@ -3331,7 +3331,7 @@ core and return a descriptor to it."
   (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")
   (terpri))
 
-(defun write-constants-h ()
+(defun write-constants-h (*standard-output*)
   ;; writing entire families of named constants
   (let ((constants nil))
     (dolist (package-name '( ;; Even in CMU CL, constants from VM
@@ -3495,7 +3495,7 @@ core and return a descriptor to it."
             (sb!xc:mask-field (symbol-value symbol) -1))))
 
 #!+sb-ldb
-(defun write-tagnames-h (&optional (out *standard-output*))
+(defun write-tagnames-h (out)
   (labels
       ((pretty-name (symbol strip)
          (let ((name (string-downcase symbol)))
@@ -3538,7 +3538,7 @@ core and return a descriptor to it."
             (coerce array-type-bits 'list)))
   (values))
 
-(defun write-primitive-object (obj)
+(defun write-primitive-object (obj *standard-output*)
   ;; writing primitive object layouts
   (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
   (format t "struct ~A {~%" (c-name (string-downcase (sb!vm:primitive-object-name obj))))
@@ -3564,7 +3564,7 @@ core and return a descriptor to it."
     (terpri))
   (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
-(defun write-structure-object (dd)
+(defun write-structure-object (dd *standard-output*)
   (flet ((cstring (designator) (c-name (string-downcase designator))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
@@ -3590,11 +3590,11 @@ core and return a descriptor to it."
     (format t "};~2%")
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
 
-(defun write-static-symbols ()
+(defun write-static-symbols (stream)
   (dolist (symbol (cons nil sb!vm:*static-symbols*))
     ;; FIXME: It would be nice to use longer names than NIL and
     ;; (particularly) T in #define statements.
-    (format t "#define ~A LISPOBJ(0x~X)~%"
+    (format stream "#define ~A LISPOBJ(0x~X)~%"
             ;; FIXME: It would be nice not to need to strip anything
             ;; that doesn't get stripped always by C-SYMBOL-NAME.
             (c-symbol-name symbol "%*.!")
@@ -3607,16 +3607,16 @@ core and return a descriptor to it."
                  sb!vm:other-pointer-lowtag
                  (if symbol (sb!vm:static-symbol-offset symbol) 0))))))
 
-(defun write-sc-offset-coding ()
+(defun write-sc-offset-coding (stream)
   (flet ((write-array (name bytes)
-           (format t "static struct sc_offset_byte ~A[] = {~@
+           (format stream "static struct sc_offset_byte ~A[] = {~@
                       ~{    {~{ ~2D, ~2D ~}}~^,~%~}~@
                       };~2%"
                    name
                    (mapcar (lambda (byte)
                              (list (byte-size byte) (byte-position byte)))
                            bytes))))
-    (format t "struct sc_offset_byte {
+    (format stream "struct sc_offset_byte {
     int size;
     int position;
 };~2%")
@@ -3629,7 +3629,7 @@ core and return a descriptor to it."
 ;;; information is subject to change due to relocating GC, but even so
 ;;; it can be very handy when attempting to troubleshoot the early
 ;;; stages of cold load.
-(defun write-map ()
+(defun write-map (*standard-output*)
   (let ((*print-pretty* nil)
         (*print-case* :upcase))
     (format t "assembler routines defined in core image:~2%")
@@ -4056,54 +4056,40 @@ initially undefined function references:~2%")
 
       ;; Write results to files.
       (when map-file-name
-        (with-open-file (*standard-output* map-file-name
-                                           :direction :output
-                                           :if-exists :supersede)
-          (write-map)))
-      (let ((fn (format nil "~A/Makefile.features" c-header-dir-name)))
-        (ensure-directories-exist fn)
-        (with-open-file (*standard-output* fn :direction :output
-                                              :if-exists :supersede)
-          (write-makefile-features)))
-      ;;
-      ;; FIXME: I dislike this approach of redefining
-      ;; *STANDARD-OUTPUT* instead of putting the new stream in a
-      ;; lexical variable, and it's annoying to have WRITE-MAP (to
-      ;; *STANDARD-OUTPUT*) not be parallel to WRITE-INITIAL-CORE-FILE
-      ;; (to a stream explicitly passed as an argument).
-      (macrolet ((out-to (name &body body)
-                   `(let ((fn (format nil "~A/~A.h" c-header-dir-name ,name)))
-                     (with-open-file (*standard-output* fn
-                                      :if-exists :supersede :direction :output)
-                       (write-boilerplate)
-                       (let ((n (c-name (string-upcase ,name))))
-                         (format
-                          t
-                          "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~A 1~%"
-                          n n))
+        (with-open-file (stream map-file-name :direction :output :if-exists :supersede)
+          (write-map stream)))
+      (let ((filename (format nil "~A/Makefile.features" c-header-dir-name)))
+        (ensure-directories-exist filename)
+        (with-open-file (stream filename :direction :output :if-exists :supersede)
+          (write-makefile-features stream)))
+      (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
+                   `(with-open-file (stream (format nil "~A/~A.h" c-header-dir-name ,name)
+                                            :direction :output :if-exists :supersede)
+                       (write-boilerplate stream)
+                       (format stream
+                               "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~:*~A~%"
+                               (c-name (string-upcase ,name)))
                        ,@body
-                       (format t
-                        "#endif /* SBCL_GENESIS_~A */~%"
-                        (string-upcase ,name))))))
-        (out-to "config" (write-config-h))
-        (out-to "constants" (write-constants-h))
+                       (format stream "#endif~%"))))
+        (out-to "config" (write-config-h stream))
+        (out-to "constants" (write-constants-h stream))
         #!+sb-ldb
-        (out-to "tagnames" (write-tagnames-h))
+        (out-to "tagnames" (write-tagnames-h stream))
         (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
                              :key #'sb!vm:primitive-object-name)))
           (dolist (obj structs)
             (out-to (string-downcase (sb!vm:primitive-object-name obj))
-              (write-primitive-object obj)))
+              (write-primitive-object obj stream)))
           (out-to "primitive-objects"
             (dolist (obj structs)
-              (format t "~&#include \"~A.h\"~%"
+              (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb!vm:primitive-object-name obj))))))
         (dolist (class '(classoid hash-table layout package
                          sb!c::compiled-debug-info sb!c::compiled-debug-fun))
           (out-to (string-downcase class)
-            (write-structure-object (layout-info (find-layout class)))))
-        (out-to "static-symbols" (write-static-symbols))
-        (out-to "sc-offset" (write-sc-offset-coding)))
+            (write-structure-object (layout-info (find-layout class)) stream)))
+        (out-to "static-symbols" (write-static-symbols stream))
+        (out-to "sc-offset" (write-sc-offset-coding stream)))
 
       (when core-file-name
         (write-initial-core-file core-file-name)))))
