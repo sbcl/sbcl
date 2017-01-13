@@ -74,12 +74,12 @@ forwarding_pointer_p(lispobj *pointer) {
 #endif
 }
 
-static inline lispobj *
+static inline lispobj
 forwarding_pointer_value(lispobj *pointer) {
 #ifdef LISP_FEATURE_GENCGC
-    return (lispobj *) ((pointer_sized_uint_t) pointer[1]);
+    return pointer[1];
 #else
-    return (lispobj *) ((pointer_sized_uint_t) pointer[0]);
+    return pointer[0];
 #endif
 }
 static inline lispobj
@@ -232,8 +232,7 @@ trans_code(struct code *code)
 #ifdef DEBUG_CODE_GC
         printf("Was already transported\n");
 #endif
-        return (struct code *) forwarding_pointer_value
-            ((lispobj *)((pointer_sized_uint_t) code));
+        return (struct code *)native_pointer(forwarding_pointer_value((lispobj*)code));
     }
 
     gc_assert(widetag_of(code->header) == CODE_HEADER_WIDETAG);
@@ -614,12 +613,12 @@ boolean positive_bignum_logbitp(int index, struct bignum* bignum)
      such as it being kept in a local variable during structure manipulation.
      See 'interleaved-raw.impure.lisp' for a way to trigger this */
   if (forwarding_pointer_p((lispobj*)bignum)) {
-      lispobj *forwarded = forwarding_pointer_value((lispobj*)bignum);
+      lispobj forwarded = forwarding_pointer_value((lispobj*)bignum);
 #if 0
       fprintf(stderr, "GC bignum_logbitp(): fwd from %p to %p\n",
               (void*)bignum, (void*)forwarded);
 #endif
-      bignum = (struct bignum*)native_pointer((lispobj)forwarded);
+      bignum = (struct bignum*)native_pointer(forwarded);
   }
 
   int len = HeaderValue(bignum->header);
@@ -670,7 +669,7 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
       if (forwarding_pointer_p((lispobj*)bitmap))
           bitmap = (struct bignum*)
-            native_pointer((lispobj)forwarding_pointer_value((lispobj*)bitmap));
+            native_pointer(forwarding_pointer_value((lispobj*)bitmap));
       struct instance_scanner scanner;
       scanner.base = instance_ptr;
       scanner.proc = proc;
@@ -756,7 +755,7 @@ scav_instance(lispobj *where, lispobj header)
         promote_immobile_obj(layout, 1);
 #else
     if (forwarding_pointer_p(layout))
-        layout = native_pointer((lispobj)forwarding_pointer_value(layout));
+        layout = native_pointer(forwarding_pointer_value(layout));
 #endif
 
     sword_t nslots = instance_length(header) | 1;
@@ -973,8 +972,7 @@ void scan_weak_pointers(void)
             first_pointer = (lispobj *)native_pointer(value);
 
             if (forwarding_pointer_p(first_pointer)) {
-              wp->value=
-                (lispobj)LOW_WORD(forwarding_pointer_value(first_pointer));
+              wp->value = LOW_WORD(forwarding_pointer_value(first_pointer));
             } else {
             /* Break it. */
                 wp->value = NIL;
@@ -1830,8 +1828,7 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
         lispobj *forwarded_start;
 
         if (forwarding_pointer_p(start))
-            forwarded_start =
-                native_pointer((lispobj)forwarding_pointer_value(start));
+            forwarded_start = native_pointer(forwarding_pointer_value(start));
         else
             forwarded_start = start;
         lispobj thing = *forwarded_start;
@@ -2532,18 +2529,18 @@ scavenge_interrupt_contexts(struct thread *th)
 struct vector * symbol_name(lispobj * sym)
 {
   if (forwarding_pointer_p(sym))
-    sym = native_pointer((lispobj)forwarding_pointer_value(sym));
+    sym = native_pointer(forwarding_pointer_value(sym));
   if (lowtag_of(((struct symbol*)sym)->name) != OTHER_POINTER_LOWTAG)
       return NULL;
   lispobj * name = native_pointer(((struct symbol*)sym)->name);
   if (forwarding_pointer_p(name))
-      name = native_pointer((lispobj)forwarding_pointer_value(name));
+      name = native_pointer(forwarding_pointer_value(name));
   return (struct vector*)name;
 }
 struct vector * classoid_name(lispobj * classoid)
 {
   if (forwarding_pointer_p(classoid))
-      classoid = native_pointer((lispobj)forwarding_pointer_value(classoid));
+      classoid = native_pointer(forwarding_pointer_value(classoid));
   lispobj sym = ((struct classoid*)classoid)->name;
   return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL
     : symbol_name(native_pointer(sym));
@@ -2551,7 +2548,7 @@ struct vector * classoid_name(lispobj * classoid)
 struct vector * layout_classoid_name(lispobj * layout)
 {
   if (forwarding_pointer_p(layout))
-      layout = native_pointer((lispobj)forwarding_pointer_value(layout));
+      layout = native_pointer(forwarding_pointer_value(layout));
   lispobj classoid = ((struct layout*)layout)->classoid;
   return lowtag_of(classoid) != INSTANCE_POINTER_LOWTAG ? NULL
     : classoid_name(native_pointer(classoid));
@@ -2559,7 +2556,7 @@ struct vector * layout_classoid_name(lispobj * layout)
 struct vector * instance_classoid_name(lispobj * instance)
 {
   if (forwarding_pointer_p(instance))
-      instance = native_pointer((lispobj)forwarding_pointer_value(instance));
+      instance = native_pointer(forwarding_pointer_value(instance));
   lispobj layout = instance_layout(instance);
   return lowtag_of(layout) != INSTANCE_POINTER_LOWTAG ? NULL
     : layout_classoid_name(native_pointer(layout));
