@@ -595,7 +595,7 @@ static char *code_slots[] = {"bytes: ", "debug: ",
                              "n_entries: ",
 #endif
                              NULL};
-static char *fn_slots[] = {
+static char *simple_fun_slots[] = {
     "self: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
 static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ", "layout: ", NULL};
@@ -764,7 +764,8 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case SIMPLE_FUN_HEADER_WIDETAG:
-                print_slots(fn_slots, 6, ptr);
+                print_slots(simple_fun_slots,
+                            sizeof simple_fun_slots/sizeof(char*)-1, ptr);
                 break;
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
