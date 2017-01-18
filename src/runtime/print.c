@@ -598,7 +598,11 @@ static char *code_slots[] = {"bytes: ", "debug: ",
 static char *simple_fun_slots[] = {
     "self: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
-static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ", "layout: ", NULL};
+static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ",
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+                                             "layout: ",
+#endif
+                                             NULL};
 static char *weak_pointer_slots[] = {"value: ", NULL};
 static char *fdefn_slots[] = {"name: ", "function: ", "raw_addr: ", NULL};
 static char *value_cell_slots[] = {"value: ", NULL};
@@ -775,11 +779,13 @@ static void print_otherptr(lispobj obj)
 #endif
 
             case CLOSURE_HEADER_WIDETAG:
-                print_slots(closure_slots, count, ptr);
+                print_slots(closure_slots,
+                            count & SHORT_HEADER_MAX_WORDS, ptr);
                 break;
 
             case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-                print_slots(funcallable_instance_slots, count, ptr);
+                print_slots(funcallable_instance_slots,
+                            count & SHORT_HEADER_MAX_WORDS, ptr);
                 break;
 
             case VALUE_CELL_HEADER_WIDETAG:
