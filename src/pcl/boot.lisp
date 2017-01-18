@@ -2658,28 +2658,51 @@ generic function lambda list ~S~:>"
       (setf (gdefinition (car fn)) (fdefinition (caddr fn))))
 
     (loop for (fspec method-combination . methods) in *!generic-function-fixups*
-       for gf = (gdefinition fspec) do
-       (flet ((make-method (spec)
-                (destructuring-bind
-                      (lambda-list specializers qualifiers fun-name) spec
-                  (let* ((specializers (mapcar #'find-class specializers))
-                         (fun-name (or fun-name fspec))
-                         (fun (fdefinition fun-name))
-                         (initargs (list :function
-                                         (set-fun-name
-                                          (early-gf-primary-slow-method-fn fun)
-                                          `(call ,fun-name)))))
-                    (declare (type function fun))
-                    (make-a-method
-                     'standard-method
-                     qualifiers lambda-list specializers initargs nil)))))
-         (setf (generic-function-method-class gf)
-               *the-class-standard-method*
-               (generic-function-method-combination gf)
-               (ecase method-combination
-                 (standard *standard-method-combination*)
-                 (or *or-method-combination*)))
-         (set-methods gf (mapcar #'make-method methods)))))
+          for gf = (gdefinition fspec) do
+          (labels ((translate-source-location (function)
+                     ;; This is lifted from sb-introspect, OAOO and all that.
+                     (let* ((function-object (sb-kernel::%fun-fun function))
+                            (function-header (sb-kernel:fun-code-header function-object))
+                            (debug-info (sb-kernel:%code-debug-info function-header))
+                            (debug-source (sb-c::debug-info-source debug-info))
+                            (debug-fun (debug-info-debug-function function debug-info))
+                            (tlf (and debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
+                       (sb-c::%make-definition-source-location (sb-c::debug-source-namestring debug-source)
+                                                               tlf
+                                                               (sb-c::compiled-debug-fun-form-number debug-fun))))
+                   (debug-info-debug-function (function debug-info)
+                     (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
+                           (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
+                       (or
+                        (find-if
+                         (lambda (x)
+                           (and
+                            (sb-c::compiled-debug-fun-p x)
+                            (eq (sb-c::compiled-debug-fun-name x) name)))
+                         map)
+                        (elt map 0))))
+                   (make-method (spec)
+                     (destructuring-bind
+                         (lambda-list specializers qualifiers fun-name) spec
+                       (let* ((specializers (mapcar #'find-class specializers))
+                              (fun-name (or fun-name fspec))
+                              (fun (fdefinition fun-name))
+                              (initargs (list :function
+                                              (set-fun-name
+                                               (early-gf-primary-slow-method-fn fun)
+                                               `(call ,fun-name)))))
+                         (declare (type function fun))
+                         (make-a-method
+                          'standard-method
+                          qualifiers lambda-list specializers initargs nil
+                          :definition-source (translate-source-location fun))))))
+            (setf (generic-function-method-class gf)
+                  *the-class-standard-method*
+                  (generic-function-method-combination gf)
+                  (ecase method-combination
+                    (standard *standard-method-combination*)
+                    (or *or-method-combination*)))
+            (set-methods gf (mapcar #'make-method methods)))))
 
   (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
