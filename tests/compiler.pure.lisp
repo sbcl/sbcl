@@ -6101,3 +6101,7 @@
                          :allow-notes nil)
                         #\B)
                #\b)))
+
+(with-test (:name (:valid-callable-argument :toplevel-xep))
+  (assert (nth-value 2 (checked-compile `(lambda (l) (find-if (lambda ()) l))
+                                        :allow-warnings t))))
