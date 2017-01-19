@@ -816,6 +816,12 @@ specification."
                           (with-current-source-form (case)
                             (with-unique-names (tag fun)
                               (destructuring-bind (type ll &body body) case
+                                (unless (and (listp ll)
+                                             (symbolp (car ll))
+                                             (null (cdr ll)))
+                                  (error "Malformed HANDLER-CASE lambda-list. Should be either () or (symbol), not ~s."
+                                         ll))
+
                                 (push `(,fun ,ll ,@body) local-funs)
                                 (list tag type ll fun)))))
                         cases)))
