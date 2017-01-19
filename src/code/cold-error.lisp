@@ -76,7 +76,7 @@
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
   (let* ((condition
-           (coerce-to-condition datum arguments 'simple-condition 'signal))
+           (apply #'coerce-to-condition datum 'simple-condition 'signal arguments))
          (handler-clusters *handler-clusters*)
          (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
     (when *break-on-signals*
@@ -162,23 +162,21 @@
   (/show0 "done cold-printing ERROR arguments")
 
   (infinite-error-protect
-    (let ((condition (coerce-to-condition datum arguments
-                                          'simple-error 'error))
-          (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'error)))
-      (/show0 "done coercing DATUM to CONDITION")
-      (/show0 "signalling CONDITION from within ERROR")
-      (signal condition)
-      (/show0 "done signalling CONDITION within ERROR")
-      (invoke-debugger condition))))
+   (let ((condition (apply #'coerce-to-condition datum 'simple-error 'error
+                           arguments))
+         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'error)))
+     (/show0 "done coercing DATUM to CONDITION")
+     (/show0 "signalling CONDITION from within ERROR")
+     (signal condition)
+     (/show0 "done signalling CONDITION within ERROR")
+     (invoke-debugger condition))))
 
 (defun cerror (continue-string datum &rest arguments)
   (infinite-error-protect
     (with-simple-restart
         (continue "~A" (apply #'format nil continue-string arguments))
-      (let ((condition (coerce-to-condition datum
-                                            arguments
-                                            'simple-error
-                                            'cerror)))
+      (let ((condition (apply #'coerce-to-condition datum
+                              'simple-error 'cerror arguments)))
         (with-condition-restarts condition (list (find-restart 'continue))
           (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'cerror)))
             (signal condition)
@@ -192,10 +190,10 @@
 ;;; applications which try to do similar things with *DEBUGGER-HOOK*
 (defun %break (what &optional (datum "break") &rest arguments)
   (infinite-error-protect
-    (with-simple-restart (continue "Return from ~S." what)
-      (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* '%break)))
-        (invoke-debugger
-         (coerce-to-condition datum arguments 'simple-condition what)))))
+   (with-simple-restart (continue "Return from ~S." what)
+     (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* '%break)))
+       (invoke-debugger
+        (apply #'coerce-to-condition datum 'simple-condition what arguments)))))
   nil)
 
 (defun break (&optional (datum "break") &rest arguments)
@@ -208,22 +206,23 @@ of condition handling occurring."
 
 (defun %warn (datum arguments super default-type)
   (infinite-error-protect
-    (let ((condition (coerce-to-condition datum arguments default-type 'warn))
-          (superclassoid-name (classoid-name super)))
-      ;: CONDITION is necessarily an INSTANCE,
-      ;; but pedantry requires it be the right subtype of instance.
-      (unless (classoid-typep (%instance-layout condition)
-                              super condition)
-        (error 'simple-type-error
-               :datum datum :expected-type superclassoid-name
-               :format-control "~S does not designate a ~A class"
-               :format-arguments (list datum superclassoid-name)))
-      (restart-case (signal condition)
-        (muffle-warning ()
-          :report "Skip warning."
-          (return-from %warn nil)))
-      (format *error-output* "~&~@<~S: ~3i~:_~A~:>~%"
-              superclassoid-name condition)))
+   (let ((condition (apply #'coerce-to-condition datum default-type 'warn
+                           arguments))
+         (superclassoid-name (classoid-name super)))
+     ;; CONDITION is necessarily an INSTANCE,
+     ;; but pedantry requires it be the right subtype of instance.
+     (unless (classoid-typep (%instance-layout condition)
+                             super condition)
+       (error 'simple-type-error
+              :datum datum :expected-type superclassoid-name
+              :format-control "~S does not designate a ~A class"
+              :format-arguments (list datum superclassoid-name)))
+     (restart-case (signal condition)
+       (muffle-warning ()
+         :report "Skip warning."
+         (return-from %warn nil)))
+     (format *error-output* "~&~@<~S: ~3i~:_~A~:>~%"
+             superclassoid-name condition)))
   nil)
 
 (defun warn (datum &rest arguments)

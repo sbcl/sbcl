@@ -89,8 +89,8 @@
 (declaim (ftype (function (t &rest t) #+(and sb-xc-host ccl) *
                                       #-(and sb-xc-host ccl) nil) compiler-error))
 (defun compiler-error (datum &rest arguments)
-  (let ((condition (coerce-to-condition datum arguments
-                                        'simple-program-error 'compiler-error)))
+  (let ((condition (apply #'coerce-to-condition datum
+                          'simple-program-error 'compiler-error arguments)))
     (restart-case
         (cerror "Replace form with call to ERROR."
                 'compiler-error

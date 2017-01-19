@@ -215,12 +215,13 @@ with that condition (or with no condition) will be returned."
 
 ;;; To reduce expansion size of RESTART-CASE
 (defun with-simple-condition-restarts (function cerror-arg datum &rest arguments)
-  (let ((condition (coerce-to-condition datum arguments
-                                        (case function
-                                          (warn 'simple-warning)
-                                          (signal 'simple-condition)
-                                          (t 'simple-error))
-                                        function)))
+  (let ((condition (apply #'coerce-to-condition datum
+                          (case function
+                            (warn 'simple-warning)
+                            (signal 'simple-condition)
+                            (t 'simple-error))
+                          function
+                          arguments)))
     (with-condition-restarts condition (car *restart-clusters*)
       (if (eq function 'cerror)
           (cerror cerror-arg condition)
@@ -229,8 +230,8 @@ with that condition (or with no condition) will be returned."
 
 (defun assert-error (assertion &optional args-and-values places datum &rest arguments)
   (let ((cond (if datum
-                  (coerce-to-condition
-                   datum arguments 'simple-error 'error)
+                  (apply #'coerce-to-condition
+                         datum 'simple-error 'error arguments)
                   (make-condition
                    'simple-error
                    :format-control "~@<The assertion ~S failed~:[.~:; ~

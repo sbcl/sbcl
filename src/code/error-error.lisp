@@ -37,9 +37,8 @@
                (sb!debug:print-backtrace :stream *terminal-io* :emergency-best-effort t)
                (force-output *terminal-io*)
                (invoke-debugger
-                (coerce-to-condition "Maximum error nesting depth exceeded" nil
-                                     'simple-error
-                                     'error)))
+                (coerce-to-condition "Maximum error nesting depth exceeded"
+                                     'simple-error 'error)))
              (safely-print (message)
                (handler-case
                    (progn

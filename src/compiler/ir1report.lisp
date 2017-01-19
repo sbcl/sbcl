@@ -421,9 +421,9 @@ has written, having proved that it is unreachable."))
              (with-unique-names (block)
                `(block ,block
                   (let ((,condition
-                         (coerce-to-condition ,datum ,args
-                                              'simple-compiler-note
-                                              'with-condition)))
+                          (apply #'coerce-to-condition ,datum
+                                 'simple-compiler-note 'with-condition
+                                 ,args)))
                     (restart-case
                         (signal ,condition)
                       (muffle-warning ()

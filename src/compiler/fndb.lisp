@@ -1847,7 +1847,7 @@
 (defknown style-warn (t &rest t) null ())
 
 (defknown coerce-to-condition ((or condition symbol string function)
-                               list type-specifier symbol)
+                               type-specifier symbol &rest t)
     condition
     ())
 

@@ -93,8 +93,8 @@
                     nil)))
            (fail (datum &rest arguments)
              (return-from check-backtrace
-               (values nil (sb-kernel:coerce-to-condition
-                            datum arguments 'simple-error 'error)))))
+               (values nil (apply #'sb-kernel:coerce-to-condition
+                                  datum 'simple-error 'error arguments)))))
     (mapc (lambda (frame spec)
             (unless (cond
                       ((not spec)
@@ -128,8 +128,8 @@
                      :test #'equal))
            (fail (datum &rest arguments)
              (return-from verify-backtrace
-               (values nil (sb-kernel:coerce-to-condition
-                            datum arguments 'simple-error 'error)))))
+               (values nil (apply #'sb-kernel:coerce-to-condition
+                                  datum 'simple-error 'error arguments)))))
     (call-with-backtrace
      (lambda (backtrace condition)
        (declare (ignore condition))
