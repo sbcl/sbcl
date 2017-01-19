@@ -917,7 +917,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                                "%SIMD-PACK-SINGLES")
 
                ;; versioning utility
-               "ASSERT-VERSION->="))
+               "ASSERT-VERSION->="
+
+               "CALLABLE-CAST"))
 
    #s(sb-cold:package-data
       :name "SB!FORMAT"

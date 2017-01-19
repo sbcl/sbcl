@@ -1481,6 +1481,7 @@
 ;;; Used for marking CALLABLE arguments with unrecognizable LVARS in
 ;;; VALID-CALLABLE-ARGUMENT so that it can be rerun in
 ;;; IR1-OPTIMIZE-CAST with better information.
+;;; Also used by CALLABLE-CAST
 (def!struct (function-designator-cast (:include cast))
   (arg-count (missing-arg) :type index)
   (caller nil :type symbol))

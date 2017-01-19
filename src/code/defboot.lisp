@@ -659,26 +659,26 @@ evaluated as a PROGN."
              ;; consing the test and handler is also load-time constant.
              (let ((name (when (typep handler
                                       '(cons (member function quote)
-                                             (cons symbol null)))
+                                        (cons symbol null)))
                            (cadr handler))))
                (cond ((or (not name)
                           (assq name (local-functions))
                           (and (eq (car handler) 'function)
                                (sb!c::fun-locally-defined-p name env)))
                       `(cons ,(case (car test)
-                               ((named-lambda function) test)
-                               (t `(load-time-value ,test t)))
+                                ((named-lambda function) test)
+                                (t `(load-time-value ,test t)))
                              ,(if (typep handler '(cons (eql function)))
-                                  handler
+                                  `(callable-cast 1 handler-bind ,handler)
                                   ;; Regardless of lexical policy, never allow
                                   ;; a non-callable into handler-clusters.
                                   `(let ((x ,handler))
                                      (declare (optimize (safety 3)))
-                                     (the callable x)))))
+                                     (callable-cast 1 handler-bind x)))))
                      ((info :function :info name) ; known
                       ;; This takes care of CONTINUE,ABORT,MUFFLE-WARNING.
                       ;; #' will be evaluated in the null environment.
-                      `(load-time-value (cons ,test #',name) t))
+                      `(load-time-value (cons ,test (callable-cast 1 handler-bind #',name)) t))
                      (t
                       ;; For each handler specified as #'F we must verify
                       ;; that F is fboundp upon entering the binding scope.
@@ -693,7 +693,7 @@ evaluated as a PROGN."
                                         (find-or-create-fdefn ',name) t))))
                       ;; Resolve to an fdefn at load-time.
                       `(load-time-value
-                        (cons ,test (find-or-create-fdefn ',name))
+                        (cons ,test (find-or-create-fdefn (callable-cast 1 handler-bind ',name)))
                         t)))))
 
            (const-list (items)
