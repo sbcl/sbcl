@@ -105,7 +105,8 @@
 (defstruct readable-struct a)
 (macrolet
     ((frob (string)
-       `(assert (eq (readable-struct-a (read-from-string ,string)) t))))
+       `(handler-bind ((warning #'muffle-warning))
+          (assert (eq (readable-struct-a (read-from-string ,string)) t)))))
   (frob "#S(READABLE-STRUCT :A T)")
   (frob "#S(READABLE-STRUCT A T)")
   (frob "#S(READABLE-STRUCT \"A\" T)")
@@ -225,11 +226,12 @@
                 :ok))))
 
 (defun cl-user::esoteric-load-thing ()
-  ;; This LOAD-AS-SOURCE will fail if PRINT1 reads as the keyword :PRIN1
+  ;; This LOAD-AS-SOURCE will fail if SET reads as the keyword :SET
   (let ((s (make-string-input-stream
-            "(cl:in-package :cl-user) (prin1 'okey-dokey)")))
+            "(cl:in-package :cl-user) (set 'okey-dokey 3)")))
     (let ((*package* *package*))
-      (sb-impl::load-as-source s :print t :verbose t))))
+      (sb-impl::load-as-source s :print nil :verbose nil))
+    (assert (eql (symbol-value 'cl-user::okey-dokey) 3))))
 
 (with-test (:name :reader-package-in-conditional)
   ;; Sharp-plus binds *package* but not *reader-package* so that if,
