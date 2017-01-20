@@ -164,8 +164,8 @@
            (let ((interr-symbol
                    (sb!c::%interr-symbol-for-type-spec type)))
              (if interr-symbol
-                 `(sb!c::%type-check-error/c ,var ',interr-symbol)
-                 `(sb!c::%type-check-error ,var ',type))))))
+                 `(sb!c::%type-check-error/c ,var ',interr-symbol nil)
+                 `(sb!c::%type-check-error ,var ',type nil))))))
 
       `(block ,block
          (tagbody

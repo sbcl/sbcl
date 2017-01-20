@@ -12,6 +12,8 @@
 
 (in-package "SB!C")
 
+(defvar *location-context* nil)
+
 (defun note-this-location (vop kind)
   #!+sb-doc
   "NOTE-THIS-LOCATION VOP Kind
@@ -21,7 +23,7 @@
   that the live set is computed."
   (let ((lab (gen-label)))
     (emit-label lab)
-    (note-debug-location vop lab kind)))
+    (note-debug-location vop lab kind *location-context*)))
 
 (defun note-next-instruction (vop kind)
   #!+sb-doc

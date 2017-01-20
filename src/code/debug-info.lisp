@@ -109,6 +109,7 @@
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
+  (contexts nil :type (or simple-vector null))
   ;; If all code locations in this function are in the same top level
   ;; form, then this is the number of that form, otherwise NIL. If
   ;; NIL, then each code location represented in the BLOCKS specifies

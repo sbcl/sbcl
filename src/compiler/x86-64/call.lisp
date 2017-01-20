@@ -1351,7 +1351,8 @@
          ;; Types are trees of symbols, so 'any-reg' is not
          ;; really possible.
          (type :scs (any-reg descriptor-reg constant)))
-  (:arg-types untagged-num *)
+  (:arg-types untagged-num * (:constant t))
+  (:info *location-context*)
   (:vop-var vop)
   (:save-p :compute-only)
   ;; cost is a smidgen less than type-check-error
@@ -1362,8 +1363,8 @@
   (:policy :fast-safe)
   (:translate sb!c::%type-check-error/c)
   (:args (object :scs (signed-reg unsigned-reg)))
-  (:arg-types untagged-num (:constant symbol))
-  (:info errcode)
+  (:arg-types untagged-num (:constant symbol) (:constant t))
+  (:info errcode *location-context*)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 899 ; smidgen less than type-check-error/c

@@ -514,17 +514,27 @@
 
 (define-condition storage-condition (serious-condition) ())
 
+(defun decode-type-error-context (context)
+  (typecase context
+    ((cons (eql :struct))
+     (format nil "when setting slot ~s of structure ~s"
+             (third context) (second context)))
+    (t context)))
+
 (define-condition type-error (error)
   ((datum :reader type-error-datum :initarg :datum)
-   (expected-type :reader type-error-expected-type :initarg :expected-type))
+   (expected-type :reader type-error-expected-type :initarg :expected-type)
+   (context :initform nil :reader type-error-context :initarg :context))
   (:report
    (lambda (condition stream)
      (format stream  "~@<The value ~
                       ~@:_~2@T~S ~
                       ~@:_is not of type ~
-                      ~@:_~2@T~/sb!impl:print-type-specifier/~:@>"
+                      ~@:_~2@T~/sb!impl:print-type-specifier/~@[ ~
+                      ~@:_~a~]~:@>"
              (type-error-datum condition)
-             (type-error-expected-type condition)))))
+             (type-error-expected-type condition)
+             (decode-type-error-context (type-error-context condition))))))
 
 ;;; not specified by ANSI, but too useful not to have around.
 (define-condition simple-style-warning (simple-condition style-warning) ())

@@ -130,7 +130,8 @@
                  'layout-invalid
                  'type-error)
              :datum object
-             :expected-type type)))
+             :expected-type type
+             :context (sb!di:error-context))))
 
 (deferr layout-invalid-error (object layout)
   (error 'layout-invalid
@@ -224,7 +225,8 @@
                                fp (first arguments) alien-context)
                        :expected-type
                        (car (svref sb!c:+backend-internal-errors+
-                                   error-number)))
+                                   error-number))
+                       :context (sb!di:error-context))
                 (let ((handler
                         (and (typep error-number
                                     '#.`(mod ,(length **internal-error-handlers**)))

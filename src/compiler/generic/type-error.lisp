@@ -76,8 +76,8 @@
                  :load-if (not (sc-is object
                                       descriptor-reg any-reg
                                       unsigned-reg signed-reg constant))))
-  (:arg-types * (:constant symbol))
-  (:info errcode)
+  (:arg-types * (:constant symbol) (:constant t))
+  (:info errcode *location-context*)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 900
@@ -87,7 +87,7 @@
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
-(macrolet ((def (name error translate &rest args)
+(macrolet ((def (name error translate context &rest args)
              `(define-vop (,name)
                 ,@(when translate
                     `((:policy :fast-safe)
@@ -98,23 +98,26 @@
                                           :load-if (not (sc-is ,arg descriptor-reg any-reg
                                                                unsigned-reg signed-reg constant))))
                                  args))
+                ,@(and context
+                       `((:info *location-context*)
+                         (:arg-types * * (:constant t))))
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
                   (error-call vop ',error ,@args)))))
   (def arg-count-error invalid-arg-count-error
-    sb!c::%arg-count-error nargs)
+    sb!c::%arg-count-error nil nargs)
   (def local-arg-count-error local-invalid-arg-count-error
-    sb!c::%local-arg-count-error nargs fname)
-  (def type-check-error object-not-type-error sb!c::%type-check-error
-    object type)
-  (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
+    sb!c::%local-arg-count-error nil nargs fname)
+  (def type-check-error object-not-type-error sb!c::%type-check-error t
+    object ptype)
+  (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error nil
     object layout)
   (def odd-key-args-error odd-key-args-error
-    sb!c::%odd-key-args-error)
+    sb!c::%odd-key-args-error nil)
   (def unknown-key-arg-error unknown-key-arg-error
-    sb!c::%unknown-key-arg-error key)
-  (def nil-fun-returned-error nil-fun-returned-error nil fun))
+    sb!c::%unknown-key-arg-error nil key)
+  (def nil-fun-returned-error nil-fun-returned-error nil nil fun))
 
 (defun encode-internal-error-args (values)
   (with-adjustable-vector (vector)

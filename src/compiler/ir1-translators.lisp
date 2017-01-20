@@ -897,7 +897,7 @@ other."
 ;;;; the THE special operator, and friends
 
 ;;; A logic shared among THE and TRULY-THE.
-(defun the-in-policy (type value policy start next result)
+(defun the-in-policy (type value policy start next result &optional context)
   (let ((type (if (ctype-p type) type
                    (compiler-values-specifier-type type))))
     (cond ((or (eq type *wild-type*)
@@ -914,7 +914,7 @@ other."
           (t (let ((value-ctran (make-ctran))
                    (value-lvar (make-lvar)))
                (ir1-convert start value-ctran value-lvar value)
-               (let ((cast (make-cast value-lvar type policy)))
+               (let ((cast (make-cast value-lvar type policy context)))
                  (link-node-to-previous-ctran cast value-ctran)
                  (setf (lvar-dest value-lvar) cast)
                  (use-continuation cast next result)))))))
@@ -955,6 +955,10 @@ Consequences are undefined if any result is not of the declared type
 -- typical symptoms including memory corruptions. Use with great
 care."
   (the-in-policy value-type form **zero-typecheck-policy** start next result))
+
+;;; Like THE but provides some context information to be presented when the type error is signalled
+(def-ir1-translator the-context ((value-type context form) start next result)
+  (the-in-policy value-type form (lexenv-policy *lexenv*) start next result context))
 
 (def-ir1-translator bound-cast ((array bound index) start next result)
   (let ((check-bound-tran (make-ctran))
@@ -1010,8 +1014,12 @@ care."
       (info :function :macro-function 'callable-cast)
       (lambda (whole env)
         (declare (ignore env))
-        `(the callable ,@(cdddr whole))))
-              
+        `(the callable ,@(cdddr whole)))
+      (info :function :macro-function 'the-context)
+      (lambda (whole env)
+        (declare (ignore env))
+        `(the ,(cadr whole) ,@(cdddr whole))))
+
 ;;;; SETQ
 
               (defun explode-setq (form err-fun)

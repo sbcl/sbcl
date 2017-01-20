@@ -1454,7 +1454,8 @@
   ;; above. NULL if we do not have exit value semantics.
   (vestigial-exit-entry-lexenv nil :type (or lexenv null))
   ;; the lvar which is checked
-  (value (missing-arg) :type lvar))
+  (value (missing-arg) :type lvar)
+  (context nil))
 (defprinter (cast :identity t)
   %type-check
   value

@@ -1017,7 +1017,7 @@ of specialized arrays is supported."
         ((typep array 'vector)
          (list (length array)))
         (t
-         (sb!c::%type-check-error/c array 'object-not-array-error))))
+         (sb!c::%type-check-error/c array 'object-not-array-error nil))))
 
 (defun array-total-size (array)
   #!+sb-doc
@@ -1028,7 +1028,7 @@ of specialized arrays is supported."
         ((typep array 'vector)
          (length array))
         (t
-         (sb!c::%type-check-error/c array 'object-not-array-error))))
+         (sb!c::%type-check-error/c array 'object-not-array-error nil))))
 
 (defun array-displacement (array)
   #!+sb-doc

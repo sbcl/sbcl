@@ -373,7 +373,7 @@
 ;;; unsupplied. Such checking is impossible to efficiently do at the
 ;;; source level because our fixed-values conventions are optimized
 ;;; for the common MV-BIND case.
-(defun make-type-check-form (types)
+(defun make-type-check-form (types &optional context)
   (let ((temps (make-gensym-list (length types))))
     `(multiple-value-bind ,temps 'dummy
        ,@(mapcar (lambda (temp type)
@@ -386,8 +386,8 @@
                             (%interr-symbol-for-type-spec external-spec)))
                      `(unless (typep ,temp ',test)
                         ,(if interr-symbol
-                             `(%type-check-error/c ,temp ',interr-symbol)
-                             `(%type-check-error ,temp ',external-spec)))))
+                             `(%type-check-error/c ,temp ',interr-symbol ',context)
+                             `(%type-check-error ,temp ',external-spec ',context)))))
                  temps
                  types)
        (values ,@temps))))
@@ -399,7 +399,8 @@
   (declare (type cast cast) (type list types))
   (let ((value (cast-value cast))
         (length (length types)))
-    (filter-lvar value (make-type-check-form types))
+    (filter-lvar value (make-type-check-form types
+                                             (cast-context cast)))
     (reoptimize-lvar (cast-value cast))
     (setf (cast-type-to-check cast) *wild-type*)
     (setf (cast-%type-check cast) nil)

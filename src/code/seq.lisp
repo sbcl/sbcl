@@ -165,8 +165,8 @@
             ,vector-form))
          ,@(cond ((not other-form-p)
                   `((t
-                     (sb!c::%type-check-error
-                      ,sequence '(or list vector)))))
+                     (sb!c::%type-check-error ,sequence '(or list vector)
+                                              nil))))
                  (other-form
                   `(((extended-sequence-p ,sequence)
                      (let ((,sequence (truly-the extended-sequence ,sequence)))
@@ -174,7 +174,7 @@
                        ,other-form))
                     (t
                      (sb!c::%type-check-error/c
-                      ,sequence 'sb!kernel::object-not-sequence-error)))))))
+                      ,sequence 'sb!kernel::object-not-sequence-error nil)))))))
 
 ;;; Like SEQ-DISPATCH-CHECKING, but also assert that OTHER-FORM produces
 ;;; a sequence. This assumes that the containing function declares its

@@ -15,6 +15,9 @@
 (deftype byte-buffer () '(vector (unsigned-byte 8)))
 (defvar *byte-buffer*)
 (declaim (type byte-buffer *byte-buffer*))
+(defvar *contexts*)
+(declaim (type (vector t) *contexts*))
+
 
 ;;;; debug blocks
 
@@ -26,10 +29,11 @@
 ;;; The LOCATION-INFO structure holds the information what we need
 ;;; about locations which code generation decided were "interesting".
 (defstruct (location-info
-            (:constructor make-location-info (kind label vop))
+            (:constructor make-location-info (kind label vop context))
             (:copier nil))
   ;; The kind of location noted.
   (kind nil :type location-kind)
+  (context nil)
   ;; The label pointing to the interesting code location.
   (label nil :type (or label index null))
   ;; The VOP that emitted this location (for node, save-set, ir2-block, etc.)
@@ -38,10 +42,10 @@
 ;;; This is called during code generation in places where there is an
 ;;; "interesting" location: someplace where we are likely to end up
 ;;; in the debugger, and thus want debug info.
-(defun note-debug-location (vop label kind)
+(defun note-debug-location (vop label kind &optional context)
   (declare (type vop vop) (type (or label null) label)
            (type location-kind kind))
-  (let ((location (make-location-info kind label vop)))
+  (let ((location (make-location-info kind label vop context)))
     (setf (ir2-block-locations (vop-block vop))
           (nconc (ir2-block-locations (vop-block vop))
                  (list location)))
@@ -110,7 +114,8 @@
 ;;; the code/source map and live info. If true, VOP is the VOP
 ;;; associated with this location, for use in determining whether TNs
 ;;; are spilled.
-(defun dump-1-location (node block kind tlf-num label live var-locs vop)
+(defun dump-1-location (node block kind tlf-num label live var-locs vop
+                        &optional context)
   (declare (type node node) (type ir2-block block)
            (type (or null local-tn-bit-vector) live)
            (type (or label index) label)
@@ -139,11 +144,14 @@
                      :initial-element 0
                      :element-type 'bit)
          byte-buffer))
-
     (write-var-string (or (and (typep node 'combination)
                                (combination-step-info node))
                           "")
-                      byte-buffer))
+                      byte-buffer)
+    (write-var-integer (if context
+                           (1+ (vector-push-extend context *contexts*))
+                           0)
+                       byte-buffer))
   (values))
 
 ;;; Extract context info from a Location-Info structure and use it to
@@ -159,7 +167,8 @@
                      (location-info-label loc)
                      (vop-save-set vop)
                      var-locs
-                     vop))
+                     vop
+                     (location-info-context loc)))
   (values))
 
 ;;; Scan all the blocks, determining if all locations are in the same
@@ -213,6 +222,9 @@
    (let ((*previous-location* 0)
          (physenv (lambda-physenv fun))
          (byte-buffer *byte-buffer*)
+         (*contexts* (make-array 10
+                                 :fill-pointer 0
+                                 :adjustable t))
          prev-block
          locations
          elsewhere-locations)
@@ -241,7 +253,7 @@
 
      (values (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
                                       byte-buffer)
-             tlf-num form-number))))
+             tlf-num form-number *contexts*))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -573,11 +585,12 @@
                  (compute-args fun var-locs))))
 
     (if (and (>= level 2) (not toplevel-p))
-        (multiple-value-bind (blocks tlf-num form-number)
+        (multiple-value-bind (blocks tlf-num form-number contexts)
             (compute-debug-blocks fun var-locs)
           (setf (compiled-debug-fun-blocks dfun) blocks
                 (compiled-debug-fun-tlf-number dfun) tlf-num
-                (compiled-debug-fun-form-number dfun) form-number))
+                (compiled-debug-fun-form-number dfun) form-number
+                (compiled-debug-fun-contexts dfun) (coerce contexts 'simple-vector)))
         (multiple-value-bind (tlf-num form-number) (find-tlf-number fun)
           (setf (compiled-debug-fun-tlf-number dfun) tlf-num
                 (compiled-debug-fun-form-number dfun) form-number)))

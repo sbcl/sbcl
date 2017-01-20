@@ -2302,14 +2302,15 @@ is :ANY, the function name is not checked."
     (when action (funcall action node))))
 
 ;;;
-(defun make-cast (value type policy)
+(defun make-cast (value type policy &optional context)
   (declare (type lvar value)
            (type ctype type)
            (type policy policy))
   (%make-cast :asserted-type type
               :type-to-check (maybe-weaken-check type policy)
               :value value
-              :derived-type (coerce-to-values type)))
+              :derived-type (coerce-to-values type)
+              :context context))
 
 (defun cast-type-check (cast)
   (declare (type cast cast))

@@ -467,7 +467,7 @@
              (:include code-location)
              (:constructor make-known-code-location
                            (pc debug-fun %debug-block %tlf-offset %form-number
-                               %live-set kind step-info &aux (%unknown-p nil)))
+                               %live-set kind step-info context &aux (%unknown-p nil)))
              (:constructor make-compiled-code-location (pc debug-fun))
              (:copier nil))
   ;; an index into DEBUG-FUN's component slot
@@ -479,7 +479,8 @@
   ;; (unexported) To see SB!C::LOCATION-KIND, do
   ;; (SB!KERNEL:TYPEXPAND 'SB!C::LOCATION-KIND).
   (kind :unparsed :type (or (member :unparsed) sb!c::location-kind))
-  (step-info :unparsed :type (or (member :unparsed :foo) simple-string)))
+  (step-info :unparsed :type (or (member :unparsed :foo) simple-string))
+  (context :unparsed))
 
 ;;;; frames
 
@@ -1646,20 +1647,24 @@ register."
            (when (>= i len) (return))
            (let ((block (make-compiled-debug-block)))
              (dotimes (k (sb!c:read-var-integerf blocks i))
-               (let ((kind (svref sb!c::*compiled-code-location-kinds*
-                                  (aref+ blocks i)))
-                     (pc (+ last-pc
-                            (sb!c:read-var-integerf blocks i)))
-                     (tlf-offset (or tlf-number
-                                     (sb!c:read-var-integerf blocks i)))
-                     (form-number (sb!c:read-var-integerf blocks i))
-                     (live-set (sb!c:read-packed-bit-vector
-                                live-set-len blocks i))
-                     (step-info (sb!c:read-var-string blocks i)))
+               (let* ((kind (svref sb!c::*compiled-code-location-kinds*
+                                   (aref+ blocks i)))
+                      (pc (+ last-pc
+                             (sb!c:read-var-integerf blocks i)))
+                      (tlf-offset (or tlf-number
+                                      (sb!c:read-var-integerf blocks i)))
+                      (form-number (sb!c:read-var-integerf blocks i))
+                      (live-set (sb!c:read-packed-bit-vector
+                                 live-set-len blocks i))
+                      (step-info (sb!c:read-var-string blocks i))
+                      (context-index (sb!c:read-var-integerf blocks i))
+                      (context (and (plusp context-index)
+                                    (svref (sb!c::compiled-debug-fun-contexts compiler-debug-fun)
+                                           (1- context-index)))))
                  (vector-push-extend (make-known-code-location
                                       pc debug-fun block tlf-offset
                                       form-number live-set kind
-                                      step-info)
+                                      step-info context)
                                      locations-buffer)
                  (setf last-pc pc)))
              (setf (compiled-debug-block-code-locations block)
@@ -1911,6 +1916,7 @@ register."
   (if (code-location-unknown-p code-location)
       nil
       (let ((live-set (compiled-code-location-%live-set code-location)))
+        (fill-in-code-location code-location)
         (cond ((eq live-set :unparsed)
                (unless (fill-in-code-location code-location)
                  ;; This check should be unnecessary. We're missing
@@ -1921,6 +1927,22 @@ register."
                  (bug "unknown code location"))
                (compiled-code-location-%live-set code-location))
               (t live-set)))))
+
+(defun code-location-context (code-location)
+  (unless (code-location-unknown-p code-location)
+    (let ((context (compiled-code-location-context code-location)))
+      (cond ((eq context :unparsed)
+             (etypecase code-location
+               (compiled-code-location
+                (unless (fill-in-code-location code-location)
+                  (bug "unknown code location"))
+                (compiled-code-location-context code-location))))
+            (t context)))))
+
+(defun error-context ()
+  (let ((frame sb!debug:*stack-top-hint*))
+    (when frame
+      (code-location-context (frame-code-location frame)))))
 
 ;;; true if OBJ1 and OBJ2 are the same place in the code
 (defun code-location= (obj1 obj2)
@@ -1970,6 +1992,8 @@ register."
                     (compiled-code-location-kind loc))
               (setf (compiled-code-location-step-info code-location)
                     (compiled-code-location-step-info loc))
+              (setf (compiled-code-location-context code-location)
+                    (compiled-code-location-context loc))
               (return-from fill-in-code-location t))))))))
 
 ;;;; operations on DEBUG-BLOCKs
