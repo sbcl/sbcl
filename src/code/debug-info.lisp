@@ -54,10 +54,21 @@
 ;;;;    ...more <kind, delta, top level form offset, form-number, live-set>
 ;;;;       tuples...
 
-(defparameter *compiled-code-location-kinds*
-  #(:unknown-return :known-return :internal-error :non-local-exit
-    :block-start :call-site :single-value-return :non-local-entry
-    :step-before-vop))
+(defconstant-eqx +compiled-code-location-kinds+
+    #(:unknown-return :known-return :internal-error :non-local-exit
+      :block-start :call-site :single-value-return :non-local-entry
+      :step-before-vop)
+  #'equalp)
+
+(eval-when (:compile-toplevel)
+  (assert (<= (integer-length (1- (length +compiled-code-location-kinds+))) 4)))
+
+;;; Location flags, encoded in the low 4 bits of loction kind byte
+(defconstant compiled-code-location-stepping         (ash #b0001 4))
+(defconstant compiled-code-location-context          (ash #b0010 4))
+(defconstant compiled-code-location-live             (ash #b0100 4))
+(defconstant compiled-code-location-zero-form-number (ash #b1000 4))
+
 
 ;;;; DEBUG-FUN objects
 

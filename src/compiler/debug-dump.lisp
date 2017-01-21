@@ -122,36 +122,45 @@
            (type location-kind kind) (type (or index null) tlf-num)
            (type hash-table var-locs) (type (or vop null) vop))
 
-  (let ((byte-buffer *byte-buffer*))
+  (let ((byte-buffer *byte-buffer*)
+        (stepping (and (combination-p node)
+                       (combination-step-info node)))
+        (anything-alive (and live
+                             (find 1 live)))
+        (path (node-source-path node)))
     (vector-push-extend
-     (position-or-lose kind *compiled-code-location-kinds*)
+     (logior
+      (if context
+          compiled-code-location-context
+          0)
+      (if stepping
+          compiled-code-location-stepping
+          0)
+      (if anything-alive
+          compiled-code-location-live
+          0)
+      (if (zerop (source-path-form-number path))
+          compiled-code-location-zero-form-number
+          0)
+      (position-or-lose kind +compiled-code-location-kinds+))
      byte-buffer)
 
     (let ((loc (if (fixnump label) label (label-position label))))
       (write-var-integer (- loc *previous-location*) byte-buffer)
       (setq *previous-location* loc))
 
-    (let ((path (node-source-path node)))
-      (unless tlf-num
-        (write-var-integer (source-path-tlf-number path) byte-buffer))
+    (unless tlf-num
+      (write-var-integer (source-path-tlf-number path) byte-buffer))
+    (unless (zerop (source-path-form-number path))
       (write-var-integer (source-path-form-number path) byte-buffer))
 
-    (if live
-        (write-packed-bit-vector (compute-live-vars live node block var-locs vop)
-                                 byte-buffer)
-        (write-packed-bit-vector
-         (make-array (logandc2 (+ (hash-table-count var-locs) 7) 7)
-                     :initial-element 0
-                     :element-type 'bit)
-         byte-buffer))
-    (write-var-string (or (and (typep node 'combination)
-                               (combination-step-info node))
-                          "")
-                      byte-buffer)
-    (write-var-integer (if context
-                           (1+ (vector-push-extend context *contexts*))
-                           0)
-                       byte-buffer))
+    (when anything-alive
+      (write-packed-bit-vector (compute-live-vars live node block var-locs vop)
+                               byte-buffer))
+    (when stepping
+      (write-var-string stepping byte-buffer))
+    (when context
+      (write-var-integer (vector-push-extend context *contexts*) byte-buffer)))
   (values))
 
 ;;; Extract context info from a Location-Info structure and use it to
@@ -565,10 +574,10 @@
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
          (actual-level (policy (lambda-bind fun) compute-debug-fun))
-         (level (if #!+sb-dyncount *collect-dynamic-statistics*
-                    #!-sb-dyncount nil
-                    (max actual-level 2)
-                    actual-level))
+         (level (cond #!+sb-dyncount
+                      (*collect-dynamic-statistics*
+                       (max actual-level 2))
+                      (actual-level)))
          (toplevel-p (eq :toplevel (compiled-debug-fun-kind dfun))))
     (cond ((or (zerop level) toplevel-p))
           ((and (<= level 1)
@@ -590,7 +599,9 @@
           (setf (compiled-debug-fun-blocks dfun) blocks
                 (compiled-debug-fun-tlf-number dfun) tlf-num
                 (compiled-debug-fun-form-number dfun) form-number
-                (compiled-debug-fun-contexts dfun) (coerce contexts 'simple-vector)))
+                (compiled-debug-fun-contexts dfun)
+                (and (plusp (length contexts))
+                     (coerce contexts 'simple-vector))))
         (multiple-value-bind (tlf-num form-number) (find-tlf-number fun)
           (setf (compiled-debug-fun-tlf-number dfun) tlf-num
                 (compiled-debug-fun-form-number dfun) form-number)))

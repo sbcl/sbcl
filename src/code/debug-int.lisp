@@ -1647,20 +1647,29 @@ register."
            (when (>= i len) (return))
            (let ((block (make-compiled-debug-block)))
              (dotimes (k (sb!c:read-var-integerf blocks i))
-               (let* ((kind (svref sb!c::*compiled-code-location-kinds*
-                                   (aref+ blocks i)))
+               (let* ((flags (aref+ blocks i))
+                      (kind (svref sb!c::+compiled-code-location-kinds+
+                                   (ldb (byte 4 0) flags)))
                       (pc (+ last-pc
                              (sb!c:read-var-integerf blocks i)))
                       (tlf-offset (or tlf-number
                                       (sb!c:read-var-integerf blocks i)))
-                      (form-number (sb!c:read-var-integerf blocks i))
-                      (live-set (sb!c:read-packed-bit-vector
-                                 live-set-len blocks i))
-                      (step-info (sb!c:read-var-string blocks i))
-                      (context-index (sb!c:read-var-integerf blocks i))
-                      (context (and (plusp context-index)
-                                    (svref (sb!c::compiled-debug-fun-contexts compiler-debug-fun)
-                                           (1- context-index)))))
+                      (form-number
+                        (if (logtest sb!c::compiled-code-location-zero-form-number flags)
+                            0
+                            (sb!c:read-var-integerf blocks i)))
+                      (live-set
+                        (if (logtest sb!c::compiled-code-location-live flags)
+                            (sb!c:read-packed-bit-vector live-set-len blocks i)
+                            (make-array (* live-set-len 8) :element-type 'bit)))
+                      (step-info
+                        (if (logtest sb!c::compiled-code-location-stepping flags)
+                            (sb!c:read-var-string blocks i)
+                            ""))
+                      (context
+                        (and (logtest sb!c::compiled-code-location-context flags)
+                             (svref (sb!c::compiled-debug-fun-contexts compiler-debug-fun)
+                                    (sb!c:read-var-integerf blocks i)))))
                  (vector-push-extend (make-known-code-location
                                       pc debug-fun block tlf-offset
                                       form-number live-set kind
