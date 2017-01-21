@@ -292,27 +292,43 @@
 ;;; we don't care how it looks, but can recover the intended specialization.
 
 (defun coerce-to-smallest-eltype (seq)
-  (let ((maxoid 0) (length 0))
+  (let ((max-positive 0)
+        (max-negative 0)
+        (length 0))
     (flet ((frob (x)
-             (if (typep x 'unsigned-byte)
-                 (when (>= x maxoid)
-                   (setf maxoid x))
-                 (return-from coerce-to-smallest-eltype
-                   (coerce seq 'simple-vector)))))
+             (typecase x
+               ((integer 0)
+                (when (>= x max-positive)
+                  (setf max-positive x)))
+               ((integer * -1)
+                (let ((abs (- x)))
+                  (when (>= abs max-negative)
+                    (setf max-negative abs))))
+               (t
+                (return-from coerce-to-smallest-eltype
+                  (coerce seq 'simple-vector))))))
       (if (listp seq)
           (dolist (i seq)
-            (incf length) ; so not to traverse again to compute it
+            (incf length)     ; so not to traverse again to compute it
             (frob i))
           (dovector (i seq (setq length (length seq)))
             (frob i)))
-      (let ((specializer (etypecase maxoid
-                           ((unsigned-byte 8) '(unsigned-byte 8))
-                           ((unsigned-byte 16) '(unsigned-byte 16))
-                           ((unsigned-byte 32) '(unsigned-byte 32))
-                           ((unsigned-byte 64) '(unsigned-byte 64)))))
-        ;; formerly (coerce seq `(simple-array ,specializer (*)))
-        ;; plus a kludge for cross-compilation. This is nicer.
-        (!make-specialized-array length specializer seq)))))
+      (if (zerop length)
+          #()
+          (let* ((negative (plusp max-negative))
+                 (bits (max (+ (integer-length (max max-positive
+                                                    (1- max-negative)))
+                               (if negative 1 0))
+                            8))
+                 ;; Next power of two
+                 (bits (if (= (logcount bits) 1)
+                           bits
+                           (ash 1 (integer-length bits)))))
+            ;; formerly (coerce seq `(simple-array ,specializer (*)))
+            ;; plus a kludge for cross-compilation. This is nicer.
+            (!make-specialized-array length `(,(if negative
+                                                   'signed-byte
+                                                   'unsigned-byte) ,bits) seq))))))
 
 ;;;; variables
 
@@ -471,7 +487,7 @@
     (coerce buffer 'simple-vector)))
 
 ;;; Return VAR's relative position in the function's variables (determined
-;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DELETED.
+;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DEBUG-INFO-VAR-DELETED.
 (defun debug-location-for (var var-locs)
   (declare (type lambda-var var) (type hash-table var-locs))
   (let ((res (gethash var var-locs)))
@@ -479,7 +495,7 @@
           (t
            (aver (or (null (leaf-refs var))
                      (not (tn-offset (leaf-info var)))))
-           'deleted))))
+           debug-info-var-deleted))))
 
 ;;;; arguments/returns
 
@@ -512,16 +528,16 @@
                                             (return-from one-arg))
                                            (more
                                             (setf (arg-info-default info) t)))
-                                     (res 'rest-arg)))
+                                     (res debug-info-var-rest)))
                                   (:more-context
-                                   (res 'more-arg))
+                                   (res debug-info-var-more))
                                   (:optional
                                    (unless saw-optional
-                                     (res 'optional-args)
+                                     (res debug-info-var-optional)
                                      (setq saw-optional t))))
                                 (res (debug-location-for actual var-locs))
                                 (when (arg-info-supplied-p info)
-                                  (res 'supplied-p)
+                                  (res debug-info-var-supplied-p)
                                   (res (debug-location-for (pop actual-vars) var-locs))))
                                 (t
                                  (res (debug-location-for actual var-locs)))))))
@@ -536,8 +552,7 @@
 ;;; (Must be known values return...)
 (defun compute-debug-returns (fun)
   (coerce-to-smallest-eltype
-   (mapcar (lambda (loc)
-             (tn-sc-offset loc))
+   (mapcar #'tn-sc-offset
            (return-info-locations (tail-set-info (lambda-tail-set fun))))))
 
 ;;;; debug functions
@@ -550,12 +565,23 @@
          (main-p (and dispatch
                       (eq fun (optional-dispatch-main-entry dispatch))))
          (kind (if main-p nil (functional-kind fun)))
-         (name (leaf-debug-name fun)))
+         (name (leaf-debug-name fun))
+         (name (if (consp name)
+                   (case (car name)
+                     ((xep tl-xep)
+                      (assert (eq kind :external))
+                      (second name))
+                     (&optional-processor
+                      (setf kind :optional)
+                      (second name))
+                     (&more-processor
+                      (setf kind :more)
+                      (second name))
+                     (t
+                      name))
+                   name)))
     (funcall (compiled-debug-fun-ctor kind)
-             :name (cond ((typep name '(cons (member xep tl-xep) (cons t null)))
-                          (assert (eq kind :external))
-                          (second name))
-                         (t name))
+             :name name
              #!-fp-and-pc-standard-save :return-pc
              #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
              #!-fp-and-pc-standard-save :old-fp

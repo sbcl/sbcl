@@ -616,7 +616,7 @@ thread, NIL otherwise."
           info))
 
 (defun clean-&more-processor (name args info)
-  (values (second name)
+  (values name
           (if (consp args)
               (let* ((more (last args 2))
                      (context (first more))
@@ -629,7 +629,7 @@ thread, NIL otherwise."
                      (list
                       (make-unprintable-object "more unavailable arguments")))))
               args)
-          (cons :more info)))
+          info))
 
 (defun clean-fast-method (name args style info)
   (declare (type (member :minimal :normal :full) style))
@@ -653,17 +653,11 @@ thread, NIL otherwise."
   (let ((args (frame-args-as-list frame)))
     (cond ((memq :external info)
            (clean-xep frame name args info))
-          ((consp name)
-           (case (first name)
-             ((sb!c::&more-processor)
-              (clean-&more-processor name args info))
-             ((sb!c::&optional-processor)
-              (clean-frame-call frame (second name) method-frame-style
-                                info))
-             ((sb!pcl::fast-method)
-              (clean-fast-method name args method-frame-style info))
-             (t
-              (values name args info))))
+          ((memq :more info)
+           (clean-&more-processor name args info))
+          ((and (consp name)
+                (eq (car name) 'sb!pcl::fast-method))
+           (clean-fast-method name args method-frame-style info))
           (t
            (values name args info)))))
 

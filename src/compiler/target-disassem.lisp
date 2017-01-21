@@ -1462,7 +1462,7 @@
                          (sb!c::compiled-debug-fun-start-pc fmap-entry))
                  (cond (#+nil (eq last-offset fun-offset)
                         (and (equal name fname)
-                             (neq kind :external)
+                             (null kind)
                              (not first-block-seen-p))
                               (setf first-block-seen-p t))
                        ((eq kind :external)

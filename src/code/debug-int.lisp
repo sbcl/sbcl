@@ -1320,7 +1320,7 @@ register."
                                    (code-header-words component))
                                 sb!vm:n-word-bytes))))))
 
-;;; Return the kind of the function, which is one of :OPTIONAL,
+;;; Return the kind of the function, which is one of :OPTIONAL, :MORE
 ;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.
 (defun debug-fun-kind (debug-fun)
   ;; FIXME: This "is one of" information should become part of the function
@@ -1484,31 +1484,31 @@ register."
                        tag-and-info)
                    result))
            (var-or-deleted (index-or-deleted)
-             (if (eq index-or-deleted 'sb!c::deleted)
+             (if (eq index-or-deleted sb!c::debug-info-var-deleted)
                  :deleted
                  (svref vars index-or-deleted))))
       (loop
          :while (< i len)
          :for ele = (aref args i) :do
          (cond
-           ((eq ele 'sb!c::optional-args)
+           ((eq ele sb!c::debug-info-var-optional)
             (setf optionalp t))
-           ((eq ele 'sb!c::rest-arg)
+           ((eq ele sb!c::debug-info-var-rest)
             (push-var '(:rest) 1))
            ;; The next two args are the &MORE arg context and
            ;; count.
-           ((eq ele 'sb!c::more-arg)
+           ((eq ele sb!c::debug-info-var-more)
             (push-var '(:more) 2))
            ;; SUPPLIED-P var immediately following keyword or
            ;; optional. Stick the extra var in the result element
            ;; representing the keyword or optional, which is the
            ;; previous one.
-           ((eq ele 'sb!c::supplied-p)
+           ((eq ele sb!c::debug-info-var-supplied-p)
             (push-var (pop result) 1))
            ;; The keyword of a keyword parameter. Store it so the next
            ;; element can be used to form a (:keyword KEYWORD VALUE)
            ;; entry.
-           ((typep ele '(and symbol (not (eql sb!c::deleted))))
+           ((typep ele 'symbol)
             (setf keyword ele))
            ;; The previous element was the keyword of a keyword
            ;; parameter and is stored in KEYWORD. The current element
@@ -1522,7 +1522,7 @@ register."
            (optionalp
             (push-var (list :optional (var-or-deleted ele))))
            ;; Deleted required, optional or keyword argument.
-           ((eq ele 'sb!c::deleted)
+           ((eq ele sb!c::debug-info-var-deleted)
             (push-var :deleted))
            ;; Required arg at beginning of args array.
            (t
@@ -1536,7 +1536,7 @@ register."
            (simple-vector vars))
   (let ((ele (aref args i)))
     (cond ((not (symbolp ele)) (svref vars ele))
-          ((eq ele 'sb!c::deleted) :deleted)
+          ((eq ele sb!c::debug-info-var-deleted) :deleted)
           (t (error "malformed arguments description")))))
 
 (defun compiled-debug-fun-debug-info (debug-fun)

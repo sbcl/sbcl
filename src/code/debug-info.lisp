@@ -69,6 +69,12 @@
 (defconstant compiled-code-location-live             (ash #b0100 4))
 (defconstant compiled-code-location-zero-form-number (ash #b1000 4))
 
+(defconstant debug-info-var-deleted -1)
+(defconstant debug-info-var-rest -2)
+(defconstant debug-info-var-more -3)
+(defconstant debug-info-var-optional -4)
+(defconstant debug-info-var-supplied-p -5)
+
 
 ;;;; DEBUG-FUN objects
 
@@ -191,6 +197,10 @@
                                          #-sb-xc-host (:pure t)
                                          (:copier nil)
                                          (:predicate nil)))
+(def!struct (compiled-debug-fun-more (:include compiled-debug-fun)
+                                     #-sb-xc-host (:pure t)
+                                     (:copier nil)
+                                     (:predicate nil)))
 (def!struct (compiled-debug-fun-external (:include compiled-debug-fun)
                                          #-sb-xc-host (:pure t)
                                          (:copier nil)
@@ -207,6 +217,7 @@
 (defun compiled-debug-fun-ctor (kind)
   (ecase kind
     (:optional #'make-compiled-debug-fun-optional)
+    (:more #'make-compiled-debug-fun-more)
     (:external #'make-compiled-debug-fun-external)
     (:toplevel #'make-compiled-debug-fun-toplevel)
     (:cleanup #'make-compiled-debug-fun-cleanup)
@@ -215,6 +226,7 @@
 (defun compiled-debug-fun-kind (debug-fun)
   (etypecase debug-fun
     (compiled-debug-fun-optional :optional)
+    (compiled-debug-fun-more :more)
     (compiled-debug-fun-external :external)
     (compiled-debug-fun-toplevel :toplevel)
     (compiled-debug-fun-cleanup :cleanup)
