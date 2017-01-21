@@ -37,7 +37,8 @@
   (loop with policy = (lexenv-policy (node-lexenv call))
         for args on (basic-combination-args call)
         and var in (lambda-vars fun)
-        do (assert-lvar-type (car args) (leaf-type var) policy)
+        do (assert-lvar-type (car args) (leaf-type var) policy
+                             (cons :bind (lambda-var-%source-name var)))
         do (unless (leaf-refs var)
              (flush-dest (car args))
              (setf (car args) nil)))

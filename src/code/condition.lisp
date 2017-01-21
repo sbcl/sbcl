@@ -515,11 +515,16 @@
 (define-condition storage-condition (serious-condition) ())
 
 (defun decode-type-error-context (context)
-  (typecase context
-    ((cons (eql :struct))
-     (format nil "when setting slot ~s of structure ~s"
-             (third context) (second context)))
-    (t context)))
+  (if (consp context)
+      (case (car context)
+        (:struct
+         (format nil "when setting slot ~s of structure ~s"
+                 (cddr context) (cadr context)))
+        (:bind
+         (format nil "when binding ~s"
+                 (cdr context)))
+        (t context))
+      context))
 
 (define-condition type-error (error)
   ((datum :reader type-error-datum :initarg :datum)

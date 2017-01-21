@@ -406,11 +406,11 @@
            (unlink-node node))))
 
 ;;; Make a CAST and insert it into IR1 before node NEXT.
-(defun insert-cast-before (next lvar type policy)
+(defun insert-cast-before (next lvar type policy &optional context)
   (declare (type node next) (type lvar lvar) (type ctype type))
   (with-ir1-environment-from-node next
     (let* ((ctran (node-prev next))
-           (cast (make-cast lvar type policy))
+           (cast (make-cast lvar type policy context))
            (internal-ctran (make-ctran)))
       (setf (ctran-next ctran) cast
             (node-prev cast) ctran)

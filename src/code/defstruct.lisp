@@ -1047,7 +1047,7 @@ unless :NAMED is also specified.")))
                        (if (eq type-spec t)
                            newval
                            `(the-context ,type-spec
-                                         (:struct ,(dd-name dd) ,(dsd-name dsd))
+                                         (:struct ,(dd-name dd) . ,(dsd-name dsd))
                                          ,newval))))
                 (ecase function
                   (:setf
@@ -1630,7 +1630,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                 (if (eq type t)
                                     var
                                     `(the-context ,type
-                                                  (:struct ,(dd-name dd) ,(dsd-name dsd))
+                                                  (:struct ,(dd-name dd) . ,(dsd-name dsd))
                                                   ,var))))
                             (dd-slots dd) lambda-list))))))
   (destructuring-bind (llks &optional req opt rest keys aux) args

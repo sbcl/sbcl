@@ -313,13 +313,14 @@
 ;;; splitting off DEST a new CAST node; old LVAR will deliver values
 ;;; to CAST. If we improve the assertion, we set TYPE-CHECK and
 ;;; TYPE-ASSERTED to guarantee that the new assertion will be checked.
-(defun assert-lvar-type (lvar type policy)
+(defun assert-lvar-type (lvar type policy &optional context)
   (declare (type lvar lvar) (type ctype type))
   (unless (values-subtypep (lvar-derived-type lvar) type)
     (let ((internal-lvar (make-lvar))
           (dest (lvar-dest lvar)))
       (substitute-lvar internal-lvar lvar)
-      (let ((cast (insert-cast-before dest lvar type policy)))
+      (let ((cast (insert-cast-before dest lvar type policy
+                                      context)))
         (use-lvar cast internal-lvar)
         t))))
 
