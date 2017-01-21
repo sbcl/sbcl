@@ -375,7 +375,7 @@
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :tl-xep))
-  (assert-backtrace #'namestring '(((namestring) (:tl :external))) :details t)
+  (assert-backtrace #'namestring '(((namestring) (:external))) :details t)
   (assert-backtrace #'namestring '((namestring))))
 
 (with-test (:name (:backtrace :more-processor))

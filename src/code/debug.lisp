@@ -589,7 +589,7 @@ thread, NIL otherwise."
       (make-unprintable-object "unavailable lambda list"))))
 
 (defun clean-xep (frame name args info)
-  (values (second name)
+  (values name
           #!-precise-arg-count-error
           (if (consp args)
               (let* ((count (first args))
@@ -613,9 +613,7 @@ thread, NIL otherwise."
                    (not (sb!di::tl-invalid-arg-count-error-p frame)))
               (rest args)
               args)
-          (if (eq (car name) 'sb!c::tl-xep)
-              (cons :tl info)
-              info)))
+          info))
 
 (defun clean-&more-processor (name args info)
   (values (second name)
@@ -653,20 +651,21 @@ thread, NIL otherwise."
 
 (defun clean-frame-call (frame name method-frame-style info)
   (let ((args (frame-args-as-list frame)))
-    (if (consp name)
-        (case (first name)
-          ((sb!c::xep sb!c::tl-xep)
+    (cond ((memq :external info)
            (clean-xep frame name args info))
-          ((sb!c::&more-processor)
-           (clean-&more-processor name args info))
-          ((sb!c::&optional-processor)
-           (clean-frame-call frame (second name) method-frame-style
-                             info))
-          ((sb!pcl::fast-method)
-           (clean-fast-method name args method-frame-style info))
+          ((consp name)
+           (case (first name)
+             ((sb!c::&more-processor)
+              (clean-&more-processor name args info))
+             ((sb!c::&optional-processor)
+              (clean-frame-call frame (second name) method-frame-style
+                                info))
+             ((sb!pcl::fast-method)
+              (clean-fast-method name args method-frame-style info))
+             (t
+              (values name args info))))
           (t
-           (values name args info)))
-        (values name args info))))
+           (values name args info)))))
 
 (defun frame-call (frame &key (method-frame-style *method-frame-style*)
                               replace-dynamic-extent-objects)

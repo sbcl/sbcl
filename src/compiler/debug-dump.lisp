@@ -548,22 +548,27 @@
   (let* ((2env (physenv-info (lambda-physenv fun)))
          (dispatch (lambda-optional-dispatch fun))
          (main-p (and dispatch
-                      (eq fun (optional-dispatch-main-entry dispatch)))))
-    (funcall (compiled-debug-fun-ctor (if main-p nil (functional-kind fun)))
-     :name (leaf-debug-name fun)
-     #!-fp-and-pc-standard-save :return-pc
-     #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
-     #!-fp-and-pc-standard-save :old-fp
-     #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-old-fp 2env))
-     :start-pc (label-position (ir2-physenv-environment-start 2env))
-     :elsewhere-pc (label-position (ir2-physenv-elsewhere-start 2env))
-     :closure-save (when (ir2-physenv-closure-save-tn 2env)
-                     (tn-sc-offset (ir2-physenv-closure-save-tn 2env)))
-     #!+unwind-to-frame-and-call-vop
-     :bsp-save
-     #!+unwind-to-frame-and-call-vop
-     (when (ir2-physenv-bsp-save-tn 2env)
-       (tn-sc-offset (ir2-physenv-bsp-save-tn 2env))))))
+                      (eq fun (optional-dispatch-main-entry dispatch))))
+         (kind (if main-p nil (functional-kind fun)))
+         (name (leaf-debug-name fun)))
+    (funcall (compiled-debug-fun-ctor kind)
+             :name (cond ((typep name '(cons (member xep tl-xep) (cons t null)))
+                          (assert (eq kind :external))
+                          (second name))
+                         (t name))
+             #!-fp-and-pc-standard-save :return-pc
+             #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
+             #!-fp-and-pc-standard-save :old-fp
+             #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-old-fp 2env))
+             :start-pc (label-position (ir2-physenv-environment-start 2env))
+             :elsewhere-pc (label-position (ir2-physenv-elsewhere-start 2env))
+             :closure-save (when (ir2-physenv-closure-save-tn 2env)
+                             (tn-sc-offset (ir2-physenv-closure-save-tn 2env)))
+             #!+unwind-to-frame-and-call-vop
+             :bsp-save
+             #!+unwind-to-frame-and-call-vop
+             (when (ir2-physenv-bsp-save-tn 2env)
+               (tn-sc-offset (ir2-physenv-bsp-save-tn 2env))))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as

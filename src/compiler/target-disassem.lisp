@@ -1461,7 +1461,9 @@
                          last-offset
                          (sb!c::compiled-debug-fun-start-pc fmap-entry))
                  (cond (#+nil (eq last-offset fun-offset)
-                              (and (equal name fname) (not first-block-seen-p))
+                        (and (equal name fname)
+                             (neq kind :external)
+                             (not first-block-seen-p))
                               (setf first-block-seen-p t))
                        ((eq kind :external)
                         (when first-block-seen-p

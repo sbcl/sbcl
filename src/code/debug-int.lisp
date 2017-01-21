@@ -1282,26 +1282,15 @@ register."
                 (when (typep val 'sb!interpreter:interpreted-function)
                   (%fun-name val))))))) ; Get its name
        ((sb!c::compiled-debug-fun-closure-save compiler-debug-fun)
-        (let ((closure-name
-                (sb!impl::closure-name
-                 #!+precise-arg-count-error
-                 (if (tl-invalid-arg-count-error-p frame)
-                     (sub-access-debug-var-slot (frame-pointer frame)
-                                                sb!c:closure-sc
-                                                (compiled-frame-escaped frame))
-                     (sub-access-debug-var-slot (frame-pointer frame) it))
-                 #!-precise-arg-count-error
-                 (sub-access-debug-var-slot (frame-pointer frame) it))))
-          (if closure-name
-              ;; The logic in CLEAN-FRAME-CALL is based on the frame name,
-              ;; so if the simple-fun is named (XEP mumble) then the closure
-              ;; needs to pretend to be named similarly.
-              (let ((simple-fun-name
-                      (sb!di:debug-fun-name debug-fun)))
-                (if (and (listp simple-fun-name)
-                         (eq (car simple-fun-name) 'sb!c::xep))
-                    `(sb!c::xep ,closure-name)
-                    closure-name))))))))
+        (sb!impl::closure-name
+         #!+precise-arg-count-error
+         (if (tl-invalid-arg-count-error-p frame)
+             (sub-access-debug-var-slot (frame-pointer frame)
+                                        sb!c:closure-sc
+                                        (compiled-frame-escaped frame))
+             (sub-access-debug-var-slot (frame-pointer frame) it))
+         #!-precise-arg-count-error
+         (sub-access-debug-var-slot (frame-pointer frame) it))))))
 
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
 (defun fun-debug-fun (fun)
