@@ -123,7 +123,8 @@
       (assert-lvar-type
        new-value
        (array-type-specialized-element-type type)
-       (lexenv-policy (node-lexenv (lvar-dest new-value))))))
+       (lexenv-policy (node-lexenv (lvar-dest new-value)))
+       'aref)))
   (lvar-type new-value))
 
 ;;; Return true if ARG is NIL, or is a constant-lvar whose
