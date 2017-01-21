@@ -160,7 +160,9 @@
     (when stepping
       (write-var-string stepping byte-buffer))
     (when context
-      (write-var-integer (vector-push-extend context *contexts*) byte-buffer)))
+      (write-var-integer (or (position context *contexts* :test #'equal)
+                             (vector-push-extend context *contexts*))
+                         byte-buffer)))
   (values))
 
 ;;; Extract context info from a Location-Info structure and use it to
@@ -231,9 +233,6 @@
    (let ((*previous-location* 0)
          (physenv (lambda-physenv fun))
          (byte-buffer *byte-buffer*)
-         (*contexts* (make-array 10
-                                 :fill-pointer 0
-                                 :adjustable t))
          prev-block
          locations
          elsewhere-locations)
@@ -262,7 +261,7 @@
 
      (values (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
                                       byte-buffer)
-             tlf-num form-number *contexts*))))
+             tlf-num form-number))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -550,9 +549,8 @@
          (dispatch (lambda-optional-dispatch fun))
          (main-p (and dispatch
                       (eq fun (optional-dispatch-main-entry dispatch)))))
-    (make-compiled-debug-fun
+    (funcall (compiled-debug-fun-ctor (if main-p nil (functional-kind fun)))
      :name (leaf-debug-name fun)
-     :kind (if main-p nil (functional-kind fun))
      #!-fp-and-pc-standard-save :return-pc
      #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
      #!-fp-and-pc-standard-save :old-fp
@@ -594,14 +592,11 @@
                  (compute-args fun var-locs))))
 
     (if (and (>= level 1) (not toplevel-p))
-        (multiple-value-bind (blocks tlf-num form-number contexts)
+        (multiple-value-bind (blocks tlf-num form-number)
             (compute-debug-blocks fun var-locs)
           (setf (compiled-debug-fun-blocks dfun) blocks
                 (compiled-debug-fun-tlf-number dfun) tlf-num
-                (compiled-debug-fun-form-number dfun) form-number
-                (compiled-debug-fun-contexts dfun)
-                (and (plusp (length contexts))
-                     (coerce contexts 'simple-vector))))
+                (compiled-debug-fun-form-number dfun) form-number))
         (multiple-value-bind (tlf-num form-number) (find-tlf-number fun)
           (setf (compiled-debug-fun-tlf-number dfun) tlf-num
                 (compiled-debug-fun-form-number dfun) form-number)))
@@ -643,7 +638,10 @@
         (*byte-buffer* (make-array 10
                                    :element-type '(unsigned-byte 8)
                                    :fill-pointer 0
-                                   :adjustable t)))
+                                   :adjustable t))
+        (*contexts* (make-array 10
+                                :fill-pointer 0
+                                :adjustable t)))
     (dolist (lambda (component-lambdas component))
       (clrhash var-locs)
       (push (cons (label-position (block-label (lambda-block lambda)))
@@ -652,7 +650,10 @@
     (let* ((sorted (sort dfuns #'< :key #'car))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info :name (component-name component)
-                                :fun-map fun-map))))
+                                :fun-map fun-map
+                                :contexts
+                                (and (plusp (length *contexts*))
+                                     (coerce *contexts* 'simple-vector))))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.

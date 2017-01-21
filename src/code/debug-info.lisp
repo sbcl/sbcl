@@ -72,7 +72,8 @@
 
 ;;;; DEBUG-FUN objects
 
-(def!struct (debug-fun (:constructor nil)))
+(def!struct (debug-fun (:constructor nil)
+                       (:copier nil)))
 
 (def!struct (compiled-debug-fun (:include debug-fun)
                                 #-sb-xc-host (:pure t))
@@ -88,9 +89,7 @@
   ;; A list of DEBUG-FUN objects is maintained for each COMPONENT. To
   ;; figure out which DEBUG-FUN object corresponds to your FUNCTION
   ;; object, you compare the name values of each. -- WHN 2001-12-20
-  (name (missing-arg) :type (or simple-string cons symbol))
-  ;; The kind of function (same as FUNCTIONAL-KIND):
-  (kind nil :type (member nil :optional :external :toplevel :cleanup))
+  (name (missing-arg) :type (or simple-string cons symbol) :read-only t)
   ;; a description of variable locations for this function, in alphabetical
   ;; order by name; or NIL if no information is available
   ;;
@@ -120,7 +119,6 @@
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
-  (contexts nil :type (or simple-vector null))
   ;; If all code locations in this function are in the same top level
   ;; form, then this is the number of that form, otherwise NIL. If
   ;; NIL, then each code location represented in the BLOCKS specifies
@@ -182,12 +180,46 @@
   (old-fp (missing-arg) :type sc-offset)
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
-  (start-pc (missing-arg) :type index)
+  (start-pc (missing-arg) :type index :read-only t)
   ;; The start of elsewhere code for this function (if any.)
-  (elsewhere-pc (missing-arg) :type index)
-  (closure-save nil :type (or sc-offset null))
+  (elsewhere-pc (missing-arg) :type index :read-only t)
+  (closure-save nil :type (or sc-offset null)  :read-only t)
   #!+unwind-to-frame-and-call-vop
-  (bsp-save nil :type (or sc-offset null)))
+  (bsp-save nil :type (or sc-offset null)  :read-only t))
+
+(def!struct (compiled-debug-fun-optional (:include compiled-debug-fun)
+                                         #-sb-xc-host (:pure t)
+                                         (:copier nil)
+                                         (:predicate nil)))
+(def!struct (compiled-debug-fun-external (:include compiled-debug-fun)
+                                         #-sb-xc-host (:pure t)
+                                         (:copier nil)
+                                         (:predicate nil)))
+(def!struct (compiled-debug-fun-toplevel (:include compiled-debug-fun)
+                                         #-sb-xc-host (:pure t)
+                                         (:copier nil)
+                                         (:predicate nil)))
+(def!struct (compiled-debug-fun-cleanup (:include compiled-debug-fun)
+                                        #-sb-xc-host (:pure t)
+                                        (:copier nil)
+                                        (:predicate nil)))
+
+(defun compiled-debug-fun-ctor (kind)
+  (ecase kind
+    (:optional #'make-compiled-debug-fun-optional)
+    (:external #'make-compiled-debug-fun-external)
+    (:toplevel #'make-compiled-debug-fun-toplevel)
+    (:cleanup #'make-compiled-debug-fun-cleanup)
+    ((nil) #'make-compiled-debug-fun)))
+
+(defun compiled-debug-fun-kind (debug-fun)
+  (etypecase debug-fun
+    (compiled-debug-fun-optional :optional)
+    (compiled-debug-fun-external :external)
+    (compiled-debug-fun-toplevel :toplevel)
+    (compiled-debug-fun-cleanup :cleanup)
+    (compiled-debug-fun nil)))
+
 
 ;;;; minimal debug function
 
@@ -298,7 +330,9 @@
   ;; always careful to put our code in low memory. Is that how it
   ;; works? Would this break if we used a more general memory map? --
   ;; WHN 20000120
-  (fun-map (missing-arg) :type simple-vector :read-only t))
+  (fun-map (missing-arg) :type simple-vector :read-only t)
+  ;; Location contexts
+  (contexts nil :type (or simple-vector null) :read-only t))
 
 (defvar *!initial-debug-sources*)
 

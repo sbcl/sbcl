@@ -1668,7 +1668,8 @@ register."
                             ""))
                       (context
                         (and (logtest sb!c::compiled-code-location-context flags)
-                             (svref (sb!c::compiled-debug-fun-contexts compiler-debug-fun)
+                             (svref (sb!c::compiled-debug-info-contexts
+                                     (%code-debug-info (compiled-debug-fun-component debug-fun)))
                                     (sb!c:read-var-integerf blocks i)))))
                  (vector-push-extend (make-known-code-location
                                       pc debug-fun block tlf-offset
