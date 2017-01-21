@@ -187,9 +187,9 @@
   (symbol (missing-arg) :type symbol)
   ;; a unique integer identification relative to other variables with the same
   ;; symbol
-  (id 0 :type index)
+  (id 0 :type index :read-only t)
   ;; Does the variable always have a valid value?
-  (alive-p nil :type boolean))
+  (alive-p nil :type boolean :read-only t))
 (defmethod print-object ((debug-var debug-var) stream)
   (print-unreadable-object (debug-var stream :type t :identity t)
     (format stream
@@ -209,13 +209,13 @@
                  sc-offset save-sc-offset indirect-sc-offset info))
             (:copier nil))
   ;; storage class and offset (unexported)
-  (sc-offset nil :type sb!c:sc-offset)
+  (sc-offset nil :type sb!c:sc-offset :read-only t)
   ;; storage class and offset when saved somewhere
-  (save-sc-offset nil :type (or sb!c:sc-offset null))
+  (save-sc-offset nil :type (or sb!c:sc-offset null) :read-only t)
   ;; For indirect closures the fp of the parent frame is stored in the
   ;; normal sc-offsets above, and this has the offset into the frame
-  (indirect-sc-offset nil :type (or sb!c:sc-offset null))
-  (info nil))
+  (indirect-sc-offset nil :type (or sb!c:sc-offset null) :read-only t)
+  (info nil) :read-only t)
 
 ;;;; DEBUG-FUNs
 
@@ -253,7 +253,7 @@
                                  (blocks nil)
                                  (%function nil)))
             (:copier nil))
-  %name)
+  (%name nil :read-only t))
 
 ;;;; DEBUG-BLOCKs
 
@@ -282,7 +282,7 @@
 (defstruct (code-location (:constructor nil)
                           (:copier nil))
   ;; the DEBUG-FUN containing this CODE-LOCATION
-  (debug-fun nil :type debug-fun)
+  (debug-fun nil :type debug-fun :read-only t)
   ;; This is initially :UNSURE. Upon first trying to access an
   ;; :UNPARSED slot, if the data is unavailable, then this becomes T,
   ;; and the code-location is unknown. If the data is available, this
@@ -315,16 +315,16 @@
   ;; next frame down and the return-pc for that frame.
   (%down :unparsed :type (or frame (member nil :unparsed)))
   ;; the DEBUG-FUN for the function whose call this frame represents
-  (debug-fun nil :type debug-fun)
+  (debug-fun nil :type debug-fun :read-only t)
   ;; the CODE-LOCATION where the frame's DEBUG-FUN will continue
   ;; running when program execution returns to this frame. If someone
   ;; interrupted this frame, the result could be an unknown
   ;; CODE-LOCATION.
-  (code-location nil :type code-location)
+  (code-location nil :type code-location :read-only t)
   ;; an a-list of catch-tags to code-locations
   (%catches :unparsed :type (or list (member :unparsed)))
   ;; pointer to frame on control stack (unexported)
-  pointer
+  (pointer nil :read-only t)
   ;; This is the frame's number for prompt printing. Top is zero.
   (number 0 :type index))
 
@@ -338,7 +338,7 @@
   ;; (unexported). If escaped, this is a pointer to the state that was
   ;; saved when we were interrupted, an os_context_t, i.e. the third
   ;; argument to an SA_SIGACTION-style signal handler.
-  escaped)
+  (escaped nil :read-only t))
 (defmethod print-object ((obj compiled-frame) str)
   (print-unreadable-object (obj str :type t)
     (format str
@@ -374,9 +374,9 @@
                                           (component offset))
                             (:copier nil))
   ;; This is the component in which the breakpoint lies.
-  component
+  (component nil :read-only t)
   ;; This is the byte offset into the component.
-  (offset nil :type index)
+  (offset nil :type index :read-only t)
   ;; The original instruction replaced by the breakpoint.
   (instruction nil :type (or null sb!vm::word))
   ;; A list of user breakpoints at this location.
@@ -400,12 +400,13 @@
   ;; See the COOKIE-FUN slot.
   (hook-fun (required-arg) :type function)
   ;; CODE-LOCATION or DEBUG-FUN
-  (what nil :type (or code-location debug-fun))
+  (what nil :type (or code-location debug-fun) :read-only t)
   ;; :CODE-LOCATION, :FUN-START, or :FUN-END for that kind
   ;; of breakpoint. :UNKNOWN-RETURN-PARTNER if this is the partner of
   ;; a :code-location breakpoint at an :UNKNOWN-RETURN code-location.
   (kind nil :type (member :code-location :fun-start :fun-end
-                          :unknown-return-partner))
+                          :unknown-return-partner)
+            :read-only t)
   ;; Status helps the user and the implementation.
   (status :inactive :type (member :active :inactive :deleted))
   ;; This is a backpointer to a breakpoint-data.
@@ -430,7 +431,7 @@
   ;; the cookie, and the hook function takes the cookie too.
   (cookie-fun nil :type (or null function))
   ;; This slot users can set with whatever information they find useful.
-  %info)
+  (%info nil))
 (defmethod print-object ((obj breakpoint) str)
   (let ((what (breakpoint-what obj)))
     (print-unreadable-object (obj str :type t)
@@ -449,9 +450,10 @@
                           (compiler-debug-fun component))
             (:copier nil))
   ;; compiler's dumped DEBUG-FUN information (unexported)
-  (compiler-debug-fun nil :type sb!c::compiled-debug-fun)
+  (compiler-debug-fun nil :type sb!c::compiled-debug-fun
+                          :read-only t)
   ;; code object (unexported).
-  component
+  (component nil :read-only t)
   ;; the :FUN-START breakpoint (if any) used to facilitate
   ;; function end breakpoints
   (end-starter nil :type (or null breakpoint)))
@@ -471,7 +473,7 @@
              (:constructor make-compiled-code-location (pc debug-fun))
              (:copier nil))
   ;; an index into DEBUG-FUN's component slot
-  (pc nil :type index)
+  (pc nil :type index :read-only t)
   ;; a bit-vector indexed by a variable's position in
   ;; DEBUG-FUN-DEBUG-VARS indicating whether the variable has a
   ;; valid value at this code-location. (unexported).
@@ -2845,9 +2847,9 @@ register."
             (:constructor make-fun-end-cookie (bogus-lra debug-fun))
             (:copier nil))
   ;; a pointer to the bogus-lra created for :FUN-END breakpoints
-  bogus-lra
+  (bogus-lra nil :read-only t)
   ;; the DEBUG-FUN associated with this cookie
-  debug-fun)
+  (debug-fun nil :read-only t))
 
 ;;; This maps bogus-lra-components to cookies, so that
 ;;; HANDLE-FUN-END-BREAKPOINT can find the appropriate cookie for the

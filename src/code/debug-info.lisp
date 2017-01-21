@@ -82,6 +82,7 @@
                        (:copier nil)))
 
 (def!struct (compiled-debug-fun (:include debug-fun)
+                                (:copier nil)
                                 #-sb-xc-host (:pure t))
   ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
   ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
@@ -289,7 +290,8 @@
 
 ;;; There is one per compiled file and one per function compiled at
 ;;; toplevel or loaded from source.
-(def!struct (debug-source #-sb-xc-host (:pure t))
+(def!struct (debug-source #-sb-xc-host (:pure t)
+                          (:copier nil))
   ;; (This is one of those structures where IWBNI we had multiple
   ;; inheritance.  The first four slots describe compilation of a
   ;; file, the fifth and sixth compilation of a form processed by
@@ -298,31 +300,32 @@
 
   ;; When the DEBUG-SOURCE describes a file, the file's namestring.
   ;; Otherwise, NIL.
-  (namestring nil :type (or null string))
+  (namestring nil :type (or null string) :read-only t)
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
   ;; The FILE-POSITIONs of the truly top level forms read from this
   ;; file (if applicable). The vector element type will be chosen to
   ;; hold the largest element.
-  (start-positions nil :type (or (simple-array * (*)) null))
+  (start-positions nil :type (or (simple-array * (*)) null) :read-only t)
 
   ;; For functions processed by EVAL (including EVAL-WHEN and LOAD on
   ;; a source file), the source form.
-  (form nil :type list)
+  (form nil :type list :read-only t)
   ;; This is the function whose source is the form.
-  (function nil)
+  (function nil :read-only t)
 
   ;; the universal time that the source was compiled
   (compiled (missing-arg) :type unsigned-byte)
   ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
-  (plist *source-plist*))
+  (plist *source-plist* :read-only t))
 
 ;;;; DEBUG-INFO structures
 
-(def!struct debug-info
+(def!struct (debug-info
+             (:copier nil))
   ;; Some string describing something about the code in this component.
-  (name (missing-arg) :type t)
+  (name (missing-arg) :type t :read-only t)
   ;; A DEBUG-SOURCE structure describing where the code for this
   ;; component came from, in the order that forms were read.
   (source nil))
@@ -376,24 +379,26 @@
                                 (princ (file-info-name s) stream)))))
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. If from a stream, :STREAM.
-  (name (missing-arg) :type (or pathname (eql :lisp)))
+  (name (missing-arg) :type (or pathname (eql :lisp)) :read-only t)
   ;; the external format that we'll call OPEN with, if NAME is a file.
-  (external-format nil)
+  (external-format nil  :read-only t)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
   ;; to TRUENAME call.) Null if not a file. This is used to set
   ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the
   ;; debug-info.
-  (untruename nil :type (or pathname null))
+  (untruename nil :type (or pathname null) :read-only t)
   ;; the file's write date (if relevant)
-  (write-date nil :type (or unsigned-byte null))
+  (write-date nil :type (or unsigned-byte null)  :read-only t)
   ;; parallel vectors containing the forms read out of the file and
   ;; the file positions that reading of each form started at (i.e. the
   ;; end of the previous form)
-  (forms (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
-  (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
+  (forms (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t)
+                                                       :read-only t)
+  (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t)
+                                                           :read-only t)
   ;; A vector of character ranges than span each subform in the TLF,
   ;; reset to empty for each one, updated by form-tracking-stream-observer.
-  (subforms nil :type (or null (vector t)) :read-only t)
+  (subforms nil :type (or null (vector t)) :read-only t :read-only t)
   ;; A list of objects about which the compile may/would/should have signaled
   ;; a style-warning in the :compile-toplevel situation, so we don't do it
   ;; again in the :load-toplevel situation.
@@ -412,11 +417,11 @@
                                   (s stream :type t :identity t))))
              (:copier nil))
   ;; the UT that compilation started at
-  (start-time (get-universal-time) :type unsigned-byte)
+  (start-time (get-universal-time) :type unsigned-byte :read-only t)
   ;; the IRT that compilation started at
-  (start-real-time (get-internal-real-time) :type unsigned-byte)
+  (start-real-time (get-internal-real-time) :type unsigned-byte :read-only t)
   ;; the FILE-INFO structure for this compilation
-  (file-info nil :type (or file-info null))
+  (file-info nil :type (or file-info null) :read-only t)
   ;; the stream that we are using to read the FILE-INFO, or NIL if
   ;; no stream has been opened yet
   (stream nil :type (or stream null))
@@ -426,4 +431,4 @@
   ;; if the current compilation is recursive (e.g., due to EVAL-WHEN
   ;; processing at compile-time), the invoking compilation's
   ;; source-info.
-  (parent nil :type (or source-info null)))
+  (parent nil :type (or source-info null) :read-only t))
