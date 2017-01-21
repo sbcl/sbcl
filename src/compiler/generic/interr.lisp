@@ -153,7 +153,9 @@
   #!+sb-simd-pack simd-pack
   weak-pointer
   instance
+  #!+sb-unicode
   character
+  base-char
   ((and vector (not simple-array)) object-not-complex-vector)
 
   ;; Now, in approximate order of descending popularity.
