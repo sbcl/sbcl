@@ -23,6 +23,9 @@
 (defvar *unavailable-argument*
   (sb-debug::make-unprintable-object "unavailable argument"))
 
+(defvar *unavailable-more*
+  (sb-debug::make-unprintable-object "more unavailable arguments"))
+
 (defvar *unavailable-lambda-list*
   (sb-debug::make-unprintable-object "unavailable lambda list"))
 
@@ -386,7 +389,7 @@
                     '(((bt.1.2 ?) (:more :optional)))
                     :details t)
   (assert-backtrace (lambda () (bt.1.3 :key))
-                    `(((bt.1.3 . ,*unavailable-lambda-list*) (:more :optional)))
+                    `(((bt.1.3  ,*unavailable-more*) (:more :optional)))
                     :details t)
   (assert-backtrace (checked-compile '(lambda () (bt.1.1 :key))
                                      :allow-style-warnings t)
@@ -411,10 +414,10 @@
 (with-test (:name (:backtrace :varargs-entry))
   (assert-backtrace #'bt.3.1 '((bt.3.1 :key nil)))
   (assert-backtrace #'bt.3.2 '((bt.3.2 :key ?)))
-  (assert-backtrace #'bt.3.3 `((bt.3.3 . ,*unavailable-lambda-list*)))
+  (assert-backtrace #'bt.3.3 `((bt.3.3 :key ,*unavailable-argument*)))
   (assert-backtrace #'bt.3.1 '((bt.3.1 :key nil)))
   (assert-backtrace #'bt.3.2 '((bt.3.2 :key ?)))
-  (assert-backtrace #'bt.3.3 `((bt.3.3 . ,*unavailable-lambda-list*))))
+  (assert-backtrace #'bt.3.3 `((bt.3.3 :key ,*unavailable-argument*))))
 
 ;;; This test is somewhat deceptively named. Due to confusion in debug naming
 ;;; these functions used to have sb-c::hairy-args-processor debug names for
@@ -422,19 +425,19 @@
 (with-test (:name (:backtrace :hairy-args-processor))
   (assert-backtrace #'bt.4.1 '((bt.4.1 ?)))
   (assert-backtrace #'bt.4.2 '((bt.4.2 ?)))
-  (assert-backtrace #'bt.4.3 `((bt.4.3 . ,*unavailable-lambda-list*)))
+  (assert-backtrace #'bt.4.3 `((bt.4.3 ,*unused-argument*)))
   (assert-backtrace #'bt.4.1 '((bt.4.1 ?)))
   (assert-backtrace #'bt.4.2 '((bt.4.2 ?)))
-  (assert-backtrace #'bt.4.3 `((bt.4.3 . ,*unavailable-lambda-list*))))
+  (assert-backtrace #'bt.4.3 `((bt.4.3 ,*unused-argument*))))
 
 (with-test (:name (:backtrace :optional-processor))
   (assert-backtrace #'bt.5.1 '(((bt.5.1) (:optional))) :details t)
   (assert-backtrace #'bt.5.2 '(((bt.5.2) (:optional))) :details t)
-  (assert-backtrace #'bt.5.3 `(((bt.5.3 . ,*unavailable-lambda-list*) (:optional)))
+  (assert-backtrace #'bt.5.3 `(((bt.5.3) (:optional)))
                     :details t)
   (assert-backtrace #'bt.5.1 '((bt.5.1)))
   (assert-backtrace #'bt.5.2 '((bt.5.2)))
-  (assert-backtrace #'bt.5.3 `((bt.5.3 . ,*unavailable-lambda-list*))))
+  (assert-backtrace #'bt.5.3 `((bt.5.3))))
 
 (with-test (:name (:backtrace :unused-optinoal-with-supplied-p :bug-1498644))
   (assert-backtrace (lambda () (bt.6.1 :opt))
@@ -444,14 +447,14 @@
                     `(((bt.6.2 ,*unused-argument*) ()))
                     :details t)
   (assert-backtrace (lambda () (bt.6.3 :opt))
-                    `(((bt.6.3 . ,*unavailable-lambda-list*) ()))
+                    `(((bt.6.3 ,*unused-argument*) ()))
                     :details t)
   (assert-backtrace (lambda () (bt.6.1 :opt))
                     `((bt.6.1 ,*unused-argument*)))
   (assert-backtrace (lambda () (bt.6.2 :opt))
                     `((bt.6.2 ,*unused-argument*)))
   (assert-backtrace (lambda () (bt.6.3 :opt))
-                    `((bt.6.3 . ,*unavailable-lambda-list*))))
+                    `((bt.6.3 ,*unused-argument*))))
 
 (with-test (:name (:backtrace :unused-key-with-supplied-p))
   (assert-backtrace (lambda () (bt.7.1 :key :value))
@@ -461,14 +464,14 @@
                     `(((bt.7.2 :key ,*unused-argument*) ()))
                     :details t)
   (assert-backtrace (lambda () (bt.7.3 :key :value))
-                    `(((bt.7.3 . ,*unavailable-lambda-list*) ()))
+                    `(((bt.7.3 :key ,*unused-argument*) ()))
                     :details t)
   (assert-backtrace (lambda () (bt.7.1 :key :value))
                     `((bt.7.1 :key ,*unused-argument*)))
   (assert-backtrace (lambda () (bt.7.2 :key :value))
                     `((bt.7.2 :key ,*unused-argument*)))
   (assert-backtrace (lambda () (bt.7.3 :key :value))
-                    `((bt.7.3 . ,*unavailable-lambda-list*))))
+                    `((bt.7.3 :key ,*unused-argument*))))
 
 (defvar *compile-nil-error*
   (checked-compile '(lambda (x)

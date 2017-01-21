@@ -432,14 +432,14 @@
                (dolist (leaf (lambda-vars x))
                  (frob-leaf leaf (leaf-info leaf) gensym-p))))
       (frob-lambda fun t)
-      (when (>= level 2)
+      (when (>= level 1)
         (dolist (x (ir2-physenv-closure (physenv-info (lambda-physenv fun))))
           (let ((thing (car x)))
             (when (lambda-var-p thing)
-              (frob-leaf thing (cdr x) (= level 3)))))
+              (frob-leaf thing (cdr x) (>= level 2)))))
 
         (dolist (let (lambda-lets fun))
-          (frob-lambda let (= level 3)))))
+          (frob-lambda let (>= level 2)))))
 
     (let ((sorted (sort (vars) #'string<
                         :key (lambda (x)
@@ -579,8 +579,8 @@
                        (max actual-level 2))
                       (actual-level)))
          (toplevel-p (eq :toplevel (compiled-debug-fun-kind dfun))))
-    (cond ((or (zerop level) toplevel-p))
-          ((and (<= level 1)
+    (cond (toplevel-p)
+          ((and (zerop level)
                 (let ((od (lambda-optional-dispatch fun)))
                   (or (not od)
                       (not (eq (optional-dispatch-main-entry od) fun)))))
@@ -593,7 +593,7 @@
            (setf (compiled-debug-fun-arguments dfun)
                  (compute-args fun var-locs))))
 
-    (if (and (>= level 2) (not toplevel-p))
+    (if (and (>= level 1) (not toplevel-p))
         (multiple-value-bind (blocks tlf-num form-number contexts)
             (compute-debug-blocks fun var-locs)
           (setf (compiled-debug-fun-blocks dfun) blocks

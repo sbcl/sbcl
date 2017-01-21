@@ -1396,7 +1396,7 @@
                   ))))
         (sb!di:no-debug-blocks () nil)))))
 
-(defvar *disassemble-annotate* t
+(defvar *disassemble-annotate* nil
   #!+sb-doc
   "Annotate DISASSEMBLE output with source code.")
 

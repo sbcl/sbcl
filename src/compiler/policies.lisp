@@ -110,7 +110,7 @@ This option has no effect without COMPUTE-DEBUG-FUN.")
 
 (define-optimization-quality compute-debug-fun
     debug
-  ("no" "minimal" "yes" "yes"))
+  ("minimal" "yes" "yes" "yes"))
 
 (define-optimization-quality preserve-single-use-debug-variables
     (if (and (>= debug 2)
