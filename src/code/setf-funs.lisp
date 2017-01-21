@@ -34,8 +34,10 @@
       (let ((res (type-specifier
                   (single-value-type
                    (values-specifier-type (third type)))))
-            (arglist (cons 'newval (sb-kernel:%fun-lambda-list
-                                    (symbol-function name)))))
+            (arglist (cons 'newval (or (sb-kernel:%fun-lambda-list
+                                        (symbol-function name))
+                                       ;; For low debug builds
+                                       (make-gensym-list (length args))))))
         `(locally
           (declare (muffle-conditions
                     ;; Expect SETF macro + function warnings.

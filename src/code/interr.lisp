@@ -161,18 +161,6 @@
   (%primitive print "Thread local storage exhausted.")
   (sb!impl::%halt))
 
-
-;;; Returns true if number of arguments matches required/optional
-;;; arguments handler expects.
-(defun internal-error-args-ok (arguments handler)
-  (multiple-value-bind (llks req opt)
-      (parse-lambda-list (%simple-fun-arglist handler) :silent t)
-    (declare (ignore llks))
-    (let ((n (length arguments))
-          (n-req (length req))
-          (n-opt (length opt)))
-      (and (>= n n-req) (<= n (+ n-req n-opt))))))
-
 ;;;; INTERNAL-ERROR signal handler
 
 ;;; Backtrace code may want to know the error that caused
@@ -232,8 +220,8 @@
                                     '#.`(mod ,(length **internal-error-handlers**)))
                              (svref **internal-error-handlers** error-number))))
                   (cond
-                    ((and (functionp handler)
-                          (internal-error-args-ok arguments handler))
+                    ((functionp handler)
+                     ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
                      (macrolet ((arg (n)
                                   `(sb!di::sub-access-debug-var-slot
                                     fp (nth ,n arguments) alien-context)))
