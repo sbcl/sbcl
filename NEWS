@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes in sbcl-1.3.14
+changes relative to in sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes
     macros expanding into a DECLARE expression. This is not a language change,
     since ANSI forbids such usage (X3J13 issue DECLARE-MACROS:FLUSH).
@@ -11,6 +11,8 @@ changes in sbcl-1.3.14
   * enhancement: the "--noinform" command-line option inhibits output from
     save-lisp-and-die in addition to removing the startup banner.
   * bug fix: PROCESS-KILL failed to return errno if the system call failed
+  * optimization: slightly more comprehensive treatment of the keyword
+    arguments to MAKE-ARRAY in compiler transformations.
 
 changes in sbcl-1.3.13 relative to sbcl-1.3.12:
   * enhancement: SET triggers package locks on undefined variables.
