@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.3.13:
+changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes
     macros expanding into a DECLARE expression. This is not a language change,
     since ANSI forbids such usage (X3J13 issue DECLARE-MACROS:FLUSH).
