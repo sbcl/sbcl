@@ -2,10 +2,10 @@
 
 changes relative to sbcl-1.3.14:
   * enhancement: SBCL generates more debug information by default.
-  * enhancement: type errors provide context iformation, such as which
+  * enhancement: type errors provide context information, such as which
     variable is being bound, which slot of which structure is being set.
   * defaults change: sb-ext:*disassemble-annotate* default to NIL, due to its
-    poor reliability. 
+    poor reliability.
 
 changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes
