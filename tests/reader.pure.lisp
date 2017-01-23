@@ -294,12 +294,14 @@
   (set-syntax-from-char #\7 #\Space)
   (assert (string= (format nil "~7D" 1) "      1")))
 
-(let ((symbol (find-symbol "DOES-NOT-EXIST" "CL-USER")))
-  (assert (null symbol))
-  (handler-case
-      (read-from-string "CL-USER:DOES-NOT-EXIST")
-    (reader-error (c)
-      (princ c))))
+(with-test (:name :report-reader-error)
+  ;; Apparently this wants to test the printing of the error string
+  ;; otherwise we'd just use ASSERT-SIGNAL.
+  (let ((symbol (find-symbol "DOES-NOT-EXIST" "CL-USER")))
+    (declare (optimize safety)) ; don't flush PRINC-TO-STRING
+    (assert (null symbol))
+    (handler-case (read-from-string "CL-USER:DOES-NOT-EXIST")
+     (reader-error (c) (princ-to-string c)))))
 
 ;;; The GET-MACRO-CHARACTER in SBCL <= "1.0.34.2" bogusly computed its
 ;;; second return value relative to *READTABLE* rather than the passed
@@ -426,8 +428,11 @@
   (assert-error (read-from-string "(let ((foo 3) #+sbcl) wat)"))
   (assert-error (read-from-string "(let ((foo 3) #-brand-x) wat)")))
 
+;; Another test asserting that a signaled condition is printable
 (with-test (:name :impossible-number-error)
-  (princ (nth-value 1 (ignore-errors (READ-FROM-STRING "1/0")))))
+  (locally
+   (declare (optimize safety)) ; don't flush PRINC-TO-STRING
+   (princ-to-string (nth-value 1 (ignore-errors (READ-FROM-STRING "1/0"))))))
 
 (with-test (:name :read-from-string-compiler-macro)
   ;; evaluation order should be the customary one. In particular,
