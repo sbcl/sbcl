@@ -73,7 +73,8 @@
          (applicable-method
           (find specialized-arg methods
                 :test (lambda (arg method &aux (guard (car method)))
-                        (and (fboundp guard) (funcall guard arg))))))
+                        (and (or (functionp guard) (fboundp guard))
+                             (funcall guard arg))))))
     (assert applicable-method)
     ;; The "method" is a list: (GUARD LAMBDA . OTHER-STUFF)
     ;; Call using no permutation-vector / no precomputed next method.
