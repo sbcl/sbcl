@@ -369,5 +369,8 @@
             sb!impl::get-processes-status-changes
             sb!impl::step-form
             sb!impl::step-values
+            sb!impl::stringify-package-designator
+            sb!impl::stringify-string-designator
+            sb!impl::stringify-string-designators
             sb!impl::unencapsulate-generic-function)))
   (setf (gethash sym *undefined-fun-whitelist*) t))
