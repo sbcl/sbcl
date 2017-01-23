@@ -1292,7 +1292,7 @@
   (deffrob write-to-string () simple-string
            (unsafely-flushable)))
 
-(defknown (prin1-to-string princ-to-string) (t) simple-string (flushable))
+(defknown (prin1-to-string princ-to-string) (t) simple-string (unsafely-flushable))
 (defknown sb!impl::stringify-object (t) simple-string)
 
 (defknown write-char (character &optional stream-designator) character ()

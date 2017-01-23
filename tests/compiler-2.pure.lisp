@@ -137,3 +137,12 @@
     (try x "X")
     ;; For this I'd accept either Z or X in the message.
     (try (progn (let ((z x)) (identity z))) "X")))
+
+(with-test (:name :princ-to-string-unflushable)
+  ;; Ordinary we'll flush it
+  (let ((f (compile nil '(lambda (x) (princ-to-string x) x))))
+    (assert (not (ctu:find-named-callees f :name 'princ-to-string))))
+  ;; But in high safety it should be called for effect
+  (let ((f (compile nil '(lambda (x)
+                           (declare (optimize safety)) (princ-to-string x) x))))
+    (assert (ctu:find-named-callees f :name 'princ-to-string))))
