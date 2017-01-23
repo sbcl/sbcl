@@ -600,7 +600,7 @@ static void instance_scan_range(void* arg, int offset, int nwords)
 // scav_instance and verify_space.
 void
 instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
-                          lispobj *instance_ptr,
+                          lispobj *instance_slots,
                           sword_t n_words,
                           lispobj *layout_obj)
 {
@@ -615,7 +615,7 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
       sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
       for (index = 0; index < n_words ; index++, bitmap >>= 1)
           if (bitmap & 1)
-              proc(instance_ptr + index, 1);
+              proc(instance_slots + index, 1);
   } else { /* huge bitmap */
       struct bignum * bitmap;
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
@@ -623,7 +623,7 @@ instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
           bitmap = (struct bignum*)
             native_pointer(forwarding_pointer_value((lispobj*)bitmap));
       struct instance_scanner scanner;
-      scanner.base = instance_ptr;
+      scanner.base = instance_slots;
       scanner.proc = proc;
       bitmap_scan((uword_t*)bitmap->digits, HeaderValue(bitmap->header), 0,
                   instance_scan_range, &scanner);
