@@ -94,16 +94,8 @@ include the pathname of the file and the position of the definition."
 
 (declaim (ftype (sb-int:sfunction (t debug-info) debug-function) debug-info-debug-function))
 (defun debug-info-debug-function (function debug-info)
-  (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
-        (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
-    (or
-     (find-if
-      (lambda (x)
-        (and
-         (sb-c::compiled-debug-fun-p x)
-         (eq (sb-c::compiled-debug-fun-name x) name)))
-      map)
-     (elt map 0))))
+  (sb-di::compiled-debug-fun-from-pc debug-info
+                                     (sb-di::function-start-pc-offset function)))
 
 (defun valid-function-name-p (name)
   "True if NAME denotes a valid function name, ie. one that can be passed to

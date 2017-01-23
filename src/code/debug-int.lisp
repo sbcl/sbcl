@@ -1005,6 +1005,36 @@ register."
                    min-diff (- end address)))
     min-name))
 
+(defun compiled-debug-fun-from-pc (debug-info pc &optional escaped)
+  (let* ((fun-map (sb!c::compiled-debug-info-fun-map debug-info))
+         (len (length fun-map)))
+    (declare (type simple-vector fun-map))
+    (if (= len 1)
+        (svref fun-map 0)
+        (let ((i 1)
+              (elsewhere-p
+                (>= pc (sb!c::compiled-debug-fun-elsewhere-pc
+                        (svref fun-map 0)))))
+          (declare (type sb!int:index i))
+          (loop
+           (when (or (= i len)
+                     (let ((next-pc (if elsewhere-p
+                                        (sb!c::compiled-debug-fun-elsewhere-pc
+                                         (svref fun-map (1+ i)))
+                                        (svref fun-map i))))
+                       (if escaped
+                           (< pc next-pc)
+                           ;; Non-escaped frame means that this frame calls something.
+                           ;; And the PC points to where something should return.
+                           ;; The return adress may be in the next
+                           ;; function, e.g. in local tail calls the
+                           ;; function will be entered just after the
+                           ;; CALL.
+                           ;; See debug.impure.lisp/:local-tail-call for a test-case
+                           (<= pc next-pc))))
+             (return (svref fun-map (1- i))))
+           (incf i 2))))))
+
 ;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB!C::DEBUG-INFO and run down its FUN-MAP to get a
 ;;; SB!C::COMPILED-DEBUG-FUN from the PC. The result only needs to
@@ -1024,36 +1054,7 @@ register."
      ((eq info :bogus-lra)
       (make-bogus-debug-fun "function end breakpoint"))
      (t
-      (let* ((fun-map (sb!c::compiled-debug-info-fun-map info))
-             (len (length fun-map)))
-        (declare (type simple-vector fun-map))
-        (if (= len 1)
-            (make-compiled-debug-fun (svref fun-map 0) component)
-            (let ((i 1)
-                  (elsewhere-p
-                   (>= pc (sb!c::compiled-debug-fun-elsewhere-pc
-                           (svref fun-map 0)))))
-              (declare (type sb!int:index i))
-              (loop
-                (when (or (= i len)
-                          (let ((next-pc (if elsewhere-p
-                                             (sb!c::compiled-debug-fun-elsewhere-pc
-                                              (svref fun-map (1+ i)))
-                                             (svref fun-map i))))
-                            (if escaped
-                                (< pc next-pc)
-                                ;; Non-escaped frame means that this frame calls something.
-                                ;; And the PC points to where something should return.
-                                ;; The return adress may be in the next
-                                ;; function, e.g. in local tail calls the
-                                ;; function will be entered just after the
-                                ;; CALL.
-                                ;; See debug.impure.lisp/:local-tail-call for a test-case
-                                (<= pc next-pc))))
-                  (return (make-compiled-debug-fun
-                           (svref fun-map (1- i))
-                           component)))
-                (incf i 2)))))))))
+      (make-compiled-debug-fun (compiled-debug-fun-from-pc info pc escaped) component)))))
 
 ;;; This returns a code-location for the COMPILED-DEBUG-FUN,
 ;;; DEBUG-FUN, and the pc into its code vector. If we stopped at a
@@ -1211,6 +1212,15 @@ register."
                ,@body))
            ,result))))
 
+(defun function-start-pc-offset (function)
+  (let* ((fun (%fun-fun function))
+         (code (fun-code-header fun)))
+    (- (* (fun-word-offset fun) n-word-bytes)
+       (code-header-words code))))
+
+(defun debug-info-debug-function (function debug-info)
+  (compiled-debug-fun-from-pc debug-info (function-start-pc-offset function)))
+
 ;;; Return the object of type FUNCTION associated with the DEBUG-FUN,
 ;;; or NIL if the function is unavailable or is non-existent as a user
 ;;; callable function object.
@@ -1220,16 +1230,15 @@ register."
         (setf (debug-fun-%function debug-fun)
               (etypecase debug-fun
                 (compiled-debug-fun
-                 (loop with component = (compiled-debug-fun-component debug-fun)
-                       and start-pc = (sb!c::compiled-debug-fun-start-pc
-                                       (compiled-debug-fun-compiler-debug-fun debug-fun))
-                       for i downfrom (1- (code-n-entries component)) to 0
-                       for entry = (%code-entry-point component i)
-                       when (= start-pc
-                                (sb!c::compiled-debug-fun-start-pc
-                                 (compiled-debug-fun-compiler-debug-fun
-                                  (fun-debug-fun entry))))
-                       return entry))
+                 (let (result)
+                   (loop with component = (compiled-debug-fun-component debug-fun)
+                         with start-pc = (sb!c::compiled-debug-fun-start-pc
+                                          (compiled-debug-fun-compiler-debug-fun debug-fun))
+                         for i below (code-n-entries component)
+                         for entry = (%code-entry-point component i)
+                         while (> start-pc (function-start-pc-offset entry))
+                         do (setf result entry))
+                   result))
                 (bogus-debug-fun nil)))
         cached-value)))
 
