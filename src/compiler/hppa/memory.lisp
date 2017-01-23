@@ -2,9 +2,7 @@
 
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the offset to
 ;;; be read or written is a property of the VOP used.  Cell-Setf is similar to
-;;; Cell-Set, but delivers the new value as the result.  Cell-Setf-Function
-;;; takes its arguments as if it were a setf function (new value first, as
-;;; apposed to a setf macro, which takes the new value last).
+;;; Cell-Set, but delivers the new value as the result.
 ;;;
 (define-vop (cell-ref)
   (:args (object :scs (descriptor-reg)))
