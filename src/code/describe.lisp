@@ -208,7 +208,7 @@
   (typecase x
     (standard-char "standard-char")
     (base-char "base-char")
-    (t "character")))
+    #+sb-unicode (t "character"))) ; unreachable if no unicode
 
 (defun print-standard-describe-header (x stream)
   (format stream "~&~A~%  [~A]~%"
