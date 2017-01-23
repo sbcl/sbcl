@@ -169,6 +169,12 @@
              :set-trans (setf %code-n-entries)
              :ref-trans %code-n-entries
              :ref-known (flushable foldable))
+  #!+x86
+  (fixups :type t
+          :ref-known (flushable)
+          :ref-trans %code-fixups
+          :set-known ()
+          :set-trans (setf %code-fixups))
   (constants :rest-p t))
 
 (!define-primitive-object (fdefn :type fdefn

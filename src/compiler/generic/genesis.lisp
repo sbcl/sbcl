@@ -2191,11 +2191,8 @@ core and return a descriptor to it."
                (fixups fixup-offsets (cdr fixups)))
               ((null fixups))
             (write-wordindexed/raw fixup-vector index (car fixups)))
-          ;; KLUDGE: The fixup vector is stored as the first constant,
-          ;; not as a separately-named slot.
           (write-wordindexed (make-random-descriptor code-object-address)
-                             sb!vm:code-constants-offset
-                             fixup-vector))))))
+                             sb!vm::code-fixups-slot fixup-vector))))))
 
 ;;; Given a pointer to a code object and a byte offset relative to the
 ;;; tail of the code object's header, return a byte offset relative to the

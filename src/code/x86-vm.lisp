@@ -67,30 +67,23 @@
            ;; but in SBCL relocatable dynamic space code is always in
            ;; use, so we always do the check.)
            (incf *num-fixups*)
-           (let ((fixups (code-header-ref code code-constants-offset)))
+           (let ((fixups (sb!vm::%code-fixups code)))
              (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
                     (let ((new-fixups
                             (adjust-fixup-array fixups (1+ (length fixups)))))
                       (setf (aref new-fixups (length fixups)) offset)
-                      (setf (code-header-ref code code-constants-offset)
-                            new-fixups)))
+                      (setf (sb!vm::%code-fixups code) new-fixups)))
+                   ((eql fixups 0)
+                    (setf (sb!vm::%code-fixups code)
+                          (make-array 1 :element-type '(unsigned-byte 32)
+                                        :initial-element offset)))
                    (t
-                    (unless (or (eq (widetag-of fixups)
-                                    unbound-marker-widetag)
-                                (zerop fixups))
-                      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
-                    (setf (code-header-ref code code-constants-offset)
-                          (make-array
-                           1
-                           :element-type '(unsigned-byte 32)
-                           :initial-element offset)))))))
+                    (bug "FU'd fixups: ~S" fixups))))))
     (without-gcing
       (let* ((sap (truly-the system-area-pointer
                              (code-instructions code)))
              (obj-start-addr (logand (get-lisp-obj-address code)
                                      #xfffffff8))
-             ;; FIXME: what is this 5?
-             #+nil (const-start-addr (+ obj-start-addr (* 5 n-word-bytes)))
              (code-start-addr (sap-int (code-instructions code)))
              (ncode-words (code-header-ref code 1))
              (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))

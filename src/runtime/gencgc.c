@@ -1839,15 +1839,9 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
            code_start_addr,code_end_addr));
     */
 
-    /* The first constant should be a pointer to the fixups for this
-       code objects. Check. */
-    fixups = new_code->constants[0];
-
-    /* It will be 0 or the unbound-marker if there are no fixups (as
-     * will be the case if the code object has been purified, for
-     * example) and will be an other pointer if it is valid. */
-    if ((fixups == 0) || (fixups == UNBOUND_MARKER_WIDETAG) ||
-        !is_lisp_pointer(fixups)) {
+    fixups = new_code->fixups;
+    /* It will be a Lisp vector if valid, or 0 if there are no fixups */
+    if (fixups == 0 || !is_lisp_pointer(fixups)) {
         /* Check for possible errors. */
         if (check_code_fixups)
             sniff_code_object(new_code, displacement);

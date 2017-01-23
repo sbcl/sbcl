@@ -151,17 +151,7 @@
 ;;; additional noise in the code object header.
 (defun select-component-format (component)
   (declare (type component component))
-  ;; The 1+ here is because for the x86 the first constant is a
-  ;; pointer to a list of fixups, or NIL if the code object has none.
-  ;; (The fixups are needed at GC copy time because the X86 code isn't
-  ;; relocatable.)
-  ;;
-  ;; KLUDGE: It'd be cleaner to have the fixups entry be a named
-  ;; element of the CODE (aka component) primitive object. However,
-  ;; it's currently a large, tricky, error-prone chore to change
-  ;; the layout of any primitive object, so for the foreseeable future
-  ;; we'll just live with this ugliness. -- WHN 2002-01-02
-  (dotimes (i (+ code-constants-offset #!+x86 1))
+  (dotimes (i code-constants-offset)
     (vector-push-extend nil
                         (ir2-component-constants (component-info component))))
   (values))
