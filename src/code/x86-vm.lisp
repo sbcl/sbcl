@@ -85,8 +85,7 @@
              (obj-start-addr (logand (get-lisp-obj-address code)
                                      #xfffffff8))
              (code-start-addr (sap-int (code-instructions code)))
-             (ncode-words (code-header-ref code 1))
-             (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
+             (code-end-addr (+ code-start-addr (%code-code-size code))))
         (unless (member kind '(:absolute :relative))
           (error "Unknown code-object-fixup kind ~S." kind))
         (ecase kind
