@@ -2729,6 +2729,8 @@
 
 ;; Using (get-std-handle-or-null +std-error-handle+) instead of the file
 ;; descriptor might make this work on win32, but I don't know.
+#!+win32
+(defun !make-cold-stderr-stream () (make-broadcast-stream))
 #!-win32
 (macrolet ((stderr () 2))
  (!defglobal *!cold-stderr-buf* " ")

@@ -153,11 +153,10 @@
   (/show0 "entering !COLD-INIT")
   (setq *readtable* (make-readtable)
         *print-length* 6 *print-level* 3)
-  #!-win32
-  (write-string "COLD-INIT... "
-                (setq *error-output* (!make-cold-stderr-stream)
+  (setq *error-output* (!make-cold-stderr-stream)
                       *standard-output* *error-output*
-                      *trace-output* *error-output*))
+                      *trace-output* *error-output*)
+  (write-string "COLD-INIT... ")
 
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
@@ -236,7 +235,6 @@
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
   (/show0 "doing cold toplevel forms and fixups")
-  #!-win32
   (progn (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
          (terpri))
 

@@ -89,7 +89,7 @@
 (defun %target-defstruct (dd)
   (declare (type defstruct-description dd))
 
-  #!+(and sb-show (host-feature sb-xc) (not win32))
+  #!+(and sb-show (host-feature sb-xc))
   (progn (write `(%target-defstruct ,(dd-name dd))) (terpri))
 
   (when (dd-doc dd)
