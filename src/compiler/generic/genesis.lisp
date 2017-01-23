@@ -2138,14 +2138,6 @@ core and return a descriptor to it."
   (push (cons name address)
         *cold-assembler-routines*))
 
-(defun record-cold-assembler-fixup (routine
-                                    code-object
-                                    offset
-                                    &optional
-                                    (kind :both))
-  (push (list routine code-object offset kind)
-        *cold-assembler-fixups*))
-
 (defun lookup-assembler-reference (symbol &optional (errorp t))
   (let ((value (cdr (assoc symbol *cold-assembler-routines*))))
     (unless value
@@ -2204,7 +2196,7 @@ core and return a descriptor to it."
           sb!vm:word-shift)
      insts-offset-bytes))
 
-(declaim (ftype (function (descriptor sb!vm:word sb!vm:word keyword))
+(declaim (ftype (function (descriptor sb!vm:word sb!vm:word keyword) descriptor)
                 do-cold-fixup))
 (defun do-cold-fixup (code-object after-header value kind)
   (let* ((offset-within-code-object (calc-offset code-object after-header))
@@ -2428,7 +2420,7 @@ core and return a descriptor to it."
               #!+x86
               (note-load-time-code-fixup code-object
                                          after-header))))))))
-  (values))
+  code-object)
 
 (defun resolve-assembler-fixups ()
   (dolist (fixup *cold-assembler-fixups*)
@@ -3131,8 +3123,8 @@ core and return a descriptor to it."
          (code-object (pop-stack)))
     (do-cold-fixup code-object
                    (read-word-arg (fasl-input-stream))
-                   (ensure-symbol-tls-index symbol) kind)
-    code-object))
+                   (ensure-symbol-tls-index symbol)
+                   kind))) ; and re-push code-object
 
 (define-cold-fop (fop-foreign-fixup)
   (let* ((kind (pop-stack))
@@ -3143,13 +3135,12 @@ core and return a descriptor to it."
     #!+sb-dynamic-core
     (let ((offset (read-word-arg (fasl-input-stream)))
           (value (dyncore-note-symbol sym nil)))
-      (do-cold-fixup code-object offset value kind))
+      (do-cold-fixup code-object offset value kind)) ; and re-push code-object
     #!- (and) (format t "Bad non-plt fixup: ~S~S~%" sym code-object)
     #!-sb-dynamic-core
     (let ((offset (read-word-arg (fasl-input-stream)))
           (value (cold-foreign-symbol-address sym)))
-      (do-cold-fixup code-object offset value kind))
-   code-object))
+      (do-cold-fixup code-object offset value kind)))) ; and re-push code-object
 
 #!+linkage-table
 (define-cold-fop (fop-foreign-dataref-fixup)
@@ -3162,8 +3153,7 @@ core and return a descriptor to it."
     #!+sb-dynamic-core
     (let ((offset (read-word-arg (fasl-input-stream)))
           (value (dyncore-note-symbol sym t)))
-      (do-cold-fixup code-object offset value kind)
-      code-object)
+      (do-cold-fixup code-object offset value kind)) ; and re-push code-object
     #!-sb-dynamic-core
     (progn
       (maphash (lambda (k v)
@@ -3211,7 +3201,7 @@ core and return a descriptor to it."
          (kind (pop-stack))
          (code-object (pop-stack))
          (offset (read-word-arg (fasl-input-stream))))
-    (record-cold-assembler-fixup routine code-object offset kind)
+    (push (list routine code-object offset kind) *cold-assembler-fixups*)
     code-object))
 
 (define-cold-fop (fop-code-object-fixup)
@@ -3219,8 +3209,7 @@ core and return a descriptor to it."
          (code-object (pop-stack))
          (offset (read-word-arg (fasl-input-stream)))
          (value (descriptor-bits code-object)))
-    (do-cold-fixup code-object offset value kind)
-    code-object))
+    (do-cold-fixup code-object offset value kind))) ; and re-push code-object
 
 #!+immobile-code
 (define-cold-fop (fop-static-call-fixup)
