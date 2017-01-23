@@ -355,8 +355,13 @@
                                  sb!vm:simple-character-string-widetag))
                           (1+ length)
                           length)))
+    ;; Be careful not to allocate backing storage for element type NIL.
+    ;; Both it and type BIT have N-BITS-SHIFT = 0, so the determination
+    ;; of true size can't be left up to VECTOR-LENGTH-IN-WORDS.
     (allocate-vector widetag length
-                     (vector-length-in-words full-length n-bits-shift))))
+                     (if (/= widetag sb!vm:simple-array-nil-widetag)
+                         (vector-length-in-words full-length n-bits-shift)
+                         0))))
 
 (defun array-underlying-widetag (array)
   (macrolet ((make-case ()
