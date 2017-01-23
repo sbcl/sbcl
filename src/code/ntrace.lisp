@@ -39,7 +39,7 @@
 
 ;;; A TRACE-INFO object represents all the information we need to
 ;;; trace a given function.
-(def!struct (trace-info
+(defstruct (trace-info
              (:print-object (lambda (x stream)
                               (print-unreadable-object (x stream :type t)
                                 (prin1 (trace-info-what x) stream)))))
