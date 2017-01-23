@@ -1218,9 +1218,6 @@ register."
     (- (* (fun-word-offset fun) n-word-bytes)
        (code-header-words code))))
 
-(defun debug-info-debug-function (function debug-info)
-  (compiled-debug-fun-from-pc debug-info (function-start-pc-offset function)))
-
 ;;; Return the object of type FUNCTION associated with the DEBUG-FUN,
 ;;; or NIL if the function is unavailable or is non-existent as a user
 ;;; callable function object.
