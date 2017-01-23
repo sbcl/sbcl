@@ -56,13 +56,6 @@
 os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
-#ifndef LISP_FEATURE_GENCGC
-inline static boolean
-in_gc_p(void) {
-    return current_dynamic_space == from_space;
-}
-#endif
-
 sword_t (*scavtab[256])(lispobj *where, lispobj object);
 lispobj (*transother[256])(lispobj object);
 sword_t (*sizetab[256])(lispobj *where);

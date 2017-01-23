@@ -1,6 +1,13 @@
 #ifndef _FORWARDING_PTR_H_
 #define _FORWARDING_PTR_H_
 
+#ifndef LISP_FEATURE_GENCGC
+inline static boolean
+in_gc_p(void) {
+    return current_dynamic_space == from_space;
+}
+#endif
+
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
     lispobj first_word=*pointer;
