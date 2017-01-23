@@ -859,15 +859,15 @@
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
     (let* ((context (nth-interrupt-context index))
-           (cfp (int-sap (sb!vm:context-register context sb!vm::cfp-offset))))
+           (cfp (int-sap (context-register context sb!vm::cfp-offset))))
       (/noshow0 "got CONTEXT")
       (unless (control-stack-pointer-valid-p cfp)
         (return (values nil nil nil t)))
       (when (sap= frame-pointer cfp)
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
-          (let* ((component-ptr (component-ptr-from-pc
-                                 (sb!vm:context-pc context)))
+          (let* ((pc (context-pc context))
+                 (component-ptr (component-ptr-from-pc pc))
                  (code (unless (sap= component-ptr (int-sap #x0))
                          (component-from-component-ptr component-ptr))))
             (/noshow0 "got CODE")
@@ -879,7 +879,7 @@
             (let* ((code-header-len (* (code-header-words code)
                                        sb!vm:n-word-bytes))
                    (pc-offset
-                     (- (sap-int (sb!vm:context-pc context))
+                     (- (sap-int pc)
                         (- (get-lisp-obj-address code)
                            sb!vm:other-pointer-lowtag)
                         code-header-len)))
@@ -1945,6 +1945,20 @@ register."
     (when frame
       (code-location-context (frame-code-location frame)))))
 
+(defun decode-arithmetic-error-operands (context)
+  (let* ((alien-context (sb!alien:sap-alien context (* os-context-t)))
+         (fp (int-sap (context-register alien-context
+                                        sb!vm::cfp-offset)))
+         (sb!debug:*stack-top-hint* (find-interrupted-frame))
+         (error-context (error-context)))
+    (and error-context
+         (values (car error-context)
+                 (loop for x in (cdr error-context)
+                       collect (if (integerp x)
+                                   (sub-access-debug-var-slot
+                                    fp x alien-context)
+                                   x))))))
+
 ;;; true if OBJ1 and OBJ2 are the same place in the code
 (defun code-location= (obj1 obj2)
   (etypecase obj1
@@ -1973,7 +1987,8 @@ register."
 (defun fill-in-code-location (code-location)
   (declare (type compiled-code-location code-location))
   (let* ((debug-fun (code-location-debug-fun code-location))
-         (blocks (debug-fun-debug-blocks debug-fun)))
+         (blocks (debug-fun-debug-blocks debug-fun))
+         (found))
     (declare (simple-vector blocks))
     (dotimes (i (length blocks) nil)
       (let* ((block (svref blocks i))
@@ -1982,20 +1997,29 @@ register."
         (dotimes (j (length locations))
           (let ((loc (svref locations j)))
             (when (sub-compiled-code-location= code-location loc)
-              (setf (code-location-%debug-block code-location) block)
-              (setf (code-location-%tlf-offset code-location)
-                    (code-location-%tlf-offset loc))
-              (setf (code-location-%form-number code-location)
-                    (code-location-%form-number loc))
-              (setf (compiled-code-location-%live-set code-location)
-                    (compiled-code-location-%live-set loc))
-              (setf (compiled-code-location-kind code-location)
-                    (compiled-code-location-kind loc))
-              (setf (compiled-code-location-step-info code-location)
-                    (compiled-code-location-step-info loc))
-              (setf (compiled-code-location-context code-location)
-                    (compiled-code-location-context loc))
-              (return-from fill-in-code-location t))))))))
+              (unless found
+                (setf found loc))
+              ;; There may be multiple locations in multiple blocks at a given PC, prefer
+              ;; the :internal-error ones.
+              (when (eq (compiled-code-location-kind loc) :internal-error)
+                (setf found loc)
+                (return)))))))
+    (when found
+      (setf (code-location-%debug-block code-location)
+            (code-location-%debug-block found))
+      (setf (code-location-%tlf-offset code-location)
+            (code-location-%tlf-offset found))
+      (setf (code-location-%form-number code-location)
+            (code-location-%form-number found))
+      (setf (compiled-code-location-%live-set code-location)
+            (compiled-code-location-%live-set found))
+      (setf (compiled-code-location-kind code-location)
+            (compiled-code-location-kind found))
+      (setf (compiled-code-location-step-info code-location)
+            (compiled-code-location-step-info found))
+      (setf (compiled-code-location-context code-location)
+            (compiled-code-location-context found))
+      t)))
 
 ;;;; operations on DEBUG-BLOCKs
 

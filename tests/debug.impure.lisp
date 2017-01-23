@@ -338,7 +338,7 @@
    "debugger invoked"
    '*
    "DIVISION-BY-ZERO"
-   "operands (1 0)"
+   "Operation was (/ 1 0)"
    '*
    "INTEGER-/-INTEGER"
    "source: "

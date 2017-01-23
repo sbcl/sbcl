@@ -245,7 +245,7 @@
       ((eql den 0)
        (error 'division-by-zero
               :operands (list num den)
-              :operation 'build-ratio))
+              :operation '/))
       ((eql den 1) num)
       (t (%make-ratio num den)))))
 

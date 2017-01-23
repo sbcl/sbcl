@@ -617,7 +617,7 @@
                      (type-of condition))
              (when (arithmetic-error-operation condition)
                (format stream
-                       "~%Operation was ~S, operands ~S."
+                       "~%Operation was (~S ~{~S~^ ~})."
                        (arithmetic-error-operation condition)
                        (arithmetic-error-operands condition))))))
 

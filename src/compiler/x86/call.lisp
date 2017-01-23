@@ -558,13 +558,13 @@
 (defun check-ocfp-and-return-pc (old-fp return-pc)
   #+nil
   (format t "*known-return: old-fp ~S, tn-kind ~S; ~S ~S~%"
-          old-fp (sb!c::tn-kind old-fp) (sb!c::tn-save-tn old-fp)
-          (sb!c::tn-kind (sb!c::tn-save-tn old-fp)))
+          old-fp (tn-kind old-fp) (sb!c::tn-save-tn old-fp)
+          (tn-kind (sb!c::tn-save-tn old-fp)))
   #+nil
   (format t "*known-return: return-pc ~S, tn-kind ~S; ~S ~S~%"
-          return-pc (sb!c::tn-kind return-pc)
+          return-pc (tn-kind return-pc)
           (sb!c::tn-save-tn return-pc)
-          (sb!c::tn-kind (sb!c::tn-save-tn return-pc)))
+          (tn-kind (sb!c::tn-save-tn return-pc)))
   (unless (and (sc-is old-fp control-stack)
                (= (tn-offset old-fp) ocfp-save-offset))
     (error "ocfp not on stack in standard save location?"))

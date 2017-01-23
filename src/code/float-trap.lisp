@@ -191,16 +191,19 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; Signal the appropriate condition when we get a floating-point error.
 #!-win32
 (defun sigfpe-handler (signal info context)
-  (declare (ignore signal context))
+  (declare (ignore signal))
   (declare (type system-area-pointer info))
   (let ((code (sb!unix::siginfo-code info)))
-    (with-interrupts
-      ;; Reset the accumulated exceptions, may be needed on other
-      ;; platforms too, at least Linux doesn't seem to require it.
-      #!+(or sunos (and hppa linux))
-      (setf (ldb sb!vm::float-sticky-bits (floating-point-modes)) 0)
-      (error (or (cdr (assoc code *sigfpe-code-error-alist*))
-                 'floating-point-exception)))))
+    (multiple-value-bind (op operands) (sb!di::decode-arithmetic-error-operands context)
+     (with-interrupts
+       ;; Reset the accumulated exceptions, may be needed on other
+       ;; platforms too, at least Linux doesn't seem to require it.
+       #!+(or sunos (and hppa linux))
+       (setf (ldb sb!vm::float-sticky-bits (floating-point-modes)) 0)
+       (error (or (cdr (assoc code *sigfpe-code-error-alist*))
+                  'floating-point-exception)
+              :operation op
+              :operands operands)))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions
