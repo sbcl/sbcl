@@ -70,7 +70,8 @@
 #include "interr.h"
 #endif
 
-extern char *sbcl_home = SBCL_PREFIX"/lib/sbcl/";
+extern char *sbcl_home;
+char *sbcl_home = SBCL_PREFIX"/lib/sbcl/";
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
