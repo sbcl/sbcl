@@ -12,7 +12,7 @@ GREP = ggrep
 ASSEM_SRC = x86-64-assem.S ldso-stubs.S
 ARCH_SRC = x86-64-arch.c
 
-OS_SRC = sunos-os.c x86-64-sunos-os.c os-common.c
+OS_SRC = sunos-os.c x86-64-sunos-os.c
 OS_LIBS= -ldl -lsocket -lnsl -lrt
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz

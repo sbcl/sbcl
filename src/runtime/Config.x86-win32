@@ -14,7 +14,7 @@ TARGET=sbcl.exe
 ASSEM_SRC = x86-assem.S
 ARCH_SRC = x86-arch.c
 
-OS_SRC = win32-os.c x86-win32-os.c os-common.c pthreads_win32.c
+OS_SRC = win32-os.c x86-win32-os.c pthreads_win32.c
 
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a
