@@ -2148,43 +2148,15 @@ core and return a descriptor to it."
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
 
-;;; The x86 port needs to store code fixups along with code objects if
-;;; they are to be moved, so fixups for code objects in the dynamic
-;;; heap need to be noted.
-#!+x86
-(defvar *load-time-code-fixups*)
-
 #!+x86
 (defun note-load-time-code-fixup (code-object offset)
   ;; If CODE-OBJECT might be moved
   (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
            dynamic-core-space-id)
-    (push offset (gethash (descriptor-bits code-object)
-                          *load-time-code-fixups*
-                          nil)))
-  (values))
-
-#!+x86
-(defun output-load-time-code-fixups ()
-  (let ((fixup-infos nil))
-    (maphash
-     (lambda (code-object-address fixup-offsets)
-       (push (cons code-object-address fixup-offsets) fixup-infos))
-     *load-time-code-fixups*)
-    (setq fixup-infos (sort fixup-infos #'< :key #'car))
-    (dolist (fixup-info fixup-infos)
-      (let ((code-object-address (car fixup-info))
-            (fixup-offsets (cdr fixup-info)))
-        (let ((fixup-vector
-               (allocate-vector-object
-                *dynamic* sb!vm:n-word-bits (length fixup-offsets)
-                sb!vm:simple-array-unsigned-byte-32-widetag)))
-          (do ((index sb!vm:vector-data-offset (1+ index))
-               (fixups fixup-offsets (cdr fixups)))
-              ((null fixups))
-            (write-wordindexed/raw fixup-vector index (car fixups)))
-          (write-wordindexed (make-random-descriptor code-object-address)
-                             sb!vm::code-fixups-slot fixup-vector))))))
+    (let ((fixups (read-wordindexed code-object sb!vm::code-fixups-slot)))
+      (write-wordindexed code-object sb!vm::code-fixups-slot
+        (cold-cons (make-fixnum-descriptor offset)
+                   (if (= (descriptor-bits fixups) 0) *nil-descriptor* fixups))))))
 
 ;;; Given a pointer to a code object and a byte offset relative to the
 ;;; tail of the code object's header, return a byte offset relative to the
@@ -3904,8 +3876,7 @@ initially undefined function references:~2%")
            *cold-static-call-fixups*
            *cold-assembler-fixups*
            *cold-assembler-routines*
-           (*deferred-known-fun-refs* nil)
-           #!+x86 (*load-time-code-fixups* (make-hash-table)))
+           (*deferred-known-fun-refs* nil))
 
       ;; If we're given a preload file, it contains tramps and whatnot
       ;; that must be loaded before we create any FDEFNs.  It can in
@@ -3986,7 +3957,6 @@ initially undefined function references:~2%")
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-deferred-known-funs)
       (resolve-assembler-fixups)
-      #!+x86 (output-load-time-code-fixups)
       (foreign-symbols-to-core)
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")
