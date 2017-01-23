@@ -204,11 +204,6 @@
 (defconstant max-core-space-id 5)
 (defconstant deflated-core-space-id-flag 8)
 
-;; This is somewhat arbitrary as there is no concept of the the
-;; number of bits in the "low" part of a descriptor any more.
-(defconstant target-space-alignment (ash 1 16)
-  "the alignment requirement for spaces in the target.")
-
 ;;; a GENESIS-time representation of a memory space (e.g. read-only
 ;;; space, dynamic space, or static space)
 (defstruct (gspace (:constructor %make-gspace)
@@ -218,12 +213,8 @@
   (identifier (missing-arg) :type fixnum :read-only t)
   ;; the word address where the data will be loaded
   (word-address (missing-arg) :type unsigned-byte :read-only t)
-  ;; the data themselves. (Note that in CMU CL this was a pair of
-  ;; fields SAP and WORDS-ALLOCATED, but that wasn't very portable.)
-  ;; (And then in SBCL this was a VECTOR, but turned out to be
-  ;; unportable too, since ANSI doesn't think that arrays longer than
-  ;; 1024 (!) should needed by portable CL code...)
-  (bytes (make-bigvec) :read-only t)
+  ;; the gspace contents as a BIGVEC
+  (bytes (make-bigvec) :type bigvec :read-only t)
   ;; the index of the next unwritten word (i.e. chunk of
   ;; SB!VM:N-WORD-BYTES bytes) in BYTES, or equivalently the number of
   ;; words actually written in BYTES. In order to convert to an actual
@@ -238,10 +229,18 @@
     (format stream "@#x~X ~S" (gspace-byte-address gspace) (gspace-name gspace))))
 
 (defun make-gspace (name identifier byte-address)
-  (unless (zerop (rem byte-address target-space-alignment))
-    (error "The byte address #X~X is not aligned on a #X~X-byte boundary."
-           byte-address
-           target-space-alignment))
+  ;; Genesis should be agnostic of space alignment except in so far as it must
+  ;; be a multiple of the backend page size. We used to care more, in that
+  ;; descriptor-bits were composed of a high half and low half for the
+  ;; questionable motive of caring about fixnum-ness of the halves,
+  ;; despite the wonderful abstraction INTEGER that transparently becomes
+  ;; a BIGNUM if the host's fixnum is limited in size.
+  ;; So it's not clear whether this test belongs here, because if we do need it,
+  ;; then it best belongs where we assign space addresses in the first place.
+  (let ((target-space-alignment (ash 1 16)))
+    (unless (zerop (rem byte-address target-space-alignment))
+      (error "The byte address #X~X is not aligned on a #X~X-byte boundary."
+             byte-address target-space-alignment)))
   (%make-gspace :name name
                 :identifier identifier
                 :word-address (ash byte-address (- sb!vm:word-shift))))
@@ -3329,12 +3328,9 @@ core and return a descriptor to it."
 (defun write-constants-h (*standard-output*)
   ;; writing entire families of named constants
   (let ((constants nil))
-    (dolist (package-name '( ;; Even in CMU CL, constants from VM
-                            ;; were automatically propagated
-                            ;; into the runtime.
-                            "SB!VM"
-                            ;; In SBCL, we also propagate various
-                            ;; magic numbers related to file format,
+    (dolist (package-name '("SB!VM"
+                            ;; We also propagate magic numbers
+                            ;; related to file format,
                             ;; which live here instead of SB!VM.
                             "SB!FASL"))
       (do-external-symbols (symbol (find-package package-name))
