@@ -59,6 +59,9 @@
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 #include "genesis/cons.h"
 #endif
+#ifdef LISP_FEATURE_X86
+#include "forwarding-ptr.h"
+#endif
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
@@ -1855,15 +1858,18 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     fixups_vector = (struct vector *)native_pointer(fixups);
 
     /* Could be pointing to a forwarding pointer. */
-    /* FIXME is this always in from_space?  if so, could replace this code with
-     * forwarding_pointer_p/forwarding_pointer_value */
+    /* This is extremely unlikely, because the only referent of the fixups
+       is usually the code itself; so scavenging the vector won't occur
+       until after the code object is known to be live. As we're just now
+       enlivening the code, the fixups shouldn't have been forwarded.
+       Maybe the vector is on the special binding stack though ... */
     if (is_lisp_pointer(fixups) &&
         (find_page_index((void*)fixups_vector) != -1) &&
-        (fixups_vector->header == 0x01)) {
+        forwarding_pointer_p((lispobj*)fixups_vector))  {
         /* If so, then follow it. */
         /*SHOW("following pointer to a forwarding pointer");*/
-        fixups_vector =
-            (struct vector *)native_pointer((lispobj)fixups_vector->length);
+        fixups_vector = (struct vector *)
+          native_pointer(forwarding_pointer_value((lispobj*)fixups_vector));
     }
 
     /*SHOW("got fixups");*/

@@ -1,0 +1,43 @@
+#ifndef _FORWARDING_PTR_H_
+#define _FORWARDING_PTR_H_
+
+inline static boolean
+forwarding_pointer_p(lispobj *pointer) {
+    lispobj first_word=*pointer;
+#ifdef LISP_FEATURE_GENCGC
+    return (first_word == 0x01);
+#else
+    return (is_lisp_pointer(first_word)
+            && in_gc_p() /* cheneygc new_space_p() is broken when not in gc */
+            && new_space_p(first_word));
+#endif
+}
+
+static inline lispobj
+forwarding_pointer_value(lispobj *pointer) {
+#ifdef LISP_FEATURE_GENCGC
+    return pointer[1];
+#else
+    return pointer[0];
+#endif
+}
+static inline lispobj
+set_forwarding_pointer(lispobj * pointer, lispobj newspace_copy) {
+  // The object at 'pointer' might already have been forwarded,
+  // but that's ok. Such occurs primarily when dealing with
+  // code components, because code can be forwarded by scavenging any
+  // pointer to a function that resides within the code.
+  // Testing whether the object had been forwarded would just slow
+  // things down, so we blindly stomp on whatever was there.
+  // Unfortunately this also implies we can't assert
+  // that we're operating on a not-yet-forwarded object here.
+#ifdef LISP_FEATURE_GENCGC
+    pointer[0]=0x01;
+    pointer[1]=newspace_copy;
+#else
+    pointer[0]=newspace_copy;
+#endif
+    return newspace_copy;
+}
+
+#endif
