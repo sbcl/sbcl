@@ -1709,6 +1709,7 @@ forms that explicitly control this kind of evaluation.")
          (form-num (sb!di:code-location-form-number start-location)))
     (multiple-value-bind (translations form)
         (sb!di:get-toplevel-form start-location)
+      (declare (notinline warn))
       (cond ((< form-num (length translations))
              (sb!di:source-path-context form
                                         (svref translations form-num)

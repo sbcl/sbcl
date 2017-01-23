@@ -115,10 +115,18 @@
      ,@body))
 
 (defun compiler-warn (datum &rest arguments)
+  ;; WARN isn't actually inlined, however the NOTINLINE avoids use of #'WARN
+  ;; directly as a code constant, without indirection through its #<fdefn>.
+  ;; This matters because:
+  ;;  (1) a layer of indirection is needed for encapulation to work properly
+  ;;      via APPLY, and the minor optimization is hardly worth doing for WARN
+  ;;  (2) WARN is redefined in warm load
+  (declare (notinline warn))
   (apply #'warn datum arguments)
   (values))
 
 (defun compiler-style-warn (datum &rest arguments)
+  (declare (notinline style-warn)) ; same reasoning as above
   (apply #'style-warn datum arguments)
   (values))
 

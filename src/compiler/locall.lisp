@@ -540,9 +540,10 @@
                         default-name))))
 
 (defun warn-invalid-local-call (node count &rest warn-arguments)
+  (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (aver (combination-p node))
   (aver (typep count 'unsigned-byte))
-  (apply 'warn warn-arguments)
+  (apply 'warn warn-arguments) ; XXX: Should this be COMPILER-WARN?
   (transform-call-with-ir1-environment
    node
    `(lambda (&rest args)

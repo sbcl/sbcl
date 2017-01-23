@@ -136,22 +136,7 @@
              (t (funcall f (let ((s (string designator)))
                              (if (eql (mismatch s "SB!") 3)
                                  (concatenate 'string "SB-" (subseq s 3))
-                                 s)))))))
-
-    ;; Wrap thing-defining-functions that style-warn sufficiently early
-    ;; that HANDLER-BIND can't be used to suppress the warning
-    ;; (since condition classoids don't exist yet).
-    (flet ((warning-suppressor (signaler)
-             (lambda (f &rest args)
-               (encapsulate signaler '!cold-init (constantly nil))
-               (apply f args)
-               (unencapsulate signaler '!cold-init)))) ; Restore it.
-      ;; %DEFUN complains about everything being redefined
-      (encapsulate-1 '%defun (warning-suppressor 'warn))
-      ;; %DEFCONSTANT complains about all named types because of earmuffs.
-      (encapsulate-1 'sb!c::%defconstant (warning-suppressor 'style-warn))
-      ;; %DEFSETF ',FN warns when #'(SETF fn) also has a function binding.
-      (encapsulate-1 '%defsetf (warning-suppressor 'style-warn))))
+                                 s))))))))
   names)
 
 (defmacro !with-init-wrappers (&rest forms)

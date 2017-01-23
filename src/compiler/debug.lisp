@@ -43,6 +43,7 @@ One of :WARN, :ERROR or :NONE.")
 ;;; Otherwise similar to BARF.
 (declaim (ftype (function (string &rest t) (values)) burp))
 (defun burp (string &rest *args*)
+  (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (ecase *burp-action*
     (:warn (apply #'warn string *args*))
     (:error (apply #'cerror "press on anyway." string *args*))

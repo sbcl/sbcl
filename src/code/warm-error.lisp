@@ -1,0 +1,60 @@
+;;;; error stuff that needs to wait until warm load
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB-KERNEL")
+
+;;; Moved from 'cold-error' to this file because of (at least) these reasons:
+;;;  - the LOAD-TIME-VALUE forms need to run after 'condition.lisp'
+;;;    has created the WARNING and STYLE-WARNING classoids
+;;;  - even if this were loaded no earlier than the classoid definitions,
+;;;    the entirety of condition handling doesn't work soon enough in cold-init.
+(flet ((%warn (datum super default-type &rest arguments)
+         (infinite-error-protect
+          (let ((condition (apply #'coerce-to-condition datum default-type 'warn
+                                  arguments))
+                (superclassoid-name (classoid-name super)))
+            ;; CONDITION is necessarily an INSTANCE,
+            ;; but pedantry requires it be the right subtype of instance.
+            (unless (classoid-typep (%instance-layout condition)
+                                    super condition)
+              (error 'simple-type-error
+                     :datum datum :expected-type superclassoid-name
+                     :format-control "~S does not designate a ~A class"
+                     :format-arguments (list datum superclassoid-name)))
+            (restart-case (%signal condition)
+              (muffle-warning ()
+                :report "Skip warning."
+                (return-from %warn nil)))
+            (format *error-output* "~&~@<~S: ~3i~:_~A~:>~%"
+                    superclassoid-name condition)))
+         nil))
+
+  ;; We don't warn about redefinition of WARN, apparently (not sure why)
+  (defun warn (datum &rest arguments)
+  #+sb-doc
+  "Warn about a situation by signalling a condition formed by DATUM and
+   ARGUMENTS. While the condition is being signaled, a MUFFLE-WARNING restart
+   exists that causes WARN to immediately return NIL."
+    (declare (explicit-check))
+    ;; FIXME: figure out how to get genesis to understand that certain
+    ;; classoids (particularly those defined by the language standard)
+    ;; never need to go through the classoid-cell indirection,
+    ;; as the classoid object itself is essentially permanent.
+    (apply #'%warn datum (load-time-value (find-classoid 'warning) t)
+           'simple-warning arguments))
+
+  ;; But we would warn about redefinition of STYLE-WARN.
+  (fmakunbound 'style-warn)
+
+  (defun style-warn (datum &rest arguments)
+    (declare (explicit-check))
+    (apply #'%warn datum (load-time-value (find-classoid 'style-warning) t)
+           'simple-style-warning arguments)))

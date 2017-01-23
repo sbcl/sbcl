@@ -408,6 +408,7 @@ Examples:
 ;;; as indicated above, the second line hides some information.
 (defun style-warn-once (thing fmt &rest args)
   (declare (special *compile-object*))
+  (declare (notinline style-warn)) ; See COMPILER-STYLE-WARN for rationale
   (let* ((source-info *source-info*)
          (file-info (and (source-info-p source-info)
                          (source-info-file-info source-info)))

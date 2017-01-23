@@ -1305,6 +1305,7 @@
 ;;; if either the transform succeeded or was aborted.
 (defun ir1-transform (node transform)
   (declare (type combination node) (type transform transform))
+  (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (let* ((type (transform-type transform))
          (fun (transform-function transform))
          (constrained (fun-type-p type))

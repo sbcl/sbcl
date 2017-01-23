@@ -75,10 +75,11 @@
    ARGUMENTS. If the condition is not handled, NIL is returned. If
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
-  (let* ((condition
-           (apply #'coerce-to-condition datum 'simple-condition 'signal arguments))
-         (handler-clusters *handler-clusters*)
-         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
+  (declare (explicit-check))
+  (%signal (apply #'coerce-to-condition datum 'simple-condition 'signal arguments)))
+(defun %signal (condition)
+  (let ((handler-clusters *handler-clusters*)
+        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* '%signal)))
     (when *break-on-signals*
       (maybe-break-on-signal condition))
     (do ((cluster (pop handler-clusters) (pop handler-clusters)))
@@ -165,9 +166,8 @@
    (let ((condition (apply #'coerce-to-condition datum 'simple-error 'error
                            arguments))
          (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'error)))
-     (/show0 "done coercing DATUM to CONDITION")
      (/show0 "signalling CONDITION from within ERROR")
-     (signal condition)
+     (%signal condition)
      (/show0 "done signalling CONDITION within ERROR")
      (invoke-debugger condition))))
 
@@ -179,7 +179,7 @@
                               'simple-error 'cerror arguments)))
         (with-condition-restarts condition (list (find-restart 'continue))
           (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'cerror)))
-            (signal condition)
+            (%signal condition)
             (invoke-debugger condition))))))
   nil)
 
@@ -204,33 +204,25 @@ of condition handling occurring."
         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'break)))
     (apply #'%break 'break datum arguments)))
 
-(defun %warn (datum arguments super default-type)
-  (infinite-error-protect
-   (let ((condition (apply #'coerce-to-condition datum default-type 'warn
-                           arguments))
-         (superclassoid-name (classoid-name super)))
-     ;; CONDITION is necessarily an INSTANCE,
-     ;; but pedantry requires it be the right subtype of instance.
-     (unless (classoid-typep (%instance-layout condition)
-                             super condition)
-       (error 'simple-type-error
-              :datum datum :expected-type superclassoid-name
-              :format-control "~S does not designate a ~A class"
-              :format-arguments (list datum superclassoid-name)))
-     (restart-case (signal condition)
-       (muffle-warning ()
-         :report "Skip warning."
-         (return-from %warn nil)))
-     (format *error-output* "~&~@<~S: ~3i~:_~A~:>~%"
-             superclassoid-name condition)))
-  nil)
-
+;;; These functions definitions are for cold-init.
+;;; The real definitions are found in 'condition.lisp'
+(defvar *!cold-warn-action* nil)
 (defun warn (datum &rest arguments)
-  #!+sb-doc
-  "Warn about a situation by signalling a condition formed by DATUM and
-   ARGUMENTS. While the condition is being signaled, a MUFFLE-WARNING restart
-   exists that causes WARN to immediately return NIL."
-  (%warn datum arguments (find-classoid 'warning) 'simple-warning))
-
+  (let ((action (cond ((boundp '*!cold-warn-action*) *!cold-warn-action*)
+                      ((not (member datum
+                                    '(asterisks-around-constant-variable-name
+                                      redefinition-with-defun)))
+                       'print))))
+    (when (member action '(lose print))
+      (let ((*package* *cl-package*))
+        (write-string "cold WARN: datum=") ; WRITE could be too broken as yet
+        (write (get-lisp-obj-address datum) :radix t :base 16)
+        (write-string " = ")
+        (write datum)
+        (write-char #\space)
+        (write (get-lisp-obj-address arguments) :radix t :base 16)
+        (terpri)))
+    (when (eq action 'lose) (sb!sys:%primitive sb!c:halt))))
 (defun style-warn (datum &rest arguments)
-  (%warn datum arguments (find-classoid 'style-warning) 'simple-style-warning))
+  (declare (notinline warn))
+  (apply 'warn datum arguments))

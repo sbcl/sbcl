@@ -76,10 +76,11 @@
 ;;; indicate that the files should be handled not in cold load but
 ;;; afterwards.
 (let ((early-srcs
-              ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
-              ;; It could be done in genesis, but not earlier,
-              ;; since the host has a package of that name.
-              '("SRC;CODE;DEFPACKAGE"))
+              '("SRC;CODE;WARM-ERROR"
+                ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
+                ;; It could be done in genesis, but not earlier,
+                ;; since the host has a package of that name.
+                "SRC;CODE;DEFPACKAGE"))
 
       (interpreter-srcs
               #+sb-fasteval
