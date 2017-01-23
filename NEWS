@@ -1,6 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.3.14:
+  * minor incompatible change: the reader will when feasible create
+    new symbols using a BASE-STRING for the print name.  Additionally,
+    string literals can favor the base-string type if desired, though
+    the default is to always return UTF-32 strings for compatibility.
+    A preference for base-string does not disable reading Unicode.
+    The choice is controlled via (SETF READTABLE-BASE-CHAR-PREFERENCE).
+    If Unicode was disabled at build time, this setting does nothing.
   * enhancement: SBCL generates more debug information by default.
   * enhancement: type errors provide context information, such as which
     variable is being bound, which slot of which structure is being set.

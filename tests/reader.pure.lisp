@@ -521,3 +521,35 @@
                "zebra"   "zebra"
                "Zebra"   "Zebra"
                "ZEBRA"   "ZEBRA")))
+
+#+sb-unicode
+(with-test (:name :base-char-preference)
+  (let* ((rt (copy-readtable))
+         (*readtable* rt)
+         (callcount 0))
+    (flet ((expect (setting symbol-name-type string-type)
+             (unless (eq setting :default)
+               (setf (readtable-base-char-preference rt) setting))
+             ;; Each test has to intern a new symbol of course.
+             (let ((input (format nil "MAMALOOK~D" (incf callcount))))
+               (assert (equal (type-of (symbol-name (read-from-string input)))
+                              symbol-name-type))
+               (assert (equal (type-of (read-from-string "\"Foobarbaz\""))
+                              string-type)))
+             ;; Also verify that COPY-READTABLE works
+             (assert (eq (readtable-base-char-preference (copy-readtable rt))
+                         (readtable-base-char-preference rt)))))
+      ;; Verify correctness of the stated default as per the docstring
+      (assert (eq (readtable-base-char-preference rt) :symbols))
+      ;; Default: prefer base symbols, but CHARACTER strings.
+      (expect :default '(simple-base-string 9) '(simple-array character (9)))
+      ;; Prefer base strings, but CHARACTER strings for symbol names
+      (expect :strings
+              '(simple-array character (9))
+              '(simple-base-string 9))
+      ;; Prefer base-string for everything
+      (expect :both '(simple-base-string 9) '(simple-base-string 9))
+      ;; Prefer base-string for neither
+      (expect nil
+              '(simple-array character (9))
+              '(simple-array character (9))))))

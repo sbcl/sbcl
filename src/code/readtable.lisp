@@ -88,6 +88,27 @@ types for the Common Lisp expression reader."
   (character-macro-hash-table (make-hash-table) :type hash-table
    :read-only t)
   (%readtable-case 0 :type (mod 4))
+  ;; Element type to use when reading a string literal with no extended-chars.
+  ;; The system itself prefers base-string, but otherwise it is a contentious
+  ;; issue. We don't (by default) use base-strings, because people often write:
+  ;;   (SETF (CHAR (READ-STRING S) 0) #\PILE_OF_POO),
+  ;; or more likely, something the effect of which resembles
+  ;;   (SETF (CHAR (ADJUST-ARRAY "" 10) 0) #\SMILE)
+  ;; which are each dubious constructs, because they assume READ to produce
+  ;; strings capable of holding any char. The latter further assumes something
+  ;; about compilation, because in that example, considering that there are no
+  ;; characters in the literal, it is unclear whether the array should
+  ;; be similar-as-constant to an array of base-char or array of character.
+  ;; While indeed SBCL prints base-strings readably (if *PRINT-READABLY* is T)
+  ;; using #. syntax, the question is what the writer of the code intended
+  ;; if (s)he did not know that the string should have been expressly
+  ;; specified via #.(MAKE-STRING ... :ELEMENT-TYPE) or somesuch.
+  (%readtable-string-preference 'base-char :type (member character base-char))
+  ;; With symbols, it's fairly clear that immutability of print names
+  ;; renders the distinction between the kinds of string in the symbol-name
+  ;; as being less relevant. If you expect (copy-seq (string asymbol))
+  ;; to produce a certain type of string, your code is unportable anyway.
+  (%readtable-symbol-preference 'base-char :type (member character base-char))
   (%readtable-normalization #!+sb-unicode t #!-sb-unicode nil :type boolean))
 
 (defconstant +readtable-upcase+ 0)

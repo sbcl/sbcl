@@ -246,6 +246,31 @@ and NIL to suppress normalization."
   (assert-not-standard-readtable readtable '(setf readtable-normalization))
   (setf (%readtable-normalization readtable) new-value))
 
+(defun readtable-base-char-preference (readtable)
+  #!+sb-doc
+  "Returns :SYMBOLS, :STRINGS, :BOTH, or NIL, depending on whether the
+reader should try to intern a base-string when reading a symbol name,
+respectively produce a base-string when reading a quoted string, or in both
+cases, or neither. The preference applies when a symbol-name or string
+contains only BASE-CHAR characters. An (ARRAY CHARACTER (*)) can always
+be interned (returned, respectively) as required. The default is :SYMBOLS."
+  ;; For efficiency the single preference occupies two slots internally.
+  (let ((symbols (eq (%readtable-symbol-preference readtable) 'base-char))
+        (strings (eq (%readtable-string-preference readtable) 'base-char)))
+    (cond ((and strings symbols) :both)
+          (symbols :symbols)
+          (strings :strings))))
+
+(defun (setf readtable-base-char-preference) (new-value readtable)
+  (declare (type (member :symbols :strings :both nil) new-value))
+  #!+sb-doc
+  "Sets the READTABLE-BASE-CHAR-PREFERENCE of the given READTABLE."
+  (setf (%readtable-symbol-preference readtable)
+        (if (member new-value '(:symbols :both)) 'base-char 'character)
+        (%readtable-string-preference readtable)
+        (if (member new-value '(:strings :both)) 'base-char 'character))
+  new-value)
+
 (defun replace/eql-hash-table (to from &optional (transform #'identity))
   (maphash (lambda (k v) (setf (gethash k to) (funcall transform v))) from)
   to)
@@ -296,6 +321,10 @@ readtable when not provided."
      #'copy-cmt-entry)
     (setf (readtable-case really-to-readtable)
           (readtable-case really-from-readtable))
+    (setf (%readtable-string-preference really-to-readtable)
+          (%readtable-string-preference really-from-readtable)
+          (%readtable-symbol-preference really-to-readtable)
+          (%readtable-symbol-preference really-from-readtable))
     (setf (readtable-normalization really-to-readtable)
           (readtable-normalization really-from-readtable))
     really-to-readtable))
@@ -895,21 +924,6 @@ standard Lisp readtable when NIL."
               (simple-reader-error
                stream "More than one object follows . in list.")))))))
 
-;;; Whether it is permissible to read strings as base-string
-;;; if no extended-chars are present. The system itself prefers this, but
-;;; otherwise it is a contentious issue. We don't (by default) use base-strings,
-;;; so that people can dubiously write:
-;;;   (SETF (CHAR (READ-STRING S) 0) #\PILE_OF_POO),
-;;; which is stupid because it makes an assumption about what READ does.
-#!+sb-unicode
-(defvar *read-prefer-base-string* t)
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro token-elt-type (flag)
-    (declare (ignorable flag))
-    `(if (and ,flag #!+sb-unicode *read-prefer-base-string*)
-         'base-char
-         'character)))
-
 (defun read-string (stream closech)
   ;; This accumulates chars until it sees same char that invoked it.
   ;; We avoid copying any given input character more than twice-
@@ -961,7 +975,9 @@ standard Lisp readtable when NIL."
           (let* ((sum (loop for buf in chain sum (length buf)))
                  (result
                   (make-array (+ sum ptr)
-                              :element-type (token-elt-type only-base-chars))))
+                              :element-type (if only-base-chars
+                                                (%readtable-string-preference rt)
+                                                'character))))
             (setq ptr sum)
             ;; Now work backwards from the end
             (replace result buf :start1 ptr)
@@ -1577,7 +1593,9 @@ extended <package-name>::<form-in-package> syntax."
         (return (%intern (token-buf-string buf)
                          (token-buf-fill-ptr buf)
                          pkg
-                         (token-elt-type (token-buf-only-base-chars buf)))))))))
+                         (if (token-buf-only-base-chars buf)
+                             (%readtable-symbol-preference rt)
+                             'character))))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of

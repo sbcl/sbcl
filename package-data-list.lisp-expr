@@ -771,6 +771,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "PRINT-UNREADABLY"
 
                ;; Readtable normalization control
+               "READTABLE-BASE-CHAR-PREFERENCE"
                "READTABLE-NORMALIZATION"
 
                ;; and a mechanism for controlling same at compile time

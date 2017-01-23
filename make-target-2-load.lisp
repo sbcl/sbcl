@@ -60,6 +60,15 @@
 ;;; SB-C::*POLICY* has file scope)
 (setq sb-c::*policy* (copy-structure sb-c::**baseline-policy**))
 
+;;; Adjust READTABLE-BASE-CHAR-PREFERENCE back to the advertised default.
+(dolist (rt (list sb-impl::*standard-readtable* *debug-readtable*))
+  (setf (readtable-base-char-preference rt) :symbols))
+;;; Change the internal constructor's default too.
+sb-kernel::(setf (dsd-default
+                  (find 'sb-impl::%readtable-string-preference
+                        (dd-slots (find-defstruct-description 'readtable))
+                        :key #'dsd-name)) 'character)
+
 ;;; Lock internal packages
 #+sb-package-locks
 (dolist (p (list-all-packages))
@@ -100,7 +109,7 @@
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 (sb-ext:save-lisp-and-die
  (progn
-   ;; See comment in 'reader.lisp'
-   #+sb-unicode (setq sb-impl::*read-prefer-base-string* nil)
+   ;; See comment in 'readtable.lisp'
+   (setf (readtable-base-char-preference *readtable*) :symbols)
    ;; This is a base string since the flag wasn't set to NIL yet.
    "output/sbcl.core"))
