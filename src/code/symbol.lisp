@@ -494,7 +494,10 @@ distinct from the global value. Can also be SETF."
 
 ;;;; GENSYM and friends
 
-(defun %make-symbol-name (prefix counter)
+(defvar *gentemp-counter* 0)
+(declaim (type unsigned-byte *gentemp-counter*))
+
+(flet ((%symbol-nameify (prefix counter)
   (declare (string prefix))
   (if (typep counter '(and fixnum unsigned-byte))
       (let ((s ""))
@@ -516,12 +519,11 @@ distinct from the global value. Can also be SETF."
           (recurse 1 counter)))
       (with-simple-output-to-string (s)
         (write-string prefix s)
-        (%output-integer-in-base counter 10 s))))
+        (%output-integer-in-base counter 10 s)))))
 
 (defvar *gensym-counter* 0
   #!+sb-doc
   "counter for generating unique GENSYM symbols")
-(declaim (type unsigned-byte *gensym-counter*))
 
 (defun gensym (&optional (thing "G"))
   #!+sb-doc
@@ -537,18 +539,14 @@ distinct from the global value. Can also be SETF."
           (values thing (let ((old *gensym-counter*))
                           (setq *gensym-counter* (1+ old))
                           old)))
-    (make-symbol (%make-symbol-name prefix int))))
-
-(defvar *gentemp-counter* 0)
-(declaim (type unsigned-byte *gentemp-counter*))
+    (make-symbol (%symbol-nameify prefix int))))
 
 (defun gentemp (&optional (prefix "T") (package (sane-package)))
   #!+sb-doc
   "Creates a new symbol interned in package PACKAGE with the given PREFIX."
-  (declare (type string prefix))
-  (loop for name = (%make-symbol-name prefix (incf *gentemp-counter*))
-        while (nth-value 1 (find-symbol name package))
-        finally (return (values (intern name package)))))
+  (loop (multiple-value-bind (sym accessibility)
+            (intern (%symbol-nameify prefix (incf *gentemp-counter*)) package)
+          (unless accessibility (return sym))))))
 
 ;;; This function is to be called just before a change which would affect the
 ;;; symbol value. We don't absolutely have to call this function before such

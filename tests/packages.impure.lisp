@@ -840,3 +840,46 @@ if a restart was invoked."
                              (:lock t)))))
       (assert (equal (package-local-nicknames package2) `((,name3 . ,package1))))
       (assert (package-locked-p package2)))))
+
+;;; Now a possibly useless test on an essentially useless function.
+;;; But we may as well get it right - assert that GENTEMP returns
+;;; a symbol that definitely did not exist in the specified package
+;;; even if multiple threads are calling it simultaneously.
+
+;;; We'll create about 25000 symbols, and mark the ones that were returned
+;;; by GENTEMP. Because *GENTEMP-COUNTER* isn't synchronized, but INTERN is,
+;;; returning an indicator of whether it created a symbol, it's simple enough
+;;; to make GENTEMP not accidentally return a symbol created by someone else.
+
+;;; Use array of fixnums because there're no atomic ops on array of word.
+;;; This is either 58000 useful bits or 126000 bits depending on word size.
+(defglobal *scoreboard* (make-array 2000))
+(defglobal *testpkg* (make-package "A-NICE-PACKAGE"))
+
+(defun hammer-on-gentemp (package n-iter)
+  (dotimes (i n-iter)
+    (let ((index (parse-integer (string (gentemp "T" package)) :start 1)))
+      ;; Mark this index in the scoreboard, failing if already set.
+      (multiple-value-bind (elt-index bit-index)
+          (floor index sb-vm:n-positive-fixnum-bits)
+        (let ((old (svref *scoreboard* elt-index)))
+          (loop
+           (when (logbitp bit-index old) (return-from hammer-on-gentemp :fail))
+           (let ((actual-old
+                  (cas (svref *scoreboard* elt-index)
+                       old (logior old (ash 1 bit-index)))))
+             (if (eq old actual-old) (return))
+             (setq old actual-old))))))))
+
+;; This test would consistently fail when GENTEMP first called FIND-SYMBOL
+;; and then INTERN when FIND-SYMBOL said that it found no symbol.
+(with-test (:name :gentemp-threadsafety)
+  (let ((n-threads 5)
+        (n-iter 1000)
+        (threads))
+    (dotimes (i n-threads)
+      (push (sb-thread:make-thread #'hammer-on-gentemp
+                                   :arguments (list *testpkg* n-iter))
+            threads))
+    (let ((results (mapcar #'sb-thread:join-thread threads)))
+      (assert (not (find :fail results))))))
