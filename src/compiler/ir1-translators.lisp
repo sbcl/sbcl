@@ -1022,84 +1022,84 @@ care."
 
 ;;;; SETQ
 
-              (defun explode-setq (form err-fun)
-                (collect ((sets))
-                  (do ((op (car form))
-                       (thing (cdr form) (cddr thing)))
-                      ((endp thing) (sets))
-                    (if (endp (cdr thing))
-                        (funcall err-fun "odd number of args to ~A: ~S" op form)
-                        (sets `(,op ,(first thing) ,(second thing)))))))
+(defun explode-setq (form err-fun)
+  (collect ((sets))
+    (do ((op (car form))
+         (thing (cdr form) (cddr thing)))
+        ((endp thing) (sets))
+      (if (endp (cdr thing))
+          (funcall err-fun "odd number of args to ~A: ~S" op form)
+          (sets `(,op ,(first thing) ,(second thing)))))))
 
 ;;; If there is a definition in LEXENV-VARS, just set that, otherwise
 ;;; look at the global information. If the name is for a constant,
 ;;; then error out.
-              (def-ir1-translator setq ((&whole source &rest things) start next result)
-                (if (proper-list-of-length-p things 2)
-                    (let* ((name (first things))
-                           (value-form (second things))
-                           (leaf (or (lexenv-find name vars) (find-free-var name))))
-                      (etypecase leaf
-                        (leaf
-                         (when (constant-p leaf)
-                           (compiler-error "~S is a constant and thus can't be set." name))
-                         (when (lambda-var-p leaf)
-                           (let ((home-lambda (ctran-home-lambda-or-null start)))
-                             (when home-lambda
-                               (sset-adjoin leaf (lambda-calls-or-closes home-lambda))))
-                           (when (lambda-var-ignorep leaf)
-                             ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
-                             ;; requires that this be a STYLE-WARNING, not a full warning.
-                             (compiler-style-warn
-                              "~S is being set even though it was declared to be ignored."
-                              name)))
-                         (if (and (global-var-p leaf) (eq :unknown (global-var-kind leaf)))
-                             ;; For undefined variables go through SET, so that we can catch
-                             ;; constant modifications.
-                             (ir1-convert start next result `(set ',name ,value-form))
-                             (setq-var start next result leaf value-form)))
-                        (cons
-                         (aver (eq (car leaf) 'macro))
-                         ;; Allow *MACROEXPAND-HOOK* to see NAME get expanded,
-                         ;; not just see a use of SETF on the new place.
-                         (ir1-convert start next result `(setf ,name ,(second things))))
-                        (heap-alien-info
-                         (ir1-convert start next result
-                                      `(%set-heap-alien ',leaf ,(second things))))))
-                    (ir1-convert-progn-body start next result
-                                            (explode-setq source 'compiler-error))))
+(def-ir1-translator setq ((&whole source &rest things) start next result)
+  (if (proper-list-of-length-p things 2)
+      (let* ((name (first things))
+             (value-form (second things))
+             (leaf (or (lexenv-find name vars) (find-free-var name))))
+        (etypecase leaf
+          (leaf
+           (when (constant-p leaf)
+             (compiler-error "~S is a constant and thus can't be set." name))
+           (when (lambda-var-p leaf)
+             (let ((home-lambda (ctran-home-lambda-or-null start)))
+               (when home-lambda
+                 (sset-adjoin leaf (lambda-calls-or-closes home-lambda))))
+             (when (lambda-var-ignorep leaf)
+               ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
+               ;; requires that this be a STYLE-WARNING, not a full warning.
+               (compiler-style-warn
+                "~S is being set even though it was declared to be ignored."
+                name)))
+           (if (and (global-var-p leaf) (eq :unknown (global-var-kind leaf)))
+               ;; For undefined variables go through SET, so that we can catch
+               ;; constant modifications.
+               (ir1-convert start next result `(set ',name ,value-form))
+               (setq-var start next result leaf value-form)))
+          (cons
+           (aver (eq (car leaf) 'macro))
+           ;; Allow *MACROEXPAND-HOOK* to see NAME get expanded,
+           ;; not just see a use of SETF on the new place.
+           (ir1-convert start next result `(setf ,name ,(second things))))
+          (heap-alien-info
+           (ir1-convert start next result
+                        `(%set-heap-alien ',leaf ,(second things))))))
+      (ir1-convert-progn-body start next result
+                              (explode-setq source 'compiler-error))))
 
 ;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
 ;;; This should only need to be called in SETQ.
-              (defun setq-var (start next result var value)
-                (declare (type ctran start next) (type (or lvar null) result)
-                         (type basic-var var))
-                (let ((dest-ctran (make-ctran))
-                      (dest-lvar (make-lvar))
-                      (type (or (lexenv-find var type-restrictions)
-                                (leaf-type var))))
-                  (ir1-convert start dest-ctran dest-lvar `(the ,(type-specifier type)
-                                                                ,value))
-                  (let ((res (make-set :var var :value dest-lvar)))
-                    (setf (lvar-dest dest-lvar) res)
-                    (setf (leaf-ever-used var) t)
-                    (push res (basic-var-sets var))
-                    (link-node-to-previous-ctran res dest-ctran)
-                    (use-continuation res next result))))
-              
+(defun setq-var (start next result var value)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (type basic-var var))
+  (let ((dest-ctran (make-ctran))
+        (dest-lvar (make-lvar))
+        (type (or (lexenv-find var type-restrictions)
+                  (leaf-type var))))
+    (ir1-convert start dest-ctran dest-lvar `(the ,(type-specifier type)
+                                                  ,value))
+    (let ((res (make-set :var var :value dest-lvar)))
+      (setf (lvar-dest dest-lvar) res)
+      (setf (leaf-ever-used var) t)
+      (push res (basic-var-sets var))
+      (link-node-to-previous-ctran res dest-ctran)
+      (use-continuation res next result))))
+
 ;;;; CATCH, THROW and UNWIND-PROTECT
 
 ;;; We turn THROW into a MULTIPLE-VALUE-CALL of a magical function,
 ;;; since as far as IR1 is concerned, it has no interesting
 ;;; properties other than receiving multiple-values.
-              (def-ir1-translator throw ((tag result) start next result-lvar)
-                #!+sb-doc
-                "THROW tag form
+(def-ir1-translator throw ((tag result) start next result-lvar)
+  #!+sb-doc
+  "THROW tag form
 
 Do a non-local exit, return the values of FORM from the CATCH whose tag is EQ
 to TAG."
-                (ir1-convert start next result-lvar
-                             `(multiple-value-call #'%throw ,tag ,result)))
+  (ir1-convert start next result-lvar
+               `(multiple-value-call #'%throw ,tag ,result)))
 
 ;;; This is a special special form used to instantiate a cleanup as
 ;;; the current cleanup within the body. KIND is the kind of cleanup
@@ -1108,19 +1108,19 @@ to TAG."
 ;;; and introduce the cleanup into the lexical environment. We
 ;;; back-patch the ENTRY-CLEANUP for the current cleanup to be the new
 ;;; cleanup, since this inner cleanup is the interesting one.
-              (def-ir1-translator %within-cleanup
-                  ((kind mess-up &body body) start next result)
-                (let ((dummy (make-ctran))
-                      (dummy2 (make-ctran)))
-                  (ir1-convert start dummy nil mess-up)
-                  (let* ((mess-node (ctran-use dummy))
-                         (cleanup (make-cleanup :kind kind
-                                                :mess-up mess-node))
-                         (old-cup (lexenv-cleanup *lexenv*))
-                         (*lexenv* (make-lexenv :cleanup cleanup)))
-                    (setf (entry-cleanup (cleanup-mess-up old-cup)) cleanup)
-                    (ir1-convert dummy dummy2 nil '(%cleanup-point))
-                    (ir1-convert-progn-body dummy2 next result body))))
+(def-ir1-translator %within-cleanup
+    ((kind mess-up &body body) start next result)
+  (let ((dummy (make-ctran))
+        (dummy2 (make-ctran)))
+    (ir1-convert start dummy nil mess-up)
+    (let* ((mess-node (ctran-use dummy))
+           (cleanup (make-cleanup :kind kind
+                                  :mess-up mess-node))
+           (old-cup (lexenv-cleanup *lexenv*))
+           (*lexenv* (make-lexenv :cleanup cleanup)))
+      (setf (entry-cleanup (cleanup-mess-up old-cup)) cleanup)
+      (ir1-convert dummy dummy2 nil '(%cleanup-point))
+      (ir1-convert-progn-body dummy2 next result body))))
 
 ;;; This is a special special form that makes an "escape function"
 ;;; which returns unknown values from named block. We convert the
@@ -1131,131 +1131,131 @@ to TAG."
 ;;;
 ;;; Note that environment analysis replaces references to escape
 ;;; functions with references to the corresponding NLX-INFO structure.
-              (def-ir1-translator %escape-fun ((tag) start next result)
-                (let ((fun (let ((*allow-instrumenting* nil))
-                             (ir1-convert-lambda
-                              `(lambda ()
-                                 (return-from ,tag (%unknown-values)))
-                              :debug-name (debug-name 'escape-fun tag))))
-                      (ctran (make-ctran)))
-                  (setf (functional-kind fun) :escape)
-                  (ir1-convert start ctran nil `(%%allocate-closures ,fun))
-                  (reference-leaf ctran next result fun)))
+(def-ir1-translator %escape-fun ((tag) start next result)
+  (let ((fun (let ((*allow-instrumenting* nil))
+               (ir1-convert-lambda
+                `(lambda ()
+                   (return-from ,tag (%unknown-values)))
+                :debug-name (debug-name 'escape-fun tag))))
+        (ctran (make-ctran)))
+    (setf (functional-kind fun) :escape)
+    (ir1-convert start ctran nil `(%%allocate-closures ,fun))
+    (reference-leaf ctran next result fun)))
 
 ;;; Yet another special special form. This one looks up a local
 ;;; function and smashes it to a :CLEANUP function, as well as
 ;;; referencing it.
-              (def-ir1-translator %cleanup-fun ((name) start next result)
-                ;; FIXME: Should this not be :TEST #'EQUAL? What happens to
-                ;; (SETF FOO) here?
-                (let ((fun (lexenv-find name funs)))
-                  (aver (lambda-p fun))
-                  (setf (functional-kind fun) :cleanup)
-                  (reference-leaf start next result fun)))
+(def-ir1-translator %cleanup-fun ((name) start next result)
+  ;; FIXME: Should this not be :TEST #'EQUAL? What happens to
+  ;; (SETF FOO) here?
+  (let ((fun (lexenv-find name funs)))
+    (aver (lambda-p fun))
+    (setf (functional-kind fun) :cleanup)
+    (reference-leaf start next result fun)))
 
-              (def-ir1-translator catch ((tag &body body) start next result)
-                #!+sb-doc
-                "CATCH tag form*
+(def-ir1-translator catch ((tag &body body) start next result)
+  #!+sb-doc
+  "CATCH tag form*
 
 Evaluate TAG and instantiate it as a catcher while the body forms are
 evaluated in an implicit PROGN. If a THROW is done to TAG within the dynamic
 scope of the body, then control will be transferred to the end of the body and
 the thrown values will be returned."
-                ;; We represent the possibility of the control transfer by making an
-                ;; "escape function" that does a lexical exit, and instantiate the
-                ;; cleanup using %WITHIN-CLEANUP.
-                (ir1-convert
-                 start next result
-                 (with-unique-names (exit-block)
-                   `(block ,exit-block
-                      (%within-cleanup
-                       :catch (%catch (%escape-fun ,exit-block) ,tag)
-                       ,@body)))))
+  ;; We represent the possibility of the control transfer by making an
+  ;; "escape function" that does a lexical exit, and instantiate the
+  ;; cleanup using %WITHIN-CLEANUP.
+  (ir1-convert
+   start next result
+   (with-unique-names (exit-block)
+     `(block ,exit-block
+        (%within-cleanup
+         :catch (%catch (%escape-fun ,exit-block) ,tag)
+         ,@body)))))
 
-              (def-ir1-translator unwind-protect
-                  ((protected &body cleanup) start next result)
-                #!+sb-doc
-                "UNWIND-PROTECT protected cleanup*
+(def-ir1-translator unwind-protect
+    ((protected &body cleanup) start next result)
+  #!+sb-doc
+  "UNWIND-PROTECT protected cleanup*
 
 Evaluate the form PROTECTED, returning its values. The CLEANUP forms are
 evaluated whenever the dynamic scope of the PROTECTED form is exited (either
 due to normal completion or a non-local exit such as THROW)."
-                ;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
-                ;; cleanup forms into a local function so that they can be referenced
-                ;; both in the case where we are unwound and in any local exits. We
-                ;; use %CLEANUP-FUN on this to indicate that reference by
-                ;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
-                ;; an XEP.
-                (ir1-convert
-                 start next result
-                 (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
-                   `(flet ((,cleanup-fun ()
-                             ,@cleanup
-                             nil))
-                      ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
-                      ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
-                      ;; and something can be done to make %ESCAPE-FUN have
-                      ;; dynamic extent too.
-                      (declare (dynamic-extent #',cleanup-fun))
-                      (block ,drop-thru-tag
-                        (multiple-value-bind (,next ,start ,count)
-                            (block ,exit-tag
-                              (%within-cleanup
-                               :unwind-protect
-                               (%unwind-protect (%escape-fun ,exit-tag)
-                                                (%cleanup-fun ,cleanup-fun))
-                               (return-from ,drop-thru-tag ,protected)))
-                          (declare (optimize (insert-debug-catch 0)))
-                          (,cleanup-fun)
-                          (%continue-unwind ,next ,start ,count)))))))
-              
+  ;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
+  ;; cleanup forms into a local function so that they can be referenced
+  ;; both in the case where we are unwound and in any local exits. We
+  ;; use %CLEANUP-FUN on this to indicate that reference by
+  ;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
+  ;; an XEP.
+  (ir1-convert
+   start next result
+   (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
+     `(flet ((,cleanup-fun ()
+               ,@cleanup
+               nil))
+        ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
+        ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
+        ;; and something can be done to make %ESCAPE-FUN have
+        ;; dynamic extent too.
+        (declare (dynamic-extent #',cleanup-fun))
+        (block ,drop-thru-tag
+          (multiple-value-bind (,next ,start ,count)
+              (block ,exit-tag
+                (%within-cleanup
+                 :unwind-protect
+                 (%unwind-protect (%escape-fun ,exit-tag)
+                                  (%cleanup-fun ,cleanup-fun))
+                 (return-from ,drop-thru-tag ,protected)))
+            (declare (optimize (insert-debug-catch 0)))
+            (,cleanup-fun)
+            (%continue-unwind ,next ,start ,count)))))))
+
 ;;;; multiple-value stuff
 
-              (def-ir1-translator multiple-value-call ((fun &rest args) start next result)
-                #!+sb-doc
-                "MULTIPLE-VALUE-CALL function values-form*
+(def-ir1-translator multiple-value-call ((fun &rest args) start next result)
+  #!+sb-doc
+  "MULTIPLE-VALUE-CALL function values-form*
 
 Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
 values from the first VALUES-FORM making up the first argument, etc."
-                (let* ((ctran (make-ctran))
-                       (fun-lvar (make-lvar))
-                       (node (if args
-                                 ;; If there are arguments, MULTIPLE-VALUE-CALL
-                                 ;; turns into an MV-COMBINATION.
-                                 (make-mv-combination fun-lvar)
-                                 ;; If there are no arguments, then we convert to a
-                                 ;; normal combination, ensuring that a MV-COMBINATION
-                                 ;; always has at least one argument. This can be
-                                 ;; regarded as an optimization, but it is more
-                                 ;; important for simplifying compilation of
-                                 ;; MV-COMBINATIONS.
-                                 (make-combination fun-lvar))))
-                  (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun))
-                  (setf (lvar-dest fun-lvar) node)
-                  (collect ((arg-lvars))
-                    (let ((this-start ctran))
-                      (dolist (arg args)
-                        (let ((this-ctran (make-ctran))
-                              (this-lvar (make-lvar node)))
-                          (ir1-convert this-start this-ctran this-lvar arg)
-                          (setq this-start this-ctran)
-                          (arg-lvars this-lvar)))
-                      (link-node-to-previous-ctran node this-start)
-                      (use-continuation node next result)
-                      (setf (basic-combination-args node) (arg-lvars))))))
+  (let* ((ctran (make-ctran))
+         (fun-lvar (make-lvar))
+         (node (if args
+                   ;; If there are arguments, MULTIPLE-VALUE-CALL
+                   ;; turns into an MV-COMBINATION.
+                   (make-mv-combination fun-lvar)
+                   ;; If there are no arguments, then we convert to a
+                   ;; normal combination, ensuring that a MV-COMBINATION
+                   ;; always has at least one argument. This can be
+                   ;; regarded as an optimization, but it is more
+                   ;; important for simplifying compilation of
+                   ;; MV-COMBINATIONS.
+                   (make-combination fun-lvar))))
+    (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun))
+    (setf (lvar-dest fun-lvar) node)
+    (collect ((arg-lvars))
+      (let ((this-start ctran))
+        (dolist (arg args)
+          (let ((this-ctran (make-ctran))
+                (this-lvar (make-lvar node)))
+            (ir1-convert this-start this-ctran this-lvar arg)
+            (setq this-start this-ctran)
+            (arg-lvars this-lvar)))
+        (link-node-to-previous-ctran node this-start)
+        (use-continuation node next result)
+        (setf (basic-combination-args node) (arg-lvars))))))
 
-              (def-ir1-translator multiple-value-prog1
-                  ((values-form &rest forms) start next result)
-                #!+sb-doc
-                "MULTIPLE-VALUE-PROG1 values-form form*
+(def-ir1-translator multiple-value-prog1
+    ((values-form &rest forms) start next result)
+  #!+sb-doc
+  "MULTIPLE-VALUE-PROG1 values-form form*
 
 Evaluate VALUES-FORM and then the FORMS, but return all the values of
 VALUES-FORM."
-                (let ((dummy (make-ctran)))
-                  (ctran-starts-block dummy)
-                  (ir1-convert start dummy result values-form)
-                  (ir1-convert-progn-body dummy next nil forms)))
-              
+  (let ((dummy (make-ctran)))
+    (ctran-starts-block dummy)
+    (ir1-convert start dummy result values-form)
+    (ir1-convert-progn-body dummy next nil forms)))
+
 ;;;; interface to defining macros
 
 ;;; Old CMUCL comment:
@@ -1269,10 +1269,10 @@ VALUES-FORM."
 ;;; EVAL-WHEN, this function is no longer used.  However, it might be
 ;;; worth figuring out why it was used, and maybe doing analogous
 ;;; munging to the functions created in the expanders for the macros.
-              (defun revert-source-path (name)
-                (do ((path *current-path* (cdr path)))
-                    ((null path) *current-path*)
-                  (let ((first (first path)))
-                    (when (or (eq first name)
-                              (eq first 'original-source-start))
-                      (return path)))))
+(defun revert-source-path (name)
+  (do ((path *current-path* (cdr path)))
+      ((null path) *current-path*)
+    (let ((first (first path)))
+      (when (or (eq first name)
+                (eq first 'original-source-start))
+        (return path)))))
