@@ -1880,9 +1880,7 @@ core and return a descriptor to it."
   (aver (= (descriptor-lowtag des) sb!vm:list-pointer-lowtag))
   (write-wordindexed des sb!vm:cons-cdr-slot newval)
   des)
-(defun cold-null (des)
-  (= (descriptor-bits des)
-     (descriptor-bits *nil-descriptor*)))
+(defun cold-null (des) (descriptor= des *nil-descriptor*))
 
 ;;; Given a cold representation of a function name, return a warm
 ;;; representation.
