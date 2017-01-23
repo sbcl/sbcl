@@ -777,8 +777,17 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
               "~S is already a nickname for ~S."
               n (package-%name found)))))))
 
+;;; ANSI specifies that:
+;;;  (1) MAKE-PACKAGE and DEFPACKAGE use the same default package-use-list
+;;;  (2) that it (as an implementation-defined value) should be documented,
+;;;      which we do in the doc string.
+;;; For OAOO reasons we give a name to this value and then use #. readmacro
+;;; to splice it in as a constant. Anyone who actually wants a random value
+;;; is free to :USE (PACKAGE-USE-LIST :CL-USER) or whatever.
+(defglobal *!default-package-use-list* nil)
+
 (defun make-package (name &key
-                          (use '#.*default-package-use-list*)
+                          (use '#.*!default-package-use-list*)
                           nicknames
                           (internal-symbols 10)
                           (external-symbols 10))
@@ -788,7 +797,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are estimates for the number of
 internal and external symbols which will ultimately be present in the package.
 The default value of USE is implementation-dependent, and in this
-implementation it is ~S." *default-package-use-list*)
+implementation it is ~S." *!default-package-use-list*)
   (prog ((name (stringify-string-designator name))
          (nicks (stringify-string-designators nicknames))
          clobber)

@@ -275,7 +275,6 @@
  ("src/code/fd-stream"     :not-host)
  ("src/code/stream"        :not-host)
  ("src/code/early-format")
- ("src/code/defpackage"    :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ("src/code/common-os" :not-host)

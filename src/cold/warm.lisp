@@ -20,26 +20,12 @@
                      (space 1)
                      (speed 2)))
 
-
-;;;; package hacking
-
-;;; Assert that genesis preserves shadowing symbols.
+;;; Assert that genesis preserved shadowing symbols.
 (let ((p sb-assem::*backend-instruction-set-package*))
   (unless (eq p (find-package "SB-VM"))
     (dolist (expect '("SEGMENT" "MAKE-SEGMENT"))
       (assert (find expect (package-shadowing-symbols p) :test 'string=)))))
 
-;;; FIXME: This nickname is a deprecated hack for backwards
-;;; compatibility with code which assumed the CMU-CL-style
-;;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
-;;; in 0.7.0, so we should get rid of this nickname after a while.
-(let ((package (find-package "SB-ALIEN")))
-  (rename-package package
-                  (package-name package)
-                  (cons "SB-C-CALL" (package-nicknames package))))
-
-(let ((package (find-package "SB-SEQUENCE")))
-  (rename-package package (package-name package) (list "SEQUENCE")))
 
 ;;;; compiling and loading more of the system
 
@@ -89,7 +75,13 @@
 ;;; into build-order.lisp-expr with some new flag (perhaps :WARM) to
 ;;; indicate that the files should be handled not in cold load but
 ;;; afterwards.
-(let ((interpreter-srcs
+(let ((early-srcs
+              ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
+              ;; It could be done in genesis, but not earlier,
+              ;; since the host has a package of that name.
+              '("SRC;CODE;DEFPACKAGE"))
+
+      (interpreter-srcs
               #+sb-fasteval
               '("SRC;INTERPRETER;MACROS"
                 "SRC;INTERPRETER;CHECKFUNS"
@@ -221,6 +213,7 @@
                   (sb-int:/show "done loading" output-truename))))))))
 
   (let ((*compile-print* nil))
+    (do-srcs early-srcs)
     (with-compilation-unit () (do-srcs interpreter-srcs))
     (with-compilation-unit () (do-srcs pcl-srcs))
     (do-srcs other-srcs))))

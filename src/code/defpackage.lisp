@@ -9,29 +9,10 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
-;;; the list of packages to use by default when no :USE argument is
-;;; supplied to MAKE-PACKAGE or other package creation forms
-;;;
-;;; ANSI specifies (1) that MAKE-PACKAGE and DEFPACKAGE use the same
-;;; value, and (2) that it (as an implementation-defined value) should
-;;; be documented, which we do in the doc string. So for OAOO reasons
-;;; we represent this value as a variable only at compile time, and
-;;; then use #. readmacro hacks to splice it into the target code as a
-;;; constant.
-(eval-when (:compile-toplevel)
-  (defparameter *default-package-use-list*
-    ;; ANSI says this is implementation-defined. So we make it NIL,
-    ;; the way God intended. Anyone who actually wants a random value
-    ;; is free to :USE (PACKAGE-USE-LIST :CL-USER) anyway.:-|
-    nil))
-
-;; this macro can't work (never has, never will) until the target system
-;; is fully operational, so push it down to non-toplevel.
-(let ()
 (defmacro defpackage (package &rest options)
-  #!+sb-doc
+  #+sb-doc
   #.(format nil
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
    following: ~{~&~4T~A~}
@@ -43,13 +24,13 @@
     (:shadow "{symbol-name}*")
     (:shadowing-import-from "<package-name> {symbol-name}*")
     (:local-nicknames "{local-nickname actual-package-name}*")
-    #!+sb-package-locks (:lock "boolean")
-    #!+sb-package-locks (:implement "{package-name}*")
+    #+sb-package-locks (:lock "boolean")
+    #+sb-package-locks (:implement "{package-name}*")
     (:documentation "doc-string")
     (:intern "{symbol-name}*")
     (:size "<integer>")
     (:nicknames "{package-name}*"))
-  '(:size #!+sb-package-locks :lock))
+  '(:size #+sb-package-locks :lock))
   (let ((nicknames nil)
         (local-nicknames nil)
         (size nil)
@@ -75,7 +56,7 @@
                :format-arguments (list option)))
       (setq optname (car option) optval (cdr option))
       (case optname
-        ((:documentation :size #!+sb-package-locks :lock)
+        ((:documentation :size #+sb-package-locks :lock)
          (when (memq optname seen)
            (error 'simple-program-error
                   :format-control "can't specify ~S more than once."
@@ -128,11 +109,11 @@
          (setf interns (append interns (stringify-string-designators optval))))
         (:export
          (setf exports (append exports (stringify-string-designators optval))))
-        #!+sb-package-locks
+        #+sb-package-locks
         (:implement
          (setf implement (append implement (stringify-package-designators optval))
                implement-p t))
-        #!+sb-package-locks
+        #+sb-package-locks
         (:lock
          (setf lock (coerce optval 'boolean)))
         (:documentation
@@ -159,10 +140,9 @@
                     ;; * (package-implements-list (make-package "B")) => NIL
                     ',(if implement-p implement (list package))
                     ',local-nicknames
-                    ',lock (sb!c:source-location)
+                    ',lock (sb-c:source-location)
                     ,@(and doc
                            `(,doc))))))
-)
 
 (defun check-disjoint (&rest args)
   ;; An arg is (:key . set)
@@ -220,8 +200,8 @@
          ;; existing use list
          (package-use-list package))
         (t
-         ;; :default for a new package is the *default-package-use-list*
-         '#.*default-package-use-list*)))
+         ;; :default for a new package is the *!default-package-use-list*
+         '#.*!default-package-use-list*)))
 
 (defun update-package (package nicknames source-location
                        shadows shadowing-imports
@@ -229,8 +209,7 @@
                        imports interns
                        exports implement local-nicknames
                        lock doc-string)
-  (declare #!-sb-package-locks
-           (ignore implement lock))
+  (declare #-sb-package-locks (ignore implement lock))
   (%enter-new-nicknames package nicknames)
   ;; 1. :shadow and :shadowing-import-from
   ;;
@@ -261,7 +240,7 @@
   (when source-location
     (setf (package-source-location package) source-location))
   (setf (package-doc-string package) doc-string)
-  #!+sb-package-locks
+  #+sb-package-locks
   (progn
     ;; Handle packages this is an implementation package of
     (dolist (p implement)
@@ -272,7 +251,7 @@
 
 (declaim (type list *on-package-variance*))
 (defvar *on-package-variance* '(:warn t)
-  #!+sb-doc
+  #+sb-doc
   "Specifies behavior when redefining a package using DEFPACKAGE and the
 definition is in variance with the current state of the package.
 
@@ -367,7 +346,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
            (unexport no-longer-exported package))
          (keep-them ()
            :report "Keep exporting them.")))))
-  #!+sb-package-locks
+  #+sb-package-locks
   (let ((old-implements
           (set-difference (package-implements-list package)
                           (mapcar #'find-undeleted-package-or-lose implement))))
@@ -432,3 +411,16 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                     :format-control "no symbol named ~S in ~S"
                     :format-arguments (list name (package-name package))))
            (intern name package)))))
+
+;;;; package hacking
+
+;;; FIXME: This nickname is a deprecated hack for backwards
+;;; compatibility with code which assumed the CMU-CL-style
+;;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
+;;; in 0.7.0, so we should get rid of this nickname after a while.
+(let ((package (find-package "SB-ALIEN")))
+  (rename-package package package
+                  (cons "SB-C-CALL" (package-nicknames package))))
+
+(let ((package (find-package "SB-SEQUENCE")))
+  (rename-package package package (list "SEQUENCE")))
