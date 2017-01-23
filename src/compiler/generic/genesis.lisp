@@ -1166,10 +1166,7 @@ core and return a descriptor to it."
      :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
-     :equalp-tests (if (boundp '*simple-vector-0-descriptor*)
-                       *simple-vector-0-descriptor*
-                       (setq *simple-vector-0-descriptor*
-                             (vector-in-core nil)))
+     :equalp-tests *simple-vector-0-descriptor*
      :source-location *nil-descriptor*
      :%for-std-class-b (make-fixnum-descriptor 0)
      :slot-list *nil-descriptor*
@@ -3914,6 +3911,7 @@ initially undefined function references:~2%")
                                      #!+gencgc sb!vm:dynamic-space-start
                                      #!-gencgc sb!vm:dynamic-0-space-start))
            (*nil-descriptor* (make-nil-descriptor))
+           (*simple-vector-0-descriptor* (vector-in-core nil))
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
