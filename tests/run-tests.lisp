@@ -228,7 +228,7 @@
   (use-package :assertoid))
 
 (defun load-test (file)
-  `(load ,file))
+  `(load ,file :external-format :utf-8))
 
 (defun cload-test (file)
   `(let ((compile-name (compile-file-pathname ,file)))
