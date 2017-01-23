@@ -215,7 +215,7 @@
   ;; For indirect closures the fp of the parent frame is stored in the
   ;; normal sc-offsets above, and this has the offset into the frame
   (indirect-sc-offset nil :type (or sb!c:sc-offset null) :read-only t)
-  (info nil) :read-only t)
+  (info nil :read-only t))
 
 ;;;; DEBUG-FUNs
 
