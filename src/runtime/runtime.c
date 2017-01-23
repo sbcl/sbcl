@@ -70,9 +70,7 @@
 #include "interr.h"
 #endif
 
-#ifndef SBCL_HOME
-#define SBCL_HOME SBCL_PREFIX"/lib/sbcl/"
-#endif
+extern char *sbcl_home = SBCL_PREFIX"/lib/sbcl/";
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
@@ -234,17 +232,18 @@ and resources this platform demands.\n\
 char *
 search_for_core ()
 {
-    char *sbcl_home = getenv("SBCL_HOME");
+    char *env_sbcl_home = getenv("SBCL_HOME");
     char *lookhere;
     char *stem = "/sbcl.core";
     char *core;
 
-    if (!(sbcl_home && *sbcl_home)) sbcl_home = SBCL_HOME;
-    lookhere = (char *) calloc(strlen(sbcl_home) +
+    if (!(env_sbcl_home && *env_sbcl_home))
+      env_sbcl_home = sbcl_home;
+    lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                strlen(stem) +
                                1,
                                sizeof(char));
-    sprintf(lookhere, "%s%s", sbcl_home, stem);
+    sprintf(lookhere, "%s%s", env_sbcl_home, stem);
     core = copied_existing_filename_or_null(lookhere);
 
     if (!core) {
@@ -448,7 +447,6 @@ main(int argc, char *argv[], char *envp[])
     boolean debug_environment_p = 0;
 
     lispobj initial_function;
-    const char *sbcl_home = getenv("SBCL_HOME");
 
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
     os_preinit();
@@ -645,22 +643,6 @@ main(int argc, char *argv[], char *envp[])
     /* If no core file was specified, look for one. */
     if (!core) {
         core = search_for_core();
-    }
-
-    /* Make sure that SBCL_HOME is set and not the empty string,
-       unless loading an embedded core. */
-    if (!(sbcl_home && *sbcl_home) && embedded_core_offset == 0) {
-        char *envstring, *copied_core, *dir;
-        char *stem = "SBCL_HOME=";
-        copied_core = copied_string(core);
-        dir = dirname(copied_core);
-        envstring = (char *) calloc(strlen(stem) +
-                                    strlen(dir) +
-                                    1,
-                                    sizeof(char));
-        sprintf(envstring, "%s%s", stem, dir);
-        putenv(envstring);
-        free(copied_core);
     }
 
     if (!lisp_startup_options.noinform && embedded_core_offset == 0) {

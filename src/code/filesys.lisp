@@ -588,14 +588,16 @@ exist or if is a file or a symbolic link."
           (delete-dir physical)))))
 
 
+(sb!alien:define-alien-variable ("sbcl_home" *sbcl-home*) c-string)
+
 (defun sbcl-homedir-pathname ()
-  (let ((sbcl-home (posix-getenv "SBCL_HOME")))
-    ;; SBCL_HOME isn't set for :EXECUTABLE T embedded cores
-    (when (and sbcl-home (not (string= sbcl-home "")))
-      (parse-native-namestring sbcl-home
-                               *physical-host*
-                               *default-pathname-defaults*
-                               :as-directory t))))
+  (let ((env (posix-getenv "SBCL_HOME")))
+    (parse-native-namestring (if (and env (not (string= env "")))
+                                 env
+                                 *sbcl-home*)
+                             *physical-host*
+                             *default-pathname-defaults*
+                             :as-directory t)))
 
 (defun user-homedir-namestring (&optional username)
   (flet ((not-empty (x)
