@@ -532,6 +532,7 @@ void show_lstring(struct vector * string, int quotes, FILE *s)
 
 static void brief_otherptr(lispobj obj)
 {
+    extern void safely_show_lstring(struct vector*, int, FILE*);
     lispobj *ptr, header;
     int type;
     struct symbol *symbol;
@@ -564,6 +565,16 @@ static void brief_otherptr(lispobj obj)
         default:
             printf("#<ptr to ");
             brief_otherimm(header);
+            if (type == FDEFN_WIDETAG) {  // Try to print name, if a symbol
+                // FIXME: more address validity checks perhaps?
+                lispobj name = ((struct fdefn*)ptr)->name;
+                if (lowtag_of(name) == OTHER_POINTER_LOWTAG
+                    && widetag_of(*native_pointer(name)) == SYMBOL_HEADER_WIDETAG) {
+                  printf(" for ");
+                  struct vector* str = symbol_name(native_pointer(name));
+                  safely_show_lstring(str, 0, stdout);
+                }
+            }
             putchar('>');
     }
 }
@@ -606,6 +617,26 @@ static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ",
 static char *weak_pointer_slots[] = {"value: ", NULL};
 static char *fdefn_slots[] = {"name: ", "function: ", "raw_addr: ", NULL};
 static char *value_cell_slots[] = {"value: ", NULL};
+
+static lispobj symbol_function(lispobj* symbol)
+{
+    lispobj info = ((struct symbol*)symbol)->info;
+    if (lowtag_of(info) == LIST_POINTER_LOWTAG)
+        info = CONS(info)->cdr;
+    if (lowtag_of(info) == OTHER_POINTER_LOWTAG) {
+        struct vector* v = (struct vector*)native_pointer(info);
+        int len = fixnum_value(v->length);
+        if (len != 0) {
+            lispobj elt = v->data[0];  // Just like INFO-VECTOR-FDEFN
+            if (fixnump(elt) && (fixnum_value(elt) & 07777) >= 07701) {
+                lispobj fdefn = v->data[len-1];
+                if (lowtag_of(fdefn) == OTHER_POINTER_LOWTAG)
+                    return FDEFN(fdefn)->fun;
+            }
+        }
+    }
+    return NIL;
+}
 
 static void print_otherptr(lispobj obj)
 {
@@ -671,6 +702,8 @@ static void print_otherptr(lispobj obj)
                 // Only 1 byte of a symbol header conveys its size.
                 // The other bytes may be freely used by the backend.
                 print_slots(symbol_slots, count & 0xFF, ptr);
+                if (symbol_function(ptr-1) != NIL)
+                    print_obj("fun: ", symbol_function(ptr-1));
                 break;
 
 #if N_WORD_BITS == 32
@@ -768,6 +801,10 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case SIMPLE_FUN_HEADER_WIDETAG:
+                print_obj("code: ",
+                          make_lispobj(native_pointer((lispobj)(ptr-1))
+                                       -(HeaderValue(header)&0xFFFF),
+                                       OTHER_POINTER_LOWTAG));
                 print_slots(simple_fun_slots,
                             sizeof simple_fun_slots/sizeof(char*)-1, ptr);
                 break;
