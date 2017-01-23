@@ -278,27 +278,26 @@
   "the lowtag bits for DES"
   (logand (descriptor-bits des) sb!vm:lowtag-mask))
 
-(cl:defmethod print-object ((des descriptor) stream)
-  (let ((lowtag (descriptor-lowtag des)))
+(defmethod print-object ((des descriptor) stream)
+  (let ((gspace (descriptor-gspace des))
+        (bits (descriptor-bits des))
+        (lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
-      (cond ((eq (descriptor-gspace des) :load-time-value)
+      (cond ((eq gspace :load-time-value)
              (format stream "for LTV ~D" (descriptor-word-offset des)))
             ((is-fixnum-lowtag lowtag)
              (format stream "for fixnum: ~W" (descriptor-fixnum des)))
             ((is-other-immediate-lowtag lowtag)
              (format stream
                      "for other immediate: #X~X, type #b~8,'0B"
-                     (ash (descriptor-bits des) (- sb!vm:n-widetag-bits))
-                     (logand (descriptor-bits des) sb!vm:widetag-mask)))
+                     (ash bits (- sb!vm:n-widetag-bits))
+                     (logand bits sb!vm:widetag-mask)))
             (t
              (format stream
                      "for pointer: #X~X, lowtag #b~v,'0B, ~A"
-                     (logandc2 (descriptor-bits des) sb!vm:lowtag-mask)
+                     (logandc2 bits sb!vm:lowtag-mask)
                      sb!vm:n-lowtag-bits lowtag
-                     (let ((gspace (descriptor-gspace des)))
-                       (if gspace
-                           (gspace-name gspace)
-                           "unknown"))))))))
+                     (if gspace (gspace-name gspace) "unknown")))))))
 
 ;;; Return a descriptor for a block of LENGTH bytes out of GSPACE. The
 ;;; free word index is boosted as necessary, and if additional memory
@@ -1189,6 +1188,7 @@ core and return a descriptor to it."
       (structure-classoid
        (cond ((dd-predicate-name (layout-info (classoid-layout classoid))))
              ;; All early INSTANCEs should be STRUCTURE-OBJECTs.
+             ;; Except: see hack for CONDITIONs in CLASS-DEPTHOID.
              ((eq type-name 'structure-object) 'sb!kernel:%instancep)))
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
@@ -1890,25 +1890,20 @@ core and return a descriptor to it."
                  (intern (symbol-name des) *cl-package*)
                  des)
              (ecase (descriptor-lowtag des)
-                    (#.sb!vm:list-pointer-lowtag
-                     (aver (not (cold-null des))) ; function named NIL? please no..
-                     ;; Do cold (DESTRUCTURING-BIND (COLD-CAR COLD-CADR) DES ..).
-                     (let* ((car-des (cold-car des))
-                            (cdr-des (cold-cdr des))
-                            (cadr-des (cold-car cdr-des))
-                            (cddr-des (cold-cdr cdr-des)))
-                       (aver (cold-null cddr-des))
-                       (list (warm-symbol car-des)
-                             (warm-symbol cadr-des))))
-                    (#.sb!vm:other-pointer-lowtag
-                     (warm-symbol des))))))
+              (#.sb!vm:list-pointer-lowtag
+               (aver (not (cold-null des))) ; function named NIL? please no..
+               (let ((rest (cold-cdr des)))
+                 (aver (cold-null (cold-cdr rest)))
+                 (list (warm-symbol (cold-car des))
+                       (warm-symbol (cold-car rest)))))
+              (#.sb!vm:other-pointer-lowtag
+               (warm-symbol des))))))
     (legal-fun-name-or-type-error result)
     result))
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
   (declare (type (or symbol descriptor) cold-name))
   (declare (special core-file-name))
-  (/noshow0 "/cold-fdefinition-object")
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
         (let ((fdefn (allocate-header+object (or *cold-fdefn-gspace*
