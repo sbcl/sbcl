@@ -1567,7 +1567,6 @@ static lispobj adjust_fun_entry(lispobj raw_entry)
 /// objects, because scavenger functions might invoke transport functions.
 /// The best approach is to do an explicit switch over all object types.
 #include "genesis/hash-table.h"
-#include "genesis/cons.h"
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
