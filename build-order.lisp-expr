@@ -272,6 +272,7 @@
  ("src/code/misc")
 
  ("src/code/symbol"        :not-host)
+ ("src/code/late-cas"      :not-host)
  ("src/code/fd-stream"     :not-host)
  ("src/code/stream"        :not-host)
  ("src/code/early-format")
@@ -753,7 +754,6 @@
 
  ("src/code/late-format") ; needs SB!XC:DEFMACRO
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
- ("src/code/late-cas" :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; PCL-related stuff, which shouldn't need to be done earlier than

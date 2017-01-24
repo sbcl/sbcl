@@ -51,18 +51,6 @@
   #!+sb-doc
   "List of available buffers.")
 
-(defglobal *available-buffers-lock*
-  (sb!thread:make-mutex :name "lock for *AVAILABLE-BUFFERS*")
-  #!+sb-doc
-  "Mutex for access to *AVAILABLE-BUFFERS*.")
-
-(defmacro with-available-buffers-lock ((&optional) &body body)
-  ;; CALL-WITH-SYSTEM-MUTEX because streams are low-level enough to be
-  ;; async signal safe, and in particular a C-c that brings up the
-  ;; debugger while holding the mutex would lose badly.
-  `(sb!thread::with-system-mutex (*available-buffers-lock*)
-     ,@body))
-
 (defconstant +bytes-per-buffer+ (* 4 1024)
   #!+sb-doc
   "Default number of bytes per buffer.")
@@ -80,14 +68,7 @@
       buffer)))
 
 (defun get-buffer ()
-  ;; Don't go for the lock if there is nothing to be had -- sure,
-  ;; another thread might just release one before we get it, but that
-  ;; is not worth the cost of locking. Also release the lock before
-  ;; allocation, since it's going to take a while.
-  (if *available-buffers*
-      (or (with-available-buffers-lock ()
-            (pop *available-buffers*))
-          (alloc-buffer))
+  (or (and *available-buffers* (atomic-pop *available-buffers*))
       (alloc-buffer)))
 
 (declaim (inline reset-buffer))
@@ -98,8 +79,7 @@
 
 (defun release-buffer (buffer)
   (reset-buffer buffer)
-  (with-available-buffers-lock ()
-    (push buffer *available-buffers*)))
+  (atomic-push buffer *available-buffers*))
 
 
 ;;;; the FD-STREAM structure
@@ -183,27 +163,19 @@
   (print-unreadable-object (fd-stream stream :type t :identity t)
     (format stream "for ~S" (fd-stream-name fd-stream))))
 
-;;; This is a separate buffer management function, as it wants to be
-;;; clever about locking -- grabbing the lock just once.
+;;; Release all of FD-STREAM's buffers. Originally the intent of this
+;;; was to grab a mutex once only, but the buffer pool is lock-free now.
 (defun release-fd-stream-buffers (fd-stream)
-  (let ((ibuf (fd-stream-ibuf fd-stream))
-        (obuf (fd-stream-obuf fd-stream))
-        (queue (loop for item in (fd-stream-output-queue fd-stream)
-                       when (buffer-p item)
-                       collect (reset-buffer item))))
-    (when ibuf
-      (push (reset-buffer ibuf) queue))
-    (when obuf
-      (push (reset-buffer obuf) queue))
-    ;; ...so, anything found?
-    (when queue
-      ;; detach from stream
-      (setf (fd-stream-ibuf fd-stream) nil
-            (fd-stream-obuf fd-stream) nil
-            (fd-stream-output-queue fd-stream) nil)
-      ;; splice to *available-buffers*
-      (with-available-buffers-lock ()
-        (setf *available-buffers* (nconc queue *available-buffers*))))))
+  (awhen (fd-stream-ibuf fd-stream)
+    (setf (fd-stream-ibuf fd-stream) nil)
+    (release-buffer it))
+  (awhen (fd-stream-obuf fd-stream)
+    (setf (fd-stream-obuf fd-stream) nil)
+    (release-buffer it))
+  (dolist (buf (fd-stream-output-queue fd-stream))
+    (when (buffer-p buf)
+      (release-buffer buf)))
+  (setf (fd-stream-output-queue fd-stream) nil))
 
 ;;;; FORM-TRACKING-STREAM
 
@@ -2587,7 +2559,7 @@
 (defun stream-deinit ()
   ;; Unbind to make sure we're not accidently dealing with it
   ;; before we're ready (or after we think it's been deinitialized).
-  (with-available-buffers-lock () (%makunbound '*available-buffers*)))
+  (%makunbound '*available-buffers*))
 
 (defun stdstream-external-format (fd outputp)
   #!-win32 (declare (ignore fd outputp))
@@ -2606,9 +2578,8 @@
 ;;; This is called whenever a saved core is restarted.
 (defun stream-reinit (&optional init-buffers-p)
   (when init-buffers-p
-    (with-available-buffers-lock ()
-      (aver (not (boundp '*available-buffers*)))
-      (setf *available-buffers* nil)))
+    (aver (not (boundp '*available-buffers*)))
+    (setf *available-buffers* nil))
   (with-simple-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
         #!-win32 (values 0 1 2)

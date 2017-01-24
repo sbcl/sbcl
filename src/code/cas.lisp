@@ -41,6 +41,19 @@
                              (the ,type ,new)))
                 `(,op ,instance))))))
 
+;;; FIXME: the generated code for CAS on a defglobal contains a
+;;; use of UNBOUND-SYMBOL-ERROR. This is is not unique to CAS, viz.:
+;;; * (defglobal *ggg* 3)
+;;; * (disassemble '(lambda () (symbol-value '*ggg*)))
+;;;   ... 
+;;;   ; 98: L0:   CC0A             BREAK 10                         ; error trap
+;;;   ; 9A:       06               BYTE #X06                        ; UNBOUND-SYMBOL-ERROR
+;;;   ; 9B:       00               BYTE #X00                        ; RAX
+;;; whereas evaluating the atom *GGG* is perfectly fine.
+;;; In fact not only is the unbound check emitted, so is the TLS value check,
+;;; but there's no CAS expander for SYMBOL-GLOBAL-VALUE, so we can't
+;;; macroexpand ATOMIC-PUSH into (CAS (SYMBOL-GLOBAL-VALUE ...))
+
 (defun get-cas-expansion (place &optional environment)
   #!+sb-doc
   "Analogous to GET-SETF-EXPANSION. Returns the following six values:
@@ -88,8 +101,12 @@ EXPERIMENTAL: Interface subject to change."
       (flet ((invalid-place ()
            (error "Invalid place to CAS: ~S -> ~S" place expanded)))
       (unless (consp expanded)
-        ;; FIXME: Allow (CAS *FOO* <OLD> <NEW>), maybe?
-        (invalid-place))
+        (cond ((and (symbolp expanded)
+                    (member (info :variable :kind expanded)
+                            '(:global :special)))
+               (setq expanded `(symbol-value ',expanded)))
+              (t
+               (invalid-place))))
       (let ((name (car expanded)))
         (unless (symbolp name)
           (invalid-place))
