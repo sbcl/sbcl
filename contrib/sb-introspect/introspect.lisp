@@ -117,12 +117,11 @@ FBOUNDP."
   "Call FN for each allocated code component in one of SPACES.  FN
 receives the object and its size as arguments.  SPACES should be a
 list of the symbols :dynamic, :static, or :read-only."
-  (dolist (space spaces)
-    (sb-vm::map-allocated-objects
+  (apply #'sb-vm::map-allocated-objects
      (lambda (obj header size)
        (when (= sb-vm:code-header-widetag header)
          (funcall fn obj size)))
-     space)))
+     spaces))
 
 (declaim (inline map-caller-code-components))
 (defun map-caller-code-components (function spaces fn)

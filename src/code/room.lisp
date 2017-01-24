@@ -337,13 +337,21 @@
   (define-alien-variable "heap_base" (* t))
   (define-alien-variable "page_table" (* (struct page))))
 
-;;; Iterate over all the objects allocated in SPACE, calling FUN with
-;;; the object, the object's type code, and the object's total size in
-;;; bytes, including any header and padding.
-(defun map-allocated-objects (fun space)
-  (declare (type function fun)
-           (type spaces space))
-  (without-gcing
+;;; Iterate over all the objects allocated in each of the SPACES, calling FUN
+;;; with the object, the object's type code, and the object's total size in
+;;; bytes, including any header and padding. As a special case, if exactly one
+;;; space named :ALL is requested, then map over the known spaces.
+(defun map-allocated-objects (fun &rest spaces)
+  (declare (type function fun))
+  (when (and (= (length spaces) 1) (eq (first spaces) :all))
+    (return-from map-allocated-objects
+     (map-allocated-objects fun
+                            :read-only :static
+                            #!+immobile-space :immobile
+                            :dynamic)))
+  ;; You can't specify :ALL and also a list of spaces. Check that up front.
+  (do-rest-arg ((space) spaces) (the spaces space))
+  (flet ((do-1-space (space)
     (ecase space
       (:static
        ;; Static space starts with NIL, which requires special
@@ -432,6 +440,10 @@
           else do (incf end page-size)
 
           finally (map-objects-in-range fun start end))))))
+  (do-rest-arg ((space) spaces)
+    (if (eq space :dynamic)
+        (without-gcing (do-1-space space))
+        (do-1-space space)))))
 
 ;;;; MEMORY-USAGE
 
@@ -779,8 +791,11 @@
 (defun code-header-words (code)
   (logand (get-header-data code) short-header-max-words))
 
+;;; This interface allows one either to be agnostic of the referencing space,
+;;; or specify exactly one space, but not specify a list of spaces.
+;;; An upward-compatible change would be to assume a list, and call ENSURE-LIST.
 (defun map-referencing-objects (fun space object)
-  (declare (type spaces space))
+  (declare (type (or (eql :all) spaces) space))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
   (flet ((maybe-call (fun obj)

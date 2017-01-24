@@ -165,18 +165,12 @@ comments from CMU CL:
   (dohash ((k v) *backend-template-names* :locked t)
     (declare (ignore v))
     (remprop k 'vop-stats))
-
-  (locally
-      (declare (optimize (speed 3) (safety 0))
-               (inline sb!vm::map-allocated-objects))
-    (without-gcing
-      (dolist (space spaces)
-        (sb!vm::map-allocated-objects
+  (sb!vm::map-allocated-objects
          (lambda (object type-code size)
            (declare (ignore type-code size))
            (when (dyncount-info-p object)
              (clear-dyncount-info object)))
-         space)))))
+         spaces))
 
 ;;; Call NOTE-DYNCOUNT-INFO on all DYNCOUNT-INFO structure allocated in the
 ;;; specified spaces. Return a hashtable describing the counts. The initial
@@ -187,19 +181,14 @@ comments from CMU CL:
   "Return a hash-table mapping string VOP names to VOP-STATS structures
    describing the VOPs executed. If clear is true, then reset all counts to
    zero as a side effect."
-  (locally
-      (declare (optimize (speed 3) (safety 0))
-               (inline sb!vm::map-allocated-objects))
-    (without-gcing
-      (dolist (space spaces)
-        (sb!vm::map-allocated-objects
+  (sb!vm::map-allocated-objects
          (lambda (object type-code size)
            (declare (ignore type-code size))
            (when (dyncount-info-p object)
              (note-dyncount-info object)
              (when clear
                (clear-dyncount-info object))))
-         space))))
+         spaces)
 
   (let ((counts (make-hash-table :test 'equal)))
     (dohash ((k v) *backend-template-names* :locked t)

@@ -35,7 +35,7 @@
                   (type (funcall raw-accessor f)))
              (setf (sb-kernel:%simple-fun-type f)
                    (or (gethash type ht) (setf (gethash type ht) type)))))))
-     :dynamic))
+     :all))
 
   (sb-disassem::!compile-inst-printers)
 
