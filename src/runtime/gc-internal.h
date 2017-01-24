@@ -304,6 +304,10 @@ static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 static inline boolean immobile_filler_p(lispobj* obj) {
   return *(int*)obj == (2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG);
 }
+
+#define set_instance_layout(instance_ptr,layout) \
+  instance_ptr[0] = (layout << 32) | (instance_ptr[0] & 0xFFFFFFFF)
+
 #endif /* immobile space */
 
 #endif /* _GC_INTERNAL_H_ */
