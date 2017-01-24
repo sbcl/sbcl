@@ -984,7 +984,6 @@ core and return a descriptor to it."
 ;;; descriptor of a cold symbol or (in an abbreviation for the
 ;;; most common usage pattern) an ordinary symbol, which will be
 ;;; automatically cold-interned.
-(declaim (ftype (function ((or symbol descriptor) descriptor)) cold-set))
 (defun cold-set (symbol-or-symbol-des value)
   (let ((symbol-des (etypecase symbol-or-symbol-des
                       (descriptor symbol-or-symbol-des)
