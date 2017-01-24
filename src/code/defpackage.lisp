@@ -11,9 +11,15 @@
 
 (in-package "SB-IMPL")
 
+;;; FIXME: figure out why a full call to FORMAT this early in warm load
+;;; says that CLASS is not a known type. (Obviously it needs to parse
+;;; a type spec, but then why it is only a style-warning and not an error?)
+;;; Weirder still, why does it depend on the target architecture?
+
 (defmacro defpackage (package &rest options)
   #+sb-doc
-  #.(format nil
+  #.(locally (declare (notinline format))
+     (format nil
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
    following: ~{~&~4T~A~}
    All options except ~{~A, ~}and :DOCUMENTATION can be used multiple
@@ -30,7 +36,7 @@
     (:intern "{symbol-name}*")
     (:size "<integer>")
     (:nicknames "{package-name}*"))
-  '(:size #+sb-package-locks :lock))
+  '(:size #+sb-package-locks :lock)))
   (let ((nicknames nil)
         (local-nicknames nil)
         (size nil)
