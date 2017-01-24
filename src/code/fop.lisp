@@ -534,6 +534,25 @@
                        (read-word-arg (fasl-input-stream)))
         val))
 
+;;; genesis dumps all positions at once
+(!define-fop 208 (fop-source-info-position (position) nil)
+  (let* ((positions (sb!c::debug-source-start-positions *fasl-source-info*))
+         (length (length positions)))
+    (setf (sb!c::debug-source-start-positions *fasl-source-info*)
+          (cond ((zerop length)
+                 (make-array 1 :element-type
+                             (sb!c::smallest-element-type position nil)
+                               :initial-element position))
+                ((typep position (array-element-type positions))
+                 (adjust-array positions (1+ length)
+                               :initial-element position))
+                (t
+                 (let ((result (make-array (1+ length) :element-type
+                                           (sb!c::smallest-element-type position nil))))
+                   (replace result positions)
+                   (setf (aref result length) position)
+                   result))))))
+
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-FOP.
 (!define-fop 203 (fop-nthcdr (obj))
@@ -571,13 +590,7 @@
   component)
 
 (!define-fop 174 (fop-note-debug-source (debug-source) nil)
-  (warn "~@<FOP-NOTE-DEBUG-SOURCE seen in ordinary load (not cold load) -- ~
-very strange!  If you didn't do something to cause this, please report it as ~
-a bug.~@:>")
-  ;; we are going to be lenient with coming across this fop in a warm SBCL.
-  (setf (sb!c::debug-source-compiled debug-source) (get-universal-time)
-        (sb!c::debug-source-created debug-source)
-        (file-write-date (sb!c::debug-source-namestring debug-source))))
+  (setf *fasl-source-info* debug-source))
 
 ;;; Modify a slot in a CONSTANTS object.
 (!define-fop 140 :not-host (fop-alter-code ((:operands index) code value) nil)

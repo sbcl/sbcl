@@ -2876,6 +2876,11 @@ core and return a descriptor to it."
   (let ((debug-source (pop-stack)))
     (cold-push debug-source *current-debug-sources*)))
 
+(define-cold-fop (fop-source-info-position)
+  (write-slots (cold-car *current-debug-sources*)
+               (find-layout 'sb!c::debug-source)
+               :start-positions (pop-stack)))
+
 (define-cold-fop (fop-fdefn)
   (cold-fdefinition-object (pop-stack)))
 

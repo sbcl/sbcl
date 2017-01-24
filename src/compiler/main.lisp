@@ -1722,6 +1722,12 @@ necessary, since type inference may take arbitrarily long to converge.")
           (with-compilation-values
             (sb!xc:with-compilation-unit ()
               (with-world-lock ()
+                ;; First, save the file source info, file-positions
+                ;; will be empty and it will be updated each time new
+                ;; component debug info is dumped that way if LOAD is
+                ;; interrupted the already loaded components will have
+                ;; working source locations
+                (sb!fasl:fasl-dump-source-info info *compile-object*)
                 (sub-sub-compile-file info)
                 (unless (zerop (hash-table-count *code-coverage-records*))
                   ;; Dump the code coverage records into the fasl.
@@ -1736,12 +1742,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                                       list))
                                 nil
                                 nil)))
+                #+sb-xc-host
+                (sb!fasl::fasl-dump-source-info-cold info *compile-object*)
                 (finish-block-compilation)
-                (let ((object *compile-object*))
-                  (etypecase object
-                    (fasl-output (fasl-dump-source-info info object))
-                    (core-object (fix-core-source-info info object))
-                    (null)))
                 nil))))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of

@@ -285,12 +285,23 @@
                (elt (file-info-forms direct-file-info) 0)))
      :function function)))
 
+(defun smallest-element-type (integer negative)
+  (let ((bits (max (+ (integer-length integer)
+                      (if negative 1 0))
+                   8)))
+    (list (if negative
+              'signed-byte
+              'unsigned-byte)
+          (if (= (logcount bits) 1) ;; power of two?
+              bits
+              ;; Next power of two
+              (ash 1 (integer-length bits))))))
+
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
 ;;; possible. Ordinarily we coerce it to the smallest specialized
 ;;; vector we can.
 ;;; During cross-compilation the in-memory representation is opaque -
 ;;; we don't care how it looks, but can recover the intended specialization.
-
 (defun coerce-to-smallest-eltype (seq)
   (let ((max-positive 0)
         (max-negative 0)
@@ -315,20 +326,11 @@
             (frob i)))
       (if (zerop length)
           #()
-          (let* ((negative (plusp max-negative))
-                 (bits (max (+ (integer-length (max max-positive
-                                                    (1- max-negative)))
-                               (if negative 1 0))
-                            8))
-                 ;; Next power of two
-                 (bits (if (= (logcount bits) 1)
-                           bits
-                           (ash 1 (integer-length bits)))))
-            ;; formerly (coerce seq `(simple-array ,specializer (*)))
-            ;; plus a kludge for cross-compilation. This is nicer.
-            (!make-specialized-array length `(,(if negative
-                                                   'signed-byte
-                                                   'unsigned-byte) ,bits) seq))))))
+          (!make-specialized-array length
+                                   (smallest-element-type (max max-positive
+                                                               (1- max-negative))
+                                                          (plusp max-negative))
+                                   seq)))))
 
 ;;;; variables
 

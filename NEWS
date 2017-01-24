@@ -18,6 +18,8 @@ changes relative to sbcl-1.3.14:
     Rideau)
   * bug fix: data race in GENTEMP fixed - it can no longer return the
     same interned symbol to multiple threads if called concurrently
+  * bug fix: interrupting LOADing of FASLs does not leave functions without
+    source locations. (lp#540276)
 
 changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes

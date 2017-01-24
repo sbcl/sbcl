@@ -307,7 +307,7 @@
   ;; The FILE-POSITIONs of the truly top level forms read from this
   ;; file (if applicable). The vector element type will be chosen to
   ;; hold the largest element.
-  (start-positions nil :type (or (simple-array * (*)) null) :read-only t)
+  (start-positions nil :type (or (simple-array * (*)) null))
 
   ;; For functions processed by EVAL (including EVAL-WHEN and LOAD on
   ;; a source file), the source form.

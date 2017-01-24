@@ -61,10 +61,6 @@
   ;; is the offset in the table of the code object needing to be
   ;; patched, and <offset> is the offset that must be patched.
   (patch-table (make-hash-table :test 'eq) :type hash-table)
-  ;; a list of the table handles for all of the DEBUG-INFO structures
-  ;; dumped in this file. These structures must be back-patched with
-  ;; source location information when the compilation is complete.
-  (debug-info () :type list)
   ;; This is used to keep track of objects that we are in the process
   ;; of dumping so that circularities can be preserved. The key is the
   ;; object that we have previously seen, and the value is the object
@@ -76,7 +72,11 @@
   (circularity-table (make-hash-table :test 'eq) :type hash-table)
   ;; a hash table of structures that are allowed to be dumped. If we
   ;; try to dump a structure that isn't in this hash table, we lose.
-  (valid-structures (make-hash-table :test 'eq) :type hash-table))
+  (valid-structures (make-hash-table :test 'eq) :type hash-table)
+  ;; DEBUG-SOURCE written at the very beginning
+  (source-info nil :type (or null sb!c::debug-source))
+  ;; The last file position updated by DUMP-CODE-OBJECT
+  (last-file-position 0 :type index))
 
 ;;; This structure holds information about a circularity.
 (defstruct (circularity (:copier nil))
@@ -1117,9 +1117,22 @@
       ;; Dump the debug info.
       (let ((info (sb!c::debug-info-for-component component))
             (*dump-only-valid-structures* nil))
+        (setf (sb!c::debug-info-source info)
+              (fasl-output-source-info fasl-output))
         (dump-object info fasl-output)
-        (push (dump-to-table fasl-output)
-              (fasl-output-debug-info fasl-output)))
+        ;; Update DEBUG-SOURCE-START-POSITIONS each time new
+        ;; debug-info is written, that way if LOAD is interrupted the
+        ;; already loaded components will have working source locations
+        #-sb-xc-host ; done in bulk by fasl-dump-source-info-cold
+        (let ((positions (sb!c::file-info-positions
+                          (sb!c::source-info-file-info sb!c::*source-info*))))
+          (loop for i from (fasl-output-last-file-position fasl-output)
+                below (length positions)
+                do
+                (dump-object i fasl-output)
+                (dump-fop 'fop-source-info-position fasl-output))
+          (setf (fasl-output-last-file-position fasl-output)
+                (length positions))))
 
       (dump-object (if (eq (sb!c::component-kind component) :toplevel) :toplevel nil)
                    fasl-output)
@@ -1241,29 +1254,25 @@
 ;;; FASL-OUTPUT-DEBUG-INFO, so that subsequent components with
 ;;; different source info may be dumped.
 (defun fasl-dump-source-info (info fasl-output)
-  (declare (type sb!c::source-info info))
-  (let ((res (sb!c::debug-source-for-info info))
+  (let ((source-info (sb!c::debug-source-for-info info))
         (*dump-only-valid-structures* nil))
+    (setf (fasl-output-source-info fasl-output) source-info)
     ;; Zero out the timestamps to get reproducible fasls.
-    #+sb-xc-host (setf (sb!c::debug-source-created res) 0
-                       (sb!c::debug-source-compiled res) 0)
-    (dump-object res fasl-output)
-    (let ((res-handle (dump-pop fasl-output)))
-      (dolist (info-handle (fasl-output-debug-info fasl-output))
-        (dump-push res-handle fasl-output)
-        (dump-fop 'fop-structset fasl-output)
-        (dump-word info-handle fasl-output)
-        (macrolet ((debug-info-source-index ()
-                     (let ((dd (find-defstruct-description 'sb!c::debug-info)))
-                       (dsd-index (find 'source (dd-slots dd)
-                                        :key #'dsd-name :test 'string=)))))
-          (dump-word (debug-info-source-index) fasl-output)))
-      #+sb-xc-host
-      (progn
-        (dump-push res-handle fasl-output)
-        (dump-fop 'fop-note-debug-source fasl-output))))
-  (setf (fasl-output-debug-info fasl-output) nil)
-  (values))
+    #+sb-xc-host (setf (sb!c::debug-source-created source-info) 0
+                       (sb!c::debug-source-compiled source-info) 0)
+    (dump-object source-info fasl-output)
+    (dump-fop 'fop-note-debug-source fasl-output)))
+
+;;; Do it at all at once (as opposed to one by one in
+;;; dump-code-object) for simplicity. Cold load can't be interrupted.
+#+sb-xc-host
+(defun fasl-dump-source-info-cold (info fasl-output)
+  (dump-object (sb!c::coerce-to-smallest-eltype
+                (sb!c::file-info-positions
+                 (sb!c::source-info-file-info info)))
+               fasl-output)
+  (dump-fop 'fop-source-info-position fasl-output))
+
 
 ;;;; dumping structures
 
