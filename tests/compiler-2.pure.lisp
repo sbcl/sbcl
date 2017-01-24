@@ -146,3 +146,12 @@
   (let ((f (compile nil '(lambda (x)
                            (declare (optimize safety)) (princ-to-string x) x))))
     (assert (ctu:find-named-callees f :name 'princ-to-string))))
+
+(with-test (:name :map-allocated-objects-no-consing)
+  (let ((n 0))
+    (sb-int:dx-flet ((f (obj type size)
+                       (declare (ignore obj type size))
+                       (incf n)))
+      (ctu:assert-no-consing
+       (sb-vm::map-allocated-objects #'f :dynamic)
+       5))))

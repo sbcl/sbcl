@@ -340,7 +340,6 @@
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with
 ;;; the object, the object's type code, and the object's total size in
 ;;; bytes, including any header and padding.
-#!-sb-fluid (declaim (maybe-inline map-allocated-objects))
 (defun map-allocated-objects (fun space)
   (declare (type function fun)
            (type spaces space))
@@ -416,8 +415,11 @@
           with start = (sap-ref-lispobj (alien-sap (addr heap-base)) 0)
           with end = start
 
-          ;; This is our page range.
-          for page-index from 0 below last-free-page
+          ;; This is our page range. The type constraint is far too generous,
+          ;; but it does its job of producing efficient code.
+          for page-index
+          of-type (integer -1 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
+          from 0 below last-free-page
           for next-page-addr from (+ start page-size) by page-size
           for page-bytes-used = (slot (deref page-table page-index) 'bytes-used)
 
@@ -727,8 +729,7 @@
                                      test)
   (declare (type spaces space)
            (type (or index null) larger smaller type count)
-           (type (or function null) test)
-           #!-sb-fluid (inline map-allocated-objects))
+           (type (or function null) test))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
   (collect ((counted 0 1+))
@@ -779,8 +780,7 @@
   (logand (get-header-data code) short-header-max-words))
 
 (defun map-referencing-objects (fun space object)
-  (declare (type spaces space)
-           #!-sb-fluid (inline map-allocated-objects))
+  (declare (type spaces space))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
   (flet ((maybe-call (fun obj)
