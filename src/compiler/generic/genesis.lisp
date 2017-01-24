@@ -588,14 +588,14 @@
   pointing to them."
   (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag
                             (make-page-attributes align256p 0)))
-(defun allocate-header+object (gspace length widetag &optional page-kind)
+(defun allocate-header+object (gspace length widetag)
   "Allocate LENGTH words plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
   with the resultant length and WIDETAG."
   (let ((des (allocate-cold-descriptor
               gspace (ash (1+ length) sb!vm:word-shift)
               sb!vm:other-pointer-lowtag
-              (make-page-attributes nil page-kind))))
+              (make-page-attributes nil 0))))
     (write-header-word des length widetag)
     des))
 (defun allocate-vector-object (gspace element-bits length widetag)
@@ -943,23 +943,10 @@ core and return a descriptor to it."
 (defvar *cold-symbol-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
 
 ;;; Allocate (and initialize) a symbol.
-(defun allocate-symbol (name interned
-                             &key (gspace (symbol-value *cold-symbol-gspace*)))
+(defun allocate-symbol (name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
-  (declare (ignore interned))
-  #!+immobile-space
-  (when (and (eq gspace *immobile-fixedobj*) (char/= (char name 0) #\*))
-    ;; immobile symbols that aren't likely to be special vars
-    ;; should go in regular dynamic space until a de-frag pass is
-    ;; implemented for save-lisp-and-die. Otherwise they create
-    ;; tons of holes all over the immobile space.
-    (setq gspace *dynamic*))
-  (let ((symbol (allocate-header+object
-                 gspace (1- sb!vm:symbol-size)
-                 sb!vm:symbol-header-widetag
-                 ;; Tell the allocator what kind of symbol page to prefer.
-                 ;; This only affects gc performance, not correctness.
-                 0)))
+  (let ((symbol (allocate-header+object gspace (1- sb!vm:symbol-size)
+                                        sb!vm:symbol-header-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
     (write-wordindexed symbol sb!vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-info-slot *nil-descriptor*)
@@ -1517,7 +1504,7 @@ core and return a descriptor to it."
 ;; - the target compiler doesn't and couldn't - but here it doesn't matter.
 (defun get-uninterned-symbol (name)
   (or (gethash name *uninterned-symbol-table*)
-      (let ((cold-symbol (allocate-symbol name nil)))
+      (let ((cold-symbol (allocate-symbol name)))
         (setf (gethash name *uninterned-symbol-table*) cold-symbol))))
 
 ;;; Dump the target representation of HOST-VALUE,
@@ -1610,7 +1597,7 @@ core and return a descriptor to it."
       (setf symbol (intern (symbol-name symbol) *cl-package*))))
 
   (or (get symbol 'cold-intern-info)
-      (let ((handle (allocate-symbol (symbol-name symbol) t :gspace gspace)))
+      (let ((handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
