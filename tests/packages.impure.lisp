@@ -873,7 +873,7 @@ if a restart was invoked."
 
 ;; This test would consistently fail when GENTEMP first called FIND-SYMBOL
 ;; and then INTERN when FIND-SYMBOL said that it found no symbol.
-(with-test (:name :gentemp-threadsafety)
+(with-test (:name (gentemp :threadsafety) :skipped-on '(not :sb-thread))
   (let ((n-threads 5)
         (n-iter 1000)
         (threads))
