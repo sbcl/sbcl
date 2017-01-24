@@ -387,7 +387,7 @@
   ;; These VOPs are each used in one place only, and deliberately not
   ;; specified as transforming the function after which they are named.
   (def alloc-immobile-layout "alloc_layout" ; MAKE-LAYOUT
-       ((descriptor-reg) (descriptor-reg)))
+       ((descriptor-reg)))
   (def alloc-immobile-symbol "alloc_sym"    ; MAKE-SYMBOL
        ((descriptor-reg) (any-reg)))
   (def alloc-immobile-fdefn  "alloc_fdefn"  ; MAKE-FDEFN

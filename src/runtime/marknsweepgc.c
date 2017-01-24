@@ -1454,7 +1454,7 @@ lispobj* find_preceding_object(lispobj* obj)
 
 #include "genesis/vector.h"
 #include "genesis/instance.h"
-lispobj alloc_layout(lispobj layout_layout, lispobj slots)
+lispobj alloc_layout(lispobj slots)
 {
     struct vector* v = (struct vector*)native_pointer(slots);
     // If INSTANCE_DATA_START is 0, subtract 1 word for the header.
@@ -1466,12 +1466,12 @@ lispobj alloc_layout(lispobj layout_layout, lispobj slots)
                                    CEILING(LAYOUT_SIZE,2),
                                    0),
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                         (layout_layout << 32) |
+                         (LAYOUT_OF_LAYOUT << 32) |
 #endif
                          (LAYOUT_SIZE-1)<<8 | INSTANCE_HEADER_WIDETAG,
                          &layout_page_hint);
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    l->slots[0] = layout_layout;
+    l->slots[0] = LAYOUT_OF_LAYOUT;
 #endif
     memcpy(&l->slots[INSTANCE_DATA_START], v->data,
            (LAYOUT_SIZE - INSTANCE_DATA_START - 1)*N_WORD_BYTES);
@@ -1563,9 +1563,9 @@ static lispobj adjust_fun_entry(lispobj raw_entry)
     return raw_entry; // for fdefn which has a tramp
 }
 
-/// It's tricky to try to use the scavtab[] functions for fixing up
-/// moved code. The simplest approach is to basically do a large switch
-/// over all object types.
+/// It's tricky to try to use the scavtab[] functions for fixing up moved
+/// objects, because scavenger functions might invoke transport functions.
+/// The best approach is to do an explicit switch over all object types.
 #include "genesis/hash-table.h"
 #include "genesis/cons.h"
 static void fixup_space(lispobj* where, size_t n_words)
@@ -1737,7 +1737,7 @@ static int classify_symbol(lispobj* obj)
       return 1;
   struct vector* symbol_name = (struct vector*)native_pointer(symbol->name);
   if (symbol_name->length >= make_fixnum(2) &&
-      schar(symbol_name, 0) == '*'&&
+      schar(symbol_name, 0) == '*' &&
       schar(symbol_name, fixnum_value(symbol_name->length)-1) == '*')
       return 3;
   return 2;
