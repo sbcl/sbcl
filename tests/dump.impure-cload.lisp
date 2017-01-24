@@ -334,8 +334,10 @@
 ;; Track the make-load-form FOPs as they fly by at load-time.
 (defvar *call-tracker* nil)
 (dolist (fop-name 'sb-fasl::(fop-allocate-instance fop-set-slot-values))
-  (let* ((index (position fop-name sb-fasl::**fop-names**))
-         (fun (the function (aref sb-fasl::**fop-funs** index))))
+  (let* ((index (position fop-name sb-fasl::**fop-funs**
+                          :key
+                          (lambda (x) (and (functionp x) (sb-kernel:%fun-name x)))))
+         (fun (aref sb-fasl::**fop-funs** index)))
     (setf (aref sb-fasl::**fop-funs** index)
           (lambda (&rest args)
             (push fop-name *call-tracker*)

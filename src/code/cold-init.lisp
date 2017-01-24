@@ -276,7 +276,7 @@
            (setf (sb!vm::%code-fixups obj)
                  (coerce (sort fixups #'<) '(simple-array sb!vm:word (*))))))))
    :dynamic)
-                                  
+
   ;; Now that L-T-V forms have executed, the symbol output chooser works.
   (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
 

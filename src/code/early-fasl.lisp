@@ -131,16 +131,12 @@
 
 ;;;; the FOP database
 
-(declaim (simple-vector **fop-names** **fop-funs**))
-
-;;; a vector indexed by a FaslOP that yields the FOP's name
-(defglobal **fop-names** (make-array 256 :initial-element nil))
-
 ;;; a vector indexed by a FaslOP that yields a function which performs
 ;;; the operation. Most functions take 0 arguments - they only manipulate
 ;;; the fop stack. But if the fop is defined to receive an argument (or two)
 ;;; then loader's main loop is responsible for supplying it.
 (defglobal **fop-funs** (make-array 256 :initial-element 0))
+(declaim (simple-vector **fop-funs**))
 
 ;;; Two arrays indicate fop function signature.
 ;;; The first array indicates how many integer operands follow the opcode.

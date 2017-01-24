@@ -70,8 +70,9 @@
     (unless (zerop (mod base-opcode n-slots))
       (error "Opcode for fop ~S must be a multiple of ~D" name n-slots))
     (loop for opcode from base-opcode below (+ base-opcode n-slots)
-          when (functionp (svref **fop-funs** opcode))
-          do (let ((oname (svref **fop-names** opcode)))
+          for function = (svref **fop-funs** opcode)
+          when (functionp function)
+          do (let ((oname (nth-value 2 (function-lambda-expression function))))
                (when (and oname (not (eq oname name)))
                  (error "fop ~S with opcode ~D conflicts with fop ~S."
                         name opcode oname))))
@@ -85,8 +86,7 @@
     ;; If there is more than 1, they follow, using varint encoding.
     (dotimes (j n-slots)
       (let ((opcode (+ base-opcode j)))
-        (setf (svref **fop-names** opcode) name
-              (svref **fop-funs** opcode) (symbol-function name)
+        (setf (svref **fop-funs** opcode) (symbol-function name)
               (aref (car **fop-signatures**) opcode) n-operands
               (sbit (cdr **fop-signatures**) opcode) pushp))))
   name)

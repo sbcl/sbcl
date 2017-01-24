@@ -423,38 +423,39 @@
                   #!+sb-show `(when trace ,@forms)
                   #!-sb-show (progn forms nil)))
       (loop
-       (let ((byte (the (unsigned-byte 8) (read-byte stream))))
+       (let* ((byte (the (unsigned-byte 8) (read-byte stream)))
+              (function (svref **fop-funs** byte))
+              (n-operands (aref (car **fop-signatures**) byte)))
          ;; Do some debugging output.
          (tracing
-           (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
-                   (1- (file-position stream))
-                   (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
-                   (svref (%fasl-input-table fasl-input) 0) ; table pointer
-                   byte (aref **fop-names** byte)))
+          (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
+                  (1- (file-position stream))
+                  (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
+                  (svref (%fasl-input-table fasl-input) 0) ; table pointer
+                  byte (and (functionp function)
+                            (nth-value 2 (function-lambda-expression function)))))
          ;; Actually execute the fop.
          (let ((result
-                (let ((function (svref **fop-funs** byte))
-                      (n-operands (aref (car **fop-signatures**) byte)))
-                  (cond ((not (functionp function))
-                         (error "corrupt fasl file: FOP code #x~x" byte))
-                        ((zerop n-operands)
-                         (funcall function fasl-input))
-                        (t
-                         (let (arg1 arg2 arg3)
-                           (with-fast-read-byte ((unsigned-byte 8) stream)
-                             ;; The low 2 bits of the opcode determine the
-                             ;; number of octets used for the 1st operand.
-                             (setq arg1 (fast-read-var-u-integer (ash 1 (logand byte 3)))))
-                           (when (>= n-operands 2)
-                             (setq arg2 (read-varint-arg fasl-input))
-                             (when (>= n-operands 3)
-                               (setq arg3 (read-varint-arg fasl-input))))
-                           (tracing (format *trace-output* "{~D~@[,~D~@[,~D~]~]}"
-                                            arg1 arg2 arg3))
-                           (case n-operands
-                             (3 (funcall function fasl-input arg1 arg2 arg3))
-                             (2 (funcall function fasl-input arg1 arg2))
-                             (1 (funcall function fasl-input arg1)))))))))
+                 (cond ((not (functionp function))
+                        (error "corrupt fasl file: FOP code #x~x" byte))
+                       ((zerop n-operands)
+                        (funcall function fasl-input))
+                       (t
+                        (let (arg1 arg2 arg3)
+                          (with-fast-read-byte ((unsigned-byte 8) stream)
+                            ;; The low 2 bits of the opcode determine the
+                            ;; number of octets used for the 1st operand.
+                            (setq arg1 (fast-read-var-u-integer (ash 1 (logand byte 3)))))
+                          (when (>= n-operands 2)
+                            (setq arg2 (read-varint-arg fasl-input))
+                            (when (>= n-operands 3)
+                              (setq arg3 (read-varint-arg fasl-input))))
+                          (tracing (format *trace-output* "{~D~@[,~D~@[,~D~]~]}"
+                                           arg1 arg2 arg3))
+                          (case n-operands
+                            (3 (funcall function fasl-input arg1 arg2 arg3))
+                            (2 (funcall function fasl-input arg1 arg2))
+                            (1 (funcall function fasl-input arg1))))))))
            (when (plusp (sbit (cdr **fop-signatures**) byte))
              (push-fop-stack result fasl-input))
            (let ((stack (%fasl-input-stack fasl-input)))
@@ -519,7 +520,7 @@
                    (dotimes (i 255)
                      (declare (fixnum i))
                      (let ((n (svref ,vec i)))
-                       (push (cons (svref *fop-names* i) n) ,lvar)
+                       (push (cons (%fun-name (svref **fop-funs** i)) n) ,lvar)
                        (incf ,tvar n)))
                    (setq ,lvar (subseq (sort ,lvar (lambda (x y)
                                                      (> (cdr x) (cdr y))))
