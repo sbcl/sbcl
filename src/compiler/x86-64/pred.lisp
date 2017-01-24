@@ -194,25 +194,18 @@
 ;;; Note: a constant-tn is allowed in CMP; it uses an EA displacement,
 ;;; not immediate data.
 (define-vop (if-eq)
-  (:args (x :scs (any-reg descriptor-reg control-stack constant)
-            :load-if (not (and (sc-is x immediate)
-                               (sc-is y any-reg descriptor-reg
-                                      control-stack constant))))
+  (:args (x :scs (any-reg descriptor-reg control-stack))
          (y :scs (any-reg descriptor-reg immediate)
-            :load-if (not (and (sc-is x any-reg descriptor-reg immediate)
-                               (sc-is y control-stack constant)))))
-  (:temporary (:sc descriptor-reg) temp)
+            :load-if (and (sc-is x control-stack)
+                          (not (sc-is y any-reg descriptor-reg immediate)))))
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
   (:generator 6
     (cond
-      ((or (sc-is y immediate)
-           (sc-is x immediate))
-       (when (sc-is x immediate)
-         (rotatef x y))
-       (let ((value (encode-value-if-immediate y))
-             (immediate (immediate32-p x)))
+      ((sc-is y immediate)
+       (let* ((value (encode-value-if-immediate y))
+              (immediate (immediate32-p value)))
          (cond ((and (zerop value) (sc-is x any-reg descriptor-reg))
                 (inst test x x))
                (immediate
@@ -220,8 +213,8 @@
                ((not (sc-is x control-stack))
                 (inst cmp x (constantize value)))
                (t
-                (inst mov temp value)
-                (inst cmp x temp)))))
+                (inst mov temp-reg-tn value)
+                (inst cmp x temp-reg-tn)))))
       (t
        (inst cmp x y)))))
 
