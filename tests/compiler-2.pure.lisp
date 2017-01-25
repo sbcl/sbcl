@@ -147,7 +147,7 @@
                            (declare (optimize safety)) (princ-to-string x) x))))
     (assert (ctu:find-named-callees f :name 'princ-to-string))))
 
-(with-test (:name :map-allocated-objects-no-consing)
+(with-test (:name :map-allocated-objects-no-consing :fails-on :ppc)
   (let ((n 0))
     (sb-int:dx-flet ((f (obj type size)
                        (declare (ignore obj type size))
