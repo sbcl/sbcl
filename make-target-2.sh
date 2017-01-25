@@ -68,7 +68,7 @@ echo //checking for leftover cold-init symbols
            (when (and (symbolp obj) (not (symbol-package obj))
                       (search "!" (string obj)))
              (push obj l)))
-         :dynamic)
+         :all)
         (format t "Found ~D:~%~S~%" (length l) l))
     (abort ()
       :report "Abort building SBCL."
