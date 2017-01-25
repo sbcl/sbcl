@@ -130,7 +130,9 @@
                               (push (list (step-condition-form condition)
                                           (step-condition-args condition))
                                     results)
-                              (if (< (incf count) 4)
+                              (if (< (incf count)
+                                     #+(or x86 x86-64) 4
+                                     #-(or x86 x86-64) 5)
                                   (invoke-restart 'step-into)
                                   (invoke-restart 'step-next)))))))
     (step (fib 3))
