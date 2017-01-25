@@ -182,7 +182,7 @@
 ;; %make-symbol is the internal API, but the primitive object allocator
 ;; is %%make-symbol, because when immobile space feature is present,
 ;; we dispatch to either the C allocator or the Lisp allocator.
-(defknown %make-symbol (simple-string boolean) symbol (flushable))
+(defknown %make-symbol (fixnum simple-string) symbol (flushable))
 (defknown sb!vm::%%make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())

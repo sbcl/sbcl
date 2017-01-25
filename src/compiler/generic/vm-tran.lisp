@@ -31,7 +31,7 @@
   '(if (< x 0) (- x) x))
 
 (deftransform make-symbol ((string) (simple-string))
-  `(%make-symbol string nil))
+  `(%make-symbol 0 string))
 
 #!-immobile-space
 (define-source-transform %make-symbol (string kind)

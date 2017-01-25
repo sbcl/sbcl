@@ -346,33 +346,40 @@ distinct from the global value. Can also be SETF."
   #!+sb-doc
   "Make and return a new symbol with the STRING as its print name."
   (declare (type string string))
-  (%make-symbol (if (simple-string-p string)
-                    string
-                    (subseq string 0))
-                nil))
+  (%make-symbol 0 (if (simple-string-p string) string (subseq string 0))))
 
-;;; We try to partition immobile symbols onto separate gc cards based on
-;;; a heuristic, to make them mostly have the same generation per card,
-;;; expecting that:
-;;;  - uninterned symbols become garbage almost immediately
-;;;  - symbols looking like special variables are permanent
-;;;  - other symbols are not touched often, if at all
-;;; It does not really matter if a symbol is on the "wrong" kind of card,
-;;; so there is no problem with (un)interning etc.
-;;; However, it turns out that without a pre-save de-fragmentation pass over
-;;; immobile space, there are many widely separated pages of symbols,
-;;; inhibiting the ability to create pages of other fixed-size allocations.
-;;; So the heuristic is essentially disabled for now, and all symbols except
-;;; for those that look like specials are located in ordinary dynamic space.
+;;; All symbols go into immobile space if #!+immobile-symbols is enabled,
+;;; but not if disabled. The win with immobile space that is that all symbols
+;;; can be considered static from an addressing viewpoint, but GC'able.
+;;; (After codegen learns how, provided that defrag becomes smart enough
+;;; to fixup machine code so that defrag remains meaningful)
+;;;
+;;; However, with immobile space being limited in size, you might not want
+;;; symbols in there. In particular, if an application uses symbols as data
+;;; - perhaps symbolic algebra on a Raspberry Pi - then not only is a faster
+;;; purely Lisp allocator better, you probably want not to run out of space.
+;;; The plausible heuristic that interned symbols be immobile, and otherwise not,
+;;; is mostly ok, except for the unfortunate possibility of calling IMPORT
+;;; on a random gensym. And even if a symbol is in immobile space at compile-time,
+;;; it might not be at load-time, if you do nasty things like that, so really
+;;; we can't make any reasonable determination - it's sort of all or nothing.
+
+;;; We can perhaps hardcode addresses of keywords in any case if we think that
+;;; people aren't in the habit of importing gensyms into #<package KEYWORD>.
+;;; It's kinda useless to do that, though not technically forbidden.
+;;; (It can produce a not-necessarily-self-evaluating keyword)
+
 #!+immobile-space
-(defun %make-symbol (name intern) ; intern means "will be interned" or not
-  (declare (type simple-string name))
-  (if (and intern
-           (plusp (length name))
-           (char= (char name 0) #\*)
-           (char= (char name (1- (length name))) #\*))
-      (truly-the (values symbol)
-                 (%primitive sb!vm::alloc-immobile-symbol name 0))
+(defun %make-symbol (kind name)
+  (declare (ignorable kind) (type simple-string name))
+  (if #!-immobile-symbols
+      (or (eql kind 1) ; keyword
+          (and (eql kind 2) ; random interned symbol
+               (plusp (length name))
+               (char= (char name 0) #\*)
+               (char= (char name (1- (length name))) #\*)))
+      #!+immobile-symbols t ; always place them there
+      (truly-the (values symbol) (%primitive sb!vm::alloc-immobile-symbol name))
       (sb!vm::%%make-symbol name)))
 
 (defun get (symbol indicator &optional (default nil))

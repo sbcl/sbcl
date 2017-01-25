@@ -256,7 +256,11 @@ static int get_freeish_page(int hint_page, int attributes)
           }
       if (ATTRIBUTES_MATCH_P(page_attr_packed, attributes)
           && !page_full_p(page)) {
-          if (fixedobj_pages[page].gens <= 1) { // instant win
+          // Try to avoid new objects on pages with any pseudo-static objects,
+          // because then touching the young object forces scanning the page,
+          // which is unfortunate if most things on it were untouched.
+          if (fixedobj_pages[page].gens < (1<<PSEUDO_STATIC_GENERATION)) {
+            // instant win
             return page;
           } else if (fixedobj_pages[page].gens < best_genmask) {
             best_genmask = fixedobj_pages[page].gens;
@@ -1484,18 +1488,17 @@ lispobj alloc_layout(lispobj slots)
 }
 
 #include "genesis/symbol.h"
-lispobj alloc_sym(lispobj name, int kind)
+lispobj alloc_sym(lispobj name)
 {
-    // 'kind' is a heuristic to separate symbols by their expected use,
-    // i.e. symbols whose page is often written (global vars)
-    // versus symbols that exist only as names.
-    int* hint = &symbol_page_hint;
+    // While there are different "kinds" of symbols in the defragmentation
+    // logic, we don't distinguish them when allocating,
+    // on the theory that contiguous allocations are preferable anyway.
     struct symbol* s = (struct symbol*)
       alloc_immobile_obj(MAKE_ATTR(CEILING(SYMBOL_SIZE,2), // spacing
                                    CEILING(SYMBOL_SIZE,2), // size
-                                   kind),
+                                   0),
                          (SYMBOL_SIZE-1)<<8 | SYMBOL_HEADER_WIDETAG,
-                         hint);
+                         &symbol_page_hint);
     s->value = UNBOUND_MARKER_WIDETAG;
     s->hash = 0;
     s->info = NIL;
@@ -1720,11 +1723,11 @@ static int schar(struct vector* string, int index)
 }
 
 #include "genesis/package.h"
+#define N_SYMBOL_KINDS 4
+
 // Return an integer 0..3 telling which block of symbols to relocate 'sym' into.
 // This is the same as the "symbol kind" in the allocator.
 //  0 = uninterned, 1 = keyword, 2 = other interned, 3 = special var
-
-#define N_SYMBOL_KINDS 4
 static int classify_symbol(lispobj* obj)
 {
   struct symbol* symbol = (struct symbol*)obj;
@@ -1798,7 +1801,6 @@ void defrag_immobile_space(int* components)
                                       LAYOUT_ALIGN / N_WORD_BYTES);
     int n_fdefn_pages = calc_n_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
 
-    //    char* symbol_alloc_ptr[N_SYMBOL_KINDS+1];
     char* layout_alloc_ptr = defrag_base;
     char* fdefn_alloc_ptr  = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;
     char* symbol_alloc_ptr[N_SYMBOL_KINDS+1];
@@ -1839,7 +1841,6 @@ void defrag_immobile_space(int* components)
               break;
             case SYMBOL_HEADER_WIDETAG:
               alloc_ptr = &symbol_alloc_ptr[classify_symbol(obj)];
-              //alloc_ptr = &symbol_alloc_ptr;
               break;
             default:
               lose("Unexpected widetag");

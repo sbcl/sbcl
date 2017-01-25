@@ -389,7 +389,7 @@
   (def alloc-immobile-layout "alloc_layout" ; MAKE-LAYOUT
        ((descriptor-reg)))
   (def alloc-immobile-symbol "alloc_sym"    ; MAKE-SYMBOL
-       ((descriptor-reg) (any-reg)))
+       ((descriptor-reg)))
   (def alloc-immobile-fdefn  "alloc_fdefn"  ; MAKE-FDEFN
        ((descriptor-reg)))
   )
