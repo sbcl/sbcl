@@ -122,12 +122,14 @@
            (type location-kind kind) (type (or index null) tlf-num)
            (type hash-table var-locs) (type (or vop null) vop))
 
-  (let ((byte-buffer *byte-buffer*)
-        (stepping (and (combination-p node)
-                       (combination-step-info node)))
-        (anything-alive (and live
-                             (find 1 live)))
-        (path (node-source-path node)))
+  (let* ((byte-buffer *byte-buffer*)
+         (stepping (and (combination-p node)
+                        (combination-step-info node)))
+         (live (and live
+                    (compute-live-vars live node block var-locs vop)))
+         (anything-alive (and live
+                              (find 1 live)))
+         (path (node-source-path node)))
     (vector-push-extend
      (logior
       (if context
@@ -155,8 +157,7 @@
       (write-var-integer (source-path-form-number path) byte-buffer))
 
     (when anything-alive
-      (write-packed-bit-vector (compute-live-vars live node block var-locs vop)
-                               byte-buffer))
+      (write-packed-bit-vector live byte-buffer))
     (when stepping
       (write-var-string stepping byte-buffer))
     (when context
