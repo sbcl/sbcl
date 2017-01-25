@@ -609,10 +609,8 @@
          (level (cond #!+sb-dyncount
                       (*collect-dynamic-statistics*
                        (max actual-level 2))
-                      (actual-level)))
-         (toplevel-p (eq :toplevel (compiled-debug-fun-kind dfun))))
-    (cond (toplevel-p)
-          ((and (zerop level)
+                      (actual-level))))
+    (cond ((and (zerop level)
                 (let ((od (lambda-optional-dispatch fun)))
                   (or (not od)
                       (not (eq (optional-dispatch-main-entry od) fun)))))
@@ -625,7 +623,7 @@
            (setf (compiled-debug-fun-arguments dfun)
                  (compute-args fun var-locs))))
 
-    (if (and (>= level 1) (not toplevel-p))
+    (if (>= level 1)
         (multiple-value-bind (blocks tlf-num form-number)
             (compute-debug-blocks fun var-locs)
           (setf (compiled-debug-fun-blocks dfun) blocks
