@@ -101,7 +101,8 @@
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
 (defknown copy-structure (structure-object) structure-object
-  (flushable)) ;; FIXME: can derive the type based on the structure
+  (flushable)
+  :derive-type #'result-type-first-arg)
 
 ;;;; from the "Control Structure" chapter:
 
