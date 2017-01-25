@@ -14,24 +14,27 @@
 
 ;;;; the PACKAGE-HASHTABLE structure
 
-;;; comment from CMU CL:
-;;;      Packages are implemented using a special kind of hashtable. It is
-;;;   an open hashtable with a parallel 8-bit I-vector of hash-codes. The
-;;;   primary purpose of the hash for each entry is to reduce paging by
-;;;   allowing collisions and misses to be detected without paging in the
-;;;   symbol and pname for an entry. If the hash for an entry doesn't
-;;;   match that for the symbol that we are looking for, then we can
-;;;   go on without touching the symbol, pname, or even hastable vector.
-;;;      It turns out that, contrary to my expectations, paging is a very
-;;;   important consideration the design of the package representation.
-;;;   Using a similar scheme without the entry hash, the fasloader was
-;;;   spending more than half its time paging in INTERN.
-;;;      The hash code also indicates the status of an entry. If it zero,
-;;;   the entry is unused. If it is one, then it is deleted.
-;;;   Double-hashing is used for collision resolution.
-
-;; FIXME: too vaguely named. Should be PACKAGE-HASH-VECTOR.
-(def!type hash-vector () '(simple-array (unsigned-byte 8) (*)))
+;;; Packages are implemented using a special kind of hashtable -
+;;; the storage is a single vector in which each cell is both key and value.
+;;; While previously we also used a parallel vector of 8-bit hash codes,
+;;; that turned out to be a pessimization on modern systems, where memory
+;;; can be be read faster than it was 27 years ago. (That's when it was
+;;; discovered - so it is claimed - that without a comparison for hash,
+;;; the majority of time loading fasls was due to paging in symbol names)
+;;;
+;;; But hardware-based prefetch makes it so that it costs no more to compare
+;;; a symbol's hash code than to first compare a smaller hash that doesn't
+;;; require dereferencing the symbol, only to use it as the guard condition
+;;; to compare the full symbol-hash, and only then the symbol-name.
+;;;
+;;; In fairness to the former implementation, for technical reasons
+;;; it was not possible to use SYMBOL-HASH as the hash value by which
+;;; to avoid spurious STRING= calls that would definitely fail.
+;;; Prior to change 06ccf13ed3, there were two reasons for that:
+;;;   (1) we didn't force interned symbols to have a precomputed hash
+;;;   (2) NIL has a strange hash. That was resolved by making any random
+;;;       symbol whose name is spelled "NIL" have the identical strange hash
+;;;       so that the hash is a pure function of the name's characters.
 
 (sb!xc:defstruct (package-hashtable
                   (:constructor %make-package-hashtable

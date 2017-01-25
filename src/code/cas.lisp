@@ -45,7 +45,7 @@
 ;;; use of UNBOUND-SYMBOL-ERROR. This is is not unique to CAS, viz.:
 ;;; * (defglobal *ggg* 3)
 ;;; * (disassemble '(lambda () (symbol-value '*ggg*)))
-;;;   ... 
+;;;   ...
 ;;;   ; 98: L0:   CC0A             BREAK 10                         ; error trap
 ;;;   ; 9A:       06               BYTE #X06                        ; UNBOUND-SYMBOL-ERROR
 ;;;   ; 9B:       00               BYTE #X00                        ; RAX

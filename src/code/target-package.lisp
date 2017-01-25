@@ -74,7 +74,7 @@
     (let* ((n-live (%package-hashtable-symbol-count table))
            (n-deleted (package-hashtable-deleted table))
            (n-filled (+ n-live n-deleted))
-           (n-cells (1- (length (package-hashtable-cells table)))))
+           (n-cells (length (package-hashtable-cells table))))
       (format stream
               "(~D+~D)/~D [~@[~,3f words/sym,~]load=~,1f%]"
               n-live n-deleted n-cells
@@ -104,11 +104,10 @@
               by 2
               when (positive-primep n) return n)))
     (let* ((n (actual-package-hashtable-size size))
+           ;; SIZE is how many symbols we'd like to be able to store,
+           ;; but the number of physical cells is N, chosen for its primality.
            (size (truncate (* n *package-rehash-threshold*)))
-           (table (make-array (1+ n) :initial-element 0)))
-      (setf (aref table n)
-            (make-array n :element-type '(unsigned-byte 8)
-                          :initial-element 0))
+           (table (make-array n :initial-element 0)))
       (%make-package-hashtable table size))))
 
 (declaim (inline pkg-symbol-valid-p))
@@ -117,13 +116,10 @@
 ;;; Destructively resize TABLE to have room for at least SIZE entries
 ;;; and rehash its existing entries.
 (defun resize-package-hashtable (table size)
-  (let* ((symvec (package-hashtable-cells table))
-         (len (1- (length symvec)))
-         (temp-table (make-package-hashtable size)))
-    (dotimes (i len)
-      (let ((sym (svref symvec i)))
-        (when (pkg-symbol-valid-p sym)
-          (add-symbol temp-table sym))))
+  (let ((temp-table (make-package-hashtable size)))
+    (dovector (sym (package-hashtable-cells table))
+      (when (pkg-symbol-valid-p sym)
+        (add-symbol temp-table sym)))
     (setf (package-hashtable-cells table) (package-hashtable-cells temp-table)
           (package-hashtable-size table) (package-hashtable-size temp-table)
           (package-hashtable-free table) (package-hashtable-free temp-table)
@@ -608,17 +604,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 
 ;;;; operations on package hashtables
 
-;;; Compute a number between 1 and 255 based on the sxhash of the
-;;; pname and the length thereof.
-(declaim (inline entry-hash))
-(defun entry-hash (length sxhash)
-  (declare (index length) ((and fixnum unsigned-byte) sxhash))
-  (1+ (rem (logxor length sxhash
-                   (ash sxhash -8) (ash sxhash -16) (ash sxhash -19))
-           255)))
-
-;;; Add a symbol to a package hashtable. The symbol is assumed
-;;; not to be present.
+;;; Add a symbol to a package hashtable. The symbol MUST NOT be present.
 (defun add-symbol (table symbol)
   (when (zerop (package-hashtable-free table))
     ;; The hashtable is full. Resize it to be able to hold twice the
@@ -630,22 +616,21 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                                     (package-hashtable-deleted table))
                                  2)))
   (let* ((symvec (package-hashtable-cells table))
-         (len (1- (length symvec)))
-         (hashvec (the hash-vector (aref symvec len)))
+         (len (length symvec))
          (sxhash (truly-the fixnum (ensure-symbol-hash symbol)))
          (h2 (1+ (rem sxhash (- len 2)))))
     (declare (fixnum sxhash h2))
     (do ((i (rem sxhash len) (rem (+ i h2) len)))
-        ((eql (aref hashvec i) 0)
-         (if (eql (svref symvec i) 0)
-             (decf (package-hashtable-free table))
-             (decf (package-hashtable-deleted table)))
-         ;; This order of these two SETFs does not matter.
-         ;; An empty symbol cell is skipped on lookup if the hash cell
-         ;; matches something accidentally. "empty" = any fixnum.
-         (setf (svref symvec i) symbol)
-         (setf (aref hashvec i)
-               (entry-hash (length (symbol-name symbol)) sxhash)))
+        ((fixnump (svref symvec i))
+         ;; Interning has to pre-check whether the symbol existed in any
+         ;; package used by the package in which intern is happening,
+         ;; so it's not really useful to be lock-free here,
+         ;; even though we could be. (We're already inside a mutex)
+         (let ((old (svref symvec i)))
+           (setf (svref symvec i) symbol)
+           (if (eql old 0)
+               (decf (package-hashtable-free table)) ; unused
+               (decf (package-hashtable-deleted table))))) ; tombstone
       (declare (fixnum i)))))
 
 ;;; Resize the package hashtables of all packages so that their load
@@ -671,74 +656,45 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; If the symbol is found, then FORMS are executed; otherwise not.
 
 (defmacro with-symbol (((symbol-var &optional (index-var (gensym))) table
-                       string length sxhash entry-hash) &body forms)
-  (with-unique-names (vec len hash-vec h2 probed-ehash name)
+                       string length sxhash) &body forms)
+  (with-unique-names (vec len h2 probed-thing name)
     `(let* ((,vec (package-hashtable-cells ,table))
-            (,len (1- (length ,vec)))
-            (,hash-vec (the hash-vector (svref ,vec ,len)))
+            (,len (length ,vec))
             (,index-var (rem (the hash ,sxhash) ,len))
-            (,h2 (1+ (the index (rem (the hash ,sxhash)
-                                      (the index (- ,len 2)))))))
+            (,h2 (1+ (the index (rem ,sxhash (the index (- ,len 2)))))))
        (declare (type index ,len ,h2 ,index-var))
        (loop
-        (let ((,probed-ehash (aref ,hash-vec ,index-var)))
-          (cond
-           ((eql ,probed-ehash ,entry-hash)
-            (let ((,symbol-var (truly-the symbol (svref ,vec ,index-var))))
-              (when (eq (symbol-hash ,symbol-var) ,sxhash)
-                (let ((,name (symbol-name ,symbol-var)))
+        (let ((,probed-thing (svref ,vec ,index-var)))
+          (cond ((not (fixnump ,probed-thing))
+                 (let ((,symbol-var (truly-the symbol ,probed-thing)))
+                   (when (eq (symbol-hash ,symbol-var) ,sxhash)
+                     (let ((,name (symbol-name ,symbol-var)))
                   ;; The pre-test for length is kind of an unimportant
                   ;; optimization, but passing it for both :end arguments
                   ;; requires that it be within bounds for the probed symbol.
-                  (when (and (= (length ,name) ,length)
-                             (string= ,string ,name
-                                      :end1 ,length :end2 ,length))
-                    (return (progn ,@forms)))))))
-           ((eql ,probed-ehash 0)
-            ;; either a never used cell or a tombstone left by UNINTERN
-            (when (eql (svref ,vec ,index-var) 0) ; really never used
-              (return)))))
+                       (when (and (= (length ,name) ,length)
+                                  (string= ,string ,name
+                                           :end1 ,length :end2 ,length))
+                         (return (progn ,@forms)))))))
+              ;; either a never used cell or a tombstone left by UNINTERN
+                ((eql ,probed-thing 0) ; really never used
+                 (return))))
         (when (>= (incf ,index-var ,h2) ,len)
           (decf ,index-var ,len))))))
 
-;;; Delete the entry for STRING in TABLE. The entry must exist.
-;;; Deletion stores -1 for the symbol and 0 for the hash tombstone.
-;;; Storing NIL for the symbol, as used to be done, is vulnerable to a rare
-;;; concurrency bug because many strings have the same ENTRY-HASH as NIL:
-;;;  (entry-hash 3 (sxhash "NIL")) => 177 and
-;;;  (entry-hash 2 (sxhash "3M")) => 177
-;;; Suppose, in the former approach, that "3M" is interned,
-;;; and then the following sequence of events occur:
-;;;  - thread 1 performs FIND-SYMBOL on "NIL", hits the hash code at
-;;;    at index I, and is then context-switched out. When this thread
-;;     resumes, it assumes a valid symbol in (SVREF SYM-VEC I)
-;;;  - thread 2 uninterns "3M" and fully completes that, storing NIL
-;;;    in the slot for the symbol that thread 1 will next read.
-;;;  - thread 1 continues, and test for STRING= to NIL,
-;;;    wrongly seeing NIL as a present symbol.
-;;; It's possible this is harmless, because NIL is usually inherited from CL,
-;;; but if the secondary return value mattered to the application,
-;;; it is probably wrong. And of course if NIL was not intended to be found
-;;; - as in a package that does not use CL - then finding NIL at all is wrong.
-;;; The better approach is to treat 'hash' as purely a heuristic without
-;;; ill-effect from false positives. No barrier, nor read-consistency
-;;; check is required, since a symbol is both its key and value,
-;;; and the "absence of a symbol" marker is never mistaken for a symbol.
+;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
 ;;;
 (defun nuke-symbol (table symbol)
   (let* ((string (symbol-name symbol))
          (length (length string))
-         (hash (symbol-hash symbol))
-         (ehash (entry-hash length hash)))
+         (hash (symbol-hash symbol)))
     (declare (type index length)
              (type hash hash))
-    (with-symbol ((symbol index) table string length hash ehash)
+    (with-symbol ((symbol index) table string length hash)
       ;; It is suboptimal to grab the vectors again, but not broken,
       ;; because we have exclusive use of the table for writing.
-      (let* ((symvec (package-hashtable-cells table))
-             (hashvec (the hash-vector (aref symvec (1- (length symvec))))))
-        (setf (aref hashvec index) 0)
-        (setf (aref symvec index) -1)) ; any nonzero fixnum will do
+      (let ((symvec (package-hashtable-cells table)))
+        (setf (aref symvec index) -1))
       (incf (package-hashtable-deleted table))))
   ;; If the table is less than one quarter full, halve its size and
   ;; rehash the entries.
@@ -1047,14 +1003,11 @@ implementation it is ~S." *!default-package-use-list*)
 (defun %find-symbol (string length package)
   (declare (simple-string string)
            (type index length))
-  (let* ((hash (compute-symbol-hash string length))
-         (ehash (entry-hash length hash)))
-    (declare (type hash hash ehash))
-    (with-symbol ((symbol) (package-internal-symbols package)
-                  string length hash ehash)
+  (let ((hash (compute-symbol-hash string length)))
+    (declare (type hash hash))
+    (with-symbol ((symbol) (package-internal-symbols package) string length hash)
       (return-from %find-symbol (values symbol :internal)))
-    (with-symbol ((symbol) (package-external-symbols package)
-                  string length hash ehash)
+    (with-symbol ((symbol) (package-external-symbols package) string length hash)
       (return-from %find-symbol (values symbol :external)))
     (let* ((tables (package-tables package))
            (n (length tables)))
@@ -1067,7 +1020,7 @@ implementation it is ~S." *!default-package-use-list*)
           (loop
              (with-symbol ((symbol) (locally (declare (optimize (safety 0)))
                                              (svref tables i))
-                           string length hash ehash)
+                           string length hash)
                (setf (package-mru-table-index package) i)
                (return-from %find-symbol (values symbol :inherited)))
              (if (< (decf i) 0) (setq i (1- n)))
@@ -1083,12 +1036,9 @@ implementation it is ~S." *!default-package-use-list*)
 (defun find-external-symbol (string package)
   (declare (simple-string string))
   (let* ((length (length string))
-         (hash (compute-symbol-hash string length))
-         (ehash (entry-hash length hash)))
-    (declare (type index length)
-             (type hash hash))
-    (with-symbol ((symbol) (package-external-symbols package)
-                  string length hash ehash)
+         (hash (compute-symbol-hash string length)))
+    (declare (type index length) (type hash hash))
+    (with-symbol ((symbol) (package-external-symbols package) string length hash)
       (return-from find-external-symbol (values symbol t))))
   (values nil nil))
 
@@ -1709,7 +1659,7 @@ PACKAGE."
            (package-iter-step (logior (mask-field (byte 3 3) start-state)
                                       next-state)
                               ;; assert that physical length was nonzero
-                              (the index (1- (length symbols)))
+                              (the index (length symbols))
                               symbols pkglist))))
     (declare (inline desired-state-p this-package))
     (if (zerop index)
@@ -1723,7 +1673,7 @@ PACKAGE."
                                                (logand start-state 3))))))
                      (when (zerop index)
                        (return (advance start-state))))))
-          (declare #-sb-xc-host(optimize (sb!c::insert-array-bounds-checks 0)))
+          (declare (optimize (sb!c::insert-array-bounds-checks 0)))
           (if (logtest start-state +package-iter-check-shadows+)
               (let ((shadows (package-%shadowing-symbols (this-package))))
                 (scan (not (member sym shadows :test #'string=))))
