@@ -116,3 +116,54 @@
          (%byte-blt ,vec ,index ,n-res 0 ,n-bytes)
          (incf ,index ,n-bytes)
          ,n-res))))
+
+;;; Code fixup locations are stored as varints even more densely than
+;;; would be an array of unsigned-byte. The backing storage is an integer
+;;; (typically a bignum, but a fixnum will do),
+;;; and each value represents the difference from the preceding value.
+
+;;; Somebody should try changing the x86 code to use this representation
+;;; and profile that to see if it makes performance worse.
+;;; x86-64 does not care about speed here, because GC is unaffected
+;;; except when saving a core.
+
+;;; XXX: Maybe rename this if we use it to pack debug-fun-ish things.
+(defun pack-code-fixup-locs (list)
+  ;; Estimate the length
+  (let ((bytes (make-array (* 2 (length list)) :fill-pointer 0 :adjustable t
+                           :element-type '(unsigned-byte 8)))
+        (prev 0))
+    (dolist (x list)
+      (aver (> x prev)) ; the incoming list must be sorted
+      (write-var-integer (- x prev) bytes)
+      (setq prev x))
+    ;; Pack into a single integer
+    (let ((result 0) (shift 0))
+      (dovector (byte bytes)
+        (setf result (logior result (ash byte shift))
+              shift (+ shift 8)))
+      (aver (equal (unpack-code-fixup-locs result) list))
+      result)))
+
+(defmacro do-packed-varints ((loc locs) &body body)
+  (with-unique-names (integer byte bytepos shift acc prev)
+    `(let ((,integer ,locs)
+           (,bytepos 0)
+           (,shift 0)
+           (,acc 0)
+           (,prev 0))
+       (loop
+        (let ((,byte (ldb (byte 8 ,bytepos) ,integer)))
+          (incf ,bytepos 8)
+          (setf ,acc (logior ,acc (ash (logand ,byte #x7f) ,shift)))
+          (cond ((logtest ,byte #x80) (incf ,shift 7))
+                ;; No offset can be zero, so this is the delimiter
+                ((zerop ,acc) (return))
+                (t
+                 (let ((,loc (+ ,prev ,acc))) ,@body (setq ,prev ,loc))
+                 (setq ,acc 0 ,shift 0))))))))
+
+(defun unpack-code-fixup-locs (packed-integer)
+  (collect ((locs))
+    (do-packed-varints (loc packed-integer) (locs loc))
+    (locs)))

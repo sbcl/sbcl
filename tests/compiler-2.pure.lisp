@@ -155,3 +155,37 @@
       (ctu:assert-no-consing
        (sb-vm::map-allocated-objects #'f :dynamic)
        5))))
+
+(with-test (:name :pack-varints-as-bignum)
+  (dotimes (i 500) ; do some random testing this many times
+    (let* ((random-numbers (loop repeat (+ (random 20) 3)
+                                 collect (1+ (random 4000))))
+           (test-list (sort (delete-duplicates random-numbers) #'<))
+           (packed-int (sb-c::pack-code-fixup-locs test-list))
+           (result (make-array 1 :element-type 'sb-ext:word)))
+      ;; The packer intrinsically self-checks the packing
+      ;; so we don't need to assert anything about that.
+      (sb-sys:with-pinned-objects (packed-int result)
+        ;; Now exercise the C unpacker.
+        ;; This hack of allocating 4 longs is terrible, but whatever.
+        (let ((unpacker (make-alien long 4))
+              (prev-loc 0))
+          (alien-funcall (extern-alien "varint_unpacker_init"
+                                       (function void (* long) unsigned))
+                         unpacker
+                         (sb-kernel:get-lisp-obj-address packed-int))
+          (sb-int:collect ((unpacked))
+            (loop
+             (let ((status
+                    (alien-funcall
+                     (extern-alien "varint_unpack"
+                                   (function int (* long) system-area-pointer))
+                     unpacker (sb-sys:vector-sap result))))
+               (let ((val (aref result 0)))
+                 ;; status of 0 is EOF, val = 0 means a decoded value was 0,
+                 ;; which can't happen, so it's effectively EOF.
+                 (when (or (eql status 0) (eql val 0)) (return))
+                 (let ((loc (+ prev-loc val)))
+                   (unpacked loc)
+                   (setq prev-loc loc)))))
+            (assert (equal (unpacked) test-list))))))))
