@@ -1073,11 +1073,9 @@
 ;;; We dump trap objects in any unused slots or forward referenced slots.
 (defun dump-code-object (component code-segment code-length fixups
                          fasl-output entry-offsets)
-
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
-
   (let* ((2comp (component-info component))
          (constants (sb!c:ir2-component-constants 2comp))
          (header-length (length constants)))
@@ -1129,7 +1127,7 @@
           (loop for i from (fasl-output-last-file-position fasl-output)
                 below (length positions)
                 do
-                (dump-object i fasl-output)
+                (dump-object (aref positions i) fasl-output)
                 (dump-fop 'fop-source-info-position fasl-output))
           (setf (fasl-output-last-file-position fasl-output)
                 (length positions))))
