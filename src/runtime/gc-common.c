@@ -2509,7 +2509,7 @@ int varint_unpack(struct varint_unpacker* unpacker, int* result)
         int word_index = unpacker->index / N_WORD_BYTES;
         int byte_index = unpacker->index % N_WORD_BYTES;
         int byte = (((unsigned int*)unpacker->data)[word_index]
-                    >> (byte_index * 8)) &
+                    >> (byte_index * 8)) & 0xFF;
 #endif
         ++unpacker->index;
         accumulator |= (byte & 0x7F) << shift;
