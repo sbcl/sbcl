@@ -887,6 +887,7 @@
       (give-up-ir1-transform)))
 
 (deftransform string ((x) (symbol)) '(symbol-name x))
+(deftransform string ((x) (string)) '(progn x))
 
 ;;;; transforms for sequence functions
 
