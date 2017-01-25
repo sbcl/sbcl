@@ -1011,10 +1011,13 @@ register."
     (declare (type simple-vector fun-map))
     (if (= len 1)
         (svref fun-map 0)
-        (let ((i 1)
-              (elsewhere-p
-                (>= pc (sb!c::compiled-debug-fun-elsewhere-pc
-                        (svref fun-map 0)))))
+        (let* ((i 1)
+               (first-elsewhere-pc (sb!c::compiled-debug-fun-elsewhere-pc
+                                    (svref fun-map 0)))
+               (elsewhere-p
+                 (if escaped ;; See the comment below
+                     (>= pc first-elsewhere-pc)
+                     (> pc first-elsewhere-pc))))
           (declare (type sb!int:index i))
           (loop
            (when (or (= i len)
