@@ -34,7 +34,7 @@
   `(%make-symbol 0 string))
 
 #!-immobile-space
-(define-source-transform %make-symbol (string kind)
+(define-source-transform %make-symbol (kind string)
   (declare (ignore kind))
   `(sb!vm::%%make-symbol ,string))
 
