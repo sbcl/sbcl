@@ -24,7 +24,7 @@
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (without-gcing
-   (let ((sap (%primitive code-instructions code)))
+   (let ((sap (code-instructions code)))
      (ecase kind
        (:jmp-hint
         (aver (zerop (ldb (byte 2 0) value)))

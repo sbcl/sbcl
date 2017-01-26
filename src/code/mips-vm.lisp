@@ -20,7 +20,7 @@
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (without-gcing
-   (let ((sap (%primitive sb!c::code-instructions code)))
+   (let ((sap (code-instructions code)))
      (ecase kind
        (:absolute
         (setf (sap-ref-32 sap offset) fixup))

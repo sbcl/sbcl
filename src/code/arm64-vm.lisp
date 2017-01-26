@@ -18,7 +18,7 @@
   (unless (zerop (rem offset 4))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (without-gcing
-    (let ((sap (%primitive code-instructions code)))
+    (let ((sap (code-instructions code)))
       (ecase kind
         (:absolute
          (setf (sap-ref-word sap offset) fixup))

@@ -24,7 +24,7 @@
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (without-gcing
-   (let ((sap (%primitive code-instructions code)))
+   (let ((sap (code-instructions code)))
      (ecase kind
        (:call
         (error "Can't deal with CALL fixups, yet."))
