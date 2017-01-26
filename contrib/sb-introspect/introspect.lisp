@@ -472,14 +472,13 @@ If an unsupported TYPE is requested, the function will return NIL.
   (let* ((debug-info (function-debug-info function))
          (debug-source (debug-info-source debug-info))
          (debug-fun (debug-info-debug-function function debug-info))
-         (tlf (if debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
+         (tlf (sb-c::compiled-debug-info-tlf-number debug-info)))
     (make-definition-source
      :pathname
      (when (stringp (sb-c::debug-source-namestring debug-source))
        (parse-namestring (sb-c::debug-source-namestring debug-source)))
      :character-offset
-     (if tlf
-         (elt (sb-c::debug-source-start-positions debug-source) tlf))
+     (sb-c::compiled-debug-info-char-offset debug-info)
      :form-path (if tlf (list tlf))
      :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
      :file-write-date (sb-c::debug-source-created debug-source)

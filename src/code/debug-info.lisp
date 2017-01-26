@@ -126,11 +126,6 @@
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
-  ;; If all code locations in this function are in the same top level
-  ;; form, then this is the number of that form, otherwise NIL. If
-  ;; NIL, then each code location represented in the BLOCKS specifies
-  ;; the TLF number.
-  (tlf-number nil :type (or index null))
   (form-number nil :type (or index null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
@@ -304,10 +299,6 @@
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
-  ;; The FILE-POSITIONs of the truly top level forms read from this
-  ;; file (if applicable). The vector element type will be chosen to
-  ;; hold the largest element.
-  (start-positions nil :type (or (simple-array * (*)) null))
 
   ;; For functions processed by EVAL (including EVAL-WHEN and LOAD on
   ;; a source file), the source form.
@@ -347,7 +338,9 @@
   ;; WHN 20000120
   (fun-map (missing-arg) :type simple-vector :read-only t)
   ;; Location contexts
-  (contexts nil :type (or simple-vector null) :read-only t))
+  (contexts nil :type (or simple-vector null) :read-only t)
+  (tlf-number nil :type (or index null))
+  (char-offset nil :type (or index null)))
 
 (defvar *!initial-debug-sources*)
 

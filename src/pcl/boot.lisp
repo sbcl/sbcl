@@ -2665,11 +2665,11 @@ generic function lambda list ~S~:>"
                             (function-header (sb-kernel:fun-code-header function-object))
                             (debug-info (sb-kernel:%code-debug-info function-header))
                             (debug-source (sb-c::debug-info-source debug-info))
-                            (debug-fun (debug-info-debug-function function debug-info))
-                            (tlf (and debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
-                       (sb-c::%make-definition-source-location (sb-c::debug-source-namestring debug-source)
-                                                               tlf
-                                                               (sb-c::compiled-debug-fun-form-number debug-fun))))
+                            (debug-fun (debug-info-debug-function function debug-info)))
+                       (sb-c::%make-definition-source-location
+                        (sb-c::debug-source-namestring debug-source)
+                        (sb-c::compiled-debug-info-tlf-number debug-info)
+                        (sb-c::compiled-debug-fun-form-number debug-fun))))
                    (debug-info-debug-function (function debug-info)
                      (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
                            (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))

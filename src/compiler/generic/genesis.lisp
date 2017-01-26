@@ -2858,15 +2858,6 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading code objects and functions
 
-(define-cold-fop (fop-note-debug-source)
-  (let ((debug-source (pop-stack)))
-    (cold-push debug-source *current-debug-sources*)))
-
-(define-cold-fop (fop-source-info-position)
-  (write-slots (cold-car *current-debug-sources*)
-               (find-layout 'sb!c::debug-source)
-               :start-positions (pop-stack)))
-
 (define-cold-fop (fop-fdefn)
   (cold-fdefinition-object (pop-stack)))
 

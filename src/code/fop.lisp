@@ -534,25 +534,6 @@
                        (read-word-arg (fasl-input-stream)))
         val))
 
-;;; genesis dumps all positions at once
-(!define-fop 208 (fop-source-info-position (position) nil)
-  (let* ((positions (sb!c::debug-source-start-positions *fasl-source-info*))
-         (length (length positions)))
-    (setf (sb!c::debug-source-start-positions *fasl-source-info*)
-          (cond ((zerop length)
-                 (make-array 1 :element-type
-                             (sb!c::smallest-element-type position nil)
-                               :initial-element position))
-                ((typep position (array-element-type positions))
-                 (adjust-array positions (1+ length)
-                               :initial-element position))
-                (t
-                 (let ((result (make-array (1+ length) :element-type
-                                           (sb!c::smallest-element-type position nil))))
-                   (replace result positions)
-                   (setf (aref result length) position)
-                   result))))))
-
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-FOP.
 (!define-fop 203 (fop-nthcdr (obj))
@@ -588,9 +569,6 @@
 (!define-fop 61 :not-host (fop-sanctify-for-execution (component))
   (sb!vm:sanctify-for-execution component)
   component)
-
-(!define-fop 174 (fop-note-debug-source (debug-source) nil)
-  (setf *fasl-source-info* debug-source))
 
 ;;; Modify a slot in a CONSTANTS object.
 (!define-fop 140 :not-host (fop-alter-code ((:operands index) code value) nil)

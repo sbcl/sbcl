@@ -74,9 +74,7 @@
   ;; try to dump a structure that isn't in this hash table, we lose.
   (valid-structures (make-hash-table :test 'eq) :type hash-table)
   ;; DEBUG-SOURCE written at the very beginning
-  (source-info nil :type (or null sb!c::debug-source))
-  ;; The last file position updated by DUMP-CODE-OBJECT
-  (last-file-position 0 :type index))
+  (source-info nil :type (or null sb!c::debug-source)))
 
 ;;; This structure holds information about a circularity.
 (defstruct (circularity (:copier nil))
@@ -1117,20 +1115,7 @@
             (*dump-only-valid-structures* nil))
         (setf (sb!c::debug-info-source info)
               (fasl-output-source-info fasl-output))
-        (dump-object info fasl-output)
-        ;; Update DEBUG-SOURCE-START-POSITIONS each time new
-        ;; debug-info is written, that way if LOAD is interrupted the
-        ;; already loaded components will have working source locations
-        #-sb-xc-host ; done in bulk by fasl-dump-source-info-cold
-        (let ((positions (sb!c::file-info-positions
-                          (sb!c::source-info-file-info sb!c::*source-info*))))
-          (loop for i from (fasl-output-last-file-position fasl-output)
-                below (length positions)
-                do
-                (dump-object (aref positions i) fasl-output)
-                (dump-fop 'fop-source-info-position fasl-output))
-          (setf (fasl-output-last-file-position fasl-output)
-                (length positions))))
+        (dump-object info fasl-output))
 
       (dump-object (if (eq (sb!c::component-kind component) :toplevel) :toplevel nil)
                    fasl-output)
@@ -1246,31 +1231,6 @@
   (dump-fop 'fop-funcall-for-effect fasl-output)
   (dump-byte 0 fasl-output)
   (values))
-
-;;; Compute the correct list of DEBUG-SOURCE structures and backpatch
-;;; all of the dumped DEBUG-INFO structures. We clear the
-;;; FASL-OUTPUT-DEBUG-INFO, so that subsequent components with
-;;; different source info may be dumped.
-(defun fasl-dump-source-info (info fasl-output)
-  (let ((source-info (sb!c::debug-source-for-info info))
-        (*dump-only-valid-structures* nil))
-    (setf (fasl-output-source-info fasl-output) source-info)
-    ;; Zero out the timestamps to get reproducible fasls.
-    #+sb-xc-host (setf (sb!c::debug-source-created source-info) 0
-                       (sb!c::debug-source-compiled source-info) 0)
-    (dump-object source-info fasl-output)
-    (dump-fop 'fop-note-debug-source fasl-output)))
-
-;;; Do it at all at once (as opposed to one by one in
-;;; dump-code-object) for simplicity. Cold load can't be interrupted.
-#+sb-xc-host
-(defun fasl-dump-source-info-cold (info fasl-output)
-  (dump-object (sb!c::coerce-to-smallest-eltype
-                (sb!c::file-info-positions
-                 (sb!c::source-info-file-info info)))
-               fasl-output)
-  (dump-fop 'fop-source-info-position fasl-output))
-
 
 ;;;; dumping structures
 
