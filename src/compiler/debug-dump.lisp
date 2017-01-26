@@ -183,12 +183,10 @@
 ;;; Dump out the number of locations and the locations for Block.
 (defun dump-block-locations (block locations var-locs)
   (declare (type cblock block) (list locations))
-  (if (and locations
-           (eq (location-info-kind (first locations))
-               :non-local-entry))
-      (write-var-integer (length locations) *byte-buffer*)
+  (unless (and locations
+               (eq (location-info-kind (first locations))
+                   :non-local-entry))
       (let ((2block (block-info block)))
-        (write-var-integer (+ (length locations) 1) *byte-buffer*)
         (dump-1-location (block-start-node block)
                          2block :block-start
                          (ir2-block-%label 2block)
@@ -226,7 +224,6 @@
     (dump-block-locations prev-block (nreverse locations) var-locs)
 
     (when elsewhere-locations
-      (write-var-integer (length elsewhere-locations) byte-buffer)
       (dolist (loc (nreverse elsewhere-locations))
         (push loc locations)
         (dump-location-from-info loc var-locs)))
