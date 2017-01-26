@@ -2163,183 +2163,21 @@ core and return a descriptor to it."
                                 offset-within-code-object))
          (gspace-byte-address (gspace-byte-address
                                (descriptor-gspace code-object))))
-    ;; There's just a ton of code here that gets deleted,
-    ;; inhibiting the view of the the forest through the trees.
-    ;; Use of #+sbcl would say "probable bug in read-time conditional"
-    #+#.(cl:if (cl:member :sbcl cl:*features*) '(and) '(or))
-    (declare (sb-ext:muffle-conditions sb-ext:code-deletion-note))
-    (ecase +backend-fasl-file-implementation+
-      ;; See CMU CL source for other formerly-supported architectures
-      ;; (and note that you have to rewrite them to use BVREF-X
-      ;; instead of SAP-REF).
-      (:alpha
-         (ecase kind
-         (:jmp-hint
-          (assert (zerop (ldb (byte 2 0) value))))
-         (:bits-63-48
-          (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
-                 (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
-                 (value (if (logbitp 47 value) (+ value (ash 1 48)) value)))
-            (setf (bvref-8 gspace-bytes gspace-byte-offset)
-                  (ldb (byte 8 48) value)
-                  (bvref-8 gspace-bytes (1+ gspace-byte-offset))
-                  (ldb (byte 8 56) value))))
-         (:bits-47-32
-          (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
-                 (value (if (logbitp 31 value) (+ value (ash 1 32)) value)))
-            (setf (bvref-8 gspace-bytes gspace-byte-offset)
-                  (ldb (byte 8 32) value)
-                  (bvref-8 gspace-bytes (1+ gspace-byte-offset))
-                  (ldb (byte 8 40) value))))
-         (:ldah
-          (let ((value (if (logbitp 15 value) (+ value (ash 1 16)) value)))
-            (setf (bvref-8 gspace-bytes gspace-byte-offset)
-                  (ldb (byte 8 16) value)
-                  (bvref-8 gspace-bytes (1+ gspace-byte-offset))
-                  (ldb (byte 8 24) value))))
-         (:lda
-          (setf (bvref-8 gspace-bytes gspace-byte-offset)
-                (ldb (byte 8 0) value)
-                (bvref-8 gspace-bytes (1+ gspace-byte-offset))
-                (ldb (byte 8 8) value)))
-         (:absolute32
-          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
-      (:arm
-       (ecase kind
-         (:absolute
-          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
-      (:arm64
-       (ecase kind
-         (:absolute
-          (setf (bvref-64 gspace-bytes gspace-byte-offset) value))
-         (:cond-branch
-          (setf (ldb (byte 19 5)
-                     (bvref-32 gspace-bytes gspace-byte-offset))
-                (ash (- value (+ gspace-byte-address gspace-byte-offset))
-                     -2)))
-         (:uncond-branch
-          (setf (ldb (byte 26 0)
-                     (bvref-32 gspace-bytes gspace-byte-offset))
-                (ash (- value (+ gspace-byte-address gspace-byte-offset))
-                     -2)))))
-      (:hppa
-       (ecase kind
-         (:absolute
-          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))
-         (:load
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (logior (mask-field (byte 18 14)
-                                    (bvref-32 gspace-bytes gspace-byte-offset))
-                        (if (< value 0)
-                          (1+ (ash (ldb (byte 13 0) value) 1))
-                          (ash (ldb (byte 13 0) value) 1)))))
-         (:load11u
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (logior (mask-field (byte 18 14)
-                                    (bvref-32 gspace-bytes gspace-byte-offset))
-                        (if (< value 0)
-                          (1+ (ash (ldb (byte 10 0) value) 1))
-                          (ash (ldb (byte 11 0) value) 1)))))
-         (:load-short
-          (let ((low-bits (ldb (byte 11 0) value)))
-            (assert (<= 0 low-bits (1- (ash 1 4)))))
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (logior (ash (dpb (ldb (byte 4 0) value)
-                                  (byte 4 1)
-                                  (ldb (byte 1 4) value)) 17)
-                        (logand (bvref-32 gspace-bytes gspace-byte-offset)
-                                #xffe0ffff))))
-         (:hi
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (logior (mask-field (byte 11 21)
-                                    (bvref-32 gspace-bytes gspace-byte-offset))
-                        (ash (ldb (byte 5 13) value) 16)
-                        (ash (ldb (byte 2 18) value) 14)
-                        (ash (ldb (byte 2 11) value) 12)
-                        (ash (ldb (byte 11 20) value) 1)
-                        (ldb (byte 1 31) value))))
-         (:branch
-          (let ((bits (ldb (byte 9 2) value)))
-            (assert (zerop (ldb (byte 2 0) value)))
-            (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                  (logior (ash bits 3)
-                          (mask-field (byte 1 1) (bvref-32 gspace-bytes gspace-byte-offset))
-                          (mask-field (byte 3 13) (bvref-32 gspace-bytes gspace-byte-offset))
-                          (mask-field (byte 11 21) (bvref-32 gspace-bytes gspace-byte-offset))))))))
-      (:mips
-       (ecase kind
-         (:absolute
-          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))
-         (:jump
-          (assert (zerop (ash value -28)))
-          (setf (ldb (byte 26 0)
-                     (bvref-32 gspace-bytes gspace-byte-offset))
-                (ash value -2)))
-         (:lui
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (logior (mask-field (byte 16 16)
-                                    (bvref-32 gspace-bytes gspace-byte-offset))
-                        (ash (1+ (ldb (byte 17 15) value)) -1))))
-         (:addi
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (logior (mask-field (byte 16 16)
-                                    (bvref-32 gspace-bytes gspace-byte-offset))
-                        (ldb (byte 16 0) value))))))
-       ;; FIXME: PowerPC Fixups are not fully implemented. The bit
-       ;; here starts to set things up to work properly, but there
-       ;; needs to be corresponding code in ppc-vm.lisp
-       (:ppc
-        (ecase kind
-          (:absolute
-           (setf (bvref-32 gspace-bytes gspace-byte-offset) value))
-          (:ba
-           (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                 (dpb (ash value -2) (byte 24 2)
-                      (bvref-32 gspace-bytes gspace-byte-offset))))
-          (:ha
-           (let* ((un-fixed-up (bvref-16 gspace-bytes
-                                         (+ gspace-byte-offset 2)))
-                  (fixed-up (+ un-fixed-up value))
-                  (h (ldb (byte 16 16) fixed-up))
-                  (l (ldb (byte 16 0) fixed-up)))
-             (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
-                   (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
-          (:l
-           (let* ((un-fixed-up (bvref-16 gspace-bytes
-                                         (+ gspace-byte-offset 2)))
-                  (fixed-up (+ un-fixed-up value)))
-             (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
-                   (ldb (byte 16 0) fixed-up))))))
-      (:sparc
-       (ecase kind
-         (:call
-          (error "can't deal with call fixups yet"))
-         (:sethi
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (dpb (ldb (byte 22 10) value)
-                     (byte 22 0)
-                     (bvref-32 gspace-bytes gspace-byte-offset))))
-         (:add
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (dpb (ldb (byte 10 0) value)
-                     (byte 10 0)
-                     (bvref-32 gspace-bytes gspace-byte-offset))))
-         (:absolute
-          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
-      ((:x86 :x86-64)
+    (declare (ignorable gspace-byte-address))
+    #!-(or x86 x86-64)
+    (sb!vm::fixup-code-object code-object gspace-byte-offset value kind)
+    #!+(or x86 x86-64)
        ;; XXX: Note that un-fixed-up is read via bvref-word, which is
        ;; 64 bits wide on x86-64, but the fixed-up value is written
        ;; via bvref-32.  This would make more sense if we supported
        ;; :absolute64 fixups, but apparently the cross-compiler
        ;; doesn't dump them.
-       (let* ((un-fixed-up (bvref-word gspace-bytes
-                                               gspace-byte-offset))
-              (code-object-start-addr (logandc2 (descriptor-bits code-object)
-                                                sb!vm:lowtag-mask)))
-         (assert (= code-object-start-addr
-                  (+ gspace-byte-address
-                     (descriptor-byte-offset code-object))))
-         (ecase kind
+    (let* ((un-fixed-up (bvref-word gspace-bytes gspace-byte-offset))
+           (code-object-start-addr (logandc2 (descriptor-bits code-object)
+                                             sb!vm:lowtag-mask)))
+      (assert (= code-object-start-addr
+                 (+ gspace-byte-address (descriptor-byte-offset code-object))))
+      (ecase kind
            (:absolute
             (let ((fixed-up (+ value un-fixed-up)))
               (setf (bvref-32 gspace-bytes gspace-byte-offset)
@@ -2377,7 +2215,7 @@ core and return a descriptor to it."
               ;; a fixup.
               #!+x86
               (note-load-time-code-fixup code-object
-                                         after-header))))))))
+                                         after-header))))))
   code-object)
 
 (defun resolve-assembler-fixups ()

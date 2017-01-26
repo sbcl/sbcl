@@ -11,6 +11,7 @@
 
 (in-package "SB!VM")
 
+#-xc-xc-host (progn
 ;;; See x86-vm.lisp for a description of this.
 (define-alien-type os-context-t (struct os-context-t-struct))
 
@@ -19,7 +20,9 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "Alpha")
+) ; end PROGN
 
+(!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind)
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
@@ -51,7 +54,7 @@
         (setf (sap-ref-8 sap offset) (ldb (byte 8 0) value))
         (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))
        (:absolute32
-        (setf (sap-ref-32 sap offset) value))))))
+        (setf (sap-ref-32 sap offset) value)))))))
 
 ;;;; "sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
@@ -67,6 +70,7 @@
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
+#-sb-xc-host (progn
 (define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
   (context (* os-context-t)))
 
@@ -142,4 +146,4 @@
     (declare (type system-area-pointer pc))
     (values error-number
             (sb!kernel::decode-internal-error-args (sap+ pc 5) error-number))))
-
+) ; end PROGN

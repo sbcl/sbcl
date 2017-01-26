@@ -249,15 +249,15 @@
 
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
- #!+sparc ("src/code/sparc-vm" :not-host)
- #!+hppa  ("src/code/hppa-vm"  :not-host)
+ #!+sparc ("src/code/sparc-vm")
+ #!+hppa  ("src/code/hppa-vm")
  #!+x86   ("src/code/x86-vm"   :not-host)
  #!+x86-64("src/code/x86-64-vm"   :not-host)
- #!+ppc   ("src/code/ppc-vm"   :not-host)
- #!+alpha ("src/code/alpha-vm" :not-host)
- #!+mips  ("src/code/mips-vm"  :not-host)
- #!+arm   ("src/code/arm-vm" :not-host)
- #!+arm64 ("src/code/arm64-vm" :not-host)
+ #!+ppc   ("src/code/ppc-vm")
+ #!+alpha ("src/code/alpha-vm")
+ #!+mips  ("src/code/mips-vm")
+ #!+arm   ("src/code/arm-vm")
+ #!+arm64 ("src/code/arm64-vm")
 
  #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
  #!+win32 ("src/code/target-exception" :not-host)

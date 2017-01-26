@@ -2,6 +2,7 @@
 ;;;
 (in-package "SB!VM")
 
+#-sb-xc-host (progn
 ;;; See x86-vm.lisp for a description of this.
 ;;; FIXME: Why is this present in every ARCH-vm.lisp with the the same definition. Is there something like common-vm?
 (define-alien-type os-context-t (struct os-context-t-struct))
@@ -10,9 +11,11 @@
   #!+sb-doc
   "Return a string describing the type of the local machine."
   "ARM64")
+) ; end PROGN
 
 ;;;; FIXUP-CODE-OBJECT
 
+(!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
   (unless (zerop (rem offset 4))
@@ -27,13 +30,14 @@
                (ash (- fixup (+ (sap-int sap) offset)) -2)))
         (:uncond-branch
          (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
-               (ash (- fixup (+ (sap-int sap) offset)) -2)))))))
+               (ash (- fixup (+ (sap-int sap) offset)) -2))))))))
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
+#-sb-xc-host (progn
 (define-alien-routine ("os_context_register_addr" context-register-addr)
   (* unsigned-long)
   (context (* os-context-t))
@@ -106,3 +110,4 @@
             (if (= (ldb (byte 8 5) instruction) invalid-arg-count-trap)
                 '(#.arg-count-sc)
                 (sb!kernel::decode-internal-error-args (sap+ pc 4) error-number)))))
+) ; end PROGN

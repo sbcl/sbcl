@@ -2,6 +2,7 @@
 ;;;
 (in-package "SB!VM")
 
+#-sb-xc-host (progn
 (define-alien-type os-context-t (struct os-context-t-struct))
 
 
@@ -10,9 +11,11 @@
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "PowerPC")
+) ; end PROGN
 
 ;;;; FIXUP-CODE-OBJECT
 
+(!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))
@@ -41,12 +44,13 @@
                  (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
        (:l
         (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) fixup)))))))
+              (ldb (byte 16 0) fixup))))))))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
 
+#-sb-xc-host (progn
 (define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
   (context (* os-context-t)))
 
@@ -158,4 +162,4 @@
                          '(#.arg-count-sc)))))
           (t
            (values #.(error-number-or-lose 'unknown-error) nil)))))
-
+) ; end PROGN

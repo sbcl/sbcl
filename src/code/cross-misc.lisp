@@ -205,6 +205,8 @@
 (defun fdefn-p (x) (declare (ignore x)) nil)
 
 ;;; Needed for constant-folding
-(defun sb!sys:system-area-pointer-p (x) x nil) ; nothing is a SAP
+(defun system-area-pointer-p (x) x nil) ; nothing is a SAP
 ;;; Needed for DEFINE-MOVE-FUN LOAD-SYSTEM-AREA-POINTER
-(defun sb!sys:sap-int (x) (error "can't take SAP-INT ~S" x))
+(defun sap-int (x) (error "can't take SAP-INT ~S" x))
+;;; Needed for FIXUP-CODE-OBJECT
+(defmacro without-gcing (&body body) `(progn ,@body))

@@ -1,5 +1,6 @@
 (in-package "SB!VM")
 
+#-sb-xc-host (progn
 (define-alien-type os-context-t (struct os-context-t-struct))
 
 ;;;; MACHINE-TYPE
@@ -7,9 +8,10 @@
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "HPPA")
+) ; end PROGN
 
 ;;;; FIXUP-CODE-OBJECT
-;FIX-lav: unify code with genesis.lisp fixup
+(!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind)
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
@@ -50,8 +52,9 @@
                 (logior (ash bits 3)
                         (mask-field (byte 1 1) inst)
                         (mask-field (byte 3 13) inst)
-                        (mask-field (byte 11 21) inst)))))))))
+                        (mask-field (byte 11 21) inst))))))))))
 
+#-sb-xc-host (progn
 (define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
   (context (* os-context-t)))
 
@@ -96,3 +99,4 @@
     (declare (type system-area-pointer pc))
     (values error-number
             (sb!kernel::decode-internal-error-args (sap+ pc 5) error-number))))
+) ; end PROGN

@@ -3,6 +3,7 @@
 (in-package "SB!VM")
 
 
+#-sb-xc-host (progn
 (define-alien-type os-context-t (struct os-context-t-struct))
 (define-alien-type os-context-register-t unsigned-long-long)
 
@@ -12,9 +13,11 @@
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "MIPS")
+) ; end PROGN
 
 ;;;; FIXUP-CODE-OBJECT
 
+(!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind)
   (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))
@@ -33,9 +36,10 @@
               (ash (1+ (ash value -15)) -1)))
        (:addi
         (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) value)))))))
+              (ldb (byte 16 0) value))))))))
 
 
+#-sb-xc-host (progn
 (define-alien-routine ("os_context_pc_addr" context-pc-addr)
     (* os-context-register-t)
   (context (* os-context-t) :in))
@@ -120,3 +124,4 @@
     (values error-number
             (sb!kernel::decode-internal-error-args (sap+ pc (1+ offset))
                                                    error-number))))
+) ; end PROGN
