@@ -147,7 +147,9 @@
                            (declare (optimize safety)) (princ-to-string x) x))))
     (assert (ctu:find-named-callees f :name 'princ-to-string))))
 
-(with-test (:name :map-allocated-objects-no-consing :fails-on :ppc)
+(with-test (:name :map-allocated-objects-no-consing
+                  :skipped-on :sb-fasteval
+                  :fails-on :ppc)
   (let ((n 0))
     (sb-int:dx-flet ((f (obj type size)
                        (declare (ignore obj type size))
@@ -156,7 +158,8 @@
        (sb-vm::map-allocated-objects #'f :dynamic)
        5))))
 
-(with-test (:name :pack-varints-as-bignum)
+(with-test (:name :pack-varints-as-bignum
+                  :fails-on :sb-fasteval)
   (dotimes (i 500) ; do some random testing this many times
     (let* ((random-numbers (loop repeat (+ (random 20) 3)
                                  collect (1+ (random 4000))))
