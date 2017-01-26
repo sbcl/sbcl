@@ -178,7 +178,8 @@
 (defun generating-lisp (closure-variables args form)
   (let ((lambda `(lambda ,closure-variables
                    ,@(when (member 'miss-fn closure-variables)
-                           `((declare (type function miss-fn))))
+                       `((declare (type function miss-fn))))
+                   (declare (optimize (sb-c::eval-store-source-form 0)))
                    #'(lambda ,args
                        (let ()
                          (declare #.*optimize-speed*)

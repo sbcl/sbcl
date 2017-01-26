@@ -567,7 +567,8 @@
               (apply
                (let ((*compiling-optimized-constructor* t))
                  (handler-bind ((compiler-note #'muffle-warning))
-                   (compile nil `(lambda ,names ,form))))
+                   (compile nil `(lambda ,names (declare #.*optimize-speed*)
+                                   ,form))))
                locations)
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 

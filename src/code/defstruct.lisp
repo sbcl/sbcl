@@ -1063,6 +1063,7 @@ unless :NAMED is also specified.")))
 ;;; Return a LAMBDA form which can be used to set a slot
 (defun slot-setter-lambda-form (dd dsd)
   `(lambda (newval instance)
+     (declare (optimize (debug 0)))
      ,(slot-access-transform :setf '(instance newval) (cons dd dsd))))
 
 ;;; Blow away all the compiler info for the structure CLASS. Iterate
