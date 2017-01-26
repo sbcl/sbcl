@@ -131,27 +131,27 @@
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The
   ;; locations are in the order that the arguments are actually passed
-  ;; in, but special marker symbols can be interspersed to indicate
+  ;; in, but special negative numbers can be interspersed to indicate
   ;; the original call syntax:
   ;;
-  ;; DELETED
+  ;;  DEBUG-INFO-VAR-DELETED
   ;;    There was an argument to the function in this position, but it was
   ;;    deleted due to lack of references. The value cannot be recovered.
   ;;
-  ;; SUPPLIED-P
+  ;; DEBUG-INFO-VAR-SUPPLIED-P
   ;;    The following location is the supplied-p value for the preceding
   ;;    keyword or optional.
   ;;
-  ;; OPTIONAL-ARGS
+  ;; DEBUG-INFO-VAR-OPTIONAL
   ;;    Indicates that following unqualified args are optionals, not required.
   ;;
-  ;; REST-ARG
+  ;; DEBUG-INFO-VAR-REST
   ;;    The following location holds the list of rest args.
   ;;
-  ;; MORE-ARG
+  ;; DEBUG-INFO-VAR-MORE
   ;;    The following two locations are the more arg context and count.
   ;;
-  ;; <any other symbol>
+  ;; <symbol>
   ;;    The following location is the value of the &KEY argument with the
   ;;    specified name.
   ;;
