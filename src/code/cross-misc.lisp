@@ -203,3 +203,8 @@
 ;;; hosts.  It doesn't really matter what this function does: we don't
 ;;; have FDEFN objects on the host anyway.
 (defun fdefn-p (x) (declare (ignore x)) nil)
+
+;;; Needed for constant-folding
+(defun sb!sys:system-area-pointer-p (x) x nil) ; nothing is a SAP
+;;; Needed for DEFINE-MOVE-FUN LOAD-SYSTEM-AREA-POINTER
+(defun sb!sys:sap-int (x) (error "can't take SAP-INT ~S" x))

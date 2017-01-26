@@ -1013,7 +1013,7 @@
                     (:constructor %make-segment)
                     (:copier nil))
   (sap-maker (missing-arg)
-             :type (function () system-area-pointer))
+             :type (function () #-sb-xc-host system-area-pointer))
   ;; Length in bytes of the range of memory covered by this segment.
   (length 0 :type disassem-length)
   (virtual-location 0 :type address)
@@ -1034,7 +1034,7 @@
   ;; offset of next position
   (next-offs 0 :type offset)
   ;; a sap pointing to our segment
-  (segment-sap nil :type (or null system-area-pointer))
+  (segment-sap nil :type (or null #-sb-xc-host system-area-pointer))
   ;; the current segment
   (segment nil :type (or null segment))
   ;; to avoid buffer overrun at segment end, we might need to copy bytes

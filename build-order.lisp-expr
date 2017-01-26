@@ -86,7 +86,6 @@
  ("src/code/cross-char"  :not-target)
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
- ("src/code/cross-sap"   :not-target)
  ("src/code/cross-thread" :not-target)
  ("src/code/cross-condition" :not-target)
 
