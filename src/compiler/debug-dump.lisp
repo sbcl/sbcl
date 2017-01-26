@@ -432,7 +432,9 @@
           (prev-name nil)
           (id 0)
           (i 0)
-          (buffer (make-array 0 :fill-pointer 0 :adjustable t)))
+          (buffer (make-array 0 :fill-pointer 0 :adjustable t))
+          ;; XEPs don't have any useful variables
+          (minimal (eq (functional-kind fun) :external)))
       (declare (type (or simple-string null) prev-name)
                (type index id i))
       (dolist (x sorted)
@@ -442,7 +444,7 @@
                  (incf id))
                 (t
                  (setq id 0  prev-name name)))
-          (dump-1-var fun var (cdr x) id nil buffer)
+          (dump-1-var fun var (cdr x) id minimal buffer)
           (setf (gethash var var-locs) i)
           (incf i)))
       (coerce buffer 'simple-vector))))
