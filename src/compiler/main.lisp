@@ -1290,7 +1290,10 @@ necessary, since type inference may take arbitrarily long to converge.")
               ;; EVAL strategy of compiling everything inside (LAMBDA ()
               ;; ...).  -- CSR, 2002-11-02
               (when (core-object-p *compile-object*)
-                (fix-core-source-info *source-info* *compile-object* result))
+                (fix-core-source-info *source-info* *compile-object*
+                                      (and (policy (lambda-bind fun)
+                                               (> eval-store-source-form 0))
+                                           result)))
 
               (mapc #'clear-ir1-info components-from-dfo))))))))
 

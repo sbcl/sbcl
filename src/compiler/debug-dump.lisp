@@ -244,10 +244,10 @@
                           (file-info-name file-info))
                       file-info))
      :created (file-info-write-date file-info)
-
-     :form (let ((direct-file-info (source-info-file-info info)))
-             (when (eq :lisp (file-info-name direct-file-info))
-               (elt (file-info-forms direct-file-info) 0)))
+     :form (when function
+             (let ((direct-file-info (source-info-file-info info)))
+               (when (eq :lisp (file-info-name direct-file-info))
+                 (elt (file-info-forms direct-file-info) 0))))
      :function function)))
 
 (defun smallest-element-type (integer negative)
