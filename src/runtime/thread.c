@@ -479,6 +479,7 @@ new_thread_trampoline(struct thread *th)
 }
 
 static struct thread *create_thread_struct(lispobj);
+static void free_thread_struct(struct thread *th);
 
 void
 attach_os_thread(init_thread_data *scribble)
@@ -555,6 +556,7 @@ detach_os_thread(init_thread_data *scribble)
     odxprint(misc, "deattach_os_thread: detached");
     pthread_setspecific(lisp_thread, (void *)0);
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
+    free_thread_struct(th);
 }
 
 void
