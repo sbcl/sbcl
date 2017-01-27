@@ -43,16 +43,6 @@
 
 ;;;; :CODE-OBJECT fixups
 
-;;; a counter to measure the storage overhead of these fixups
-(defvar *num-fixups* 0)
-;;; FIXME: When the system runs, it'd be interesting to see what this is.
-
-(declaim (inline adjust-fixup-array))
-(defun adjust-fixup-array (array size)
-  (let ((new (make-array size :element-type '(unsigned-byte 32))))
-    (replace new array)
-    new))
-
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 ;;;
@@ -60,49 +50,20 @@
 ;;; code object.
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
-  (flet ((add-fixup (code offset)
-           ;; (We check for and ignore fixups for code objects in the
-           ;; read-only and static spaces. (In the old CMU CL code
-           ;; this check was conditional on *ENABLE-DYNAMIC-SPACE-CODE*,
-           ;; but in SBCL relocatable dynamic space code is always in
-           ;; use, so we always do the check.)
-           (incf *num-fixups*)
-           (let ((fixups (sb!vm::%code-fixups code)))
-             (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
-                    (let ((new-fixups
-                            (adjust-fixup-array fixups (1+ (length fixups)))))
-                      (setf (aref new-fixups (length fixups)) offset)
-                      (setf (sb!vm::%code-fixups code) new-fixups)))
-                   ((eql fixups 0)
-                    (setf (sb!vm::%code-fixups code)
-                          (make-array 1 :element-type '(unsigned-byte 32)
-                                        :initial-element offset)))
-                   (t
-                    (bug "FU'd fixups: ~S" fixups))))))
-    (without-gcing
-      (let* ((sap (truly-the system-area-pointer
-                             (code-instructions code)))
-             (obj-start-addr (logand (get-lisp-obj-address code)
-                                     #xfffffff8))
-             (code-start-addr (sap-int (code-instructions code)))
-             (code-end-addr (+ code-start-addr (%code-code-size code))))
-        (unless (member kind '(:absolute :relative))
-          (error "Unknown code-object-fixup kind ~S." kind))
+  (without-gcing
+   (when
+     (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))
+            (sap (code-instructions code))
+            (code-end-addr (+ (sap-int sap) (%code-code-size code))))
         (ecase kind
           (:absolute
            ;; Word at sap + offset contains a value to be replaced by
            ;; adding that value to fixup.
            (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
            ;; Record absolute fixups that point within the code object.
-           (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
-             (add-fixup code offset)))
+           (< obj-start-addr (sap-ref-32 sap offset) code-end-addr))
           (:relative
            ;; Fixup is the actual address wanted.
-           ;;
-           ;; Record relative fixups that point outside the code
-           ;; object.
-           (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
-             (add-fixup code offset))
            ;; Replace word with value to add to that loc to get there.
            (let* ((loc-sap (+ (sap-int sap) offset))
                   ;; Use modular arithmetic so that if the offset
@@ -111,8 +72,19 @@
                   (rel-val (ldb (byte 32 0)
                                 (- fixup loc-sap n-word-bytes))))
              (declare (type (unsigned-byte 32) loc-sap rel-val))
-             (setf (sap-ref-32 sap offset) rel-val))))))
-    nil))
+             (setf (sap-ref-32 sap offset) rel-val))
+           ;; Record relative fixups that point outside the code object.
+           (or (< fixup obj-start-addr) (> fixup code-end-addr)))))
+    ;; The preceding logic returns T if and only if the fixup
+    ;; should be preserved for re-fix-up when code is transported.
+    (setf (sb!vm::%code-fixups code)
+          (let ((fixups (sb!vm::%code-fixups code)))
+            (let* ((len (length (the (simple-array sb!vm:word 1) fixups)))
+                   (new (replace (make-array (1+ len) :element-type 'sb!vm:word)
+                                 fixups)))
+              (setf (aref new len) offset)
+              new)))))
+  nil)
 
 ;;;; low-level signal context access functions
 ;;;;

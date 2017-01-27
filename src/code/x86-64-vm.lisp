@@ -46,11 +46,9 @@
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 (defun fixup-code-object (code offset fixup kind)
-  (declare (type index offset)
-           (type (member :absolute :absolute64 :relative) kind))
+  (declare (type index offset))
   (without-gcing
-    (let ((sap (truly-the system-area-pointer
-                          (code-instructions code))))
+    (let ((sap (code-instructions code)))
       (ecase kind
         (:absolute64
          ;; Word at sap + offset contains a value to be replaced by

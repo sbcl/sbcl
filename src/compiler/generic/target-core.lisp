@@ -20,14 +20,18 @@
                            code-component) allocate-code-object))
 (defun allocate-code-object (#!+immobile-code immobile-p boxed unboxed)
   #!+gencgc
-  (without-gcing
-   (if (or #!+immobile-code immobile-p)
-       #!+immobile-code (sb!vm::allocate-immobile-code boxed unboxed)
-       #!-immobile-code nil
-       (%make-lisp-obj
-        (alien-funcall (extern-alien "alloc_code_object"
-                                     (function unsigned unsigned unsigned))
-                       boxed unboxed))))
+  (let ((code
+         (without-gcing
+          (if (or #!+immobile-code immobile-p)
+              #!+immobile-code (sb!vm::allocate-immobile-code boxed unboxed)
+              #!-immobile-code nil
+              (%make-lisp-obj
+               (alien-funcall (extern-alien "alloc_code_object"
+                                            (function unsigned unsigned unsigned))
+                              boxed unboxed))))))
+    #!+x86 (setf (sb!vm::%code-fixups code)
+                 #.(!coerce-to-specialized #() '(unsigned-byte 32)))
+    code)
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 
