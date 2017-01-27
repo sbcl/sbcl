@@ -50,7 +50,8 @@
 ;;; The reverse mapping is obtained by reading the META-INFO.
 (declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
 (!defglobal *info-types*
-            (make-array (ash 1 info-number-bits) :initial-element nil))
+            ;; Must be dumped as a literal for cold-load.
+            #.(make-array (ash 1 info-number-bits) :initial-element nil))
 
 (defstruct (meta-info
             (:constructor

@@ -63,7 +63,7 @@
     (sb!interpreter:interpreted-function (sb!interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(!defglobal *closure-name-marker* (make-symbol ".CLOSURE-NAME."))
+(!defglobal *closure-name-marker* '#.(make-symbol ".CLOSURE-NAME."))
 (defun closure-name (closure)
   (declare (closure closure))
   (let ((len (get-closure-length closure)))

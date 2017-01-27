@@ -63,19 +63,11 @@
 ;;; when writing out the cold core image.
 (macrolet ((def (wrapper real-name)
              `(defmacro ,wrapper (sym value &optional (doc nil doc-p))
-                `(progn (eval-when (:compile-toplevel)
-                          (!delayed-cold-set-symbol-value ',sym ',value))
-                        (,',real-name ,sym ,value ,@(if doc-p (list doc)))))))
+                `(progn (,',real-name ,sym ,value ,@(if doc-p (list doc)))
+                        #-sb-xc-host (sb!fasl::setq-no-questions-asked ,sym ,value)))))
   (def !defglobal defglobal)
   (def !defparameter defparameter)
   (def !defvar defvar))
-
-(defun !delayed-cold-set-symbol-value (symbol value-form)
-  ;; Obfuscate the reference into SB-COLD to avoid "bad package for target"
-  (let ((list (find-symbol "*SYMBOL-VALUES-FOR-GENESIS*" "SB-COLD")))
-    (set list (acons symbol
-                     (cons value-form (package-name *package*))
-                     (delete symbol (symbol-value list) :key #'car)))))
 
 (defmacro !set-load-form-method (class-name usable-by &optional method)
   ;; If USABLE-BY is:

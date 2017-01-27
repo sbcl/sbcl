@@ -20,7 +20,7 @@
                `(progn
                   (declaim ((simple-vector ,n) **internal-error-handlers**))
                   (!defglobal **internal-error-handlers**
-                    (make-array ,n :initial-element 0))))))
+                              ,(make-array n :initial-element 0))))))
   (def-it))
 
 (eval-when (:compile-toplevel :execute)

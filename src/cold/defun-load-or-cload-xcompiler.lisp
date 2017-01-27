@@ -18,15 +18,6 @@
 ;;; The table is populated later in this file.
 (defparameter *undefined-fun-whitelist* (make-hash-table :test 'equal))
 
-(defvar *symbol-values-for-genesis*)
-(export '*symbol-values-for-genesis*)
-(let ((pathname "output/init-symbol-values.lisp-expr"))
-  (setq *symbol-values-for-genesis*
-        (and (probe-file pathname) (read-from-file pathname)))
-  (defun save-initial-symbol-values ()
-    (with-open-file (f pathname :direction :output :if-exists :supersede)
-      (write *symbol-values-for-genesis* :stream f :readably t))))
-
 (when (make-host-1-parallelism)
   (require :sb-posix))
 #+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))

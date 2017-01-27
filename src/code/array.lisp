@@ -1770,8 +1770,19 @@ function to be removed without further warning."
            (error 'type-error
                   :datum (first args)
                   :expected-type '(simple-array * (*)))))
-       (!defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)
-                                          :initial-element #',error-name))
+       (!defglobal ,table-name ,(make-array (1+ sb!vm:widetag-mask)))
+
+       ;; This SUBSTITUTE call happens ** after ** all the SETFs below it.
+       ;; DEFGLOBAL's initial value is dumped by genesis as a vector filled
+       ;; with 0 (it would not work if the vector held function objects).
+       ;; Then the SETFs happen, as cold-load can process %SVSET, which
+       ;; is great, because it means that hairy sequence dispatch may occur
+       ;; as early as you'd like in cold-init without regard to file order.
+       ;; However when it comes to actually executing the toplevel forms
+       ;; that were compiled into thunks of target code to invoke,
+       ;; all the known good entries must be preserved.
+       (substitute #',error-name 0 ,table-name)
+
        ,@(loop for info across sb!vm:*specialized-array-element-type-properties*
                for typecode = (sb!vm:saetp-typecode info)
                for specifier = (sb!vm:saetp-specifier info)

@@ -211,7 +211,9 @@
                                   (typep value '(cons (member lambda function
                                                               named-lambda))))))
                       (and (eq function 'setq)
-                           (setq-fopcompilable-p (cdr form))))))))))
+                           (setq-fopcompilable-p (cdr form)))
+
+                      (eq function 'sb!fasl::setq-no-questions-asked))))))))
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
@@ -401,7 +403,7 @@
                            (loop for (arg . next) on args
                              do (fopcompile arg path
                                             (if next nil for-value-p)))))
-                      ((setq)
+                      ((setq #+sb-xc-host sb!fasl::setq-no-questions-asked)
                        (if (and for-value-p (endp args))
                            (fopcompile nil path t)
                            (loop for (name value . next) on args by #'cddr

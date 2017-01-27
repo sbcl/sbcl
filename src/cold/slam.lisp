@@ -52,4 +52,3 @@
                                         ".trace")
                            srcname))))
         (target-compile-stem stem flags)))))
-(save-initial-symbol-values)

@@ -1543,41 +1543,6 @@ core and return a descriptor to it."
     (aver (not (cold-null f)))
     f))
 
-;;; Create the effect of executing a (MAKE-ARRAY) call on the target.
-;;; This is for initializing a restricted set of vector constants
-;;; whose contents are typically function pointers.
-(defun emulate-target-make-array (form)
-  (destructuring-bind (size-expr &key initial-element) (cdr form)
-    (let* ((size (eval size-expr))
-           (result (allocate-vector-object *dynamic* sb!vm:n-word-bits size
-                                           sb!vm:simple-vector-widetag)))
-      (aver (integerp size))
-      (unless (eql initial-element 0)
-        (let ((target-initial-element
-               (etypecase initial-element
-                 ((cons (eql function) (cons symbol null))
-                  (target-symbol-function (second initial-element)))
-                 (null *nil-descriptor*)
-                 ;; Insert more types here ...
-                 )))
-          (dotimes (index size)
-            (cold-svset result (make-fixnum-descriptor index)
-                        target-initial-element))))
-      result)))
-
-;; Return a target object produced by emulating evaluation of EXPR
-;; with *package* set to ORIGINAL-PACKAGE.
-(defun emulate-target-eval (expr original-package)
-  (let ((*package* (find-package original-package)))
-    ;; For most things, just call EVAL and dump the host object's
-    ;; target representation. But with MAKE-ARRAY we allow that the
-    ;; initial-element might not be evaluable in the host.
-    ;; Embedded MAKE-ARRAY is kept as-is because we don't "look into"
-    ;; the EXPR, just hope that it works.
-    (if (typep expr '(cons (eql make-array)))
-        (emulate-target-make-array expr)
-        (host-constant-to-core (eval expr)))))
-
 ;;; Return a handle on an interned symbol. If necessary allocate the
 ;;; symbol and record its home package.
 (defun cold-intern (symbol
@@ -1609,12 +1574,9 @@ core and return a descriptor to it."
            pkg-info handle package symbol))
         #!+sb-thread
         (assign-tls-index symbol handle)
-        (acond ((eq package *keyword-package*)
-                (setq access :external)
-                (cold-set handle handle))
-               ((assoc symbol sb-cold:*symbol-values-for-genesis*)
-                (cold-set handle (destructuring-bind (expr . package) (cdr it)
-                                   (emulate-target-eval expr package)))))
+        (when (eq package *keyword-package*)
+          (setq access :external)
+          (cold-set handle handle))
         handle)))
 
 (defun record-accessibility (accessibility target-pkg-info symbol-descriptor
