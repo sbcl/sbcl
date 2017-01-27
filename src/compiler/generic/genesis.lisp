@@ -214,11 +214,11 @@
   ;; the word address where the data will be loaded
   (word-address (missing-arg) :type unsigned-byte :read-only t)
   ;; the gspace contents as a BIGVEC
-  (bytes (make-bigvec) :type bigvec :read-only t)
+  (data (make-bigvec) :type bigvec :read-only t)
   ;; the index of the next unwritten word (i.e. chunk of
-  ;; SB!VM:N-WORD-BYTES bytes) in BYTES, or equivalently the number of
-  ;; words actually written in BYTES. In order to convert to an actual
-  ;; index into BYTES, thus must be multiplied by SB!VM:N-WORD-BYTES.
+  ;; SB!VM:N-WORD-BYTES bytes) in DATA, or equivalently the number of
+  ;; words actually written in DATA. In order to convert to an actual
+  ;; index into DATA, thus must be multiplied by SB!VM:N-WORD-BYTES.
   (free-word-index 0))
 
 (defun gspace-byte-address (gspace)
@@ -317,9 +317,9 @@
     ;; Grow GSPACE as necessary until it's big enough to handle
     ;; NEW-FREE-WORD-INDEX.
     (do ()
-        ((>= (bvlength (gspace-bytes gspace))
+        ((>= (bvlength (gspace-data gspace))
              (* new-free-word-index sb!vm:n-word-bytes)))
-      (expand-bigvec (gspace-bytes gspace)))
+      (expand-bigvec (gspace-data gspace)))
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
@@ -388,7 +388,7 @@
 
 ;;; common idioms
 (defun descriptor-mem (des)
-  (gspace-bytes (descriptor-intuit-gspace des)))
+  (gspace-data (descriptor-intuit-gspace des)))
 (defun descriptor-byte-offset (des)
   (ash (descriptor-word-offset des) sb!vm:word-shift))
 
@@ -654,7 +654,7 @@ core and return a descriptor to it."
                                       sb!vm:n-byte-bits
                                       (1+ length)
                                       sb!vm:simple-base-string-widetag))
-         (bytes (gspace-bytes gspace))
+         (bytes (gspace-data gspace))
          (offset (+ (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
                     (descriptor-byte-offset des))))
     (write-wordindexed des
@@ -2120,12 +2120,12 @@ core and return a descriptor to it."
                 do-cold-fixup))
 (defun do-cold-fixup (code-object after-header value kind)
   (let* ((offset-within-code-object (calc-offset code-object after-header))
-         (gspace-bytes (descriptor-mem code-object))
+         (gspace-data (descriptor-mem code-object))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
                                 offset-within-code-object))
          (gspace-byte-address (gspace-byte-address
                                (descriptor-gspace code-object))))
-    (declare (ignorable gspace-byte-address))
+    (declare (ignorable gspace-data gspace-byte-address))
     #!-(or x86 x86-64)
     (sb!vm::fixup-code-object code-object gspace-byte-offset value kind)
     #!+(or x86 x86-64)
@@ -2134,7 +2134,7 @@ core and return a descriptor to it."
        ;; via bvref-32.  This would make more sense if we supported
        ;; :absolute64 fixups, but apparently the cross-compiler
        ;; doesn't dump them.
-    (let* ((un-fixed-up (bvref-word gspace-bytes gspace-byte-offset))
+    (let* ((un-fixed-up (bvref-word gspace-data gspace-byte-offset))
            (code-object-start-addr (logandc2 (descriptor-bits code-object)
                                              sb!vm:lowtag-mask)))
       (assert (= code-object-start-addr
@@ -2142,8 +2142,7 @@ core and return a descriptor to it."
       (ecase kind
            (:absolute
             (let ((fixed-up (+ value un-fixed-up)))
-              (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                    fixed-up)
+              (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
               ;; comment from CMU CL sources:
               ;;
               ;; Note absolute fixups that point within the object.
@@ -2162,22 +2161,19 @@ core and return a descriptor to it."
               ;; where all the code-objects are loaded.
               #!+x86
               (unless (< fixed-up code-object-start-addr)
-                (note-load-time-code-fixup code-object
-                                           after-header))))
+                (note-load-time-code-fixup code-object after-header))))
            (:relative ; (used for arguments to X86 relative CALL instruction)
             (let ((fixed-up (- (+ value un-fixed-up)
                                gspace-byte-address
                                gspace-byte-offset
                                4))) ; "length of CALL argument"
-              (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                    fixed-up)
+              (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
               ;; Note relative fixups that point outside the code
               ;; object, which is to say all relative fixups, since
               ;; relative addressing within a code object never needs
               ;; a fixup.
               #!+x86
-              (note-load-time-code-fixup code-object
-                                         after-header))))))
+              (note-load-time-code-fixup code-object after-header))))))
   code-object)
 
 (defun resolve-assembler-fixups ()
@@ -3465,7 +3461,7 @@ initially undefined function references:~2%")
     ;; be zero-filled. This will always be true under Mach on machines
     ;; where the page size is equal. (RT is 4K, PMAX is 4K, Sun 3 is
     ;; 8K).
-    (write-bigvec-as-sequence (gspace-bytes gspace)
+    (write-bigvec-as-sequence (gspace-data gspace)
                               *core-file*
                               :end total-bytes
                               :pad-with-zeros t)
