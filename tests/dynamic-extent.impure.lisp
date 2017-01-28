@@ -1309,3 +1309,23 @@
                            (sb-kernel:current-sp)))))
     (assert (sb-sys:sap= start end))
     (assert result)))
+
+
+(with-test (:name :unused-paremeters-of-an-inlined-function)
+  (let ((name (gensym "fun")))
+    (proclaim `(inline ,name))
+    (eval `(defun ,name (a b &optional c d)
+             (declare (ignore c d))
+             (cons a b)))
+    (assert (equal (funcall
+                    (funcall
+                     (checked-compile
+                      `(lambda ()
+                         (let ((x (cons
+                                   (,name 1 2)
+                                   (,name 2 3))))
+                           (declare (dynamic-extent x))
+                           (true x))
+                         #',name)))
+                    2 3)
+                   '(2 . 3)))))

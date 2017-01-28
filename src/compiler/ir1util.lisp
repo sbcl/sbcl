@@ -579,8 +579,10 @@
                        (when (lambda-p clambda1)
                          (dolist (var (lambda-vars clambda1) t)
                            (dolist (var-ref (lambda-var-refs var))
-                             (let ((dest (principal-lvar-dest (ref-lvar var-ref))))
-                               (unless (and (combination-p dest) (recurse dest))
+                             (let* ((lvar (ref-lvar var-ref))
+                                    (dest (and lvar (principal-lvar-dest lvar))))
+                               (unless (or (not dest)
+                                           (and (combination-p dest) (recurse dest)))
                                  (return-from combination-args-flow-cleanly-p nil)))))))))))
     (recurse combination1)))
 
