@@ -420,51 +420,52 @@
 ;;;; final decision on stack allocation of dynamic-extent structures
 (defun recheck-dynamic-extent-lvars (component)
   (declare (type component component))
-  (dolist (lambda (component-lambdas component))
-    (loop for entry in (lambda-entries lambda)
-          for cleanup = (entry-cleanup entry)
-          do (when (eq (cleanup-kind cleanup) :dynamic-extent)
-               (collect ((real-dx-lvars))
-                 (loop for what in (cleanup-info cleanup)
-                       do (etypecase what
-                            (cons
-                             (let ((dx (car what))
-                                   (lvar (cdr what)))
-                               (cond ((lvar-good-for-dx-p lvar dx component)
-                                      ;; Since the above check does deep
-                                      ;; checks. we need to deal with the deep
-                                      ;; results in here as well.
-                                      (dolist (cell (handle-nested-dynamic-extent-lvars
-                                                     dx lvar component))
-                                        (let ((real (principal-lvar (cdr cell))))
-                                          (setf (lvar-dynamic-extent real) cleanup)
-                                          (real-dx-lvars real))))
-                                     (t
-                                      (note-no-stack-allocation lvar)
-                                      (setf (lvar-dynamic-extent lvar) nil)))))
-                            (node       ; DX closure
-                             (let* ((call what)
-                                    (arg (first (basic-combination-args call)))
-                                    (funs (lvar-value arg))
-                                    (dx nil))
-                               (dolist (fun funs)
-                                 (binding* ((() (leaf-dynamic-extent fun)
-                                             :exit-if-null)
-                                            (xep (functional-entry-fun fun)
-                                                 :exit-if-null)
-                                            (closure (physenv-closure
-                                                      (get-lambda-physenv xep))))
-                                   (cond (closure
-                                          (setq dx t))
-                                         (t
-                                          (setf (leaf-extent fun) nil)))))
-                               (when dx
-                                 (setf (lvar-dynamic-extent arg) cleanup)
-                                 (real-dx-lvars arg))))))
-                 (let ((real-dx-lvars (delete-duplicates (real-dx-lvars))))
-                   (setf (cleanup-info cleanup) real-dx-lvars)
-                   (setf (component-dx-lvars component)
-                         (append real-dx-lvars (component-dx-lvars component))))))))
+  (let (*dx-combination-p-check-local*) ;; catch unconverted combinations
+    (dolist (lambda (component-lambdas component))
+      (loop for entry in (lambda-entries lambda)
+            for cleanup = (entry-cleanup entry)
+            do (when (eq (cleanup-kind cleanup) :dynamic-extent)
+                 (collect ((real-dx-lvars))
+                   (loop for what in (cleanup-info cleanup)
+                         do (etypecase what
+                              (cons
+                               (let ((dx (car what))
+                                     (lvar (cdr what)))
+                                 (cond ((lvar-good-for-dx-p lvar dx component)
+                                        ;; Since the above check does deep
+                                        ;; checks. we need to deal with the deep
+                                        ;; results in here as well.
+                                        (dolist (cell (handle-nested-dynamic-extent-lvars
+                                                       dx lvar component))
+                                          (let ((real (principal-lvar (cdr cell))))
+                                            (setf (lvar-dynamic-extent real) cleanup)
+                                            (real-dx-lvars real))))
+                                       (t
+                                        (note-no-stack-allocation lvar)
+                                        (setf (lvar-dynamic-extent lvar) nil)))))
+                              (node     ; DX closure
+                               (let* ((call what)
+                                      (arg (first (basic-combination-args call)))
+                                      (funs (lvar-value arg))
+                                      (dx nil))
+                                 (dolist (fun funs)
+                                   (binding* ((() (leaf-dynamic-extent fun)
+                                               :exit-if-null)
+                                              (xep (functional-entry-fun fun)
+                                                   :exit-if-null)
+                                              (closure (physenv-closure
+                                                        (get-lambda-physenv xep))))
+                                     (cond (closure
+                                            (setq dx t))
+                                           (t
+                                            (setf (leaf-extent fun) nil)))))
+                                 (when dx
+                                   (setf (lvar-dynamic-extent arg) cleanup)
+                                   (real-dx-lvars arg))))))
+                   (let ((real-dx-lvars (delete-duplicates (real-dx-lvars))))
+                     (setf (cleanup-info cleanup) real-dx-lvars)
+                     (setf (component-dx-lvars component)
+                           (append real-dx-lvars (component-dx-lvars component)))))))))
   (values))
 
 ;;;; cleanup emission

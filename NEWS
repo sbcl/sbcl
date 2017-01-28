@@ -25,6 +25,8 @@ changes relative to sbcl-1.3.14:
     same interned symbol to multiple threads if called concurrently
   * bug fix: interrupting LOADing of FASLs does not leave functions without
     source locations. (lp#540276)
+  * bug fix: DYNAMIC-EXTENT-declared results of NOTINLINE local functions were
+    treated as if they were actually stack allocated (lp#1659964)
 
 changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes

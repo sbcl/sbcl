@@ -542,6 +542,10 @@
                                          (nth it args))
                                      dx)))))))
 
+;;; Bound to NIL in RECHECK-DYNAMIC-EXTENT-LVARS, so that the
+;;; combinations that didn't get converted are treated as dx-safe.
+(defvar *dx-combination-p-check-local* t)
+
 (defun dx-combination-p (use dx)
   (and (combination-p use)
        (or
@@ -549,17 +553,18 @@
         (known-dx-combination-p use dx)
         ;; Possibly a not-yet-eliminated lambda which ends up returning the
         ;; results of an actual known DX combination.
-        (let* ((fun (combination-fun use))
-               (ref (principal-lvar-use fun))
-               (clambda (when (ref-p ref)
-                          (ref-leaf ref)))
-               (creturn (when (lambda-p clambda)
-                          (lambda-return clambda)))
-               (result-use (when (return-p creturn)
-                             (principal-lvar-use (return-result creturn)))))
-          ;; FIXME: We should be able to deal with multiple uses here as well.
-          (and (dx-combination-p result-use dx)
-               (combination-args-flow-cleanly-p use result-use dx))))))
+        (and *dx-combination-p-check-local*
+             (let* ((fun (combination-fun use))
+                    (ref (principal-lvar-use fun))
+                    (clambda (when (ref-p ref)
+                               (ref-leaf ref)))
+                    (creturn (when (lambda-p clambda)
+                               (lambda-return clambda)))
+                    (result-use (when (return-p creturn)
+                                  (principal-lvar-use (return-result creturn)))))
+               ;; FIXME: We should be able to deal with multiple uses here as well.
+               (and (dx-combination-p result-use dx)
+                    (combination-args-flow-cleanly-p use result-use dx)))))))
 
 (defun combination-args-flow-cleanly-p (combination1 combination2 dx)
   (labels ((recurse (combination)
