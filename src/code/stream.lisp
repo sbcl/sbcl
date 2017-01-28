@@ -1344,6 +1344,7 @@
 ;;;; FIXME: It would be nice to support space-efficient
 ;;;; string-output-streams with element-type base-char. This would
 ;;;; mean either a separate subclass, or typecases in functions.
+;;;; (Partially done, but only for bounded amount of output)
 
 (defconstant +string-output-stream-buffer-initial-size+ 64)
 
@@ -1385,6 +1386,17 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (if (csubtypep (specifier-type element-type) (specifier-type 'character))
       (%make-string-output-stream element-type)
       (error "~S is not a subtype of CHARACTER" element-type)))
+
+(defstruct (finite-base-string-output-stream
+            (:include ansi-stream
+                      (out #'finite-base-string-ouch)
+                      (misc #'finite-base-string-out-misc))
+            (:constructor %make-finite-base-string-output-stream (buffer))
+            (:copier nil)
+            (:predicate nil))
+  (buffer nil :type simple-base-string :read-only t)
+  (pointer 0 :type index))
+(declaim (freeze-type finite-base-string-output-stream))
 
 ;;; Pushes the current segment onto the prev-list, and either pops
 ;;; or allocates a new one.
@@ -1637,6 +1649,21 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (frob (simple-array nil (*)))))))
 
     result))
+
+(defun finite-base-string-ouch (stream character)
+  (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+  (let ((pointer (finite-base-string-output-stream-pointer stream))
+        (buffer (finite-base-string-output-stream-buffer stream)))
+    (cond ((= pointer (length buffer))
+           (bug "Should not happen"))
+          (t
+           (setf (char buffer pointer) (truly-the base-char character)
+                 (finite-base-string-output-stream-pointer stream)
+                 (truly-the index (1+ pointer)))))))
+
+(defun finite-base-string-out-misc (stream operation &optional arg1 arg2)
+  (declare (ignore stream operation arg1 arg2))
+  (error "finite-base-string-out-misc needs an implementation"))
 
 ;;;; fill-pointer streams
 

@@ -1895,6 +1895,7 @@
 (defknown (ill-in ill-bin ill-out ill-bout
            sb!impl::string-inch sb!impl::string-in-misc
            sb!impl::string-ouch sb!impl::string-sout sb!impl::string-out-misc
+           sb!impl::finite-base-string-ouch sb!impl::finite-base-string-out-misc
            sb!impl::fill-pointer-ouch sb!impl::fill-pointer-sout
            sb!impl::fill-pointer-misc
            sb!impl::case-frob-upcase-out sb!impl::case-frob-upcase-sout

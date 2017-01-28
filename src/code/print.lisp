@@ -205,8 +205,44 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; This produces the printed representation of an object as a string.
 ;;; The few ...-TO-STRING functions above call this.
 (defun stringify-object (object)
-  (with-simple-output-to-string (stream)
-    (output-object object stream)))
+  (typecase object
+    (integer
+     (let ((buffer-size (approx-chars-in-repr object)))
+       (let* ((string (make-string buffer-size :element-type 'base-char))
+              (stream (%make-finite-base-string-output-stream string)))
+         (declare (inline %make-finite-base-string-output-stream))
+         (declare (truly-dynamic-extent stream))
+         (output-integer object stream)
+         (%shrink-vector string
+                         (finite-base-string-output-stream-pointer stream)))))
+    ;; Could do something for other numeric types, symbols, ...
+    (t
+     (with-simple-output-to-string (stream)
+       (output-object object stream)))))
+
+;;; Estimate the number of chars in the printed representation of OBJECT.
+;;; The answer must be an overestimate or exact; never an underestimate.
+(defun approx-chars-in-repr (object)
+  (declare (integer object))
+  ;; Round *PRINT-BASE* down to the nearest lower power-of-2, call that N,
+  ;; and "guess" that the one character can represent N bits.
+  ;; This is exact for bases which are exactly a power-of-2, or an overestimate
+  ;; otherwise, as mandated by the finite output stream.
+  (let ((bits-per-char
+         (aref #.(!coerce-to-specialized
+                  ;; base 2 or base 3  = 1 bit per character
+                  ;; base 4 .. base 7  = 2 bits per character
+                  ;; base 8 .. base 15 = 3 bits per character, etc
+                  #(1 1 2 2 2 2 3 3 3 3 3 3 3 3
+                    4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 5 5 5 5 5)
+                  '(unsigned-byte 8))
+               (- *print-base* 2))))
+    (+ (if (minusp object) 1 0) ; leading sign
+       (if *print-radix* 4 0) ; #rNN or trailing decimal
+       (ceiling (if (fixnump object)
+                    sb!vm:n-positive-fixnum-bits
+                    (* (%bignum-length object) sb!bignum::digit-size))
+                bits-per-char))))
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
@@ -1099,11 +1135,12 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defun output-integer (integer stream)
   (let ((base *print-base*))
-    (when (and (/= base 10) *print-radix*)
-      (%output-radix base stream))
-    (%output-integer-in-base integer base stream)
-    (when (and *print-radix* (= base 10))
-      (write-char #\. stream))))
+    (cond (*print-radix*
+           (unless (= base 10) (%output-radix base stream))
+           (%output-integer-in-base integer base stream)
+           (when (= base 10) (write-char #\. stream)))
+          (t
+           (%output-integer-in-base integer base stream)))))
 
 (defun output-ratio (ratio stream)
   (let ((base *print-base*))
