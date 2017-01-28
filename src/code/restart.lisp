@@ -9,38 +9,11 @@
 
 (in-package "SB!KERNEL")
 
-;;; A comment formerly here about "for DX allocation" was incredibly misleading.
-;;; We (apparently) never want DX allocation of restarts, except in
-;;; INITIAL-THREAD-FUNCTION-TRAMPOLINE where we do, but only "accidentally".
-;;; The accident is that if there is exactly ONE escape point, or there is more
-;;; than one and they all return the same fixed number of values,
-;;; then the generated code is right. If they don't, there's a problem.
-
-;;; So, following this DEFSTRUCT was a NOTINLINE proclamation, which we need,
-;;; because now that the compiler is smart enough to inline any structure
-;;; constructor anywhere, it can and does. I'm puzzled why, because I thought
-;;; the way this worked was that a local INLINE declaration would always
-;;; "succeed" in finding an inline expansion, but I didn't think that the
-;;; compiler would actually choose of its own free will to do local inlining,
-;;; even though the standard says that's what it *can* do unless told not to.
-
-;;; Then, if it does inline MAKE-RESTART, a problem occurs in RESTART-BIND
-;;; with a TRULY-DYNAMIC-EXTENT declaration, because restarts go on the stack
-;;; that can't. But I think that itself is a bug. They *should* go on the stack,
-;;; because the chain of cons cells pointing to them is on the stack.
-;;; The restarts are otherwise inaccessible. I'm pretty sure this
-;;; is actually a compiler bug.
-
-;;; So in a nutshell, there are 2 issues:
-;;; (1) DX seems legitimate, but there may be a compiler bug.
-;;; (2) The logic about when to assume that a structure constructor
-;;;     can automatically be inlined is tricker than its author understands.
-
-(declaim (notinline make-restart))
+#!+stack-allocatable-fixed-objects
+(declaim (inline make-restart)) ;; to allow DX-allocation
 
 ;;;; This defstruct should appear before any use of WITH-CONDITION-RESTARTS
 ;;;; so that the slot accessors are transformed.
-
 (defstruct (restart (:constructor make-restart
                         ;; Having TEST-FUNCTION at the end allows
                         ;; to not replicate its default value in RESTART-BIND.

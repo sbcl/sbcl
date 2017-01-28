@@ -1461,7 +1461,6 @@ session."
          (sb!impl::*token-buf-pool* nil)
          (sb!impl::*ignored-package-locks* :invalid)
          (sb!impl::*descriptor-handlers* nil)) ; serve-event
-    (declare (inline make-restart)) ;; to allow DX-allocation
     ;; Binding from C
     (setf sb!vm:*alloc-signal* *default-alloc-signal*)
     (setf (thread-os-thread thread) (current-thread-os-thread))
