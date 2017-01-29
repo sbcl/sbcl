@@ -433,6 +433,22 @@
       (values nil t)
       (allocate-instance->constructor-call class)))
 
+;;; Build an inline cache: a CONS, with the actual cache in the CDR.
+(defun make-ctor-inline-cache-form
+    (ensure-ctor-name class-arg &optional ensure-ctor-args ctor-args)
+  `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.))
+     (binding* ((.cache. (load-time-value (cons 'ctor-cache nil)))
+                (.store. (cdr .cache.))
+                (.class-arg. ,class-arg)
+                ((.fun. .new-store.)
+                 (,ensure-ctor-name .class-arg. .store. ,@ensure-ctor-args)))
+       ;; Thread safe: if multiple threads hit this in parallel, the
+       ;; update from the other one is just lost -- no harm done,
+       ;; except for the need to redo the work next time.
+       (unless (eq .store. .new-store.)
+         (setf (cdr .cache.) .new-store.))
+       (funcall .fun. ,@ctor-args))))
+
 (defun allocate-instance->constructor-call (class-arg)
   (let ((constant-class (if (classp class-arg)
                             class-arg
@@ -451,19 +467,7 @@
           ;; function to an optimized constructor function.
           `(funcall (load-time-value
                      (ensure-allocator ',function-name ',class-or-name) t)))
-        `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.))
-           (let* ((.cache. (load-time-value (cons 'ctor-cache nil)))
-                  (.store. (cdr .cache.))
-                  (.class-arg. ,class-arg))
-             (multiple-value-bind (.fun. .new-store.)
-                 (ensure-cached-allocator .class-arg. .store.)
-               ;; Thread safe: if multiple threads hit this in
-               ;; parallel, the update from the other one is
-               ;; just lost -- no harm done, except for the need
-               ;; to redo the work next time.
-               (unless (eq .store. .new-store.)
-                 (setf (cdr .cache.) .new-store.))
-               (funcall .fun.)))))))
+        (make-ctor-inline-cache-form 'ensure-cached-allocator class-arg))))
 
 (defun make-instance->constructor-call (form safe-code-p)
   (destructuring-bind (class-arg &rest args) (cdr form)
@@ -520,22 +524,8 @@
                          t)
                         ,@value-forms))
             (when (and class-arg (not (constantp class-arg)))
-              ;; Build an inline cache: a CONS, with the actual cache
-              ;; in the CDR.
-              `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.
-                                                        make-instance))
-                 (let* ((.cache. (load-time-value (cons 'ctor-cache nil)))
-                        (.store. (cdr .cache.))
-                        (.class-arg. ,class-arg))
-                   (multiple-value-bind (.fun. .new-store.)
-                       (ensure-cached-ctor .class-arg. .store. ',initargs ',safe-code-p)
-                     ;; Thread safe: if multiple threads hit this in
-                     ;; parallel, the update from the other one is
-                     ;; just lost -- no harm done, except for the need
-                     ;; to redo the work next time.
-                     (unless (eq .store. .new-store.)
-                       (setf (cdr .cache.) .new-store.))
-                     (funcall .fun. ,@value-forms))))))))))
+              (make-ctor-inline-cache-form
+               'ensure-cached-ctor class-arg `(',initargs ',safe-code-p) value-forms)))))))
 
 ;;; **************************************************
 ;;; Load-Time Constructor Function Generation  *******
