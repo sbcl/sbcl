@@ -142,3 +142,31 @@
          (g (eval `(defun ,(gensym) ()))))
     (eval `(defun h () (,f) (,g))))
   (sb-kernel::order-by-in-degree))
+
+(defparameter *pin-test-object* nil)
+(defparameter *pin-test-object-address* nil)
+
+(with-test (:name (sb-sys:with-pinned-objects :actually-pins-objects)
+                  :fails-on '(and (or :x86 :x86-64)
+                                  :interpreter)
+                  :skipped-on ':cheneygc)
+  ;; Under certain circumstances (x86oids running the interpreter),
+  ;; WITH-PINNED-OBJECTS may be a no-op.  We know that cheneygc is not
+  ;; affected (because cheneygc WITH-PINNED-OBJECTS devolves to
+  ;; WITHOUT-GCING), and non-x86oid targets are vastly unlikely to be
+  ;; affected (because non-x86oid gencgc uses an explicit pin list),
+  ;; but x86oids use some magic to force the compiler to store
+  ;; references to the object on the stack.
+  ;;
+  ;; Our basic approach is to allocate some kind of object and stuff
+  ;; it where it doesn't need to be on the control stack.  We then pin
+  ;; the object, take its address and store that somewhere as well,
+  ;; force a full GC, re-take the address, and see if it moved.
+  (locally (declare (notinline make-string)) ;; force full call
+    (setf *pin-test-object* (make-string 100)))
+  (sb-sys:with-pinned-objects (*pin-test-object*)
+    (setf *pin-test-object-address*
+          (sb-kernel:get-lisp-obj-address *pin-test-object*))
+    (gc :full t)
+    (assert (= (sb-kernel:get-lisp-obj-address *pin-test-object*)
+               *pin-test-object-address*))))
