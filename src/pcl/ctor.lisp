@@ -177,6 +177,9 @@
                (mapcar #'arg-name list))))
     (list* 'ctor class-name safe-code-p (munge initargs))))
 
+(declaim (ftype (sfunction * function)
+                ensure-ctor ensure-allocator))
+
 ;;; Keep this a separate function for testing.
 (defun ensure-ctor (function-name class-name initargs safe-code-p)
   (with-world-lock ()
@@ -342,6 +345,9 @@
       (setf table (nth-value 1 (put-ctor ctor table))))
     table))
 
+(declaim (ftype (function * (values function t &optional))
+                ensure-cached-ctor ensure-cached-allocator))
+
 (defun ensure-cached-ctor (class-name store initargs safe-code-p)
   (flet ((maybe-ctor-for-caching ()
            (if (typep class-name '(or symbol class))
@@ -443,9 +449,8 @@
           ;; Return code constructing a ctor at load time, which,
           ;; when called, will set its funcallable instance
           ;; function to an optimized constructor function.
-          `(funcall (truly-the function
-                               (load-time-value
-                                (ensure-allocator ',function-name ',class-or-name) t))))
+          `(funcall (load-time-value
+                     (ensure-allocator ',function-name ',class-or-name) t)))
         `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.))
            (let* ((.cache. (load-time-value (cons 'ctor-cache nil)))
                   (.store. (cdr .cache.))
@@ -458,7 +463,7 @@
                ;; to redo the work next time.
                (unless (eq .store. .new-store.)
                  (setf (cdr .cache.) .new-store.))
-               (funcall (truly-the function .fun.))))))))
+               (funcall .fun.)))))))
 
 (defun make-instance->constructor-call (form safe-code-p)
   (destructuring-bind (class-arg &rest args) (cdr form)
@@ -509,11 +514,10 @@
               ;; Return code constructing a ctor at load time, which,
               ;; when called, will set its funcallable instance
               ;; function to an optimized constructor function.
-              `(funcall (truly-the function
-                                   (load-time-value
-                                    (ensure-ctor ',function-name ',class-or-name ',initargs
-                                                 ',safe-code-p)
-                                    t))
+              `(funcall (load-time-value
+                         (ensure-ctor ',function-name ',class-or-name ',initargs
+                                      ',safe-code-p)
+                         t)
                         ,@value-forms))
             (when (and class-arg (not (constantp class-arg)))
               ;; Build an inline cache: a CONS, with the actual cache
@@ -531,7 +535,7 @@
                      ;; to redo the work next time.
                      (unless (eq .store. .new-store.)
                        (setf (cdr .cache.) .new-store.))
-                     (funcall (truly-the function .fun.) ,@value-forms))))))))))
+                     (funcall .fun. ,@value-forms))))))))))
 
 ;;; **************************************************
 ;;; Load-Time Constructor Function Generation  *******
