@@ -275,6 +275,8 @@ in regs.  Returns a (simple-array (unsigned-byte 8) (16))."
   (let ((result (make-array 16 :element-type '(unsigned-byte 8))))
     (declare (type (simple-array (unsigned-byte 8) (16)) result))
     (macrolet ((frob (reg offset)
+                 ;; Avoid efficiency notes.
+                 (declare (optimize (speed 1) (safety 1) (space 1) (debug 1)))
                  (let ((var (gensym)))
                    `(let ((,var ,reg))
                       (declare (type ub32 ,var))
