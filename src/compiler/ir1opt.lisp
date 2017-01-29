@@ -2254,9 +2254,9 @@
       ;; LVAR have the same dynamic-extent environment.  The
       ;; conservative version of this is that there are no EXITs for
       ;; any ENTRY introduced between the LEXENV of the deleted EXIT
-      ;; and the LEXENV of the target ENTRY and that both the LEXENV
-      ;; of the deleted EXIT and the LEXENV of the ENTRY have the same
-      ;; set of :DYNAMIC-EXTENT variables and functions.
+      ;; and the LEXENV of the target ENTRY and that there is no
+      ;; :DYNAMIC-EXTENT cleanup between the deleted EXIT and the
+      ;; target ENTRY (which the CAST shares a lexenv with).
       (let* ((entry-lexenv (cast-vestigial-exit-entry-lexenv cast))
              (entry-blocks (lexenv-blocks entry-lexenv))
              (entry-tags (lexenv-tags entry-lexenv)))
@@ -2268,23 +2268,14 @@
             ((eq current-tag entry-tags))
           (when (entry-exits (cadar current-tag))
             (return-from may-delete-vestigial-exit nil)))
-        (do ((vars (lexenv-vars exit-lexenv) (cdr vars)))
-            ((eq vars (lexenv-vars entry-lexenv)))
-          ;; (CDAR VARS) is the actual variable we're looking at,
-          ;; except that if it's a symbol-macro then it's (MACRO
-          ;; . <form>), and that's not a leaf, so ignore the
-          ;; non-LEAF-P variables.
-          (when (and (leaf-p (cdar vars))
-                     (leaf-dynamic-extent (cdar vars)))
-            (return-from may-delete-vestigial-exit nil)))
-        (do ((funs (lexenv-funs exit-lexenv) (cdr funs)))
-            ((eq funs (lexenv-funs entry-lexenv)))
-          ;; Like with VARS, we can have FUNS of the form (MACRO
-          ;; . <something>), though in this case it's an expander
-          ;; function.  Again, ignore the non-LEAF-P functions.
-          (when (and (leaf-p (cdar funs))
-                     (leaf-dynamic-extent (cdar funs)))
-            (return-from may-delete-vestigial-exit nil))))))
+        (let ((entry-cleanup (block-start-cleanup (node-block cast)))
+              (exit-block (car (block-pred (node-block cast)))))
+          (do-nested-cleanups (cleanup exit-block)
+            (when (eq cleanup entry-cleanup)
+              (return))
+            (when (eq (cleanup-kind cleanup)
+                      :dynamic-extent)
+              (return-from may-delete-vestigial-exit nil)))))))
   (values t))
 
 (defun compile-time-type-error-context (context)

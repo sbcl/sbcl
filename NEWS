@@ -27,6 +27,9 @@ changes relative to sbcl-1.3.14:
     source locations. (lp#540276)
   * bug fix: DYNAMIC-EXTENT-declared results of NOTINLINE local functions were
     treated as if they were actually stack allocated (lp#1659964)
+  * bug fix: correctly handle the case of a non-local exit within a function
+    terminating the extent of dynamic-extent, dynamic-bound variables in the
+    presence of multiple-values (lp#1655011)
 
 changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes
