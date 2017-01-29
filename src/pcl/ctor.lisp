@@ -450,24 +450,23 @@
        (funcall .fun. ,@ctor-args))))
 
 (defun allocate-instance->constructor-call (class-arg)
-  (let ((constant-class (if (classp class-arg)
-                            class-arg
-                            (and (proper-list-of-length-p class-arg 2)
-                                 (eq (car class-arg) 'find-class)
-                                 (proper-list-of-length-p (cadr class-arg) 2)
-                                 (eq (caadr class-arg) 'quote)
-                                 (symbolp (cadadr class-arg))
-                                 (cadadr class-arg)))))
-    (if constant-class
-        (let* ((class-or-name constant-class)
-               (function-name (list 'ctor 'allocator class-or-name)))
-          (sb-int:check-deprecated-type class-or-name)
-          ;; Return code constructing a ctor at load time, which,
-          ;; when called, will set its funcallable instance
-          ;; function to an optimized constructor function.
-          `(funcall (load-time-value
-                     (ensure-allocator ',function-name ',class-or-name) t)))
-        (make-ctor-inline-cache-form 'ensure-cached-allocator class-arg))))
+  (flet ((make-allocator-form (class-or-name)
+           (sb-int:check-deprecated-type class-or-name)
+           (let ((function-name (list 'ctor 'allocator class-or-name)))
+             ;; Return code constructing a ctor at load time, which,
+             ;; when called, will set its funcallable instance
+             ;; function to an optimized constructor function.
+             `(funcall (load-time-value
+                        (ensure-allocator ',function-name ',class-or-name) t)))))
+    (cond
+      ((classp class-arg)
+       (make-allocator-form class-arg))
+      ((typep class-arg '(cons (eql find-class)
+                               (cons (cons (eql quote) (cons symbol null)) null)))
+       (let ((class-name (second (second class-arg))))
+         (make-allocator-form class-name)))
+      (t
+       (make-ctor-inline-cache-form 'ensure-cached-allocator class-arg)))))
 
 (defun make-instance->constructor-call (form safe-code-p)
   (destructuring-bind (class-arg &rest args) (cdr form)
