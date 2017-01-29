@@ -314,6 +314,9 @@
                      (list (initarg-error-initargs condition))
                      (initarg-error-class condition)))))
 
+(defun initarg-error (class invalid-keys)
+  (error 'initarg-error :class class :initargs invalid-keys))
+
 (defun check-initargs-2-plist (initargs class legal &optional (error-p t))
   (let ((invalid-keys ()))
     (unless (getf initargs :allow-other-keys)
@@ -325,7 +328,7 @@
                     (eq key :allow-other-keys))
           (push key invalid-keys)))
       (when (and invalid-keys error-p)
-        (error 'initarg-error :class class :initargs invalid-keys)))
+        (initarg-error class invalid-keys)))
     invalid-keys))
 
 (defun check-initargs-2-list (initkeys class legal &optional (error-p t))
@@ -337,5 +340,5 @@
         (unless (memq key legal)
           (push key invalid-keys)))
       (when (and invalid-keys error-p)
-        (error 'initarg-error :class class :initargs invalid-keys)))
+        (initarg-error class invalid-keys)))
     invalid-keys))

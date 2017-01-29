@@ -1222,7 +1222,7 @@
     (when invalid-keys
       ;; FIXME: should have an operation here, and maybe a set of
       ;; valid keys.
-      (error 'initarg-error :class class :initargs invalid-keys))))
+      (initarg-error class invalid-keys))))
 
 (defun check-ri-initargs (instance initargs)
   (let* ((class (class-of instance))
@@ -1245,6 +1245,6 @@
                       (acons keys invalid cache))
                 invalid))))
     (when invalid-keys
-      (error 'initarg-error :class class :initargs invalid-keys))))
+      (initarg-error class invalid-keys))))
 
 ;;; end of ctor.lisp
