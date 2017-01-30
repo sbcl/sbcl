@@ -147,16 +147,15 @@
 (defparameter *pin-test-object-address* nil)
 
 (with-test (:name (sb-sys:with-pinned-objects :actually-pins-objects)
-                  :fails-on '(and (or :x86 :x86-64)
-                                  :interpreter)
                   :skipped-on ':cheneygc)
-  ;; Under certain circumstances (x86oids running the interpreter),
-  ;; WITH-PINNED-OBJECTS may be a no-op.  We know that cheneygc is not
-  ;; affected (because cheneygc WITH-PINNED-OBJECTS devolves to
-  ;; WITHOUT-GCING), and non-x86oid targets are vastly unlikely to be
-  ;; affected (because non-x86oid gencgc uses an explicit pin list),
-  ;; but x86oids use some magic to force the compiler to store
-  ;; references to the object on the stack.
+  ;; The interpreters (both sb-eval and sb-fasteval) special-case
+  ;; WITH-PINNED-OBJECTS as a "special form", because the x86oid
+  ;; version of WITH-PINNED-OBJECTS uses black magic that isn't
+  ;; supportable outside of the compiler.  The non-x86oid versions of
+  ;; WITH-PINNED-OBJECTS don't use black magic, but are overridden
+  ;; anyway.  But the special-case logic was, historically broken, and
+  ;; this affects all gencgc targets (cheneygc isn't affected because
+  ;; cheneygc WITH-PINNED-OBJECTS devolves to WITHOUT-GCING).
   ;;
   ;; Our basic approach is to allocate some kind of object and stuff
   ;; it where it doesn't need to be on the control stack.  We then pin

@@ -681,7 +681,7 @@
       (labels ((recurse (list forms)
                  (if (not list)
                      (dispatch forms env)
-                     (sb-sys:with-pinned-objects ((car list))
+                     (sb-sys:with-pinned-objects ((dispatch (car list) env))
                        (recurse (cdr list) forms)))))
         (recurse objects forms)))))
 
