@@ -2250,13 +2250,13 @@
       ;; RETURN-FROM.  We may delete them only when we can show that
       ;; there are no other code paths that use the entry LVAR that
       ;; are live from within the block that contained the deleted
-      ;; EXIT (our predecessor block) and that all uses of the entry
-      ;; LVAR have the same dynamic-extent environment.  The
-      ;; conservative version of this is that there are no EXITs for
-      ;; any ENTRY introduced between the LEXENV of the deleted EXIT
-      ;; and the LEXENV of the target ENTRY and that there is no
-      ;; :DYNAMIC-EXTENT cleanup between the deleted EXIT and the
-      ;; target ENTRY (which the CAST shares a lexenv with).
+      ;; EXIT and that all uses of the entry LVAR have the same
+      ;; dynamic-extent environment.  The conservative version of this
+      ;; is that there are no EXITs for any ENTRY introduced between
+      ;; the LEXENV of the deleted EXIT and the LEXENV of the target
+      ;; ENTRY and that there is no :DYNAMIC-EXTENT cleanup between
+      ;; the deleted EXIT and the target ENTRY (which the CAST shares
+      ;; a lexenv with).
       (let* ((entry-lexenv (cast-vestigial-exit-entry-lexenv cast))
              (entry-blocks (lexenv-blocks entry-lexenv))
              (entry-tags (lexenv-tags entry-lexenv)))
@@ -2269,13 +2269,21 @@
           (when (entry-exits (cadar current-tag))
             (return-from may-delete-vestigial-exit nil)))
         (let ((entry-cleanup (block-start-cleanup (node-block cast)))
-              (exit-block (car (block-pred (node-block cast)))))
-          (do-nested-cleanups (cleanup exit-block)
-            (when (eq cleanup entry-cleanup)
-              (return))
-            (when (eq (cleanup-kind cleanup)
-                      :dynamic-extent)
-              (return-from may-delete-vestigial-exit nil)))))))
+              (exit-blocks (block-pred (node-block cast))))
+          ;; If the deleted EXIT was the only node in its block then
+          ;; the block itself gets deleted, and we can thus end up
+          ;; with more than one predecessor.  If there's an EXIT from
+          ;; another lambda into the deleted EXIT (such as with the
+          ;; escape function for CATCH), then there will be no
+          ;; cleanups for one (or more) of the predecessor blocks, so
+          ;; we need to check all of them.
+          (dolist (exit-block exit-blocks)
+            (do-nested-cleanups (cleanup exit-block)
+              (when (eq cleanup entry-cleanup)
+                (return))
+              (when (eq (cleanup-kind cleanup)
+                        :dynamic-extent)
+                (return-from may-delete-vestigial-exit nil))))))))
   (values t))
 
 (defun compile-time-type-error-context (context)
