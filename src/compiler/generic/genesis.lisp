@@ -140,8 +140,8 @@
                   (le-octet-indices
                    (loop with n-octets = (/ n 8)
                          for i from 0 below n-octets
-                         collect `(+ byte-index #+big-endian ,(- n-octets i 1)
-                                                #-big-endian ,i))))
+                         collect `(+ byte-index #!+big-endian ,(- n-octets i 1)
+                                                #!-big-endian ,i))))
               `(progn
                  (defun ,name (bigvec byte-index)
                    (logior ,@(loop for index in le-octet-indices
