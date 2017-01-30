@@ -31,10 +31,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 32)
 
-;;; the number of bits per byte, where a byte is the smallest
-;;; addressable object
-(defconstant n-byte-bits 8)
-
 ;;; The minimum immediate offset in a memory-referencing instruction.
 (defconstant minimum-immediate-offset (- (expt 2 31)))
 

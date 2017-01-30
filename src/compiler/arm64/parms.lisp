@@ -20,10 +20,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 64)
 
-;;; number of bits per byte where a byte is the smallest addressable
-;;; object
-(defconstant n-byte-bits 8)
-
 ;;; Floating-point related constants, both format descriptions and FPU
 ;;; control register descriptions.  These don't exactly match up with
 ;;; what the machine manuals say because the Common Lisp standard

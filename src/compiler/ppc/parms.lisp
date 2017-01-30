@@ -20,10 +20,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 32)
 
-;;; number of bits per byte where a byte is the smallest addressable
-;;; object
-(defconstant n-byte-bits 8)
-
 ;;; flags for the generational garbage collector
 (defconstant pseudo-atomic-interrupted-flag 1)
 (defconstant pseudo-atomic-flag 4)

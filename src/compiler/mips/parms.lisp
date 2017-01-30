@@ -19,10 +19,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 32)
 
-;;; number of bits per byte where a byte is the smallest addressable
-;;; object
-(defconstant n-byte-bits 8)
-
 (defconstant float-sign-shift 31)
 
 (defconstant single-float-bias 126)
