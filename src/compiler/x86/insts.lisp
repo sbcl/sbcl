@@ -591,9 +591,6 @@
 (define-bitfield-emitter emit-dword 32
   (byte 32 0))
 
-(define-bitfield-emitter emit-byte-with-reg 8
-  (byte 5 3) (byte 3 0))
-
 (define-bitfield-emitter emit-mod-reg-r/m-byte 8
   (byte 2 6) (byte 3 3) (byte 3 0))
 
@@ -623,12 +620,16 @@
 
 ;;;; the effective-address (ea) structure
 
+(declaim (ftype (sfunction (tn) (mod 8)) reg-tn-encoding))
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
   (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
   (let ((offset (tn-offset tn)))
     (logior (ash (logand offset 1) 2)
             (ash offset -1))))
+
+(defun emit-byte+reg (seg byte reg)
+  (emit-byte seg (+ byte (reg-tn-encoding reg))))
 
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
                (:copier nil))
@@ -909,11 +910,7 @@
             (cond ((or (integerp src)
                        (and (fixup-p src)
                             (eq (fixup-flavor src) :symbol-tls-index)))
-                   (emit-byte-with-reg segment
-                                       (if (eq size :byte)
-                                           #b10110
-                                           #b10111)
-                                       (reg-tn-encoding dst))
+                   (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
                    (if (fixup-p src)
                        (emit-absolute-fixup segment src)
                        (emit-sized-immediate segment size src)))
@@ -1012,7 +1009,7 @@
             (aver (not (eq size :byte)))
             (maybe-emit-operand-size-prefix segment size)
             (cond ((register-p src)
-                   (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
+                   (emit-byte+reg segment #x50 src))
                   (t
                    (emit-byte segment #b11111111)
                    (emit-ea segment src #b110 t))))))))
@@ -1030,7 +1027,7 @@
      (aver (not (eq size :byte)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
-            (emit-byte-with-reg segment #b01011 (reg-tn-encoding dst)))
+            (emit-byte+reg segment #x58 dst))
            (t
             (emit-byte segment #b10001111)
             (emit-ea segment dst #b000))))))
@@ -1050,9 +1047,7 @@
      (maybe-emit-operand-size-prefix segment size)
      (labels ((xchg-acc-with-something (acc something)
                 (if (and (not (eq size :byte)) (register-p something))
-                    (emit-byte-with-reg segment
-                                        #b10010
-                                        (reg-tn-encoding something))
+                    (emit-byte+reg segment #x90 something)
                     (xchg-reg-with-something acc something)))
               (xchg-reg-with-something (reg something)
                 (emit-byte segment (if (eq size :byte) #b10000110 #b10000111))
@@ -1248,7 +1243,7 @@
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((and (not (eq size :byte)) (register-p dst))
-            (emit-byte-with-reg segment #b01000 (reg-tn-encoding dst)))
+            (emit-byte+reg segment #x40 dst))
            (t
             (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
             (emit-ea segment dst #b000))))))
@@ -1262,7 +1257,7 @@
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((and (not (eq size :byte)) (register-p dst))
-            (emit-byte-with-reg segment #b01001 (reg-tn-encoding dst)))
+            (emit-byte+reg segment #x48 dst))
            (t
             (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
             (emit-ea segment dst #b001))))))
@@ -1373,7 +1368,7 @@
   (:printer ext-reg-no-width ((op #b11001)))
   (:emitter
    (emit-byte segment #x0f)
-   (emit-byte-with-reg segment #b11001 (reg-tn-encoding dst))))
+   (emit-byte+reg segment #xC8 dst)))
 
 ;;; CBW -- Convert Byte to Word. AX <- sign_xtnd(AL)
 (define-instruction cbw (segment)

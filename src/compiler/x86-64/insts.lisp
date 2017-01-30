@@ -972,9 +972,6 @@
 (define-bitfield-emitter emit-qword 64
   (byte 64 0))
 
-(define-bitfield-emitter emit-byte-with-reg 8
-  (byte 5 3) (byte 3 0))
-
 (define-bitfield-emitter emit-mod-reg-r/m-byte 8
   (byte 2 6) (byte 3 3) (byte 3 0))
 
@@ -1014,6 +1011,7 @@
 
 ;;;; the effective-address (ea) structure
 
+(declaim (ftype (sfunction (tn) (mod 8)) reg-tn-encoding))
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
   ;; ea only has space for three bits of register number: regs r8
@@ -1026,6 +1024,9 @@
                (ash offset -1))))
     (float-registers
      (mod (tn-offset tn) 8))))
+
+(defun emit-byte+reg (seg byte reg)
+  (emit-byte seg (+ byte (reg-tn-encoding reg))))
 
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
                (:copier nil))
@@ -1483,7 +1484,7 @@
          ;; or six bytes. (A REX prefix will be emitted only if the
          ;; destination is an extended register.)
          (maybe-emit-rex-prefix segment :dword nil nil dst)
-         (emit-byte-with-reg segment #b10111 (reg-tn-encoding dst))
+         (emit-byte+reg segment #xB8 dst)
          (emit-dword segment src))
         (t
          (maybe-emit-rex-prefix segment :qword nil nil dst)
@@ -1508,7 +1509,7 @@
                (t
                 ;; We need a full 64-bit immediate. Instruction size:
                 ;; ten bytes.
-                (emit-byte-with-reg segment #b10111 (reg-tn-encoding dst))
+                (emit-byte+reg segment #xB8 dst)
                 (emit-qword segment src))))))
 
 (define-instruction mov (segment dst src)
@@ -1536,17 +1537,15 @@
                                                                  dst src))
                          (t
                           (maybe-emit-rex-prefix segment size nil nil dst)
-                          (emit-byte-with-reg segment
-                                              (if (eq size :byte)
-                                                  #b10110
-                                                  #b10111)
-                                              (reg-tn-encoding dst))
+                          (emit-byte+reg segment
+                                         (if (eq size :byte) #xB0 #xB8)
+                                         dst)
                           (emit-sized-immediate segment size src))))
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
                                 '(:static-call :foreign :assembly-routine)))
                    (maybe-emit-rex-prefix segment :dword nil nil dst)
-                   (emit-byte-with-reg segment #b10111 (reg-tn-encoding dst))
+                   (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
                   (t
                    (maybe-emit-rex-for-ea segment src dst)
@@ -1687,7 +1686,7 @@
             (maybe-emit-operand-size-prefix segment size)
             (maybe-emit-rex-for-ea segment src nil :operand-size :do-not-set)
             (cond ((register-p src)
-                   (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
+                   (emit-byte+reg segment #x50 src))
                   (t
                    (emit-byte segment #b11111111)
                    (emit-ea segment src #b110 :allow-constants t))))))))
@@ -1701,7 +1700,7 @@
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst nil :operand-size :do-not-set)
      (cond ((register-p dst)
-            (emit-byte-with-reg segment #b01011 (reg-tn-encoding dst)))
+            (emit-byte+reg segment #x58 dst))
            (t
             (emit-byte segment #b10001111)
             (emit-ea segment dst #b000))))))
@@ -1751,9 +1750,7 @@
                                    (eq size :dword))))
                     (progn
                       (maybe-emit-rex-for-ea segment something acc)
-                      (emit-byte-with-reg segment
-                                          #b10010
-                                          (reg-tn-encoding something)))
+                      (emit-byte+reg segment #x90 something))
                     (xchg-reg-with-something acc something)))
               (xchg-reg-with-something (reg something)
                 (maybe-emit-rex-for-ea segment something reg)
@@ -2063,7 +2060,7 @@
    (let ((size (operand-size dst)))
      (maybe-emit-rex-prefix segment size nil nil dst)
      (emit-byte segment #x0f)
-     (emit-byte-with-reg segment #b11001 (reg-tn-encoding dst)))))
+     (emit-byte+reg segment #xC8 dst))))
 
 ;;; CBW -- Convert Byte to Word. AX <- sign_xtnd(AL)
 (define-instruction cbw (segment)
