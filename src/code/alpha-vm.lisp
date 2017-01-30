@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-#-xc-xc-host (progn
+#-sb-xc-host (progn
 ;;; See x86-vm.lisp for a description of this.
 (define-alien-type os-context-t (struct os-context-t-struct))
 
