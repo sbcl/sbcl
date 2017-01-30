@@ -135,39 +135,23 @@
 
 ;;; BVREF-32 and friends. These are like SAP-REF-n, except that
 ;;; instead of a SAP we use a BIGVEC.
-(macrolet ((make-bvref-n
-            (n)
-            (let* ((name (intern (format nil "BVREF-~A" n)))
-                   (number-octets (/ n 8))
-                   (ash-list-le
-                    (loop for i from 0 to (1- number-octets)
-                          collect `(ash (bvref bigvec (+ byte-index ,i))
-                                        ,(* i 8))))
-                   (ash-list-be
-                    (loop for i from 0 to (1- number-octets)
-                          collect `(ash (bvref bigvec
-                                               (+ byte-index
-                                                  ,(- number-octets 1 i)))
-                                        ,(* i 8))))
-                   (setf-list-le
-                    (loop for i from 0 to (1- number-octets)
-                          append
-                          `((bvref bigvec (+ byte-index ,i))
-                            (ldb (byte 8 ,(* i 8)) new-value))))
-                   (setf-list-be
-                    (loop for i from 0 to (1- number-octets)
-                          append
-                          `((bvref bigvec (+ byte-index ,i))
-                            (ldb (byte 8 ,(- n 8 (* i 8))) new-value)))))
+(macrolet ((make-bvref-n (n)
+            (let ((name (intern (format nil "BVREF-~A" n)))
+                  (le-octet-indices
+                   (loop with n-octets = (/ n 8)
+                         for i from 0 below n-octets
+                         collect `(+ byte-index #+big-endian ,(- n-octets i 1)
+                                                #-big-endian ,i))))
               `(progn
                  (defun ,name (bigvec byte-index)
-                   (logior ,@(ecase sb!c:*backend-byte-order*
-                               (:little-endian ash-list-le)
-                               (:big-endian ash-list-be))))
+                   (logior ,@(loop for index in le-octet-indices
+                                   for i from 0
+                                   collect `(ash (bvref bigvec ,index) ,(* i 8)))))
                  (defun (setf ,name) (new-value bigvec byte-index)
-                   (setf ,@(ecase sb!c:*backend-byte-order*
-                             (:little-endian setf-list-le)
-                             (:big-endian setf-list-be))))))))
+                   (setf ,@(loop for index in le-octet-indices
+                                 for i from 0
+                          append `((bvref bigvec ,index)
+                                   (ldb (byte 8 ,(* i 8)) new-value)))))))))
   (make-bvref-n 8)
   (make-bvref-n 16)
   (make-bvref-n 32)
