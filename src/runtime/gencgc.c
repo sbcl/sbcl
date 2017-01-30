@@ -1812,8 +1812,8 @@ void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
     sword_t nheader_words, ncode_words, nwords;
-    os_vm_address_t constants_start_addr, constants_end_addr;
-    os_vm_address_t code_start_addr, code_end_addr;
+    os_vm_address_t __attribute__((unused)) constants_start_addr, constants_end_addr;
+    os_vm_address_t __attribute__((unused)) code_start_addr, code_end_addr;
     os_vm_address_t code_addr = (os_vm_address_t)new_code;
     os_vm_address_t old_addr = (os_vm_address_t)old_code;
     os_vm_size_t displacement = code_addr - old_addr;

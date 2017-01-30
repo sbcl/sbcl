@@ -30,9 +30,8 @@ ensure_space(lispobj *start, uword_t size)
 {
     if (os_validate((os_vm_address_t)start,(os_vm_size_t)size)==NULL) {
         fprintf(stderr,
-                "ensure_space: failed to validate %lu bytes at 0x%08lx\n",
-                size,
-                (uword_t)start);
+                "ensure_space: failed to validate %lu bytes at %p\n",
+                (long unsigned)size, start);
         fprintf(stderr,
                 "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
         exit(1);

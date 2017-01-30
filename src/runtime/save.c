@@ -200,7 +200,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
 
     if (!lisp_startup_options.noinform)
         printf("writing %lu bytes from the %s space at %p\n",
-               (uword_t)bytes, names[id], addr);
+               (long unsigned)bytes, names[id], addr);
 
     data = write_and_compress_bytes(file, (char *)addr, bytes, file_offset,
                                     core_compression_level);
