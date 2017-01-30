@@ -158,8 +158,7 @@
        (sb-vm::map-allocated-objects #'f :dynamic)
        5))))
 
-(with-test (:name :pack-varints-as-bignum
-                  :fails-on :sb-fasteval)
+(with-test (:name :pack-varints-as-bignum)
   (dotimes (i 500) ; do some random testing this many times
     (let* ((random-numbers (loop repeat (+ (random 20) 3)
                                  collect (1+ (random 4000))))
