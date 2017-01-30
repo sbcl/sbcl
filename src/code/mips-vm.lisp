@@ -26,7 +26,7 @@
    (let ((sap (code-instructions code)))
      (ecase kind
        (:absolute
-        (setf (sap-ref-32 sap offset) fixup))
+        (setf (sap-ref-32 sap offset) value))
        (:jump
         (aver (zerop (ash value -28)))
         (setf (ldb (byte 26 0) (sap-ref-32 sap offset))

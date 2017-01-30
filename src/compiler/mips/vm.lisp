@@ -287,6 +287,7 @@
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
      (sc-number-or-lose 'immediate))
+    #-sb-xc-host ; There is no such object type in the host
     (system-area-pointer
      (sc-number-or-lose 'immediate))
     (character
