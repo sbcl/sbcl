@@ -2067,6 +2067,9 @@ core and return a descriptor to it."
   (values))     ;; PROGN
 
 (defun cold-foreign-symbol-address (name)
+  (declare (ignorable name))
+  #!+crossbuild-test #xf00fa8 ; any random 4-octet-aligned value should do
+  #!-crossbuild-test
   (or (find-foreign-symbol-in-table name *cold-foreign-symbol-table*)
       *foreign-symbol-placeholder-value*
       (progn
@@ -3572,7 +3575,6 @@ initially undefined function references:~2%")
 (defun sb-cold:genesis (&key object-file-names preload-file
                              core-file-name c-header-dir-name map-file-name
                              symbol-table-file-name)
-  #!+sb-dynamic-core
   (declare (ignorable symbol-table-file-name))
   (declare (special core-file-name))
 
@@ -3588,7 +3590,7 @@ initially undefined function references:~2%")
 
   (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 
-    #!-sb-dynamic-core
+    #!-(or sb-dynamic-core crossbuild-test)
     (when core-file-name
       (if symbol-table-file-name
           (load-cold-foreign-symbol-table symbol-table-file-name)
