@@ -220,7 +220,7 @@ trans_code(struct code *code)
     for_each_simple_fun(i, nfheaderp, new_code, 1, {
         /* Calculate the old raw function pointer */
         struct simple_fun* fheaderp =
-          (struct simple_fun*)((char*)nfheaderp - displacement);
+          (struct simple_fun*)LOW_WORD((char*)nfheaderp - displacement);
         /* Calculate the new lispobj */
         lispobj nfheaderl = make_lispobj(nfheaderp, FUN_POINTER_LOWTAG);
 

@@ -289,7 +289,7 @@ ptrans_code(lispobj thing)
     /* Put in forwarding pointers for all the functions. */
     uword_t displacement = result - thing;
     for_each_simple_fun(i, newfunc, new, 1, {
-        lispobj* old = (lispobj*)((char*)newfunc - displacement);
+        lispobj* old = (lispobj*)LOW_WORD((char*)newfunc - displacement);
         *old = make_lispobj(newfunc, FUN_POINTER_LOWTAG);
     });
 
