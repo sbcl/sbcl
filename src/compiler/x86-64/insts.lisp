@@ -1524,7 +1524,8 @@
                            (emit-qword segment src))))
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
-                                '(:static-call :foreign :assembly-routine)))
+                                '(:static-call :foreign :assembly-routine
+                                  :immobile-object)))
                    (maybe-emit-rex-prefix segment :dword nil nil dst)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
@@ -1554,7 +1555,7 @@
             ;; these should always end up in low memory.
             (aver (or (member (fixup-flavor src)
                               '(:foreign :foreign-dataref :symbol-tls-index
-                                :assembly-routine))
+                                :assembly-routine :immobile-object))
                       (eq (ea-size dst) :dword)))
             (maybe-emit-rex-for-ea segment dst nil)
             (emit-byte segment #xC7)
@@ -1867,26 +1868,25 @@
   (let ((size (matching-operand-size dst src)))
     (maybe-emit-operand-size-prefix segment size)
     (cond
-     ((integerp src)
-      (cond ((and (not (eq size :byte)) (<= -128 src 127))
-             (maybe-emit-rex-for-ea segment dst nil)
-             (emit-byte segment #b10000011)
-             (emit-ea segment dst opcode :allow-constants allow-constants)
-             (emit-byte segment src))
-            ((accumulator-p dst)
-             (maybe-emit-rex-for-ea segment dst nil)
+     ((and (neq size :byte) (typep src '(signed-byte 8)))
+      (maybe-emit-rex-for-ea segment dst nil)
+      (emit-byte segment #b10000011)
+      (emit-ea segment dst opcode :allow-constants allow-constants)
+      (emit-byte segment src))
+     ((or (integerp src)
+          (and (fixup-p src) (eq (fixup-flavor src) :immobile-object)))
+      (maybe-emit-rex-for-ea segment dst nil)
+      (cond ((accumulator-p dst)
              (emit-byte segment
                         (dpb opcode
                              (byte 3 3)
-                             (if (eq size :byte)
-                                 #b00000100
-                                 #b00000101)))
-             (emit-sized-immediate segment size src))
+                             (if (eq size :byte) #b00000100 #b00000101))))
             (t
-             (maybe-emit-rex-for-ea segment dst nil)
              (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
-             (emit-ea segment dst opcode :allow-constants allow-constants)
-             (emit-sized-immediate segment size src))))
+             (emit-ea segment dst opcode :allow-constants allow-constants)))
+      (if (fixup-p src)
+          (emit-absolute-fixup segment src)
+          (emit-sized-immediate segment size src)))
      ((register-p src)
       (maybe-emit-rex-for-ea segment dst src)
       (emit-byte segment

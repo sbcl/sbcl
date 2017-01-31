@@ -221,7 +221,12 @@
                              immed
                              (sc-number-or-lose 'constant))))
               (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
-         (unless use-immed-p
+         ;; Objects of type SYMBOL can be immediate but they still go in the constants
+         ;; because liveness depends on pointer tracing without looking at code-fixups.
+         (when (or (not use-immed-p)
+                   #!+immobile-symbols
+                   (let ((val (constant-value constant)))
+                     (and (symbolp val) (not (sb!vm:static-symbol-p val)))))
            (let ((constants (ir2-component-constants component)))
              (setf (tn-offset res) (fill-pointer constants))
              (vector-push-extend constant constants)))

@@ -85,11 +85,11 @@
     ;; If target is a register, we can just mov it there directly
     ((and (tn-p target)
           (sc-is target signed-reg unsigned-reg descriptor-reg any-reg))
-     (if (zerop val)
-         (zeroize target)
-         (inst mov target val)))
+     ;; val can be a fixup for an immobile symbol
+     (cond ((and #!+immobile-symbols (numberp val) (zerop val)) (zeroize target))
+           (t (inst mov target val))))
     ;; Likewise if the value is small enough.
-    ((typep val '(signed-byte 32))
+    ((typep val '(or (signed-byte 32) #!+immobile-space fixup))
      (inst mov target val))
     ;; Otherwise go through the temporary register
     (tmp-tn

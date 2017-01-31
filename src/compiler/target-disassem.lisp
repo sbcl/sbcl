@@ -2032,10 +2032,24 @@
             dstate)
       t)))
 
-(defun maybe-note-static-symbol (offset dstate)
+(defun maybe-note-static-symbol (address dstate)
   (dolist (symbol sb!vm:*static-symbols*)
-    (when (= (get-lisp-obj-address symbol) offset)
-      (return (note (lambda (s) (prin1 symbol s)) dstate)))))
+    (when (= (get-lisp-obj-address symbol) address)
+      (return (note (lambda (s) (prin1 symbol s)) dstate))))
+  ;; Guess whether 'address' is an immobile-space symbol by looking at
+  ;; code header constants. If it matches any constant, assume that it
+  ;; is a use of the constant.  This has false positives of course,
+  ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
+  ;; used in an unboxed context, such as an ADD instruction,
+  ;; might be seen as an address.
+  #!+(and immobile-space x86-64)
+  (let ((code (seg-code (dstate-segment dstate))))
+    (when code
+      (loop for i from sb!vm:code-constants-offset
+            below (code-header-words code)
+            for const = (code-header-ref code i)
+            when (eql (get-lisp-obj-address const) address)
+            return (note (lambda (s) (prin1-quoted-short const s)) dstate)))))
 
 (defun get-internal-error-name (errnum)
   (cadr (svref sb!c:+backend-internal-errors+ errnum)))

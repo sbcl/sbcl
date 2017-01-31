@@ -565,7 +565,7 @@
 (!define-fop 65 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
-#!-(or x86 x86-64)
+#!-x86
 (!define-fop 61 :not-host (fop-sanctify-for-execution (component))
   (sb!vm:sanctify-for-execution component)
   component)
@@ -609,6 +609,15 @@
                            (read-word-arg (fasl-input-stream))
                            (ensure-symbol-tls-index symbol)
                            kind)
+  code-object)
+
+#!+immobile-space
+(!define-fop 134 :not-host (fop-immobile-obj-fixup (code-object kind obj))
+  (sb!vm:fixup-code-object code-object
+                           (read-word-arg (fasl-input-stream))
+                           (get-lisp-obj-address obj) ; OBJ can't move
+                           kind
+                           :immobile-object)
   code-object)
 
 #!+immobile-code

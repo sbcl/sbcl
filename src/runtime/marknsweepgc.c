@@ -49,6 +49,7 @@
 #include "gc-internal.h"
 #include "genesis/vector.h"
 #include "forwarding-ptr.h"
+#include "var-io.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1576,6 +1577,7 @@ static void fixup_space(lispobj* where, size_t n_words)
     lispobj header_word, layout;
     int widetag;
     long size;
+    void fixup_immobile_refs(struct code*);
 
     while (where < end) {
         gc_assert(!forwarding_pointer_p(where));
@@ -1615,6 +1617,8 @@ static void fixup_space(lispobj* where, size_t n_words)
               f->self = adjust_fun_entry(f->self);
               adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
           });
+          if (((struct code*)where)->fixups)
+              fixup_immobile_refs((struct code*)where);
           break;
         case CLOSURE_HEADER_WIDETAG:
           where[1] = adjust_fun_entry(where[1]);
@@ -2053,6 +2057,44 @@ void verify_immobile_page_protection(int keep_gen, int new_gen)
     }
   }
 }
+
+// Fixup immediate values that encode Lisp object addresses
+// in immobile space.
+#include "forwarding-ptr.h"
+#ifdef LISP_FEATURE_X86_64
+void fixup_immobile_refs(struct code* code)
+{
+    struct varint_unpacker fixups;
+    varint_unpacker_init(&fixups, code->fixups);
+    char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
+    int prev_loc = 0, loc;
+    while (varint_unpack(&fixups, &loc) && loc != 0) {
+        // For extra compactness, each loc is relative to the prior,
+        // so that the magnitudes are smaller.
+        loc += prev_loc;
+        prev_loc = loc;
+        int* fixup_where = (int*)(instructions + loc);
+        lispobj obj = (lispobj)(*fixup_where);
+        if (is_lisp_pointer(obj)) {
+            if (forwarding_pointer_p(native_pointer(obj)))
+              *fixup_where = (int)
+                forwarding_pointer_value(native_pointer(obj));
+        } else {
+            lispobj* symbol = (lispobj*)(obj - offsetof(struct symbol,value));
+            int fixup_val = 0;
+            if (forwarding_pointer_p(symbol)) {
+                lispobj new_symbol = forwarding_pointer_value(symbol);
+                symbol = native_pointer(new_symbol);
+                fixup_val = new_symbol - OTHER_POINTER_LOWTAG
+                  + offsetof(struct symbol,value);
+            }
+            gc_assert(widetag_of(*(lispobj*)tempspace_addr(symbol))
+                      == SYMBOL_HEADER_WIDETAG);
+            if (fixup_val) *fixup_where = fixup_val;
+        }
+    }
+}
+#endif
 
 #ifdef VERIFY_PAGE_GENS
 void check_fixedobj_page(int page)

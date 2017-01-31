@@ -27,8 +27,11 @@
     (if (sc-is object immediate)
         (inst mov value
               (make-ea :qword :disp
-                       (+ nil-value (static-symbol-offset (tn-value object))
-                          (- (* offset n-word-bytes) lowtag))))
+                       (let* ((symbol (tn-value object))
+                              (offset (- (* offset n-word-bytes) lowtag)))
+                         (if (and #!+immobile-symbols (static-symbol-p symbol))
+                             (+ nil-value (static-symbol-offset symbol) offset)
+                             (make-fixup symbol :immobile-object offset)))))
         (loadw value object offset lowtag))))
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))

@@ -45,8 +45,8 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-(defun fixup-code-object (code offset fixup kind)
-  (declare (type index offset))
+(defun fixup-code-object (code offset fixup kind &optional flavor)
+  (declare (type index offset) (ignorable flavor))
   (without-gcing
     (let ((sap (code-instructions code)))
       (ecase kind
@@ -73,7 +73,21 @@
                   ;; so add 4 bytes for the size of the displacement itself.
                   (- fixup
                      (the (unsigned-byte 64) (+ (sap-int sap) offset 4))))))))))
-    nil)
+  ;; An absolute fixup is stored in the code header if it
+  ;; references an immobile-space (but not static-space) object.
+  #!+immobile-space
+  (when (eq flavor :immobile-object)
+    (let ((fixups (sb!vm::%code-fixups code)))
+      ;; Sanctifying the code component will compact these into a bignum.
+      (setf (sb!vm::%code-fixups code)
+            (cons offset (if (eql fixups 0) nil fixups)))))
+  nil)
+
+(defun sanctify-for-execution (code)
+  (let ((fixups (sb!vm::%code-fixups code)))
+    (when (listp fixups)
+      (setf (sb!vm::%code-fixups code) (sb!c::pack-code-fixup-locs fixups))))
+  nil)
 
 ;;;; low-level signal context access functions
 ;;;;

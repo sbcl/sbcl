@@ -1045,6 +1045,10 @@
         (:code-object
          (aver (null name))
          (dump-fop 'fop-code-object-fixup fasl-output))
+        #!+immobile-space
+        (:immobile-object
+         (dump-non-immediate-object (the symbol name) fasl-output)
+         (dump-fop 'fop-immobile-obj-fixup fasl-output))
         #!+immobile-code
         (:static-call
          (dump-non-immediate-object name fasl-output)
@@ -1130,7 +1134,7 @@
       ;; dumps aren't included in the LENGTH passed to FOP-CODE.
       (dump-fixups fixups fasl-output)
 
-      #!-(or x86 x86-64)
+      #!-x86
       (dump-fop 'fop-sanctify-for-execution fasl-output)
 
       (let ((handle (dump-pop fasl-output)))

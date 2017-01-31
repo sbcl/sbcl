@@ -72,13 +72,18 @@
                     (:code-object
                      (aver (null name))
                      (get-lisp-obj-address code))
+                    #!+immobile-space
+                    (:immobile-object
+                     (get-lisp-obj-address
+                      (the (or layout symbol) name)))
                     #!+immobile-code
                     (:static-call
                      (sb!vm::function-raw-address name))
                     (:symbol-tls-index
                      (aver (symbolp name))
                      (ensure-symbol-tls-index name)))))
-      (sb!vm:fixup-code-object code position value kind))))
+      (sb!vm:fixup-code-object code position value kind
+                               #!+x86-64 flavor))))
 
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
 ;;; function hasn't been compiled yet, make a note in the patch table.

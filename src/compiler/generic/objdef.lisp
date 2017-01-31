@@ -169,7 +169,7 @@
              :set-trans (setf %code-n-entries)
              :ref-trans %code-n-entries
              :ref-known (flushable foldable))
-  #!+x86
+  #!+(or x86 immobile-space)
   (fixups :type t
           :ref-known (flushable)
           :ref-trans %code-fixups

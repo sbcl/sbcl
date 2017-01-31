@@ -2649,7 +2649,7 @@ core and return a descriptor to it."
          (fun (cold-fdefn-fun (cold-fdefinition-object name))))
     (if (cold-null fun) `(:known-fun . ,name) fun)))
 
-#!-(or x86 x86-64)
+#!-x86
 (define-cold-fop (fop-sanctify-for-execution)
   (pop-stack))
 
@@ -2947,6 +2947,21 @@ core and return a descriptor to it."
          (offset (read-word-arg (fasl-input-stream)))
          (value (descriptor-bits code-object)))
     (do-cold-fixup code-object offset value kind))) ; and re-push code-object
+
+#!+immobile-space
+(define-cold-fop (fop-immobile-obj-fixup)
+  (let ((obj (pop-stack))
+        (kind (pop-stack))
+        (code-object (pop-stack))
+        (offset (read-word-arg (fasl-input-stream))))
+    #!+x86-64 ; Record this fixup in the code header
+    (let ((fixups (read-wordindexed code-object sb!vm::code-fixups-slot)))
+      (write-wordindexed code-object sb!vm::code-fixups-slot
+        (cold-cons (make-fixnum-descriptor offset)
+                   (if (= (descriptor-bits fixups) 0) *nil-descriptor* fixups))))
+    (do-cold-fixup code-object offset
+                   (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
+                   kind)))
 
 #!+immobile-code
 (define-cold-fop (fop-static-call-fixup)

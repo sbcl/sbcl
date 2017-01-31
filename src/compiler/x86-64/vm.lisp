@@ -456,7 +456,8 @@
          character)
      (sc-number-or-lose 'immediate))
     (symbol
-     (when (static-symbol-p value)
+     ;; immobile-symbols implies that ALL symbols are static in placement.
+     (when (and #!-immobile-symbols (static-symbol-p value))
        (sc-number-or-lose 'immediate)))
     (single-float
        (sc-number-or-lose
@@ -488,10 +489,10 @@
   (if (sc-is tn immediate)
       (let ((val (tn-value tn)))
         (etypecase val
-          (integer (if tag
-                       (fixnumize val)
-                       val))
-          (symbol (+ nil-value (static-symbol-offset val)))
+          (integer  (if tag (fixnumize val) val))
+          (symbol   (if (and #!+immobile-symbols (static-symbol-p val))
+                        (+ nil-value (static-symbol-offset val))
+                        (make-fixup val :immobile-object)))
           (character (if tag
                          (logior (ash (char-code val) n-widetag-bits)
                                  character-widetag)
