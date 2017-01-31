@@ -1472,46 +1472,6 @@
 
 ;;;; general data transfer
 
-;;; This is the part of the MOV instruction emitter that does moving
-;;; of an immediate value into a qword register. We go to some length
-;;; to achieve the shortest possible encoding.
-(defun emit-immediate-move-to-qword-register (segment dst src)
-  (declare (type integer src))
-  (cond ((typep src '(unsigned-byte 32))
-         ;; We use the B8 - BF encoding with an operand size of 32 bits
-         ;; here and let the implicit zero-extension fill the upper half
-         ;; of the 64-bit destination register. Instruction size: five
-         ;; or six bytes. (A REX prefix will be emitted only if the
-         ;; destination is an extended register.)
-         (maybe-emit-rex-prefix segment :dword nil nil dst)
-         (emit-byte+reg segment #xB8 dst)
-         (emit-dword segment src))
-        (t
-         (maybe-emit-rex-prefix segment :qword nil nil dst)
-         (cond ((typep src '(signed-byte 32))
-                ;; Use the C7 encoding that takes a 32-bit immediate and
-                ;; sign-extends it to 64 bits. Instruction size: seven
-                ;; bytes.
-                (emit-byte segment #b11000111)
-                (emit-mod-reg-r/m-byte segment #b11 #b000
-                                       (reg-tn-encoding dst))
-                (emit-signed-dword segment src))
-               ((<= (- (expt 2 64) (expt 2 31))
-                    src
-                    (1- (expt 2 64)))
-                ;; This triggers on positive integers of 64 bits length
-                ;; with the most significant 33 bits being 1. We use the
-                ;; same encoding as in the previous clause.
-                (emit-byte segment #b11000111)
-                (emit-mod-reg-r/m-byte segment #b11 #b000
-                                       (reg-tn-encoding dst))
-                (emit-signed-dword segment (- src (expt 2 64))))
-               (t
-                ;; We need a full 64-bit immediate. Instruction size:
-                ;; ten bytes.
-                (emit-byte+reg segment #xB8 dst)
-                (emit-qword segment src))))))
-
 (define-instruction mov (segment dst src)
   ;; immediate to register
   (:printer reg ((op #b1011 :prefilter (lambda (dstate value)
@@ -1532,15 +1492,36 @@
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
             (cond ((integerp src)
-                   (cond ((eq size :qword)
-                          (emit-immediate-move-to-qword-register segment
-                                                                 dst src))
-                         (t
-                          (maybe-emit-rex-prefix segment size nil nil dst)
-                          (emit-byte+reg segment
-                                         (if (eq size :byte) #xB0 #xB8)
-                                         dst)
-                          (emit-sized-immediate segment size src))))
+                   ;; We want to encode the immediate using the fewest bytes possible.
+                   (let ((immediate-size
+                          ;; If it's a :qword constant that fits in an unsigned
+                          ;; :dword, then use a zero-extended :dword immediate.
+                          (if (and (eq size :qword) (typep src '(unsigned-byte 32)))
+                              :dword
+                              size)))
+                     (maybe-emit-rex-prefix segment immediate-size nil nil dst))
+                   (acond ((neq size :qword) ; :dword or smaller dst is straightforward
+                           (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
+                           (emit-sized-immediate segment size src))
+                          ;; This must be move to a :qword register.
+                          ((typep src '(unsigned-byte 32))
+                           ;; Encode as B8+dst using operand size of 32 bits
+                           ;; and implicit zero-extension.
+                           ;; Instruction size: 5 if no REX prefix, or 6 with.
+                           (emit-byte+reg segment #xB8 dst)
+                           (emit-dword segment src))
+                          ((sb!vm::immediate32-p src)
+                           ;; It's either a signed-byte-32, or a large unsigned
+                           ;; value whose 33 high bits are all 1.
+                           ;; Encode as C7 which sign-extends a 32-bit imm to 64 bits.
+                           ;; Instruction size: 7 bytes.
+                           (emit-byte segment #xC7)
+                           (emit-mod-reg-r/m-byte segment #b11 #b000 (reg-tn-encoding dst))
+                           (emit-signed-dword segment it))
+                          (t
+                           ;; 64-bit immediate. Instruction size: 10 bytes.
+                           (emit-byte+reg segment #xB8 dst)
+                           (emit-qword segment src))))
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
                                 '(:static-call :foreign :assembly-routine)))
@@ -1549,23 +1530,20 @@
                    (emit-absolute-fixup segment src))
                   (t
                    (maybe-emit-rex-for-ea segment src dst)
-                   (emit-byte segment
-                              (if (eq size :byte)
-                                  #b10001010
-                                  #b10001011))
+                   (emit-byte segment (if (eq size :byte) #x8A #x8B))
                    (emit-ea segment src (reg-tn-encoding dst)
                             :allow-constants t))))
-           ((integerp src)
+           ((integerp src) ; imm to memory
             ;; C7 only deals with 32 bit immediates even if the
             ;; destination is a 64-bit location. The value is
             ;; sign-extended in this case.
             (maybe-emit-rex-for-ea segment dst nil)
-            (emit-byte segment (if (eq size :byte) #b11000110 #b11000111))
+            (emit-byte segment (if (eq size :byte) #xC6 #xC7))
             (emit-ea segment dst #b000)
             (emit-sized-immediate segment size src))
-           ((register-p src)
+           ((register-p src) ; reg to mem
             (maybe-emit-rex-for-ea segment dst src)
-            (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
+            (emit-byte segment (if (eq size :byte) #x88 #x89))
             (emit-ea segment dst (reg-tn-encoding src)))
            ((fixup-p src)
             ;; Generally we can't MOV a fixupped value into an EA, since
@@ -1579,7 +1557,7 @@
                                 :assembly-routine))
                       (eq (ea-size dst) :dword)))
             (maybe-emit-rex-for-ea segment dst nil)
-            (emit-byte segment #b11000111)
+            (emit-byte segment #xC7)
             (emit-ea segment dst #b000)
             (emit-absolute-fixup segment src))
            (t

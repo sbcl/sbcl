@@ -18,10 +18,8 @@
 (defun immediate32-p (x)
   (typecase x
     ((signed-byte 32) x)
-    ((unsigned-byte 64)
-     (let ((chopped (sb!c::mask-signed-field 32 x)))
-       (and (= x (ldb (byte 64 0) chopped))
-            chopped)))
+    ((integer #.(- (expt 2 64) (expt 2 31)) #.most-positive-word)
+     (sb!c::mask-signed-field 32 x))
     (t nil)))
 
 ;; If 'immediate32-p' is true, use it; otherwise use a RIP-relative constant.
