@@ -3184,18 +3184,17 @@ verify_space(lispobj *start, size_t words)
                     break;
 
                 case INSTANCE_HEADER_WIDETAG:
-                    {
-                        lispobj layout = instance_layout(start);
-                        if (!layout) {
-                            count = 1;
-                            break;
-                        }
+                    if (instance_layout(start)) {
+                        lispobj bitmap =
+                            ((struct layout*)
+                             native_pointer(instance_layout(start)))->bitmap;
                         sword_t nslots = instance_length(thing) | 1;
-                        instance_scan_interleaved(verify_space, start+1, nslots,
-                                                  native_pointer(layout));
+                        instance_scan(verify_space, start+1, nslots, bitmap);
                         count = 1 + nslots;
-                        break;
+                    } else {
+                        count = 1;
                     }
+                    break;
                 case CODE_HEADER_WIDETAG:
                     {
                         /* Check that it's not in the dynamic space.

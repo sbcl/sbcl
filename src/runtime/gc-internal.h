@@ -221,15 +221,12 @@ extern void scrub_thread_control_stack(struct thread *);
 #endif
 
 extern void
-instance_scan_interleaved(void (*proc)(),
-                          lispobj *instance_ptr,
-                          sword_t n_words,
-                          lispobj *layout_obj);
+instance_scan(void (*proc)(), lispobj *instance_ptr, sword_t n_words, lispobj bitmap);
 
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);
 
-// Generalization of instance_scan_interleaved
+// Generalization of instance_scan
 #define BIT_SCAN_INVERT 1
 #define BIT_SCAN_CLEAR  2
 typedef uword_t in_use_marker_t;

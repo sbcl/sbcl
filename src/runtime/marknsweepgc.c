@@ -1603,11 +1603,12 @@ static void fixup_space(lispobj* where, size_t n_words)
               layout = forwarding_pointer_value(native_pointer(layout));
               set_instance_layout(where, layout);
           }
-          lispobj* native_layout = tempspace_addr(native_pointer(layout));
-          gc_assert(widetag_of(*native_layout) == INSTANCE_HEADER_WIDETAG);
-          instance_scan_interleaved(adjust_words, where+1,
-                                    instance_length(header_word) | 1,
-                                    native_layout);
+          struct layout* native_layout = (struct layout*)
+              tempspace_addr(native_pointer(layout));
+          gc_assert(widetag_of(native_layout->header) == INSTANCE_HEADER_WIDETAG);
+          instance_scan(adjust_words, where+1,
+                        instance_length(header_word) | 1,
+                        native_layout->bitmap);
           break;
         case CODE_HEADER_WIDETAG:
           // Fixup the constant pool.

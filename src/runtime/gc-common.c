@@ -600,13 +600,11 @@ static void instance_scan_range(void* arg, int offset, int nwords)
 // Helper function for stepping through the tagged slots of an instance in
 // scav_instance and verify_space.
 void
-instance_scan_interleaved(void (*proc)(lispobj*, sword_t),
-                          lispobj *instance_slots,
-                          sword_t n_words,
-                          lispobj *layout_obj)
+instance_scan(void (*proc)(lispobj*, sword_t),
+              lispobj *instance_slots,
+              sword_t n_words,
+              lispobj layout_bitmap)
 {
-  struct layout *layout = (struct layout*)layout_obj;
-  lispobj layout_bitmap = layout->bitmap;
   sword_t index;
 
   /* This code might be made more efficient by run-length-encoding the ranges
@@ -713,10 +711,11 @@ scav_instance(lispobj *where, lispobj header)
 
     sword_t nslots = instance_length(header) | 1;
     ++where;
-    if (((struct layout*)layout)->bitmap == make_fixnum(-1))
+    lispobj bitmap = ((struct layout*)layout)->bitmap;
+    if (bitmap == make_fixnum(-1))
         scavenge(where, nslots);
     else
-        instance_scan_interleaved(scavenge, where, nslots, layout);
+        instance_scan(scavenge, where, nslots, bitmap);
 
     return 1 + nslots;
 }
