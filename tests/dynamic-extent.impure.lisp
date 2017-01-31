@@ -617,6 +617,35 @@
   (assert (equalp (nested-bad 42) (make-nested-good :bar *bar*)))
   (assert (equalp *bar* (list (list (make-nested-bad :bar (list 42)))))))
 
+;;; Conditional nested DX
+
+;; These two test cases prompted a substantial redesign of the STACK
+;; phase of the compiler to handle their particular permutation of
+;; nested DX.
+
+(with-test (:name (:bug-1044465 :reduced))
+  ;; Test case from Stas Boukarev
+  (compile nil '(lambda (x)
+                 (let ((a (if x
+                              (list (list x))
+                              (list (list x)))))
+                   (declare (dynamic-extent a))
+                   (prin1 a)
+                   1))))
+
+(with-test (:name (:bug-1044465 :nasty))
+  ;; Test case from Alastair Bridgewater
+  (compile nil '(lambda (x y)
+                 (dotimes (i 2)
+                   (block bar
+                     (let ((a (if x
+                                 (list (list x))
+                                 (list (list x))))
+                           (b (if y x (return-from bar x))))
+                      (declare (dynamic-extent a))
+                      (prin1 a)
+                      b))))))
+
 ;;; multiple uses for dx lvar
 
 (defun-with-dx multiple-dx-uses ()
