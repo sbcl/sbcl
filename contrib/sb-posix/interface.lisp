@@ -334,8 +334,8 @@
 
   ;; FIXME this is a lie, of course this can fail, but there's no
   ;; error handling here yet!
-  #+mach-exception-handler
-  (define-call "setup_mach_exceptions" void never-fails)
+  #+darwin
+  (define-call "darwin_reinit" void never-fails)
   (define-call ("posix_fork" :c-name "fork") pid-t minusp)
   (defun fork ()
     "Forks the current process, returning 0 in the new process and the PID of
@@ -346,9 +346,9 @@ not supported."
          (when (cdr sb-thread::*all-threads*)
            (go :error))
          (let ((pid (posix-fork)))
-           #+mach-exception-handler
+           #+darwin
            (when (= pid 0)
-             (setup-mach-exceptions))
+             (darwin-reinit))
            (return-from fork pid)))
      :error
        (error "Cannot fork with multiple threads running.")))

@@ -193,24 +193,16 @@ mach_lisp_thread_destroy(struct thread *thread) {
         lose("Error destroying an exception port");
     }
 }
+#endif
 
 void
-setup_mach_exceptions() {
+darwin_reinit() {
+    init_mach_clock();
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     setup_mach_exception_handling_thread();
     mach_lisp_thread_init(all_threads);
-}
-
-pid_t
-mach_fork() {
-    pid_t pid = fork();
-    if (pid == 0) {
-        setup_mach_exceptions();
-        return pid;
-    } else {
-        return pid;
-    }
-}
 #endif
+}
 
 void darwin_init(void)
 {
