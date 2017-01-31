@@ -264,26 +264,6 @@
          (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
-  ;; ASAP after the toplevel forms have executed,
-  ;; convert code fixup lists into vectors or packed integers.
-  #!+x86
-  (sb!vm::map-allocated-objects
-   (lambda (obj type size)
-     (declare (ignore size))
-     (when (= type sb!vm:code-header-widetag)
-       (let ((fixups (sb!vm::%code-fixups obj)))
-         (when (listp fixups)
-           (setf (sb!vm::%code-fixups obj)
-                 (coerce (sort fixups #'<) '(simple-array sb!vm:word (*))))))))
-   :dynamic)
-  #!+x86-64
-  (sb!vm::map-allocated-objects
-   (lambda (obj type size)
-     (declare (ignore size))
-     (when (= type sb!vm:code-header-widetag)
-       (sb!vm::sanctify-for-execution obj)))
-   :all)
-
   ;; Now that L-T-V forms have executed, the symbol output chooser works.
   (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
 

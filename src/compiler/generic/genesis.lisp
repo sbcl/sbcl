@@ -820,10 +820,17 @@ core and return a descriptor to it."
   (let* ((size (length objects))
          (result (allocate-vector-object gspace sb!vm:n-word-bits size
                                          sb!vm:simple-vector-widetag)))
-    (dotimes (index size)
+    (dotimes (index size result)
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
-                         (pop objects)))
-    result))
+                         (pop objects)))))
+#!+x86
+(defun ub32-vector-in-core (objects)
+  (let* ((size (length objects))
+         (result (allocate-vector-object *dynamic* sb!vm:n-word-bits size
+                                         sb!vm:simple-array-unsigned-byte-32-widetag)))
+    (dotimes (index size result)
+      (write-wordindexed/raw result (+ index sb!vm:vector-data-offset)
+                             (pop objects)))))
 (defun cold-svset (vector index value)
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
     (write-wordindexed vector (+ i sb!vm:vector-data-offset) value)))
@@ -2083,15 +2090,9 @@ core and return a descriptor to it."
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
 
-#!+x86
-(defun note-load-time-code-fixup (code-object offset)
-  ;; If CODE-OBJECT might be moved
-  (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
-           dynamic-core-space-id)
-    (let ((fixups (read-wordindexed code-object sb!vm::code-fixups-slot)))
-      (write-wordindexed code-object sb!vm::code-fixups-slot
-        (cold-cons (make-fixnum-descriptor offset)
-                   (if (= (descriptor-bits fixups) 0) *nil-descriptor* fixups))))))
+;;; In case we need to store code fixups in code objects.
+;;; At present only the x86 backends use this
+(defvar *code-fixup-notes*)
 
 ;;; Given a pointer to a code object and a byte offset relative to the
 ;;; tail of the code object's header, return a byte offset relative to the
@@ -2107,60 +2108,55 @@ core and return a descriptor to it."
                 do-cold-fixup))
 (defun do-cold-fixup (code-object after-header value kind)
   (let* ((offset-within-code-object (calc-offset code-object after-header))
-         (gspace-data (descriptor-mem code-object))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
-                                offset-within-code-object))
-         (gspace-byte-address (gspace-byte-address
-                               (descriptor-gspace code-object))))
-    (declare (ignorable gspace-data gspace-byte-address))
+                                offset-within-code-object)))
     #!-(or x86 x86-64)
     (sb!vm::fixup-code-object code-object gspace-byte-offset value kind)
+
     #!+(or x86 x86-64)
        ;; XXX: Note that un-fixed-up is read via bvref-word, which is
        ;; 64 bits wide on x86-64, but the fixed-up value is written
        ;; via bvref-32.  This would make more sense if we supported
        ;; :absolute64 fixups, but apparently the cross-compiler
        ;; doesn't dump them.
-    (let* ((un-fixed-up (bvref-word gspace-data gspace-byte-offset))
-           (code-object-start-addr (logandc2 (descriptor-bits code-object)
-                                             sb!vm:lowtag-mask)))
-      (assert (= code-object-start-addr
+    (let* ((gspace-data (descriptor-mem code-object))
+           (un-fixed-up (bvref-word gspace-data gspace-byte-offset))
+           (obj-start-addr (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask))
+           (code-end-addr
+            (+ obj-start-addr
+               (ash (logand (get-header-data code-object)
+                            sb!vm:short-header-max-words) sb!vm:word-shift)
+               (descriptor-fixnum
+                (read-wordindexed code-object sb!vm:code-code-size-slot))))
+           (gspace-byte-address (gspace-byte-address
+                                 (descriptor-gspace code-object))))
+      (declare (ignorable code-end-addr))
+      (assert (= obj-start-addr
                  (+ gspace-byte-address (descriptor-byte-offset code-object))))
-      (ecase kind
+      ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
+      ;; Except for the use of saps, this is basically identical.
+      (when
+          (ecase kind
            (:absolute
             (let ((fixed-up (+ value un-fixed-up)))
               (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
-              ;; comment from CMU CL sources:
-              ;;
-              ;; Note absolute fixups that point within the object.
-              ;; KLUDGE: There seems to be an implicit assumption in
-              ;; the old CMU CL code here, that if it doesn't point
-              ;; before the object, it must point within the object
-              ;; (not beyond it). It would be good to add an
-              ;; explanation of why that's true, or an assertion that
-              ;; it's really true, or both.
-              ;;
-              ;; One possible explanation is that all absolute fixups
-              ;; point either within the code object, within the
-              ;; runtime, within read-only or static-space, or within
-              ;; the linkage-table space.  In all x86 configurations,
-              ;; these areas are prior to the start of dynamic space,
-              ;; where all the code-objects are loaded.
-              #!+x86
-              (unless (< fixed-up code-object-start-addr)
-                (note-load-time-code-fixup code-object after-header))))
+              ;; Absolute fixups are recorded if within the object.
+              #!+x86 (< obj-start-addr fixed-up code-end-addr)
+              #!+x86-64 nil))
            (:relative ; (used for arguments to X86 relative CALL instruction)
             (let ((fixed-up (- (+ value un-fixed-up)
                                gspace-byte-address
                                gspace-byte-offset
                                4))) ; "length of CALL argument"
               (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
-              ;; Note relative fixups that point outside the code
-              ;; object, which is to say all relative fixups, since
-              ;; relative addressing within a code object never needs
-              ;; a fixup.
-              #!+x86
-              (note-load-time-code-fixup code-object after-header))))))
+              ;; Relative fixups are recorded if without the object.
+              #!+x86 (or (< fixed-up obj-start-addr) (> fixed-up code-end-addr))
+              #!+x86-64 nil)))
+        ;; FIXME - do we need this check? The same is not in x86-vm.
+        (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
+                 dynamic-core-space-id)
+          (push after-header (gethash (descriptor-bits code-object)
+                                      *code-fixup-notes*))))))
   code-object)
 
 (defun resolve-assembler-fixups ()
@@ -2954,11 +2950,12 @@ core and return a descriptor to it."
         (kind (pop-stack))
         (code-object (pop-stack))
         (offset (read-word-arg (fasl-input-stream))))
-    #!+x86-64 ; Record this fixup in the code header
-    (let ((fixups (read-wordindexed code-object sb!vm::code-fixups-slot)))
-      (write-wordindexed code-object sb!vm::code-fixups-slot
-        (cold-cons (make-fixnum-descriptor offset)
-                   (if (= (descriptor-bits fixups) 0) *nil-descriptor* fixups))))
+    ;; For x86-64, we have absolute fixups that will need subsequent fixup
+    ;; (to symbols) on relocation, and ones that won't.
+    ;; Decide here to record the fixup, because "kind" is not passed
+    ;; through to DO-COLD-FIXUP.
+    #!+x86-64
+    (push offset (gethash (descriptor-bits code-object) *code-fixup-notes*))
     (do-cold-fixup code-object offset
                    (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
                    kind)))
@@ -3655,6 +3652,7 @@ initially undefined function references:~2%")
            *cold-static-call-fixups*
            *cold-assembler-fixups*
            *cold-assembler-routines*
+           (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
 
       ;; If we're given a preload file, it contains tramps and whatnot
@@ -3737,6 +3735,13 @@ initially undefined function references:~2%")
       (resolve-deferred-known-funs)
       (resolve-assembler-fixups)
       (foreign-symbols-to-core)
+      #!+(or x86 x86-64)
+      (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
+        (write-wordindexed (make-random-descriptor (car pair))
+                           sb!vm::code-fixups-slot
+                           #!+x86 (ub32-vector-in-core (cdr pair))
+                           #!+x86-64 (number-to-core
+                                      (sb!c::pack-code-fixup-locs (cdr pair)))))
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)

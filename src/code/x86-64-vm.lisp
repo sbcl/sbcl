@@ -75,6 +75,9 @@
                      (the (unsigned-byte 64) (+ (sap-int sap) offset 4))))))))))
   ;; An absolute fixup is stored in the code header if it
   ;; references an immobile-space (but not static-space) object.
+  ;; This needn't be inside WITHOUT-GCING, because code fixups will point
+  ;; only to objects that don't move except during save-lisp-and-die.
+  ;; So there is no race with GC here.
   #!+immobile-space
   (when (eq flavor :immobile-object)
     (let ((fixups (sb!vm::%code-fixups code)))
