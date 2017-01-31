@@ -5926,6 +5926,16 @@
                   `(lambda ()
                      (car (describe 1 (make-broadcast-stream)))))))))
 
+;; To check the :EXIT-DELETION tests below, enable the following form,
+;; which allows the compiler to delete all vestigial exits, even if it
+;; "shouldn't", which should case the :EXIT-DELETION tests to fail in
+;; various ways.
+#+(or)
+(without-package-locks
+    (defun sb-c::may-delete-vestigial-exit (cast)
+      (declare (ignore cast))
+      t))
+
 ;; Vestigial exit deletion was a bit too aggressive, causing stack
 ;; analysis to decide that the value of (BAR 10) in both cases below
 ;; needed to be nipped out from under the dynamic-extent allocation of
@@ -5950,6 +5960,41 @@
                         (bar #'y)
                         (if x
                             (return-from test))))))))
+
+(with-test (:name (:exit-deletion :bug-533930))
+  (compile nil '(lambda ()
+                 (block a
+                   (multiple-value-prog1 42
+                     (catch 'ct
+                       (let ((x (cons t t)))
+                         (declare (dynamic-extent x))
+                         (return-from a (catch 'ct (foo x))))))))))
+
+(with-test (:name (:exit-deletion :bug-518099))
+  (compile nil '(lambda (a)
+                 (block b1
+                   (multiple-value-prog1 42
+                     (catch 'ct
+                       (return-from b1
+                         (catch 'ct2
+                           (min 1 a)))))))))
+
+(with-test (:name (:exit-deletion :bug-1655011))
+  (compile nil '(lambda (x)
+                 (block nil
+                   (multiple-value-prog1 (catch 'ct)
+                     (let ((* (list 10)))
+                       (declare (dynamic-extent *))
+                       (if x
+                           (return))))))))
+
+(with-test (:name (:exit-deletion :2017-01-30))
+  (compile nil '(lambda (b c)
+                 (block b5
+                   (multiple-value-prog1 42
+                     (restart-bind nil
+                       (if b (return-from b5
+                               (catch 'foo c)))))))))
 
 (with-test (:name :mv-call-no-let-conversion)
   (assert (equal
