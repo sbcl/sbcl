@@ -134,7 +134,7 @@
                 (declare (ignore sap))
                 `(sb!fasl::gspace-byte-address
                   (sb!fasl::descriptor-gspace code))) ; use CODE, not SAP
-              (sap-ref-8 (sap offset) `(sb!fasl::bvref-32 ,sap ,offset))
+              (sap-ref-8 (sap offset) `(sb!fasl::bvref-8 ,sap ,offset))
               (sap-ref-32 (sap offset) `(sb!fasl::bvref-32 ,sap ,offset))
               (sap-ref-word (sap offset) `(sb!fasl::bvref-word ,sap ,offset)))
      ,@body))
