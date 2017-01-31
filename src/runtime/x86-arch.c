@@ -322,7 +322,7 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     }
 #endif
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL");
+    lose("Unhandled SIGILL at %p.", *os_context_pc_addr(context));
 }
 #endif /* not LISP_FEATURE_WIN32 */
 

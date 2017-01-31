@@ -372,7 +372,7 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 #endif
 
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL.");
+    lose("Unhandled SIGILL at %p.", *os_context_pc_addr(context));
 }
 
 #ifdef X86_64_SIGFPE_FIXUP
