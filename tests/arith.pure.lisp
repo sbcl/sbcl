@@ -783,3 +783,9 @@
     (assert (= (funcall fun sb-ext:most-positive-word)
                (logxor sb-ext:most-positive-word
                        (1- (expt 2 (/ sb-vm:n-word-bits 2))))))))
+
+(with-test (:name :logand-mask-word)
+  (let ((fun (checked-compile `(lambda (x)
+                                 (logand x (ash sb-ext:most-positive-word -1))))))
+    (assert (= (funcall fun -1)
+               (ash most-positive-word -1)))))

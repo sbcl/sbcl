@@ -344,8 +344,7 @@
   (:translate logand)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:arg-types t (:constant (member #.most-positive-word
-                                   #.(ash most-positive-word -1))))
+  (:arg-types t (:constant word))
   (:results (r :scs (unsigned-reg)))
   (:info mask)
   (:result-types unsigned-num)
@@ -353,15 +352,13 @@
     (move r x)
     (generate-fixnum-test r)
     (inst jmp :nz BIGNUM)
-    (if (= mask most-positive-word)
-        (inst sar r n-fixnum-tag-bits)
-        (inst shr r n-fixnum-tag-bits))
+    (inst sar r n-fixnum-tag-bits)
     (inst jmp DONE)
     BIGNUM
     (loadw r x bignum-digits-offset other-pointer-lowtag)
+    DONE
     (unless (= mask most-positive-word)
-      (inst btr r (1- n-word-bits)))
-    DONE))
+      (inst and r mask))))
 
 
 (define-vop (fast-+-c/signed=>signed fast-safe-arith-op)
