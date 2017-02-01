@@ -681,8 +681,9 @@
       (labels ((recurse (list forms)
                  (if (not list)
                      (dispatch forms env)
-                     (sb-sys:with-pinned-objects ((dispatch (car list) env))
-                       (recurse (cdr list) forms)))))
+                     (let ((obj (dispatch (car list) env)))
+                       (sb-sys:with-pinned-objects (obj)
+                         (recurse (cdr list) forms))))))
         (recurse objects forms)))))
 
 ;;; Now for the complicated stuff, starting with the simplest
