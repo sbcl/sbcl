@@ -5996,6 +5996,34 @@
                        (if b (return-from b5
                                (catch 'foo c)))))))))
 
+(with-test (:name (:exit-deletion :2017-01-30 :even-more-subtle))
+  (compile nil '(lambda (b c)
+                 (block b5
+                   (multiple-value-prog1 42
+                     (restart-bind nil
+                       (if b (return-from b5
+                               (catch 'foo
+                                 (error "even more subtle"))))))))))
+
+(with-test (:name (:exit-deletion :2017-01-31 :tagbody))
+  (let ((test-closure
+         (compile nil '(lambda (b c)
+                        (declare (notinline funcall))
+                        (block b5
+                          (multiple-value-prog1 42
+                            (if b (tagbody
+                                     (return-from b5
+                                       (funcall c (lambda () (go away))))
+                                   away))))))))
+    ;; Be careful here: The return value can be garbage.  Our saving
+    ;; grace is that it's stack garbage, thus by definition GC-safe to
+    ;; hold in a register long enough to take its address, but we
+    ;; really don't want to try and externalize it in any way.
+    (assert (= (sb-kernel:get-lisp-obj-address
+                (funcall test-closure t #'funcall))
+               (sb-kernel:get-lisp-obj-address
+                42)))))
+
 (with-test (:name :mv-call-no-let-conversion)
   (assert (equal
            (funcall
