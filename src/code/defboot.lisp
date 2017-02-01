@@ -184,6 +184,8 @@ evaluated as a PROGN."
   (unless (symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body t)
+    ;; Maybe kill docstring, but only under the cross-compiler.
+    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
            (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
            (lambda `(lambda ,lambda-list ,@lambda-guts))
@@ -242,6 +244,8 @@ evaluated as a PROGN."
   SPECIAL and, optionally, initialize it. If the variable already has a
   value, the old value is not clobbered. The third argument is an optional
   documentation string for the variable."
+  ;; Maybe kill docstring, but only under the cross-compiler.
+  #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
@@ -259,6 +263,8 @@ evaluated as a PROGN."
   variable special and sets its value to VAL, overwriting any
   previous value. The third argument is an optional documentation
   string for the parameter."
+  ;; Maybe kill docstring, but only under the cross-compiler.
+  #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))

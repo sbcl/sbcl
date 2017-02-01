@@ -33,7 +33,9 @@
               (make-macro-lambda nil lambda-list body :special-form name
                                  :doc-string-allowed :external
                                  :wrap-block nil)))
-    (declare (ignorable doc))
+    (declare (ignorable doc)) ; unused on host
+    ;; Maybe kill docstring, but only under the cross-compiler.
+    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
     `(progn
       (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
                       ,fn-name))
@@ -47,7 +49,7 @@
         (,lambda-expr ,whole-var *lexenv*)
         (values))
       #-sb-xc-host
-      (install-guard-function ',name '(:special ,name) ,(or #!+sb-doc doc))
+      (install-guard-function ',name '(:special ,name) ,doc)
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
       (setf (info :function :ir1-convert ',name) #',fn-name)

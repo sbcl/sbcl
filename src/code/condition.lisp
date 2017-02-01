@@ -459,6 +459,8 @@
           (t
            (error "unknown option: ~S" (first option)))))
 
+      ;; Maybe kill docstring, but only under the cross-compiler.
+      #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq documentation nil)
       `(progn
          (eval-when (:compile-toplevel)
            (%compiler-define-condition ',name ',parent-types ',layout

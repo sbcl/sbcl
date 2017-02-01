@@ -95,6 +95,8 @@ locally bound, declared special, defined as constants, and neither bound
 nor defined as symbol macros.
 
 See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
+  ;; Maybe kill docstring, but only under the cross-compiler.
+  #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
   (let ((boundp (make-symbol "BOUNDP")))
     `(progn
        (eval-when (:compile-toplevel)
@@ -114,6 +116,8 @@ Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
 unless it has otherwise been assigned a value.
 
 See also DEFGLOBAL which assigns the VALUE at compile-time too."
+  ;; Maybe kill docstring, but only under the cross-compiler.
+  #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
   (let ((boundp (make-symbol "BOUNDP")))
     `(progn
        (eval-when (:compile-toplevel)

@@ -6,6 +6,40 @@
 (progn
   (load "src/cold/warm.lisp")
 
+  ;;; Remove docstrings that snuck in, as will happen with
+  ;;; any file compiled in warm load.
+  #-sb-doc
+  (let ((count 0))
+    (macrolet ((clear-it (place)
+                 `(when ,place
+                    (setf ,place nil)
+                    (incf count))))
+      ;; 1. Functions, macros, special operators
+      (sb-vm::map-allocated-objects
+       (lambda (obj type size)
+         (declare (ignore size))
+         (case type
+          (#.sb-vm:code-header-widetag
+           (dotimes (i (sb-kernel:code-n-entries obj))
+             (let ((f (sb-kernel:%code-entry-point obj i)))
+               (clear-it (sb-kernel:%simple-fun-doc f)))))
+          (#.sb-vm:instance-header-widetag
+           (when (typep obj 'class)
+             (when (slot-boundp obj 'sb-pcl::%documentation)
+               (clear-it (slot-value obj 'sb-pcl::%documentation)))))
+          (#.sb-vm:funcallable-instance-header-widetag
+           (when (typep obj 'standard-generic-function)
+             (when (slot-boundp obj 'sb-pcl::%documentation)
+               (clear-it (slot-value obj 'sb-pcl::%documentation)))))))
+       :all)
+      ;; 2. Variables, types, and anything else
+      (do-all-symbols (s)
+        (dolist (category '(:variable :type :typed-structure :setf))
+          (clear-it (sb-int:info category :documentation s)))
+        (clear-it (sb-int:info :random-documentation :stuff s))))
+    (when (plusp count)
+      (format t "~&Removed ~D doc string~:P" count)))
+
   ;; Share identical FUN-INFOs
   sb-int::
   (let ((ht (make-hash-table :test 'equalp))

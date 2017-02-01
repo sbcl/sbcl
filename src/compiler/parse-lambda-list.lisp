@@ -1099,6 +1099,8 @@
               (style-warn-once lambda-list "variable ~S occurs more than once"
                                (car tail))))
           (append whole env (ds-lambda-list-variables parse nil)))
+    ;; Maybe kill docstring, but only under the cross-compiler.
+    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq docstring nil)
     (values `(,@(if lambda-name `(named-lambda ,lambda-name) '(lambda))
                   (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
               ,@(when (and docstring (eq doc-string-allowed :internal))

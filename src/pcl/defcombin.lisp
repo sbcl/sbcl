@@ -97,7 +97,8 @@
     (when old-method
       (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)
-    (setf (random-documentation type-name 'method-combination) doc)
+    (when doc
+      (setf (random-documentation type-name 'method-combination) doc))
     type-name))
 
 (defun short-combine-methods (type-name options operator ioa method doc)
