@@ -595,3 +595,9 @@ os_restore_fp_control(os_context_t *context)
 }
 
 #endif
+
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+  return (os_context_register_t *)((&context->uc_mcontext->__fs.__fpu_xmm0) + offset);
+}
