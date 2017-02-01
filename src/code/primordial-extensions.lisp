@@ -266,7 +266,6 @@
                                     (OS, CPU, whatever)."
                                    controlp)
                                   arguments)
-  (declare (ignorable doc))
   `(defun ,name (&rest args)
      ,doc
      (declare (ignore args))

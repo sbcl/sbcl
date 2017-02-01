@@ -15,13 +15,13 @@
 
 ;;; The initialization of these streams is performed by
 ;;; STREAM-COLD-INIT-OR-RESET.
-(defvar *terminal-io* () #!+sb-doc "terminal I/O stream")
-(defvar *standard-input* () #!+sb-doc "default input stream")
-(defvar *standard-output* () #!+sb-doc "default output stream")
-(defvar *error-output* () #!+sb-doc "error output stream")
-(defvar *query-io* () #!+sb-doc "query I/O stream")
-(defvar *trace-output* () #!+sb-doc "trace output stream")
-(defvar *debug-io* () #!+sb-doc "interactive debugging stream")
+(defvar *terminal-io* () "terminal I/O stream")
+(defvar *standard-input* () "default input stream")
+(defvar *standard-output* () "default output stream")
+(defvar *error-output* () "error output stream")
+(defvar *query-io* () "query I/O stream")
+(defvar *trace-output* () "trace output stream")
+(defvar *debug-io* () "interactive debugging stream")
 
 (defun stream-element-type-stream-element-mode (element-type)
   (cond ((or (not element-type)

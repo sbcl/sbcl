@@ -79,7 +79,7 @@
   (values))
 
 (defvar *stepper-hook* 'single-step
-  #+sb-doc "Customization hook for alternative single-steppers.
+  "Customization hook for alternative single-steppers.
 *STEPPER-HOOK* is bound to NIL prior to calling the bound function
 with the STEP-CONDITION as argument.")
 

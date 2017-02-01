@@ -24,7 +24,6 @@
 
 ;;; c.f. x86 backend:
 ;;(defmacro move (dst src)
-;;  #!+sb-doc
 ;;  "Move SRC into DST unless they are location=."
 ;;  (once-only ((n-dst dst)
 ;;              (n-src src))

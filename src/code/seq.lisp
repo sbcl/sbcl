@@ -338,7 +338,7 @@
                 (sb!sequence:emptyp sequence)))
 
 (defun elt (sequence index)
-  #!+sb-doc "Return the element of SEQUENCE specified by INDEX."
+  "Return the element of SEQUENCE specified by INDEX."
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
                 (do ((count index (1- count))
@@ -355,7 +355,7 @@
                 (sb!sequence:elt sequence index)))
 
 (defun %setelt (sequence index newval)
-  #!+sb-doc "Store NEWVAL as the component of SEQUENCE specified by INDEX."
+  "Store NEWVAL as the component of SEQUENCE specified by INDEX."
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
                 (do ((count index (1- count))
@@ -372,7 +372,7 @@
                 (setf (sb!sequence:elt sequence index) newval)))
 
 (defun length (sequence)
-  #!+sb-doc "Return an integer that is the length of SEQUENCE."
+  "Return an integer that is the length of SEQUENCE."
   (declare (explicit-check))
   (seq-dispatch-checking sequence
                 (length sequence)
@@ -538,7 +538,7 @@
 ;;;; COPY-SEQ
 
 (defun copy-seq (sequence)
-  #!+sb-doc "Return a copy of SEQUENCE which is EQUAL to SEQUENCE but not EQ."
+  "Return a copy of SEQUENCE which is EQUAL to SEQUENCE but not EQ."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking sequence
     (list-copy-seq* sequence)

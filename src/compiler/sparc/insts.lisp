@@ -98,14 +98,14 @@ Otherwise, use the Sparc register names")
            (cond ((null name) nil)
                  (t (make-symbol (concatenate 'string "%" name)))))
        sb!vm::*register-names*)
-  #!+sb-doc "The Lisp names for the Sparc integer registers")
+  "The Lisp names for the Sparc integer registers")
 
 (defparameter sparc-reg-symbols
   #("%G0" "%G1" "%G2" "%G3" "%G4" "%G5" NIL NIL
     "%O0" "%O1" "%O2" "%O3" "%O4" "%O5" "%O6" "%O7"
     "%L0" "%L1" "%L2" "%L3" "%L4" "%L5" "%L6" "%L7"
     "%I0" "%I1" "%I2" "%I3" "%I4" "%I5" NIL "%I7")
-  #!+sb-doc "The standard names for the Sparc integer registers")
+  "The standard names for the Sparc integer registers")
 
 (defun get-reg-name (index)
   (if *disassem-use-lisp-reg-names*

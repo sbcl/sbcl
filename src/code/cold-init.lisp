@@ -146,7 +146,7 @@
 
 ;;; called when a cold system starts up
 (defun !cold-init (&aux real-choose-symbol-out-fun)
-  #!+sb-doc "Give the world a shove and hope it spins."
+  "Give the world a shove and hope it spins."
 
   #!+sb-show
   (sb!int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")

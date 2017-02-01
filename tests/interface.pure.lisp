@@ -19,10 +19,14 @@
 
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols
 
-;;; FIXME: It would probably be good to require here that every
-;;; external symbol either has a doc string or has some good excuse
-;;; (like being an accessor for a structure which has a doc string).
-
+(with-test (:name (documentation :cl) :skipped-on '(:not :sb-doc))
+  (let ((n 0))
+    (do-symbols (s 'cl)
+      (if (fboundp s)
+          (when (documentation s 'function)
+            (incf n))))
+    (assert (= n 594))))
+
 ;;;; tests of interface machinery
 
 ;;; APROPOS should accept a package designator, not just a package, and
@@ -71,26 +75,6 @@
 (with-test (:name (documentation :sb-ext))
   ;; We should have documentation for our extension package:
   (assert (documentation (find-package "SB-EXT") t)))
-
-;; This is trying to assert that you didn't mistakenly write
-;; "#!+sb-doc (important-form)" in source code
-;; but it's an absolutely terrible test, because it is nothing more
-;; than a change detector. There are two possible improvements:
-;; 1. eliminate the change-detection nature of the test by documenting
-;;    all functions in CL, so that the magic constant goes away.
-;;    This would still be an indirect test.
-;; 2. stop littering up the source code with #!+sb-doc,
-;;    always write docstrings, and have 'make-target-2-load.lisp' remove them
-;;    if desired. This would eliminate >1100 reader conditionals,
-;;    comprising nearly 68% of all reader conditionals in SBCL source.
-#+sb-doc
-(with-test (:name (documentation :cl))
-  (let ((n 0))
-    (do-symbols (s 'cl)
-      (if (fboundp s)
-          (when (documentation s 'function)
-            (incf n))))
-    (assert (= n 594))))
 
 ;;; DECLARE should not be a special operator
 (with-test (:name (declare :not special-operator-p))

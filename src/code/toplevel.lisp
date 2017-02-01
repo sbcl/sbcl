@@ -176,15 +176,15 @@ any non-negative real number."
 
 (defvar / nil
   "a list of all the values returned by the most recent top level EVAL")
-(defvar //  nil #!+sb-doc "the previous value of /")
-(defvar /// nil #!+sb-doc "the previous value of //")
-(defvar *   nil #!+sb-doc "the value of the most recent top level EVAL")
-(defvar **  nil #!+sb-doc "the previous value of *")
-(defvar *** nil #!+sb-doc "the previous value of **")
-(defvar +   nil #!+sb-doc "the value of the most recent top level READ")
-(defvar ++  nil #!+sb-doc "the previous value of +")
-(defvar +++ nil #!+sb-doc "the previous value of ++")
-(defvar -   nil #!+sb-doc "the form currently being evaluated")
+(defvar //  nil "the previous value of /")
+(defvar /// nil "the previous value of //")
+(defvar *   nil "the value of the most recent top level EVAL")
+(defvar **  nil "the previous value of *")
+(defvar *** nil "the previous value of **")
+(defvar +   nil "the value of the most recent top level READ")
+(defvar ++  nil "the previous value of +")
+(defvar +++ nil "the previous value of ++")
+(defvar -   nil "the form currently being evaluated")
 
 (defun interactive-eval (form &key (eval #'eval))
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,

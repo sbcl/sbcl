@@ -702,9 +702,8 @@ is either numeric or alphabetic."
   (not (two-arg-char-equal c1 c2)))
 
 (macrolet ((def (name test doc)
-             (declare (ignorable doc))
              `(defun ,name (character &rest more-characters)
-                #!+sb-doc ,doc
+                ,doc
                 (if more-characters
                     (do ((c character (nth i more-characters))
                          (i 0 (1+ i)))
@@ -733,9 +732,8 @@ Case is ignored."))
   (>= (equal-char-code c1) (equal-char-code c2)))
 
 (macrolet ((def (op test doc &optional explicit-check)
-             (declare (ignorable doc))
              `(defun ,op (character &rest more-characters)
-                #!+sb-doc ,doc
+                ,doc
                 ,@(when explicit-check `((declare (explicit-check))))
                 (let ((c1 character))
                   (declare (character c1))

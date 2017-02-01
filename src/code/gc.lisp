@@ -309,7 +309,7 @@ statistics are appended to it."
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (full nil) (gen 0) &allow-other-keys)
-  #!+(and sb-doc gencgc)
+  #!+gencgc
   "Initiate a garbage collection.
 
 The default is to initiate a nursery collection, which may in turn
@@ -319,7 +319,7 @@ used to specify the oldest generation guaranteed to be collected.
 
 On CheneyGC platforms arguments FULL and GEN take no effect: a full
 collection is always performed."
-  #!+(and sb-doc (not gencgc))
+  #!-gencgc
   "Initiate a garbage collection.
 
 The collection is always a full collection.
@@ -415,7 +415,6 @@ Note: currently changes to this value are lost when saving core."
     (array generation #.(1+ sb!vm:+pseudo-static-generation+)))
 
 (macrolet ((def (slot doc &optional setfp)
-             (declare (ignorable doc))
              `(progn
                 (defun ,(symbolicate "GENERATION-" slot) (generation)
                   ,doc

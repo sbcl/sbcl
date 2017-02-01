@@ -1642,9 +1642,8 @@ a variable."))
       (apply #'invoke-restart restart arguments))))
 
 (macrolet ((define-nil-returning-restart (name args doc)
-             #!-sb-doc (declare (ignore doc))
              `(defun ,name (,@args &optional condition)
-                #!+sb-doc ,doc
+                ,doc
                 (try-restart ',name condition ,@args))))
   (define-nil-returning-restart continue ()
     "Transfer control to a restart named CONTINUE, or return NIL if none exists.")
@@ -1661,9 +1660,8 @@ return NIL if none exists."))
 ;;; single-stepping restarts
 
 (macrolet ((def (name doc)
-               #!-sb-doc (declare (ignore doc))
                `(defun ,name (condition)
-                 #!+sb-doc ,doc
+                 ,doc
                  (invoke-restart (find-restart-or-control-error ',name condition)))))
   (def step-continue
       "Transfers control to the STEP-CONTINUE restart associated with

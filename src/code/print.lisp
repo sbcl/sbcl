@@ -88,7 +88,6 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;; routines to print objects
 
 (macrolet ((def (fn doc &rest forms)
-             (declare (ignorable doc))
              `(defun ,fn
                     (object
                      &key
@@ -113,7 +112,7 @@ variable: an unreadable object representing the error is printed instead.")
                       *print-pprint-dispatch*)
                      ((:suppress-errors *suppress-print-errors*)
                       *suppress-print-errors*))
-               #!+sb-doc ,doc
+               ,doc
                (declare (explicit-check))
                ,@forms)))
   (def write

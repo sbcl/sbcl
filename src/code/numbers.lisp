@@ -356,10 +356,9 @@
 ;;;; can sometimes be sliced exceedingly thing...)
 
 (macrolet ((define-arith (op init doc)
-             #!-sb-doc (declare (ignore doc))
              `(defun ,op (&rest numbers)
                 (declare (explicit-check))
-                #!+sb-doc ,doc
+                ,doc
                 (if numbers
                     (let ((result (the number (fast-&rest-nth 0 numbers))))
                       (do-rest-arg ((n) numbers 1 result)
@@ -793,9 +792,8 @@
       t))
 
 (macrolet ((def (op doc)
-             (declare (ignorable doc))
              `(defun ,op (number &rest more-numbers)
-                #!+sb-doc ,doc
+                ,doc
                 (declare (explicit-check))
                 (let ((n1 number))
                   (declare (real n1))
@@ -980,9 +978,8 @@ the first."
 ;;;; logicals
 
 (macrolet ((def (op init doc)
-             #!-sb-doc (declare (ignore doc))
              `(defun ,op (&rest integers)
-                #!+sb-doc ,doc
+                ,doc
                 (declare (explicit-check))
                 (if integers
                     (do ((result (fast-&rest-nth 0 integers)
@@ -1020,23 +1017,23 @@ the first."
   (def two-arg-eqv nil logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
   (def lognand t lognand
        (lambda (x y) (lognot (bignum-logical-and x y)))
-       #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
+       "Complement the logical AND of INTEGER1 and INTEGER2.")
   (def lognor t lognor
        (lambda (x y) (lognot (bignum-logical-ior x y)))
-       #!+sb-doc "Complement the logical OR of INTEGER1 and INTEGER2.")
+       "Complement the logical OR of INTEGER1 and INTEGER2.")
   ;; ... but BIGNUM-LOGICAL-NOT on a bignum will always return a bignum
   (def logandc1 t logandc1
        (lambda (x y) (bignum-logical-and (bignum-logical-not x) y))
-       #!+sb-doc "Bitwise AND (LOGNOT INTEGER1) with INTEGER2.")
+       "Bitwise AND (LOGNOT INTEGER1) with INTEGER2.")
   (def logandc2 t logandc2
        (lambda (x y) (bignum-logical-and x (bignum-logical-not y)))
-       #!+sb-doc "Bitwise AND INTEGER1 with (LOGNOT INTEGER2).")
+       "Bitwise AND INTEGER1 with (LOGNOT INTEGER2).")
   (def logorc1 t logorc1
        (lambda (x y) (bignum-logical-ior (bignum-logical-not x) y))
-       #!+sb-doc "Bitwise OR (LOGNOT INTEGER1) with INTEGER2.")
+       "Bitwise OR (LOGNOT INTEGER1) with INTEGER2.")
   (def logorc2 t logorc2
        (lambda (x y) (bignum-logical-ior x (bignum-logical-not y)))
-       #!+sb-doc "Bitwise OR INTEGER1 with (LOGNOT INTEGER2)."))
+       "Bitwise OR INTEGER1 with (LOGNOT INTEGER2)."))
 
 (defun logcount (integer)
   "Count the number of 1 bits if INTEGER is non-negative,
@@ -1385,8 +1382,7 @@ and the number of 0 bits if INTEGER is negative."
 ;;;; miscellaneous number predicates
 
 (macrolet ((def (name doc)
-             (declare (ignorable doc))
-             `(defun ,name (number) #!+sb-doc ,doc
+             `(defun ,name (number) ,doc
                 (declare (explicit-check))
                 (,name number))))
   (def zerop "Is this number zero?")

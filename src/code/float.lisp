@@ -38,9 +38,8 @@
 
 (defmacro !define-float-dispatching-function
     (name doc single double #!+(and long-float x86) long)
-  (declare (ignorable doc))
   `(defun ,name (x)
-     #!+sb-doc ,doc
+     ,doc
      (number-dispatch ((x float))
        ((single-float)
         (let ((bits (single-float-bits x)))

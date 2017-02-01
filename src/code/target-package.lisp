@@ -512,7 +512,7 @@ Experimental: interface subject to change."
   (%package-hashtable-symbol-count (package-external-symbols package)))
 
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!")
-  #!+sb-doc "the current package")
+  "the current package")
 
 (define-condition bootstrap-package-not-found (condition)
   ((name :initarg :name :reader bootstrap-package-name)))

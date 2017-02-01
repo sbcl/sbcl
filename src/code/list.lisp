@@ -27,90 +27,90 @@
           subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
 ;;; These functions perform basic list operations.
-(defun car (list) #!+sb-doc "Return the 1st object in a list." (car list))
+(defun car (list) "Return the 1st object in a list." (car list))
 (defun cdr (list)
-  #!+sb-doc "Return all but the first object in a list."
+  "Return all but the first object in a list."
   (cdr list))
-(defun cadr (list) #!+sb-doc "Return the 2nd object in a list." (cadr list))
-(defun cdar (list) #!+sb-doc "Return the cdr of the 1st sublist." (cdar list))
-(defun caar (list) #!+sb-doc "Return the car of the 1st sublist." (caar list))
+(defun cadr (list) "Return the 2nd object in a list." (cadr list))
+(defun cdar (list) "Return the cdr of the 1st sublist." (cdar list))
+(defun caar (list) "Return the car of the 1st sublist." (caar list))
 (defun cddr (list)
-  #!+sb-doc "Return all but the 1st two objects of a list."
+  "Return all but the 1st two objects of a list."
   (cddr list))
 (defun caddr (list)
-  #!+sb-doc "Return the 1st object in the cddr of a list."
+  "Return the 1st object in the cddr of a list."
   (caddr list))
 (defun caadr (list)
-  #!+sb-doc "Return the 1st object in the cadr of a list."
+  "Return the 1st object in the cadr of a list."
   (caadr list))
 (defun caaar (list)
-  #!+sb-doc "Return the 1st object in the caar of a list."
+  "Return the 1st object in the caar of a list."
   (caaar list))
 (defun cdaar (list)
-  #!+sb-doc "Return the cdr of the caar of a list."
+  "Return the cdr of the caar of a list."
   (cdaar list))
 (defun cddar (list)
-  #!+sb-doc "Return the cdr of the cdar of a list."
+  "Return the cdr of the cdar of a list."
   (cddar list))
 (defun cdddr (list)
-  #!+sb-doc "Return the cdr of the cddr of a list."
+  "Return the cdr of the cddr of a list."
   (cdddr list))
 (defun cadar (list)
-  #!+sb-doc "Return the car of the cdar of a list."
+  "Return the car of the cdar of a list."
   (cadar list))
 (defun cdadr (list)
-  #!+sb-doc "Return the cdr of the cadr of a list."
+  "Return the cdr of the cadr of a list."
   (cdadr list))
 (defun caaaar (list)
-  #!+sb-doc "Return the car of the caaar of a list."
+  "Return the car of the caaar of a list."
   (caaaar list))
 (defun caaadr (list)
-  #!+sb-doc "Return the car of the caadr of a list."
+  "Return the car of the caadr of a list."
   (caaadr list))
 (defun caaddr (list)
-  #!+sb-doc "Return the car of the caddr of a list."
+  "Return the car of the caddr of a list."
   (caaddr list))
 (defun cadddr (list)
-  #!+sb-doc "Return the car of the cdddr of a list."
+  "Return the car of the cdddr of a list."
   (cadddr list))
 (defun cddddr (list)
-  #!+sb-doc "Return the cdr of the cdddr of a list."
+  "Return the cdr of the cdddr of a list."
   (cddddr list))
 (defun cdaaar (list)
-  #!+sb-doc "Return the cdr of the caaar of a list."
+  "Return the cdr of the caaar of a list."
   (cdaaar list))
 (defun cddaar (list)
-  #!+sb-doc "Return the cdr of the cdaar of a list."
+  "Return the cdr of the cdaar of a list."
   (cddaar list))
 (defun cdddar (list)
-  #!+sb-doc "Return the cdr of the cddar of a list."
+  "Return the cdr of the cddar of a list."
   (cdddar list))
 (defun caadar (list)
-  #!+sb-doc "Return the car of the cadar of a list."
+  "Return the car of the cadar of a list."
   (caadar list))
 (defun cadaar (list)
-  #!+sb-doc "Return the car of the cdaar of a list."
+  "Return the car of the cdaar of a list."
   (cadaar list))
 (defun cadadr (list)
-  #!+sb-doc "Return the car of the cdadr of a list."
+  "Return the car of the cdadr of a list."
   (cadadr list))
 (defun caddar (list)
-  #!+sb-doc "Return the car of the cddar of a list."
+  "Return the car of the cddar of a list."
   (caddar list))
 (defun cdaadr (list)
-  #!+sb-doc "Return the cdr of the caadr of a list."
+  "Return the cdr of the caadr of a list."
   (cdaadr list))
 (defun cdadar (list)
-  #!+sb-doc "Return the cdr of the cadar of a list."
+  "Return the cdr of the cadar of a list."
   (cdadar list))
 (defun cdaddr (list)
-  #!+sb-doc "Return the cdr of the caddr of a list."
+  "Return the cdr of the caddr of a list."
   (cdaddr list))
 (defun cddadr (list)
-  #!+sb-doc "Return the cdr of the cdadr of a list."
+  "Return the cdr of the cdadr of a list."
   (cddadr list))
 (defun cons (se1 se2)
-  #!+sb-doc "Return a list with SE1 as the CAR and SE2 as the CDR."
+  "Return a list with SE1 as the CAR and SE2 as the CDR."
   (cons se1 se2))
 
 (declaim (maybe-inline tree-equal-test tree-equal-test-not))

@@ -37,7 +37,7 @@
 (!set-load-form-method comma (:host :xc :target))
 
 (declaim (type (and fixnum unsigned-byte) *backquote-depth*))
-(defvar *backquote-depth* 0 #!+sb-doc "how deep we are into backquotes")
+(defvar *backquote-depth* 0 "how deep we are into backquotes")
 (defvar *bq-error* "Comma not inside a backquote.")
 
 (/show0 "backq.lisp 50")
