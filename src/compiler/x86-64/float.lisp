@@ -395,7 +395,8 @@
                  (loop for arg in args
                        collect
                        (cond ((or (symbolp arg)
-                                  (floatp arg)) arg)
+                                  (floatp arg)
+                                  (complexp arg)) arg)
                              ((eq (tn-kind arg) :constant)
                               (tn-value arg))
                              (t
@@ -575,24 +576,28 @@
                              (:result-types ,complex-type)
                              (:vop-var vop)
                              (:generator ,cost
-                               (if (sc-is x ,real-constant-sc)
-                                   (inst ,complex-move-inst dup
-                                         (register-inline-constant
-                                          (complex (tn-value x) (tn-value x))))
-                                   (let ((real x))
-                                     ,duplicate-inst))
-                                ;; safe: dup /= y
-                                (when (location= dup r)
-                                  (rotatef dup y))
-                                (if (sc-is y ,complex-constant-sc)
-                                    (inst ,complex-move-inst r
-                                          (register-inline-constant (tn-value y)))
-                                    (move r y))
-                                (note-float-location ',op vop r dup)
-                                (when (sc-is dup ,complex-constant-sc)
-                                  (setf dup (register-inline-constant
-                                             :aligned (tn-value dup))))
-                                (inst ,op-inst r dup))))
+                               (let (first-value
+                                     (second-value r))
+                                 (if (sc-is x ,real-constant-sc)
+                                     (inst ,complex-move-inst dup
+                                           (register-inline-constant
+                                            (complex (setf first-value (tn-value x)) (tn-value x))))
+                                     (let ((real x))
+                                       (setf first-value x)
+                                       ,duplicate-inst))
+                                 ;; safe: dup /= y
+                                 (when (location= dup r)
+                                   (rotatef dup y)
+                                   (setf second-value dup))
+                                 (if (sc-is y ,complex-constant-sc)
+                                     (inst ,complex-move-inst r
+                                           (register-inline-constant (tn-value y)))
+                                     (move r y))
+                                 (note-float-location ',op vop first-value second-value)
+                                 (when (sc-is dup ,complex-constant-sc)
+                                   (setf dup (register-inline-constant
+                                              :aligned (tn-value dup))))
+                                 (inst ,op-inst r dup)))))
 
                        ,(when complex-real-name
                           `(define-vop (,complex-real-name float-op)
@@ -613,23 +618,28 @@
                              (:result-types ,complex-type)
                              (:vop-var vop)
                              (:generator ,cost
-                               (if (sc-is y ,real-constant-sc)
-                                   (inst ,complex-move-inst dup
-                                         (register-inline-constant
-                                          (complex (tn-value y) (tn-value y))))
-                                   (let ((real y))
-                                     ,duplicate-inst))
-                                (when (location= dup r)
-                                  (rotatef x dup))
-                                (if (sc-is x ,complex-constant-sc)
-                                    (inst ,complex-move-inst r
-                                          (register-inline-constant (tn-value x)))
-                                    (move r x))
-                                (note-float-location ',op vop r dup)
-                                (when (sc-is dup ,complex-constant-sc)
-                                  (setf dup (register-inline-constant
-                                             :aligned (tn-value dup))))
-                                (inst ,op-inst r dup))))))
+                               (let ((first-value r)
+                                     second-value)
+                                 (if (sc-is y ,real-constant-sc)
+                                     (inst ,complex-move-inst dup
+                                           (register-inline-constant
+                                            (complex (setf second-value (tn-value y))
+                                                     (tn-value y))))
+                                     (let ((real y))
+                                       (setf second-value y)
+                                       ,duplicate-inst))
+                                 (when (location= dup r)
+                                   (rotatef x dup)
+                                   (setf first-value dup))
+                                 (if (sc-is x ,complex-constant-sc)
+                                     (inst ,complex-move-inst r
+                                           (register-inline-constant (tn-value x)))
+                                     (move r x))
+                                 (note-float-location ',op vop first-value second-value)
+                                 (when (sc-is dup ,complex-constant-sc)
+                                   (setf dup (register-inline-constant
+                                              :aligned (tn-value dup))))
+                                 (inst ,op-inst r dup)))))))
                    (t ; duplicate, not commutative
                     `(progn
                        ,(when real-complex-name
@@ -675,12 +685,13 @@
                              (:result-types ,complex-type)
                              (:vop-var vop)
                              (:generator ,cost
-                               (let ((second-value dup))
+                               (let (second-value)
                                  (if (sc-is y ,real-constant-sc)
                                      (setf dup (register-inline-constant
                                                 :aligned (complex (setf second-value (tn-value y))
                                                                   (tn-value y))))
                                      (let ((real y))
+                                       (setf second-value y)
                                        ,duplicate-inst))
                                  (move r x)
                                  (note-float-location ',op vop r second-value)
@@ -735,7 +746,8 @@
   (:result-types complex-single-float)
   (:vop-var vop)
   (:generator 12
-    (let ((second-value dup))
+    (let ((second-value dup)
+          (first-value r))
       (flet ((duplicate (x)
                (let ((word (ldb (byte 64 0)
                                 (logior (ash (single-float-bits (imagpart x)) 32)
@@ -749,16 +761,18 @@
           (fp-single-zero
            (inst xorps dup dup))
           (t (move dup y)
+             (setf second-value y)
              (inst shufps dup dup #b00000000)))
         (sc-case x
           (fp-complex-single-immediate
-           (inst movaps r (duplicate (setf second-value (tn-value y)))))
+           (inst movaps r (duplicate (setf first-value (tn-value x)))))
           (fp-complex-single-zero
            (inst xorps r r))
           (t
            (move r x)
+           (setf first-value x)
            (inst unpcklpd r r)))
-        (note-float-location '/ vop r second-value)
+        (note-float-location '/ vop first-value second-value)
         (inst divps r dup)
         (inst movq r r)))))
 

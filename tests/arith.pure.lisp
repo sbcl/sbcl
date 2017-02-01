@@ -789,3 +789,10 @@
                                  (logand x (ash sb-ext:most-positive-word -1))))))
     (assert (= (funcall fun -1)
                (ash most-positive-word -1)))))
+
+(with-test (:name ://complex-real-single-float)
+  (assert (= (funcall (checked-compile `(lambda (b)
+                                          (declare (type single-float b))
+                                          (/ #c(1.0 2.0) b)))
+                      1.0)
+             #c(1.0 2.0))))
