@@ -182,9 +182,9 @@
              (tagbody
               retry-compile-file
                 (multiple-value-bind (output-truename warnings-p failure-p)
-                    (if *compile-files-p*
-                        (compile-file fullname)
-                        (compile-file-pathname fullname))
+                    (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
+                     ((t)   (compile-file fullname))
+                     ((nil) (compile-file-pathname fullname)))
                   (declare (ignore warnings-p))
                   (sb-int:/show "done compiling" fullname)
                   (cond ((not output-truename)
@@ -213,22 +213,11 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
-  (let ((*compile-print* nil))
+  (let ((*print-length* 10)
+        (*print-level* 5)
+        (*print-circle* t)
+        (*compile-print* nil))
     (do-srcs early-srcs)
     (with-compilation-unit () (do-srcs interpreter-srcs))
     (with-compilation-unit () (do-srcs pcl-srcs))
     (do-srcs other-srcs))))
-
-;;;; setting package documentation
-
-;;; While we were running on the cross-compilation host, we tried to
-;;; be portable and not overwrite the doc strings for the standard
-;;; packages. But now the cross-compilation host is only a receding
-;;; memory, and we can have our way with the doc strings.
-#+sb-doc
-(setf (documentation (find-package "COMMON-LISP") t)
-      "public: home of symbols defined by the ANSI language specification"
-      (documentation (find-package "COMMON-LISP-USER") t)
-      "public: the default package for user code and data"
-      (documentation (find-package "KEYWORD") t)
-      "public: home of keywords")

@@ -41,7 +41,7 @@ fi
 # for much longer than that, don't worry, it's likely to be normal.
 if [ "$1" != --load ]; then
     echo //doing warm init - compilation phase
-    echo '(load "loader.lisp") (load-sbcl-file "make-target-2.lisp")' | \
+    echo '(load "loader.lisp") (load-sbcl-file "src/cold/warm.lisp")' | \
     ./src/runtime/sbcl \
         --core output/cold-sbcl.core \
         --lose-on-corruption \

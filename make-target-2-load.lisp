@@ -2,9 +2,8 @@
 (progn
   (defvar *compile-files-p* nil)
   "about to LOAD warm.lisp (with *compile-files-p* = NIL)")
-(let ((*print-length* 10)
-      (*print-level* 5)
-      (*print-circle* t))
+
+(progn
   (load "src/cold/warm.lisp")
 
   ;; Share identical FUN-INFOs
@@ -52,7 +51,17 @@
                (null (symbol-plist symbol)))
       (setf (sb-kernel:symbol-info symbol) nil)))
 
+  ;; Set doc strings for the standard packages.
+  #+sb-doc
+  (setf (documentation (find-package "COMMON-LISP") t)
+        "public: home of symbols defined by the ANSI language specification"
+        (documentation (find-package "COMMON-LISP-USER") t)
+        "public: the default package for user code and data"
+        (documentation (find-package "KEYWORD") t)
+        "public: home of keywords")
+
   "done with warm.lisp, about to GC :FULL T")
+
 (sb-ext:gc :full t)
 
 ;;; resetting compilation policy to neutral values in preparation for
