@@ -295,12 +295,10 @@
       (emit-alignment 2))))
 
 (defun error-call (vop error-code &rest values)
-  #!+sb-doc
   "Cause an error.  ERROR-CODE is the error to cause."
   (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 (defun generate-error-code (vop error-code &rest values)
-  #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   (assemble (*elsewhere*)

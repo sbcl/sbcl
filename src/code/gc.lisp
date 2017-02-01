@@ -76,7 +76,6 @@
   )
 
 (defun room (&optional (verbosity :default))
-  #!+sb-doc
   "Print to *STANDARD-OUTPUT* information about the state of internal
   storage and its management. The optional argument controls the
   verbosity of output. If it is T, ROOM prints out a maximal amount of
@@ -113,7 +112,6 @@
 
 (declaim (ftype (sfunction () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
-  #!+sb-doc
   "Return the number of bytes consed since the program began. Typically
 this result will be a consed bignum, so if you have an application (e.g.
 profiling) which can't tolerate the overhead of consing bignums, you'll
@@ -126,7 +124,6 @@ and submit it as a patch."
 ;;;; GC hooks
 
 (!defvar *after-gc-hooks* nil
-  #!+sb-doc
   "Called after each garbage collection, except for garbage collections
 triggered during thread exits. In a multithreaded environment these hooks may
 run in any thread.")
@@ -160,7 +157,6 @@ run in any thread.")
         (free-alien old))
       pathname))
   (defun gc-logfile ()
-    #!+sb-doc
     "Return the pathname used to log garbage collections. Can be SETF.
 Default is NIL, meaning collections are not logged. If non-null, the
 designated file is opened before and after each collection, and generation
@@ -171,7 +167,6 @@ statistics are appended to it."
 
 (declaim (inline dynamic-space-size))
 (defun dynamic-space-size ()
-  #!+sb-doc
   "Size of the dynamic space in bytes."
   (extern-alien "dynamic_space_size" os-vm-size-t))
 
@@ -368,7 +363,6 @@ guaranteed to be collected."
 ;;;; auxiliary functions
 
 (defun bytes-consed-between-gcs ()
-  #!+sb-doc
   "The amount of memory that will be allocated before the next garbage
 collection is initiated. This can be set with SETF.
 
@@ -424,7 +418,6 @@ Note: currently changes to this value are lost when saving core."
              (declare (ignorable doc))
              `(progn
                 (defun ,(symbolicate "GENERATION-" slot) (generation)
-                  #!+sb-doc
                   ,doc
                   #!+gencgc
                   (declare (generation-index generation))
@@ -481,7 +474,6 @@ promotion. Available on GENCGC platforms only.
 
 Experimental: interface subject to change."))
   (defun generation-average-age (generation)
-    #!+sb-doc
     "Average age of memory allocated to GENERATION: average number of times
 objects allocated to the generation have seen younger objects promoted to it.
 Available on GENCGC platforms only.

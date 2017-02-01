@@ -62,7 +62,6 @@
                            (unblock-deferrable-signals)))))))))
 
 (defmacro in-interruption ((&key) &body body)
-  #!+sb-doc
   "Convenience macro on top of INVOKE-INTERRUPTION."
   `(dx-flet ((interruption () ,@body))
      (invoke-interruption #'interruption)))
@@ -285,7 +284,6 @@
   (sb!impl::get-processes-status-changes))
 
 (defun sb!kernel:signal-cold-init-or-reinit ()
-  #!+sb-doc
   "Enable all the default signals that Lisp knows how to deal with."
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)

@@ -41,7 +41,6 @@
 
 (defmacro sb!xc:deftype (&whole form name lambda-list &body body
                          &environment env)
-  #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
   (unless (symbolp name)

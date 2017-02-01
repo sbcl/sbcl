@@ -293,7 +293,6 @@
   (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv))))
 
 (defun eval (original-exp)
-  #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
    result or results."
   (let ((*eval-source-context* original-exp)
@@ -311,7 +310,6 @@
 ;;; ordinarily handled magically by the compiler
 
 (defun apply (function arg &rest arguments)
-  #!+sb-doc
   "Apply FUNCTION to a list of arguments produced by evaluating ARGUMENTS in
   the manner of LIST*. That is, a list is made of the values of all but the
   last argument, appended to the value of the last argument, which must be a
@@ -327,17 +325,14 @@
                  (apply function (cons arg arguments)))))))
 
 (defun funcall (function &rest arguments)
-  #!+sb-doc
   "Call FUNCTION with the given ARGUMENTS."
   (apply function arguments))
 
 (defun values (&rest values)
-  #!+sb-doc
   "Return all arguments, in order, as values."
   (declare (truly-dynamic-extent values))
   (values-list values))
 
 (defun values-list (list)
-  #!+sb-doc
   "Return all of the elements of LIST, in order, as values."
   (values-list list))

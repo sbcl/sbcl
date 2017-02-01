@@ -58,7 +58,6 @@
         (prin1 (restart-name restart) stream))
       (restart-report restart stream)))
 
-#!+sb-doc
 (setf (fdocumentation 'restart-name 'function)
       "Return the name of the given restart object.")
 
@@ -99,7 +98,6 @@
           (funcall function restart))))))
 
 (defun compute-restarts (&optional condition)
-  #!+sb-doc
   "Return a list of all the currently active restarts ordered from most recently
 established to less recently established. If CONDITION is specified, then only
 restarts associated with CONDITION (or with no condition) will be returned."
@@ -143,7 +141,6 @@ restarts associated with CONDITION (or with no condition) will be returned."
         (map-restarts #'named-restart-p condition call-test-p))))
 
 (defun find-restart (identifier &optional condition)
-  #!+sb-doc
   "Return the first restart identified by IDENTIFIER. If IDENTIFIER is a symbol,
 then the innermost applicable restart with that name is returned. If IDENTIFIER
 is a restart, it is returned if it is currently active. Otherwise NIL is
@@ -163,7 +160,6 @@ with that condition (or with no condition) will be returned."
              :format-arguments (list identifier condition))))
 
 (defun invoke-restart (restart &rest values)
-  #!+sb-doc
   "Calls the function associated with the given restart, passing any given
    arguments. If the argument restart is not a restart or a currently active
    non-nil restart name, then a CONTROL-ERROR is signalled."
@@ -202,7 +198,6 @@ with that condition (or with no condition) will be returned."
         '())))
 
 (defun invoke-restart-interactively (restart)
-  #!+sb-doc
   "Calls the function associated with the given restart, prompting for any
    necessary arguments. If the argument restart is not a restart or a
    currently active non-NIL restart name, then a CONTROL-ERROR is signalled."

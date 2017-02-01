@@ -580,7 +580,6 @@
 ;;;; user interface to the pretty printer
 
 (defun pprint-newline (kind &optional stream)
-  #!+sb-doc
   "Output a conditional newline to STREAM (which defaults to
    *STANDARD-OUTPUT*) if it is a pretty-printing stream, and do
    nothing if not. KIND can be one of:
@@ -608,7 +607,6 @@
   nil)
 
 (defun pprint-indent (relative-to n &optional stream)
-  #!+sb-doc
   "Specify the indentation to use in the current logical block if
 STREAM \(which defaults to *STANDARD-OUTPUT*) is a pretty-printing
 stream and do nothing if not. (See PPRINT-LOGICAL-BLOCK.) N is the
@@ -632,7 +630,6 @@ line break."
   nil)
 
 (defun pprint-tab (kind colnum colinc &optional stream)
-  #!+sb-doc
   "If STREAM (which defaults to *STANDARD-OUTPUT*) is a pretty-printing
    stream, perform tabbing based on KIND, otherwise do nothing. KIND can
    be one of:
@@ -654,7 +651,6 @@ line break."
   nil)
 
 (defun pprint-fill (stream list &optional (colon? t) atsign?)
-  #!+sb-doc
   "Output LIST to STREAM putting :FILL conditional newlines between each
    element. If COLON? is NIL (defaults to T), then no parens are printed
    around the output. ATSIGN? is ignored (but allowed so that PPRINT-FILL
@@ -671,7 +667,6 @@ line break."
       (pprint-newline :fill stream))))
 
 (defun pprint-linear (stream list &optional (colon? t) atsign?)
-  #!+sb-doc
   "Output LIST to STREAM putting :LINEAR conditional newlines between each
    element. If COLON? is NIL (defaults to T), then no parens are printed
    around the output. ATSIGN? is ignored (but allowed so that PPRINT-LINEAR
@@ -688,7 +683,6 @@ line break."
       (pprint-newline :linear stream))))
 
 (defun pprint-tabular (stream list &optional (colon? t) atsign? tabsize)
-  #!+sb-doc
   "Output LIST to STREAM tabbing to the next column that is an even multiple
    of TABSIZE (which defaults to 16) between each element. :FILL style
    conditional newlines are also output between each element. If COLON? is

@@ -33,7 +33,6 @@
 (defstruct shared-object pathname namestring handle dont-save)
 
 (defun load-shared-object (pathname &key dont-save)
-  #!+sb-doc
   "Load a shared library / dynamic shared object file / similar foreign
 container specified by designated PATHNAME, such as a .so on an ELF platform.
 
@@ -104,7 +103,6 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
     pathname))
 
 (defun unload-shared-object (pathname)
-  #!+sb-doc
   "Unloads the shared object loaded earlier using the designated PATHNAME with
 LOAD-SHARED-OBJECT, to the degree supported on the platform.
 
@@ -175,7 +173,6 @@ Experimental."
 (let ((symbols (make-hash-table :test #'equal))
       (undefineds (make-hash-table :test #'equal)))
   (defun ensure-dynamic-foreign-symbol-address (symbol &optional datap)
-    #!+sb-doc
     "Returns the address of the foreign symbol as an integer. On linkage-table
 ports if the symbols isn't found a special guard address is returned instead,
 accesses to which will result in an UNDEFINED-ALIEN-ERROR. On other ports an

@@ -317,7 +317,6 @@
 
 ;;; Now that we have created the machinery for setting documentation, we can
 ;;; set the documentation for the machinery for setting documentation.
-#+sb-doc
 (setf (documentation 'documentation 'function)
       "Return the documentation string of Doc-Type for X, or NIL if none
 exists. System doc-types are VARIABLE, FUNCTION, STRUCTURE, TYPE, SETF, and T.

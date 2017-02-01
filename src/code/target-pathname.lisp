@@ -332,14 +332,12 @@
     host))
 
 (defun pathname (pathspec)
-  #!+sb-doc
   "Convert PATHSPEC (a pathname designator) into a pathname."
   (declare (type pathname-designator pathspec))
   (with-pathname (pathname pathspec)
     pathname))
 
 (defun native-pathname (pathspec)
-  #!+sb-doc
   "Convert PATHSPEC (a pathname designator) into a pathname, assuming
 the operating system native pathname conventions."
   (with-native-pathname (pathname pathspec)
@@ -435,7 +433,6 @@ the operating system native pathname conventions."
                         &optional
                         (defaults *default-pathname-defaults*)
                         (default-version :newest))
-  #!+sb-doc
   "Construct a filled in pathname by completing the unspecified components
    from the defaults."
   (declare (type pathname-designator pathname)
@@ -523,7 +520,6 @@ the operating system native pathname conventions."
                            (version nil versionp)
                            defaults
                            (case :local))
-  #!+sb-doc
   "Makes a new pathname from the component arguments. Note that host is
 a host-structure or string."
   (declare (type (or string host pathname-component-tokens) host)
@@ -597,7 +593,6 @@ a host-structure or string."
                                     ver))))
 
 (defun pathname-host (pathname &key (case :local))
-  #!+sb-doc
   "Return PATHNAME's host."
   (declare (type pathname-designator pathname)
            (type (member :local :common) case)
@@ -607,7 +602,6 @@ a host-structure or string."
     (%pathname-host pathname)))
 
 (defun pathname-device (pathname &key (case :local))
-  #!+sb-doc
   "Return PATHNAME's device."
   (declare (type pathname-designator pathname)
            (type (member :local :common) case))
@@ -619,7 +613,6 @@ a host-structure or string."
                                 :lower)))))
 
 (defun pathname-directory (pathname &key (case :local))
-  #!+sb-doc
   "Return PATHNAME's directory."
   (declare (type pathname-designator pathname)
            (type (member :local :common) case))
@@ -630,7 +623,6 @@ a host-structure or string."
                                  (%pathname-host pathname))
                                 :lower)))))
 (defun pathname-name (pathname &key (case :local))
-  #!+sb-doc
   "Return PATHNAME's name."
   (declare (type pathname-designator pathname)
            (type (member :local :common) case))
@@ -642,7 +634,6 @@ a host-structure or string."
                                 :lower)))))
 
 (defun pathname-type (pathname &key (case :local))
-  #!+sb-doc
   "Return PATHNAME's type."
   (declare (type pathname-designator pathname)
            (type (member :local :common) case))
@@ -654,7 +645,6 @@ a host-structure or string."
                                 :lower)))))
 
 (defun pathname-version (pathname)
-  #!+sb-doc
   "Return PATHNAME's version."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
@@ -877,7 +867,6 @@ a host-structure or string."
                                 (defaults *default-pathname-defaults*)
                                 &key (start 0) end junk-allowed
                                 as-directory)
-  #!+sb-doc
   "Convert THING into a pathname, using the native conventions
 appropriate for the pathname host HOST, or if not specified the
 host of DEFAULTS.  If THING is a string, the parse is bounded by
@@ -931,7 +920,6 @@ directory."
 (defun-cached (namestring :hash-bits 5 :hash-function #'sxhash
                           :memoizer memoize)
     ((pathname pathname=))
-  #!+sb-doc
   "Construct the full (name)string form of the pathname."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
@@ -944,7 +932,6 @@ directory."
                   (funcall (host-unparse host) pathname)))))))
 
 (defun native-namestring (pathname &key as-file)
-  #!+sb-doc
   "Construct the full native (name)string form of PATHNAME.  For
 file systems whose native conventions allow directories to be
 indicated as files, if AS-FILE is true and the name, type, and
@@ -961,7 +948,6 @@ system's syntax for files."
         (funcall (host-unparse-native host) pathname as-file)))))
 
 (defun host-namestring (pathname)
-  #!+sb-doc
   "Return a string representation of the name of the host in the pathname."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
@@ -973,7 +959,6 @@ system's syntax for files."
            pathname)))))
 
 (defun directory-namestring (pathname)
-  #!+sb-doc
   "Return a string representation of the directories used in the pathname."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
@@ -985,7 +970,6 @@ system's syntax for files."
            pathname)))))
 
 (defun file-namestring (pathname)
-  #!+sb-doc
   "Return a string representation of the name used in the pathname."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
@@ -999,7 +983,6 @@ system's syntax for files."
 (defun enough-namestring (pathname
                           &optional
                           (defaults *default-pathname-defaults*))
-  #!+sb-doc
   "Return an abbreviated pathname sufficient to identify the pathname relative
    to the defaults."
   (declare (type pathname-designator pathname))
@@ -1015,7 +998,6 @@ system's syntax for files."
 ;;;; wild pathnames
 
 (defun wild-pathname-p (pathname &optional field-key)
-  #!+sb-doc
   "Predicate for determining whether pathname contains any wildcards."
   (declare (type pathname-designator pathname)
            (type (member nil :host :device :directory :name :type :version)
@@ -1039,7 +1021,6 @@ system's syntax for files."
         (:version (frob (%pathname-version pathname)))))))
 
 (defun pathname-match-p (in-pathname in-wildname)
-  #!+sb-doc
   "Pathname matches the wildname template?"
   (declare (type pathname-designator in-pathname))
   (with-pathname (pathname in-pathname)
@@ -1243,7 +1224,6 @@ system's syntax for files."
         (res))))
 
 (defun translate-pathname (source from-wildname to-wildname &key)
-  #!+sb-doc
   "Use the source pathname to translate the from-wildname's wild and
 unspecified elements into a completed to-pathname based on the to-wildname."
   (declare (type pathname-designator source from-wildname to-wildname))
@@ -1507,7 +1487,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
   `(satisfies logical-namestring-p))
 
 (defun logical-pathname (pathspec)
-  #!+sb-doc
   "Converts the pathspec argument to a logical-pathname and returns it."
   (declare (type (or logical-pathname string stream) pathspec)
            (values logical-pathname))
@@ -1653,14 +1632,12 @@ unspecified elements into a completed to-pathname based on the to-wildname."
           translation-list))
 
 (defun logical-pathname-translations (host)
-  #!+sb-doc
   "Return the (logical) host object argument's list of translations."
   (declare (type (or string logical-host) host)
            (values list))
   (logical-host-translations (find-logical-host host)))
 
 (defun (setf logical-pathname-translations) (translations host)
-  #!+sb-doc
   "Set the translations list for the logical host argument."
   (declare (type (or string logical-host) host)
            (type list translations)
@@ -1671,7 +1648,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
     (setf (logical-host-translations host) translations)))
 
 (defun translate-logical-pathname (pathname &key)
-  #!+sb-doc
   "Translate PATHNAME to a physical pathname, which is returned."
   (declare (type pathname-designator pathname)
            (values (or null pathname)))
@@ -1695,7 +1671,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
    :unspecific nil nil nil nil))
 
 (defun load-logical-pathname-translations (host)
-  #!+sb-doc
   "Reads logical pathname translations from SYS:SITE;HOST.TRANSLATIONS.NEWEST,
 with HOST replaced by the supplied parameter. Returns T on success.
 
@@ -1747,7 +1722,6 @@ experimental and subject to change."
             ("SYS:OUTPUT;**;*.*.*" ,output)))))
 
 (defun set-sbcl-source-location (pathname)
-  #!+sb-doc
   "Initialize the SYS logical host based on PATHNAME, which should be
 the top-level directory of the SBCL sources. This will replace any
 existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and

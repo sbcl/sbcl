@@ -116,7 +116,6 @@
 
 ;;; old working version
 (defun coerce (object output-type-spec)
-  #!+sb-doc
   "Coerce the Object to an object of type Output-Type-Spec."
   (declare (explicit-check))
   (flet ((coerce-error ()

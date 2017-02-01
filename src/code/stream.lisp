@@ -233,7 +233,6 @@
 ;;; probably thinking of something like what Unix calls block devices)
 ;;; but I can't see any better way to do it. -- WHN 2001-04-14
 (defun stream-associated-with-file-p (x)
-  #!+sb-doc
   "Test for the ANSI concept \"stream associated with a file\"."
   (or (typep x 'file-stream)
       (and (synonym-stream-p x)
@@ -967,7 +966,6 @@
 (defprinter (two-way-stream) input-stream output-stream)
 
 (defun make-two-way-stream (input-stream output-stream)
-  #!+sb-doc
   "Return a bidirectional stream which gets its input from INPUT-STREAM and
    sends its output to OUTPUT-STREAM."
   ;; FIXME: This idiom of the-real-stream-of-a-possibly-synonym-stream
@@ -1060,7 +1058,6 @@
             (concatenated-stream-streams x))))
 
 (defun make-concatenated-stream (&rest streams)
-  #!+sb-doc
   "Return a stream which takes its input from each of the streams in turn,
    going on to the next at EOF."
   (dolist (stream streams)
@@ -1158,7 +1155,6 @@
             (two-way-stream-output-stream x))))
 
 (defun make-echo-stream (input-stream output-stream)
-  #!+sb-doc
   "Return a bidirectional stream which gets its input from INPUT-STREAM and
    sends its output to OUTPUT-STREAM. In addition, all input is echoed to
    the output stream."
@@ -1312,7 +1308,6 @@
     (:element-mode 'character)))
 
 (defun make-string-input-stream (string &optional (start 0) end)
-  #!+sb-doc
   "Return an input stream which will supply the characters of STRING between
   START and END in order."
   (declare (type string string)
@@ -1379,7 +1374,6 @@
 
 (declaim (freeze-type string-output-stream))
 (defun make-string-output-stream (&key (element-type 'character))
-  #!+sb-doc
   "Return an output stream which will accumulate all output given it for the
 benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (explicit-check))
@@ -1803,7 +1797,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (declaim (freeze-type case-frob-stream))
 
 (defun make-case-frob-stream (target kind)
-  #!+sb-doc
   "Return a stream that sends all output to the stream TARGET, but modifies
    the case of letters, depending on KIND, which should be one of:
      :UPCASE - convert to upper case.
@@ -2074,7 +2067,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 ;;;; READ-SEQUENCE
 
 (defun read-sequence (seq stream &key (start 0) end)
-  #!+sb-doc
   "Destructively modify SEQ by reading elements from STREAM.
   That part of SEQ bounded by START and END is destructively modified by
   copying successive elements into it from STREAM. If the end of file
@@ -2218,7 +2210,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 ;;;; WRITE-SEQUENCE
 
 (defun write-sequence (seq stream &key (start 0) (end nil))
-  #!+sb-doc
   "Write the elements of SEQ bounded by START and END to STREAM."
   (declare (type sequence seq)
            (type stream stream)

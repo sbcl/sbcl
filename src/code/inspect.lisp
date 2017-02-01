@@ -24,12 +24,10 @@
   (values))
 
 (defvar *inspect-fun* #'inspector
-  #+sb-doc
   "A function of three arguments OBJECT, INPUT, and OUTPUT which starts an interactive inspector.")
 
 (defvar *inspected*)
 
-#+sb-doc
 (setf (documentation '*inspected* 'variable)
       "the value currently being inspected in CL:INSPECT")
 

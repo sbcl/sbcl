@@ -48,7 +48,6 @@
 (declaim (ftype (function (t &optional lexenv-designator))
                 sb!xc:get-setf-expansion))
 (defun sb!xc:get-setf-expansion (form &optional environment)
-  #!+sb-doc
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
@@ -159,7 +158,6 @@
                    forms)))
 
   (sb!xc:defmacro setf (&whole form &rest args &environment env)
-  #!+sb-doc
   "Takes pairs of arguments like SETQ. The first is a place and the second
   is the value that is supposed to go into that place. Returns the last
   value. The place argument may be any of the access forms for which SETF
@@ -195,7 +193,6 @@
   ;; various SETF-related macros
 
   (sb!xc:defmacro shiftf (&whole form &rest args &environment env)
-  #!+sb-doc
   "One or more SETF-style place expressions, followed by a single
    value expression. Evaluates all of the expressions in turn, then
    assigns the value of each expression to the place on its left,
@@ -259,7 +256,6 @@
              `(,@setters nil))))
 
   (sb!xc:defmacro psetf (&rest pairs &environment env)
-  #!+sb-doc
   "This is to SETF as PSETQ is to SETQ. Args are alternating place
   expressions and values to go into those places. All of the subforms and
   values are determined, left to right, and only then are the locations
@@ -267,7 +263,6 @@
     (expand pairs env 'psetf 'setf))
 
   (sb!xc:defmacro psetq (&rest pairs &environment env)
-  #!+sb-doc
   "PSETQ {var value}*
    Set the variables to the values, like SETQ, except that assignments
    happen in parallel, i.e. no assignments take place until all the
@@ -275,7 +270,6 @@
     (expand pairs env 'psetq 'setq))))
 
 (sb!xc:defmacro rotatef (&rest args &environment env)
-  #!+sb-doc
   "Takes any number of SETF-style place expressions. Evaluates all of the
    expressions in turn, then assigns to each place the value of the form to
    its right. The rightmost form gets the value of the leftmost.
@@ -300,7 +294,6 @@
            ,@(thunk (mv-bindings) (cdr (getters))))))))
 
 (sb!xc:defmacro push (obj place &environment env)
-  #!+sb-doc
   "Takes an object and a location holding a list. Conses the object onto
   the list, returning the modified list. OBJ is evaluated before PLACE."
   ;; If PLACE has multiple store locations, what should we do?
@@ -311,7 +304,6 @@
   (expand-rmw-macro 'cons (list obj) place '() nil env '(item)))
 
 (sb!xc:defmacro pushnew (obj place &rest keys &environment env)
-  #!+sb-doc
   "Takes an object and a location holding a list. If the object is
   already in the list, does nothing; otherwise, conses the object onto
   the list. Keyword arguments are accepted as per the ADJOIN function."
@@ -323,7 +315,6 @@
   (expand-rmw-macro 'adjoin (list obj) place keys nil env '(item)))
 
 (sb!xc:defmacro pop (place &environment env)
-  #!+sb-doc
   "The argument is a location holding a list. Pops one item off the front
   of the list and returns it."
   (if (symbolp (setq place (macroexpand-for-setf place env)))
@@ -341,7 +332,6 @@
              ,ret)))))
 
 (sb!xc:defmacro remf (place indicator &environment env)
-  #!+sb-doc
   "Place may be any place expression acceptable to SETF, and is expected
   to hold a property list or (). This list is destructively altered to
   remove the property specified by the indicator. Returns T if such a
@@ -395,13 +385,11 @@
                        ,@(cdr newval))
                   ,setter)))))
   (sb!xc:defmacro incf (place &optional (delta 1) &environment env)
-  #!+sb-doc
   "The first argument is some location holding a number. This number is
   incremented by the second argument, DELTA, which defaults to 1."
     (expand place delta env '+))
 
   (sb!xc:defmacro decf (place &optional (delta 1) &environment env)
-  #!+sb-doc
   "The first argument is some location holding a number. This number is
   decremented by the second argument, DELTA, which defaults to 1."
     (expand place delta env 'xsubtract)))
@@ -409,7 +397,6 @@
 ;;;; DEFINE-MODIFY-MACRO stuff
 
 (sb!xc:defmacro sb!xc:define-modify-macro (name lambda-list function &optional doc-string)
-  #!+sb-doc
   "Creates a new read-modify-write macro like PUSH or INCF."
   (binding* (((nil required optional rest)
               (parse-lambda-list
@@ -468,7 +455,6 @@
 ;;; but the bug seems to be due to irreconcilable problems in the spec.
 ;;; Everybody seems to interpret the spec the way we do though.
 (sb!xc:defmacro sb!xc:defsetf (access-fn &rest rest)
-  #!+sb-doc
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
   (unless (symbolp access-fn)
@@ -588,7 +574,6 @@
 
 ;;; DEFINE-SETF-EXPANDER is a lot like DEFMACRO.
 (sb!xc:defmacro sb!xc:define-setf-expander (access-fn lambda-list &body body)
-  #!+sb-doc
   "Syntax like DEFMACRO, but creates a setf expander function. The body
   of the definition must be a form that returns five appropriate values."
   (unless (symbolp access-fn)

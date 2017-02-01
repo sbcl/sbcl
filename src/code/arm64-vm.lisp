@@ -8,7 +8,6 @@
 (define-alien-type os-context-t (struct os-context-t-struct))
 
 (defun machine-type ()
-  #!+sb-doc
   "Return a string describing the type of the local machine."
   "ARM64")
 ) ; end PROGN

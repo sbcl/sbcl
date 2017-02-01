@@ -73,7 +73,6 @@
                                          (compression nil)
                                          #!+win32
                                          (application-type :console))
-  #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
 Only global state is preserved: the stack is unwound in the process.

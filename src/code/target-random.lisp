@@ -86,7 +86,6 @@
 ;;; A: Because the DEFKNOWN for MAKE-RANDOM-STATE is more restricted
 ;;;    and doesn't accept numerical state.
 (defun make-random-state (&optional state)
-  #!+sb-doc
   "Make a random state object. The optional STATE argument specifies a seed
 for deterministic pseudo-random number generation.
 
@@ -133,7 +132,6 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
       (fallback-random-seed)))
 
 (defun seed-random-state (&optional state)
-  #!+sb-doc
   "Make a random state object. The optional STATE argument specifies a seed
 for deterministic pseudo-random number generation.
 

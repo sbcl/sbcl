@@ -62,7 +62,6 @@
                                  (accrued-exceptions nil accrued-x-p)
                                  (fast-mode nil fast-mode-p)
                                  #!+x86 (precision nil precisionp))
-  #!+sb-doc
   "This function sets options controlling the floating-point
 hardware. If a keyword is not supplied, then the current value is
 preserved. Possible keywords:
@@ -123,7 +122,6 @@ in effect."
   (values))
 
 (defun get-floating-point-modes ()
-  #!+sb-doc
   "This function returns a list representing the state of the floating
 point modes. The list is in the same format as the &KEY arguments to
 SET-FLOATING-POINT-MODES, i.e.

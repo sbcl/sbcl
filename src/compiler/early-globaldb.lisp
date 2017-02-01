@@ -287,21 +287,18 @@
         (test-name (symbolicate name "-ATTRIBUTEP")))
     `(progn
        (defmacro ,constructor (&rest attribute-names)
-         #!+sb-doc
          "Automagically generated boolean attribute creation function.
   See !DEF-BOOLEAN-ATTRIBUTE."
          (encode-attribute-mask attribute-names ,vector))
        (defun ,(symbolicate "DECODE-" name "-ATTRIBUTES") (attributes)
          (decode-attribute-mask attributes ,vector))
        (defmacro ,test-name (attributes &rest attribute-names)
-         #!+sb-doc
          "Automagically generated boolean attribute test function.
   See !DEF-BOOLEAN-ATTRIBUTE."
          `(logtest (the attributes ,attributes)
                    (,',constructor ,@attribute-names)))
        (define-setf-expander ,test-name (place &rest attributes
                                                &environment env)
-         #!+sb-doc
          "Automagically generated boolean attribute setter. See
  !DEF-BOOLEAN-ATTRIBUTE."
          (multiple-value-bind (temps values stores setter getter)

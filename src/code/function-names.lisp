@@ -17,7 +17,6 @@
                           '*valid-fun-names-alist*)))
 
 (defmacro define-function-name-syntax (symbol (var) &body body)
-  #!+sb-doc
   "Define function names of the form of a list headed by SYMBOL to be
 a legal function name, subject to restrictions imposed by BODY.  BODY
 is evaluated with VAR bound to the form required to check, and should
@@ -36,7 +35,6 @@ situations."
 ;;; I would think that after 11 years of we're entitled to rename it.
 ;;; VALIDATE-FUNCTION-NAME would be apt.
 (defun valid-function-name-p (name)
-  #!+sb-doc
   "The primary return value indicates whether NAME is a valid function
 name; if it is, the second return value will be a symbol suitable for
 use as a BLOCK name in the function in question."

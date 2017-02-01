@@ -12,13 +12,11 @@
 (in-package "SB!IMPL")
 
 (defun make-weak-pointer (object)
-  #!+sb-doc
   "Allocate and return a weak pointer which points to OBJECT."
   (make-weak-pointer object))
 
 #!-sb-fluid (declaim (inline weak-pointer-value))
 (defun weak-pointer-value (weak-pointer)
-  #!+sb-doc
   "If WEAK-POINTER is valid, return the value of WEAK-POINTER and T.
 If the referent of WEAK-POINTER has been garbage collected,
 returns the values NIL and NIL."

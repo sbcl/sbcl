@@ -92,7 +92,6 @@ with the STEP-CONDITION as argument.")
         (funcall hook condition)))))
 
 (defmacro step (form)
-  #+sb-doc
   "The form is evaluated with single stepping enabled. Function calls
 outside the lexical scope of the form can be stepped into only if the
 functions in question have been compiled with sufficient DEBUG policy

@@ -66,7 +66,6 @@
 (!defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
 
 (defmacro without-interrupts (&body body)
-  #!+sb-doc
   "Executes BODY with all deferrable interrupts disabled. Deferrable
 interrupts arriving during execution of the BODY take effect after BODY has
 been executed.
@@ -152,7 +151,6 @@ WITHOUT-INTERRUPTS in:
            (,without-interrupts-body)))))
 
 (defmacro with-interrupts (&body body)
-  #!+sb-doc
   "Executes BODY with deferrable interrupts conditionally enabled. If there
 are pending interrupts they take effect prior to executing BODY.
 

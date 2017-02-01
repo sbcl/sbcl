@@ -532,7 +532,6 @@
                            (element-type '(unsigned-byte 8))
                            (initial-contents nil initial-contents-p)
                            (initial-element nil initial-element-p))
-  #!+sb-doc
   "Allocate vector of LENGTH elements in static space. Only allocation
 of specialized arrays is supported."
   ;; STEP 1: check inputs fully
@@ -604,7 +603,6 @@ of specialized arrays is supported."
     data))
 
 (defun vector (&rest objects)
-  #!+sb-doc
   "Construct a SIMPLE-VECTOR from the given objects."
   (let ((v (make-array (length objects))))
     (do-rest-arg ((x i) objects 0 v)
@@ -864,7 +862,6 @@ of specialized arrays is supported."
              index)))))
 
 (defun array-in-bounds-p (array &rest subscripts)
-  #!+sb-doc
   "Return T if the SUBSCRIPTS are in bounds for the ARRAY, NIL otherwise."
   (declare (truly-dynamic-extent subscripts))
   (let ((length (length subscripts)))
@@ -891,7 +888,6 @@ of specialized arrays is supported."
   (apply #'%array-row-major-index array subscripts))
 
 (defun aref (array &rest subscripts)
-  #!+sb-doc
   "Return the element of the ARRAY specified by the SUBSCRIPTS."
   (declare (truly-dynamic-extent subscripts))
   (row-major-aref array (apply #'%array-row-major-index array subscripts)))
@@ -908,7 +904,6 @@ of specialized arrays is supported."
         new-value))
 
 (defun row-major-aref (array index)
-  #!+sb-doc
   "Return the element of array corresponding to the row-major index. This is
    SETFable."
   (declare (optimize (safety 1)))
@@ -919,7 +914,6 @@ of specialized arrays is supported."
   (setf (row-major-aref array index) new-value))
 
 (defun svref (simple-vector index)
-  #!+sb-doc
   "Return the INDEXth element of the given Simple-Vector."
   (declare (optimize (safety 1)))
   (aref simple-vector index))
@@ -929,7 +923,6 @@ of specialized arrays is supported."
   (setf (aref simple-vector index) new))
 
 (defun bit (bit-array &rest subscripts)
-  #!+sb-doc
   "Return the bit from the BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (array bit) bit-array)
            (truly-dynamic-extent subscripts)
@@ -946,7 +939,6 @@ of specialized arrays is supported."
         new-value))
 
 (defun sbit (simple-bit-array &rest subscripts)
-  #!+sb-doc
   "Return the bit from SIMPLE-BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (simple-array bit) simple-bit-array)
            (truly-dynamic-extent subscripts)
@@ -966,7 +958,6 @@ of specialized arrays is supported."
 ;;;; miscellaneous array properties
 
 (defun array-element-type (array)
-  #!+sb-doc
   "Return the type of the elements of the array"
   (let ((widetag (%other-pointer-widetag array))
         (table (load-time-value
@@ -991,14 +982,12 @@ of specialized arrays is supported."
             (truly-the (or list symbol) (aref table (%other-pointer-widetag array))))))))
 
 (defun array-rank (array)
-  #!+sb-doc
   "Return the number of dimensions of ARRAY."
   (if (array-header-p array)
       (%array-rank array)
       1))
 
 (defun array-dimension (array axis-number)
-  #!+sb-doc
   "Return the length of dimension AXIS-NUMBER of ARRAY."
   (declare (array array) (type index axis-number))
   (cond ((not (array-header-p array))
@@ -1012,7 +1001,6 @@ of specialized arrays is supported."
          (%array-dimension array axis-number))))
 
 (defun array-dimensions (array)
-  #!+sb-doc
   "Return a list whose elements are the dimensions of the array"
   (declare (explicit-check))
   (cond ((array-header-p array)
@@ -1025,7 +1013,6 @@ of specialized arrays is supported."
          (sb!c::%type-check-error/c array 'object-not-array-error nil))))
 
 (defun array-total-size (array)
-  #!+sb-doc
   "Return the total number of elements in the Array."
   (declare (explicit-check))
   (cond ((array-header-p array)
@@ -1036,7 +1023,6 @@ of specialized arrays is supported."
          (sb!c::%type-check-error/c array 'object-not-array-error nil))))
 
 (defun array-displacement (array)
-  #!+sb-doc
   "Return the values of :DISPLACED-TO and :DISPLACED-INDEX-offset
    options to MAKE-ARRAY, or NIL and 0 if not a displaced array."
   (declare (type array array))
@@ -1046,7 +1032,6 @@ of specialized arrays is supported."
       (values nil 0)))
 
 (defun adjustable-array-p (array)
-  #!+sb-doc
   "Return T if and only if calling ADJUST-ARRAY on ARRAY will return
    the identical object."
   (declare (array array))
@@ -1060,7 +1045,6 @@ of specialized arrays is supported."
 
 (declaim (inline array-has-fill-pointer-p))
 (defun array-has-fill-pointer-p (array)
-  #!+sb-doc
   "Return T if the given ARRAY has a fill pointer, or NIL otherwise."
   (declare (array array))
   (and (array-header-p array) (%array-fill-pointer-p array)))
@@ -1084,7 +1068,6 @@ of specialized arrays is supported."
 
 (declaim (inline fill-pointer))
 (defun fill-pointer (vector)
-  #!+sb-doc
   "Return the FILL-POINTER of the given VECTOR."
   (declare (explicit-check))
   (if (array-has-fill-pointer-p vector)
@@ -1109,7 +1092,6 @@ of specialized arrays is supported."
 ;;; new ca. sbcl-0.7.0) rather than the VECTOR-PUSH code (which dates
 ;;; back to CMU CL).
 (defun vector-push (new-element array)
-  #!+sb-doc
   "Attempt to set the element of ARRAY designated by its fill pointer
    to NEW-ELEMENT, and increment the fill pointer by one. If the fill pointer is
    too large, NIL is returned, otherwise the index of the pushed element is
@@ -1192,7 +1174,6 @@ of specialized arrays is supported."
     fill-pointer))
 
 (defun vector-pop (array)
-  #!+sb-doc
   "Decrease the fill pointer by 1 and return the element pointed to by the
   new fill pointer."
   (declare (explicit-check))
@@ -1214,7 +1195,6 @@ of specialized arrays is supported."
                            (initial-contents nil initial-contents-p)
                            fill-pointer
                            displaced-to displaced-index-offset)
-  #!+sb-doc
   "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
   (when (invalid-array-p array)
     (invalid-array-error array))
@@ -1502,7 +1482,6 @@ of specialized arrays is supported."
 ;;; User visible extension
 (declaim (ftype (sfunction (array) (simple-array * (*))) array-storage-vector))
 (defun array-storage-vector (array)
-  #!+sb-doc
   "Returns the underlying storage vector of ARRAY, which must be a non-displaced array.
 
 In SBCL, if ARRAY is a of type \(SIMPLE-ARRAY * \(*)), it is its own storage
@@ -1658,7 +1637,6 @@ function to be removed without further warning."
 
 (defmacro def-bit-array-op (name function)
   `(defun ,name (bit-array-1 bit-array-2 &optional result-bit-array)
-     #!+sb-doc
      ,(format nil
               "Perform a bit-wise ~A on the elements of BIT-ARRAY-1 and ~
                BIT-ARRAY-2,~%  putting the results in RESULT-BIT-ARRAY. ~
@@ -1711,7 +1689,6 @@ function to be removed without further warning."
 (def-bit-array-op bit-orc2 logorc2)
 
 (defun bit-not (bit-array &optional result-bit-array)
-  #!+sb-doc
   "Performs a bit-wise logical NOT on the elements of BIT-ARRAY,
   putting the results in RESULT-BIT-ARRAY. If RESULT-BIT-ARRAY is T,
   BIT-ARRAY is used. If RESULT-BIT-ARRAY is NIL or omitted, a new array is

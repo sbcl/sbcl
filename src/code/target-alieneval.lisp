@@ -56,7 +56,6 @@
         (oops))))))
 
 (defmacro define-alien-variable (name type &environment env)
-  #!+sb-doc
   "Define NAME as an external alien variable of type TYPE. NAME should
 be a list of a string holding the alien name and a symbol to use as
 the Lisp name. If NAME is just a symbol or string, then the other name
@@ -85,7 +84,6 @@ is guessed from the one supplied."
     (setf (info :source-location :variable lisp-name) location)))
 
 (defun alien-value (symbol)
-  #!+sb-doc
   "Returns the value of the alien variable bound to SYMBOL. Signals an
 error if SYMBOL is not bound to an alien variable, or if the alien
 variable is undefined."
@@ -93,7 +91,6 @@ variable is undefined."
                    (error 'unbound-variable :name symbol))))
 
 (defmacro extern-alien (name type &environment env)
-  #!+sb-doc
   "Access the alien variable named NAME, assuming it is of type TYPE.
 This is SETFable."
   (let* ((alien-name (etypecase name
@@ -104,7 +101,6 @@ This is SETFable."
     `(%alien-value (foreign-symbol-sap ,alien-name ,datap) 0 ',alien-type)))
 
 (defmacro with-alien (bindings &body body &environment env)
-  #!+sb-doc
   "Establish some local alien variables. Each BINDING is of the form:
      VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
    ALLOCATION should be one of:
@@ -223,12 +219,10 @@ This is SETFable."
 
 #!-sb-fluid (declaim (inline null-alien))
 (defun null-alien (x)
-  #!+sb-doc
   "Return true if X (which must be an ALIEN pointer) is null, false otherwise."
   (zerop (sap-int (alien-sap x))))
 
 (defmacro sap-alien (sap type &environment env)
-  #!+sb-doc
   "Convert the system area pointer SAP to an ALIEN of the specified TYPE (not
    evaluated.) TYPE must be pointer-like."
   (let ((alien-type (parse-alien-type type env)))
@@ -237,7 +231,6 @@ This is SETFable."
         (error "cannot make an alien of type ~S out of a SAP" type))))
 
 (defun alien-sap (alien)
-  #!+sb-doc
   "Return a System-Area-Pointer pointing to Alien's data."
   (declare (type alien-value alien))
   (alien-value-sap alien))
@@ -245,7 +238,6 @@ This is SETFable."
 ;;;; allocation/deallocation of heap aliens
 
 (defmacro make-alien (type &optional size &environment env)
-  #!+sb-doc
   "Allocate an alien of type TYPE in foreign heap, and return an alien
 pointer to it. The allocated memory is not initialized, and may
 contain garbage. The memory is allocated using malloc(3), so it can be
@@ -358,7 +350,6 @@ Examples:
 
 #!-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
-  #!+sb-doc
   "Dispose of the storage pointed to by ALIEN. The ALIEN must have been
 allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
   (alien-funcall (extern-alien "free" (function (values) system-area-pointer))
@@ -386,7 +377,6 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
                                  &key (start 0) end
                                       (external-format :default)
                                       (null-terminate t))
-  #!+sb-doc
   "Copy part of STRING delimited by START and END into freshly
 allocated foreign memory, freeable using free(3) or FREE-ALIEN.
 Returns the allocated string as a (* CHAR) alien, and the number of
@@ -419,7 +409,6 @@ null byte."
 ;;; Extract the value from the named slot from the record ALIEN. If
 ;;; ALIEN is actually a pointer, then DEREF it first.
 (defun slot (alien slot)
-  #!+sb-doc
   "Extract SLOT from the Alien STRUCT or UNION ALIEN. May be set with SETF."
   (declare (type alien-value alien)
            (type symbol slot)
@@ -512,7 +501,6 @@ null byte."
 
 ;;; Dereference the alien and return the results.
 (defun deref (alien &rest indices)
-  #!+sb-doc
   "Dereference an Alien pointer or array. If an array, the indices are used
    as the indices of the array element to access. If a pointer, one index can
    optionally be specified, giving the equivalent of C pointer arithmetic."
@@ -631,7 +619,6 @@ null byte."
 ;;;; the CAST macro
 
 (defmacro cast (alien type &environment env)
-  #!+sb-doc
   "Convert ALIEN to an Alien of the specified TYPE (not evaluated.)  Both types
    must be Alien array, pointer or function types."
   `(%cast ,alien ',(parse-alien-type type env)))
@@ -655,7 +642,6 @@ null byte."
 ;;;; the ALIEN-SIZE macro
 
 (defmacro alien-size (type &optional (units :bits) &environment env)
-  #!+sb-doc
   "Return the size of the alien type TYPE. UNITS specifies the units to
    use and can be either :BITS, :BYTES, or :WORDS."
   (let* ((alien-type (parse-alien-type type env))
@@ -708,7 +694,6 @@ null byte."
 ;;;; ALIEN-FUNCALL, DEFINE-ALIEN-ROUTINE
 
 (defun alien-funcall (alien &rest args)
-  #!+sb-doc
   "Call the foreign function ALIEN with the specified arguments. ALIEN's
 type specifies the argument and result types."
   (declare (type alien-value alien))
@@ -741,7 +726,6 @@ type specifies the argument and result types."
 (defmacro define-alien-routine (name result-type
                                      &rest args
                                      &environment lexenv)
-  #!+sb-doc
   "DEFINE-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
 
 Define a foreign interface function for the routine with the specified NAME.
@@ -848,7 +832,6 @@ way that the argument is passed.
                              ,@(results))))))))))
 
 (defun alien-typep (object type)
-  #!+sb-doc
   "Return T iff OBJECT is an alien of type TYPE."
   (let ((lisp-rep-type (compute-lisp-rep-type type)))
     (if lisp-rep-type
@@ -865,7 +848,6 @@ way that the argument is passed.
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
 
 (defvar *alien-callback-info* nil
-  #!+sb-doc
   "Maps SAPs to corresponding CALLBACK-INFO structures: contains all the
 information we need to manipulate callbacks after their creation. Used for
 changing the lisp-side function they point to, invalidation, etc.")
@@ -883,18 +865,15 @@ changing the lisp-side function they point to, invalidation, etc.")
   (cdr (assoc (alien-sap alien) *alien-callback-info* :test #'sap=)))
 
 (defvar *alien-callbacks* (make-hash-table :test #'equal)
-  #!+sb-doc
   "Cache of existing callback SAPs, indexed with (SPECIFER . FUNCTION). Used for
 memoization: we don't create new callbacks if one pointing to the correct
 function with the same specifier already exists.")
 
 (defvar *alien-callback-wrappers* (make-hash-table :test #'equal)
-  #!+sb-doc
   "Cache of existing lisp wrappers, indexed with SPECIFER. Used for memoization:
 we don't create new wrappers if one for the same specifier already exists.")
 
 (defvar *alien-callback-trampolines* (make-array 32 :fill-pointer 0 :adjustable t)
-  #!+sb-doc
   "Lisp trampoline store: assembler wrappers contain indexes to this, and
 ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 
@@ -1050,7 +1029,6 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 
 (let ()
 (defmacro alien-callback (specifier function &environment env)
-  #!+sb-doc
   "Returns an alien-value with of alien ftype SPECIFIER, that can be passed to
 an alien function as a pointer to the FUNCTION. If a callback for the given
 SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
@@ -1071,7 +1049,6 @@ one."
       ',(parse-alien-type specifier env)))))
 
 (defun alien-callback-p (alien)
-  #!+sb-doc
   "Returns true if the alien is associated with a lisp-side callback,
 and a secondary return value of true if the callback is still valid."
   (let ((info (alien-callback-info alien)))
@@ -1079,14 +1056,12 @@ and a secondary return value of true if the callback is still valid."
       (values t (and (callback-info-function info) t)))))
 
 (defun alien-callback-function (alien)
-  #!+sb-doc
   "Returns the lisp function designator associated with the callback."
   (let ((info (alien-callback-info alien)))
     (when info
       (callback-info-function info))))
 
 (defun (setf alien-callback-function) (function alien)
-  #!+sb-doc
   "Changes the lisp function designated by the callback."
   (let ((info (alien-callback-info alien)))
     (unless info
@@ -1103,7 +1078,6 @@ and a secondary return value of true if the callback is still valid."
     function))
 
 (defun invalidate-alien-callback (alien)
-  #!+sb-doc
   "Invalidates the callback designated by the alien, if any, allowing the
 associated lisp function to be GC'd, and causing further calls to the same
 callback signal an error."
@@ -1136,7 +1110,6 @@ callback signal an error."
 ;;; the FDEFINITION should invalidate the callback, and redefining the
 ;;; callback should change existing callbacks to point to the new defintion.
 (defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
-  #!+sb-doc
   "Defines #'NAME as a function with the given body and lambda-list, and NAME as
 the alien callback for that function with the given alien type."
   (declare (symbol name))

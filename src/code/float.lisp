@@ -22,7 +22,6 @@
                        float-trapping-nan-p))
 
 (defun float-denormalized-p (x)
-  #!+sb-doc
   "Return true if the float X is denormalized."
   (number-dispatch ((x float))
     ((single-float)
@@ -112,7 +111,6 @@
 ;;; return the number of digits or 0.
 #!-sb-fluid (declaim (maybe-inline float-precision))
 (defun float-precision (f)
-  #!+sb-doc
   "Return a non-negative number of significant digits in its float argument.
   Will be less than FLOAT-DIGITS if denormalized or zero."
   (declare (explicit-check))
@@ -138,7 +136,6 @@
          integer-decode-long-denorm)))))
 
 (defun float-sign (float1 &optional (float2 (float 1 float1)))
-  #!+sb-doc
   "Return a floating-point number that has the same sign as
    FLOAT1 and, if FLOAT2 is given, has the same absolute value
    as FLOAT2."
@@ -170,7 +167,6 @@
     ((long-float) sb!vm:long-float-digits)))
 
 (defun float-radix (x)
-  #!+sb-doc
   "Return (as an integer) the radix b of its floating-point argument."
   (declare (ignore x) (type float x))
   2)
@@ -329,7 +325,6 @@
 
 ;;; Dispatch to the correct type-specific i-d-f function.
 (defun integer-decode-float (x)
-  #!+sb-doc
   "Return three values:
    1) an integer representation of the significand.
    2) the exponent for the power of 2 that the significand must be multiplied
@@ -455,7 +450,6 @@
 
 ;;; Dispatch to the appropriate type-specific function.
 (defun decode-float (f)
-  #!+sb-doc
   "Return three values:
    1) a floating-point number representing the significand. This is always
       between 0.5 (inclusive) and 1.0 (exclusive).
@@ -590,7 +584,6 @@
 
 ;;; Dispatch to the correct type-specific scale-float function.
 (defun scale-float (f ex)
-  #!+sb-doc
   "Return the value (* f (expt (float 2 f) ex)), but with no unnecessary loss
   of precision or overflow."
   (declare (explicit-check))
@@ -606,7 +599,6 @@
 ;;;; converting to/from floats
 
 (defun float (number &optional (other () otherp))
-  #!+sb-doc
   "Converts any REAL to a float. If OTHER is not provided, it returns a
   SINGLE-FLOAT if NUMBER is not already a FLOAT. If OTHER is provided, the
   result is the same float format as OTHER."
@@ -838,7 +830,6 @@
      (%unary-ftruncate number))))
 
 (defun rational (x)
-  #!+sb-doc
   "RATIONAL produces a rational number for any real numeric argument. This is
   more efficient than RATIONALIZE, but it assumes that floating-point is
   completely accurate, giving a result that isn't as pretty."
@@ -917,7 +908,6 @@
 ;;;   <http://modular.fas.harvard.edu/edu/Fall2001/124/lectures/lecture17/lecture18/>
 
 (defun rationalize (x)
-  #!+sb-doc
   "Converts any REAL to a RATIONAL.  Floats are converted to a simple rational
   representation exploiting the assumption that floats are only accurate to
   their precision.  RATIONALIZE (and also RATIONAL) preserve the invariant:

@@ -451,7 +451,6 @@
                (make-symbol token)))))))
 
 (defvar *read-eval* t
-  #!+sb-doc
   "If false, then the #. read macro is disabled.")
 
 (defun sharp-dot (stream sub-char numarg)

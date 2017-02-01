@@ -16,12 +16,10 @@
 #!-win32 (error "missing :WIN32 feature")
 
 (defun software-type ()
-  #!+sb-doc
   "Return a string describing the supporting software."
   (values "Win32"))
 
 (defun software-version ()
-  #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
   (or *software-version*

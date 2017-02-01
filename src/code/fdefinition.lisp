@@ -230,7 +230,6 @@
 ;;; info structure, we do something conceptually equal, but
 ;;; mechanically it is different.
 (defun unencapsulate (name type)
-  #!+sb-doc
   "Removes NAME's most recent encapsulation of the specified TYPE."
   (let* ((fdefn (find-fdefn name))
          (encap-info (encapsulation-info (fdefn-fun fdefn))))
@@ -305,7 +304,6 @@
 ;;; and we might even be able to forbid tracing these functions.
 ;;; -- WHN 2001-11-02
 (defun fdefinition (name)
-  #!+sb-doc
   "Return name's global function definition taking care to respect any
    encapsulations and to return the innermost encapsulated definition.
    This is SETF'able."
@@ -318,7 +316,6 @@
            (return fun))))))
 
 (defvar *setf-fdefinition-hook* nil
-  #!+sb-doc
   "A list of functions that (SETF FDEFINITION) invokes before storing the
    new value. The functions take the function name and the new value.")
 
@@ -334,7 +331,6 @@
            :format-arguments (list object setter))))
 
 (defun %set-fdefinition (name new-value)
-  #!+sb-doc
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
   (declare (explicit-check))
@@ -383,14 +379,12 @@
 ;;;; FBOUNDP and FMAKUNBOUND
 
 (defun fboundp (name)
-  #!+sb-doc
   "Return true if name has a global function definition."
   (declare (explicit-check))
   (let ((fdefn (find-fdefn name)))
     (and fdefn (fdefn-fun fdefn) t)))
 
 (defun fmakunbound (name)
-  #!+sb-doc
   "Make NAME have no global function definition."
   (declare (explicit-check))
   (with-single-package-locked-error

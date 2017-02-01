@@ -33,7 +33,6 @@
           yes no))
 
 (defun y-or-n-p (&optional format-string &rest arguments)
-  #!+sb-doc
   "Y-OR-N-P prints the message, if any, and reads characters from
    *QUERY-IO* until the user enters y or Y as an affirmative, or either
    n or N as a negative answer. It asks again if you enter any other
@@ -48,7 +47,6 @@
             (t (clarify-legal-query-input "y" "n"))))))
 
 (defun yes-or-no-p (&optional format-string &rest arguments)
-  #!+sb-doc
   "YES-OR-NO-P is similar to Y-OR-N-P, except that it clears the
    input buffer, beeps, and uses READ-LINE to get the strings
    YES or NO."

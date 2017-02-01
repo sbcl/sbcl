@@ -655,13 +655,11 @@
                   (setq fallback template)))))))))
 
 (defvar *efficiency-note-limit* 2
-  #!+sb-doc
   "This is the maximum number of possible optimization alternatives will be
   mentioned in a particular efficiency note. NIL means no limit.")
 (declaim (type (or index null) *efficiency-note-limit*))
 
 (defvar *efficiency-note-cost-threshold* 5
-  #!+sb-doc
   "This is the minimum cost difference between the chosen implementation and
   the next alternative that justifies an efficiency note.")
 (declaim (type index *efficiency-note-cost-threshold*))

@@ -207,7 +207,6 @@
                :format-arguments (list designator)))))
 
 (defun make-condition (type &rest initargs)
-  #!+sb-doc
   "Make an instance of a condition object using the specified initargs."
   ;; Note: While ANSI specifies no exceptional situations in this function,
   ;; ALLOCATE-CONDITION will signal a type error if TYPE does not designate
@@ -354,7 +353,6 @@
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)
                                  &body options)
-  #!+sb-doc
   "DEFINE-CONDITION Name (Parent-Type*) (Slot-Spec*) Option*
    Define NAME as a condition type. This new type inherits slots and its
    report function from the specified PARENT-TYPEs. A slot spec is a list of:
@@ -919,20 +917,17 @@
                current-package))))
   ;; no :default-initargs -- reference-stuff provided by the
   ;; signalling form in target-package.lisp
-  #!+sb-doc
   (:documentation
    "Subtype of CL:PACKAGE-ERROR. A subtype of this error is signalled
 when a package-lock is violated."))
 
 (define-condition package-locked-error (package-lock-violation) ()
-  #!+sb-doc
   (:documentation
    "Subtype of SB-EXT:PACKAGE-LOCK-VIOLATION. An error of this type is
 signalled when an operation on a package violates a package lock."))
 
 (define-condition symbol-package-locked-error (package-lock-violation)
   ((symbol :initarg :symbol :reader package-locked-error-symbol))
-  #!+sb-doc
   (:documentation
    "Subtype of SB-EXT:PACKAGE-LOCK-VIOLATION. An error of this type is
 signalled when an operation on a symbol violates a package lock. The
@@ -1168,12 +1163,10 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 (define-condition step-condition ()
   ((form :initarg :form :reader step-condition-form))
 
-  #!+sb-doc
   (:documentation "Common base class of single-stepping conditions.
 STEP-CONDITION-FORM holds a string representation of the form being
 stepped."))
 
-#!+sb-doc
 (setf (fdocumentation 'step-condition-form 'function)
       "Form associated with the STEP-CONDITION.")
 
@@ -1190,7 +1183,6 @@ stepped."))
                (list (step-condition-form condition))
                (eq (step-condition-args condition) :unknown)
                (step-condition-args condition)))))
-  #!+sb-doc
   (:documentation "Condition signalled by code compiled with
 single-stepping information when about to execute a form.
 STEP-CONDITION-FORM holds the form, STEP-CONDITION-PATHNAME holds the
@@ -1202,14 +1194,12 @@ STEP-NEXT, and STEP-CONTINUE."))
 (define-condition step-result-condition (step-condition)
   ((result :initarg :result :reader step-condition-result)))
 
-#!+sb-doc
 (setf (fdocumentation 'step-condition-result 'function)
       "Return values associated with STEP-VALUES-CONDITION as a list,
 or the variable value associated with STEP-VARIABLE-CONDITION.")
 
 (define-condition step-values-condition (step-result-condition)
   ()
-  #!+sb-doc
   (:documentation "Condition signalled by code compiled with
 single-stepping information after executing a form.
 STEP-CONDITION-FORM holds the form, and STEP-CONDITION-RESULT holds
@@ -1221,12 +1211,10 @@ the values returned by the form as a list. No associated restarts."))
    (lambda (condition stream)
      (declare (ignore condition))
      (format stream "Returning from STEP")))
-  #!+sb-doc
   (:documentation "Condition signaled when STEP returns."))
 
 ;;; A knob for muffling warnings, mostly for use while loading files.
 (defvar *muffled-warnings* 'uninteresting-redefinition
-  #!+sb-doc
   "A type that ought to specify a subtype of WARNING.  Whenever a
 warning is signaled, if the warning is of this type and is not
 handled by any other handler, it will be muffled.")
@@ -1558,7 +1546,6 @@ the usual naming convention (names like *FOO*) for special variables"
    :software (missing-arg)
    :version (missing-arg)
    :references '((:sbcl :node "Deprecation Conditions")))
-  #!+sb-doc
   (:documentation
    "Superclass for deprecation-related error and warning
 conditions."))
@@ -1601,7 +1588,6 @@ conditions."))
      "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~
       at compile-time.~:@>"
-    #!+sb-doc
     "This warning is signaled when the use of a variable,
 function, type, etc. in :EARLY deprecation is detected at
 compile-time. The use will work at run-time with no warning or
@@ -1611,7 +1597,6 @@ error.")
      "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-impl:print-symbol-with-prefix/ will signal a runtime ~
       error.~:@>"
-    #!+sb-doc
     "This warning is signaled when the use of a variable,
 function, type, etc. in :LATE deprecation is detected at
 compile-time. The use will work at run-time with no warning or
@@ -1620,14 +1605,12 @@ error.")
   (define-deprecation-warning final-deprecation-warning warning t
      "~%~@<~:@_~*An error will be signaled at runtime for ~
       ~/sb-impl:print-symbol-with-prefix/.~:@>"
-    #!+sb-doc
     "This warning is signaled when the use of a variable,
 function, type, etc. in :FINAL deprecation is detected at
 compile-time. An error will be signaled at run-time."))
 
 (define-condition deprecation-error (error deprecation-condition)
   ()
-  #!+sb-doc
   (:documentation
    "This error is signaled at run-time when an attempt is made to use
 a thing that is in :FINAL deprecation, i.e. call a function or access
@@ -1640,7 +1623,6 @@ a variable."))
    "An ABORT restart was found that failed to transfer control dynamically."))
 
 (defun abort (&optional condition)
-  #!+sb-doc
   "Transfer control to a restart named ABORT, signalling a CONTROL-ERROR if
    none exists."
   (invoke-restart (find-restart-or-control-error 'abort condition))
@@ -1650,7 +1632,6 @@ a variable."))
   (error 'abort-failure))
 
 (defun muffle-warning (&optional condition)
-  #!+sb-doc
   "Transfer control to a restart named MUFFLE-WARNING, signalling a
    CONTROL-ERROR if none exists."
   (invoke-restart (find-restart-or-control-error 'muffle-warning condition)))

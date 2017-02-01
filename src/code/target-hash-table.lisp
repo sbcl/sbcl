@@ -148,7 +148,6 @@
   name)
 
 (defmacro define-hash-table-test (name hash-function)
-  #!+sb-doc
   "Defines NAME as a new kind of hash table test for use with the :TEST
 argument to MAKE-HASH-TABLE, and associates a default HASH-FUNCTION with it.
 
@@ -226,7 +225,6 @@ Examples:
                         (hash-function nil)
                         (weakness nil)
                         (synchronized))
-  #!+sb-doc
   "Create and return a new hash table. The keywords are as follows:
 
   :TEST
@@ -403,36 +401,29 @@ Examples:
       table)))
 
 (defun hash-table-count (hash-table)
-  #!+sb-doc
   "Return the number of entries in the given HASH-TABLE."
   (declare (type hash-table hash-table)
            (values index))
   (hash-table-number-entries hash-table))
 
-#!+sb-doc
 (setf (fdocumentation 'hash-table-rehash-size 'function)
       "Return the rehash-size HASH-TABLE was created with.")
 
-#!+sb-doc
 (setf (fdocumentation 'hash-table-rehash-threshold 'function)
       "Return the rehash-threshold HASH-TABLE was created with.")
 
-#!+sb-doc
 (setf (fdocumentation 'hash-table-synchronized-p 'function)
       "Returns T if HASH-TABLE is synchronized.")
 
 (defun hash-table-size (hash-table)
-  #!+sb-doc
   "Return a size that can be used with MAKE-HASH-TABLE to create a hash
    table that can hold however many entries HASH-TABLE can hold without
    having to be grown."
   (hash-table-rehash-trigger hash-table))
 
-#!+sb-doc
 (setf (fdocumentation 'hash-table-test 'function)
       "Return the test HASH-TABLE was created with.")
 
-#!+sb-doc
 (setf (fdocumentation 'hash-table-weakness 'function)
       "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
 :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE.")
@@ -673,7 +664,6 @@ multiple threads accessing the same hash-table without locking."
                  (,body-fun)))))))
 
 (defun gethash (key hash-table &optional default)
-  #!+sb-doc
   "Finds the entry in HASH-TABLE whose key is KEY and returns the
 associated value and T as multiple values, or returns DEFAULT and NIL
 if there is no such entry. Entries can be added using SETF."
@@ -946,7 +936,6 @@ if there is no such entry. Entries can be added using SETF."
                      (clear-slot next-vector prior next))))))))))
 
 (defun remhash (key hash-table)
-  #!+sb-doc
   "Remove the entry in HASH-TABLE associated with KEY. Return T if
 there was such an entry, or NIL if not."
   (declare (type hash-table hash-table)
@@ -957,7 +946,6 @@ there was such an entry, or NIL if not."
     (%remhash key hash-table)))
 
 (defun clrhash (hash-table)
-  #!+sb-doc
   "This removes all the entries from HASH-TABLE and returns the hash
 table itself."
   (when (plusp (hash-table-number-entries hash-table))

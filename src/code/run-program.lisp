@@ -49,7 +49,6 @@
 (progn
   (define-alien-routine wrapped-environ (* c-string))
   (defun posix-environ ()
-    #+sb-doc
     "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
     (c-strings->string-list (wrapped-environ))))
 
@@ -114,7 +113,6 @@
 
 #-win32
 (defun waitpid (pid &optional do-not-hang check-for-stopped)
-  #+sb-doc
   "Return any available status information on child process with PID."
   (multiple-value-bind (pid status)
       (c-waitpid pid
@@ -152,7 +150,6 @@
 
 ;;;; process control stuff
 (defvar *active-processes* nil
-  #+sb-doc
   "List of process structures for all active processes.")
 
 (defvar *active-processes-lock*
@@ -194,20 +191,17 @@
   (handle unsigned) (exit-code unsigned :out))
 
 (defun process-exit-code (process)
-  #+sb-doc
   "Return the exit code of PROCESS."
   (or (process-%exit-code process)
       (progn (get-processes-status-changes)
              (process-%exit-code process))))
 
 (defun process-status (process)
-  #+sb-doc
   "Return the current status of PROCESS.  The result is one of :RUNNING,
    :STOPPED, :EXITED, or :SIGNALED."
   (get-processes-status-changes)
   (process-%status process))
 
-#+sb-doc
 (setf (documentation 'process-exit-code 'function)
       "The exit code or the signal of a stopped process."
       (documentation 'process-core-dumped 'function)
@@ -229,7 +223,6 @@ The function is called with PROCESS as its only argument."
       (documentation 'process-pid 'function) "The pid of the child process.")
 
 (defun process-wait (process &optional check-for-stopped)
-  #+sb-doc
   "Wait for PROCESS to quit running for some reason. When
 CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
 PROCESS."
@@ -265,7 +258,6 @@ PROCESS."
 
 #-win32
 (defun process-kill (process signal &optional (whom :pid))
-  #+sb-doc
   "Hand SIGNAL to PROCESS. If WHOM is :PID, use the kill Unix system call. If
    WHOM is :PROCESS-GROUP, use the killpg Unix system call. If WHOM is
    :PTY-PROCESS-GROUP deliver the signal to whichever process group is
@@ -291,7 +283,6 @@ PROCESS."
              t)))))
 
 (defun process-alive-p (process)
-  #+sb-doc
   "Return T if PROCESS is still alive, NIL otherwise."
   (let ((status (process-status process)))
     (if (or (eq status :running)
@@ -300,7 +291,6 @@ PROCESS."
         nil)))
 
 (defun process-close (process)
-  #+sb-doc
   "Close all streams connected to PROCESS and stop maintaining the
 status slot."
   (macrolet ((frob (stream abort)
@@ -666,7 +656,6 @@ status slot."
                     (external-format :default)
                     directory
                     #+win32 (escape-arguments t))
-  #+sb-doc
   #.(concatenate
      'base-string
      ;; The Texinfoizer is sensitive to whitespace, so mind the

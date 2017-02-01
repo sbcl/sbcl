@@ -39,7 +39,6 @@
 ;;;; instruction-like macros
 
 (defmacro move (dst src)
-  #!+sb-doc
   "Move SRC into DST unless they are location=."
   (once-only ((n-dst dst)
               (n-src src))
@@ -160,7 +159,6 @@
   `(store-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro load-type (target source &optional (offset 0))
-  #!+sb-doc
   "Loads the type bits of a pointer into target independent of
    byte-ordering issues."
   (once-only ((n-target target)
@@ -357,12 +355,10 @@
     (encode-internal-error-args values)))
 
 (defun error-call (vop error-code &rest values)
-  #!+sb-doc
   "Cause an error. ERROR-CODE is the error to cause."
   (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 (defun generate-error-code (vop error-code &rest values)
-  #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   (assemble (*elsewhere*)

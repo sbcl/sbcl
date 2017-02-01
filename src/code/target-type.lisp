@@ -204,7 +204,6 @@
 ;;;; which are not needed during self-build.
 
 (defun typexpand-all (type-specifier &optional env)
-  #!+sb-doc
   "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
   ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to
   ;; defer to VALUES-SPECIFIER-TYPE for the check.
@@ -222,14 +221,12 @@
   (type-specifier (values-specifier-type type-specifier)))
 
 (defun defined-type-name-p (name &optional env)
-  #!+sb-doc
   "Returns T if NAME is known to name a type specifier, otherwise NIL."
   (declare (symbol name))
   (declare (ignore env))
   (and (info :type :kind name) t))
 
 (defun valid-type-specifier-p (type-specifier &optional env)
-  #!+sb-doc
   "Returns T if TYPE-SPECIFIER is a valid type specifier, otherwise NIL.
 
 There may be different metrics on what constitutes a \"valid type

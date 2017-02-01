@@ -14,7 +14,6 @@
 ;;; type TYPE. This behavior is needed e.g. to test for the validity
 ;;; of numeric subtype bounds read when cross-compiling.)
 (defun typep (object type &optional environment)
-  #!+sb-doc
   "Is OBJECT of type TYPE?"
   (declare (type lexenv-designator environment) (ignore environment))
   (declare (explicit-check))

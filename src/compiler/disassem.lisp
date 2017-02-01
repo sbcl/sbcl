@@ -58,12 +58,10 @@
 ;;; the width of the column in which instruction-bytes are printed. A
 ;;; value of zero disables the printing of instruction bytes.
 (defvar *disassem-inst-column-width* 16
-  #!+sb-doc
   "The width of instruction bytes.")
 (declaim (type text-width *disassem-inst-column-width*))
 
 (defvar *disassem-note-column* (+ 45 *disassem-inst-column-width*)
-  #!+sb-doc
   "The column in which end-of-line comments for notes are started.")
 
 ;;;; A DCHUNK contains the bits we look at to decode an
@@ -297,7 +295,6 @@
                                       &key default-printer include)
                                      &rest arg-specs)
   #+sb-xc-host (declare (ignore default-printer))
-  #!+sb-doc
   "DEFINE-INSTRUCTION-FORMAT (Name Length {Format-Key Value}*) Arg-Def*
   Define an instruction format NAME for the disassembler's use. LENGTH is
   the length of the format in bits.
@@ -772,7 +769,6 @@
 ;;;; recursively filtering things that usually don't change
 
 (defun sharing-cons (old-cons car cdr)
-  #!+sb-doc
   "If CAR is eq to the car of OLD-CONS and CDR is eq to the CDR, return
   OLD-CONS, otherwise return (cons CAR CDR)."
   (if (and (eq car (car old-cons)) (eq cdr (cdr old-cons)))
@@ -781,7 +777,6 @@
 
 (defun sharing-mapcar (fun list)
   (declare (type function fun))
-  #!+sb-doc
   "A simple (one list arg) mapcar that avoids consing up a new list
   as long as the results of calling FUN on the elements of LIST are
   eq to the original."

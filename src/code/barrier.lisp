@@ -37,7 +37,6 @@
 
 ;;;; The actual barrier macro and support
 (defmacro barrier ((kind) &body forms)
-  #!+sb-doc
   "Insert a barrier in the code stream, preventing some sort of
 reordering.
 

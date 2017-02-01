@@ -55,7 +55,6 @@
 ;;; macroexpand ATOMIC-PUSH into (CAS (SYMBOL-GLOBAL-VALUE ...))
 
 (defun get-cas-expansion (place &optional environment)
-  #!+sb-doc
   "Analogous to GET-SETF-EXPANSION. Returns the following six values:
 
  * list of temporary variables
@@ -140,7 +139,6 @@ EXPERIMENTAL: Interface subject to change."
 
 ;;; This is what it all comes down to.
 (defmacro cas (place old new &environment env)
-  #!+sb-doc
   "Synonym for COMPARE-AND-SWAP.
 
 Additionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
@@ -165,7 +163,6 @@ EXPERIMENTAL: Interface subject to change."
        ,cas-form)))
 
 (defmacro define-cas-expander (accessor lambda-list &body body)
-  #!+sb-doc
   "Analogous to DEFINE-SETF-EXPANDER. Defines a CAS-expansion for ACCESSOR.
 BODY must return six values as specified in GET-CAS-EXPANSION.
 
@@ -187,7 +184,6 @@ EXPERIMENTAL: Interface subject to change."
 ;; And as mentioned no sbcl-devel, &REST is beyond bogus, it's broken.
 ;;
 (defmacro defcas (accessor lambda-list function &optional docstring)
-  #!+sb-doc
   "Analogous to short-form DEFSETF. Defines FUNCTION as responsible
 for compare-and-swap on places accessed using ACCESSOR. LAMBDA-LIST
 must correspond to the lambda-list of the accessor.
@@ -217,7 +213,6 @@ EXPERIMENTAL: Interface subject to change."
                  `(,',accessor ,@temps))))))
 
 (defmacro compare-and-swap (place old new)
-  #!+sb-doc
   "Atomically stores NEW in PLACE if OLD matches the current value of PLACE.
 Two values are considered to match if they are EQ. Returns the previous value
 of PLACE: if the returned value is EQ to OLD, the swap was carried out.
@@ -374,7 +369,6 @@ been defined. (See SB-EXT:CAS for more information.)
                  ,old-value))))))))))
 
 (defmacro atomic-incf (&environment env place &optional (diff 1))
-  #!+sb-doc
   #.(format nil
   "Atomically increments PLACE by DIFF, and returns the value of PLACE before
 the increment.
@@ -404,7 +398,6 @@ EXPERIMENTAL: Interface subject to change."
   (expand-atomic-frob 'atomic-incf place diff env))
 
 (defmacro atomic-decf (&environment env place &optional (diff 1))
-  #!+sb-doc
   #.(format nil
   "Atomically decrements PLACE by DIFF, and returns the value of PLACE before
 the decrement.

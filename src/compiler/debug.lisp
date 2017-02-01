@@ -13,7 +13,6 @@
 (in-package "SB!C")
 
 (defvar *args* ()
-  #!+sb-doc
   "This variable is bound to the format arguments when an error is signalled
 by BARF or BURP.")
 
@@ -34,7 +33,6 @@ by BARF or BURP.")
   (values))
 
 (defvar *burp-action* :warn
-  #!+sb-doc
   "Action taken by the BURP function when a possible compiler bug is detected.
 One of :WARN, :ERROR or :NONE.")
 (declaim (type (member :warn :error :none) *burp-action*))
@@ -1241,7 +1239,6 @@ One of :WARN, :ERROR or :NONE.")
                (res)))))))
 
 (defun nth-vop (thing n)
-  #!+sb-doc
   "Return the Nth VOP in the IR2-BLOCK pointed to by THING."
   (let ((block (block-info (block-or-lose thing))))
     (do ((i 0 (1+ i))

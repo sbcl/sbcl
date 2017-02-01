@@ -254,7 +254,6 @@
 
 (defmacro without-scheduling ((&optional (segment '(%%current-segment%%)))
                               &body body)
-  #!+sb-doc
   "Execute BODY (as a PROGN) without scheduling any of the instructions
    generated inside it. This is not protected by UNWIND-PROTECT, so
    DO NOT use THROW or RETURN-FROM to escape from it."
@@ -1173,7 +1172,6 @@
 ;;; some bozo closes over it, but nobody does anything like that...
 (defmacro assemble ((&optional segment vop &key labels) &body body
                     &environment env)
-  #!+sb-doc
   "Execute BODY (as a progn) with SEGMENT as the current segment."
   (flet ((label-name-p (thing)
            (and thing (symbolp thing))))
@@ -1231,7 +1229,6 @@
                    *backend-instruction-set-package*)))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
-  #!+sb-doc
   "Emit the specified instruction to the current segment."
   (let* ((stringablep (typep instruction '(or symbol string character)))
          (sym (and stringablep (inst-emitter-symbol instruction))))
@@ -1248,7 +1245,6 @@
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
 ;;; and %%CURRENT-VOP%% prevents this from being an ordinary function.
 (defmacro emit-label (label)
-  #!+sb-doc
   "Emit LABEL at this location in the current segment."
   `(%emit-label (%%current-segment%%) (%%current-vop%%) ,label))
 
@@ -1261,12 +1257,10 @@
 ;;; **CURRENT-SEGMENT* and (%%CURRENT-VOP%%) prevents this from being an
 ;;; ordinary function.
 (defmacro emit-alignment (bits &optional (pattern 0))
-  #!+sb-doc
   "Emit an alignment restriction to the current segment."
   `(%emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,pattern))
 
 (defun label-position (label &optional if-after delta)
-  #!+sb-doc
   "Return the current position for LABEL. Chooser maybe-shrink functions
    should supply IF-AFTER and DELTA in order to ensure correct results."
   (let ((posn (label-posn label)))
@@ -1275,7 +1269,6 @@
         posn)))
 
 (defun append-segment (segment other-segment)
-  #!+sb-doc
   "Append OTHER-SEGMENT to the end of SEGMENT. Don't use OTHER-SEGMENT
    for anything after this."
   (when (segment-run-scheduler segment)
@@ -1315,7 +1308,6 @@
   (values))
 
 (defun finalize-segment (segment)
-  #!+sb-doc
   "Do any final processing of SEGMENT and return the total number of bytes
    covered by this segment."
   (when (segment-run-scheduler segment)

@@ -150,7 +150,6 @@
 ;;;; variables
 
 (defvar *load-depth* 0
-  #!+sb-doc
   "the current number of recursive LOADs")
 (declaim (type index *load-depth*))
 

@@ -43,7 +43,6 @@
              name)))))))
 
 (defun symbol-value (symbol)
-  #!+sb-doc
   "Return SYMBOL's current bound value."
   (declare (optimize (safety 1)))
   (symbol-value symbol))
@@ -53,12 +52,10 @@
   (or (maybe-handle-deprecated-global-variable symbol env) form))
 
 (defun boundp (symbol)
-  #!+sb-doc
   "Return non-NIL if SYMBOL is bound to a value."
   (boundp symbol))
 
 (defun set (symbol new-value)
-  #!+sb-doc
   "Set SYMBOL's value cell to NEW-VALUE."
   (declare (type symbol symbol))
   (about-to-modify-symbol-value symbol 'set new-value)
@@ -68,7 +65,6 @@
   (%set-symbol-value symbol new-value))
 
 (defun symbol-global-value (symbol)
-  #!+sb-doc
   "Return the SYMBOL's current global value. Identical to SYMBOL-VALUE,
 in single-threaded builds: in multithreaded builds bound values are
 distinct from the global value. Can also be SETF."
@@ -89,7 +85,6 @@ distinct from the global value. Can also be SETF."
   (%set-symbol-value symbol (%primitive sb!c:make-unbound-marker)))
 
 (defun makunbound (symbol)
-  #!+sb-doc
   "Make SYMBOL unbound, removing any value it may currently have."
   (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
     ;; :EVENTUALLY is allowed for :always-bound here, as it has no bearing
@@ -140,7 +135,6 @@ distinct from the global value. Can also be SETF."
   (symbol-hash symbol))
 
 (defun symbol-function (symbol)
-  #!+sb-doc
   "Return SYMBOL's current function definition. Settable with SETF."
   (%coerce-name-to-fun symbol symbol-fdefn))
 
@@ -241,7 +235,6 @@ distinct from the global value. Can also be SETF."
                 sb!vm:other-pointer-lowtag))))
 
 (defun symbol-plist (symbol)
-  #!+sb-doc
   "Return SYMBOL's property list."
   #!+symbol-info-vops
   (symbol-plist symbol) ; VOP translates it
@@ -329,12 +322,10 @@ distinct from the global value. Can also be SETF."
 ;;; End of Info/Plist slot manipulation
 
 (defun symbol-name (symbol)
-  #!+sb-doc
   "Return SYMBOL's name as a string."
   (symbol-name symbol))
 
 (defun symbol-package (symbol)
-  #!+sb-doc
   "Return the package SYMBOL was interned in, or NIL if none."
   (symbol-package symbol))
 
@@ -343,7 +334,6 @@ distinct from the global value. Can also be SETF."
   (%set-symbol-package symbol package))
 
 (defun make-symbol (string)
-  #!+sb-doc
   "Make and return a new symbol with the STRING as its print name."
   (declare (type string string))
   (%make-symbol 0 (if (simple-string-p string) string (subseq string 0))))
@@ -383,7 +373,6 @@ distinct from the global value. Can also be SETF."
       (sb!vm::%%make-symbol name)))
 
 (defun get (symbol indicator &optional (default nil))
-  #!+sb-doc
   "Look on the property list of SYMBOL for the specified INDICATOR. If this
   is found, return the associated value, else return DEFAULT."
   (get3 symbol indicator default))
@@ -400,7 +389,6 @@ distinct from the global value. Can also be SETF."
              (return (car cdr-pl)))))))
 
 (defun %put (symbol indicator value)
-  #!+sb-doc
   "The VALUE is added as a property of SYMBOL under the specified INDICATOR.
   Returns VALUE."
   (do ((pl (symbol-plist symbol) (cddr pl)))
@@ -416,7 +404,6 @@ distinct from the global value. Can also be SETF."
            (return value)))))
 
 (defun remprop (symbol indicator)
-  #!+sb-doc
   "Look on property list of SYMBOL for property with specified
   INDICATOR. If found, splice this indicator and its value out of
   the plist, and return the tail of the original list starting with
@@ -437,7 +424,6 @@ distinct from the global value. Can also be SETF."
            (return pl)))))
 
 (defun getf (place indicator &optional (default ()))
-  #!+sb-doc
   "Search the property list stored in PLACE for an indicator EQ to INDICATOR.
   If one is found, return the corresponding value, else return DEFAULT."
   (do ((plist place (cddr plist)))
@@ -461,7 +447,6 @@ distinct from the global value. Can also be SETF."
       (return place))))
 
 (defun get-properties (place indicator-list)
-  #!+sb-doc
   "Like GETF, except that INDICATOR-LIST is a list of indicators which will
   be looked for in the property list stored in PLACE. Three values are
   returned, see manual for details."
@@ -477,7 +462,6 @@ distinct from the global value. Can also be SETF."
            (return (values (car plist) (cadr plist) plist))))))
 
 (defun copy-symbol (symbol &optional (copy-props nil) &aux new-symbol)
-  #!+sb-doc
   "Make and return a new uninterned symbol with the same print name
   as SYMBOL. If COPY-PROPS is false, the new symbol is neither bound
   nor fbound and has no properties, else it has a copy of SYMBOL's
@@ -494,7 +478,6 @@ distinct from the global value. Can also be SETF."
   new-symbol)
 
 (defun keywordp (object)
-  #!+sb-doc
   "Return true if Object is a symbol in the \"KEYWORD\" package."
   (and (symbolp object)
        (eq (symbol-package object) *keyword-package*)))
@@ -529,11 +512,9 @@ distinct from the global value. Can also be SETF."
         (%output-integer-in-base counter 10 s)))))
 
 (defvar *gensym-counter* 0
-  #!+sb-doc
   "counter for generating unique GENSYM symbols")
 
 (defun gensym (&optional (thing "G"))
-  #!+sb-doc
   "Creates a new uninterned symbol whose name is a prefix string (defaults
    to \"G\"), followed by a decimal number. Thing, when supplied, will
    alter the prefix if it is a string, or be used for the decimal number
@@ -549,7 +530,6 @@ distinct from the global value. Can also be SETF."
     (make-symbol (%symbol-nameify prefix int))))
 
 (defun gentemp (&optional (prefix "T") (package (sane-package)))
-  #!+sb-doc
   "Creates a new symbol interned in package PACKAGE with the given PREFIX."
   (loop (multiple-value-bind (sym accessibility)
             (intern (%symbol-nameify prefix (incf *gentemp-counter*)) package)

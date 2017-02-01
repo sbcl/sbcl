@@ -319,7 +319,6 @@
 #+sb-xc
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions
                            &environment env)
-  #!+sb-doc
   "DEFSTRUCT {Name | (Name Option*)} [Documentation] {Slot | (Slot [Default] {Key Value}*)}
    Define the structure type Name. Instances are created by MAKE-<name>,
    which takes &KEY arguments allowing initial slot values to the specified.
@@ -360,7 +359,6 @@
 
 #+sb-xc-host
 (defmacro sb!xc:defstruct (name-and-options &rest slot-descriptions)
-  #!+sb-doc
   "Cause information about a target structure to be built into the
   cross-compiler."
   `(progn ,@(!expander-for-defstruct

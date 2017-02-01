@@ -52,7 +52,6 @@
                             ;; a deep copy, so the DEFSTRUCT-generated
                             ;; default is not suitable.
                             (:copier nil))
-  #!+sb-doc
   "A READTABLE is a data structure that maps characters into syntax
 types for the Common Lisp expression reader."
   ;; The CHARACTER-ATTRIBUTE-TABLE is a vector of BASE-CHAR-CODE-LIMIT

@@ -58,7 +58,6 @@
   (frob function))
 
 (defmacro load-type (target source &optional (offset 0))
-  #!+sb-doc
   "Loads the type bits of a pointer into target independent of
   byte-ordering issues."
   (once-only ((n-target target)

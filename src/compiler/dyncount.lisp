@@ -12,11 +12,9 @@
 (in-package "SB!DYNCOUNT")
 
 (defvar *collect-dynamic-statistics* nil
-  #!+sb-doc
   "When T, emit extra code to collect dynamic statistics about vop usages.")
 
 (defvar *dynamic-counts-tn* nil
-  #!+sb-doc
   "Holds the TN for the counts vector.")
 
 (def!struct (dyncount-info)

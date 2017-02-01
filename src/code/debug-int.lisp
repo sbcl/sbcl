@@ -36,7 +36,6 @@
 
 (define-condition debug-condition (serious-condition)
   ()
-  #!+sb-doc
   (:documentation
    "All DEBUG-CONDITIONs inherit from this type. These are serious conditions
     that must be handled, but they are not programmer errors."))
@@ -44,7 +43,6 @@
 (define-condition no-debug-fun-returns (debug-condition)
   ((debug-fun :reader no-debug-fun-returns-debug-fun
               :initarg :debug-fun))
-  #!+sb-doc
   (:documentation
    "The system could not return values from a frame with DEBUG-FUN since
     it lacked information about returning values.")
@@ -60,7 +58,6 @@
 (define-condition no-debug-blocks (debug-condition)
   ((debug-fun :reader no-debug-blocks-debug-fun
               :initarg :debug-fun))
-  #!+sb-doc
   (:documentation "The debug-fun has no debug-block information.")
   (:report (lambda (condition stream)
              (format stream "~&~S has no debug-block information."
@@ -69,7 +66,6 @@
 (define-condition no-debug-vars (debug-condition)
   ((debug-fun :reader no-debug-vars-debug-fun
               :initarg :debug-fun))
-  #!+sb-doc
   (:documentation "The DEBUG-FUN has no DEBUG-VAR information.")
   (:report (lambda (condition stream)
              (format stream "~&~S has no debug variable information."
@@ -78,7 +74,6 @@
 (define-condition lambda-list-unavailable (debug-condition)
   ((debug-fun :reader lambda-list-unavailable-debug-fun
               :initarg :debug-fun))
-  #!+sb-doc
   (:documentation
    "The DEBUG-FUN has no lambda list since argument DEBUG-VARs are
     unavailable.")
@@ -113,7 +108,6 @@
 ;;; branches that remain unimplemented.
 
 (define-condition debug-error (error) ()
-  #!+sb-doc
   (:documentation
    "All programmer errors from using the interface for building debugging
     tools inherit from this type."))
@@ -197,7 +191,6 @@
             (debug-var-symbol debug-var)
             (debug-var-id debug-var))))
 
-#!+sb-doc
 (setf (fdocumentation 'debug-var-id 'function)
   "Return the integer that makes DEBUG-VAR's name and package unique
    with respect to other DEBUG-VARs in the same function.")
@@ -270,7 +263,6 @@
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-block-fun-name obj) str)))
 
-#!+sb-doc
 (setf (fdocumentation 'debug-block-elsewhere-p 'function)
   "Return whether debug-block represents elsewhere code.")
 
@@ -2733,7 +2725,6 @@ register."
 
 (defun eval-in-frame (frame form)
   (declare (type frame frame))
-  #!+sb-doc
   "Evaluate FORM in the lexical context of FRAME's current code location,
    returning the results of the evaluation."
   (funcall (preprocess-for-eval form (frame-code-location frame)) frame))

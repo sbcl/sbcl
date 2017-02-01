@@ -68,12 +68,10 @@
   '(character-set ((0 . #.(1- base-char-code-limit)))))
 
 (sb!xc:deftype extended-char ()
-  #!+sb-doc
   "Type of CHARACTERs that aren't BASE-CHARs."
   '(and character (not base-char)))
 
 (sb!xc:deftype standard-char ()
-  #!+sb-doc
   "Type corresponding to the characters required by the standard."
   '(member
     #\Newline #\Space #\! #\" #\# #\$ #\% #\& #\' #\( #\) #\* #\+ #\,

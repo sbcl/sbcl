@@ -16,16 +16,13 @@
 ;;; prefixes..
 
 (defvar *trace-indentation-step* 2
-  #+sb-doc
   "the increase in trace indentation at each call level")
 
 (defvar *max-trace-indentation* 40
-  #+sb-doc
   "If the trace indentation exceeds this value, then indentation restarts at
    0.")
 
 (defvar *trace-encapsulate-default* t
-  #+sb-doc
   "the default value for the :ENCAPSULATE option to TRACE")
 
 ;;;; internal state
@@ -562,7 +559,6 @@
         collect (trace-info-what x)))
 
 (defmacro trace (&rest specs)
-  #+sb-doc
   "TRACE {Option Global-Value}* {Name {Option Value}*}*
 
 TRACE is a debugging tool that provides information when specified
@@ -693,7 +689,6 @@ The -AFTER and -ALL forms can use SB-DEBUG:ARG."
                (untrace-1 fun)))))))
 
 (defmacro untrace (&rest specs)
-  #+sb-doc
   "Remove tracing from the specified functions. Untraces all
 functions when called with no arguments."
   (if specs

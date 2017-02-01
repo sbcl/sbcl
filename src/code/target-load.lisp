@@ -14,15 +14,12 @@
 (in-package "SB!FASL")
 
 (defvar *load-source-default-type* "lisp"
-  #!+sb-doc
   "The source file types which LOAD looks for by default.")
 
 (declaim (type (or pathname null) *load-truename* *load-pathname*))
 (defvar *load-truename* nil
-  #!+sb-doc
   "the TRUENAME of the file that LOAD is currently loading")
 (defvar *load-pathname* nil
-  #!+sb-doc
   "the defaulted pathname that LOAD is currently loading")
 
 ;;;; LOAD-AS-SOURCE
@@ -110,7 +107,6 @@
 
 (defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
              (if-does-not-exist t) (external-format :default))
-  #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
   (flet ((load-stream (stream faslp)

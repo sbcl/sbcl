@@ -52,7 +52,6 @@
 ;;; Any of these special characters can be preceded by an escape
 ;;; character to cause it to be treated as a regular character.
 (defun remove-escape-characters (namestr start end escape-char)
-  #!+sb-doc
   "Remove any occurrences of escape characters from the string
    because we've already checked for whatever they may have
    protected."
@@ -421,13 +420,11 @@
 
 
 (defun probe-file (pathspec)
-  #!+sb-doc
   "Return the truename of PATHSPEC if the truename can be found,
 or NIL otherwise.  See TRUENAME for more information."
   (query-file-system pathspec :truename nil))
 
 (defun truename (pathspec)
-  #!+sb-doc
   "If PATHSPEC is a pathname that names an existing file, return
 a pathname that denotes a canonicalized name for the file.  If
 pathspec is a stream associated with a file, return a pathname
@@ -448,14 +445,12 @@ broken symlink itself."
       (query-file-system pathspec :truename)))
 
 (defun file-author (pathspec)
-  #!+sb-doc
   "Return the author of the file specified by PATHSPEC. Signal an
 error of type FILE-ERROR if no such file exists, or if PATHSPEC
 is a wild pathname."
   (query-file-system pathspec :author))
 
 (defun file-write-date (pathspec)
-  #!+sb-doc
   "Return the write date of the file specified by PATHSPEC.
 An error of type FILE-ERROR is signaled if no such file exists,
 or if PATHSPEC is a wild pathname."
@@ -466,7 +461,6 @@ or if PATHSPEC is a wild pathname."
 (/show0 "filesys.lisp 700")
 
 (defun rename-file (file new-name)
-  #!+sb-doc
   "Rename FILE to have the specified NEW-NAME. If FILE is a stream open to a
 file, then the associated file is renamed."
   (let* ((original (merge-pathnames file (sane-default-pathname-defaults)))
@@ -494,7 +488,6 @@ file, then the associated file is renamed."
       (values new-name old-truename (truename new-name)))))
 
 (defun delete-file (file)
-  #!+sb-doc
   "Delete the specified FILE.
 
 If FILE is a stream, on Windows the stream is closed immediately. On Unix
@@ -525,7 +518,6 @@ per standard Unix unlink() behaviour."
       pathname))
 
 (defun delete-directory (pathspec &key recursive)
-  #!+sb-doc
   "Deletes the directory designated by PATHSPEC (a pathname designator).
 Returns the truename of the directory deleted.
 
@@ -618,7 +610,6 @@ exist or if is a file or a symbolic link."
 
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
-  #!+sb-doc
   "Return the home directory of the user as a pathname. If the HOME
 environment variable has been specified, the directory it designates
 is returned; otherwise obtains the home directory from the operating
@@ -637,7 +628,6 @@ system. HOST argument is ignored by SBCL."
 ;;;; DIRECTORY
 
 (defun directory (pathspec &key (resolve-symlinks t))
-  #!+sb-doc
   "Return a list of PATHNAMEs, each the TRUENAME of a file that matched the
 given pathname. Note that the interaction between this ANSI-specified
 TRUENAMEing and the semantics of the Unix filesystem (symbolic links..) means
@@ -802,7 +792,6 @@ matching filenames."
 ;;; DIRECTORY.
 (defun map-directory (function directory &key (files t) (directories t)
                       (classify-symlinks t) (errorp t))
-  #!+sb-doc
   "Map over entries in DIRECTORY. Keyword arguments specify which entries to
 map over, and how:
 
@@ -1169,7 +1158,6 @@ Experimental: interface subject to change."
        (null (pathname-type pathname))))
 
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
-  #!+sb-doc
   "Test whether the directories containing the specified file
   actually exist, and attempt to create them if they do not.
   The MODE argument is a CMUCL/SBCL-specific extension to control

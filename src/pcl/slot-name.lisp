@@ -52,7 +52,6 @@
 ;;; otherwise dealing with STANDARD-INSTANCE-ACCESS becomes harder
 ;;; -- and slower -- than it needs to be.
 (defconstant +slot-unbound+ '..slot-unbound..
-  #!+sb-doc
   "SBCL specific extensions to MOP: if this value is read from an
 instance using STANDARD-INSTANCE-ACCESS, the slot is unbound.
 Similarly, an :INSTANCE allocated slot can be made unbound by

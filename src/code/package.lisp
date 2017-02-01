@@ -60,7 +60,6 @@
                                 (%name internal-symbols external-symbols))
                   (:copier nil)
                   (:predicate packagep))
-  #!+sb-doc
   "the standard structure for the description of a package"
   ;; the name of the package, or NIL for a deleted package
   (%name nil :type (or simple-string null))
@@ -122,7 +121,6 @@
                                      (package '*package*)
                                      result-form)
                                 &body body-decls)
-  #!+sb-doc
   "DO-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs at least once for each symbol accessible in the given
    PACKAGE with VAR bound to the current symbol."
@@ -134,7 +132,6 @@
                                               (package '*package*)
                                               result-form)
                                          &body body-decls)
-  #!+sb-doc
   "DO-EXTERNAL-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECL}* {TAG | FORM}*
    Executes the FORMs once for each external symbol in the given PACKAGE with
    VAR bound to the current symbol."
@@ -144,7 +141,6 @@
 (sb!xc:defmacro do-all-symbols ((var &optional
                                          result-form)
                                     &body body-decls)
-  #!+sb-doc
   "DO-ALL-SYMBOLS (VAR [RESULT-FORM]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs once for each symbol in every package with VAR bound
    to the current symbol."
@@ -157,7 +153,6 @@
 (sb!xc:defmacro with-package-iterator ((mname package-list
                                                   &rest symbol-types)
                                            &body body)
-  #!+sb-doc
   "Within the lexical scope of the body forms, MNAME is defined via macrolet
 such that successive invocations of (MNAME) will return the symbols, one by
 one, from the packages in PACKAGE-LIST. SYMBOL-TYPES may be any

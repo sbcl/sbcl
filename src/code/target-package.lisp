@@ -130,32 +130,27 @@
 #!+sb-package-locks
 (progn
 (defun package-locked-p (package)
-  #!+sb-doc
   "Returns T when PACKAGE is locked, NIL otherwise. Signals an error
 if PACKAGE doesn't designate a valid package."
   (package-lock (find-undeleted-package-or-lose package)))
 
 (defun lock-package (package)
-  #!+sb-doc
   "Locks PACKAGE and returns T. Has no effect if PACKAGE was already
 locked. Signals an error if PACKAGE is not a valid package designator"
   (setf (package-lock (find-undeleted-package-or-lose package)) t))
 
 (defun unlock-package (package)
-  #!+sb-doc
   "Unlocks PACKAGE and returns T. Has no effect if PACKAGE was already
 unlocked. Signals an error if PACKAGE is not a valid package designator."
   (setf (package-lock (find-undeleted-package-or-lose package)) nil)
   t)
 
 (defun package-implemented-by-list (package)
-  #!+sb-doc
   "Returns a list containing the implementation packages of
 PACKAGE. Signals an error if PACKAGE is not a valid package designator."
   (package-%implementation-packages (find-undeleted-package-or-lose package)))
 
 (defun package-implements-list (package)
-  #!+sb-doc
   "Returns the packages that PACKAGE is an implementation package
 of. Signals an error if PACKAGE is not a valid package designator."
   (let ((package (find-undeleted-package-or-lose package)))
@@ -165,7 +160,6 @@ of. Signals an error if PACKAGE is not a valid package designator."
 
 (defun add-implementation-package (packages-to-add
                                    &optional (package *package*))
-  #!+sb-doc
   "Adds PACKAGES-TO-ADD as implementation packages of PACKAGE. Signals
 an error if PACKAGE or any of the PACKAGES-TO-ADD is not a valid
 package designator."
@@ -177,7 +171,6 @@ package designator."
 
 (defun remove-implementation-package (packages-to-remove
                                       &optional (package *package*))
-  #!+sb-doc
   "Removes PACKAGES-TO-REMOVE from the implementation packages of
 PACKAGE. Signals an error if PACKAGE or any of the PACKAGES-TO-REMOVE
 is not a valid package designator."
@@ -189,7 +182,6 @@ is not a valid package designator."
            (mapcar #'find-undeleted-package-or-lose packages-to-remove)))))
 
 (defmacro with-unlocked-packages ((&rest packages) &body forms)
-  #!+sb-doc
   "Unlocks PACKAGES for the dynamic scope of the body. Signals an
 error if any of PACKAGES is not a valid package designator."
   (with-unique-names (unlocked-packages)
@@ -342,7 +334,6 @@ error if any of PACKAGES is not a valid package designator."
   (def package-shadowing-symbols package-%shadowing-symbols))
 
 (defun package-local-nicknames (package-designator)
-  #!+sb-doc
   "Returns an alist of \(local-nickname . actual-package) describing the
 nicknames local to the designated package.
 
@@ -378,7 +369,6 @@ Experimental: interface subject to change."
           :format-arguments format-args))
 
 (defun package-locally-nicknamed-by-list (package-designator)
-  #!+sb-doc
   "Returns a list of packages which have a local nickname for the designated
 package.
 
@@ -392,7 +382,6 @@ Experimental: interface subject to change."
 
 (defun add-package-local-nickname (local-nickname actual-package
                                    &optional (package-designator (sane-package)))
-  #!+sb-doc
   "Adds LOCAL-NICKNAME for ACTUAL-PACKAGE in the designated package, defaulting
 to current package. LOCAL-NICKNAME must be a string designator, and
 ACTUAL-PACKAGE must be a package designator.
@@ -486,7 +475,6 @@ Experimental: interface subject to change."
 
 (defun remove-package-local-nickname (old-nickname
                                       &optional (package-designator (sane-package)))
-  #!+sb-doc
   "If the designated package had OLD-NICKNAME as a local nickname for
 another package, it is removed. Returns true if the nickname existed and was
 removed, and NIL otherwise.
@@ -533,7 +521,6 @@ Experimental: interface subject to change."
    (find-restart-or-control-error 'debootstrap-package condition)))
 
 (defun find-package (package-designator)
-  #!+sb-doc
   "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
 must be a string designator, in which case the package it names is located and returned.
 
@@ -747,7 +734,6 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                           nicknames
                           (internal-symbols 10)
                           (external-symbols 10))
-  #!+sb-doc
   #.(format nil
      "Make a new package having the specified NAME, NICKNAMES, and USE
 list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are estimates for the number of
@@ -800,7 +786,6 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; If it's a *different* package, we should probably signal an error.
 ;;; (perhaps (ERROR 'ANSI-WEIRDNESS ..):-)
 (defun rename-package (package-designator name &optional (nicknames ()))
-  #!+sb-doc
   "Changes the name and nicknames for a package."
   (prog ((nicks (stringify-string-designators nicknames)))
    :restart
@@ -834,7 +819,6 @@ implementation it is ~S." *!default-package-use-list*)
        (return package))))
 
 (defun delete-package (package-designator)
-  #!+sb-doc
   "Delete the package designated by PACKAGE-DESIGNATOR from the package
   system data structures."
   (tagbody :restart
@@ -908,7 +892,6 @@ implementation it is ~S." *!default-package-use-list*)
                 (return-from delete-package t)))))))
 
 (defun list-all-packages ()
-  #!+sb-doc
   "Return a list of all existing packages."
   (let ((res ()))
     (with-package-names (names)
@@ -949,13 +932,11 @@ implementation it is ~S." *!default-package-use-list*)
                             ,@more-args)))))
 
   (defun intern (name &optional (package (sane-package)))
-  #!+sb-doc
   "Return a symbol in PACKAGE having the specified NAME, creating it
   if necessary."
     (find/intern %intern (if (base-string-p name) 'base-char 'character)))
 
   (defun find-symbol (name &optional (package (sane-package)))
-  #!+sb-doc
   "Return the symbol named STRING in PACKAGE. If such a symbol is found
   then the second value is :INTERNAL, :EXTERNAL or :INHERITED to indicate
   how the symbol is accessible. If no symbol is found then both values
@@ -1164,7 +1145,6 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.
 (defun unintern (symbol &optional (package (sane-package)))
-  #!+sb-doc
   "Makes SYMBOL no longer present in PACKAGE. If SYMBOL was present then T is
 returned, otherwise NIL. If PACKAGE is SYMBOL's home package, then it is made
 uninterned."
@@ -1223,7 +1203,6 @@ uninterned."
   (mapcar #'string (ensure-list thing)))
 
 (defun export (symbols &optional (package (sane-package)))
-  #!+sb-doc
   "Exports SYMBOLS from PACKAGE, checking that no name conflicts result."
   (with-package-graph ()
     (let ((package (find-undeleted-package-or-lose package))
@@ -1280,7 +1259,6 @@ uninterned."
 
 ;;; Check that all symbols are accessible, then move from external to internal.
 (defun unexport (symbols &optional (package (sane-package)))
-  #!+sb-doc
   "Makes SYMBOLS no longer exported from PACKAGE."
   (with-package-graph ()
     (let ((package (find-undeleted-package-or-lose package))
@@ -1308,7 +1286,6 @@ uninterned."
 ;;; Check for name conflict caused by the import and let the user
 ;;; shadowing-import if there is.
 (defun import (symbols &optional (package (sane-package)))
-  #!+sb-doc
   "Make SYMBOLS accessible as internal symbols in PACKAGE. If a symbol is
 already accessible then it has no effect. If a name conflict would result from
 the importation, then a correctable error is signalled."
@@ -1346,7 +1323,6 @@ the importation, then a correctable error is signalled."
 ;;; If a conflicting symbol is present, unintern it, otherwise just
 ;;; stick the symbol in.
 (defun shadowing-import (symbols &optional (package (sane-package)))
-  #!+sb-doc
   "Import SYMBOLS into package, disregarding any name conflict. If
   a symbol of the same name is present, then it is uninterned."
   (with-package-graph ()
@@ -1374,7 +1350,6 @@ the importation, then a correctable error is signalled."
   t)
 
 (defun shadow (symbols &optional (package (sane-package)))
-  #!+sb-doc
   "Make an internal symbol in PACKAGE with the same name as each of the
 specified SYMBOLS. If a symbol with the given name is already present in
 PACKAGE, then the existing symbol is placed in the shadowing symbols list if
@@ -1404,7 +1379,6 @@ it is not already present."
 
 ;;; Do stuff to use a package, with all kinds of fun name-conflict checking.
 (defun use-package (packages-to-use &optional (package (sane-package)))
-  #!+sb-doc
   "Add all the PACKAGES-TO-USE to the use list for PACKAGE so that the
 external symbols of the used packages are accessible as internal symbols in
 PACKAGE."
@@ -1469,7 +1443,6 @@ PACKAGE."
   t)
 
 (defun unuse-package (packages-to-unuse &optional (package (sane-package)))
-  #!+sb-doc
   "Remove PACKAGES-TO-UNUSE from the USE list for PACKAGE."
   (with-package-graph ()
     (let ((package (find-undeleted-package-or-lose package))
@@ -1489,7 +1462,6 @@ PACKAGE."
       t)))
 
 (defun find-all-symbols (string-or-symbol)
-  #!+sb-doc
   "Return a list of all symbols in the system having the specified name."
   (let ((string (string string-or-symbol))
         (res ()))
@@ -1515,7 +1487,6 @@ PACKAGE."
                      &optional
                      package-designator
                      external-only)
-  #!+sb-doc
   "Like APROPOS, except that it returns a list of the symbols found instead
   of describing them."
   (if package-designator
@@ -1537,7 +1508,6 @@ PACKAGE."
                (sort (list-all-packages) #'string-lessp :key #'package-name)))))
 
 (defun apropos (string-designator &optional package external-only)
-  #!+sb-doc
   "Briefly describe all symbols which contain the specified STRING.
   If PACKAGE is supplied then only describe symbols present in
   that package. If EXTERNAL-ONLY then only describe

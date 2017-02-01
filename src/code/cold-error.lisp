@@ -12,7 +12,6 @@
 (in-package "SB!KERNEL")
 
 (!defvar *break-on-signals* nil
-  #!+sb-doc
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will
    enter the debugger prior to signalling that condition.")
 
@@ -70,7 +69,6 @@
         (setf *break-on-signals* new-value)))))
 
 (defun signal (datum &rest arguments)
-  #!+sb-doc
   "Invokes the signal facility on a condition formed from DATUM and
    ARGUMENTS. If the condition is not handled, NIL is returned. If
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
@@ -151,7 +149,6 @@
            (1+ *current-error-depth*)))))
 
 (defun error (datum &rest arguments)
-  #!+sb-doc
   "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.
   If the condition is not handled, the debugger is invoked."
   (/show0 "entering ERROR, argument list=..")
@@ -197,7 +194,6 @@
   nil)
 
 (defun break (&optional (datum "break") &rest arguments)
-  #!+sb-doc
   "Print a message and invoke the debugger without allowing any possibility
 of condition handling occurring."
   (let ((*debugger-hook* nil) ; as specifically required by ANSI

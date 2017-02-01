@@ -146,7 +146,6 @@
 ;;;; database
 
 (defun sb!xc:macro-function (symbol &optional env)
-  #!+sb-doc
   "If SYMBOL names a macro in ENV, returns the expansion function,
 else returns NIL. If ENV is unspecified or NIL, use the global environment
 only."
@@ -206,7 +205,6 @@ only."
          fun-name)))
 
 (defun sb!xc:compiler-macro-function (name &optional env)
-  #!+sb-doc
   "If NAME names a compiler-macro in ENV, return the expansion function, else
 return NIL. Can be set with SETF when ENV is NIL."
   (legal-fun-name-or-type-error name)

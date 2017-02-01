@@ -292,7 +292,6 @@
   (values))
 
 (defmacro profile (&rest names)
-  #+sb-doc
   "PROFILE Name*
 
    If no names are supplied, return the list of profiled functions.
@@ -310,7 +309,6 @@
       `(mapc-on-named-funs #'profile-1-fun ',names)))
 
 (defmacro unprofile (&rest names)
-  #+sb-doc
   "Unwrap any profiling code around the named functions, or if no names
   are given, unprofile all profiled functions. A symbol names
   a function. A string names all the functions named by symbols in the
@@ -327,7 +325,6 @@
     (unprofile-1-fun name)))
 
 (defun reset ()
-  #+sb-doc
   "Reset the counters for all profiled functions."
   (dohash ((name profile-info) *profiled-fun-name->info* :locked t)
     (declare (ignore name))
@@ -364,7 +361,6 @@
     (max raw-compensated 0.0)))
 
 (defun report (&key limit (print-no-call-list t))
-  #+sb-doc
   "Report results from profiling. The results are approximately
 adjusted for profiling overhead. The compensation may be rather
 inaccurate when bignums are involved in runtime calculation, as in a

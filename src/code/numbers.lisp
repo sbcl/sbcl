@@ -259,7 +259,6 @@
 ;;;; COMPLEXes
 
 (defun complex (realpart &optional (imagpart 0))
-  #!+sb-doc
   "Return a complex number with the specified real and imaginary components."
   (declare (explicit-check))
   (flet ((%%make-complex (realpart imagpart)
@@ -284,7 +283,6 @@
     (float-contagion %%make-complex realpart imagpart (rational)))))
 
 (defun realpart (number)
-  #!+sb-doc
   "Extract the real part of a number."
   (etypecase number
     #!+long-float
@@ -300,7 +298,6 @@
      number)))
 
 (defun imagpart (number)
-  #!+sb-doc
   "Extract the imaginary part of a number."
   (etypecase number
     #!+long-float
@@ -318,7 +315,6 @@
      0)))
 
 (defun conjugate (number)
-  #!+sb-doc
   "Return the complex conjugate of NUMBER. For non-complex numbers, this is
   an identity."
   (declare (type number number) (explicit-check))
@@ -327,7 +323,6 @@
       number))
 
 (defun signum (number)
-  #!+sb-doc
   "If NUMBER is zero, return NUMBER, else return (/ NUMBER (ABS NUMBER))."
   (declare (explicit-check))
   (if (zerop number)
@@ -343,12 +338,10 @@
 ;;;; ratios
 
 (defun numerator (number)
-  #!+sb-doc
   "Return the numerator of NUMBER, which must be rational."
   (numerator number))
 
 (defun denominator (number)
-  #!+sb-doc
   "Return the denominator of NUMBER, which must be rational."
   (denominator number))
 
@@ -378,7 +371,6 @@
     "Return the product of its arguments. With no args, returns 1."))
 
 (defun - (number &rest more-numbers)
-  #!+sb-doc
   "Subtract the second and all subsequent arguments from the first;
   or with one argument, negate the first argument."
   (declare (explicit-check))
@@ -389,7 +381,6 @@
       (- number)))
 
 (defun / (number &rest more-numbers)
-  #!+sb-doc
   "Divide the first argument by each of the following arguments, in turn.
   With one argument, return reciprocal."
   (declare (explicit-check))
@@ -400,13 +391,11 @@
       (/ number)))
 
 (defun 1+ (number)
-  #!+sb-doc
   "Return NUMBER + 1."
   (declare (explicit-check))
   (1+ number))
 
 (defun 1- (number)
-  #!+sb-doc
   "Return NUMBER - 1."
   (declare (explicit-check))
   (1- number))
@@ -606,7 +595,6 @@
 ;;;; TRUNCATE and friends
 
 (defun truncate (number &optional (divisor 1))
-  #!+sb-doc
   "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
   (declare (explicit-check))
@@ -661,33 +649,28 @@
   (%multiply-high x y))
 
 (defun floor (number &optional (divisor 1))
-  #!+sb-doc
   "Return the greatest integer not greater than number, or number/divisor.
   The second returned value is (mod number divisor)."
   (declare (explicit-check))
   (floor number divisor))
 
 (defun ceiling (number &optional (divisor 1))
-  #!+sb-doc
   "Return the smallest integer not less than number, or number/divisor.
   The second returned value is the remainder."
   (declare (explicit-check))
   (ceiling number divisor))
 
 (defun rem (number divisor)
-  #!+sb-doc
   "Return second result of TRUNCATE."
   (declare (explicit-check))
   (rem number divisor))
 
 (defun mod (number divisor)
-  #!+sb-doc
   "Return second result of FLOOR."
   (declare (explicit-check))
   (mod number divisor))
 
 (defun round (number &optional (divisor 1))
-  #!+sb-doc
   "Rounds number (or number/divisor) to nearest integer.
   The second returned value is the remainder."
   (declare (explicit-check))
@@ -722,7 +705,6 @@
 ;;; the compiler a chance to pick off the unary float case.
 #!-sb-fluid (declaim (inline fceiling ffloor ftruncate))
 (defun ftruncate (number &optional (divisor 1))
-  #!+sb-doc
   "Same as TRUNCATE, but returns first value as a float."
   (declare (explicit-check))
   (macrolet ((ftruncate-float (rtype)
@@ -757,7 +739,6 @@
        (ftruncate-float (dispatch-type divisor))))))
 
 (defun ffloor (number &optional (divisor 1))
-  #!+sb-doc
   "Same as FLOOR, but returns first value as a float."
   (declare (explicit-check))
   (multiple-value-bind (tru rem) (ftruncate number divisor)
@@ -769,7 +750,6 @@
         (values tru rem))))
 
 (defun fceiling (number &optional (divisor 1))
-  #!+sb-doc
   "Same as CEILING, but returns first value as a float."
   (declare (explicit-check))
   (multiple-value-bind (tru rem) (ftruncate number divisor)
@@ -783,7 +763,6 @@
 ;;; FIXME: this probably needs treatment similar to the use of
 ;;; %UNARY-FTRUNCATE for FTRUNCATE.
 (defun fround (number &optional (divisor 1))
-  #!+sb-doc
   "Same as ROUND, but returns first value as a float."
   (declare (explicit-check))
   (multiple-value-bind (res rem)
@@ -793,7 +772,6 @@
 ;;;; comparisons
 
 (defun = (number &rest more-numbers)
-  #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
   (declare (number number) (explicit-check))
   (do-rest-arg ((n i) more-numbers 0 t)
@@ -802,7 +780,6 @@
                 (the number n)))))) ; for effect
 
 (defun /= (number &rest more-numbers)
-  #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
   (declare (number number) (explicit-check))
   (if more-numbers
@@ -833,7 +810,6 @@
   (def >= "Return T if arguments are in strictly non-increasing order, NIL otherwise."))
 
 (defun max (number &rest more-numbers)
-  #!+sb-doc
   "Return the greatest of its arguments; among EQUALP greatest, return
 the first."
   (declare (explicit-check))
@@ -844,7 +820,6 @@ the first."
         (setf n arg)))))
 
 (defun min (number &rest more-numbers)
-  #!+sb-doc
   "Return the least of its arguments; among EQUALP least, return
 the first."
   (declare (explicit-check))
@@ -1023,7 +998,6 @@ the first."
   (def logeqv -1 "Return the bit-wise equivalence of its arguments. Args must be integers."))
 
 (defun lognot (number)
-  #!+sb-doc
   "Return the bit-wise logical not of integer."
   (declare (explicit-check))
   (etypecase number
@@ -1065,7 +1039,6 @@ the first."
        #!+sb-doc "Bitwise OR INTEGER1 with (LOGNOT INTEGER2)."))
 
 (defun logcount (integer)
-  #!+sb-doc
   "Count the number of 1 bits if INTEGER is non-negative,
 and the number of 0 bits if INTEGER is negative."
   (declare (explicit-check))
@@ -1081,12 +1054,10 @@ and the number of 0 bits if INTEGER is negative."
      (bignum-logcount integer))))
 
 (defun logtest (integer1 integer2)
-  #!+sb-doc
   "Predicate which returns T if logand of integer1 and integer2 is not zero."
   (logtest integer1 integer2))
 
 (defun logbitp (index integer)
-  #!+sb-doc
   "Predicate returns T if bit index of integer is a 1."
   (number-dispatch ((index integer) (integer integer))
     ((fixnum fixnum) (if (< index sb!vm:n-positive-fixnum-bits)
@@ -1096,7 +1067,6 @@ and the number of 0 bits if INTEGER is negative."
     ((bignum (foreach fixnum bignum)) (minusp integer))))
 
 (defun ash (integer count)
-  #!+sb-doc
   "Shifts integer left by count places preserving sign. - count shifts right."
   (declare (integer integer count) (explicit-check))
   (etypecase integer
@@ -1124,7 +1094,6 @@ and the number of 0 bits if INTEGER is negative."
          (bignum-ashift-right integer (- count))))))
 
 (defun integer-length (integer)
-  #!+sb-doc
   "Return the number of non-sign bits in the twos-complement representation
   of INTEGER."
   (declare (explicit-check))
@@ -1137,43 +1106,35 @@ and the number of 0 bits if INTEGER is negative."
 ;;;; BYTE, bytespecs, and related operations
 
 (defun byte (size position)
-  #!+sb-doc
   "Return a byte specifier which may be used by other byte functions
   (e.g. LDB)."
   (byte size position))
 
 (defun byte-size (bytespec)
-  #!+sb-doc
   "Return the size part of the byte specifier bytespec."
   (byte-size bytespec))
 
 (defun byte-position (bytespec)
-  #!+sb-doc
   "Return the position part of the byte specifier bytespec."
   (byte-position bytespec))
 
 (defun ldb (bytespec integer)
-  #!+sb-doc
   "Extract the specified byte from integer, and right justify result."
   (ldb bytespec integer))
 
 (defun ldb-test (bytespec integer)
-  #!+sb-doc
   "Return T if any of the specified bits in integer are 1's."
   (ldb-test bytespec integer))
 
 (defun mask-field (bytespec integer)
-  #!+sb-doc
   "Extract the specified byte from integer,  but do not right justify result."
   (mask-field bytespec integer))
 
 (defun dpb (newbyte bytespec integer)
-  #!+sb-doc
   "Return new integer with newbyte in specified position, newbyte is right justified."
   (dpb newbyte bytespec integer))
 
 (defun deposit-field (newbyte bytespec integer)
-  #!+sb-doc
   "Return new integer with newbyte in specified position, newbyte is not right justified."
   (deposit-field newbyte bytespec integer))
 
@@ -1205,7 +1166,6 @@ and the number of 0 bits if INTEGER is negative."
             (logand integer (lognot mask)))))
 
 (defun sb!c::mask-signed-field (size integer)
-  #!+sb-doc
   "Extract SIZE lower bits from INTEGER, considering them as a
 2-complement SIZE-bits representation of a signed integer."
   (macrolet ((msf (size integer)
@@ -1233,7 +1193,6 @@ and the number of 0 bits if INTEGER is negative."
 ;;;; BOOLE
 
 (defun boole (op integer1 integer2)
-  #!+sb-doc
   "Bit-wise boolean function on two integers. Function chosen by OP:
         0       BOOLE-CLR
         1       BOOLE-SET
@@ -1273,7 +1232,6 @@ and the number of 0 bits if INTEGER is negative."
 ;;;; GCD and LCM
 
 (defun gcd (&rest integers)
-  #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
   integers. GCD with no arguments is defined to be 0."
   (declare (explicit-check))
@@ -1289,7 +1247,6 @@ and the number of 0 bits if INTEGER is negative."
        (declare (integer result))))))
 
 (defun lcm (&rest integers)
-  #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
   (declare (explicit-check))
@@ -1373,7 +1330,6 @@ and the number of 0 bits if INTEGER is negative."
 ;;; type dispatching. This pattern is not supported by NUMBER-DISPATCH
 ;;; thus some special-purpose macrology is needed.
 (defun isqrt (n)
-  #!+sb-doc
   "Return the greatest integer less than or equal to the square root of N."
   (declare (type unsigned-byte n) (explicit-check))
   (macrolet

@@ -13,7 +13,6 @@
   (sb!xc:defmacro %string (x) `(if (stringp ,x) ,x (string ,x))))
 
 (defun string (x)
-  #!+sb-doc
   "Coerces X into a string. If X is a string, X is returned. If X is a
    symbol, its name is returned. If X is a character then a one element
    string containing that character is returned. If X cannot be coerced
@@ -80,7 +79,6 @@
 ) ; EVAL-WHEN
 
 (defun char (string index)
-  #!+sb-doc
   "Given a string and a non-negative integer index less than the length of
   the string, returns the character object representing the character at
   that position in the string."
@@ -92,7 +90,6 @@
   (setf (char string index) new-el))
 
 (defun schar (string index)
-  #!+sb-doc
   "SCHAR returns the character object at an indexed position in a string
    just as CHAR does, except the string must be a simple-string."
   (declare (optimize (safety 1)))
@@ -234,7 +231,6 @@
   (string<>=*-body nil t))
 
 (defun string< (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically less than
   the second string, returns the longest common prefix (using char=)
   of the two strings. Otherwise, returns ()."
@@ -244,7 +240,6 @@
   (string<* string1 string2 0 nil 0 nil))
 
 (defun string> (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically greater than
   the second string, returns the longest common prefix (using char=)
   of the two strings. Otherwise, returns ()."
@@ -254,7 +249,6 @@
   (string>* string1 string2 0 nil 0 nil))
 
 (defun string<= (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically less than
   or equal to the second string, returns the longest common prefix
   (using char=) of the two strings. Otherwise, returns ()."
@@ -264,7 +258,6 @@
   (string<=* string1 string2 0 nil 0 nil))
 
 (defun string>= (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically greater
   than or equal to the second string, returns the longest common prefix
   (using char=) of the two strings. Otherwise, returns ()."
@@ -282,7 +275,6 @@
 ;;; efficient way to test for strings which begin with a particular
 ;;; pattern. Alas..) -- WHN 19991206
 (defun string= (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings (string1 and string2), and optional integers start1,
   start2, end1 and end2, compares characters in string1 to characters in
   string2 (using char=)."
@@ -292,7 +284,6 @@
   (string=* string1 string2 0 nil 0 nil))
 
 (defun string/= (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is not lexicographically equal
   to the second string, returns the longest common prefix (using char=)
   of the two strings. Otherwise, returns ()."
@@ -330,7 +321,6 @@
 ) ; EVAL-WHEN
 
 (defun string-equal (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings (string1 and string2), and optional integers start1,
   start2, end1 and end2, compares characters in string1 to characters in
   string2 (using char-equal)."
@@ -352,7 +342,6 @@
         (string-not-equal-loop 1 t nil)))))
 
 (defun string-not-equal (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is not lexicographically equal
   to the second string, returns the longest common prefix (using char-equal)
   of the two strings. Otherwise, returns ()."
@@ -438,7 +427,6 @@
   (string-less-greater-equal t t))
 
 (defun string-lessp (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically less than
   the second string, returns the longest common prefix (using char-equal)
   of the two strings. Otherwise, returns ()."
@@ -448,7 +436,6 @@
   (string-lessp* string1 string2 0 nil 0 nil))
 
 (defun string-greaterp (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically greater than
   the second string, returns the longest common prefix (using char-equal)
   of the two strings. Otherwise, returns ()."
@@ -458,7 +445,6 @@
   (string-greaterp* string1 string2 0 nil 0 nil))
 
 (defun string-not-lessp (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically greater
   than or equal to the second string, returns the longest common prefix
   (using char-equal) of the two strings. Otherwise, returns ()."
@@ -469,7 +455,6 @@
 
 (defun string-not-greaterp (string1 string2 &key (start1 0) end1 (start2 0)
                                     end2)
-  #!+sb-doc
   "Given two strings, if the first string is lexicographically less than
   or equal to the second string, returns the longest common prefix
   (using char-equal) of the two strings. Otherwise, returns ()."
@@ -482,7 +467,6 @@
 (defun make-string (count &key
                     (element-type 'character)
                     ((:initial-element fill-char)))
-  #!+sb-doc
   "Given a character count and an optional fill character, makes and returns a
 new string COUNT long filled with the fill character."
   (declare (index count))

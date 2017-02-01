@@ -62,7 +62,6 @@
                                           (print-meridian t)
                                           (print-timezone t)
                                           (print-weekday t))
-  #!+sb-doc
   "Format-Universal-Time formats a string containing the time and date
    given by universal-time in a common manner. The destination is any
    destination which can be accepted by the Format function. The
@@ -163,7 +162,6 @@
                                           (print-meridian t)
                                           (print-timezone t)
                                           (print-weekday t))
-  #!+sb-doc
   "FORMAT-DECODED-TIME formats a string containing decoded time
    expressed in a humanly-readable manner. The destination is any
    destination which can be accepted by the FORMAT function. The

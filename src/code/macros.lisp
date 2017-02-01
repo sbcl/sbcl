@@ -27,7 +27,6 @@
 ;;;
 (sb!xc:defmacro assert (test-form &optional places datum &rest arguments
                             &environment env)
-  #!+sb-doc
   "Signals an error if the value of TEST-FORM is NIL. Returns NIL.
 
    Optional DATUM and ARGUMENTS can be used to change the signaled
@@ -116,7 +115,6 @@
 ;;; the macro RESTART-CASE, which isn't defined until a later file.
 (sb!xc:defmacro check-type (place type &optional type-string
                                 &environment env)
-  #!+sb-doc
   "Signal a restartable error of type TYPE-ERROR if the value of PLACE
 is not of the specified type. If an error is signalled and the restart
 is used to return, this can only return if the STORE-VALUE restart is
@@ -181,7 +179,6 @@ invoked. In that case it will store into PLACE and start over."
 ;;;; DEFINE-COMPILER-MACRO
 
 (sb!xc:defmacro define-compiler-macro (name lambda-list &body body)
-  #!+sb-doc
   "Define a compiler-macro for NAME."
   (legal-fun-name-or-type-error name)
   (when (and (symbolp name) (special-operator-p name))
@@ -371,14 +368,12 @@ invoked. In that case it will store into PLACE and start over."
 ) ; EVAL-WHEN
 
 (sb!xc:defmacro case (keyform &body cases)
-  #!+sb-doc
   "CASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If a singleton key is T then the clause is a default clause."
   (case-body 'case keyform cases t 'eql nil nil nil))
 
 (sb!xc:defmacro ccase (keyform &body cases)
-  #!+sb-doc
   "CCASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then a correctable error is
@@ -386,28 +381,24 @@ invoked. In that case it will store into PLACE and start over."
   (case-body 'ccase keyform cases t 'eql t t t))
 
 (sb!xc:defmacro ecase (keyform &body cases)
-  #!+sb-doc
   "ECASE Keyform {({(Key*) | Key} Form*)}*
   Evaluates the Forms in the first clause with a Key EQL to the value of
   Keyform. If none of the keys matches then an error is signalled."
   (case-body 'ecase keyform cases t 'eql t nil t))
 
 (sb!xc:defmacro typecase (keyform &body cases)
-  #!+sb-doc
   "TYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true."
   (case-body 'typecase keyform cases nil 'typep nil nil nil))
 
 (sb!xc:defmacro ctypecase (keyform &body cases)
-  #!+sb-doc
   "CTYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then a correctable error is signalled."
   (case-body 'ctypecase keyform cases nil 'typep t t t))
 
 (sb!xc:defmacro etypecase (keyform &body cases)
-  #!+sb-doc
   "ETYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then an error is signalled."
@@ -501,7 +492,6 @@ invoked. In that case it will store into PLACE and start over."
 ;;;; miscellaneous macros
 
 (sb!xc:defmacro nth-value (n form &environment env)
-  #!+sb-doc
   "Evaluate FORM and return the Nth value (zero based)
  without consing a temporary list of values."
   ;; FIXME: The above is true, if slightly misleading.  The
@@ -527,7 +517,6 @@ invoked. In that case it will store into PLACE and start over."
            (the index ,n) ,form))))
 
 (sb!xc:defmacro declaim (&rest specs)
-  #!+sb-doc
   "DECLAIM Declaration*
   Do a declaration or declarations for the global environment."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -540,7 +529,6 @@ invoked. In that case it will store into PLACE and start over."
                 %print-unreadable-object))
 (sb!xc:defmacro print-unreadable-object ((object stream &key type identity)
                                              &body body)
-  #!+sb-doc
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
   with object-type prefix and object-identity suffix, and executing the
   code in BODY to provide possible further output."
@@ -552,7 +540,6 @@ invoked. In that case it will store into PLACE and start over."
         call)))
 
 (sb!xc:defmacro ignore-errors (&rest forms)
-  #!+sb-doc
   "Execute FORMS handling ERROR conditions, returning the result of the last
   form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
   `(handler-case (progn ,@forms)

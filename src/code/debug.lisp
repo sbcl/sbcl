@@ -32,7 +32,6 @@
 ;;;           #:
 ;;;         exactly 2 expected, but 5 found
 (defvar *debug-print-variable-alist* nil
-  #!+sb-doc
   "an association list describing new bindings for special variables
 to be used within the debugger. Eg.
 
@@ -52,11 +51,9 @@ provide bindings for printer control variables.")
   ;; cold toplevel forms have run. So instead we initialize it
   ;; immediately after *STANDARD-READTABLE*. -- WHN 20000205
   nil
-  #!+sb-doc
   "*READTABLE* for the debugger")
 
 (defvar *in-the-debugger* nil
-  #!+sb-doc
   "This is T while in the debugger.")
 
 ;;; nestedness inside debugger command loops
@@ -80,7 +77,6 @@ provide bindings for printer control variables.")
 ;;; get out of the system with Ctrl-C or (EXIT) or EXIT or whatever.
 ;;; But after memorizing them the wasted screen space gets annoying..
 (defvar *debug-beginner-help-p* t
-  #!+sb-doc
   "Should the debugger display beginner-oriented help messages?")
 
 (defun debug-prompt (stream)
@@ -182,12 +178,10 @@ Other commands:
 
 (declaim (unsigned-byte *backtrace-frame-count*))
 (defvar *backtrace-frame-count* 1000
-  #!+sb-doc
   "Default number of frames to backtrace. Defaults to 1000.")
 
 (declaim (type (member :minimal :normal :full) *method-frame-style*))
 (defvar *method-frame-style* :normal
-  #!+sb-doc
   "Determines how frames corresponding to method functions are represented in
 backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
 
@@ -256,7 +250,6 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
                       (start 0)
                       (from :debugger-frame)
                       (count *backtrace-frame-count*))
-  #!+sb-doc
   "Calls the designated FUNCTION with each frame on the call stack.
 Returns the last value returned by FUNCTION.
 
@@ -302,7 +295,6 @@ is :DEBUGGER-FRAME.
                         (print-frame-source nil)
                         (method-frame-style *method-frame-style*)
                         (emergency-best-effort (> *debug-command-level* 1)))
-  #!+sb-doc
   "Print a listing of the call stack to STREAM, defaulting to *DEBUG-IO*.
 
 COUNT is the number of frames to backtrace, defaulting to
@@ -396,7 +388,6 @@ possible while navigating and ignoring possible errors."
                        (start 0)
                        (from :debugger-frame)
                        (method-frame-style *method-frame-style*))
-  #!+sb-doc
     "Returns a list describing the call stack. Each frame is represented
 by a sublist:
 
@@ -461,7 +452,6 @@ information."
       obj))
 
 (defun stack-allocated-p (obj)
-  #!+sb-doc
   "Returns T if OBJ is allocated on the stack of the current
 thread, NIL otherwise."
   (with-pinned-objects (obj)
@@ -663,7 +653,6 @@ thread, NIL otherwise."
 
 (defun frame-call (frame &key (method-frame-style *method-frame-style*)
                               replace-dynamic-extent-objects)
-  #!+sb-doc
   "Returns as multiple values a descriptive name for the function responsible
 for FRAME, arguments that that function, and a list providing additional
 information about the frame.
@@ -767,7 +756,6 @@ the current thread are replaced with dummy objects which can safely escape."
 ;;;; INVOKE-DEBUGGER
 
 (defvar *debugger-hook* nil
-  #!+sb-doc
   "This is either NIL or a function of two arguments, a condition and the value
    of *DEBUGGER-HOOK*. This function can either handle the condition or return
    which causes the standard debugger to execute. The system passes the value
@@ -775,7 +763,6 @@ the current thread are replaced with dummy objects which can safely escape."
    around the invocation.")
 
 (defvar *invoke-debugger-hook* nil
-  #!+sb-doc
   "This is either NIL or a designator for a function of two arguments,
    to be run when the debugger is about to be entered.  The function is
    run with *INVOKE-DEBUGGER-HOOK* bound to NIL to minimize recursive
@@ -886,7 +873,6 @@ the current thread are replaced with dummy objects which can safely escape."
        hint))))
 
 (defun invoke-debugger (condition)
-  #!+sb-doc
   "Enter the debugger."
   (let ((*stack-top-hint* (resolve-stack-top-hint)))
     ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
@@ -1088,7 +1074,6 @@ the current thread are replaced with dummy objects which can safely escape."
 ;;; halt-on-failures and prompt-on-failures modes, suitable for
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
-  #!+sb-doc
   "When invoked, this function will turn off both the SBCL debugger
 and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
@@ -1105,7 +1090,6 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
                                                  (function sb!alien:void))))
 
 (defun enable-debugger ()
-  #!+sb-doc
   "Restore the debugger if it has been turned off by DISABLE-DEBUGGER."
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
     (setf *invoke-debugger-hook* *old-debugger-hook*
@@ -1147,7 +1131,6 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
              (incf count))))))
 
 (defvar *debug-loop-fun* #'debug-loop-fun
-  #!+sb-doc
   "A function taking no parameters that starts the low-level debug loop.")
 
 ;;; When the debugger is invoked due to a stepper condition, we don't
@@ -1174,7 +1157,6 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 ;;; Note: This defaulted to T in CMU CL. The changed default in SBCL
 ;;; was motivated by desire to play nicely with ILISP.
 (defvar *flush-debug-errors* nil
-  #!+sb-doc
   "When set, avoid calling INVOKE-DEBUGGER recursively when errors occur while
    executing in the debugger.")
 
@@ -1241,7 +1223,6 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
                         (funcall cmd-fun))))))))))))
 
 (defvar *auto-eval-in-frame* t
-  #!+sb-doc
   "When set (the default), evaluations in the debugger's command loop occur
 relative to the current frame's environment without the need of debugger
 forms that explicitly control this kind of evaluation.")
@@ -1366,7 +1347,6 @@ forms that explicitly control this kind of evaluation.")
 ;;; FIXME: This doesn't work. It would be real nice we could make it
 ;;; work! Alas, it doesn't seem to work in CMU CL X86 either..
 (defun var (name &optional (id 0 id-supplied))
-  #!+sb-doc
   "Return a variable's value if possible. NAME is a simple-string or symbol.
    If it is a simple-string, it is an initial substring of the variable's name.
    If name is a symbol, it has the same name and package as the variable whose
@@ -1424,7 +1404,6 @@ forms that explicitly control this kind of evaluation.")
       (decf n))))
 
 (defun arg (n)
-  #!+sb-doc
   "Return the N'th argument's value if possible. Argument zero is the first
    argument in a frame's default printed representation. Count keyword/value
    pairs as separate arguments."

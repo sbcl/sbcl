@@ -64,15 +64,12 @@
 
 (defconstant sb!xc:most-positive-fixnum
     (1- (ash 1 n-positive-fixnum-bits))
-  #!+sb-doc
   "the fixnum closest in value to positive infinity")
 (defconstant sb!xc:most-negative-fixnum
     (ash -1 n-positive-fixnum-bits)
-  #!+sb-doc
   "the fixnum closest in value to negative infinity")
 
 (defconstant most-positive-word (1- (expt 2 n-word-bits))
-  #!+sb-doc
   "The most positive integer that is of type SB-EXT:WORD.")
 
 (defconstant most-positive-exactly-single-float-fixnum

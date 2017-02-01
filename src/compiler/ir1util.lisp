@@ -1802,7 +1802,6 @@
 ;;; lambda with a new lambda-list with the correct number of
 ;;; arguments.
 (defun splice-fun-args (lvar fun num-args)
-  #!+sb-doc
   "If LVAR is a call to FUN with NUM-ARGS args, change those arguments to feed
 directly to the LVAR-DEST of LVAR, which must be a combination. If FUN
 is :ANY, the function name is not checked."
@@ -2149,7 +2148,6 @@ is :ANY, the function name is not checked."
   (ref-leaf (lvar-uses (basic-combination-fun call))))
 
 (defvar *inline-expansion-limit* 200
-  #!+sb-doc
   "an upper limit on the number of inline function calls that will be expanded
    in any given code object (single function or block compilation)")
 

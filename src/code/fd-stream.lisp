@@ -48,11 +48,9 @@
 (declaim (freeze-type buffer))
 
 (defglobal *available-buffers* ()
-  #!+sb-doc
   "List of available buffers.")
 
 (defconstant +bytes-per-buffer+ (* 4 1024)
-  #!+sb-doc
   "Default number of bytes per buffer.")
 
 (defun alloc-buffer (&optional (size +bytes-per-buffer+))
@@ -436,7 +434,6 @@
 ;;;; output routines and related noise
 
 (defvar *output-routines* ()
-  #!+sb-doc
   "List of all available output routines. Each element is a list of the
   element-type output, the kind of buffering, the function name, and the number
   of bytes per element.")
@@ -841,7 +838,6 @@
     result))
 
 (defvar *external-formats* (make-hash-table)
-  #!+sb-doc
   "Hashtable of all available external formats. The table maps from
   external-format names to EXTERNAL-FORMAT structures.")
 
@@ -2333,7 +2329,6 @@
              (direction direction)
              (if-does-not-exist if-does-not-exist)
              (if-exists if-exists))
-  #!+sb-doc
   "Return a stream which reads from or writes to FILENAME.
   Defined keywords:
    :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE

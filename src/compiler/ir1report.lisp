@@ -17,7 +17,6 @@
 (declaim (special *current-path*))
 
 (defvar *enclosing-source-cutoff* 1
-  #!+sb-doc
   "The maximum number of enclosing non-original source forms (i.e. from
   macroexpansion) that we print in full. For additional enclosing forms, we
   print only the CAR.")
@@ -79,7 +78,6 @@
 ;;; user wants to do some heavy tweaking to make SBCL give more
 ;;; informative output about his code.
 (defmacro define-source-context (name lambda-list &body body)
-  #!+sb-doc
   "DEFINE-SOURCE-CONTEXT Name Lambda-List Form*
    This macro defines how to extract an abbreviated source context from the
    Named form when it appears in the compiler input. Lambda-List is a DEFMACRO
@@ -528,7 +526,6 @@ has written, having proved that it is unreachable."))
 ;;;; undefined warnings
 
 (defvar *undefined-warning-limit* 3
-  #!+sb-doc
   "If non-null, then an upper limit on the number of unknown function or type
   warnings that the compiler will print for any given name in a single
   compilation. This prevents excessive amounts of output when the real

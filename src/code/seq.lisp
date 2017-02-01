@@ -186,7 +186,6 @@
                           (the sequence (values ,other-form)))))
 
 (sb!xc:defmacro %make-sequence-like (sequence length)
-  #!+sb-doc
   "Return a sequence of the same type as SEQUENCE and the given LENGTH."
   `(seq-dispatch ,sequence
      (make-list ,length)
@@ -330,7 +329,6 @@
 
 
 (defun emptyp (sequence)
-  #!+sb-doc
   "Returns T if SEQUENCE is an empty sequence and NIL
    otherwise. Signals an error if SEQUENCE is not a sequence."
   (declare (explicit-check sequence))
@@ -382,7 +380,6 @@
                 (sb!sequence:length sequence)))
 
 (defun make-sequence (result-type length &key (initial-element nil iep))
-  #!+sb-doc
   "Return a sequence of the given RESULT-TYPE and LENGTH, with
   elements initialized to INITIAL-ELEMENT."
   (declare (index length) (explicit-check))
@@ -530,7 +527,6 @@
                   collect (pop pointer))))))
 
 (defun subseq (sequence start &optional end)
-  #!+sb-doc
   "Return a copy of a subsequence of SEQUENCE starting with element number
    START and continuing to the end of SEQUENCE or the optional END."
   (declare (explicit-check sequence :result))
@@ -675,7 +671,6 @@
          (fill data item :start start :end end))))))
 
 (defun fill (sequence item &key (start 0) end)
-  #!+sb-doc
   "Replace the specified elements of SEQUENCE with ITEM."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
@@ -808,7 +803,6 @@
 
 (define-sequence-traverser replace
     (sequence1 sequence2 &rest args &key start1 end1 start2 end2)
-  #!+sb-doc
   "Destructively modifies SEQUENCE1 by copying successive elements
 into it from the SEQUENCE2.
 
@@ -847,7 +841,6 @@ many elements are copied."
 
 ;;;; REVERSE
 (defun reverse (sequence)
-  #!+sb-doc
   "Return a new sequence containing the same elements but in reverse order."
   (declare (explicit-check))
   (seq-dispatch-checking sequence
@@ -967,7 +960,6 @@ many elements are copied."
   vector)
 
 (defun nreverse (sequence)
-  #!+sb-doc
   "Return a sequence of the same elements in reverse order; the argument
    is destroyed."
   (declare (explicit-check))
@@ -981,7 +973,6 @@ many elements are copied."
 
 
 (defmacro sb!sequence:dosequence ((element sequence &optional return) &body body)
-  #!+sb-doc
   "Executes BODY with ELEMENT subsequently bound to each element of
   SEQUENCE, then returns RETURN."
   (multiple-value-bind (forms decls) (parse-body body nil)
@@ -1009,7 +1000,6 @@ many elements are copied."
 ;;;; CONCATENATE
 
 (defun concatenate (result-type &rest sequences)
-  #!+sb-doc
   "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
   specified RESULT-TYPE."
@@ -1601,7 +1591,6 @@ many elements are copied."
 (define-sequence-traverser delete
     (item sequence &rest args &key from-end test test-not start
      end count key)
-  #!+sb-doc
   "Return a sequence formed by destructively removing the specified ITEM from
   the given SEQUENCE."
   (declare (type fixnum start)
@@ -1642,7 +1631,6 @@ many elements are copied."
 
 (define-sequence-traverser delete-if
     (predicate sequence &rest args &key from-end start key end count)
-  #!+sb-doc
   "Return a sequence formed by destructively removing the elements satisfying
   the specified PREDICATE from the given SEQUENCE."
   (declare (type fixnum start)
@@ -1683,7 +1671,6 @@ many elements are copied."
 
 (define-sequence-traverser delete-if-not
     (predicate sequence &rest args &key from-end start end key count)
-  #!+sb-doc
   "Return a sequence formed by destructively removing the elements not
   satisfying the specified PREDICATE from the given SEQUENCE."
   (declare (type fixnum start)
@@ -1850,7 +1837,6 @@ many elements are copied."
 (define-sequence-traverser remove
     (item sequence &rest args &key from-end test test-not start
      end count key)
-  #!+sb-doc
   "Return a copy of SEQUENCE with elements satisfying the test (default is
    EQL) with ITEM removed."
   (declare (type fixnum start)
@@ -1871,7 +1857,6 @@ many elements are copied."
 
 (define-sequence-traverser remove-if
     (predicate sequence &rest args &key from-end start end count key)
-  #!+sb-doc
   "Return a copy of sequence with elements satisfying PREDICATE removed."
   (declare (type fixnum start)
            (truly-dynamic-extent args))
@@ -1891,7 +1876,6 @@ many elements are copied."
 
 (define-sequence-traverser remove-if-not
     (predicate sequence &rest args &key from-end start end count key)
-  #!+sb-doc
   "Return a copy of sequence with elements not satisfying PREDICATE removed."
   (declare (type fixnum start)
            (truly-dynamic-extent args))
@@ -2045,7 +2029,6 @@ many elements are copied."
 
 (define-sequence-traverser remove-duplicates
     (sequence &rest args &key test test-not start end from-end key)
-  #!+sb-doc
   "The elements of SEQUENCE are compared pairwise, and if any two match,
    the one occurring earlier is discarded, unless FROM-END is true, in
    which case the one later in the sequence is discarded. The resulting
@@ -2124,7 +2107,6 @@ many elements are copied."
 
 (define-sequence-traverser delete-duplicates
     (sequence &rest args &key test test-not start end from-end key)
-  #!+sb-doc
   "The elements of SEQUENCE are examined, and if any two match, one is
    discarded. The resulting sequence, which may be formed by destroying the
    given sequence, is returned.
@@ -2268,7 +2250,6 @@ many elements are copied."
 (define-sequence-traverser substitute
     (new old sequence &rest args &key from-end test test-not
          start count end key)
-  #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements,
   except that all elements equal to OLD are replaced with NEW."
   (declare (type fixnum start)
@@ -2280,7 +2261,6 @@ many elements are copied."
 
 (define-sequence-traverser substitute-if
     (new predicate sequence &rest args &key from-end start end count key)
-  #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements satisfying the PRED are replaced with NEW."
   (declare (type fixnum start)
@@ -2293,7 +2273,6 @@ many elements are copied."
 
 (define-sequence-traverser substitute-if-not
     (new predicate sequence &rest args &key from-end start end count key)
-  #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements not satisfying the PRED are replaced with NEW."
   (declare (type fixnum start)
@@ -2309,7 +2288,6 @@ many elements are copied."
 (define-sequence-traverser nsubstitute
     (new old sequence &rest args &key from-end test test-not
          end count key start)
-  #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements equal to OLD are replaced with NEW. SEQUENCE
   may be destructively modified."
@@ -2376,7 +2354,6 @@ many elements are copied."
 
 (define-sequence-traverser nsubstitute-if
     (new predicate sequence &rest args &key from-end start end count key)
-  #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
    except that all elements satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
@@ -2431,7 +2408,6 @@ many elements are copied."
 
 (define-sequence-traverser nsubstitute-if-not
     (new predicate sequence &rest args &key from-end start end count key)
-  #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
    except that all elements not satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
@@ -2677,7 +2653,6 @@ many elements are copied."
 
 (define-sequence-traverser count-if
     (pred sequence &rest args &key from-end start end key)
-  #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying PRED(el)."
   (declare (type fixnum start)
            (truly-dynamic-extent args))
@@ -2698,7 +2673,6 @@ many elements are copied."
 
 (define-sequence-traverser count-if-not
     (pred sequence &rest args &key from-end start end key)
-  #!+sb-doc
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (type fixnum start)
            (truly-dynamic-extent args))
@@ -2720,7 +2694,6 @@ many elements are copied."
 (define-sequence-traverser count
     (item sequence &rest args &key from-end start end
           key (test #'eql test-p) (test-not nil test-not-p))
-  #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
   (declare (type fixnum start)
@@ -2824,7 +2797,6 @@ many elements are copied."
 (define-sequence-traverser mismatch
     (sequence1 sequence2 &rest args &key from-end test test-not
      start1 end1 start2 end2 key)
-  #!+sb-doc
   "The specified subsequences of SEQUENCE1 and SEQUENCE2 are compared
    element-wise. If they are of equal length and match in every element, the
    result is NIL. Otherwise, the result is a non-negative integer, the index

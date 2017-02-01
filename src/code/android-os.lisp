@@ -16,14 +16,12 @@
 #!-android (error "missing :ANDROID feature")
 
 (defun software-type ()
-  #!+sb-doc
   "Return a string describing the supporting software."
   "Android")
 
 ;;; FIXME: More duplicated logic here vrt. other oses. Abstract into
 ;;; uname-software-version?
 (defun software-version ()
-  #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
   (or *software-version*

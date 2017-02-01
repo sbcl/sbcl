@@ -81,7 +81,6 @@
 ;;;; compiler.
 
 (defun not (object)
-  #!+sb-doc
   "Return T if X is NIL, otherwise return NIL."
   (not object))
 
@@ -91,7 +90,6 @@
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))
                     (article (if (position (schar name 0) "AEIOU") "an" "a")))
                `(defun ,pred (object)
-                  #!+sb-doc
                   ,(format nil
                            "Return true if OBJECT is ~A ~A, and NIL otherwise."
                            article
@@ -205,7 +203,6 @@
 (declaim (inline classoid-of))
 #-sb-xc-host
 (defun classoid-of (object)
-  #!+sb-doc
   "Return the class of the supplied object, which may be any Lisp object, not
    just a CLOS STANDARD-OBJECT."
   (layout-classoid (layout-of object)))
@@ -216,7 +213,6 @@
 ;;; precision here, and it is not permitted to return member types,
 ;;; negation, union, or intersection types.
 (defun type-of (object)
-  #!+sb-doc
   "Return the type of OBJECT."
   (declare (explicit-check))
   ;; We have special logic for everything except arrays.
@@ -269,7 +265,6 @@
 
 ;;; This is real simple, 'cause the compiler takes care of it.
 (defun eq (obj1 obj2)
-  #!+sb-doc
   "Return T if OBJ1 and OBJ2 are the same object, otherwise NIL."
   (eq obj1 obj2))
 ;;; and this too, but it's only needed for backends on which
@@ -281,7 +276,6 @@
 
 (declaim (inline %eql))
 (defun %eql (obj1 obj2)
-  #!+sb-doc
   "Return T if OBJ1 and OBJ2 represent the same object, otherwise NIL."
   (or (eq obj1 obj2)
       (if (or (typep obj2 'fixnum)
@@ -347,7 +341,6 @@
                                       (sbit y y-i))))))))))
 
 (defun equal (x y)
-  #!+sb-doc
   "Return T if X and Y are EQL or if they are structured components whose
 elements are EQUAL. Strings and bit-vectors are EQUAL if they are the same
 length and have identical components. Other arrays must be EQ to be EQUAL."

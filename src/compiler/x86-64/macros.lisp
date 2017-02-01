@@ -18,7 +18,6 @@
 ;;; that expand into so large an expression that the resulting code
 ;;; bloat is not justifiable.
 (defun move (dst src)
-  #!+sb-doc
   "Move SRC into DST unless they are location=."
   (unless (location= dst src)
     (sc-case dst
@@ -129,7 +128,6 @@
   #!-sb-thread `(store-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro load-type (target source &optional (offset 0))
-  #!+sb-doc
   "Loads the type bits of a pointer into target independent of
    byte-ordering issues."
   (once-only ((n-target target)
@@ -292,12 +290,10 @@
        (encode-internal-error-args values)))))
 
 (defun error-call (vop error-code &rest values)
-  #!+sb-doc
   "Cause an error. ERROR-CODE is the error to cause."
   (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 (defun generate-error-code (vop error-code &rest values)
-  #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   (assemble (*elsewhere*)
@@ -572,7 +568,6 @@
 ;;; helper for alien stuff.
 
 (sb!xc:defmacro with-pinned-objects ((&rest objects) &body body)
-  #!+sb-doc
   "Arrange with the garbage collector that the pages occupied by
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger

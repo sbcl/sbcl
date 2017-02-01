@@ -17,7 +17,6 @@
   (sb!xc:defmacro destructuring-bind (lambda-list expression &body body
                                                   &environment env)
     (declare (ignore env)) ; could be policy-sensitive (but isn't)
-    #!+sb-doc
     "Bind the variables in LAMBDA-LIST to the corresponding values in the
 tree structure resulting from the evaluation of EXPRESSION."
     `(binding* ,(sb!c::expand-ds-bind lambda-list expression t nil)

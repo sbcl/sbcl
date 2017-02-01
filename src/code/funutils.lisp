@@ -13,12 +13,10 @@
 (in-package "SB!IMPL")
 
 (defun identity (thing)
-  #!+sb-doc
   "This function simply returns what was passed to it."
   thing)
 
 (defun complement (function)
-  #!+sb-doc
   "Return a new function that returns T whenever FUNCTION returns NIL and
    NIL whenever FUNCTION returns non-NIL."
   ;; KLUDGE: constraint propagation is unable to detect that NTH gets
@@ -35,7 +33,6 @@
                   (t (funcall function)))))))))
 
 (defun constantly (value)
-  #!+sb-doc
   "Return a function that always returns VALUE."
   (lambda (&rest arguments)
     (declare (ignore arguments))

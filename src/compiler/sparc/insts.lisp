@@ -54,7 +54,6 @@
            (tn-offset tn)))))
 
 (defvar *disassem-use-lisp-reg-names* t
-  #!+sb-doc
   "If non-NIL, print registers using the Lisp register names.
 Otherwise, use the Sparc register names")
 

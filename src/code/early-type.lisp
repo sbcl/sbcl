@@ -892,7 +892,6 @@
       (specifier-type x)))
 
 (defun typexpand-1 (type-specifier &optional env)
-  #!+sb-doc
   "Takes and expands a type specifier once like MACROEXPAND-1.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
@@ -913,7 +912,6 @@ expansion happened."
         (values type-specifier nil))))
 
 (defun typexpand (type-specifier &optional env)
-  #!+sb-doc
   "Takes and expands a type specifier repeatedly like MACROEXPAND.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."

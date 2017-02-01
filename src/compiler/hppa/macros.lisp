@@ -22,7 +22,6 @@
 ;;; Instruction-like macros.
 ;;; FIXME-lav: add if always-emit-code-p is :e= then error if location=
 (defmacro move (src dst &optional always-emit-code-p)
-  #!+sb-doc
   "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P is nil)."
   (once-only ((n-src src)
               (n-dst dst))
@@ -63,7 +62,6 @@
          null-tn))
 
 (defmacro load-type (target source &optional (offset 0))
-  #!+sb-doc
   "Loads the type bits of a pointer into target independent of
 byte-ordering issues."
   (once-only ((n-target target)
@@ -84,7 +82,6 @@ byte-ordering issues."
 ;;; return instructions.
 
 (defmacro lisp-jump (function)
-  #!+sb-doc
   "Jump to the lisp function FUNCTION."
   `(progn
      (inst addi (- (ash simple-fun-code-offset word-shift)
@@ -93,7 +90,6 @@ byte-ordering issues."
      (move ,function code-tn t)))
 
 (defmacro lisp-return (return-pc &key (offset 0) (frob-code t))
-  #!+sb-doc
   "Return to RETURN-PC."
   `(progn
      (inst addi (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag)
@@ -103,7 +99,6 @@ byte-ordering issues."
          `((move ,return-pc code-tn t)))))
 
 (defmacro emit-return-pc (label)
-  #!+sb-doc
   "Emit a return-pc header word.  LABEL is the label to use for this
    return-pc."
   `(progn
@@ -134,7 +129,6 @@ byte-ordering issues."
           (storew reg cfp-tn offset))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
-  #!+sb-doc
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
               (n-stack reg-or-stack))
@@ -154,7 +148,6 @@ byte-ordering issues."
                                   &key (lowtag other-pointer-lowtag)
                                        maybe-write)
                                  &body body)
-  #!+sb-doc
   "Do stuff to allocate an other-pointer object of fixed Size with a single
 word header having the specified Type-Code.  The result is placed in
 Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
@@ -205,13 +198,11 @@ initializes the object."
     (emit-alignment word-shift)))
 
 (defun error-call (vop error-code &rest values)
-  #!+sb-doc
   "Cause an error.  ERROR-CODE is the error to cause."
   (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 
 (defun cerror-call (vop label error-code &rest values)
-  #!+sb-doc
   "Cause a continuable error.  If the error is continued, execution resumes at
   LABEL."
   (without-scheduling ()
@@ -219,7 +210,6 @@ initializes the object."
     (emit-error-break vop cerror-trap (error-number-or-lose error-code) values)))
 
 (defun generate-error-code (vop error-code &rest values)
-  #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   (assemble (*elsewhere*)
@@ -229,7 +219,6 @@ initializes the object."
       start-lab)))
 
 (defmacro generate-cerror-code (vop error-code &rest values)
-  #!+sb-doc
   "Generate-CError-Code Error-code Value*
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after

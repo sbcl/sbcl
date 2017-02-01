@@ -14,13 +14,11 @@
 ;;;; syntactic environment access
 
 (defun sb!xc:special-operator-p (symbol)
-  #!+sb-doc
   "If the symbol globally names a special form, return T, otherwise NIL."
   (declare (symbol symbol))
   (eq (info :function :kind symbol) :special-form))
 
 (defvar sb!xc:*macroexpand-hook* 'funcall
-  #!+sb-doc
   "The value of this variable must be a designator for a function that can
   take three arguments, a macro expander function, the macro form to be
   expanded, and the lexical environment to expand in. The function should
@@ -65,7 +63,6 @@
                :expected-type 'compiled-function))))
 
 (defun sb!xc:macroexpand-1 (form &optional env)
-  #!+sb-doc
   "If form is a macro (or symbol macro), expand it once. Return two values,
    the expanded form and a T-or-NIL flag indicating whether the form was, in
    fact, a macro. ENV is the lexical environment to expand in, which defaults
@@ -117,7 +114,6 @@
             (values form nil)))))
 
 (defun sb!xc:macroexpand (form &optional env)
-  #!+sb-doc
   "Repetitively call MACROEXPAND-1 until the form can no longer be expanded.
    Returns the final resultant form, and T if it was expanded. ENV is the
    lexical environment to expand in, or NIL (the default) for the null

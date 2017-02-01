@@ -49,14 +49,12 @@
   (merge-pathnames ".sbclrc" (user-homedir-pathname)))
 
 (defvar *sysinit-pathname-function* #'sysinit-pathname
-  #!+sb-doc
   "Designator for a function of zero arguments called to obtain a
 pathname designator for the default sysinit file, or NIL. If the
 function returns NIL, no sysinit file is used unless one has been
 specified on the command-line.")
 
 (defvar *userinit-pathname-function* #'userinit-pathname
-  #!+sb-doc
   "Designator for a function of zero arguments called to obtain a
 pathname designator or a stream for the default userinit file, or NIL.
 If the function returns NIL, no userinit file is used unless one has
@@ -82,7 +80,6 @@ been specified on the command-line.")
 (defvar *exit-in-process* nil)
 (declaim (type (or null real) *exit-timeout*))
 (defvar *exit-timeout* 60
-  #!+sb-doc
   "Default amount of seconds, if any, EXIT should wait for other
 threads to finish after terminating them. Default value is 60. NIL
 means to wait indefinitely.")
@@ -148,7 +145,6 @@ means to wait indefinitely.")
          (values sec (truncate frac (load-time-value 1f-9 t))))))))
 
 (defun sleep (seconds)
-  #!+sb-doc
   "This function causes execution to be suspended for SECONDS. SECONDS may be
 any non-negative real number."
   (declare (explicit-check))
@@ -179,7 +175,6 @@ any non-negative real number."
 ;;;; the default toplevel function
 
 (defvar / nil
-  #!+sb-doc
   "a list of all the values returned by the most recent top level EVAL")
 (defvar //  nil #!+sb-doc "the previous value of /")
 (defvar /// nil #!+sb-doc "the previous value of //")
@@ -192,7 +187,6 @@ any non-negative real number."
 (defvar -   nil #!+sb-doc "the form currently being evaluated")
 
 (defun interactive-eval (form &key (eval #'eval))
-  #!+sb-doc
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
 +++, ++, +, ///, //, /, and -."
   (setf - form)
@@ -510,17 +504,14 @@ any non-negative real number."
 ;;; KMR on sbcl-devel 2002-12-21.  Altered by CSR 2003-11-16 for
 ;;; threaded operation: altered *REPL-FUN* to *REPL-FUN-GENERATOR*.
 (defvar *repl-read-form-fun* #'repl-read-form-fun
-  #!+sb-doc
   "A function of two stream arguments IN and OUT for the toplevel REPL to
 call: Return the next Lisp form to evaluate (possibly handling other magic --
 like ACL-style keyword commands -- which precede the next Lisp form). The OUT
 stream is there to support magic which requires issuing new prompts.")
 (defvar *repl-prompt-fun* #'repl-prompt-fun
-  #!+sb-doc
   "A function of one argument STREAM for the toplevel REPL to call: Prompt
 the user for input.")
 (defvar *repl-fun-generator* (constantly #'repl-fun)
-  #!+sb-doc
   "A function of no arguments returning a function of one argument NOPRINT
 that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
 *STANDARD-OUTPUT* are set up.")

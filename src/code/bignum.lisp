@@ -496,7 +496,6 @@
                     (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i2))))))))))
 
 (sb!xc:defmacro with-bignum-buffers (specs &body body)
-  #!+sb-doc
   "WITH-BIGNUM-BUFFERS ({(var size [init])}*) Form*"
   (sb!int:collect ((binds)
                    (inits))

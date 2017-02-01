@@ -262,12 +262,10 @@
 
 (defvar *features*
   '#.(sort (copy-list sb-cold:*shebang-features*) #'string<)
-  #!+sb-doc
   "a list of symbols that describe features provided by the
    implementation")
 
 (defun machine-instance ()
-  #!+sb-doc
   "Return a string giving the name of the local machine."
   #!+win32 (sb!win32::get-computer-name)
   #!-win32 (truly-the simple-string (sb!unix:unix-gethostname)))
@@ -276,7 +274,6 @@
 (defvar *machine-version*)
 
 (defun machine-version ()
-  #!+sb-doc
   "Return a string describing the version of the computer hardware we
 are running on, or NIL if we can't find any useful information."
   (unless (boundp '*machine-version*)
@@ -291,28 +288,22 @@ are running on, or NIL if we can't find any useful information."
 ;;; a symbol in COMMON-LISP..
 (declaim (type (or null string) *short-site-name* *long-site-name*))
 (defvar *short-site-name* nil
-  #!+sb-doc
   "The value of SHORT-SITE-NAME.")
 (defvar *long-site-name* nil
-  #!+sb-doc
   "The value of LONG-SITE-NAME.")
 (defun short-site-name ()
-  #!+sb-doc
   "Return a string with the abbreviated site name, or NIL if not known."
   *short-site-name*)
 (defun long-site-name ()
-  #!+sb-doc
   "Return a string with the long form of the site name, or NIL if not known."
   *long-site-name*)
 
 ;;;; ED
 (declaim (type list *ed-functions*))
 (defvar *ed-functions* '()
-  #!+sb-doc
   "See function documentation for ED.")
 
 (defun ed (&optional x)
-  #!+sb-doc
   "Starts the editor (on a file or a function if named).  Functions
 from the list *ED-FUNCTIONS* are called in order with X as an argument
 until one of them returns non-NIL; these functions are responsible for
@@ -344,7 +335,6 @@ the file system."
 (defvar *dribble-stream* nil)
 
 (defun dribble (&optional pathname &key (if-exists :append))
-  #!+sb-doc
   "With a file name as an argument, dribble opens the file and sends a
   record of further I/O to that file. Without an argument, it closes
   the dribble file, and quits logging."
@@ -379,12 +369,10 @@ the file system."
 ;;;; some *LOAD-FOO* variables
 
 (defvar *load-print* nil
-  #!+sb-doc
   "the default for the :PRINT argument to LOAD")
 
 (defvar *load-verbose* nil
   ;; Note that CMU CL's default for this was T, and ANSI says it's
   ;; implementation-dependent. We choose NIL on the theory that it's
   ;; a nicer default behavior for Unix programs.
-  #!+sb-doc
   "the default for the :VERBOSE argument to LOAD")

@@ -93,7 +93,6 @@
     (funcall thunk)))
 
 (defvar *derive-function-types* nil
-  #!+sb-doc
   "Should the compiler assume that function types will never change,
   so that it can use type information inferred from current definitions
   to optimize code which uses those definitions? Setting this true
@@ -1578,7 +1577,6 @@
 ;;; a symbol in the CL package, and then eliminate this switch.
 ;;; It's permissible to have implementation-specific declarations.
 (defvar *suppress-values-declaration* nil
-  #!+sb-doc
   "If true, processing of the VALUES declaration is inhibited.")
 
 ;;; Process a single declaration spec, augmenting the specified LEXENV

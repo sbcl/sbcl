@@ -132,7 +132,6 @@
   (print-unreadable-object (x stream :type t :identity t)))
 
 (defmacro with-standard-io-syntax (&body body)
-  #!+sb-doc
   "Bind the reader and printer control variables to values that enable READ
    to reliably read the results of PRINT. These values are:
 

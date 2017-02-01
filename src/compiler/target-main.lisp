@@ -150,7 +150,6 @@
 (defun compile (name &optional (definition (or (and (symbolp name)
                                                     (macro-function name))
                                                (fdefinition name))))
-  #!+sb-doc
   "Produce a compiled function from DEFINITION. If DEFINITION is a
 lambda-expression, it is coerced to a function. If DEFINITION is an
 interpreted function, it is compiled. If DEFINITION is already a compiled
@@ -210,7 +209,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;;
 (let ()
 (defmacro compile-file-position (&whole this-form)
-  #!+sb-doc
   "Return character position of this macro invocation or NIL if unavailable."
   ;; Counting characters is intuitive because the transfer element size is 1
   ;; measurement unit. The standard allows counting in something other than
@@ -219,7 +217,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
   (compute-compile-file-position this-form nil))
 
 (defmacro compile-file-line (&whole this-form)
-  #!+sb-doc
   "Return line# and column# of this macro invocation as multiple values."
   (compute-compile-file-position this-form t))
 )

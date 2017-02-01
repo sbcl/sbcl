@@ -26,7 +26,6 @@
 
 (defmacro with-deadline ((&key seconds override)
                          &body body)
-  #!+sb-doc
   "Arranges for a TIMEOUT condition to be signalled if an operation
 respecting deadlines occurs either after the deadline has passed, or
 would take longer than the time left to complete.
@@ -62,7 +61,6 @@ Experimental."
 
 (declaim (inline decode-internal-time))
 (defun decode-internal-time (time)
-  #!+sb-doc
   "Returns internal time value TIME decoded into seconds and microseconds."
   (declare (type sb!kernel:internal-time time))
   (multiple-value-bind (sec frac)
@@ -70,7 +68,6 @@ Experimental."
     (values sec (* frac sb!unix::micro-seconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)
-  #!+sb-doc
   "Signals a timeout condition while inhibiting further timeouts due to
 deadlines while the condition is being handled."
   ;; FIXME: Maybe we should make ERROR do WITH-INTERRUPTS instead of
@@ -81,7 +78,6 @@ deadlines while the condition is being handled."
       (apply #'error datum arguments))))
 
 (defun signal-deadline ()
-  #!+sb-doc
   "Signal a DEADLINE-TIMEOUT condition, and associate a DEFER-DEADLINE
 restart with it. Implementors of blocking functions are responsible
 for calling this when a deadline is reached."
@@ -109,21 +105,18 @@ for calling this when a deadline is reached."
   nil)
 
 (defun defer-deadline (seconds &optional condition)
-  #!+sb-doc
   "Find the DEFER-DEADLINE restart associated with CONDITION, and
 invoke it with SECONDS as argument (deferring the deadline by that many
 seconds.) Otherwise return NIL if the restart is not found."
   (try-restart 'defer-deadline condition seconds))
 
 (defun cancel-deadline (&optional condition)
-  #!+sb-doc
   "Find and invoke the CANCEL-DEADLINE restart associated with
 CONDITION, or return NIL if the restart is not found."
   (try-restart 'cancel-deadline condition))
 
 (declaim (inline relative-decoded-times))
 (defun relative-decoded-times (abs-sec abs-usec)
-  #!+sb-doc
 "Returns relative decoded time as two values: difference between
 ABS-SEC and ABS-USEC and current real time.
 
@@ -158,7 +151,6 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
                                   t))
                 decode-timeout))
 (defun decode-timeout (seconds)
-  #!+sb-doc
   "Decodes a relative timeout in SECONDS into five values, taking any
 global deadlines into account: TO-SEC, TO-USEC, STOP-SEC, STOP-USEC,
 DEADLINEP.

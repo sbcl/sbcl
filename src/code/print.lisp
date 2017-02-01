@@ -14,61 +14,45 @@
 ;;;; exported printer control variables
 
 (!defvar *print-readably* nil
-  #!+sb-doc
   "If true, all objects will be printed readably. If readable printing
   is impossible, an error will be signalled. This overrides the value of
   *PRINT-ESCAPE*.")
 (!defvar *print-escape* t
-  #!+sb-doc
   "Should we print in a reasonably machine-readable way? (possibly
   overridden by *PRINT-READABLY*)")
 (!defvar *print-pretty* nil ; (set later when pretty-printer is initialized)
-  #!+sb-doc
   "Should pretty printing be used?")
 (!defvar *print-base* 10.
-  #!+sb-doc
   "The output base for RATIONALs (including integers).")
 (!defvar *print-radix* nil
-  #!+sb-doc
   "Should base be verified when printing RATIONALs?")
 (!defvar *print-level* nil
-  #!+sb-doc
   "How many levels should be printed before abbreviating with \"#\"?")
 (!defvar *print-length* nil
-  #!+sb-doc
   "How many elements at any level should be printed before abbreviating
   with \"...\"?")
 (!defvar *print-circle* nil
-  #!+sb-doc
   "Should we use #n= and #n# notation to preserve uniqueness in general (and
   circularity in particular) when printing?")
 (!defvar *print-case* :upcase
-  #!+sb-doc
   "What case should the printer should use default?")
 (!defvar *print-array* t
-  #!+sb-doc
   "Should the contents of arrays be printed?")
 (!defvar *print-gensym* t
-  #!+sb-doc
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
 (!defvar *print-lines* nil
-  #!+sb-doc
   "The maximum number of lines to print per object.")
 (!defvar *print-right-margin* nil
-  #!+sb-doc
   "The position of the right margin in ems (for pretty-printing).")
 (!defvar *print-miser-width* nil
-  #!+sb-doc
   "If the remaining space between the current column and the right margin
    is less than this, then print using ``miser-style'' output. Miser
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch*
   (sb!pretty::make-pprint-dispatch-table) ; for type-correctness
-  #!+sb-doc
   "The pprint-dispatch-table that controls how to pretty-print objects.")
 (!defvar *suppress-print-errors* nil
-  #!+sb-doc
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 
@@ -147,7 +131,6 @@ variable: an unreadable object representing the error is printed instead.")
   object)
 
 (defun prin1 (object &optional stream)
-  #!+sb-doc
   "Output a mostly READable printed representation of OBJECT on the specified
   STREAM."
   (declare (explicit-check))
@@ -156,7 +139,6 @@ variable: an unreadable object representing the error is printed instead.")
   object)
 
 (defun princ (object &optional stream)
-  #!+sb-doc
   "Output an aesthetic but not necessarily READable printed representation
   of OBJECT on the specified STREAM."
   (declare (explicit-check))
@@ -166,7 +148,6 @@ variable: an unreadable object representing the error is printed instead.")
   object)
 
 (defun print (object &optional stream)
-  #!+sb-doc
   "Output a newline, the mostly READable printed representation of OBJECT, and
   space to the specified STREAM."
   (declare (explicit-check))
@@ -177,7 +158,6 @@ variable: an unreadable object representing the error is printed instead.")
     object))
 
 (defun pprint (object &optional stream)
-  #!+sb-doc
   "Prettily output OBJECT preceded by a newline."
   (declare (explicit-check))
   (let ((*print-pretty* t)
@@ -188,14 +168,12 @@ variable: an unreadable object representing the error is printed instead.")
   (values))
 
 (defun prin1-to-string (object)
-  #!+sb-doc
   "Return the printed representation of OBJECT as a string with
    slashification on."
   (let ((*print-escape* t))
     (stringify-object object)))
 
 (defun princ-to-string (object)
-  #!+sb-doc
   "Return the printed representation of OBJECT as a string with
   slashification off."
   (let ((*print-escape* nil)

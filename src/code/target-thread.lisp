@@ -19,7 +19,6 @@
 ;;; builds.
 
 (defmacro with-cas-lock ((place) &body body)
-  #!+sb-doc
   "Runs BODY with interrupts disabled and *CURRENT-THREAD* compare-and-swapped
 into PLACE instead of NIL. PLACE must be a place acceptable to
 COMPARE-AND-SWAP, and must initially hold NIL.
@@ -68,7 +67,6 @@ WITH-CAS-LOCK can be entered recursively."
 
 (define-condition thread-error (error)
   ((thread :reader thread-error-thread :initarg :thread))
-  #!+sb-doc
   (:documentation
    "Conditions of type THREAD-ERROR are signalled when thread operations fail.
 The offending thread is initialized by the :THREAD initialization argument and
@@ -92,7 +90,6 @@ read by the function THREAD-ERROR-THREAD."))
                         (cdr part)))
        (format stream "    ~S~%" start)))))
 
-#!+sb-doc
 (setf
  (fdocumentation 'thread-error-thread 'function)
  "Return the offending thread that the THREAD-ERROR pertains to.")
@@ -112,7 +109,6 @@ read by the function THREAD-ERROR-THREAD."))
                  (:no-tls-value "the symbol has no thread-local value.")
                  (:thread-dead "the thread has exited.")
                  (:invalid-tls-value "the thread-local value is not valid."))))))
-  #!+sb-doc
   (:documentation
    "Signalled when SYMBOL-VALUE-IN-THREAD or its SETF version fails due to eg.
 the symbol not having a thread-local value, or the target thread having
@@ -135,7 +131,6 @@ offending thread using THREAD-ERROR-THREAD."))
                 (format s "In thread ~A, attempt to join the current ~
                            thread."
                         (thread-error-thread c))))))
-  #!+sb-doc
   (:documentation
    "Signalled when joining a thread fails due to abnormal exit of the thread
 to be joined. The offending thread can be accessed using
@@ -149,7 +144,6 @@ THREAD-ERROR-THREAD."))
   (:report (lambda (c s)
              (format s "Interrupt thread failed: thread ~A has exited."
                      (thread-error-thread c))))
-  #!+sb-doc
   (:documentation
    "Signalled when interrupting a thread fails because the thread has already
 exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
@@ -165,11 +159,9 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
 
 ;;; set the doc here because in early-thread FDOCUMENTATION is not
 ;;; available, yet
-#!+sb-doc
 (setf (fdocumentation '*current-thread* 'variable)
       "Bound in each thread to the thread itself.")
 
-#!+sb-doc
 (setf
  (fdocumentation 'thread-name 'function)
  "Name of the thread. Can be assigned to using SETF. Thread names can be
@@ -218,14 +210,12 @@ arbitrary printable objects, and need not be unique.")
   (print-lock mutex (mutex-name mutex) (mutex-owner mutex) stream))
 
 (defun thread-alive-p (thread)
-  #!+sb-doc
   "Return T if THREAD is still alive. Note that the return value is
 potentially stale even before the function returns, as the thread may exit at
 any time."
   (thread-%alive-p thread))
 
 (defun thread-ephemeral-p (thread)
-  #!+sb-doc
   "Return T if THREAD is `ephemeral', which indicates that this thread is
 used by SBCL for internal purposes, and specifically that it knows how to
 to terminate this thread cleanly prior to core file saving without signalling
@@ -245,7 +235,6 @@ an error in that case."
      ,@body))
 
 (defun list-all-threads ()
-  #!+sb-doc
   "Return a list of the live threads. Note that the return value is
 potentially stale even before the function returns, as new threads may be
 created and old ones may exit at any time."
@@ -309,17 +298,14 @@ created and old ones may exit at any time."
     (setq *all-threads* (list initial-thread))))
 
 (defun main-thread ()
-  #!+sb-doc
   "Returns the main thread of the process."
   *initial-thread*)
 
 (defun main-thread-p (&optional (thread *current-thread*))
-  #!+sb-doc
   "True if THREAD, defaulting to current thread, is the main thread of the process."
   (eq thread *initial-thread*))
 
 (defmacro return-from-thread (values-form &key allow-exit)
-  #!+sb-doc
   "Unwinds from and terminates the current thread, with values from
 VALUES-FORM as the results visible to JOIN-THREAD.
 
@@ -346,7 +332,6 @@ See also: ABORT-THREAD and SB-EXT:EXIT."
            (throw '%return-from-thread (values-list values))))))
 
 (defun abort-thread (&key allow-exit)
-  #!+sb-doc
   "Unwinds from and terminates the current thread abnormally, causing
 JOIN-THREAD on current thread to signal an error unless a
 default-value is provided.
@@ -450,7 +435,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 ;;;; Mutexes
 
-#!+sb-doc
 (setf (fdocumentation 'make-mutex 'function)
       "Create a mutex."
       (fdocumentation 'mutex-name 'function)
@@ -469,7 +453,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (defconstant +lock-contested+ 2))
 
 (defun mutex-owner (mutex)
-  #!+sb-doc
   "Current owner of the mutex, NIL if the mutex is free. Naturally,
 this is racy by design (another thread may acquire the mutex after
 this function returns), it is intended for informative purposes. For
@@ -482,7 +465,6 @@ HOLDING-MUTEX-P."
 
 #!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:constructor make-waitqueue (&key name)))
-  #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null thread-name))
   #!+(and sb-thread sb-futex)
@@ -490,7 +472,6 @@ HOLDING-MUTEX-P."
 
 #!+(and sb-thread (not sb-futex))
 (defstruct (waitqueue (:constructor make-waitqueue (&key name)))
-  #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null thread-name))
   ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
@@ -680,7 +661,6 @@ HOLDING-MUTEX-P."
             mutex new-owner timeout (decode-timeout timeout))))))
 
 (defun grab-mutex (mutex &key (waitp t) (timeout nil))
-  #!+sb-doc
   "Acquire MUTEX for the current thread. If WAITP is true (the default) and
 the mutex is not immediately available, sleep until it is available.
 
@@ -724,7 +704,6 @@ Notes:
             mutex self timeout (decode-timeout timeout))))))
 
 (defun release-mutex (mutex &key (if-not-owner :punt))
-  #!+sb-doc
   "Release MUTEX by setting it to NIL. Wake up threads waiting for
 this mutex.
 
@@ -822,7 +801,6 @@ IF-NOT-OWNER is :FORCE)."
   (print-unreadable-object (waitqueue stream :type t :identity t)
     (format stream "~@[~A~]" (waitqueue-name waitqueue))))
 
-#!+sb-doc
 (setf (fdocumentation 'waitqueue-name 'function)
       "The name of the waitqueue. Setfable."
       (fdocumentation 'make-waitqueue 'function)
@@ -945,7 +923,6 @@ IF-NOT-OWNER is :FORCE)."
 (declaim (notinline %condition-wait))
 
 (defun condition-wait (queue mutex &key timeout)
-  #!+sb-doc
   "Atomically release MUTEX and start waiting on QUEUE until another thread
 wakes us up using either CONDITION-NOTIFY or CONDITION-BROADCAST on
 QUEUE, at which point we re-acquire MUTEX and return T.
@@ -993,7 +970,6 @@ associated data:
                         to-sec to-usec stop-sec stop-usec deadlinep)))))
 
 (defun condition-notify (queue &optional (n 1))
-  #!+sb-doc
   "Notify N threads waiting on QUEUE.
 
 IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
@@ -1025,7 +1001,6 @@ must be held by this thread during this call."
         (futex-wake (waitqueue-token-address queue) n)))))
 
 (defun condition-broadcast (queue)
-  #!+sb-doc
   "Notify all threads waiting on QUEUE.
 
 IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
@@ -1041,7 +1016,6 @@ must be held by this thread during this call."
 
 (defstruct (semaphore (:constructor make-semaphore
                           (&key name ((:count %count) 0))))
-  #!+sb-doc
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
 future."
@@ -1051,7 +1025,6 @@ future."
   (mutex (make-mutex))
   (queue (make-waitqueue)))
 
-#!+sb-doc
 (setf (fdocumentation 'semaphore-name 'function)
       "The name of the semaphore INSTANCE. Setfable."
       (fdocumentation 'make-semaphore 'function)
@@ -1059,20 +1032,17 @@ future."
 
 (defstruct (semaphore-notification (:constructor make-semaphore-notification ())
                                    (:copier nil))
-  #!+sb-doc
   "Semaphore notification object. Can be passed to WAIT-ON-SEMAPHORE and
 TRY-SEMAPHORE as the :NOTIFICATION argument. Consequences are undefined if
 multiple threads are using the same notification object in parallel."
   (%status nil :type boolean))
 
-#!+sb-doc
 (setf (fdocumentation 'make-semaphore-notification 'function)
       "Constructor for SEMAPHORE-NOTIFICATION objects. SEMAPHORE-NOTIFICATION-STATUS
 is initially NIL.")
 
 (declaim (inline semaphore-notification-status))
 (defun semaphore-notification-status (semaphore-notification)
-  #!+sb-doc
   "Returns T if a WAIT-ON-SEMAPHORE or TRY-SEMAPHORE using
 SEMAPHORE-NOTIFICATION has succeeded since the notification object was created
 or cleared."
@@ -1081,7 +1051,6 @@ or cleared."
 
 (declaim (inline clear-semaphore-notification))
 (defun clear-semaphore-notification (semaphore-notification)
-  #!+sb-doc
   "Resets the SEMAPHORE-NOTIFICATION object for use with another call to
 WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
   (barrier (:write)
@@ -1089,7 +1058,6 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
 
 (declaim (inline semaphore-count))
 (defun semaphore-count (instance)
-  #!+sb-doc
   "Returns the current count of the semaphore INSTANCE."
   (barrier (:read))
   (semaphore-%count instance))
@@ -1167,7 +1135,6 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
                            (or null (integer 0)))
                 wait-on-semaphore))
 (defun wait-on-semaphore (semaphore &key (n 1) timeout notification)
-  #!+sb-doc
   "Decrement the count of SEMAPHORE by N if the count would not be negative.
 
 Else blocks until the semaphore can be decremented. Returns the new count of
@@ -1188,7 +1155,6 @@ decrements the count, the status is set to T."
                            (or null (integer 0)))
                 try-semaphore))
 (defun try-semaphore (semaphore &optional (n 1) notification)
-  #!+sb-doc
   "Try to decrement the count of SEMAPHORE by N. If the count were to
 become negative, punt and return NIL, otherwise return the new count of
 SEMAPHORE.
@@ -1199,7 +1165,6 @@ the status is set to T."
   (%decrement-semaphore semaphore n nil notification 'try-semaphore))
 
 (defun signal-semaphore (semaphore &optional (n 1))
-  #!+sb-doc
   "Increment the count of SEMAPHORE by N. If there are threads waiting
 on this semaphore, then N of them is woken up."
   (declare (type (integer 1) n))
@@ -1322,7 +1287,6 @@ on this semaphore, then N of them is woken up."
           (join-thread main :default t :timeout (time-left)))))))
 
 (defun terminate-session ()
-  #!+sb-doc
   "Kill all threads in session except for this one.  Does nothing if current
 thread is not the foreground thread."
   ;; FIXME: threads created in other threads may escape termination
@@ -1342,7 +1306,6 @@ thread is not the foreground thread."
 
 ;;; called from top of invoke-debugger
 (defun debugger-wait-until-foreground-thread (stream)
-  #!+sb-doc
   "Returns T if thread had been running in background, NIL if it was
 interactive."
   (declare (ignore stream))
@@ -1375,7 +1338,6 @@ interactive."
           (session-lock *session*)))))))
 
 (defun release-foreground (&optional next)
-  #!+sb-doc
   "Background this thread.  If NEXT is supplied, arrange for it to
 have the foreground next."
   #!-sb-thread (declare (ignore next))
@@ -1392,13 +1354,11 @@ have the foreground next."
     (condition-broadcast (session-interactive-threads-queue *session*))))
 
 (defun interactive-threads (&optional (session *session*))
-  #!+sb-doc
   "Return the interactive threads of SESSION defaulting to the current
 session."
   (session-interactive-threads session))
 
 (defun foreground-thread (&optional (session *session*))
-  #!+sb-doc
   "Return the foreground thread of SESSION defaulting to the current
 session."
   (first (interactive-threads session)))
@@ -1531,7 +1491,6 @@ session."
   (values))
 
 (defun make-thread (function &key name arguments ephemeral)
-  #!+sb-doc
   "Create a new thread of NAME that runs FUNCTION with the argument
 list designator provided (defaults to no argument). Thread exits when
 the function returns. The return values of FUNCTION are kept around
@@ -1586,7 +1545,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     (or thread (error "Could not create a new thread."))))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
-  #!+sb-doc
   "Suspend current thread until THREAD exits. Return the result values
 of the thread function.
 
@@ -1694,7 +1652,6 @@ subject to change."
         (setf *thruption-pending* t)))))
 
 (defun interrupt-thread (thread function)
-  #!+sb-doc
   "Interrupt THREAD and make it run FUNCTION.
 
 The interrupt is asynchronous, and can occur anywhere with the exception of
@@ -1771,7 +1728,6 @@ Short version: be careful out there."
              (error 'interrupt-thread-error :thread thread))))))
 
 (defun terminate-thread (thread)
-  #!+sb-doc
   "Terminate the thread identified by THREAD, by interrupting it and
 causing it to call SB-EXT:ABORT-THREAD with :ALLOW-EXIT T.
 
@@ -1813,7 +1769,6 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
 (define-alien-routine "thread_yield" int)
 
-#!+sb-doc
 (setf (fdocumentation 'thread-yield 'function)
       "Yield the processor to other threads.")
 
@@ -1893,7 +1848,6 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           finally (return seen))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
-  #!+sb-doc
   "Return the local value of SYMBOL in THREAD, and a secondary value of T
 on success.
 

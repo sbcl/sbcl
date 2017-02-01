@@ -68,7 +68,6 @@
                     sb!vm:n-word-bytes))))))))
 
 (defun spin-loop-hint ()
-  #!+sb-doc
   "Hints the processor that the current thread is spin-looping."
   (spin-loop-hint))
 
@@ -85,7 +84,6 @@
 ;;;; DEFGLOBAL
 
 (sb!xc:defmacro defglobal (name value &optional (doc nil docp))
-  #!+sb-doc
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
 and assigned to NAME both at compile- and load-time, but only if NAME is not
 already bound.
@@ -108,7 +106,6 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
                      (sb!c:source-location))))))
 
 (sb!xc:defmacro define-load-time-global (name value &optional (doc nil docp))
-  #!+sb-doc
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
 and assigned to NAME at load-time, but only if NAME is not already bound.
 
@@ -223,7 +220,6 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
                (go :restart)))))))
 
 (defmacro wait-for (test-form &key timeout)
-  #!+sb-doc
   "Wait until TEST-FORM evaluates to true, then return its primary value.
 If TIMEOUT is provided, waits at most approximately TIMEOUT seconds before
 returning NIL.
@@ -238,7 +234,6 @@ Experimental: subject to change without prior notice."
 
 (defmacro with-progressive-timeout ((name &key seconds)
                                     &body body)
-  #!+sb-doc
   "Binds NAME as a local function for BODY. Each time #'NAME is called, it
 returns SECONDS minus the time that has elapsed since BODY was entered, or
 zero if more time than SECONDS has elapsed. If SECONDS is NIL, #'NAME
@@ -279,7 +274,6 @@ returns NIL each time."
              (version>= (rest x) (rest y))))))
 
 (defun assert-version->= (&rest subversions)
-  #!+sb-doc
   "Asserts that the current SBCL is of version equal to or greater than
 the version specified in the arguments.  A continuable error is signaled
 otherwise.

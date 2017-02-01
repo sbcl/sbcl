@@ -37,7 +37,6 @@
 ;;;; MACHINE-TYPE
 
 (defun machine-type ()
-  #!+sb-doc
   "Return a string describing the type of the local machine."
   "X86")
 

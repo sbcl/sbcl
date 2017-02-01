@@ -38,7 +38,6 @@
 (defvar sb!vm::*pinned-objects*)
 
 (defmacro without-gcing (&body body)
-  #!+sb-doc
   "Executes the forms in the body without doing a garbage collection. It
 inhibits both automatically and explicitly triggered collections. Finally,
 upon leaving the BODY if gc is not inhibited it runs the pending gc.

@@ -74,7 +74,6 @@
 ;;; ATOMIC-MUMBLE functions are not used when self-building.
 
 (defmacro atomic-update (place update-fn &rest arguments &environment env)
-  #!+sb-doc
   "Updates PLACE atomically to the value returned by calling function
 designated by UPDATE-FN with ARGUMENTS and the previous value of PLACE.
 
@@ -114,7 +113,6 @@ Examples:
              finally (return ,new)))))
 
 (defmacro atomic-push (obj place &environment env)
-  #!+sb-doc
   "Like PUSH, but atomic. PLACE may be read multiple times before
 the operation completes -- the write does not occur until such time
 that no other thread modified PLACE between the read and the write.
@@ -130,7 +128,6 @@ Works on all CASable places."
              finally (return ,new)))))
 
 (defmacro atomic-pop (place &environment env)
-  #!+sb-doc
   "Like POP, but atomic. PLACE may be read multiple times before
 the operation completes -- the write does not occur until such time
 that no other thread modified PLACE between the read and the write.

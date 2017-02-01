@@ -122,7 +122,6 @@
 ;; This is an absolutely terrible name for a function which both assigns
 ;; the name slot of a function, and _sometimes_ binds a name to a function.
 (defun set-fun-name (fun new-name)
-  #!+sb-doc
   "Set the name of a compiled function object. Return the function."
   (when (valid-function-name-p fun)
     (setq fun (fdefinition fun)))

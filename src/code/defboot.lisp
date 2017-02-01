@@ -98,13 +98,11 @@
                                  ,(when more (make-clauses more))))))))))))
 
   (sb!xc:defmacro when (test &body forms)
-  #!+sb-doc
   "If the first argument is true, the rest of the forms are
 evaluated as a PROGN."
   `(if ,test ,(prognify forms)))
 
   (sb!xc:defmacro unless (test &body forms)
-  #!+sb-doc
   "If the first argument is not true, the rest of the forms are
 evaluated as a PROGN."
   `(if ,test nil ,(prognify forms))))
@@ -178,7 +176,6 @@ evaluated as a PROGN."
    (info :function :inline-expansion-designator name)))
 
 (sb!xc:defmacro defun (&environment env name lambda-list &body body)
-  #!+sb-doc
   "Define a function at top level."
   #+sb-xc-host
   (unless (symbol-package (fun-name-block-name name))
@@ -239,7 +236,6 @@ evaluated as a PROGN."
 ;;;; DEFVAR and DEFPARAMETER
 
 (sb!xc:defmacro defvar (var &optional (val nil valp) (doc nil docp))
-  #!+sb-doc
   "Define a special variable at top level. Declare the variable
   SPECIAL and, optionally, initialize it. If the variable already has a
   value, the old value is not clobbered. The third argument is an optional
@@ -257,7 +253,6 @@ evaluated as a PROGN."
                      `(',doc)))))
 
 (sb!xc:defmacro defparameter (var val &optional (doc nil docp))
-  #!+sb-doc
   "Define a parameter that is not normally changed by the program,
   but that may be changed without causing an error. Declare the
   variable special and sets its value to VAL, overwriting any
@@ -348,7 +343,6 @@ evaluated as a PROGN."
     (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (sb!xc:gensym)))
 
   (sb!xc:defmacro do (varlist endlist &body body)
-  #!+sb-doc
   "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
   Iteration construct. Each Var is initialized in parallel to the value of the
   specified Init form. On subsequent iterations, the Vars are assigned the
@@ -360,7 +354,6 @@ evaluated as a PROGN."
   (frob-do-body varlist endlist body 'let 'psetq 'do nil))
 
   (sb!xc:defmacro do* (varlist endlist &body body)
-  #!+sb-doc
   "DO* ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
   Iteration construct. Each Var is initialized sequentially (like LET*) to the
   value of the specified Init form. On subsequent iterations, the Vars are
@@ -458,7 +451,6 @@ evaluated as a PROGN."
 
 (sb!xc:defmacro with-condition-restarts
     (condition-form restarts-form &body body)
-  #!+sb-doc
   "Evaluates the BODY in a dynamic environment where the restarts in the list
    RESTARTS-FORM are associated with the condition returned by CONDITION-FORM.
    This allows FIND-RESTART, etc., to recognize restarts that are not related
@@ -477,7 +469,6 @@ evaluated as a PROGN."
            (pop (restart-associated-conditions ,restart)))))))
 
 (sb!xc:defmacro restart-bind (bindings &body forms)
-  #!+sb-doc
   "(RESTART-BIND ({(case-name function {keyword value}*)}*) forms)
    Executes forms in a dynamic context where the given bindings are in
    effect. Users probably want to use RESTART-CASE. A case-name of NIL
@@ -528,7 +519,6 @@ evaluated as a PROGN."
         expression)))
 
 (sb!xc:defmacro restart-case (expression &body clauses &environment env)
-  #!+sb-doc
   "(RESTART-CASE form {(case-name arg-list {keyword value}* body)}*)
    The form is evaluated in a dynamic context where the clauses have
    special meanings as points to which control may be transferred (see
@@ -623,7 +613,6 @@ evaluated as a PROGN."
 (sb!xc:defmacro with-simple-restart ((restart-name format-string
                                                        &rest format-arguments)
                                          &body forms)
-  #!+sb-doc
   "(WITH-SIMPLE-RESTART (restart-name format-string format-arguments)
    body)
    If restart-name is not invoked, then all values returned by forms are
@@ -780,7 +769,6 @@ evaluated as a PROGN."
            ,form)))))
 
 (sb!xc:defmacro handler-bind (bindings &body forms)
-  #!+sb-doc
   "(HANDLER-BIND ( {(type handler)}* ) body)
 
 Executes body in a dynamic context where the given handler bindings are in
@@ -798,7 +786,6 @@ condition."
                   #!+x86 (multiple-value-prog1 (progn ,@forms) (float-wait))))
 
 (sb!xc:defmacro handler-case (form &rest cases)
-  #!+sb-doc
   "(HANDLER-CASE form { (type ([var]) body) }* )
 
 Execute FORM in a context with handlers established for the condition types. A

@@ -27,7 +27,6 @@
                        ~/sb-impl:print-symbol-with-prefix/ subclass ~
                        ~S.~@:>"
                operation datum 'sequence (class-of datum)))))
-  #+sb-doc
   (:documentation
    "This error is signaled if a sequence operation is applied to an
    instance of a sequence class that does not support the
@@ -43,7 +42,6 @@
   (:method ((s list)) (null s))
   (:method ((s vector)) (zerop (length s)))
   (:method ((s sequence)) (zerop (length s)))
-  #+sb-doc
   (:documentation
    "Returns T if SEQUENCE is an empty sequence and NIL
    otherwise. Signals an error if SEQUENCE is not a sequence."))
@@ -53,7 +51,6 @@
   (:method ((s vector)) (length s))
   (:method ((s sequence))
     (sequence:protocol-unimplemented 'sequence:length s))
-  #+sb-doc
   (:documentation
    "Returns the length of SEQUENCE or signals a PROTOCOL-UNIMPLEMENTED
    error if the sequence protocol is not implemented for the class of
@@ -64,7 +61,6 @@
   (:method ((s vector) index) (elt s index))
   (:method ((s sequence) index)
     (sequence:protocol-unimplemented 'sequence:elt s))
-  #+sb-doc
   (:documentation
    "Returns the element at position INDEX of SEQUENCE or signals a
    PROTOCOL-UNIMPLEMENTED error if the sequence protocol is not
@@ -76,7 +72,6 @@
   (:method (new-value (s vector) index) (setf (elt s index) new-value))
   (:method (new-value (s sequence) index)
     (sequence:protocol-unimplemented '(setf sequence:elt) s))
-  #+sb-doc
   (:documentation
    "Replaces the element at position INDEX of SEQUENCE with NEW-VALUE
    and returns NEW-VALUE or signals a PROTOCOL-UNIMPLEMENTED error if
@@ -108,7 +103,6 @@
   (:method ((s sequence) length &key initial-element initial-contents)
     (declare (ignore initial-element initial-contents))
     (sequence:protocol-unimplemented 'sequence:make-sequence-like s))
-  #+sb-doc
   (:documentation
    "Returns a freshly allocated sequence of length LENGTH and of the
    same class as SEQUENCE. Elements of the new sequence are
@@ -149,7 +143,6 @@
   (:method ((s sequence) length &rest args)
     (declare (ignore args))
     (sequence:protocol-unimplemented 'sequence:adjust-sequence s))
-  #+sb-doc
   (:documentation
    "Return destructively modified SEQUENCE or a freshly allocated
    sequence of the same class as SEQUENCE of length LENGTH. Elements
@@ -178,7 +171,6 @@
     (error 'type-error
            :datum s
            :expected-type 'sequence))
-  #+sb-doc
   (:documentation
    "Returns a sequence iterator for SEQUENCE or, if START and/or END
    are supplied, the subsequence bounded by START and END as nine
@@ -227,7 +219,6 @@
       (if from-end
           (values (1- end) (1- start) from-end)
           (values start end nil))))
-  #+sb-doc
   (:documentation
    "Returns a sequence iterator for SEQUENCE, START, END and FROM-END
    as three values:
@@ -256,7 +247,6 @@
     (if from-end
         (1- iterator)
         (1+ iterator)))
-  #+sb-doc
   (:documentation
    "Moves ITERATOR one position forward or backward in SEQUENCE
    depending on the iteration direction encoded in FROM-END."))
@@ -268,7 +258,6 @@
     (= iterator limit))
   (:method ((s sequence) iterator limit from-end)
     (= iterator limit))
-  #+sb-doc
   (:documentation
    "Returns non-NIL when ITERATOR has reached LIMIT (which may
    correspond to the end of SEQUENCE) with respect to the iteration
@@ -281,7 +270,6 @@
     (aref s iterator))
   (:method ((s sequence) iterator)
     (sequence:elt s iterator))
-  #+sb-doc
   (:documentation
    "Returns the element of SEQUENCE associated to the position of
    ITERATOR."))
@@ -293,7 +281,6 @@
     (setf (aref s iterator) o))
   (:method (o (s sequence) iterator)
     (setf (sequence:elt s iterator) o))
-  #+sb-doc
   (:documentation
    "Destructively modifies SEQUENCE by replacing the sequence element
    associated to position of ITERATOR with NEW-VALUE."))
@@ -305,7 +292,6 @@
     (loop for l on s for i from 0 when (eq l iterator) return i))
   (:method ((s vector) iterator) iterator)
   (:method ((s sequence) iterator) iterator)
-  #+sb-doc
   (:documentation
    "Returns the position of ITERATOR in SEQUENCE."))
 
@@ -313,14 +299,12 @@
   (:method ((s list) iterator) iterator)
   (:method ((s vector) iterator) iterator)
   (:method ((s sequence) iterator) iterator)
-  #+sb-doc
   (:documentation
    "Returns a copy of ITERATOR which also traverses SEQUENCE but can
    be mutated independently of ITERATOR."))
 
 (defmacro sequence:with-sequence-iterator
     ((&rest vars) (sequence &rest args &key from-end start end) &body body)
-  #+sb-doc
   "Executes BODY with the elements of VARS bound to the iteration
   state returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE and
   ARGS. Elements of VARS may be NIL in which case the corresponding
@@ -341,7 +325,6 @@
     ((step endp elt setf index copy)
      (sequence &rest args &key from-end start end)
      &body body)
-  #+sb-doc
   "Executes BODY with the names STEP, ENDP, ELT, SETF, INDEX and COPY
   bound to local functions which execute the iteration state query and
   mutation functions returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE
@@ -400,7 +383,6 @@
 ;;;; generic implementations for sequence functions.
 
 (defgeneric sequence:map (result-prototype function sequence &rest sequences)
-  #+sb-doc
   (:documentation
    "Implements CL:MAP for extended sequences.
 
@@ -750,7 +732,6 @@
     (sequence:nreverse result)))
 
 (defgeneric sequence:concatenate (result-prototype &rest sequences)
-  #+sb-doc
   (:documentation
    "Implements CL:CONCATENATE for extended sequences.
 
@@ -1114,7 +1095,6 @@
   (apply #'%sort-with-temp-vector #'stable-sort sequence predicate args))
 
 (defgeneric sequence:merge (result-prototype sequence1 sequence2 predicate &key key)
-  #+sb-doc
   (:documentation
    "Implements CL:MERGE for extended sequences.
 

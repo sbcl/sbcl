@@ -359,7 +359,6 @@
                            nil)
                 exit))
 (defun exit (&key code abort (timeout *exit-timeout*))
-  #!+sb-doc
   "Terminates the process, causing SBCL to exit with CODE. CODE
 defaults to 0 when ABORT is false, and 1 when it is true.
 

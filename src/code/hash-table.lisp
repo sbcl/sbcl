@@ -106,7 +106,6 @@
 (defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
 
 (sb!xc:defmacro with-locked-hash-table ((hash-table) &body body)
-  #!+sb-doc
   "Limits concurrent accesses to HASH-TABLE for the duration of BODY.
 If HASH-TABLE is synchronized, BODY will execute with exclusive
 ownership of the table. If HASH-TABLE is not synchronized, BODY will

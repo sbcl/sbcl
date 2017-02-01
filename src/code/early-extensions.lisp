@@ -14,11 +14,9 @@
 (in-package "SB!IMPL")
 
 (defvar *core-pathname* nil
-  #!+sb-doc
   "The absolute pathname of the running SBCL core.")
 
 (defvar *runtime-pathname* nil
-  #!+sb-doc
   "The absolute pathname of the running SBCL runtime.")
 
 ;;; something not EQ to anything we might legitimately READ
@@ -303,7 +301,6 @@
 
 ;;; like (MEMBER ITEM LIST :TEST #'EQ)
 (defun memq (item list)
-  #!+sb-doc
   "Return tail of LIST beginning with first element EQ to ITEM."
   (declare (explicit-check))
   ;; KLUDGE: These could be and probably should be defined as
@@ -519,7 +516,6 @@
 ;;;; macro writing utilities
 
 (defmacro with-current-source-form ((&rest forms) &body body)
-  #!+sb-doc
   "In a macroexpander, indicate that FORMS are being processed by BODY.
 
 FORMS are usually sub-forms of the whole form passed to the expander.
@@ -968,7 +964,6 @@ NOTE: This interface is experimental and subject to change."
 (declaim (ftype (function () #+(and sb-xc-host ccl) *
                              #-(and sb-xc-host ccl) nil) missing-arg))
 (defun missing-arg ()
-  #!+sb-doc
   (/show0 "entering MISSING-ARG")
   (error "A required &KEY or &OPTIONAL argument was not supplied."))
 
@@ -1184,7 +1179,6 @@ NOTE: This interface is experimental and subject to change."
            ,@(nreverse reversed-prints))))))
 
 (defun print-symbol-with-prefix (stream symbol &optional colon at)
-  #!+sb-doc
   "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
   the current package."
   (declare (ignore colon at))
@@ -1615,7 +1609,6 @@ NOTE: This interface is experimental and subject to change."
 (declaim (type (member :compile #!+(or sb-eval sb-fasteval) :interpret)
                *evaluator-mode*))
 (!defparameter *evaluator-mode* :compile
-  #!+sb-doc
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")

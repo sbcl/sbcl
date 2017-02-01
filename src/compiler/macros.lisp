@@ -954,7 +954,6 @@
 ;;; We use WITH-SANE-IO-SYNTAX to provide safe defaults, and provide
 ;;; *COMPILER-PRINT-VARIABLE-ALIST* for user customization.
 (defvar *compiler-print-variable-alist* nil
-  #!+sb-doc
   "an association list describing new bindings for special variables
 to be used by the compiler for error-reporting, etc. Eg.
 

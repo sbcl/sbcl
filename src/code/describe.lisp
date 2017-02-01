@@ -29,7 +29,6 @@
 ;;; So it might be desirable to have the compiler not rely on this
 ;;; function, eventually.
 (defun function-lambda-expression (fun)
-  #+sb-doc
   "Return (VALUES DEFINING-LAMBDA-EXPRESSION CLOSURE-P NAME), where
   DEFINING-LAMBDA-EXPRESSION is NIL if unknown, or a suitable argument
   to COMPILE otherwise, CLOSURE-P is non-NIL if the function's definition
@@ -86,7 +85,6 @@
              line)))))
 
 (defun describe (object &optional (stream-designator *standard-output*))
-  #+sb-doc
   "Print a description of OBJECT to STREAM-DESIGNATOR."
   (let ((stream (out-stream-from-designator stream-designator))
         (*print-right-margin* (or *print-right-margin* 72))

@@ -46,7 +46,6 @@
          ,@body)))
 
 (defmacro define-alien-type (name type &environment env)
-  #!+sb-doc
   "Define the alien type NAME to be equivalent to TYPE. Name may be NIL for
    STRUCT and UNION types, in which case the name is taken from the type
    specifier."

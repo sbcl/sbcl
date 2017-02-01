@@ -21,7 +21,6 @@
      ,@body))
 
 (defun finalize (object function &key dont-save)
-  #!+sb-doc
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
@@ -82,7 +81,6 @@ Examples:
   nil)
 
 (defun cancel-finalization (object)
-  #!+sb-doc
   "Cancel any finalization for OBJECT."
   ;; Check for NIL to avoid deleting finalizers that are waiting to be
   ;; run.

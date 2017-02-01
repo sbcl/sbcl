@@ -17,16 +17,13 @@
 
 ;;; ANSI limits on compilation
 (defconstant sb!xc:call-arguments-limit sb!xc:most-positive-fixnum
-  #!+sb-doc
   "The exclusive upper bound on the number of arguments which may be passed
   to a function, including &REST args.")
 (defconstant sb!xc:lambda-parameters-limit sb!xc:most-positive-fixnum
-  #!+sb-doc
   "The exclusive upper bound on the number of parameters which may be specified
   in a given lambda list. This is actually the limit on required and &OPTIONAL
   parameters. With &KEY and &AUX you can get more.")
 (defconstant sb!xc:multiple-values-limit sb!xc:most-positive-fixnum
-  #!+sb-doc
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
 
@@ -135,7 +132,6 @@
 (defvar *lambda-conversions*)
 
 (defvar *stack-allocate-dynamic-extent* t
-  #!+sb-doc
   "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
 and stack allocates otherwise inaccessible parts of the object whenever
 possible. Potentially long (over one page in size) vectors are, however, not

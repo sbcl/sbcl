@@ -29,7 +29,6 @@
   (newlen sb!unix:size-t))
 
 (defun sysctl (type &rest name)
-  #!+sb-doc
   "Retrieves an integer or string value with the given name."
   (let ((name-len (length name)))
     (when (> name-len ctl-maxname)
@@ -56,7 +55,6 @@
 
 #!+darwin
 (defun sysctlbyname (type name)
-  #!+sb-doc
   "Retrieves an integer or string value with the given name."
   (with-alien ((result-len sb!unix:size-t))
     (ecase type
@@ -74,13 +72,11 @@
                (sb!unix::newcharstar-string result))))))))
 
 (defun software-type ()
-  #!+sb-doc
   "Return a string describing the supporting software."
   #!-gnu-kfreebsd (sysctl :str ctl-kern kern-ostype)
   #!+gnu-kfreebsd "GNU/kFreeBSD")
 
 (defun software-version ()
-  #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
    if not available."
   (or sb!sys::*software-version*

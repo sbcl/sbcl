@@ -57,7 +57,6 @@
                  (funcall ,fun ,key ,value)))))))))
 
 (defun maphash (function-designator hash-table)
-  #!+sb-doc
   "For each entry in HASH-TABLE, call the designated two-argument function on
 the key and value of the entry. Return NIL.
 
@@ -70,7 +69,6 @@ to protect the MAPHASH call."
   (maphash function-designator hash-table)) ; via compiler-macro
 
 (defmacro with-hash-table-iterator ((name hash-table) &body body)
-  #!+sb-doc
   "WITH-HASH-TABLE-ITERATOR ((name hash-table) &body body)
 
 Provides a method of manually looping over the elements of a hash-table. NAME

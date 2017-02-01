@@ -1397,7 +1397,6 @@
         (sb!di:no-debug-blocks () nil)))))
 
 (defvar *disassemble-annotate* nil
-  #!+sb-doc
   "Annotate DISASSEMBLE output with source code.")
 
 (defun add-debugging-hooks (segment debug-fun &optional sfcache)
@@ -1650,7 +1649,6 @@
 (defun disassemble (object &key
                            (stream *standard-output*)
                            (use-labels t))
-  #!+sb-doc
   "Disassemble the compiled code associated with OBJECT, which can be a
   function, a lambda expression, or a symbol with a function definition. If
   it is not already compiled, the compiler is called to produce something to

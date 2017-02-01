@@ -16,12 +16,10 @@
 #!-osf1 (error "missing :OSF1 feature")
 
 (defun software-type ()
-  #!+sb-doc
   "Return a string describing the supporting software."
   (values "OSF/1"))
 
 (defun software-version ()
-  #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
   (or *software-version*

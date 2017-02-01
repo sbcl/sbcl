@@ -831,7 +831,6 @@
 
 ;;; Just parse the type specifiers and call CSUBTYPE.
 (defun sb!xc:subtypep (type1 type2 &optional environment)
-  #!+sb-doc
   "Return two values indicating the relationship between type1 and type2.
   If values are T and T, type1 definitely is a subtype of type2.
   If values are NIL and T, type1 definitely is not a subtype of type2.

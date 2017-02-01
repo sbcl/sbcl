@@ -18,7 +18,6 @@
 (defstruct (foreign-thread
              (:include thread)
              (:conc-name "THREAD-"))
-  #!+sb-doc
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
 
@@ -26,18 +25,15 @@ temporarily.")
 (defstruct (signal-handling-thread
              (:include foreign-thread)
              (:conc-name "THREAD-"))
-  #!+sb-doc
   "Asynchronous signal handling thread."
   (signal-number nil :type integer))
 
 (defun mutex-value (mutex)
-  #!+sb-doc
   "Current owner of the mutex, NIL if the mutex is free. May return a
 stale value, use MUTEX-OWNER instead."
   (mutex-%owner mutex))
 
 (defun holding-mutex-p (mutex)
-  #!+sb-doc
   "Test whether the current thread is holding MUTEX."
   ;; This is about the only use for which a stale value of owner is
   ;; sufficient.
@@ -51,7 +47,6 @@ stale value, use MUTEX-OWNER instead."
 ;;; SPINLOCK no longer exists as a type -- provided for backwards compatibility.
 
 (deftype spinlock ()
-  #!+sb-doc
   "Spinlock type."
   'mutex)
 
@@ -123,7 +118,6 @@ stale value, use MUTEX-OWNER instead."
 
 (sb!xc:defmacro with-mutex ((mutex &key (wait-p t) timeout value)
                             &body body)
-  #!+sb-doc
   "Acquire MUTEX for the dynamic scope of BODY. If WAIT-P is true (the default),
 and the MUTEX is not immediately available, sleep until it is available.
 
@@ -162,7 +156,6 @@ current thread."
        ,mutex)))
 
 (sb!xc:defmacro with-recursive-lock ((mutex &key (wait-p t) timeout) &body body)
-  #!+sb-doc
   "Acquire MUTEX for the dynamic scope of BODY.
 
 If WAIT-P is true (the default), and the MUTEX is not immediately available or

@@ -59,23 +59,18 @@
 (defvar *top-level-form-noted* nil)
 
 (defvar sb!xc:*compile-verbose* t
-  #!+sb-doc
   "The default for the :VERBOSE argument to COMPILE-FILE.")
 (defvar sb!xc:*compile-print* t
-  #!+sb-doc
   "The default for the :PRINT argument to COMPILE-FILE.")
 (defvar *compile-progress* nil
-  #!+sb-doc
   "When this is true, the compiler prints to *STANDARD-OUTPUT* progress
   information about the phases of compilation of each function. (This
   is useful mainly in large block compilations.)")
 
 (defvar sb!xc:*compile-file-pathname* nil
-  #!+sb-doc
   "The defaulted pathname of the file currently being compiled, or NIL if not
   compiling.")
 (defvar sb!xc:*compile-file-truename* nil
-  #!+sb-doc
   "The TRUENAME of the file currently being compiled, or NIL if not
   compiling.")
 
@@ -128,7 +123,6 @@
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
 (defmacro sb!xc:with-compilation-unit (options &body body)
-  #!+sb-doc
   "Affects compilations that take place within its dynamic extent. It is
 intended to be eg. wrapped around the compilation of all files in the same system.
 
@@ -432,7 +426,6 @@ Examples:
 ;;;; component compilation
 
 (defparameter *max-optimize-iterations* 3 ; ARB
-  #!+sb-doc
   "The upper limit on the number of times that we will consecutively do IR1
 optimization that doesn't introduce any new code. A finite limit is
 necessary, since type inference may take arbitrarily long to converge.")
@@ -1828,7 +1821,6 @@ necessary, since type inference may take arbitrarily long to converge.")
      (trace-file nil)
      ((:block-compile *block-compile-arg*) nil)
      (emit-cfasl *emit-cfasl*))
-  #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and
 returning its filename.
 
@@ -1980,7 +1972,6 @@ SPEED and COMPILATION-SPEED optimization values, and the
                                     &key
                                     (output-file nil output-file-p)
                                     &allow-other-keys)
-  #!+sb-doc
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
   (if output-file-p

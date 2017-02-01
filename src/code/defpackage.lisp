@@ -17,7 +17,6 @@
 ;;; Weirder still, why does it depend on the target architecture?
 
 (defmacro defpackage (package &rest options)
-  #+sb-doc
   #.(locally (declare (notinline format))
      (format nil
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
@@ -257,7 +256,6 @@
 
 (declaim (type list *on-package-variance*))
 (defvar *on-package-variance* '(:warn t)
-  #+sb-doc
   "Specifies behavior when redefining a package using DEFPACKAGE and the
 definition is in variance with the current state of the package.
 

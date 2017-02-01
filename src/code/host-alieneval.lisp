@@ -150,7 +150,6 @@
         (error "attempt to shadow definition of ~A ~S" kind name)))))
 
 (defun unparse-alien-type (type)
-  #!+sb-doc
   "Convert the alien-type structure TYPE back into a list specification of
    the type."
   (declare (type alien-type type))
@@ -293,7 +292,6 @@
 ;;;; Interfaces to the different methods
 
 (defun alien-type-= (type1 type2)
-  #!+sb-doc
   "Return T iff TYPE1 and TYPE2 describe equivalent alien types."
   (or (eq type1 type2)
       (and (eq (alien-type-class type1)
@@ -301,7 +299,6 @@
            (invoke-alien-type-method :type= type1 type2))))
 
 (defun alien-subtype-p (type1 type2)
-  #!+sb-doc
   "Return T iff the alien type TYPE1 is a subtype of TYPE2. Currently, the
    only supported subtype relationships are is that any pointer type is a
    subtype of (* t), and any array type first dimension will match
@@ -968,7 +965,6 @@
                      (alien-record-field-type field2))))
 
 (defvar *alien-type-matches* nil
-  #!+sb-doc
   "A hashtable used to detect cycles while comparing record types.")
 
 (define-alien-type-method (record :type=) (type1 type2)
@@ -1111,7 +1107,6 @@
 ;;;; the ADDR macro
 
 (sb!xc:defmacro addr (expr &environment env)
-  #!+sb-doc
   "Return an Alien pointer to the data addressed by Expr, which must be a call
    to SLOT or DEREF, or a reference to an Alien variable."
   (let ((form (%macroexpand expr env)))

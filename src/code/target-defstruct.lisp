@@ -137,7 +137,6 @@
 
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
-  #!+sb-doc
   "Return a copy of STRUCTURE with the same (EQL) slot values."
   (declare (type structure-object structure))
   (let ((layout (%instance-layout structure)))

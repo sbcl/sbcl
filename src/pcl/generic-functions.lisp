@@ -397,7 +397,6 @@
 (defgeneric make-specializer-form-using-class
     (proto-generic-function proto-method specializer-name environment)
   (:method-combination or)
-  #+sb-doc
   (:documentation
    "Return a form which, when evaluated in the lexical environment
 described by ENVIRONMENT, parses the specializer SPECIALIZER-NAME and
@@ -431,7 +430,6 @@ protocol. Interface subject to change."))
 (defgeneric make-method-lambda-using-specializers
     (proto-generic-function proto-method qualifiers specializers
      method-lambda environment)
-  #+sb-doc
   (:documentation
    "Compute a method lambda form based on METHOD-LAMBDA, possibly
 taking into account PROTO-GENERIC-FUNCTION, PROTO-METHOD, QUALIFIERS,

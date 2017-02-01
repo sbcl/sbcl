@@ -18,18 +18,15 @@
 ;;;; exported specials
 
 (defvar *modules* ()
-  #!+sb-doc
   "This is a list of module names that have been loaded into Lisp so far.
    It is used by PROVIDE and REQUIRE.")
 
 (defvar *module-provider-functions* (list 'module-provide-contrib)
-  #!+sb-doc
   "See function documentation for REQUIRE.")
 
 ;;;; PROVIDE and REQUIRE
 
 (defun provide (module-name)
-  #!+sb-doc
   "Adds a new module name to *MODULES* indicating that it has been loaded.
    Module-name is a string designator"
   (pushnew (string module-name) *modules* :test #'string=)
@@ -48,7 +45,6 @@
           '(:sbcl :function require))))
 
 (defun require (module-name &optional pathnames)
-  #!+sb-doc
   "Loads a module, unless it already has been loaded. PATHNAMES, if supplied,
    is a designator for a list of pathnames to be loaded if the module
    needs to be. If PATHNAMES is not supplied, functions from the list
@@ -79,7 +75,6 @@
 ;;;; miscellany
 
 (defun module-provide-contrib (name)
-  #!+sb-doc
   "Stringify and downcase NAME, then attempt to load the file
    $SBCL_HOME/name/name"
   (let* ((filesys-name (string-downcase (string name)))

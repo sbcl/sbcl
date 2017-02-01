@@ -58,7 +58,6 @@
              (setf *ignored-package-locks* :invalid)))))))
 
 (defmacro without-package-locks (&body body)
-  #!+sb-doc
   "Ignores all runtime package lock violations during the execution of
 body. Body can begin with declarations."
   `(let (#!+sb-package-locks (*ignored-package-locks* t))

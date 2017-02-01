@@ -20,7 +20,6 @@
                                       (per-line-prefix nil per-line-prefix-p)
                                       (suffix ""))
                                 &body body)
-  #!+sb-doc
   "Group some output into a logical block. STREAM-SYMBOL should be either a
    stream, T (for *TERMINAL-IO*), or NIL (for *STANDARD-OUTPUT*). The printer
    control variable *PRINT-LEVEL* is automatically handled."
@@ -80,7 +79,6 @@
                                      ,@(if object (list object)))))))
 
 (defmacro pprint-exit-if-list-exhausted ()
-  #!+sb-doc
   "Cause the closest enclosing use of PPRINT-LOGICAL-BLOCK to return
    if its list argument is exhausted. Can only be used inside
    PPRINT-LOGICAL-BLOCK, and only when the LIST argument to
@@ -89,7 +87,6 @@
           PPRINT-LOGICAL-BLOCK."))
 
 (defmacro pprint-pop ()
-  #!+sb-doc
   "Return the next element from LIST argument to the closest enclosing
    use of PPRINT-LOGICAL-BLOCK, automatically handling *PRINT-LENGTH*
    and *PRINT-CIRCLE*. Can only be used inside PPRINT-LOGICAL-BLOCK.

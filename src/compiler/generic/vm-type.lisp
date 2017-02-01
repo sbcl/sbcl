@@ -125,7 +125,6 @@
          (return stype)))))
 
 (defun sb!xc:upgraded-array-element-type (spec &optional environment)
-  #!+sb-doc
   "Return the element type that will actually be used to implement an array
    with the specifier :ELEMENT-TYPE Spec."
   (declare (type lexenv-designator environment) (ignore environment))
@@ -139,7 +138,6 @@
            (type-specifier (%upgraded-array-element-type type))))))
 
 (defun sb!xc:upgraded-complex-part-type (spec &optional environment)
-  #!+sb-doc
   "Return the element type of the most specialized COMPLEX number type that
    can hold parts of type SPEC."
   (declare (type lexenv-designator environment) (ignore environment))

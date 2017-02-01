@@ -91,7 +91,6 @@
 (defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
                                   syscall-form &rest body)
-  #!+sb-doc
   "Evaluate BODY with VALUE and ERRNO bound to the return values of
 SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   `(let (,value ,errno)
@@ -112,7 +111,6 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 #!-win32
 (define-alien-routine ("getenv" posix-getenv) c-string
-  #!+sb-doc
   "Return the \"value\" part of the environment string \"name=value\" which
 corresponds to NAME, or NIL if there is none."
   (name (c-string :not-null t)))
@@ -275,7 +273,6 @@ corresponds to NAME, or NIL if there is none."
   #!+win32 (sb!win32::windows-isatty fd))
 
 (defun unix-lseek (fd offset whence)
-  #!+sb-doc
   "Unix-lseek accepts a file descriptor and moves the file pointer by
    OFFSET octets.  Whence can be any of the following:
 
@@ -427,7 +424,6 @@ corresponds to NAME, or NIL if there is none."
 (deftype exit-code ()
   `(signed-byte 32))
 (defun os-exit (code &key abort)
-  #!+sb-doc
   "Exit the process with CODE. If ABORT is true, exit is performed using _exit(2),
 avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (unless (typep code 'exit-code)
@@ -1018,7 +1014,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 #!-win32
 (defun unix-getitimer (which)
-  #!+sb-doc
   "UNIX-GETITIMER returns the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). On success,
    unix-getitimer returns 5 values,
@@ -1042,7 +1037,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 #!-win32
 (defun unix-setitimer (which int-secs int-usec val-secs val-usec)
-  #!+sb-doc
   "UNIX-SETITIMER sets the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). A SIGALRM signal
    will be delivered VALUE <seconds+microseconds> from now. INTERVAL,
@@ -1093,7 +1087,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
   #!-sb-fluid (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
-    #!+sb-doc
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
     #!+(or darwin netbsd)
