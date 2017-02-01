@@ -2278,7 +2278,7 @@
           ;; cleanups for one (or more) of the predecessor blocks, so
           ;; we need to check all of them.
           (dolist (exit-block exit-blocks)
-            (do-nested-cleanups (cleanup exit-block)
+            (do-nested-cleanups (cleanup (block-end-lexenv exit-block))
               (when (eq cleanup entry-cleanup)
                 (return))
               (when (eq (cleanup-kind cleanup)

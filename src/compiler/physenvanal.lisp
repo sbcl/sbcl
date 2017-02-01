@@ -491,7 +491,7 @@
   (collect ((code)
             (reanalyze-funs))
     (let ((cleanup2 (block-start-cleanup block2)))
-      (do-nested-cleanups (cleanup block1)
+      (do-nested-cleanups (cleanup (block-end-lexenv block1))
         (when (eq cleanup cleanup2)
           (return))
         (let* ((node (cleanup-mess-up cleanup))

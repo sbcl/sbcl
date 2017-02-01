@@ -14,20 +14,24 @@
 
 ;;;; cleanup hackery
 
+(defun lexenv-enclosing-cleanup (lexenv)
+  (declare (type lexenv lexenv))
+  (do ((lexenv2 lexenv
+               (lambda-call-lexenv (lexenv-lambda lexenv2))))
+      ((null lexenv2) nil)
+    (awhen (lexenv-cleanup lexenv2)
+      (return it))))
+
 ;;; Return the innermost cleanup enclosing NODE, or NIL if there is
 ;;; none in its function. If NODE has no cleanup, but is in a LET,
 ;;; then we must still check the environment that the call is in.
 (defun node-enclosing-cleanup (node)
   (declare (type node node))
-  (do ((lexenv (node-lexenv node)
-               (lambda-call-lexenv (lexenv-lambda lexenv))))
-      ((null lexenv) nil)
-    (awhen (lexenv-cleanup lexenv)
-      (return it))))
+  (lexenv-enclosing-cleanup (node-lexenv node)))
 
-(defun map-nested-cleanups (function block &optional return-value)
-  (declare (type cblock block))
-  (do ((cleanup (block-end-cleanup block)
+(defun map-nested-cleanups (function lexenv &optional return-value)
+  (declare (type lexenv lexenv))
+  (do ((cleanup (lexenv-enclosing-cleanup lexenv)
                 (node-enclosing-cleanup (cleanup-mess-up cleanup))))
       ((not cleanup) return-value)
     (funcall function cleanup)))
@@ -697,6 +701,10 @@
 (defun block-end-cleanup (block)
   (node-enclosing-cleanup (block-last block)))
 
+;;; Return the lexenv of the last node in BLOCK.
+(defun block-end-lexenv (block)
+  (node-lexenv (block-last block)))
+
 ;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
 ;;; if there is none.
 ;;;
@@ -1060,7 +1068,7 @@
 ;;; have the same cleanup info, corresponding to the start, so the
 ;;; same approach returns safe result.
 (defun map-block-nlxes (fun block &optional dx-cleanup-fun)
-  (do-nested-cleanups (cleanup block)
+  (do-nested-cleanups (cleanup (block-end-lexenv block))
     (let ((mess-up (cleanup-mess-up cleanup)))
       (case (cleanup-kind cleanup)
         ((:block :tagbody)
