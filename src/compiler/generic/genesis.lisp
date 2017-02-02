@@ -1173,6 +1173,7 @@ core and return a descriptor to it."
          (let ((predicate (find translation sb!c::*backend-type-predicates*
                                 :test #'type= :key #'car)))
            (cond (predicate (cdr predicate))
+                 ((eq type-name 'stream) 'streamp)
                  ((eq type-name 't) 'sb!int:constantly-t)
                  (t (error "No predicate for builtin: ~S" type-name))))))
       (null

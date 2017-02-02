@@ -78,11 +78,9 @@
 
 ;;; the size of a stream in-buffer
 ;;;
-;;; KLUDGE: The EVAL-WHEN wrapper isn't needed except when using CMU
-;;; CL as a cross-compilation host. Without it, cmucl-2.4.19 issues
-;;; full WARNINGs (not just STYLE-WARNINGs!) when processing this
-;;; file, and when processing other files which use ANSI-STREAM.
-;;; -- WHN 2000-12-13
+;;; This constant it is used in a read-time-eval, and some implementations
+;;; draw a sharp distinction between a constant being known only to
+;;; the file-compiler during compilation, and known also to the evaluator.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +ansi-stream-in-buffer-length+ 512))
 
@@ -128,7 +126,7 @@
   ;; maintain correctness of the slot in ANSI-STREAM-UNREAD-CHAR.
   (input-char-pos nil))
 
-(defmethod print-object ((x ansi-stream) stream)
+(defmethod print-object ((x stream) stream)
   (print-unreadable-object (x stream :type t :identity t)))
 
 (defmacro with-standard-io-syntax (&body body)
