@@ -2538,9 +2538,6 @@
 ;;; This is called when the cold load is first started up, and may also
 ;;; be called in an attempt to recover from nested errors.
 (defun stream-cold-init-or-reset ()
-  ;; FIXME: on gencgc the 4 standard fd-streams {stdin,stdout,stderr,tty}
-  ;; and these synonym streams are baked into +pseudo-static-generation+.
-  ;; Is that inadvertent?
   (stream-reinit)
   (setf *terminal-io* (make-synonym-stream '*tty*))
   (setf *standard-output* (make-synonym-stream '*stdout*))
@@ -2552,6 +2549,7 @@
   (values))
 
 (defun stream-deinit ()
+  (setq *tty* nil *stdin* nil *stdout* nil *stderr* nil)
   ;; Unbind to make sure we're not accidently dealing with it
   ;; before we're ready (or after we think it's been deinitialized).
   (%makunbound '*available-buffers*))

@@ -257,10 +257,11 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  (stream-deinit)
   (deinit-finalizers)
   (drop-all-hash-caches)
   (os-deinit)
+  ;; Do this last, to have some hope of printing if we need to.
+  (stream-deinit)
   (setf * nil ** nil *** nil
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))
