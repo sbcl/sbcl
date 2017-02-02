@@ -300,14 +300,14 @@
 
   (defun use-label (value dstate)
     (let* ((value (if (consp value)
-                     (logior (ldb (byte 2 0) (car value))
-                             (ash (cadr value) 2))
-                     (ash value 2)))
-          (address (+ value (dstate-cur-addr dstate))))
+                      (logior (ldb (byte 2 0) (car value))
+                              (ash (cadr value) 2))
+                      (ash value 2)))
+           (address (+ value (dstate-cur-addr dstate))))
       ;; LRA pointer
-      (when (= (logand address lowtag-mask)
-               other-pointer-lowtag)
-        (decf address (- other-pointer-lowtag n-word-bytes)))))
+      (if (= (logand address lowtag-mask) other-pointer-lowtag)
+          (- address (- other-pointer-lowtag n-word-bytes))
+          address)))
 
 
   (defun annotate-ldr-str (register offset dstate)
