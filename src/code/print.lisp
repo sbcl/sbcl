@@ -374,39 +374,19 @@ variable: an unreadable object representing the error is printed instead.")
             (format stream "UNPRINTABLE instance of ~W" classoid))))))
   (print-object object stream))
 
-;;; Note: Now that PRINT-OBJECT works right away, indirections could be removed.
-;;; i.e. do (DEFMETHOD PRINT-OBJECT ((X CONS) STREAM) (ACTUAL-PRINTER-GUTS))
-;;; But in a bootstrap situation you might wish to call a named printer directly.
-(defmethod print-object ((object function) stream) (output-fun object stream))
-(defmethod print-object ((object symbol) stream) (output-symbol object stream))
-(defmethod print-object ((object cons) stream) (output-list object stream))
-(defmethod print-object ((object integer) stream) (output-integer object stream))
-(defmethod print-object ((object float) stream) (output-float object stream))
-(defmethod print-object ((object ratio) stream) (output-ratio object stream))
-(defmethod print-object ((object complex) stream) (output-complex object stream))
-(defmethod print-object ((object character) stream) (output-character object stream))
-(defmethod print-object ((object vector) stream) (output-vector object stream))
-(defmethod print-object ((object array) stream) (output-array object stream))
-(defmethod print-object ((object system-area-pointer) stream) (output-sap object stream))
-(defmethod print-object ((object weak-pointer) stream) (output-weak-pointer object stream))
-(defmethod print-object ((object code-component) stream) (output-code-component object stream))
-(defmethod print-object ((object fdefn) stream) (output-fdefn object stream))
-#!-(or x86 x86-64) (defmethod print-object ((object lra) stream) (output-lra object stream))
-
 ;;;; symbols
 
-(defun output-symbol (object stream)
-  (declare (symbol object))
+(defmethod print-object ((object symbol) stream)
   (if (or *print-escape* *print-readably*)
       ;; Write so that reading back works
-      (output-symbol* object (symbol-package object) stream)
+      (output-symbol object (symbol-package object) stream)
       ;; Write only the characters of the name, never the package
       (let ((rt *readtable*))
         (funcall (truly-the function
                   (choose-symbol-out-fun *print-case* (%readtable-case rt)))
                  (symbol-name object) stream rt))))
 
-(defun output-symbol* (symbol package stream)
+(defun output-symbol (symbol package stream)
   (let* ((readably *print-readably*)
          (readtable (if readably *standard-readtable* *readtable*))
          (out-fun (choose-symbol-out-fun *print-case* (%readtable-case readtable))))
@@ -818,7 +798,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; recursive objects
 
-(defun output-list (list stream)
+(defmethod print-object ((list cons) stream)
   (descend-into (stream)
     (write-char #\( stream)
     (let ((length 0)
@@ -844,8 +824,8 @@ variable: an unreadable object representing the error is printed instead.")
                   '(simple-array ,(array-element-type vector) (*)))
          :stream stream))
 
-(defun output-vector (vector stream &aux (readably *print-readably*))
-  (declare (vector vector))
+(defmethod print-object ((vector vector) stream)
+ (let ((readably *print-readably*))
   (cond ((stringp vector)
          (let ((coerce-p
                 (and readably (not (typep vector '(vector character))))))
@@ -892,7 +872,7 @@ variable: an unreadable object representing the error is printed instead.")
         (*read-eval*
          (output-unreadable-vector-readably vector stream))
         (t
-         (print-not-readable-error vector stream))))
+         (print-not-readable-error vector stream)))))
 
 ;;; This function outputs a string quoting characters sufficiently
 ;;; so that someone can read it in again. Basically, put a slash in
@@ -921,7 +901,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; Output the printed representation of any array in either the #< or #A
 ;;; form.
-(defun output-array (array stream)
+(defmethod print-object ((array array) stream)
   (if (or *print-array* *print-readably*)
       (output-array-guts array stream)
       (output-terse-array array stream)))
@@ -1110,6 +1090,9 @@ variable: an unreadable object representing the error is printed instead.")
       (%output-reasonable-integer-in-base integer base stream)
       (%output-huge-integer-in-base integer base stream)))
 
+;;; This gets both a method and a specifically named function
+;;; since the latter is called from a few places.
+(defmethod print-object ((object integer) stream) (output-integer object stream))
 (defun output-integer (integer stream)
   (let ((base *print-base*))
     (cond (*print-radix*
@@ -1119,7 +1102,7 @@ variable: an unreadable object representing the error is printed instead.")
           (t
            (%output-integer-in-base integer base stream)))))
 
-(defun output-ratio (ratio stream)
+(defmethod print-object ((ratio ratio) stream)
   (let ((base *print-base*))
     (when *print-radix*
       (%output-radix base stream))
@@ -1127,7 +1110,7 @@ variable: an unreadable object representing the error is printed instead.")
     (write-char #\/ stream)
     (%output-integer-in-base (denominator ratio) base stream)))
 
-(defun output-complex (complex stream)
+(defmethod print-object ((complex complex) stream)
   (write-string "#C(" stream)
   (output-object (realpart complex) stream)
   (write-char #\space stream)
@@ -1515,7 +1498,7 @@ variable: an unreadable object representing the error is printed instead.")
     (write-string " NaN" stream)))
 
 ;;; the function called by OUTPUT-OBJECT to handle floats
-(defun output-float (x stream)
+(defmethod print-object ((x float) stream)
   (cond
    ((float-infinity-p x)
     (output-float-infinity x stream))
@@ -1564,7 +1547,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; If *PRINT-ESCAPE* is false, just do a WRITE-CHAR, otherwise output
 ;;; the character name or the character in the #\char format.
-(defun output-character (char stream)
+(defmethod print-object ((char character) stream)
   (if (or *print-escape* *print-readably*)
       (let ((graphicp (and (graphic-char-p char)
                            (standard-char-p char)))
@@ -1575,16 +1558,14 @@ variable: an unreadable object representing the error is printed instead.")
             (write-char char stream)))
       (write-char char stream)))
 
-(defun output-sap (sap stream)
-  (declare (type system-area-pointer sap))
+(defmethod print-object ((sap system-area-pointer) stream)
   (cond (*read-eval*
          (format stream "#.(~S #X~8,'0X)" 'int-sap (sap-int sap)))
         (t
          (print-unreadable-object (sap stream)
            (format stream "system area pointer: #X~8,'0X" (sap-int sap))))))
 
-(defun output-weak-pointer (weak-pointer stream)
-  (declare (type weak-pointer weak-pointer))
+(defmethod print-object ((weak-pointer weak-pointer) stream)
   (print-unreadable-object (weak-pointer stream)
     (multiple-value-bind (value validp) (weak-pointer-value weak-pointer)
       (cond (validp
@@ -1593,7 +1574,7 @@ variable: an unreadable object representing the error is printed instead.")
             (t
              (write-string "broken weak pointer" stream))))))
 
-(defun output-code-component (component stream)
+(defmethod print-object ((component code-component) stream)
   (print-unreadable-object (component stream :identity t)
     (let ((dinfo (%code-debug-info component)))
       (cond ((eq dinfo :bogus-lra)
@@ -1610,18 +1591,19 @@ variable: an unreadable object representing the error is printed instead.")
                       (write-string ", " stream)
                       (output-object (sb!c::debug-info-name dinfo) stream)))))))))
 
-(defun output-lra (lra stream)
+#!-(or x86 x86-64)
+(defmethod print-object ((lra lra) stream)
   (print-unreadable-object (lra stream :identity t)
     (write-string "return PC object" stream)))
 
-(defun output-fdefn (fdefn stream)
+(defmethod print-object ((fdefn fdefn) stream)
   (print-unreadable-object (fdefn stream :type t)
-    (let ((name (fdefn-name fdefn)))
-      ;; It's somewhat unhelpful to print as <FDEFINITION for (SETF #)>
-      ;; Generalized function names are indivisible.
-      (if (proper-list-p name)
-          (format stream "(~{~S~^ ~})" name)
-          (output-object name stream)))))
+    ;; As fdefn names are particularly relevant to those hacking on the compiler
+    ;; and disassembler, be maximally helpful by neither abbreviating (SETF ...)
+    ;; due to length cutoff, nor failing to print a package if needed.
+    ;; Some folks seem to love same-named symbols way too much.
+    (let ((*print-length* 20)) ; arbitrary
+      (prin1 (fdefn-name fdefn) stream))))
 
 #!+sb-simd-pack
 (defmethod print-object ((pack simd-pack) stream)
@@ -1673,7 +1655,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; functions
 
-(defun output-fun (object stream)
+(defmethod print-object ((object function) stream)
   (let* ((name (%fun-name object))
          (proper-name-p (and (legal-fun-name-p name) (fboundp name)
                              (eq (fdefinition name) object))))
