@@ -1634,7 +1634,7 @@ static void fixup_space(lispobj* where, size_t n_words)
                                   forwarding_pointer_value(native_pointer(layout)));
 #endif
           // skip the trampoline word at where[1]
-          adjust_words(where+2, (HeaderValue(header_word)&0xFFFF) - 1);
+          adjust_words(where+2, size-2);
           break;
         case FDEFN_WIDETAG:
           adjust_words(where+1, 2);
@@ -1644,12 +1644,12 @@ static void fixup_space(lispobj* where, size_t n_words)
         // Special case because we might need to mark hashtables
         // as needing rehash.
         case SIMPLE_VECTOR_WIDETAG:
-          if ((HeaderValue(*where) & 0xFF) == subtype_VectorValidHashing) {
+          if ((HeaderValue(header_word) & 0xFF) == subtype_VectorValidHashing) {
               struct vector* v = (struct vector*)where;
-              gc_assert(v->length > 0 &&
-                        !(fixnum_value(v->length) & 1) &&  // length must be even
-                        lowtag_of(v->data[0]) == INSTANCE_POINTER_LOWTAG);
               lispobj* data = v->data;
+              gc_assert(v->length > 0 &&
+                        lowtag_of(data[0]) == INSTANCE_POINTER_LOWTAG &&
+                        !(fixnum_value(v->length) & 1));  // length must be even
               boolean needs_rehash = 0;
               int i;
               for (i = fixnum_value(v->length)-1 ; i>=0 ; --i) {
