@@ -81,7 +81,8 @@ is guessed from the one supplied."
           (make-heap-alien-info :type type
                                 :alien-name alien-name
                                 :datap t))
-    (setf (info :source-location :variable lisp-name) location)))
+    (setf (info :source-location :variable lisp-name) location)
+    lisp-name))
 
 (defun alien-value (symbol)
   "Returns the value of the alien variable bound to SYMBOL. Signals an
