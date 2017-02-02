@@ -12,9 +12,7 @@
 
 (in-package "COMMON-LISP")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-(sb!xc:proclaim '(special cl:*
+(declaim         (special cl:*
                           cl:**
                           cl:***
                           cl:*break-on-signals*
@@ -69,10 +67,10 @@
                           cl://
                           cl:///))
 
-(sb!xc:proclaim '(type t cl:+ cl:++ cl:+++ cl:- cl:* cl:** cl:***))
+(declaim (type t cl:+ cl:++ cl:+++ cl:- cl:* cl:** cl:***))
 
 ;;; generalized booleans
-(sb!xc:proclaim '(type t cl:*compile-print* cl:*compile-verbose*
+(declaim (type t         cl:*compile-print* cl:*compile-verbose*
                          cl:*load-print* cl:*load-verbose*
                          cl:*print-array* cl:*print-radix*
                          cl:*print-circle* cl:*print-escape*
@@ -80,33 +78,31 @@
                          cl:*print-readably* cl:*read-eval*
                          cl:*read-suppress*))
 
-(sb!xc:proclaim '(type sb!pretty::pprint-dispatch-table
-                       cl:*print-pprint-dispatch*))
+(declaim (type sb!pretty::pprint-dispatch-table cl:*print-pprint-dispatch*))
 
-(sb!xc:proclaim '(type readtable cl:*readtable*))
+(declaim (type readtable cl:*readtable*))
 
-(sb!xc:proclaim '(type (integer 2 36) cl:*print-base* cl:*read-base*))
+(declaim (type (integer 2 36) cl:*print-base* cl:*read-base*))
 
-(sb!xc:proclaim '(type (member :upcase :downcase :capitalize) cl:*print-case*))
+(declaim (type (member :upcase :downcase :capitalize) cl:*print-case*))
 
-(sb!xc:proclaim '(type (member cl:single-float cl:double-float
-                        cl:short-float cl:long-float) cl:*read-default-float-format*))
+(declaim (type (member cl:single-float cl:double-float
+                       cl:short-float cl:long-float) cl:*read-default-float-format*))
 
-(sb!xc:proclaim '(type list cl:/ cl:// cl:/// cl:*features* cl:*modules*))
+(declaim (type list cl:/ cl:// cl:/// cl:*features* cl:*modules*))
 
-(sb!xc:proclaim '(type sb!kernel:type-specifier cl:*break-on-signals*))
+(declaim (type sb!kernel:type-specifier cl:*break-on-signals*))
 
-(sb!xc:proclaim '(type package cl:*package*))
+(declaim (type package cl:*package*))
 
-(sb!xc:proclaim '(type random-state cl:*random-state*))
+(declaim (type random-state cl:*random-state*))
 
 ;; KLUDGE: some of these are more specific than just STREAM.  However,
 ;; (a) we can't express that portably, and (b) we probably violate
 ;; these requirements somewhere as of sbcl-0.8.0.  (and maybe we break
 ;; even this in Gray streams or simple-streams?  apparently not,
 ;; currently)
-(sb!xc:proclaim '(type stream
-                       cl:*standard-input*
+(declaim (type stream  cl:*standard-input*
                        cl:*error-output*
                        cl:*standard-output*
                        cl:*trace-output*
@@ -119,25 +115,23 @@
 ;;; is actually allowed to be a CONS.
 ;;; CLHS would have said "_extended_ function designator"
 ;;; if it meant to allows (SETF f) as a designator.
-(sb!xc:proclaim '(type (or function symbol cons)
+(declaim (type (or function symbol cons)
                        cl:*debugger-hook*
                        cl:*macroexpand-hook*))
 
-(sb!xc:proclaim '(type unsigned-byte cl:*gensym-counter*))
+(declaim (type unsigned-byte cl:*gensym-counter*))
 
-(sb!xc:proclaim '(type (or unsigned-byte null)
+(declaim (type (or unsigned-byte null)
                        cl:*print-length*
                        cl:*print-level*
                        cl:*print-lines*
                        cl:*print-miser-width*
                        cl:*print-right-margin*))
 
-(sb!xc:proclaim '(type pathname cl:*default-pathname-defaults*))
+(declaim (type pathname cl:*default-pathname-defaults*))
 
-(sb!xc:proclaim '(type (or pathname null)
+(declaim (type (or pathname null)
                        cl:*load-pathname*
                        cl:*load-truename*
                        cl:*compile-file-pathname*
                        cl:*compile-file-truename*))
-
-) ; end EVAL-WHEN
