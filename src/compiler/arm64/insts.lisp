@@ -2640,7 +2640,7 @@
                                  (tn-offset dest))))
            (multi-instruction-maybe-shrink (segment posn magic-value)
              (when (typep (funcall compute-delta posn magic-value)
-                          '(signed-byte 19))
+                          '(signed-byte 21))
                (emit-back-patch segment 4
                                 #'one-instruction-emitter)
                t)))
@@ -2702,7 +2702,7 @@
                                 (tn-offset dest)))
             (multi-instruction-maybe-shrink (segment posn magic-value)
               (let ((delta (compute-delta posn magic-value)))
-                (when (typep delta '(signed-byte 19))
+                (when (typep delta '(signed-byte 21))
                   (emit-back-patch segment 4
                                    #'one-instruction-emitter)
                   t))))
