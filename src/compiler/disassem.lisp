@@ -17,9 +17,9 @@
 
 (deftype text-width () '(integer 0 1000))
 (deftype alignment () '(integer 0 64))
-(deftype offset () '(signed-byte 24))
-(deftype address () '(unsigned-byte #.sb!vm:n-word-bits))
-(deftype disassem-length () '(unsigned-byte 24))
+(deftype offset () 'fixnum)
+(deftype address () 'word)
+(deftype disassem-length () '(and unsigned-byte fixnum))
 (deftype column () '(integer 0 1000))
 
 (defconstant max-filtered-value-index 32)
