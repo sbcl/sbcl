@@ -40,6 +40,7 @@
 #endif
 
 unsigned int cpuid_fn1_ecx;
+unsigned int avx_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
                   unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
@@ -61,14 +62,27 @@ static void cpuid(unsigned info, unsigned subinfo,
 #endif
 }
 
+static void xgetbv(unsigned *eax, unsigned *edx)
+{
+  __asm__("xgetbv;"
+          :"=a" (*eax), "=d" (*edx)
+          : "c" (0));
+}
+
 void arch_init(void)
 {
   unsigned int eax, ebx, ecx, edx;
 
   cpuid(0, 0, &eax, &ebx, &ecx, &edx);
   if (eax >= 1) { // see if we can execute basic id function 1
+      unsigned avx_mask = 0x18000000; // OXSAVE and AVX
       cpuid(1, 0, &eax, &ebx, &ecx, &edx);
       cpuid_fn1_ecx = ecx;
+      if ((ecx & avx_mask) == avx_mask) {
+          xgetbv(&eax, &edx);
+          if ((eax & 0x06) == 0x06) // YMM and XMM
+              avx_supported = 1;
+      }
   }
 }
 

@@ -72,4 +72,6 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
     return old_value;
 }
 
+extern unsigned int avx_supported;
+
 #endif /* _X86_64_ARCH_H */

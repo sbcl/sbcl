@@ -7,6 +7,7 @@
 #include "runtime.h"
 #include "interrupt.h"
 #include "x86-64-darwin-os.h"
+#include "x86-64-arch.h"
 #include "genesis/fdefn.h"
 
 #include <mach/mach.h>
@@ -295,15 +296,23 @@ catch_exception_raise(mach_port_t exception_port,
     x86_thread_state64_t thread_state;
     mach_msg_type_number_t thread_state_count = x86_THREAD_STATE64_COUNT;
 
+#ifdef x86_AVX_STATE64_COUNT
+    x86_avx_state64_t float_state;
+    mach_msg_type_number_t float_state_count = avx_supported? x86_AVX_STATE64_COUNT : x86_FLOAT_STATE64_COUNT;
+    x86_avx_state64_t *target_float_state;
+    int float_state_flavor = avx_supported? x86_AVX_STATE64 : x86_FLOAT_STATE64_COUNT;
+#else
     x86_float_state64_t float_state;
     mach_msg_type_number_t float_state_count = x86_FLOAT_STATE64_COUNT;
+    x86_float_state64_t *target_float_state;
+    int float_state_flavor = x86_FLOAT_STATE64;
+#endif
 
     x86_exception_state64_t exception_state;
     mach_msg_type_number_t exception_state_count = x86_EXCEPTION_STATE64_COUNT;
 
     x86_thread_state64_t backup_thread_state;
     x86_thread_state64_t *target_thread_state;
-    x86_float_state64_t *target_float_state;
 
     os_vm_address_t addr;
 
@@ -316,7 +325,7 @@ catch_exception_raise(mach_port_t exception_port,
     }
     thread_get_state(thread, x86_THREAD_STATE64,
                      (thread_state_t)&thread_state, &thread_state_count);
-    thread_get_state(thread, x86_FLOAT_STATE64,
+    thread_get_state(thread, float_state_flavor,
                      (thread_state_t)&float_state, &float_state_count);
     thread_get_state(thread, x86_EXCEPTION_STATE64,
                      (thread_state_t)&exception_state, &exception_state_count);
@@ -372,7 +381,7 @@ catch_exception_raise(mach_port_t exception_port,
 
             thread_set_state(thread, x86_THREAD_STATE64,
                              (thread_state_t) thread_state.rax, thread_state_count);
-            thread_set_state(thread, x86_FLOAT_STATE64,
+            thread_set_state(thread, float_state_flavor,
                              (thread_state_t) thread_state.rbx, float_state_count);
             goto do_not_handle;
         } else if (*((unsigned short *)thread_state.rip) == 0x0b0f) {
@@ -399,14 +408,12 @@ catch_exception_raise(mach_port_t exception_port,
     stack_allocate(&thread_state, 256);
 
     /* Save thread state */
-    target_thread_state =
-        stack_allocate(&thread_state, sizeof(*target_thread_state));
+    target_thread_state = stack_allocate(&thread_state, sizeof(*target_thread_state));
     (*target_thread_state) = backup_thread_state;
 
     target_thread_state->rip += rip_offset;
     /* Save float state */
-    target_float_state =
-        stack_allocate(&thread_state, sizeof(*target_float_state));
+    target_float_state = stack_allocate(&thread_state, sizeof(*target_float_state));
     (*target_float_state) = float_state;
 
     /* Set up siginfo */
@@ -425,7 +432,7 @@ catch_exception_raise(mach_port_t exception_port,
                                handler);
     thread_set_state(thread, x86_THREAD_STATE64,
                      (thread_state_t)&thread_state, thread_state_count);
-    thread_set_state(thread, x86_FLOAT_STATE64,
+    thread_set_state(thread, float_state_flavor,
                      (thread_state_t)&float_state, float_state_count);
   do_not_handle:
 #ifdef LISP_FEATURE_SB_THREAD

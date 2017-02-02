@@ -32,6 +32,7 @@ changes relative to sbcl-1.3.14:
     presence of multiple-values (lp#1655011)
   * bug fix: handling of SB-SYS:WITH-PINNED-OBJECTS in the interpreters (both
     sb-eval and sb-fasteval) now actually pins objects on gencgc.
+  * bug fix: AVX registers are preserved during exceptions on x86-64 macOS.
 
 changes in sbcl-1.3.14 relative to sbcl-1.3.13:
   * minor incompatible change: the SB-PCL walker no longer recognizes
