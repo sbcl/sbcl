@@ -15,7 +15,7 @@
 
 #+interpreter (sb-ext:exit :code 104)
 ;; No stepper support on some platforms.
-#-(or x86 x86-64 ppc sparc mips arm)
+#-(or x86 x86-64 ppc sparc mips arm arm64)
 (sb-ext:exit :code 104)
 
 (defun fib (x)

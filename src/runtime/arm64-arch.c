@@ -114,13 +114,7 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned char register_offset =
-        *((unsigned char *)(*os_context_pc_addr(context))+5);
-    handle_single_step_trap(context, trap, register_offset);
-    /* KLUDGE: arch_skip_instruction() only skips one instruction, and
-     * there is a following word to deal with as well, so skip
-     * twice. */
-    arch_skip_instruction(context);
+    handle_single_step_trap(context, trap, reg_LEXENV);
     arch_skip_instruction(context);
 }
 

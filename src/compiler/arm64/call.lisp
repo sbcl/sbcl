@@ -892,7 +892,7 @@
                               (:load-fp
                                (move cfp-tn new-fp))))
                       ((nil)))))
-                (insert-step-instrumenting (callable-tn)
+                (insert-step-instrumenting ()
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (assemble ()
@@ -905,14 +905,7 @@
                       ;; interrupt is handled, not after the
                       ;; DEBUG-TRAP.
                       (note-this-location vop :step-before-vop)
-                      ;; Best-guess at a usable trap.  x86oids don't
-                      ;; have much more than this, SPARC, MIPS, PPC
-                      ;; and HPPA encode (TN-OFFSET CALLABLE-TN),
-                      ;; Alpha ignores stepping entirely.
                       (inst brk single-step-around-trap)
-                      (inst byte (tn-offset callable-tn))
-                      (emit-alignment 2)
-
                       STEP-DONE-LABEL))))
 
 
@@ -926,7 +919,7 @@
                       (load-constant vop name name-pass)
                       (do-next-filler)))
                    (do-next-filler)
-                   (insert-step-instrumenting name-pass))
+                   (insert-step-instrumenting))
                  `((sc-case arg-fun
                      (descriptor-reg (move lexenv arg-fun))
                      (control-stack
@@ -935,10 +928,10 @@
                      (constant
                       (load-constant vop arg-fun lexenv)
                       (do-next-filler)))
+                   (insert-step-instrumenting)
                    (loadw function lexenv closure-fun-slot
                           fun-pointer-lowtag)
-                   (do-next-filler)
-                   (insert-step-instrumenting lip)))
+                   (do-next-filler)))
            (loop
              (if filler
                  (do-next-filler)
