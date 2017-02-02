@@ -704,9 +704,13 @@
                                       (fill-pointer-value)
                                       ((and fill-pointer
                                             (not constant-fill-pointer-p))
-                                       `(if (> fill-pointer length)
-                                            (error "Invalid fill-pointer ~a" fill-pointer)
-                                            fill-pointer))
+                                       `(cond ((or (eq fill-pointer t)
+                                                   (null fill-pointer))
+                                               length)
+                                              ((> fill-pointer length)
+                                               (error "Invalid fill-pointer ~a" fill-pointer))
+                                              (t
+                                               fill-pointer)))
                                       (t
                                        'length)))
                          (setf (%array-fill-pointer-p header)
