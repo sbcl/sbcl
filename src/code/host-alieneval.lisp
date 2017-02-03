@@ -54,6 +54,8 @@
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (create-alien-type-class-if-necessary ',name ',defstruct-name
                                                  ',(or include 'root)))
+         (setf (info :source-location :alien-type ',name)
+               (sb!c:source-location))
          (def!struct (,defstruct-name
                         (:include ,include-defstruct
                                   (class ',name)
@@ -191,7 +193,7 @@
         (setf (info :alien-type kind name) defn
               (info :source-location :alien-type name) source-location))))
 
-  (defun %define-alien-type (name new)
+  (defun %define-alien-type (name new source-location)
     (ecase (info :alien-type :kind name)
       (:primitive
        (error "~/sb!impl:print-type-specifier/ is a built-in alien type."
@@ -208,6 +210,7 @@
       (:unknown))
     (setf (info :alien-type :definition name) new)
     (setf (info :alien-type :kind name) :defined)
+    (setf (info :source-location :alien-type name) source-location)
     name))
 
 ;;;; the root alien type
