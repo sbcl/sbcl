@@ -1,8 +1,5 @@
 ;;;; This file contains special proclamations for variables that are
-;;;; referenced in the code sources before they are defined. There are
-;;;; also function proclamations to make some common functions be
-;;;; known, avoiding work in recording the calls that are done before
-;;;; the definition.
+;;;; referenced in the code sources before they are defined.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -22,5 +19,4 @@
                   *in-without-gcing* *gc-inhibit* *gc-pending*
                   #!+sb-thread *stop-for-gc-pending*
                   #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
-                  *load-verbose*
                   *posix-argv*))

@@ -783,9 +783,6 @@ NOTE: This interface is experimental and subject to change."
 ;;;   Manual control over memoization is useful if there are cases for
 ;;;   which it is undesirable to pollute the cache.
 
-;;; FIXME: this macro holds onto the DEFINE-HASH-CACHE macro,
-;;; but should not.
-;;;
 ;;; Possible FIXME: if the function has a type proclamation, it forces
 ;;; a type-check every time the cache finds something. Instead, values should
 ;;; be checked once only when inserted into the cache, and not when read out.
