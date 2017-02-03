@@ -1134,7 +1134,7 @@
       ;; dumps aren't included in the LENGTH passed to FOP-CODE.
       (dump-fixups fixups fasl-output)
 
-      #!-x86
+      #!-(or x86 (and x86-64 (not immobile-space)))
       (dump-fop 'fop-sanctify-for-execution fasl-output)
 
       (let ((handle (dump-pop fasl-output)))

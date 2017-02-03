@@ -85,6 +85,7 @@
             (cons offset (if (eql fixups 0) nil fixups)))))
   nil)
 
+#!+immobile-space
 (defun sanctify-for-execution (code)
   (let ((fixups (sb!vm::%code-fixups code)))
     (when (listp fixups)

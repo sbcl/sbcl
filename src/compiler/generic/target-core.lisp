@@ -114,7 +114,7 @@
           (dolist (entry entries)
             (make-fun-entry (decf fun-index) entry code-obj object nfuns)))
 
-        #!-x86
+        #!-(or x86 (and x86-64 (not immobile-space)))
         (sb!vm:sanctify-for-execution code-obj)
 
         (push debug-info (core-object-debug-info object))

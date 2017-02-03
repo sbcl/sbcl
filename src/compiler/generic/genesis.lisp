@@ -2646,7 +2646,7 @@ core and return a descriptor to it."
          (fun (cold-fdefn-fun (cold-fdefinition-object name))))
     (if (cold-null fun) `(:known-fun . ,name) fun)))
 
-#!-x86
+#!-(or x86 (and x86-64 (not immobile-space)))
 (define-cold-fop (fop-sanctify-for-execution)
   (pop-stack))
 
@@ -3736,7 +3736,7 @@ initially undefined function references:~2%")
       (resolve-deferred-known-funs)
       (resolve-assembler-fixups)
       (foreign-symbols-to-core)
-      #!+(or x86 x86-64)
+      #!+(or x86 immobile-space)
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb!vm::code-fixups-slot
