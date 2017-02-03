@@ -12,88 +12,99 @@
 (in-package "CL-USER")
 
 ;;; In sbcl-0.6.9 FOO-NAMESTRING functions  returned "" instead of NIL.
-(let ((pathname0 (make-pathname :host nil
-                                :directory
-                                (pathname-directory
-                                 *default-pathname-defaults*)
-                                :name "getty"))
-      (pathname1 (make-pathname :host nil
-                                :directory nil
-                                :name nil)))
-  (assert (equal (file-namestring pathname0) "getty"))
-  (assert (equal (directory-namestring pathname0)
-                 (directory-namestring *default-pathname-defaults*)))
-  (assert (equal (file-namestring pathname1) ""))
-  (assert (equal (directory-namestring pathname1) "")))
+(with-test (:name (file-namestring directory-namestring :name))
+  (let ((pathname0 (make-pathname :host nil
+                                  :directory
+                                  (pathname-directory
+                                   *default-pathname-defaults*)
+                                  :name "getty"))
+        (pathname1 (make-pathname :host nil
+                                  :directory nil
+                                  :name nil)))
+    (assert (equal (file-namestring pathname0) "getty"))
+    (assert (equal (directory-namestring pathname0)
+                   (directory-namestring *default-pathname-defaults*)))
+    (assert (equal (file-namestring pathname1) ""))
+    (assert (equal (directory-namestring pathname1) ""))))
 
 ;;; In sbcl-0.6.9 DIRECTORY failed on paths with :WILD or
 ;;; :WILD-INFERIORS in their directory components.
-(let ((dir (directory "../**/*.*")))
-  ;; We know a little bit about the structure of this result;
-  ;; let's test to make sure that this test file is in it.
-  (assert (find-if (lambda (pathname)
-                     (search "tests/filesys.pure.lisp"
-                             (namestring pathname)))
-                   dir)))
+(with-test (:name (directory :wild-inferiors))
+  (let ((dir (directory "../**/*.*")))
+    ;; We know a little bit about the structure of this result;
+    ;; let's test to make sure that this test file is in it.
+    (assert (find-if (lambda (pathname)
+                       (search "tests/filesys.pure.lisp"
+                               (namestring pathname)))
+                     dir))))
 ;;; In sbcl-0.9.7 DIRECTORY failed on pathnames with character-set
 ;;; components.
-(let ((dir (directory "[f]*.*")))
-  ;; We know a little bit about the structure of this result;
-  ;; let's test to make sure that this test file is in it.
-  (assert (find-if (lambda (pathname)
-                     (search "filesys.pure.lisp"
-                             (namestring pathname)))
-                   dir)))
+(with-test (:name (directory :character-set :pattern) )
+  (let ((dir (directory "[f]*.*")))
+    ;; We know a little bit about the structure of this result;
+    ;; let's test to make sure that this test file is in it.
+    (assert (find-if (lambda (pathname)
+                       (search "filesys.pure.lisp"
+                               (namestring pathname)))
+                     dir))))
 
 ;;; Set *default-pathname-defaults* to something other than the unix
 ;;; cwd, to catch functions which access the filesystem without
 ;;; merging properly.  We should test more functions than just OPEN
 ;;; here, of course
 
-(let ((*default-pathname-defaults*
-       (make-pathname :directory
-                      (butlast
-                       (pathname-directory *default-pathname-defaults*))
-                      :defaults *default-pathname-defaults*)))
-  ;; SBCL 0.7.1.2 failed to merge on OPEN
-  (with-open-file (i "tests/filesys.pure.lisp")
-      (assert i)))
+(with-test (:name (open *default-pathname-defaults*))
+  (let ((*default-pathname-defaults*
+         (make-pathname :directory
+                        (butlast
+                         (pathname-directory *default-pathname-defaults*))
+                        :defaults *default-pathname-defaults*)))
+    ;; SBCL 0.7.1.2 failed to merge on OPEN
+    (with-open-file (i "tests/filesys.pure.lisp")
+      (assert i))))
 
 ;;; OPEN, LOAD and friends should signal an error of type FILE-ERROR
 ;;; if they are fed wild pathname designators; firstly, with wild
 ;;; pathnames that don't correspond to any files:
-(assert (typep (nth-value 1 (ignore-errors (open "non-existent*.lisp")))
-               'file-error))
-(assert (typep (nth-value 1 (ignore-errors (load "non-existent*.lisp")))
-               'file-error))
+(with-test (:name (open :wild file-error 1))
+  (assert (typep (nth-value 1 (ignore-errors (open "non-existent*.lisp")))
+                 'file-error)))
+(with-test (:name (load :wild file-error 1))
+  (assert (typep (nth-value 1 (ignore-errors (load "non-existent*.lisp")))
+                 'file-error)))
 ;;; then for pathnames that correspond to precisely one:
-(assert (typep (nth-value 1 (ignore-errors (open "filesys.pur*.lisp")))
-               'file-error))
-(assert (typep (nth-value 1 (ignore-errors (load "filesys.pur*.lisp")))
-               'file-error))
+(with-test (:name (open :wild file-error 2))
+  (assert (typep (nth-value 1 (ignore-errors (open "filesys.pur*.lisp")))
+                 'file-error)))
+(with-test (:name (load :wild file-error 2))
+  (assert (typep (nth-value 1 (ignore-errors (load "filesys.pur*.lisp")))
+                 'file-error)))
 ;;; then for pathnames corresponding to many:
-(assert (typep (nth-value 1 (ignore-errors (open "*.lisp")))
-               'file-error))
-(assert (typep (nth-value 1 (ignore-errors (load "*.lisp")))
-               'file-error))
+(with-test (:name (open :wild file-error 3))
+  (assert (typep (nth-value 1 (ignore-errors (open "*.lisp")))
+                 'file-error)))
+(with-test (:name (load :wild file-error 3))
+  (assert (typep (nth-value 1 (ignore-errors (load "*.lisp")))
+                 'file-error)))
 
 ;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
 ;;; STREAM is not a stream associated with a file.
 ;;;
 ;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
-(assert (typep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
-               'type-error))
+(with-test (:name (file-length *terminal-io* type-error))
+  (assert (typep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
+                 'type-error)))
 
 ;;; A few cases Windows does have enough marbles to pass right now
-#+win32
-(progn
+(with-test (:name (sb-ext:native-namestring :win32)
+                  :skipped-on '(not :win32))
   (assert (equal "C:\\FOO" (native-namestring "C:\\FOO")))
   (assert (equal "C:\\FOO" (native-namestring "C:/FOO")))
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR")))
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR\\" :as-file t))))
 
-(with-test (:name (:parse-native-pathname :as-directory :junk-allowed))
+(with-test (:name (sb-ext:parse-native-namestring :as-directory :junk-allowed))
   (assert
    (equal
     (parse-native-namestring "foo.lisp" nil *default-pathname-defaults*
@@ -107,7 +118,7 @@
 ;;; given only safe characters in the namestring, NATIVE-PATHNAME will
 ;;; never error, and NATIVE-NAMESTRING on the result will return the
 ;;; original namestring.
-(with-test (:name :random-native-namestrings)
+(with-test (:name (sb-ext:native-namestring sb-ext:native-pathname :random))
   (let ((safe-chars
          (coerce
           (cons #\Newline
@@ -162,31 +173,31 @@
 ;;; used to call PARSE-NATIVE-NAMESTRING without supplying a HOST
 ;;; argument, and so would lose when *DEFAULT-PATHNAME-DEFAULTS* was a
 ;;; logical pathname.
-(with-test (:name :user-homedir-pathname-robustness)
+(with-test (:name (user-homedir-pathname :robustness))
   (let ((*default-pathname-defaults* (pathname "SYS:")))
     (assert (not (typep (user-homedir-pathname)
                         'logical-pathname)))))
 
-(with-test (:name :sbcl-homedir-pathname-robustness)
+(with-test (:name (sb-int:sbcl-homedir-pathname :robustness))
   (let ((*default-pathname-defaults* (pathname "SYS:")))
-    (assert (not (typep (sb-impl::sbcl-homedir-pathname)
+    (assert (not (typep (sb-int:sbcl-homedir-pathname)
                         'logical-pathname)))))
 
-(with-test (:name :file-author-stringp)
+(with-test (:name (file-author stringp))
   #-win32
   (assert (stringp (file-author (user-homedir-pathname))))
   #+win32
   (assert (not (file-author (user-homedir-pathname)))))
-(with-test (:name :file-write-date-integerp)
+(with-test (:name (file-write-date integerp))
   (assert (integerp (file-write-date (user-homedir-pathname)))))
 
 ;;; Canonicalization of pathnames for DIRECTORY
-(with-test (:name :directory-/.)
+(with-test (:name (directory :/.))
   (assert (equal (directory #p".") (directory #p"./")))
   (assert (equal (directory #p".") (directory #p""))))
-(with-test (:name :directory-/..)
+(with-test (:name (directory :/..))
   (assert (equal (directory #p"..") (directory #p"../"))))
-(with-test (:name :directory-unspecific)
+(with-test (:name (directory :unspecific))
   (assert (equal (directory #p".")
                  (directory (make-pathname
                              :name :unspecific
@@ -211,7 +222,7 @@
 ;;;                                                    (nil nil)
 ;;;                                                    (:error :error))
 ;;;             collect (list 'do-open exist if-exists if-does-not-exist)))
-(with-test (:name :open-never-openning)
+(with-test (:name (open :never-openning))
   (flet ((do-open (existing if-exists if-does-not-exist
                    &optional (direction :output))
            (open (if existing
@@ -251,7 +262,7 @@
              (do-open t nil nil :io)))
     (assert-error (do-open t :error :error :io))))
 
-(with-test (:name :open-new-version)
+(with-test (:name (open :new-version))
   (multiple-value-bind (value error)
       (ignore-errors (open #.(or *compile-file-truename* *load-truename*)
                            :direction :output
