@@ -191,9 +191,17 @@
                  (directory (make-pathname
                              :name :unspecific
                              :type :unspecific)))))
+
+;;; This used to signal a TYPE-ERROR.
 (with-test (:name (directory :..*))
-  ;; This used to signal a TYPE-ERROR.
   (directory "somedir/..*"))
+
+;;; DIRECTORY used to treat */** as **.
+(with-test (:name (directory :*/**))
+  (assert (equal (directory "*/**/*.*")
+                 (mapcan (lambda (directory)
+                           (directory (merge-pathnames "**/*.*" directory)))
+                         (directory "*/")))))
 
 ;;; Generated with
 ;;; (loop for exist in '(nil t)

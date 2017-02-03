@@ -874,30 +874,31 @@ Experimental: interface subject to change."
 ;;; Part of DIRECTORY: implements matching the directory spec. Calls FUNCTION
 ;;; with all DIRECTORIES that match the directory portion of PATHSPEC.
 (defun map-matching-directories (function pathspec)
-  (let* ((dir (pathname-directory pathspec))
-         (length (length dir))
-         (wild (position-if (lambda (elt)
-                              (or (eq :wild elt) (typep elt 'pattern)))
-                            dir))
-         (wild-inferiors (position :wild-inferiors dir))
-         (end (cond ((and wild wild-inferiors)
-                     (min wild wild-inferiors))
-                    (t
-                     (or wild wild-inferiors length))))
-         (rest (subseq dir end))
-         (starting-point (make-pathname :directory (subseq dir 0 end)
-                                        :device (pathname-device pathspec)
-                                        :host (pathname-host pathspec)
-                                        :name nil
-                                        :type nil
-                                        :version nil)))
-    (cond (wild-inferiors
-           (map-wild-inferiors function rest starting-point))
-          (wild
-           (map-wild function rest starting-point))
-          (t
-           ;; Nothing wild -- the directory matches itself.
-           (funcall function starting-point))))
+  (binding* ((directory (pathname-directory pathspec))
+             ((mode end) (loop for component in directory
+                            for i :of-type index from 0
+                            do (typecase component
+                                 ((or (eql :wild) pattern)
+                                  (return (values :wild i)))
+                                 ((eql :wild-inferiors)
+                                  (return (values :wild-inferiors i))))))
+             ((directory-start directory-rest)
+              (if end
+                  (values (subseq directory 0 end) (subseq directory end))
+                  (values directory directory)))
+             (starting-point (make-pathname :directory directory-start
+                                            :device (pathname-device pathspec)
+                                            :host (pathname-host pathspec)
+                                            :name nil
+                                            :type nil
+                                            :version nil)))
+    (case mode
+      (:wild-inferiors
+       (map-wild-inferiors function directory-rest starting-point))
+      (:wild
+       (map-wild function directory-rest starting-point))
+      (t ; Nothing wild -- the directory matches itself.
+       (funcall function starting-point))))
   nil)
 
 (defun last-directory-piece (pathname)
