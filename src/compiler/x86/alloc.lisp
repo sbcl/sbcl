@@ -38,8 +38,7 @@
                              temp))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
              (let ((cons-cells (if star (1- num) num))
-                   (stack-allocate-p (awhen (sb!c::node-lvar node)
-                                       (sb!c::lvar-dynamic-extent it))))
+                   (stack-allocate-p (node-stack-allocate-p node)))
                (maybe-pseudo-atomic stack-allocate-p
                 (allocation res (* (pad-data-block cons-size) cons-cells) node
                             stack-allocate-p list-pointer-lowtag)
