@@ -2031,6 +2031,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%FUN-NAME"
 
                "FDEFN" "MAKE-FDEFN" "FDEFN-P" "FDEFN-NAME" "FDEFN-FUN"
+               "MAKE-DUMMY-FDEFN"
                "FDEFN-MAKUNBOUND"
                "%COERCE-CALLABLE-TO-FUN" "FUN-SUBTYPE"
                "*MAXIMUM-ERROR-DEPTH*" "%SET-SYMBOL-PLIST"

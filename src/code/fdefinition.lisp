@@ -18,6 +18,11 @@
 
 ;;;; fdefinition (fdefn) objects
 
+;;; This is used for undefined-fun-error restarts
+(defun make-dummy-fdefn ()
+  #!-immobile-space (make-fdefn nil)
+  #!+immobile-space (make-dummy-fdefn))
+
 (defun make-fdefn (name)
   #!-immobile-space (make-fdefn name)
   ;; This is %primitive because it needs pseudo-atomic,
