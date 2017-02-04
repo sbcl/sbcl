@@ -9,7 +9,20 @@
     (undefined-tramp (:return-style :none))
     ((:temp rax descriptor-reg rax-offset))
   (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
-  (error-call nil 'undefined-fun-error rax))
+  (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list rax))
+  (inst push (make-ea :qword :base rbp-tn :disp n-word-bytes))
+  (inst test rax (logxor other-pointer-lowtag fun-pointer-lowtag))
+  (inst jmp :nz FDEFN)
+  (inst jmp
+        (make-ea :qword :base rax
+                        :disp (- (* closure-fun-slot n-word-bytes)
+                                 fun-pointer-lowtag)))
+  FDEFN
+  (inst jmp
+        (make-ea :qword :base rax
+                        :disp (- (* fdefn-raw-addr-slot
+                                    n-word-bytes)
+                                 other-pointer-lowtag))))
 
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))

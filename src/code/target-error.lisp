@@ -254,6 +254,15 @@ with that condition (or with no condition) will be returned."
   (finish-output *query-io*)
   (list (eval (read *query-io*))))
 
+;;; Same as above but returns multiple values
+(defun mv-read-evaluated-form (&optional (prompt-control nil promptp)
+                            &rest prompt-args)
+  (apply #'format *query-io*
+         (if promptp prompt-control "~&Type a form to be evaluated: ")
+         prompt-args)
+  (finish-output *query-io*)
+  (multiple-value-list (eval (read *query-io*))))
+
 (defun check-type-error (place place-value type &optional type-string)
   (let ((condition
          (make-condition

@@ -36,11 +36,50 @@
            (declare (optimize (sb!c::verify-arg-count 0)))
            ,@body)))) ; EVAL-WHEN
 
+;;; Backtrace code may want to know the error that caused
+;;; interruption, but there are other means to get code interrupted
+;;; and inspecting code around PC for the error number may yield wrong
+;;; results.
+(defvar *current-internal-error* nil)
+(defvar *current-internal-trap-number*)
+(defvar *current-internal-error-args*)
+(defvar *current-internal-error-context*)
+
 (deferr undefined-fun-error (fdefn-or-symbol)
-  (error 'undefined-function
-         :name (etypecase fdefn-or-symbol
-                 (symbol fdefn-or-symbol)
-                 (fdefn (fdefn-name fdefn-or-symbol)))))
+  (let ((name (etypecase fdefn-or-symbol
+                (symbol fdefn-or-symbol)
+                (fdefn (fdefn-name fdefn-or-symbol)))))
+    (cond #!+undefined-fun-restarts
+          ((= *current-internal-trap-number* sb!vm:cerror-trap)
+           (flet ((set-value (value)
+                    (sb!di::sub-set-debug-var-slot
+                     nil (car *current-internal-error-args*)
+                     value
+                     *current-internal-error-context*)))
+             (restart-case (error 'undefined-function :name name)
+               (continue ()
+                 :report (lambda (stream)
+                           (format stream "Retry calling ~s." name)))
+               (use-value (value)
+                 :report (lambda (stream)
+                           (format stream "Call specified function."))
+                 :interactive read-evaluated-form
+                 (set-value (%coerce-callable-to-fun value)))
+               (return-value (&rest values)
+                 :report (lambda (stream)
+                           (format stream "Return specified values."))
+                 :interactive mv-read-evaluated-form
+                 (set-value (lambda (&rest args)
+                              (declare (ignore args))
+                              (values-list values))))
+               (return-nothing ()
+                 :report (lambda (stream)
+                           (format stream "Return zero values."))
+                 (set-value (lambda (&rest args)
+                              (declare (ignore args))
+                              (values)))))))
+          (t
+           (error 'undefined-function :name name)))))
 
 #!+(or arm arm64 x86-64)
 (deferr undefined-alien-fun-error (address)
@@ -163,12 +202,6 @@
 
 ;;;; INTERNAL-ERROR signal handler
 
-;;; Backtrace code may want to know the error that caused
-;;; interruption, but there are other means to get code interrupted
-;;; and inspecting code around PC for the error number may yield wrong
-;;; results.
-(defvar *current-internal-error* nil)
-
 ;;; This is needed for restarting XEPs, which do not bind anything but
 ;;; also do not save their own BSP, and we need to discard the
 ;;; bindings made by the error handling machinery.
@@ -199,11 +232,14 @@
         #!+c-stack-is-control-stack
         (declare (truly-dynamic-extent *saved-fp-and-pcs*))
        (/show0 "about to bind ERROR-NUMBER and ARGUMENTS"))
-      (multiple-value-bind (error-number arguments)
+      (multiple-value-bind (error-number arguments
+                            *current-internal-trap-number*)
           (sb!vm:internal-error-args alien-context)
         (with-interrupt-bindings
           (let ((sb!debug:*stack-top-hint* (find-interrupted-frame))
                 (*current-internal-error* error-number)
+                (*current-internal-error-args* arguments)
+                (*current-internal-error-context* alien-context)
                 (fp (int-sap (sb!vm:context-register alien-context
                                                      sb!vm::cfp-offset))))
             (if (and (>= error-number (length **internal-error-handlers**))

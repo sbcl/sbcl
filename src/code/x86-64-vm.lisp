@@ -238,7 +238,8 @@
                 '(#.arg-count-sc))
         (let ((error-number (sap-ref-8 pc 1)))
           (values error-number
-                  (sb!kernel::decode-internal-error-args (sap+ pc 2) error-number))))))
+                  (sb!kernel::decode-internal-error-args (sap+ pc 2) error-number)
+                  trap-number)))))
 
 
 ;;; the current alien stack pointer; saved/restored for non-local exits
