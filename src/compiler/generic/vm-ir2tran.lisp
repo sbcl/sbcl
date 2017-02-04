@@ -71,11 +71,10 @@
 (defun emit-inits (node block name object lowtag inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil)
-        (lvar (node-lvar node)))
+        (dx-p (node-stack-allocate-p node)))
     (flet ((zero-init-p (x)
              ;; dynamic-space is already zeroed
-             (and (or (not lvar)
-                      (not (lvar-dynamic-extent lvar)))
+             (and (not dx-p)
                   ;; KLUDGE: can't ignore type-derived
                   ;; constants since they can be closed over
                   ;; and not using them confuses the register
@@ -332,8 +331,7 @@
 
   (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template &optional not-dx-template)
     (let* ((args (basic-combination-args call))
-           (template-name (if (awhen (node-lvar call)
-                                (lvar-dynamic-extent it))
+           (template-name (if (node-stack-allocate-p call)
                               dx-template
                               not-dx-template))
            (template (and template-name
