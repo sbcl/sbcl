@@ -129,7 +129,8 @@
                     (compute-live-vars live node block var-locs vop)))
          (anything-alive (and live
                               (find 1 live)))
-         (path (node-source-path node)))
+         (path (node-source-path node))
+         (loc (if (fixnump label) label (label-position label))))
     (vector-push-extend
      (logior
       (if context
@@ -147,9 +148,8 @@
       (position-or-lose kind +compiled-code-location-kinds+))
      byte-buffer)
 
-    (let ((loc (if (fixnump label) label (label-position label))))
-      (write-var-integer (- loc *previous-location*) byte-buffer)
-      (setq *previous-location* loc))
+    (write-var-integer (- loc *previous-location*) byte-buffer)
+    (setq *previous-location* loc)
 
     (unless (zerop (source-path-form-number path))
       (write-var-integer (source-path-form-number path) byte-buffer))
@@ -159,6 +159,8 @@
     (when stepping
       (write-var-string stepping byte-buffer))
     (when context
+      (when (label-p context)
+        (setf context (- (label-position context) loc)))
       (write-var-integer (or (position context *contexts* :test #'equal)
                              (vector-push-extend context *contexts*))
                          byte-buffer)))

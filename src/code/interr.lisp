@@ -48,36 +48,63 @@
 (deferr undefined-fun-error (fdefn-or-symbol)
   (let ((name (etypecase fdefn-or-symbol
                 (symbol fdefn-or-symbol)
-                (fdefn (fdefn-name fdefn-or-symbol)))))
+                (fdefn (fdefn-name fdefn-or-symbol))))
+        #!+undefined-fun-restarts
+        context)
     (cond #!+undefined-fun-restarts
-          ((= *current-internal-trap-number* sb!vm:cerror-trap)
+          ((or (= *current-internal-trap-number* sb!vm:cerror-trap)
+               (integerp (setf context (sb!di:error-context))))
            (flet ((set-value (value)
-                    (sb!di::sub-set-debug-var-slot
-                     nil (car *current-internal-error-args*)
-                     value
-                     *current-internal-error-context*)))
-             (restart-case (error 'undefined-function :name name)
-               (continue ()
-                 :report (lambda (stream)
-                           (format stream "Retry calling ~s." name)))
-               (use-value (value)
-                 :report (lambda (stream)
-                           (format stream "Call specified function."))
-                 :interactive read-evaluated-form
-                 (set-value (%coerce-callable-to-fun value)))
-               (return-value (&rest values)
-                 :report (lambda (stream)
-                           (format stream "Return specified values."))
-                 :interactive mv-read-evaluated-form
-                 (set-value (lambda (&rest args)
-                              (declare (ignore args))
-                              (values-list values))))
-               (return-nothing ()
-                 :report (lambda (stream)
-                           (format stream "Return zero values."))
-                 (set-value (lambda (&rest args)
-                              (declare (ignore args))
-                              (values)))))))
+                    (let ((fdefn (make-dummy-fdefn)))
+                      (setf (fdefn-fun fdefn) value)
+                      (sb!di::sub-set-debug-var-slot
+                       nil (car *current-internal-error-args*)
+                       fdefn
+                       *current-internal-error-context*))))
+             (cond (context
+                    ;; The #'abc case from SAFE-FDEFN-FUN, CONTEXT
+                    ;; specifies the offset from the error location
+                    ;; where it can retry checking the FDEFN
+                    ;; NOTE:
+                    ;; This overwrites the original FDEFN register
+                    ;; but is unlikely to cause any problems since
+                    ;; FDEFNs are usually loaded by SAFE-FDEFN-FUN
+                    ;; from constants. And it's not overwriting the
+                    ;; FDEFN with some garbage but with another FDEFN.
+                    (restart-case (error 'undefined-function :name name)
+                      (continue ()
+                        :report (lambda (stream)
+                                  (format stream "Retry using ~s." name)))
+                      (use-value (value)
+                        :report (lambda (stream)
+                                  (format stream "Use specified function."))
+                        :interactive read-evaluated-form
+                        (set-value (%coerce-callable-to-fun value))))
+                    (sb!vm::incf-context-pc *current-internal-error-context*
+                                            context))
+                   (t
+                    (restart-case (error 'undefined-function :name name)
+                      (continue ()
+                        :report (lambda (stream)
+                                  (format stream "Retry calling ~s." name)))
+                      (use-value (value)
+                        :report (lambda (stream)
+                                  (format stream "Call specified function."))
+                        :interactive read-evaluated-form
+                        (set-value (%coerce-callable-to-fun value)))
+                      (return-value (&rest values)
+                        :report (lambda (stream)
+                                  (format stream "Return specified values."))
+                        :interactive mv-read-evaluated-form
+                        (set-value (lambda (&rest args)
+                                     (declare (ignore args))
+                                     (values-list values))))
+                      (return-nothing ()
+                        :report (lambda (stream)
+                                  (format stream "Return zero values."))
+                        (set-value (lambda (&rest args)
+                                     (declare (ignore args))
+                                     (values)))))))))
           (t
            (error 'undefined-function :name name)))))
 
