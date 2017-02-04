@@ -1259,11 +1259,14 @@ register."
     (cadr (svref sb!c:+backend-internal-errors+
                  sb!kernel::*current-internal-error*))))
 
-(defun tl-invalid-arg-count-error-p (frame)
-  (and (eq (interrupted-frame-error frame)
-           'invalid-arg-count-error)
-       (eq (debug-fun-kind (frame-debug-fun frame))
-           :external)))
+(defun all-args-available-p (frame)
+  (let ((error (interrupted-frame-error frame))
+        (df (frame-debug-fun frame)))
+    (or #!+precise-arg-count-error
+        (and (eq error 'invalid-arg-count-error)
+             (eq (debug-fun-kind df) :external))
+        (and (eq error 'undefined-fun-error)
+             (bogus-debug-fun-p df)))))
 
 ;; Return the name of the closure, if named, otherwise nil.
 (defun debug-fun-closure-name (debug-fun frame)
@@ -1283,14 +1286,11 @@ register."
                   (%fun-name val))))))) ; Get its name
        ((sb!c::compiled-debug-fun-closure-save compiler-debug-fun)
         (sb!impl::closure-name
-         #!+precise-arg-count-error
-         (if (tl-invalid-arg-count-error-p frame)
+         (if (all-args-available-p frame)
              (sub-access-debug-var-slot (frame-pointer frame)
                                         sb!c:closure-sc
                                         (compiled-frame-escaped frame))
-             (sub-access-debug-var-slot (frame-pointer frame) it))
-         #!-precise-arg-count-error
-         (sub-access-debug-var-slot (frame-pointer frame) it))))))
+             (sub-access-debug-var-slot (frame-pointer frame) it)))))))
 
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
 (defun fun-debug-fun (fun)

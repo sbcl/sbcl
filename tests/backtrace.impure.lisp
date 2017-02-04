@@ -191,7 +191,7 @@
                     :fails-on '(or :sparc))
     (assert-backtrace
      (lambda () (test #'optimized))
-     (list *undefined-function-frame*
+     (list (append *undefined-function-frame* '(42))
            (list `(flet test :in ,*p*) #'optimized))))
 
   ;; bug 353: This test fails at least most of the time for x86/linux
@@ -200,7 +200,7 @@
               :skipped-on :interpreter)
     (assert-backtrace
      (lambda () (test #'not-optimized))
-     (list *undefined-function-frame*
+     (list (append *undefined-function-frame* '(42))
            (list `(flet not-optimized :in ,*p*))
            (list `(flet test :in ,*p*) #'not-optimized)))))
 

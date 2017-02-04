@@ -502,11 +502,11 @@ thread, NIL otherwise."
     (dolist (element (sb!di:debug-fun-lambda-list debug-fun))
       (funcall thunk element))))
 
-;;; Since arg-count checking happens before any of the stack locations
-;;; and registers are overwritten all the arguments, including the
-;;; extra ones, can be precisely recovered.
-#!+precise-arg-count-error
-(defun arg-count-error-frame-nth-arg (n frame)
+;;; When the frame is interrupted before any of the function code is called
+;;; we can recover all the arguments, include the extra ones.
+;;; This includes the ARG-COUNT-ERROR on #+precise-arg-count-error and
+;;; UNDEFINED-FUNCTION coming from undefined-tramp
+(defun early-frame-nth-arg (n frame)
   (let* ((escaped (sb!di::compiled-frame-escaped frame))
          (pointer (sb!di::frame-pointer frame))
          (arg-count (sb!di::sub-access-debug-var-slot
@@ -519,8 +519,7 @@ thread, NIL otherwise."
          escaped)
         (error "Index ~a out of bounds for ~a supplied argument~:p." n arg-count))))
 
-#!+precise-arg-count-error
-(defun arg-count-error-frame-args (frame)
+(defun early-frame-args (frame)
   (let* ((escaped (sb!di::compiled-frame-escaped frame))
          (pointer (sb!di::frame-pointer frame))
          (arg-count (sb!di::sub-access-debug-var-slot
@@ -532,10 +531,9 @@ thread, NIL otherwise."
                    escaped))))
 
 (defun frame-args-as-list (frame)
-  #!+precise-arg-count-error
-  (when (sb!di::tl-invalid-arg-count-error-p frame)
+  (when (sb!di::all-args-available-p frame)
     (return-from frame-args-as-list
-      (arg-count-error-frame-args frame)))
+      (early-frame-args frame)))
   (handler-case
       (let ((location (sb!di:frame-code-location frame))
             (reversed-result nil))
@@ -585,7 +583,7 @@ thread, NIL otherwise."
               (let* ((count (first args))
                      (real-args (rest args)))
                 (if (and (integerp count)
-                         (sb!di::tl-invalid-arg-count-error-p frame))
+                         (sb!di::all-args-available-p frame))
                     ;; So, this is a cheap trick -- but makes backtraces for
                     ;; too-many-arguments-errors much, much easier to to
                     ;; understand.
@@ -599,8 +597,8 @@ thread, NIL otherwise."
           ;; Clip arg-count.
           #!+precise-arg-count-error
           (if (and (consp args)
-                   ;; ARG-COUNT-ERROR-FRAME-ARGS doesn't include arg-count
-                   (not (sb!di::tl-invalid-arg-count-error-p frame)))
+                   ;; EARLY-FRAME-ARGS doesn't include arg-count
+                   (not (sb!di::all-args-available-p frame)))
               (rest args)
               args)
           info))
@@ -1256,7 +1254,7 @@ forms that explicitly control this kind of evaluation.")
   ;; arg count errors are checked before anything is set up but they
   ;; are reporeted in *elsewhere*, which is after start-pc saved in the
   ;; debug function, defeating the checks.
-  (and (not (sb!di::tl-invalid-arg-count-error-p frame))
+  (and (not (sb!di::all-args-available-p frame))
        (eq (sb!di:debug-var-validity var location) :valid)))
 
 (eval-when (:execute :compile-toplevel)
@@ -1407,10 +1405,9 @@ forms that explicitly control this kind of evaluation.")
   "Return the N'th argument's value if possible. Argument zero is the first
    argument in a frame's default printed representation. Count keyword/value
    pairs as separate arguments."
-  #!+precise-arg-count-error
-  (when (sb!di::tl-invalid-arg-count-error-p *current-frame*)
+  (when (sb!di::all-args-available-p *current-frame*)
     (return-from arg
-      (arg-count-error-frame-nth-arg n *current-frame*)))
+      (early-frame-nth-arg n *current-frame*)))
   (multiple-value-bind (var lambda-var-p)
       (nth-arg n (handler-case (sb!di:debug-fun-lambda-list
                                 (sb!di:frame-debug-fun *current-frame*))
