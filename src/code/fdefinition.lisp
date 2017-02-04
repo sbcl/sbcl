@@ -114,21 +114,38 @@
 ;;; but as we've defined FDEFINITION, that strips encapsulations.
 (defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn)
                                     strictly-functionp)
-  `(let* ((name ,name) (fdefn (,lookup-fn name)))
-     (block nil
-       (when fdefn
-         (let ((f (sb!c:safe-fdefn-fun (truly-the fdefn fdefn))))
-           ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
-           ;; trampoline. This extra check ensures that full calls such as
-           ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
-           ;; This accords with the non-requirement that macros store strictly
-           ;; a function in the symbol that names them. In many implementations,
-           ;; (FUNCTIONP (SYMBOL-FUNCTION 'OR)) => NIL. We want to pretend that.
-           (,@(if strictly-functionp
-                  '(unless (macro/special-guard-fun-p f))
-                  '(progn))
-             (return f))))
-       (error 'undefined-function :name name))))
+  `(block nil
+     (let ((name ,name))
+       (tagbody retry
+          (let ((fdefn (,lookup-fn name)))
+            (when fdefn
+              (let ((f (fdefn-fun  (truly-the fdefn fdefn))))
+                ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
+                ;; trampoline. This extra check ensures that full calls such as
+                ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
+                ;; This accords with the non-requirement that macros store strictly
+                ;; a function in the symbol that names them. In many implementations,
+                ;; (FUNCTIONP (SYMBOL-FUNCTION 'OR)) => NIL. We want to pretend that.
+                (when f
+                  (,@(if strictly-functionp
+                         '(unless (macro/special-guard-fun-p f))
+                         '(progn))
+                   (return f)))))
+            (restart-case (error 'undefined-function :name name)
+              (continue ()
+                :report (lambda (stream)
+                          (format stream "Retry using ~s." name)))
+              (use-value (value)
+                :report (lambda (stream)
+                          (format stream "Use specified function"))
+                :interactive read-evaluated-form
+                (when (functionp value)
+                  (return value))
+                (setf name (the ,(if (eq lookup-fn 'symbol-fdefn)
+                                     'symbol
+                                     t)
+                                value))))
+            (go retry))))))
 
 ;; Return T if FUNCTION is the error-signaling trampoline
 ;; for a macro or a special operator. Test for this by seeing
