@@ -1616,6 +1616,21 @@
       (flet ((%f () (multiple-value-prog1 0 (return-from %f 0))))
         (complex (%f) 0)))))))
 
+(with-test (:name (:misc.293 :harder))
+  ;; Similar to the above case, but can blow up in stack analysis if
+  ;; the two blocks in the M-V-P1 are joined (due to both (FUNCALL Y)
+  ;; forms producing multiple-value results into the same LVAR,
+  ;; requiring a cleanup to be inserted between the two, yet not
+  ;; possible due to the lack of a block boundary).
+  (compile nil
+           '(lambda (x)
+             (declare (notinline complex))
+             (declare (optimize (speed 1) (space 0) (safety 1)
+                       (debug 3) (compilation-speed 3)))
+             (flet ((%f (y) (multiple-value-prog1 (funcall y)
+                              (return-from %f (funcall y)))))
+               (complex (%f x) 0)))))
+
 ;;; MISC.110A: CAST optimizer forgot to flush LVAR derived type
 (assert (zerop (funcall
   (compile

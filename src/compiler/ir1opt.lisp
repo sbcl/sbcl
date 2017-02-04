@@ -498,8 +498,15 @@
                        (or
                         ;; ... and a DX-allocator to end a block.
                         (lvar-dynamic-extent it)
-                        ;; FIXME: This is a partial workaround for bug 303.
-                        (consp (lvar-uses it)))))))
+                        ;; ... and for there to be no chance of there
+                        ;; being two successive USEs of the same
+                        ;; multi-valued LVAR in the same block (since
+                        ;; we can only insert cleanup code at block
+                        ;; boundaries, but need to discard
+                        ;; multi-valued LVAR contents before they are
+                        ;; overwritten).
+                        (and (consp (lvar-uses it))
+                             (not (lvar-single-value-p it))))))))
              nil)
             (t
              (join-blocks block next)
