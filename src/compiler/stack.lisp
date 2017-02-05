@@ -174,9 +174,6 @@
                              ;; Since DX generators end their blocks, we can
                              ;; find out UVLs allocated before them by looking
                              ;; at the stack at the end of the block.
-                             ;;
-                             ;; FIXME: This is not quite true: REFs to DX
-                             ;; closures don't end their blocks!
                              (setq new-end (merge-uvl-live-sets
                                             new-end (ir2-block-end-stack 2block)))
                              (setq new-end (merge-uvl-live-sets
@@ -409,12 +406,12 @@
                                              `(progn ,@(cleanup-code))))
                  (2block (make-ir2-block block)))
             (setf (block-info block) 2block)
+            (add-to-emit-order 2block (block-info block1))
+            (ltn-analyze-belated-block block)
             ;; Set the start and end stacks to make traces less
             ;; confusing.  Purely cosmetic.
             (setf (ir2-block-start-stack 2block) end-stack)
-            (setf (ir2-block-end-stack 2block) start-stack)
-            (add-to-emit-order 2block (block-info block1))
-            (ltn-analyze-belated-block block))))))
+            (setf (ir2-block-end-stack 2block) start-stack))))))
 
   (values))
 
@@ -450,23 +447,23 @@
                                           (component-dx-lvars component))))
 
     (dolist (block generators)
-      (find-pushed-lvars block))
+      (find-pushed-lvars block)))
 
-    ;;; Compute sets of live UVLs and DX LVARs
-    (loop for did-something = nil
-          do (do-blocks-backwards (block component)
-               (when (update-uvl-live-sets block)
-                 (setq did-something t)))
-          while did-something)
+  ;; Compute sets of live UVLs and DX LVARs
+  (loop for did-something = nil
+     do (do-blocks-backwards (block component)
+          (when (update-uvl-live-sets block)
+            (setq did-something t)))
+     while did-something)
 
-    (order-uvl-sets component)
+  (order-uvl-sets component)
 
-    (do-blocks (block component)
-      (let ((top (ir2-block-end-stack (block-info block))))
-        (dolist (succ (block-succ block))
-          (when (and (block-start succ)
-                     (not (eq (ir2-block-start-stack (block-info succ))
-                              top)))
-            (insert-stack-cleanups block succ))))))
+  (do-blocks (block component)
+    (let ((top (ir2-block-end-stack (block-info block))))
+      (dolist (succ (block-succ block))
+        (when (and (block-start succ)
+                   (not (eq (ir2-block-start-stack (block-info succ))
+                            top)))
+          (insert-stack-cleanups block succ)))))
 
   (values))

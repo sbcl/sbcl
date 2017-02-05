@@ -591,7 +591,10 @@ necessary, since type inference may take arbitrarily long to converge.")
     (when (or (ir2-component-values-receivers (component-info component))
               (component-dx-lvars component))
       (maybe-mumble "stack ")
-      (find-dominators component)
+      ;; STACK only uses dominance information for DX LVAR back
+      ;; propagation (see BACK-PROPAGATE-ONE-DX-LVAR).
+      (when (component-dx-lvars component)
+        (find-dominators component))
       (stack-analyze component)
       ;; Assign BLOCK-NUMBER for any cleanup blocks introduced by
       ;; stack analysis. There shouldn't be any unreachable code after
