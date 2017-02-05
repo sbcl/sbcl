@@ -547,7 +547,7 @@
                                      dx)))))))
 
 ;;; Bound to NIL in RECHECK-DYNAMIC-EXTENT-LVARS, so that the
-;;; combinations that didn't get converted are treated as dx-safe.
+;;; combinations that didn't get converted are not treated as dx-safe.
 (defvar *dx-combination-p-check-local* t)
 
 (defun dx-combination-p (use dx)
