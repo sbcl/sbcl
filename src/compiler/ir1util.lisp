@@ -540,11 +540,8 @@
          (or (awhen (fun-info-stack-allocate-result info)
                (funcall it use dx))
              (awhen (fun-info-result-arg info)
-               (let ((args (combination-args use)))
-                 (lvar-good-for-dx-p (if (zerop it)
-                                         (car args)
-                                         (nth it args))
-                                     dx)))))))
+               (lvar-good-for-dx-p (nth it (combination-args use))
+                                   dx))))))
 
 ;;; Bound to NIL in RECHECK-DYNAMIC-EXTENT-LVARS, so that the
 ;;; combinations that didn't get converted are not treated as dx-safe.
