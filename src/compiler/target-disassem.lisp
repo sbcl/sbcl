@@ -1241,20 +1241,6 @@
                                 debug-var-num))
                          ))))))))
 
-;;; Return a new vector which has the same contents as the old one
-;;; VEC, plus new cells (for a total size of NEW-LEN). The additional
-;;; elements are initialized to INITIAL-ELEMENT.
-(defun grow-vector (vec new-len &optional initial-element)
-  (declare (type vector vec)
-           (type fixnum new-len))
-  (let ((new
-         (make-sequence `(vector ,(array-element-type vec) ,new-len)
-                        new-len
-                        :initial-element initial-element)))
-    (dotimes (i (length vec))
-      (setf (aref new i) (aref vec i)))
-    new))
-
 ;;; Return a STORAGE-INFO struction describing the object-to-source
 ;;; variable mappings from DEBUG-FUN.
 (defun storage-info-for-debug-fun (debug-fun)
@@ -1289,13 +1275,9 @@
                           (length (length locations))
                           (offset (sb!c:sc-offset-offset sc-offset)))
                      (when (>= offset length)
-                       (setf locations
-                             (grow-vector locations
-                                          (max (* 2 length)
-                                               (1+ offset))
-                                          nil)
-                             (location-group-locations group)
-                             locations))
+                       (setf locations (adjust-array locations
+                                                     (max (* 2 length) (1+ offset)))
+                             (location-group-locations group) locations))
                      (let ((already-there (aref locations offset)))
                        (cond ((null already-there)
                               (setf (aref locations offset) debug-var-offset))
