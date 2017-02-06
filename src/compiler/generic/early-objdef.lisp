@@ -217,65 +217,53 @@
   #!-64-bit
   unused09-widetag                          ;  7E       7E
 
-  #!-64-bit
-  unused10-widetag                          ;  82       82
-  #!-64-bit
-  unused11-widetag                          ;  86       86
-
-  simple-array-widetag                      ;  8A   81  8A   81
-  simple-array-unsigned-byte-2-widetag      ;  8E   85  8E   85
-  simple-array-unsigned-byte-4-widetag      ;  92   89  92   89
-  simple-array-unsigned-byte-7-widetag      ;  96   8D  96   8D
-  simple-array-unsigned-byte-8-widetag      ;  9A   91  9A   91
-  simple-array-unsigned-byte-15-widetag     ;  9E   95  9E   95
-  simple-array-unsigned-byte-16-widetag     ;  A2   99  A2   99
+  simple-array-widetag                      ;  82   81  82   81
+  simple-array-unsigned-byte-2-widetag      ;  86   85  86   85
+  simple-array-unsigned-byte-4-widetag      ;  8A   89  8A   89
+  simple-array-unsigned-byte-7-widetag      ;  8E   8D  8E   8D
+  simple-array-unsigned-byte-8-widetag      ;  92   91  92   91
+  simple-array-unsigned-byte-15-widetag     ;  96   95  96   95
+  simple-array-unsigned-byte-16-widetag     ;  9A   99  9A   99
 
   #!-64-bit
-  simple-array-unsigned-fixnum-widetag      ;  A6   A5  A6   A5
-  simple-array-unsigned-byte-31-widetag     ;  AA   9D  AA   9D
-  simple-array-unsigned-byte-32-widetag     ;  AE   A1  AE   A1
+  simple-array-unsigned-fixnum-widetag      ;  9E   A5  9E   A5
+  simple-array-unsigned-byte-31-widetag     ;  A2   9D  A2   9D
+  simple-array-unsigned-byte-32-widetag     ;  A6   A1  A6   A1
   #!+64-bit
-  simple-array-unsigned-fixnum-widetag      ;  A6   A5  A6   A5
+  simple-array-unsigned-fixnum-widetag      ;  9E   A5  9E   A5
   #!+64-bit
   simple-array-unsigned-byte-63-widetag     ;       A9       A9
   #!+64-bit
   simple-array-unsigned-byte-64-widetag     ;       AD       AD
-  simple-array-signed-byte-8-widetag        ;  B2   B1  B2   B1
-  simple-array-signed-byte-16-widetag       ;  B6   B5  B6   B5
+  simple-array-signed-byte-8-widetag        ;  AA   B1  AA   B1
+  simple-array-signed-byte-16-widetag       ;  AE   B5  AE   B5
   #!-64-bit
-  simple-array-fixnum-widetag               ;  BA   BD  BA   BD
-  simple-array-signed-byte-32-widetag       ;  BE   B9  BE   B9
+  simple-array-fixnum-widetag               ;  B2   BD  B2   BD
+  simple-array-signed-byte-32-widetag       ;  B6   B9  B6   B9
   #!+64-bit
-  simple-array-fixnum-widetag               ;  BA   BD  BA   BD
+  simple-array-fixnum-widetag               ;  B2   BD  B2   BD
   #!+64-bit
   simple-array-signed-byte-64-widetag       ;       C1       C1
-  simple-array-single-float-widetag         ;  C2   C5  C2   C5
-  simple-array-double-float-widetag         ;  C6   C9  C6   C9
-  simple-array-complex-single-float-widetag ;  CA   CD  CA   CD
-  simple-array-complex-double-float-widetag ;  CE   D1  CE   D1
-  simple-bit-vector-widetag                 ;  D2   D5  D2   D5
-  simple-vector-widetag                     ;  D6   D9  D6   D9
+  simple-array-single-float-widetag         ;  BA   C5  BA   C5
+  simple-array-double-float-widetag         ;  BE   C9  BE   C9
+  simple-array-complex-single-float-widetag ;  C2   CD  C2   CD
+  simple-array-complex-double-float-widetag ;  C6   D1  C6   D1
+  simple-bit-vector-widetag                 ;  CA   D5  CA   D5
+  simple-vector-widetag                     ;  CE   D9  CE   D9
 
   ;; Strings
-  simple-array-nil-widetag                  ;  DA   DD  DA   DD
-  simple-base-string-widetag                ;  DE   E1  DE   E1
+  simple-array-nil-widetag                  ;  D2   DD  D2   DD
+  simple-base-string-widetag                ;  D6   E1  D6   E1
   #!+sb-unicode
-  simple-character-string-widetag           ;  E2   E5
+  simple-character-string-widetag           ;  DA   E5
   #!+sb-unicode
-  complex-character-string-widetag          ;  E6   E9
-  complex-base-string-widetag               ;  EA   ED  E2   E5
-  complex-vector-nil-widetag                ;  EE   F1  E6   E9
+  complex-character-string-widetag          ;  DE   E9
+  complex-base-string-widetag               ;  E2   ED  DA   E5
+  complex-vector-nil-widetag                ;  E6   F1  DE   E9
 
-  complex-bit-vector-widetag                ;  F2   F5  EA   ED
-  complex-vector-widetag                    ;  F6   F9  EE   F1
-  complex-array-widetag                     ;  FA   FD  F2   F5
-
-  #!-64-bit
-  unused12-widetag                          ;  FE       F6
-  #!+(and (not 64-bit) (not sb-unicode))
-  unused13-widetag                          ;           FA
-  #!+(and (not 64-bit) (not sb-unicode))
-  unused14-widetag                          ;           FE
+  complex-bit-vector-widetag                ;  EA   F5  E2   ED
+  complex-vector-widetag                    ;  EE   F9  E6   F1
+  complex-array-widetag                     ;  F2   FD  EA   F5
 )
 
 ;;; the different vector subtypes
