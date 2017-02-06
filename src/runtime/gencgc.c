@@ -3180,7 +3180,6 @@ verify_space(lispobj *start, size_t words)
 #endif
                 case UNBOUND_MARKER_WIDETAG:
                 case FDEFN_WIDETAG:
-                    count = 1;
                     break;
 
                 case INSTANCE_HEADER_WIDETAG:
@@ -3191,8 +3190,6 @@ verify_space(lispobj *start, size_t words)
                         sword_t nslots = instance_length(thing) | 1;
                         instance_scan(verify_space, start+1, nslots, bitmap);
                         count = 1 + nslots;
-                    } else {
-                        count = 1;
                     }
                     break;
                 case CODE_HEADER_WIDETAG:
