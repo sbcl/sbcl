@@ -337,6 +337,10 @@
   (define-alien-variable "heap_base" (* t))
   (define-alien-variable "page_table" (* (struct page))))
 
+(declaim (inline code-header-words))
+(defun code-header-words (code)
+  (logand (get-header-data code) short-header-max-words))
+
 ;;; Iterate over all the objects allocated in each of the SPACES, calling FUN
 ;;; with the object, the object's type code, and the object's total size in
 ;;; bytes, including any header and padding. As a special case, if exactly one
@@ -373,11 +377,12 @@
 
       #!+immobile-space
       (:immobile
-       ;; Filter out filler objects (code with no functions in it),
-       ;; and apparent cons cells, since there can't be any.
+       ;; Filter out filler objects. These either look like cons cells
+       ;; in fixedobj subspace, or code without enough header words
+       ;; in varyobj subspace. (cf 'immobile_filler_p' in gc-internal.h)
        (dx-flet ((filter (obj type size)
                    (unless (or (and (code-component-p obj)
-                                    (eql (code-n-entries obj) 0))
+                                    (eql (code-header-words obj) 2))
                                (consp obj))
                      (funcall fun obj type size))))
          (let ((start immobile-space-start)
@@ -786,10 +791,6 @@
              (setf sp
                    #!+stack-grows-downward-not-upward (sap+ sp n-word-bytes)
                    #!-stack-grows-downward-not-upward (sap+ sp (- n-word-bytes))))))
-
-(declaim (inline code-header-words))
-(defun code-header-words (code)
-  (logand (get-header-data code) short-header-max-words))
 
 ;;; This interface allows one either to be agnostic of the referencing space,
 ;;; or specify exactly one space, but not specify a list of spaces.

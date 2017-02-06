@@ -1408,9 +1408,10 @@ search_immobile_space(void *pointer)
             } else {
                 start = (lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START;
             }
-            return (gc_search_space(start,
-                                    (((lispobj*)pointer)+2)-start,
-                                    (lispobj*)pointer));
+            lispobj* found = gc_search_space(start,
+                                             (((lispobj*)pointer)+2)-start,
+                                             (lispobj*)pointer);
+            return immobile_filler_p(found) ? 0 : found;
         } else if ((lispobj)pointer < SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value) {
             char *page_base = (char*)((lispobj)pointer & ~(IMMOBILE_CARD_BYTES-1));
             if (page_attributes_valid) {
@@ -1533,7 +1534,7 @@ static struct {
 
 // Given an adddress in the target core, return the equivalent
 // physical address to read or write during defragmentation
-static void* tempspace_addr(void* address)
+static lispobj* tempspace_addr(void* address)
 {
     int byte_index = (char*)address - (char*)IMMOBILE_VARYOBJ_SUBSPACE_START;
     gc_assert(immobile_space_p((lispobj)address));
@@ -1947,8 +1948,7 @@ void defrag_immobile_space(int* components)
                                                offsetof(struct simple_fun, code));
                 lispobj* new_fun = get_load_address(old_fun);
                 gc_assert(new_fun);  // must have been forwarded
-                gc_assert(widetag_of(*(lispobj*)tempspace_addr(new_fun))
-                          == SIMPLE_FUN_HEADER_WIDETAG);
+                gc_assert(widetag_of(*tempspace_addr(new_fun)) == SIMPLE_FUN_HEADER_WIDETAG);
                 target_adjust = (int)((char*)new_fun - (char*)old_fun);
             }
             // If the instruction to fix has moved, then adjust for
@@ -2089,8 +2089,7 @@ void fixup_immobile_refs(struct code* code)
                 fixup_val = new_symbol - OTHER_POINTER_LOWTAG
                   + offsetof(struct symbol,value);
             }
-            gc_assert(widetag_of(*(lispobj*)tempspace_addr(symbol))
-                      == SYMBOL_HEADER_WIDETAG);
+            gc_assert(widetag_of(*tempspace_addr(symbol)) == SYMBOL_HEADER_WIDETAG);
             if (fixup_val) *fixup_where = fixup_val;
         }
     }
