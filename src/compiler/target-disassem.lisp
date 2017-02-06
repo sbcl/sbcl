@@ -1479,7 +1479,7 @@
            (type offset start-offset)
            (type disassem-length length))
   (let ((segments nil))
-    (when (%code-debug-info code)
+    (when (sb!c::compiled-debug-info-p (%code-debug-info code))
       (let ((fun-map (code-fun-map code))
             (sfcache (make-source-form-cache)))
         (let ((last-offset 0)
