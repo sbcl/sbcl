@@ -48,7 +48,6 @@
   (inst jmp unroll)
 
   (inst shr count n-fixnum-tag-bits)
-  (inst cld)
   (inst rep)
   (inst stos item)
   DONE

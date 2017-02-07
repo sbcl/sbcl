@@ -290,8 +290,6 @@
   (:vop-var vop)
   (:save-p t)
   (:generator 0
-    ;; ABI: Direction flag must be clear on function entry. -- JES, 2006-01-20
-    (inst cld)
     #!+sb-safepoint
     (progn
       ;; Current PC - don't rely on function to keep it in a form that

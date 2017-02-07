@@ -344,6 +344,7 @@
              (no-stack-args (gen-label))
              (default-stack-vals (gen-label))
              (count-okay (gen-label)))
+         (inst std)
          (note-this-location vop :unknown-return)
          ;; Branch off to the MV case.
          (inst jmp :c regs-defaulted)
@@ -362,7 +363,6 @@
          ;; Load RAX with NIL so we can quickly store it, and set up
          ;; stuff for the loop.
          (inst mov rax-tn nil-value)
-         (inst std)
          (inst mov rcx-tn (- nvals register-arg-count))
          ;; Jump into the default loop.
          (inst jmp default-stack-vals)
@@ -394,7 +394,6 @@
                                (+ sp->fp-offset register-arg-count))))
          ;; Do the copy.
          (inst shr rcx-tn n-fixnum-tag-bits)   ; make word count
-         (inst std)
          (inst rep)
          (inst movs :qword)
          ;; Restore RSI.

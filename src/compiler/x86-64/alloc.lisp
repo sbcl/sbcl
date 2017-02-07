@@ -177,7 +177,6 @@
                    (move rcx words)
                    (inst shr rcx n-fixnum-tag-bits)))
             (inst lea rdi data-addr)
-            (inst cld)
             (zeroize rax)
             (inst rep)
             (inst stos rax)))))))
