@@ -38,6 +38,7 @@
 
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
+#include <time.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
