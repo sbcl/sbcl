@@ -3396,8 +3396,17 @@ register."
 (defun handle-single-step-around-trap (context callee-register-offset)
   ;; Fetch the function / fdefn we're about to call from the
   ;; appropriate register.
-  (let* ((callee (make-lisp-obj
-                  (context-register context callee-register-offset)))
+  (let* ((callee
+          (cond #!+immobile-space
+                ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
+                 ;; FIXME: this ought to go in {target}-vm.lisp as
+                 ;; something like GET-FDEFN-FOR-SINGLE-STEP
+                 (let ((jmp-target (sap-ref-32 (context-pc context) 1)))
+                   (make-lisp-obj
+                    (+ jmp-target (- (ash word-shift fdefn-raw-addr-slot))
+                       other-pointer-lowtag))))
+                (t (make-lisp-obj
+                    (context-register context callee-register-offset)))))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.
@@ -3449,8 +3458,19 @@ register."
         ;; won't keep NEW-CALLEE pinned down. Once it's inside
         ;; CONTEXT, which is registered in thread->interrupt_contexts,
         ;; it will properly point to NEW-CALLEE.
-        (setf (context-register context callee-register-offset)
-              (get-lisp-obj-address new-callee))))))
+        #!+immobile-code
+        (cond
+         ((fdefn-p callee) ; as above, should be in {target}-vm.lisp
+          ;; Don't store the FDEFN in RAX, but the address of the raw_addr slot.
+          (setf (context-register context callee-register-offset)
+                (+ (get-lisp-obj-address new-callee)
+                   (- other-pointer-lowtag)
+                   (ash word-shift fdefn-raw-addr-slot)))
+          ;; And skip over the MOV EAX, imm instruction.
+          (sb!vm::incf-context-pc context 5))
+         (t
+          (setf (context-register context callee-register-offset)
+                (get-lisp-obj-address new-callee))))))))
 
 ;;; Given a signal context, fetch the step-info that's been stored in
 ;;; the debug info at the trap point.

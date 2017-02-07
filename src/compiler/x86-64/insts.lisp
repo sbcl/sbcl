@@ -154,10 +154,32 @@
                (declare (ignore junk))
                (dstate-put-inst-prop dstate +operand-size-16+)))
 
+#-sb-xc-host
+(defun maybe-note-lisp-callee (value dstate)
+  ;; Look for either an FDEFN or simple-fun entry at the specified value.
+  (binding* ((code (seg-code (dstate-segment dstate)) :exit-if-null)
+             (putative-fdefn
+              (+ value
+                 (- (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift))
+                 sb!vm:other-pointer-lowtag)))
+    ;; Taking a safe approach, scan code header for matching fdefn
+    ;; rather than assuming this is one.
+    (loop for i from sb!vm:code-constants-offset
+          below (code-header-words code)
+          for const = (code-header-ref code i)
+          when (and (typep const 'fdefn)
+                    (= putative-fdefn (get-lisp-obj-address const)))
+          do (return (note (lambda (stream) (princ const stream))
+                           dstate)))))
+
 (define-arg-type displacement
   :sign-extend t
   :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
   :printer (lambda (value stream dstate)
+             #!+immobile-space
+             (when (typep value `(integer ,sb!vm:immobile-space-start
+                                          (,sb!vm:immobile-space-end)))
+               (maybe-note-lisp-callee value dstate))
              (maybe-note-assembler-routine value nil dstate)
              (print-label value stream dstate)))
 
@@ -1524,8 +1546,8 @@
                            (emit-qword segment src))))
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
-                                '(:static-call :foreign :assembly-routine
-                                  :immobile-object)))
+                                '(:named-call :static-call :assembly-routine
+                                  :immobile-object :foreign)))
                    (maybe-emit-rex-prefix segment :dword nil nil dst)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
@@ -2334,7 +2356,7 @@
 ;;;; control transfer
 
 (define-instruction call (segment where)
-  (:printer near-jump ((op #b11101000)))
+  (:printer near-jump ((op #xE8)))
   (:printer reg/mem-default-qword ((op '(#b11111111 #b010))))
   (:emitter
    (typecase where
@@ -2355,7 +2377,7 @@
   (:printer near-cond-jump () '('j cc :tab label))
   ;; unconditional jumps
   (:printer short-jump ((op #b1011)))
-  (:printer near-jump ((op #b11101001)))
+  (:printer near-jump ((op #xE9)))
   (:printer reg/mem-default-qword ((op '(#b11111111 #b100))))
   (:emitter
    (cond (where

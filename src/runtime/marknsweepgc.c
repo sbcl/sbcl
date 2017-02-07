@@ -58,6 +58,9 @@
 #define WORDS_PER_PAGE ((int)IMMOBILE_CARD_BYTES/N_WORD_BYTES)
 #define DOUBLEWORDS_PER_PAGE (WORDS_PER_PAGE/2)
 
+// In case of problems while debugging, this is selectable.
+#define DEFRAGMENT_FIXEDOBJ_SUBSPACE 1
+
 #undef DEBUG
 #undef VERIFY_PAGE_GENS
 
@@ -817,8 +820,19 @@ static inline boolean
 fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
-    return range_points_to_younger_p(obj+1, obj+n_words,
-                                     gen, keep_gen, new_gen);
+  unsigned char widetag = widetag_of(*obj);
+  lispobj funobj[1];
+
+  switch (widetag) {
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+  case FDEFN_WIDETAG:
+    funobj[0] = fdefn_raw_referent((struct fdefn*)obj);
+    return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
+        || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
+#endif
+  default:
+    return range_points_to_younger_p(obj+1, obj+n_words, gen, keep_gen, new_gen);
+  }
 }
 
 static boolean
@@ -1411,7 +1425,7 @@ search_immobile_space(void *pointer)
             lispobj* found = gc_search_space(start,
                                              (((lispobj*)pointer)+2)-start,
                                              (lispobj*)pointer);
-            return immobile_filler_p(found) ? 0 : found;
+            return (found && immobile_filler_p(found)) ? 0 : found;
         } else if ((lispobj)pointer < SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value) {
             char *page_base = (char*)((lispobj)pointer & ~(IMMOBILE_CARD_BYTES-1));
             if (page_attributes_valid) {
@@ -1539,6 +1553,7 @@ static lispobj* tempspace_addr(void* address)
     int byte_index = (char*)address - (char*)IMMOBILE_VARYOBJ_SUBSPACE_START;
     gc_assert(immobile_space_p((lispobj)address));
     if (byte_index < 0) { // fixedobj subspace
+      if (fixedobj_tempspace.n_bytes == 0) return address;
       byte_index = (char*)address - (char*)IMMOBILE_SPACE_START;
       gc_assert(byte_index < fixedobj_tempspace.n_bytes);
       return (void*)(fixedobj_tempspace.start + byte_index);
@@ -1558,20 +1573,40 @@ static void adjust_words(lispobj *where, sword_t n_words)
     }
 }
 
-static lispobj adjust_fun_entry(lispobj raw_entry)
+static lispobj adjust_fun_entrypoint(lispobj raw_entry)
 {
     if (raw_entry > READ_ONLY_SPACE_END) {
+        // if not pointing read-only space, then it's neither closure_tramp
+        // nor funcallable_instance_tramp.
         lispobj simple_fun = raw_entry - FUN_RAW_ADDR_OFFSET;
         adjust_words(&simple_fun, 1);
         return simple_fun + FUN_RAW_ADDR_OFFSET;
     }
-    return raw_entry; // for fdefn which has a tramp
+    return raw_entry;  // otherwise it's one of those trampolines
+}
+
+static void adjust_fdefn_entrypoint(struct fdefn* fdefn, struct fdefn* new_fdefn)
+{
+    int callee_adjust = 0;
+    // Get the tagged object, either a simple-fun or a code component,
+    // referred to by the fdefn_raw_addr.
+    lispobj callee_old = fdefn_raw_referent(fdefn);
+    // If it's the undefined function trampoline, or the referent
+    // did not move, then the callee_adjust stays 0.
+    // Otherwise we adjust the rel32 field by the change in callee address.
+    if (callee_old && forwarding_pointer_p(native_pointer(callee_old))) {
+        lispobj callee_new = forwarding_pointer_value(native_pointer(callee_old));
+        callee_adjust = callee_new - callee_old;
+    }
+    *(int*)((char*)&fdefn->raw_addr + 1) +=
+      ((char*)fdefn - (char*)new_fdefn) + callee_adjust;
 }
 
 /// It's tricky to try to use the scavtab[] functions for fixing up moved
 /// objects, because scavenger functions might invoke transport functions.
 /// The best approach is to do an explicit switch over all object types.
 #include "genesis/hash-table.h"
+int fixup_space_verbose = 0;
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
@@ -1579,6 +1614,7 @@ static void fixup_space(lispobj* where, size_t n_words)
     int widetag;
     long size;
     void fixup_immobile_refs(struct code*);
+    int static_space_p = ((lispobj)where == STATIC_SPACE_START);
 
     while (where < end) {
         gc_assert(!forwarding_pointer_p(where));
@@ -1616,14 +1652,14 @@ static void fixup_space(lispobj* where, size_t n_words)
           adjust_words(where+1, code_header_words(header_word)-1);
           // Fixup all embedded simple-funs
           for_each_simple_fun(i, f, (struct code*)where, 1, {
-              f->self = adjust_fun_entry(f->self);
+              f->self = adjust_fun_entrypoint(f->self);
               adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
           });
           if (((struct code*)where)->fixups)
               fixup_immobile_refs((struct code*)where);
           break;
         case CLOSURE_HEADER_WIDETAG:
-          where[1] = adjust_fun_entry(where[1]);
+          where[1] = adjust_fun_entrypoint(where[1]);
           // FALLTHROUGH_INTENDED
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
@@ -1639,7 +1675,16 @@ static void fixup_space(lispobj* where, size_t n_words)
           break;
         case FDEFN_WIDETAG:
           adjust_words(where+1, 2);
-          where[3] = adjust_fun_entry(where[3]);
+          // If fixed-size objects (hence FDEFNs) are movable, then fixing the
+          // raw address can not be done here, because it is impossible to compute
+          // the absolute jump target - we don't know what the fdefn's original
+          // address was to compute a pc-relative address. So we do those while
+          // permuting the FDEFNs. But because static fdefns do not move,
+          // we do process their raw address slot here.
+#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
+          if (static_space_p)
+#endif
+              adjust_fdefn_entrypoint((struct fdefn*)where, (struct fdefn*)where);
           break;
 
         // Special case because we might need to mark hashtables
@@ -1785,6 +1830,8 @@ void defrag_immobile_space(int* components)
     unsigned int obj_type_histo[64], sym_kind_histo[4];
     bzero(obj_type_histo, sizeof obj_type_histo);
     bzero(sym_kind_histo, sizeof sym_kind_histo);
+
+#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     for ( ; page_index <= max_used_fixedobj_page ; ++page_index) {
         int obj_spacing = page_obj_align(page_index) << WORD_SHIFT;
         if (obj_spacing) {
@@ -1801,6 +1848,8 @@ void defrag_immobile_space(int* components)
             }
         }
     }
+    gc_assert(obj_type_histo[INSTANCE_HEADER_WIDETAG/4]);
+
     // Calculate space needed for fixedobj pages after defrag.
     // page order is: layouts, fdefns, symbols
     int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
@@ -1823,7 +1872,58 @@ void defrag_immobile_space(int* components)
     // does not have to return the unadjusted addr if below defrag_base.
     memcpy(fixedobj_tempspace.start, (char*)IMMOBILE_SPACE_START,
            (lispobj)defrag_base - IMMOBILE_SPACE_START);
+#endif
 
+    // Compute where each code component will be moved to.
+    int n_code_components = 0;
+    for (i=0 ; components[i*2] ; ++i) {
+        addr = (lispobj*)(long)components[i*2];
+        gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
+        addr = native_pointer((lispobj)addr);
+        int widetag = widetag_of(*addr);
+        lispobj new_vaddr = 0;
+        // FIXME: generalize
+        gc_assert(widetag == CODE_HEADER_WIDETAG);
+        if (!immobile_filler_p(addr)) {
+            ++n_code_components;
+            new_vaddr = IMMOBILE_VARYOBJ_SUBSPACE_START + varyobj_tempspace.n_bytes;
+            varyobj_tempspace.n_bytes += sizetab[widetag](addr) << WORD_SHIFT;
+        }
+        components[i*2+1] = new_vaddr;
+    }
+    varyobj_tempspace.start = calloc(varyobj_tempspace.n_bytes, 1);
+
+    printf("%d+%d+%d+%d objects... ",
+           obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
+           obj_type_histo[FDEFN_WIDETAG/4],
+           (sym_kind_histo[0]+sym_kind_histo[1]+
+            sym_kind_histo[2]+sym_kind_histo[3]),
+           n_code_components);
+
+    // Permute varyobj space into tempspace and deposit forwarding pointers.
+    lispobj new_vaddr;
+    for (i=0 ; components[i*2] ; ++i) {
+        if ((new_vaddr = components[i*2+1]) != 0) {
+            addr = native_pointer(components[i*2]);
+            memcpy(tempspace_addr((void*)new_vaddr), addr,
+                   sizetab[widetag_of(*addr)](addr) << WORD_SHIFT);
+            int displacement = new_vaddr - (lispobj)addr;
+            switch (widetag_of(*addr)) {
+            case CODE_HEADER_WIDETAG:
+                for_each_simple_fun(index, fun, (struct code*)addr, 1, {
+                    set_forwarding_pointer((lispobj*)fun,
+                                           make_lispobj((char*)fun + displacement,
+                                                        FUN_POINTER_LOWTAG));
+                });
+                break;
+            }
+            set_forwarding_pointer(addr,
+                                   make_lispobj((void*)new_vaddr,
+                                                OTHER_POINTER_LOWTAG));
+        }
+    }
+
+#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     // Permute fixed-sized object pages and deposit forwarding pointers.
     for ( page_index = find_immobile_page_index(defrag_base) ;
           page_index <= max_used_fixedobj_page ; ++page_index) {
@@ -1858,64 +1958,20 @@ void defrag_immobile_space(int* components)
                 && (end & ALIGN_MASK) != 0)  // ok if exactly on the boundary
                 new = (lispobj*)(end & ~ALIGN_MASK); // snap to page
 #undef ALIGN_MASK
+#ifdef LISP_FEATURE_X86_64
+            // Fix displacement in JMP or CALL instruction.
+            if (widetag == FDEFN_WIDETAG)
+                adjust_fdefn_entrypoint((struct fdefn*)obj, (struct fdefn*)new);
+#endif
             memcpy(tempspace_addr(new), obj, sizetab[widetag](obj) << WORD_SHIFT);
             set_forwarding_pointer(obj, make_lispobj(new, lowtag));
             *alloc_ptr = (char*)new + obj_spacing;
         }
     }
-
-    // Compute where each code component will be moved to.
-    int n_code_components = 0;
-    for (i=0 ; components[i*2] ; ++i) {
-        addr = (lispobj*)(long)components[i*2];
-        gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
-        addr = native_pointer((lispobj)addr);
-        int widetag = widetag_of(*addr);
-        lispobj new_vaddr = 0;
-        // FIXME: generalize
-        gc_assert(widetag == CODE_HEADER_WIDETAG);
-        if (!immobile_filler_p(addr)) {
-            ++n_code_components;
-            new_vaddr = IMMOBILE_VARYOBJ_SUBSPACE_START + varyobj_tempspace.n_bytes;
-            varyobj_tempspace.n_bytes += sizetab[widetag](addr) << WORD_SHIFT;
-        }
-        components[i*2+1] = new_vaddr;
-    }
-    varyobj_tempspace.start = calloc(varyobj_tempspace.n_bytes, 1);
-
-    gc_assert(obj_type_histo[INSTANCE_HEADER_WIDETAG/4]);
-    printf("%d+%d+%d+%d objects... ",
-           obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
-           obj_type_histo[FDEFN_WIDETAG/4],
-           (sym_kind_histo[0]+sym_kind_histo[1]+
-            sym_kind_histo[2]+sym_kind_histo[3]),
-           n_code_components);
-
-    // Permute varyobj space into tempspace and deposit forwarding pointers.
-    lispobj new_vaddr;
-    for (i=0 ; components[i*2] ; ++i) {
-        if ((new_vaddr = components[i*2+1]) != 0) {
-            addr = native_pointer(components[i*2]);
-            memcpy(tempspace_addr((void*)new_vaddr), addr,
-                   sizetab[widetag_of(*addr)](addr) << WORD_SHIFT);
-            int displacement = new_vaddr - (lispobj)addr;
-            switch (widetag_of(*addr)) {
-            case CODE_HEADER_WIDETAG:
-                for_each_simple_fun(index, fun, (struct code*)addr, 1, {
-                    set_forwarding_pointer((lispobj*)fun,
-                                           make_lispobj((char*)fun + displacement,
-                                                        FUN_POINTER_LOWTAG));
-                });
-                break;
-            }
-            set_forwarding_pointer(addr,
-                                   make_lispobj((void*)new_vaddr,
-                                                OTHER_POINTER_LOWTAG));
-        }
-    }
+#endif
 
 #ifdef LISP_FEATURE_X86_64
-    // Fix displacements in JMP and CALL instructions
+    // Fix displacements in JMP and CALL instructions in code objects.
     // There are 2 arrays in use:
     //  - the relocs[] array contains the address of any machine instruction
     //    that needs to be altered on account of space relocation.
@@ -1943,21 +1999,33 @@ void defrag_immobile_space(int* components)
             // Both this code and the jumped-to code can move.
             // For this component, adjust by the displacement by (old - new).
             // If the jump target moved, also adjust by its (new - old).
+            // The target address can be either a JMP or CALL instruction
+            // which resides in an fdefn, or a simple-fun.  They can easily
+            // be told apart by the first byte.
             if (immobile_space_p(target_addr)) {
-                lispobj* old_fun =  (lispobj*)(target_addr -
-                                               offsetof(struct simple_fun, code));
-                lispobj* new_fun = get_load_address(old_fun);
-                gc_assert(new_fun);  // must have been forwarded
-                gc_assert(widetag_of(*tempspace_addr(new_fun)) == SIMPLE_FUN_HEADER_WIDETAG);
-                target_adjust = (int)((char*)new_fun - (char*)old_fun);
+                lispobj* old_obj;
+                unsigned char expect_widetag;
+                if ((*(char*)(long)target_addr & 0xFE) == 0xE8) {  // JMP or CALL
+                    // must be jumping into an fdefn
+                    gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
+                    old_obj = (lispobj*)(target_addr - offsetof(struct fdefn, raw_addr));
+                    expect_widetag = FDEFN_WIDETAG;
+                } else {
+                    old_obj = (lispobj*)(target_addr - offsetof(struct simple_fun, code));
+                    expect_widetag = SIMPLE_FUN_HEADER_WIDETAG;
+                }
+                lispobj* new_obj = !forwarding_pointer_p(old_obj) ? old_obj :
+                  native_pointer(forwarding_pointer_value(old_obj));
+                gc_assert(widetag_of(*tempspace_addr(new_obj)) == expect_widetag);
+                target_adjust = (int)((char*)new_obj - (char*)old_obj);
             }
             // If the instruction to fix has moved, then adjust for
             // its new address, and perform the fixup in tempspace.
             // Otherwise perform the fixup where the instruction is now.
-            char* fixup_addr = (immobile_space_p((lispobj)inst_addr) ?
-                                (char*)tempspace_addr(inst_addr - code + load_addr) :
-                                (char*)inst_addr) + 1;
-            *(int*)fixup_addr += target_adjust + (code - load_addr);
+            char* fixup_loc = (immobile_space_p((lispobj)inst_addr) ?
+                               (char*)tempspace_addr(inst_addr - code + load_addr) :
+                               (char*)inst_addr) + 1;
+            *(int*)fixup_loc += target_adjust + (code - load_addr);
         }
     }
 #endif
@@ -1968,16 +2036,23 @@ void defrag_immobile_space(int* components)
     fixup_space((lispobj*)STATIC_SPACE_START,
                 (SYMBOL(STATIC_SPACE_FREE_POINTER)->value
                  - STATIC_SPACE_START) >> WORD_SHIFT);
+
     // Objects in immobile space are physically at 'tempspace',
     // but logically at their natural address. Perform fixups
     // at their current physical address.
+#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     fixup_space((lispobj*)fixedobj_tempspace.start,
                 fixedobj_tempspace.n_bytes >> WORD_SHIFT);
+#else
+    fixup_space((lispobj*)IMMOBILE_SPACE_START,
+                IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE >> WORD_SHIFT);
+#endif
     fixup_space((lispobj*)varyobj_tempspace.start,
                 varyobj_tempspace.n_bytes >> WORD_SHIFT);
 
     // Dynamic space
     // We can safely ignore allocation region boundaries.
+    fixup_space_verbose = 1;
     fixup_space((lispobj*)DYNAMIC_SPACE_START,
                 ((lispobj)
 #ifdef reg_ALLOC
@@ -1988,25 +2063,29 @@ void defrag_immobile_space(int* components)
                            - DYNAMIC_SPACE_START) >> WORD_SHIFT);
 
     // Copy the spaces back where they belong.
-    // But don't copy below the defrag_base - the first few immobile space
+
+    // Fixed-size objects: don't copy below the defrag_base - the first few
     // pages are totally static in regard to both lifetime and placement.
     // (It would "work" to copy them back - since they were copied into
     // the temp space, but it's just wasting time to do so)
+    lispobj old_free_ptr;
+    lispobj free_ptr;
+#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     int n_static_bytes = ((lispobj)defrag_base - IMMOBILE_SPACE_START);
     memcpy((char*)defrag_base,
            fixedobj_tempspace.start + n_static_bytes,
            fixedobj_tempspace.n_bytes - n_static_bytes);
-    memcpy((char*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-           varyobj_tempspace.start, varyobj_tempspace.n_bytes);
-
-    // Zero-fill the unused remainder of the immobile space
-    lispobj old_free_ptr;
-    lispobj free_ptr;
+    // Zero-fill the unused remainder
     old_free_ptr = SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value;
     free_ptr = IMMOBILE_SPACE_START + fixedobj_tempspace.n_bytes;
     bzero((char*)free_ptr, old_free_ptr - free_ptr);
     SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value = free_ptr;
+#endif
 
+    // Variable-size object pages.
+    memcpy((char*)IMMOBILE_VARYOBJ_SUBSPACE_START,
+           varyobj_tempspace.start, varyobj_tempspace.n_bytes);
+    // Zero-fill the unused remainder
     old_free_ptr = SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value;
     free_ptr = IMMOBILE_VARYOBJ_SUBSPACE_START + varyobj_tempspace.n_bytes;
     bzero((char*)free_ptr, old_free_ptr - free_ptr);
@@ -2020,6 +2099,7 @@ void defrag_immobile_space(int* components)
     free(components);
 #if 0
     // It's easy to mess things up, so assert correctness before saving a core.
+    printf("verifying defrag\n");
     page_attributes_valid = 0;
     verify_gc();
     printf("verify passed\n");
@@ -2075,22 +2155,21 @@ void fixup_immobile_refs(struct code* code)
         loc += prev_loc;
         prev_loc = loc;
         int* fixup_where = (int*)(instructions + loc);
-        lispobj obj = (lispobj)(*fixup_where);
-        if (is_lisp_pointer(obj)) {
-            if (forwarding_pointer_p(native_pointer(obj)))
-              *fixup_where = (int)
-                forwarding_pointer_value(native_pointer(obj));
+        lispobj ptr = (lispobj)(*fixup_where);
+        if (is_lisp_pointer(ptr)) {
+            if (forwarding_pointer_p(native_pointer(ptr)))
+                *fixup_where = (int)
+                  forwarding_pointer_value(native_pointer(ptr));
         } else {
-            lispobj* symbol = (lispobj*)(obj - offsetof(struct symbol,value));
-            int fixup_val = 0;
-            if (forwarding_pointer_p(symbol)) {
-                lispobj new_symbol = forwarding_pointer_value(symbol);
-                symbol = native_pointer(new_symbol);
-                fixup_val = new_symbol - OTHER_POINTER_LOWTAG
-                  + offsetof(struct symbol,value);
+            gc_assert(IMMOBILE_SPACE_START <= ptr &&
+                      ptr < (IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE));
+            // It's an absolute interior pointer. search_immobile_space() works
+            // at this point, because the page attributes on the pointee's page are valid
+            lispobj* obj = search_immobile_space((void*)ptr);
+            if (forwarding_pointer_p(obj)) {
+                lispobj fpval = forwarding_pointer_value(obj);
+                *fixup_where = (int)(long)native_pointer(fpval) + (ptr - (lispobj)obj);
             }
-            gc_assert(widetag_of(*tempspace_addr(symbol)) == SYMBOL_HEADER_WIDETAG);
-            if (fixup_val) *fixup_where = fixup_val;
         }
     }
 }

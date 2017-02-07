@@ -553,3 +553,22 @@ arch_set_fp_modes(unsigned int mxcsr)
     temp = mxcsr;
     asm ("ldmxcsr %0" : : "m" (temp));
 }
+
+lispobj fdefn_raw_referent(struct fdefn* fdefn) {
+    if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
+        unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"
+          + *(int*)((char*)&fdefn->raw_addr + 1);
+        switch (((unsigned char*)&fdefn->raw_addr)[5]) {
+        case 0x90: // closure/fin trampoline
+          return (raw_fun - offsetof(struct code, constants)) | OTHER_POINTER_LOWTAG;
+        case 0x00: // no closure/fin trampoline
+          // If the target address is in read-only space, then it's a jump or call
+          // to an asm routine, and there is no corresponding simple-fun.
+          // While we could locate and return the code-object, it's difficult to,
+          // and there's no reason to - scavenging it is unnecessary.
+          return raw_fun >= IMMOBILE_SPACE_START ? raw_fun - FUN_RAW_ADDR_OFFSET : 0;
+        }
+    } else if (fdefn->raw_addr == 0)
+        return 0;
+    lose("Can't decode fdefn raw addr @ %p: %p\n", fdefn, fdefn->raw_addr);
+}

@@ -665,17 +665,22 @@
 ;;; In tail call with fixed arguments, the passing locations are
 ;;; passed as a more arg, but there is no new-FP, since the arguments
 ;;; have been set up in the current frame.
-(macrolet ((define-full-call (name named return variable)
+(macrolet ((define-full-call (vop-name named return variable)
             (aver (not (and variable (eq return :tail))))
-            `(define-vop (,name
-                          ,@(when (eq return :unknown)
-                              '(unknown-values-receiver)))
+            #!+immobile-code (when named (setq named :direct))
+            `(define-vop (,vop-name ,@(when (eq return :unknown)
+                                        '(unknown-values-receiver)))
                (:args
                ,@(unless (eq return :tail)
                    '((new-fp :scs (any-reg) :to (:argument 1))))
 
-               (fun :scs (descriptor-reg control-stack)
-                    :target rax :to (:argument 0))
+               ;; If immobile-space is in use, then named call does not require
+               ;; a register unless the caller is NOT in immobile space,
+               ;; in which case the register is needed because there is no
+               ;; absolute addressing mode for jmp/call.
+               ,@(unless (eq named :direct)
+                   '((fun :scs (descriptor-reg control-stack)
+                          :target rax :to (:argument 0))))
 
                ,@(when (eq return :tail)
                    '((old-fp)
@@ -684,7 +689,7 @@
                ,@(unless variable '((args :more t :scs (descriptor-reg)))))
 
                ,@(when (eq return :fixed)
-               '((:results (values :more t))))
+                   '((:results (values :more t))))
 
                (:save-p ,(if (eq return :tail) :compute-only t))
 
@@ -692,9 +697,14 @@
                '((:move-args :full-call)))
 
                (:vop-var vop)
+               (:node-var node)
                (:info
                ,@(unless (or variable (eq return :tail)) '(arg-locs))
                ,@(unless variable '(nargs))
+               ;; Intuitively you might want FUN to be the first codegen arg,
+               ;; but that won't work, because EMIT-ARG-MOVES wants the
+               ;; passing locs in (FIRST (vop-codegen-info vop)).
+               ,@(when (eq named :direct) '(fun))
                ,@(when (eq return :fixed) '(nvals))
                step-instrumenting)
 
@@ -708,12 +718,9 @@
                ;; with the real function and invoke the real function
                ;; for closures. Non-closures do not need this value,
                ;; so don't care what shows up in it.
-               (:temporary
-               (:sc descriptor-reg
-                    :offset rax-offset
-                    :from (:argument 0)
-                    :to :eval)
-               rax)
+               ,@(unless (eq named :direct)
+                   '((:temporary (:sc descriptor-reg :offset rax-offset
+                                  :from (:argument 0) :to :eval) rax)))
 
                ;; We pass the number of arguments in RCX.
                (:temporary (:sc unsigned-reg :offset rcx-offset :to :eval) rcx)
@@ -744,11 +751,14 @@
                                (if (eq return :tail) 0 10)
                                15
                                (if (eq return :unknown) 25 0))
+
+               (progn node) ; always "use" it
+
                ;; This has to be done before the frame pointer is
                ;; changed! RAX stores the 'lexical environment' needed
                ;; for closures.
-               (move rax fun)
-
+               ,@(unless (eq named :direct)
+                   '((move rax fun)))
 
                ,@(if variable
                      ;; For variable call, compute the number of
@@ -846,14 +856,29 @@
 
                (note-this-location vop :call-site)
 
-               (inst ,(if (eq return :tail) 'jmp 'call)
-                     (make-ea :qword :base rax
+               ,(if (eq named :direct)
+                    `(let ((target
+                            (if (sb!c::code-immobile-p node)
+                                (make-fixup fun :named-call)
+                                (progn
+                                  ;; RAX-TN was not declared as a temp var,
+                                  ;; however it's sole purpose at this point is
+                                  ;; for function call, so even if it was used
+                                  ;; to compute a stack argument, it's free now.
+                                  ;; If the call hits the undefined fun trap,
+                                  ;; RAX will get loaded regardless.
+                                  (inst mov rax-tn (make-fixup fun :named-call))
+                                  rax-tn))))
+                       (inst ,(if (eq return :tail) 'jmp 'call) target))
+                    `(inst ,(if (eq return :tail) 'jmp 'call)
+                           (make-ea :qword :base rax
                               :disp ,(if named
                                          '(- (* fdefn-raw-addr-slot
                                                 n-word-bytes)
                                              other-pointer-lowtag)
                                        '(- (* closure-fun-slot n-word-bytes)
-                                           fun-pointer-lowtag))))
+                                           fun-pointer-lowtag)))))
+
                ,@(ecase return
                    (:fixed
                     '((default-unknown-values vop values nvals node)))

@@ -426,11 +426,22 @@ profiling, and :TIME for wallclock profiling.")
            (let* ((code (sb-di::component-from-component-ptr ptr))
                   (code-header-len (* (sb-kernel:code-header-words code)
                                       sb-vm:n-word-bytes))
+                  ;; Give up if we land in the 2 or 3 instructions of a
+                  ;; code component sans simple-fun that is not an asm routine.
+                  ;; While it's conceivable that this could be improved,
+                  ;; the problem will be different or nonexistent after
+                  ;; funcallable-instances each contain their own trampoline.
+                  #+immobile-code
+                  (di (unless (typep (sb-kernel:%code-debug-info code)
+                                     'sb-c::compiled-debug-info)
+                        (return-from debug-info
+                                     (values code (sap-int pc)))))
                   (pc-offset (- (sap-int pc)
                                 (- (sb-kernel:get-lisp-obj-address code)
                                    sb-vm:other-pointer-lowtag)
                                 code-header-len))
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
+             (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
                     (values code (sap-int pc)))
                    (df

@@ -191,9 +191,10 @@ only."
     (setf (random-documentation symbol 'function) docstring))
   ;; (SETF SYMBOL-FUNCTION) goes out of its way to disallow this closure,
   ;; but we can trivially replicate its low-level effect.
-  (setf (fdefn-fun (find-or-create-fdefn symbol))
-        (sb!impl::set-closure-name
-         (lambda (&rest args)
+  (let ((fdefn (find-or-create-fdefn symbol))
+        (closure
+         (sb!impl::set-closure-name
+          (lambda (&rest args)
            (declare (ignore args))
            ;; ANSI specification of FUNCALL says that this should be
            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
@@ -203,6 +204,20 @@ only."
                       'undefined-function)
                   :name symbol))
          fun-name)))
+    ;; For immobile-code, do something slightly different: fmakunbound,
+    ;; then assign the fdefn-fun slot to avoid consing a new closure trampoline.
+    #!+immobile-code
+    (progn (fdefn-makunbound fdefn)
+           ;; There is no :SET-TRANS for the primitive object's fdefn-fun slot,
+           ;; nor do we desire the full effect of %SET-FDEFN-FUN.
+           (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address fdefn))
+                                  (- (ash sb!vm:fdefn-fun-slot sb!vm:word-shift)
+                                     sb!vm:other-pointer-lowtag))
+                 closure))
+    ;; The above would work, but there's no overhead when installing a closure
+    ;; the regular way, so just do that.
+    #!-immobile-code
+    (setf (fdefn-fun fdefn) closure)))
 
 (defun sb!xc:compiler-macro-function (name &optional env)
   "If NAME names a compiler-macro in ENV, return the expansion function, else

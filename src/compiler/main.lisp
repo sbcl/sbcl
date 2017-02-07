@@ -575,6 +575,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                                  node-or-component))
              :toplevel)
         (eq *compile-to-memory-space* :immobile))))
+#!-immobile-code
+(defmacro code-immobile-p (x) (declare (ignore x)) nil)
 
 (defun %compile-component (component)
   (let ((*code-segment* nil)

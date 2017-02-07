@@ -74,14 +74,15 @@
                      (get-lisp-obj-address code))
                     #!+immobile-space
                     (:immobile-object
-                     (get-lisp-obj-address
-                      (the (or layout symbol) name)))
+                     (get-lisp-obj-address (the (or layout symbol) name)))
+                    #!+immobile-code
+                    (:named-call
+                     (sb!vm::fdefn-entry-address name))
                     #!+immobile-code
                     (:static-call
                      (sb!vm::function-raw-address name))
                     (:symbol-tls-index
-                     (aver (symbolp name))
-                     (ensure-symbol-tls-index name)))))
+                     (ensure-symbol-tls-index (the symbol name))))))
       (sb!vm:fixup-code-object code position value kind
                                #!+x86-64 flavor))))
 
@@ -122,21 +123,23 @@
 
 #!+(and immobile-code (host-feature sb-xc))
 (progn
-(defvar *linker-fixups*)
-(defun sb!vm::function-raw-address (name &optional (fun (awhen (find-fdefn name)
-                                                          (fdefn-fun it))))
-  (let ((addr (and fun (get-lisp-obj-address fun))))
-    (cond (addr
-           (cond ((not (<= sb!vm:immobile-space-start addr sb!vm:immobile-space-end))
-                  (error "Can't statically link to ~S: code is movable" name))
-                 ((neq (fun-subtype fun) sb!vm:simple-fun-header-widetag)
-                  (error "Can't statically link to ~S: non-simple function" name))
-                 (t
-                  (sap-ref-word (int-sap addr)
-                                (- (ash sb!vm:simple-fun-self-slot sb!vm:word-shift)
-                                   sb!vm:fun-pointer-lowtag)))))
-          ((boundp '*linker-fixups*)
-           (warn "Deferring linkage to ~S" name)
-           (cons :defer name))
-          (t
-           (error "Can't statically link to undefined function ~S" name))))))
+  (defun sb!vm::function-raw-address (name &optional (fun (awhen (find-fdefn name)
+                                                           (fdefn-fun it))))
+    (let ((addr (and fun (get-lisp-obj-address fun))))
+      (cond ((not addr)
+             (error "Can't statically link to undefined function ~S" name))
+            ((not (<= sb!vm:immobile-space-start addr sb!vm:immobile-space-end))
+             (error "Can't statically link to ~S: code is movable" name))
+            ((neq (fun-subtype fun) sb!vm:simple-fun-header-widetag)
+             (error "Can't statically link to ~S: non-simple function" name))
+            (t
+             (sap-ref-word (int-sap addr)
+                           (- (ash sb!vm:simple-fun-self-slot sb!vm:word-shift)
+                              sb!vm:fun-pointer-lowtag))))))
+
+  ;; Return the address to which to jump when calling NAME through its fdefn.
+  (defun sb!vm::fdefn-entry-address (name)
+    (let ((fdefn (find-or-create-fdefn name)))
+      (+ (get-lisp-obj-address fdefn)
+         (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
+         (- sb!vm:other-pointer-lowtag)))))

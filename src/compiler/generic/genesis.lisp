@@ -1841,6 +1841,15 @@ core and return a descriptor to it."
     (legal-fun-name-or-type-error result)
     result))
 
+#!+x86-64
+(defun encode-fdefn-raw-addr (fdefn jump-target opcode)
+  (let ((disp (- jump-target
+                 (+ (descriptor-bits fdefn)
+                    (- sb!vm:other-pointer-lowtag)
+                    (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
+                    5))))
+    (logior (ash (ldb (byte 32 0) (the (signed-byte 32) disp)) 8) opcode)))
+
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
   (declare (type (or symbol descriptor) cold-name))
   (declare (special core-file-name))
@@ -1855,14 +1864,15 @@ core and return a descriptor to it."
           (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
           (unless leave-fn-raw
             (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
-            (write-wordindexed/raw fdefn
-                                    sb!vm:fdefn-raw-addr-slot
-                                    (or (lookup-assembler-reference
-                                         'sb!vm::undefined-tramp core-file-name)
-                                    ;; Our preload for the tramps
-                                    ;; doesn't happen during host-1,
-                                    ;; so substitute a usable value.
-                                         0)))
+            (let ((tramp
+                   (or (lookup-assembler-reference 'sb!vm::undefined-tramp core-file-name)
+                       ;; Our preload for the tramps doesn't happen during host-1,
+                       ;; so substitute a usable value.
+                       0)))
+              (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
+                                     #!+(and immobile-code x86-64)
+                                     (encode-fdefn-raw-addr fdefn tramp #xE8)
+                                     #!-immobile-code tramp)))
           fdefn))))
 
 (defun cold-functionp (descriptor)
@@ -1894,15 +1904,18 @@ core and return a descriptor to it."
              sb!vm:simple-fun-header-widetag))
     (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
-    (write-wordindexed fdefn
-                       sb!vm:fdefn-raw-addr-slot
-                       #!+(or sparc arm) defn
-                       #!-(or sparc arm)
-                          (make-random-descriptor
-                           (+ (logandc2 (descriptor-bits defn)
-                                        sb!vm:lowtag-mask)
-                              (ash sb!vm:simple-fun-code-offset
-                                   sb!vm:word-shift))))
+    (let ((fun-entry-addr
+           (+ (logandc2 (descriptor-bits defn) sb!vm:lowtag-mask)
+              (ash sb!vm:simple-fun-code-offset sb!vm:word-shift))))
+      (declare (ignorable fun-entry-addr)) ; sparc and arm don't need
+      #!+(and immobile-code x86-64)
+      (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
+                             (encode-fdefn-raw-addr fdefn fun-entry-addr #xE9))
+      #!-immobile-code
+      (progn
+        #!+(or sparc arm) (write-wordindexed fdefn sb!vm:fdefn-raw-addr-slot defn)
+        #!-(or sparc arm) (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
+                                                 fun-entry-addr)))
     fdefn))
 
 ;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
@@ -2105,9 +2118,11 @@ core and return a descriptor to it."
           sb!vm:word-shift)
      insts-offset-bytes))
 
-(declaim (ftype (function (descriptor sb!vm:word sb!vm:word keyword) descriptor)
+(declaim (ftype (function (descriptor sb!vm:word sb!vm:word
+                           keyword &optional keyword) descriptor)
                 do-cold-fixup))
-(defun do-cold-fixup (code-object after-header value kind)
+(defun do-cold-fixup (code-object after-header value kind &optional flavor)
+  (declare (ignorable flavor))
   (let* ((offset-within-code-object (calc-offset code-object after-header))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
                                 offset-within-code-object)))
@@ -2130,34 +2145,41 @@ core and return a descriptor to it."
                (descriptor-fixnum
                 (read-wordindexed code-object sb!vm:code-code-size-slot))))
            (gspace-byte-address (gspace-byte-address
-                                 (descriptor-gspace code-object))))
-      (declare (ignorable code-end-addr))
+                                 (descriptor-gspace code-object)))
+           (in-dynamic-space
+            (= (gspace-identifier (descriptor-intuit-gspace code-object))
+               dynamic-core-space-id)))
+
+      (declare (ignorable code-end-addr in-dynamic-space))
       (assert (= obj-start-addr
                  (+ gspace-byte-address (descriptor-byte-offset code-object))))
       ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
       ;; Except for the use of saps, this is basically identical.
-      (when
-          (ecase kind
-           (:absolute
-            (let ((fixed-up (+ value un-fixed-up)))
-              (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
-              ;; Absolute fixups are recorded if within the object.
-              #!+x86 (< obj-start-addr fixed-up code-end-addr)
-              #!+x86-64 nil))
-           (:relative ; (used for arguments to X86 relative CALL instruction)
-            (let ((fixed-up (- (+ value un-fixed-up)
-                               gspace-byte-address
-                               gspace-byte-offset
-                               4))) ; "length of CALL argument"
-              (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
-              ;; Relative fixups are recorded if without the object.
-              #!+x86 (or (< fixed-up obj-start-addr) (> fixed-up code-end-addr))
-              #!+x86-64 nil)))
-        ;; FIXME - do we need this check? The same is not in x86-vm.
-        (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
-                 dynamic-core-space-id)
-          (push after-header (gethash (descriptor-bits code-object)
-                                      *code-fixup-notes*))))))
+      (when (ecase kind
+             (:absolute
+              (let ((fixed-up (+ value un-fixed-up)))
+                (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
+
+                ;; Absolute fixups are recorded if within the object for x86.
+                #!+x86 (and in-dynamic-space
+                            (< obj-start-addr fixed-up code-end-addr))
+
+                ;; Absolute :immobile-object fixups are recorded for x86-64.
+                #!+x86-64 (eq flavor :immobile-object)))
+
+             (:relative ; (used for arguments to X86 relative CALL instruction)
+              (let ((fixed-up (- (+ value un-fixed-up)
+                                 gspace-byte-address
+                                 gspace-byte-offset
+                                 4))) ; "length of CALL argument"
+                (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
+                ;; Relative fixups are recorded if without the object.
+                #!+x86 (and in-dynamic-space
+                            (or (< fixed-up obj-start-addr)
+                                (> fixed-up code-end-addr)))
+                #!+x86-64 nil)))
+        (push after-header (gethash (descriptor-bits code-object)
+                                    *code-fixup-notes*)))))
   code-object)
 
 (defun resolve-assembler-fixups ()
@@ -2951,15 +2973,21 @@ core and return a descriptor to it."
         (kind (pop-stack))
         (code-object (pop-stack))
         (offset (read-word-arg (fasl-input-stream))))
-    ;; For x86-64, we have absolute fixups that will need subsequent fixup
-    ;; (to symbols) on relocation, and ones that won't.
-    ;; Decide here to record the fixup, because "kind" is not passed
-    ;; through to DO-COLD-FIXUP.
-    #!+x86-64
-    (push offset (gethash (descriptor-bits code-object) *code-fixup-notes*))
     (do-cold-fixup code-object offset
                    (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
-                   kind)))
+                   kind :immobile-object)))
+
+#!+immobile-code
+(define-cold-fop (fop-named-call-fixup)
+  (let ((fdefn (cold-fdefinition-object (pop-stack)))
+          (kind (pop-stack))
+          (code-object (pop-stack))
+          (offset (read-word-arg (fasl-input-stream))))
+    (do-cold-fixup code-object offset
+                   (+ (descriptor-bits fdefn)
+                      (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
+                      (- sb!vm:other-pointer-lowtag))
+                   kind :named-call)))
 
 #!+immobile-code
 (define-cold-fop (fop-static-call-fixup)

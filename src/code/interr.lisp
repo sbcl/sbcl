@@ -55,6 +55,11 @@
           ((or (= *current-internal-trap-number* sb!vm:cerror-trap)
                (integerp (setf context (sb!di:error-context))))
            (flet ((set-value (value)
+                    ;; Can't use the VOP because FDEFNs have to go in low space
+                    ;; to allow immobile-code to do what it should.
+                    ;; Assumptions are violated if they are found in high space,
+                    ;; not the least being how far a rel32 operand can reach.
+                    #!+immobile-code (declare (notinline make-dummy-fdefn))
                     (let ((fdefn (make-dummy-fdefn)))
                       (setf (fdefn-fun fdefn) value)
                       (sb!di::sub-set-debug-var-slot

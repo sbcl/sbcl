@@ -42,6 +42,9 @@
 
 ;;;; :CODE-OBJECT fixups
 
+(defun sb!kernel::immobile-space-obj-p (obj)
+  (<= immobile-space-start (get-lisp-obj-address obj) immobile-space-end))
+
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 (defun fixup-code-object (code offset fixup kind &optional flavor)
@@ -77,19 +80,21 @@
   ;; This needn't be inside WITHOUT-GCING, because code fixups will point
   ;; only to objects that don't move except during save-lisp-and-die.
   ;; So there is no race with GC here.
+  ;; Note that genesis does not need the :NAMED-CALL case,
+  ;; because compile-file always puts code into immobile space.
   #!+immobile-space
-  (when (eq flavor :immobile-object)
-    (let ((fixups (sb!vm::%code-fixups code)))
+  (when (or (and (eq flavor :named-call) (not (sb!kernel::immobile-space-obj-p code)))
+            (eq flavor :immobile-object))
+    (let ((fixups (%code-fixups code)))
       ;; Sanctifying the code component will compact these into a bignum.
-      (setf (sb!vm::%code-fixups code)
-            (cons offset (if (eql fixups 0) nil fixups)))))
+      (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))
   nil)
 
 #!+immobile-space
 (defun sanctify-for-execution (code)
-  (let ((fixups (sb!vm::%code-fixups code)))
+  (let ((fixups (%code-fixups code)))
     (when (listp fixups)
-      (setf (sb!vm::%code-fixups code) (sb!c::pack-code-fixup-locs fixups))))
+      (setf (%code-fixups code) (sb!c::pack-code-fixup-locs fixups))))
   nil)
 
 ;;;; low-level signal context access functions
@@ -251,3 +256,72 @@
 
 ;;; the current alien stack pointer; saved/restored for non-local exits
 (defvar *alien-stack-pointer*)
+
+(defun fun-immobilize (fun)
+  (let ((code (allocate-code-object t 0 16)))
+    (setf (%code-debug-info code) fun)
+    (let ((sap (code-instructions code))
+          (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
+                 (ash code-debug-info-slot word-shift))))
+      ;; For a funcallable-instance, the instruction sequence is:
+      ;;    MOV RAX, [RIP-n] ; load the function
+      ;;    MOV RAX, [RAX+5] ; load the funcallable-instance-fun
+      ;;    JMP [RAX-3]
+      ;; Otherwise just instructions 1 and 3 will do.
+      ;; We could use the #xA1 opcode to save a byte, but that would
+      ;; be another headache do deal with when relocating this code.
+      (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
+            (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7))) ; disp
+      (let ((i (if (/= (fun-subtype fun) funcallable-instance-header-widetag)
+                   7
+                   (let ((disp8 (- (ash funcallable-instance-function-slot
+                                        word-shift)
+                                   fun-pointer-lowtag))) ; = 5
+                     (setf (sap-ref-32 sap 7) (logior (ash disp8 24) #x408B48))
+                     11))))
+        (setf (sap-ref-32 sap i) #xFD60FF))) ; JMP [RAX-3]
+    code))
+
+(defun %set-fdefn-fun (fdefn fun)
+  (declare (type fdefn fdefn) (type function fun)
+           (values function))
+  (let ((trampoline (unless (and (simple-fun-p fun)
+                                 (< (get-lisp-obj-address fun) (ash 1 32)))
+                      (fun-immobilize fun)))) ; a newly made CODE object
+    (with-pinned-objects (fdefn trampoline fun)
+      (binding* (((fun-entry-addr nop-byte)
+                  (if trampoline
+                      (values (sap-int (code-instructions trampoline)) #x90)
+                      (values (+ (get-lisp-obj-address fun)
+                                 (- fun-pointer-lowtag)
+                                 (ash simple-fun-code-offset word-shift)) 0)))
+                 (fdefn-addr (- (get-lisp-obj-address fdefn) ; base of the object
+                                other-pointer-lowtag))
+                 (fdefn-entry-addr (+ fdefn-addr ; address that callers jump to
+                                      (ash fdefn-raw-addr-slot word-shift)))
+                 (displacement (the (signed-byte 32)
+                                 (- fun-entry-addr (+ fdefn-entry-addr 5)))))
+        (setf (sap-ref-word (int-sap fdefn-entry-addr) 0)
+              (logior #xE9
+                      ;; Allow negative displacement
+                      (ash (ldb (byte 32 0) displacement) 8) ; JMP opcode
+                      (ash nop-byte 40))
+              (sap-ref-lispobj (int-sap fdefn-addr) (ash fdefn-fun-slot word-shift))
+              fun)))))
+
+#|
+(sb-kernel:make-lisp-obj
+ (alien-funcall (extern-alien "fdefn_raw_referent" (function long long))
+                (- (sb-kernel:get-lisp-obj-address
+                    (sb-kernel::find-fdefn 'suckit))
+                   sb-vm:other-pointer-lowtag)))
+
+(with-open-file (f "/tmp/cms" :direction :output)
+  (sb-vm::map-allocated-objects
+   (lambda (obj type size)
+     (when (and (= type sb-vm:code-header-widetag)
+                (zerop (sb-kernel:code-n-entries obj)))
+       (format f "~x~%" (sb-kernel:get-lisp-obj-address obj))
+       (sb-disassem::disassemble-code-component obj :stream f)))
+   :immobile))
+|#

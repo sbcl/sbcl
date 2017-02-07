@@ -344,6 +344,7 @@
            (err-lab (generate-error-code vop 'undefined-fun-error object)))
       (inst jmp :e err-lab))))
 
+#!-immobile-code
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
   (:translate (setf fdefn-fun))
@@ -371,10 +372,27 @@
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:results (result :scs (descriptor-reg)))
+  #!+immobile-code (:temporary (:sc unsigned-reg) temp)
   (:generator 38
-    (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
-    (storew (make-fixup 'undefined-tramp :assembly-routine)
-            fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+    #!+immobile-code
+    (progn
+     (inst mov (reg-in-size temp :dword)
+           (make-fixup 'undefined-tramp :assembly-routine))
+     ;; Compute displacement from the call site
+     (inst sub (reg-in-size temp :dword) (reg-in-size fdefn :dword))
+     (inst sub (reg-in-size temp :dword)
+           (+ (- other-pointer-lowtag) (ash fdefn-raw-addr-slot word-shift) 5))
+     ;; Compute the encoding of a "CALL rel32" instruction
+     (inst shl temp 8)
+     (inst or (reg-in-size temp :byte) #xE8)
+     ;; Store
+     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
+     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag))
+    #!-immobile-code
+    (progn
+     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
+     (storew (make-fixup 'undefined-tramp :assembly-routine)
+             fdefn fdefn-raw-addr-slot other-pointer-lowtag))
     (move result fdefn)))
 
 ;;;; binding and unbinding

@@ -236,6 +236,8 @@ bitmap_scan(in_use_marker_t* bitmap, int n_bitmap_words, int flags,
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 
+extern lispobj fdefn_raw_referent(struct fdefn *fdefn);
+
 static inline boolean immobile_space_p(lispobj obj)
 {
   return IMMOBILE_SPACE_START <= obj && obj < IMMOBILE_SPACE_END;

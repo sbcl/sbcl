@@ -3079,6 +3079,7 @@ verify_space(lispobj *start, size_t words)
     while (words > 0) {
         size_t count = 1;
         lispobj thing = *start;
+        lispobj pointee;
 
         if (is_lisp_pointer(thing)) {
             page_index_t page_index = find_page_index((void*)thing);
@@ -3179,7 +3180,14 @@ verify_space(lispobj *start, size_t words)
                 case SINGLE_FLOAT_WIDETAG:
 #endif
                 case UNBOUND_MARKER_WIDETAG:
+                    break;
                 case FDEFN_WIDETAG:
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+                    verify_space(start + 1, 2);
+                    pointee = fdefn_raw_referent((struct fdefn*)start);
+                    verify_space(&pointee, 1);
+                    count = 4;
+#endif
                     break;
 
                 case INSTANCE_HEADER_WIDETAG:

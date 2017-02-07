@@ -615,17 +615,24 @@
   (sb!vm:fixup-code-object code-object
                            (read-word-arg (fasl-input-stream))
                            (get-lisp-obj-address obj) ; OBJ can't move
-                           kind
-                           :immobile-object)
+                           kind :immobile-object)
   code-object)
 
 #!+immobile-code
-(!define-fop 135 :not-host (fop-static-call-fixup (code-object kind name))
-  (sb!vm:fixup-code-object code-object
-                           (read-word-arg (fasl-input-stream))
-                           (sb!vm::function-raw-address name)
-                           kind)
-  code-object)
+(progn
+  (!define-fop 133 :not-host (fop-named-call-fixup (code-object kind name))
+    (sb!vm:fixup-code-object code-object
+                             (read-word-arg (fasl-input-stream))
+                             (sb!vm::fdefn-entry-address name)
+                             kind :named-call)
+    code-object)
+
+  (!define-fop 135 :not-host (fop-static-call-fixup (code-object kind name))
+    (sb!vm:fixup-code-object code-object
+                             (read-word-arg (fasl-input-stream))
+                             (sb!vm::function-raw-address name)
+                             kind)
+    code-object))
 
 (!define-fop 147 :not-host (fop-foreign-fixup (code-object kind))
   (let* ((len (read-byte-arg (fasl-input-stream)))

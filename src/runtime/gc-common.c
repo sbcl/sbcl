@@ -771,6 +771,7 @@ scav_fdefn(lispobj *where, lispobj object)
        fdefn->fun, fdefn->raw_addr)); */
 
     scavenge(where + 1, 2); // 'name' and 'fun'
+#ifndef LISP_FEATURE_IMMOBILE_CODE
     lispobj raw_fun = (lispobj)fdefn->raw_addr;
     if (raw_fun > READ_ONLY_SPACE_END) {
         lispobj simple_fun = raw_fun - FUN_RAW_ADDR_OFFSET;
@@ -779,6 +780,16 @@ scav_fdefn(lispobj *where, lispobj object)
         if (simple_fun != raw_fun - FUN_RAW_ADDR_OFFSET)
             fdefn->raw_addr = (char *)simple_fun + FUN_RAW_ADDR_OFFSET;
     }
+#elif defined(LISP_FEATURE_X86_64)
+    lispobj obj = fdefn_raw_referent(fdefn);
+    if (obj) {
+        lispobj new = obj;
+        scavenge(&new, 1); // enliven
+        gc_assert(new == obj); // must not move
+    }
+#else
+#  error "Need to implement scav_fdefn"
+#endif
     return 4;
 }
 #endif

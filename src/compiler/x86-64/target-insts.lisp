@@ -121,9 +121,11 @@
       (print-mem-ref :ref value nil stream dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)
-  (maybe-note-assembler-routine value nil dstate)
-  (maybe-note-static-symbol value dstate)
-  (princ value stream))
+  (if (or #!+immobile-space (maybe-note-lisp-callee value dstate)
+          (maybe-note-assembler-routine value nil dstate)
+          (maybe-note-static-symbol value dstate))
+      (write value :stream stream :base 16 :radix t)
+      (princ value stream)))
 
 ;;; Return either a MACHINE-EA or a register (a fixnum).
 ;;; VALUE is a list of the mod and r/m fields of the instruction's ModRM byte.

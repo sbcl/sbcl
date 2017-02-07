@@ -202,6 +202,10 @@
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
   (show-and-call !type-class-cold-init)
+  ;; cold-init-wrappers are closures. Installing a closure as a
+  ;; named function requires consing immobile space code.
+  #!+immobile-code (setq sb!vm::*immobile-space-mutex*
+                         (sb!thread:make-mutex :name "Immobile space"))
   (!with-init-wrappers (show-and-call sb!kernel::!primordial-type-cold-init))
   (show-and-call !world-lock-cold-init)
   (show-and-call !classes-cold-init)

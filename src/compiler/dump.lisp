@@ -1050,6 +1050,10 @@
          (dump-non-immediate-object (the symbol name) fasl-output)
          (dump-fop 'fop-immobile-obj-fixup fasl-output))
         #!+immobile-code
+        (:named-call
+         (dump-non-immediate-object name fasl-output)
+         (dump-fop 'fop-named-call-fixup fasl-output))
+        #!+immobile-code
         (:static-call
          (dump-non-immediate-object name fasl-output)
          (dump-fop 'fop-static-call-fixup fasl-output))

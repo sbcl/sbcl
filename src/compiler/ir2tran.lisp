@@ -1080,17 +1080,17 @@
     (multiple-value-bind (fun-tn named)
         (fun-lvar-tn node block (basic-combination-fun node))
       (if named
+          ;; Named call to an immobile fdefn from an immobile component
+          ;; uses the FUN-TN only to preserve liveness of the fdefn.
+          ;; The name becomes an info arg.
           (vop* tail-call-named node block
-                (fun-tn old-fp return-pc pass-refs)
-                (nil)
-                nargs
-                (emit-step-p node))
+                (#!-immobile-code fun-tn old-fp return-pc pass-refs)  ; args
+                (nil)                                                 ; results
+                nargs #!+immobile-code named (emit-step-p node))      ; info
           (vop* tail-call node block
                 (fun-tn old-fp return-pc pass-refs)
                 (nil)
-                nargs
-                (emit-step-p node)))))
-
+                nargs (emit-step-p node)))))
   (values))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
@@ -1128,8 +1128,11 @@
       (multiple-value-bind (fun-tn named)
           (fun-lvar-tn node block (basic-combination-fun node))
         (if named
-            (vop* call-named node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs nvals (emit-step-p node))
+            (vop* call-named node block
+                  (fp #!-immobile-code fun-tn args)           ; args
+                  (loc-refs)                                  ; results
+                  arg-locs nargs #!+immobile-code named nvals ; info
+                  (emit-step-p node))
             (vop* call node block (fp fun-tn args) (loc-refs)
                   arg-locs nargs nvals (emit-step-p node)))
         (move-lvar-result node block locs lvar))))
@@ -1146,8 +1149,11 @@
       (multiple-value-bind (fun-tn named)
           (fun-lvar-tn node block (basic-combination-fun node))
         (if named
-            (vop* multiple-call-named node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs (emit-step-p node))
+            (vop* multiple-call-named node block
+                  (fp #!-immobile-code fun-tn args)     ; args
+                  (loc-refs)                            ; results
+                  arg-locs nargs #!+immobile-code named ; info
+                  (emit-step-p node))
             (vop* multiple-call node block (fp fun-tn args) (loc-refs)
                   arg-locs nargs (emit-step-p node))))))
   (values))

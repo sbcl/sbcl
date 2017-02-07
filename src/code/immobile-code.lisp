@@ -11,9 +11,6 @@
 
 (in-package "SB-KERNEL")
 
-(defun immobile-space-p (obj)
-  (<= sb-vm:immobile-space-start (get-lisp-obj-address obj) sb-vm:immobile-space-end))
-
 (defun order-by-in-degree ()
   (let ((compiler-stuff (make-hash-table :test 'eq))
         (other-stuff (make-hash-table :test 'eq)))
@@ -63,7 +60,7 @@
                       (when (and (fdefn-p ref)
                                  (simple-fun-p (fdefn-fun ref)))
                         (let ((code (fun-code-header (fdefn-fun ref))))
-                          (when (immobile-space-p code)
+                          (when (immobile-space-obj-p code)
                             (let ((ht (pick-table
                                        (%simple-fun-name
                                         (%code-entry-point code 0)))))
@@ -101,7 +98,7 @@
                                     (not (macro-function thing)))
                            (visit (symbol-function thing))))))
              (visit-code (code-component)
-               (when (or (not (immobile-space-p code-component))
+               (when (or (not (immobile-space-obj-p code-component))
                          (gethash code-component hashset))
                  (return-from visit-code))
                (setf (gethash code-component hashset) t)

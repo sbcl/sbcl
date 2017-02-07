@@ -19,9 +19,9 @@
 ;;;; fdefinition (fdefn) objects
 
 ;;; This is used for undefined-fun-error restarts
-(defun make-dummy-fdefn ()
-  #!-immobile-space (make-fdefn nil)
-  #!+immobile-space (make-dummy-fdefn))
+ (defun make-dummy-fdefn () ; FIXME: what's wrong with just MAKE-FDEFN ?
+   #!+(or (not immobile-space) immobile-code) (make-fdefn nil)
+   #!+(and immobile-space (not immobile-code)) (make-dummy-fdefn))
 
 (defun make-fdefn (name)
   #!-immobile-space (make-fdefn name)
@@ -46,7 +46,8 @@
   (declare (type function fun)
            (type fdefn fdefn)
            (values function))
-  (setf (fdefn-fun fdefn) fun))
+  #!+immobile-code (sb!vm::%set-fdefn-fun fdefn fun)
+  #!-immobile-code (setf (fdefn-fun fdefn) fun))
 
 (defun fdefn-makunbound (fdefn)
   (declare (type fdefn fdefn))
