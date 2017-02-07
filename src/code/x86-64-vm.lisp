@@ -42,6 +42,7 @@
 
 ;;;; :CODE-OBJECT fixups
 
+#!+immobile-space
 (defun sb!kernel::immobile-space-obj-p (obj)
   (<= immobile-space-start (get-lisp-obj-address obj) immobile-space-end))
 
