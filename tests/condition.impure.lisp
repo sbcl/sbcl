@@ -506,3 +506,33 @@
   (assert-error (this-should-fail))
   (defun some-nonexistent-handler (x) x)
   (assert (integerp (this-should-fail)))) ; but not now it shouldn't
+
+(with-test (:name :undefined-restart
+            :skipped-on '(not :x86-64)) ;; jut not implemented yet
+  (let* ((name (gensym))
+         (tail-call (checked-compile `(lambda () (,name)) :allow-style-warnings t))
+         (call (checked-compile `(lambda () (1+ (,name))) :allow-style-warnings t))
+         (return (checked-compile `(lambda () #',name) :allow-style-warnings t))
+         (value-lambda (lambda () 10)))
+    (flet ((test-continue (fun)
+             (fmakunbound name)
+             (handler-bind ((undefined-function
+                              (lambda (c)
+                                (declare (ignore c))
+                                (setf (fdefinition name)
+                                      (lambda () 123))
+                                (invoke-restart 'continue))))
+               (funcall fun)))
+           (test-use-value (fun)
+             (fmakunbound name)
+             (handler-bind ((undefined-function
+                              (lambda (c)
+                                (declare (ignore c))
+                                (invoke-restart 'use-value value-lambda))))
+               (funcall fun))))
+      (assert (eq (test-continue tail-call) 123))
+      (assert (eq (test-continue call) 124))
+      (assert (eq (test-continue return) (fdefinition name)))
+      (assert (eq (test-use-value tail-call) 10))
+      (assert (eq (test-use-value call) 11))
+      (assert (eq (test-use-value return) value-lambda)))))
