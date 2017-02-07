@@ -18,6 +18,15 @@
 #-(or x86 x86-64 ppc sparc mips arm arm64)
 (sb-ext:exit :code 104)
 
+;; These tests should either with code in dynamic space
+;; or immobile space, but they only accidentally worked
+;; because the default is dynamic space.
+;; Make sure they work in the non-default.
+;; The issue was that when we elide the move to register
+;; of the jump address, there's no register for the stepper
+;; to mess with on return from the breakpoint.
+#+immobile-code (setq sb-c::*compile-to-memory-space* :immobile)
+
 (defun fib (x)
   (declare (optimize debug))
   (if (< x 2)

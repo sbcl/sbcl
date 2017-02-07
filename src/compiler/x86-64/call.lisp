@@ -858,7 +858,8 @@
 
                ,(if (eq named :direct)
                     `(let ((target
-                            (if (sb!c::code-immobile-p node)
+                            (if (and (sb!c::code-immobile-p node)
+                                     (not step-instrumenting))
                                 (make-fixup fun :named-call)
                                 (progn
                                   ;; RAX-TN was not declared as a temp var,
