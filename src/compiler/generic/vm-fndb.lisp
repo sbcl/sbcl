@@ -430,7 +430,6 @@
   (flushable))
 
 (defknown make-fdefn (t) fdefn (flushable movable))
-(defknown make-dummy-fdefn () fdefn (flushable movable))
 (defknown fdefn-p (t) boolean (movable foldable flushable))
 (defknown fdefn-name (fdefn) t (foldable flushable))
 (defknown fdefn-fun (fdefn) (or function null) (flushable))

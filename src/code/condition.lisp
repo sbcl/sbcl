@@ -598,6 +598,9 @@
                "The function ~S is undefined."
                (cell-error-name condition))))))
 
+(define-condition retry-undefined-function
+    (simple-condition undefined-function) ())
+
 (define-condition special-form-function (undefined-function) ()
   (:report
    (lambda (condition stream)

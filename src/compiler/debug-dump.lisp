@@ -39,6 +39,13 @@
   ;; The VOP that emitted this location (for node, save-set, ir2-block, etc.)
   (vop nil :type vop))
 
+(defstruct (restart-location
+            (:constructor make-restart-location (label tn))
+            (:predicate nil)
+            (:copier nil))
+  (label nil :type label :read-only t)
+  (tn nil :type tn :read-only t))
+
 ;;; This is called during code generation in places where there is an
 ;;; "interesting" location: someplace where we are likely to end up
 ;;; in the debugger, and thus want debug info.
@@ -110,6 +117,26 @@
 (defvar *previous-location*)
 (declaim (type index *previous-location*))
 
+(defun encode-restart-location (location x)
+  (typecase x
+    (restart-location
+     (let ((tn-offset (tn-offset (restart-location-tn x)))
+           (offset (- (label-position (restart-location-label x))
+                      location))
+           (registers-size #.(integer-length (sb-size (sb-or-lose 'sb!vm::registers)))))
+       (the fixnum (logior (ash offset registers-size)
+                           tn-offset))))
+    (t
+     x)))
+
+(defun decode-restart-location (x)
+  (declare (fixnum x))
+  (let ((registers-size #.(integer-length (sb-size (sb-or-lose 'sb!vm::registers)))))
+    (values (make-sc-offset
+             (sc-number-or-lose 'sb!vm::descriptor-reg)
+             (ldb (byte registers-size 0) x))
+            (ash x (- registers-size)))))
+
 ;;; Dump a compiled debug-location into *BYTE-BUFFER* that describes
 ;;; the code/source map and live info. If true, VOP is the VOP
 ;;; associated with this location, for use in determining whether TNs
@@ -159,11 +186,10 @@
     (when stepping
       (write-var-string stepping byte-buffer))
     (when context
-      (when (label-p context)
-        (setf context (- (label-position context) loc)))
-      (write-var-integer (or (position context *contexts* :test #'equal)
-                             (vector-push-extend context *contexts*))
-                         byte-buffer)))
+      (let ((context (encode-restart-location loc context)))
+        (write-var-integer (or (position context *contexts* :test #'equal)
+                               (vector-push-extend context *contexts*))
+                           byte-buffer))))
   (values))
 
 ;;; Extract context info from a Location-Info structure and use it to

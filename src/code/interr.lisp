@@ -45,6 +45,86 @@
 (defvar *current-internal-error-args*)
 (defvar *current-internal-error-context*)
 
+#!+undefined-fun-restarts
+(defun restart-undefined (name fdefn-or-symbol context)
+  (multiple-value-bind (tn-offset pc-offset)
+      (if context
+          (sb!c::decode-restart-location context)
+          (car *current-internal-error-args*))
+    (labels ((retry-value (value)
+               (or (typecase value
+                     (fdefn (fdefn-fun value))
+                     (symbol
+                      (let ((fdefn (symbol-fdefn value)))
+                        (and fdefn
+                             (fdefn-fun fdefn))))
+                     (function value)
+                     (t
+                      (try (make-condition 'retry-undefined-function
+                                           :name name
+                                           :format-control "Bad value when resarting ~s: ~s"
+                                           :format-arguments (list name value))
+                           t)))
+                   (try (make-condition 'retry-undefined-function
+                                        :name name
+                                        :format-control (if (fdefn-p value)
+                                                            "~S is still undefined"
+                                                            "Can't replace ~s with ~s because it is undefined")
+                                        :format-arguments (list name value))
+                        t)))
+             (set-value (function retrying)
+               (if retrying
+                   (retry-value function)
+                   (sb!di::sub-set-debug-var-slot
+                    nil tn-offset
+                    (retry-value function)
+                    *current-internal-error-context*)))
+             (try (condition &optional retrying)
+               (cond (context
+                      ;; The #'abc case from SAFE-FDEFN-FUN, CONTEXT
+                      ;; specifies the offset from the error location
+                      ;; where it can retry checking the FDEFN
+                      (restart-case (error condition)
+                        (continue ()
+                          :report (lambda (stream)
+                                    (format stream "Retry using ~s." name))
+                          (set-value fdefn-or-symbol retrying))
+                        (use-value (value)
+                          :report (lambda (stream)
+                                    (format stream "Use specified function."))
+                          :interactive read-evaluated-form
+                          (set-value value retrying)))
+                      (unless retrying
+                        (sb!vm::incf-context-pc *current-internal-error-context*
+                                                pc-offset)))
+                     (t
+                      (restart-case (error condition)
+                        (continue ()
+                          :report (lambda (stream)
+                                    (format stream "Retry calling ~s." name))
+                          (set-value fdefn-or-symbol retrying))
+                        (use-value (value)
+                          :report (lambda (stream)
+                                    (format stream "Call specified function."))
+                          :interactive read-evaluated-form
+                          (set-value value retrying))
+                        (return-value (&rest values)
+                          :report (lambda (stream)
+                                    (format stream "Return specified values."))
+                          :interactive mv-read-evaluated-form
+                          (set-value (lambda (&rest args)
+                                       (declare (ignore args))
+                                       (values-list values))
+                                     retrying))
+                        (return-nothing ()
+                          :report (lambda (stream)
+                                    (format stream "Return zero values."))
+                          (set-value (lambda (&rest args)
+                                       (declare (ignore args))
+                                       (values))
+                                     retrying)))))))
+      (try (make-condition 'undefined-function :name name)))))
+
 (deferr undefined-fun-error (fdefn-or-symbol)
   (let ((name (etypecase fdefn-or-symbol
                 (symbol fdefn-or-symbol)
@@ -54,62 +134,7 @@
     (cond #!+undefined-fun-restarts
           ((or (= *current-internal-trap-number* sb!vm:cerror-trap)
                (integerp (setf context (sb!di:error-context))))
-           (flet ((set-value (value)
-                    ;; Can't use the VOP because FDEFNs have to go in low space
-                    ;; to allow immobile-code to do what it should.
-                    ;; Assumptions are violated if they are found in high space,
-                    ;; not the least being how far a rel32 operand can reach.
-                    #!+immobile-code (declare (notinline make-dummy-fdefn))
-                    (let ((fdefn (make-dummy-fdefn)))
-                      (setf (fdefn-fun fdefn) value)
-                      (sb!di::sub-set-debug-var-slot
-                       nil (car *current-internal-error-args*)
-                       fdefn
-                       *current-internal-error-context*))))
-             (cond (context
-                    ;; The #'abc case from SAFE-FDEFN-FUN, CONTEXT
-                    ;; specifies the offset from the error location
-                    ;; where it can retry checking the FDEFN
-                    ;; NOTE:
-                    ;; This overwrites the original FDEFN register
-                    ;; but is unlikely to cause any problems since
-                    ;; FDEFNs are usually loaded by SAFE-FDEFN-FUN
-                    ;; from constants. And it's not overwriting the
-                    ;; FDEFN with some garbage but with another FDEFN.
-                    (restart-case (error 'undefined-function :name name)
-                      (continue ()
-                        :report (lambda (stream)
-                                  (format stream "Retry using ~s." name)))
-                      (use-value (value)
-                        :report (lambda (stream)
-                                  (format stream "Use specified function."))
-                        :interactive read-evaluated-form
-                        (set-value (%coerce-callable-to-fun value))))
-                    (sb!vm::incf-context-pc *current-internal-error-context*
-                                            context))
-                   (t
-                    (restart-case (error 'undefined-function :name name)
-                      (continue ()
-                        :report (lambda (stream)
-                                  (format stream "Retry calling ~s." name)))
-                      (use-value (value)
-                        :report (lambda (stream)
-                                  (format stream "Call specified function."))
-                        :interactive read-evaluated-form
-                        (set-value (%coerce-callable-to-fun value)))
-                      (return-value (&rest values)
-                        :report (lambda (stream)
-                                  (format stream "Return specified values."))
-                        :interactive mv-read-evaluated-form
-                        (set-value (lambda (&rest args)
-                                     (declare (ignore args))
-                                     (values-list values))))
-                      (return-nothing ()
-                        :report (lambda (stream)
-                                  (format stream "Return zero values."))
-                        (set-value (lambda (&rest args)
-                                     (declare (ignore args))
-                                     (values)))))))))
+           (restart-undefined name fdefn-or-symbol context))
           (t
            (error 'undefined-function :name name)))))
 

@@ -336,13 +336,13 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 10
-    RETRY
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
     ;; byte comparison works because lowtags of function and nil differ
     (inst cmp (reg-in-size value :byte) (logand nil-value #xff))
-    (let* ((*location-context* RETRY)
+    (let* ((*location-context* (make-restart-location RETRY value))
            (err-lab (generate-error-code vop 'undefined-fun-error object)))
-      (inst jmp :e err-lab))))
+      (inst jmp :e err-lab))
+    RETRY))
 
 #!-immobile-code
 (define-vop (set-fdefn-fun)

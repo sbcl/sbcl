@@ -280,16 +280,6 @@
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
       (storew (make-fixup 'undefined-tramp :assembly-routine)
               result fdefn-raw-addr-slot other-pointer-lowtag))))
-#!+immobile-space
-(define-vop (make-dummy-fdefn)
-  (:policy :fast-safe)
-  (:translate make-dummy-fdefn)
-  (:results (result :scs (descriptor-reg)))
-  (:node-var node)
-  (:generator 37
-    (with-fixed-allocation (result fdefn-widetag fdefn-size node)
-      (storew nil-value result fdefn-name-slot other-pointer-lowtag)
-      (storew nil-value result fdefn-fun-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
