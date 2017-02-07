@@ -427,7 +427,11 @@ sigfpe_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int *mxcsr = arch_os_context_mxcsr_addr(context);
 
-    if (siginfo->si_code == 0) { /* XMM exception */
+#ifndef LISP_FEATURE_DARWIN
+    /* Darwin doesn't handle accrued bits right. */
+    if (siginfo->si_code == 0) 
+#endif
+    { /* XMM exception */
         siginfo->si_code = mxcsr_to_code(*mxcsr);
 
         /* Clear sticky exception flag. */
