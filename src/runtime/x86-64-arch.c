@@ -429,7 +429,7 @@ sigfpe_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
 #ifndef LISP_FEATURE_DARWIN
     /* Darwin doesn't handle accrued bits right. */
-    if (siginfo->si_code == 0) 
+    if (siginfo->si_code == 0)
 #endif
     { /* XMM exception */
         siginfo->si_code = mxcsr_to_code(*mxcsr);

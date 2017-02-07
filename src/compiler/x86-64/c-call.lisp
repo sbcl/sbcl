@@ -337,13 +337,6 @@
     (inst and rsp-tn -16)
     (move result rsp-tn)))
 
-(define-vop (dealloc-number-stack-space)
-  (:info amount)
-  (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 7) 7)))
-        (inst add rsp-tn delta)))))
-
 (macrolet ((alien-stack-ptr ()
              #!+sb-thread '(symbol-known-tls-cell '*alien-stack-pointer*)
              #!-sb-thread '(static-symbol-value-ea '*alien-stack-pointer*)))
