@@ -1606,7 +1606,6 @@ static void adjust_fdefn_entrypoint(struct fdefn* fdefn, struct fdefn* new_fdefn
 /// objects, because scavenger functions might invoke transport functions.
 /// The best approach is to do an explicit switch over all object types.
 #include "genesis/hash-table.h"
-int fixup_space_verbose = 0;
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
@@ -2052,7 +2051,6 @@ void defrag_immobile_space(int* components)
 
     // Dynamic space
     // We can safely ignore allocation region boundaries.
-    fixup_space_verbose = 1;
     fixup_space((lispobj*)DYNAMIC_SPACE_START,
                 ((lispobj)
 #ifdef reg_ALLOC

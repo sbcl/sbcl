@@ -308,20 +308,3 @@
                       (ash nop-byte 40))
               (sap-ref-lispobj (int-sap fdefn-addr) (ash fdefn-fun-slot word-shift))
               fun)))))
-
-#|
-(sb-kernel:make-lisp-obj
- (alien-funcall (extern-alien "fdefn_raw_referent" (function long long))
-                (- (sb-kernel:get-lisp-obj-address
-                    (sb-kernel::find-fdefn 'suckit))
-                   sb-vm:other-pointer-lowtag)))
-
-(with-open-file (f "/tmp/cms" :direction :output)
-  (sb-vm::map-allocated-objects
-   (lambda (obj type size)
-     (when (and (= type sb-vm:code-header-widetag)
-                (zerop (sb-kernel:code-n-entries obj)))
-       (format f "~x~%" (sb-kernel:get-lisp-obj-address obj))
-       (sb-disassem::disassemble-code-component obj :stream f)))
-   :immobile))
-|#
