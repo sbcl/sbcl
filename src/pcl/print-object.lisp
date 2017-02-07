@@ -47,6 +47,9 @@
 (defmethod print-object ((object standard-object) stream)
   (print-unreadable-object (object stream :type t :identity t)))
 
+(defmethod print-object ((object funcallable-standard-object) stream)
+  (print-unreadable-object (object stream :type t :identity t)))
+
 (defmethod print-object ((method standard-method) stream)
   (if (slot-boundp method '%generic-function)
       (print-unreadable-object (method stream :type t :identity t)

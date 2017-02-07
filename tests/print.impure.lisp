@@ -759,6 +759,15 @@
   (assert (string/= (write-to-string (find-class 'fruit))
                     (write-to-string *fruit1*))))
 
+(defclass f-s-o-for-print-object (sb-mop:funcallable-standard-object)
+  ()
+  (:metaclass sb-mop:funcallable-standard-class))
+(with-test (:name (print-object sb-mop:funcallable-standard-object))
+  (let ((instance (make-instance 'f-s-o-for-print-object)))
+    (assert (eql 0 (search "#<F-S-O-FOR-PRINT-OBJECT"
+                           (with-output-to-string (stream)
+                             (print-object instance stream)))))))
+
 (with-test (:name :format-readably)
   (let ((*print-readably* t))
     (assert (format nil "~$" #'format))
