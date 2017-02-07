@@ -554,6 +554,7 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
+#ifdef LISP_FEATURE_IMMOBILE_CODE
 lispobj fdefn_raw_referent(struct fdefn* fdefn) {
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
         unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"
@@ -572,3 +573,4 @@ lispobj fdefn_raw_referent(struct fdefn* fdefn) {
         return 0;
     lose("Can't decode fdefn raw addr @ %p: %p\n", fdefn, fdefn->raw_addr);
 }
+#endif

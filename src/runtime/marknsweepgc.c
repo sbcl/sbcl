@@ -821,7 +821,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
   unsigned char widetag = widetag_of(*obj);
-  lispobj funobj[1];
+  lispobj __attribute__((unused)) funobj[1];
 
   switch (widetag) {
 #ifdef LISP_FEATURE_IMMOBILE_CODE
