@@ -1665,7 +1665,7 @@
 (defknown (etypecase-failure ecase-failure) (t t) nil)
 
 (defknown %odd-key-args-error () nil)
-(defknown %unknown-key-arg-error (t) nil)
+(defknown %unknown-key-arg-error (t t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte
   (movable foldable flushable))
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer

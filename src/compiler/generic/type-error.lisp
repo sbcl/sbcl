@@ -100,7 +100,8 @@
                                  args))
                 ,@(and context
                        `((:info *location-context*)
-                         (:arg-types * * (:constant t))))
+                         (:arg-types ,@(make-list (length args) :initial-element '*)
+                                     (:constant t))))
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
@@ -116,7 +117,7 @@
   (def odd-key-args-error odd-key-args-error
     sb!c::%odd-key-args-error nil)
   (def unknown-key-arg-error unknown-key-arg-error
-    sb!c::%unknown-key-arg-error nil key)
+    sb!c::%unknown-key-arg-error t key)
   (def nil-fun-returned-error nil-fun-returned-error nil nil fun))
 
 (defun encode-internal-error-args (values)

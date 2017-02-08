@@ -239,9 +239,20 @@
          :format-control "odd number of &KEY arguments"))
 
 (deferr unknown-key-arg-error (key-name)
-  (error 'simple-program-error
-         :format-control "unknown &KEY argument: ~S"
-         :format-arguments (list key-name)))
+  (let ((context (sb!di:error-context)))
+    (if (integerp context)
+        (restart-case
+            (error 'simple-program-error
+               :format-control "unknown &KEY argument: ~S"
+               :format-arguments (list key-name))
+          (continue ()
+            :report (lambda (stream)
+                      (format stream "Ignore it."))
+            (sb!vm::incf-context-pc *current-internal-error-context*
+                                    context)))
+        (error 'simple-program-error
+               :format-control "unknown &KEY argument: ~S"
+               :format-arguments (list key-name)))))
 
 ;; TODO: make the arguments (ARRAY INDEX &optional BOUND)
 ;; and don't need the bound for vectors. Just read it.

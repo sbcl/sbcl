@@ -536,3 +536,9 @@
       (assert (eq (test-use-value tail-call) 10))
       (assert (eq (test-use-value call) 11))
       (assert (eq (test-use-value return) value-lambda)))))
+
+(with-test (:name :unknown-key-restart)
+  (handler-bind ((error #'continue))
+    (assert (= (funcall (checked-compile '(lambda (&key abc) (1+ abc)))
+                        :bogus 30 :abc 20)
+               21))))

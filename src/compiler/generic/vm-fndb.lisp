@@ -465,3 +465,5 @@
 (defknown %data-vector-and-index (array index)
                                  (values (simple-array * (*)) index)
                                  (foldable flushable))
+
+(defknown restart-point (t) t ())

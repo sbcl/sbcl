@@ -2052,6 +2052,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
         (let ((*compiler-error-context* node))
           (compiler-warn "violating package lock on ~/sb-impl:print-symbol-with-prefix/"
                          symbol))))))
+
+(defoptimizer (restart-point ir2-convert) ((location) node block)
+  (setf (restart-location-label (lvar-value location))
+        (block-label (ir2-block-block block))))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)

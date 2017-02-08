@@ -628,8 +628,10 @@
                     (cond ,@(tests))))))
 
             (unless allowp
-              (body `(when (and (/= ,n-losep 0) (not ,n-allowp))
-                       (%unknown-key-arg-error ,n-lose)))))))
+              (let ((location (make-restart-location)))
+                (body `(if (and (/= ,n-losep 0) (not ,n-allowp))
+                           (%unknown-key-arg-error ,n-lose ,location)
+                           (restart-point ,location))))))))
 
       (let ((ep (ir1-convert-lambda-body
                  `((let ,(temps)

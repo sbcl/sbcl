@@ -730,7 +730,7 @@
            call
            `(lambda (&rest args)
               (declare (ignore args))
-              (%unknown-key-arg-error ',(car loser)))
+              (%unknown-key-arg-error ',(car loser) nil))
            '%unknown-key-arg-error)
           (return-from convert-more-call)))
 
