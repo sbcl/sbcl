@@ -1699,7 +1699,10 @@ register."
                  (live (logtest sb!c::compiled-debug-var-environment-live
                                 flags))
                  (save (logtest sb!c::compiled-debug-var-save-loc-p flags))
-                 (symbol (if minimal nil (geti)))
+                 (symbol (if (or more-count-p
+                                 more-context-p
+                                 minimal)
+                             nil (geti)))
                  (id (if (logtest sb!c::compiled-debug-var-id-p flags)
                          (geti)
                          0))

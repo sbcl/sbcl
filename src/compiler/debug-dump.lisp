@@ -363,7 +363,8 @@
          (indirect (and (lambda-var-indirect var)
                         (not (lambda-var-explicit-value-cell var))
                         (neq (lambda-physenv fun)
-                             (lambda-physenv (lambda-var-home var))))))
+                             (lambda-physenv (lambda-var-home var)))))
+         more)
     (declare (type index flags))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
@@ -378,16 +379,19 @@
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
-    (unless (or (zerop id) minimal)
-      (setq flags (logior flags compiled-debug-var-id-p)))
     (when indirect
       (setq flags (logior flags compiled-debug-var-indirect-p)))
     (when info
       (case (arg-info-kind info)
         (:more-context
-         (setq flags (logior flags compiled-debug-var-more-context-p)))
+         (setq flags (logior flags compiled-debug-var-more-context-p)
+               more t))
         (:more-count
-         (setq flags (logior flags compiled-debug-var-more-count-p)))))
+         (setq flags (logior flags compiled-debug-var-more-count-p)
+               more t))))
+    (unless (or more (zerop id) minimal)
+      (setq flags (logior flags compiled-debug-var-id-p)))
+
     #!+64-bit
     (cond (indirect
            (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
@@ -400,7 +404,8 @@
            (when save-tn
              (setf (ldb (byte 27 35) flags) (tn-sc-offset save-tn)))))
     (vector-push-extend flags buffer)
-    (unless minimal
+    (unless (or minimal
+                more) ;; &more vars need no name
       (vector-push-extend name buffer)
       (unless (zerop id)
         (vector-push-extend id buffer)))

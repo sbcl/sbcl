@@ -1647,12 +1647,13 @@ forms that explicitly control this kind of evaluation.")
                 (:more-context
                  (setf more-context (sb!di:debug-var-value v *current-frame*)))
                 (:more-count
-                 (setf more-count (sb!di:debug-var-value v *current-frame*))))
-              (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
-                      (sb!di:debug-var-symbol v)
-                      (zerop (sb!di:debug-var-id v))
-                      (sb!di:debug-var-id v)
-                      (sb!di:debug-var-value v *current-frame*))))
+                 (setf more-count (sb!di:debug-var-value v *current-frame*)))
+                (t
+                 (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
+                         (sb!di:debug-var-symbol v)
+                         (zerop (sb!di:debug-var-id v))
+                         (sb!di:debug-var-id v)
+                         (sb!di:debug-var-value v *current-frame*))))))
           (when (and more-context more-count)
             (format *debug-io* "~S  =  ~S~%"
                     'more
