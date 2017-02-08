@@ -16,48 +16,58 @@
 
 (defvar *macro-policy* nil)
 ;;; global policy restrictions as a POLICY object or nil
-(!defvar *policy-restrictions* nil)
+(defvar *policy-min* nil)
+(defvar *policy-max* nil)
 
-(defun restrict-compiler-policy (&optional quality (min 0))
+(defun restrict-compiler-policy (&optional quality (min 0) (max 3))
   "Assign a minimum value to an optimization quality. QUALITY is the name of
-the optimization quality to restrict, and MIN (defaulting to zero) is the
-minimum allowed value.
+the optimization quality to restrict, MIN (defaulting to zero) is the
+minimum allowed value, and MAX (defaults to 3) is the maximum.
 
 Returns the alist describing the current policy restrictions.
 
 If QUALITY is NIL or not given, nothing is done.
 
-Otherwise, if MIN is zero or not given, any existing restrictions of QUALITY
-are removed. If MIN is between one and three inclusive, it becomes the new
-minimum value for the optimization quality: any future proclamations or
-declarations of the quality with a value less then MIN behave as if the value
-was MIN instead.
+Otherwise, if MIN is zero or MAX is 3 or neither are given, any
+existing restrictions of QUALITY are removed.
 
-This is intended to be used interactively, to facilitate recompiling large
-bodies of code with eg. a known minimum safety.
-
-See also :POLICY option in WITH-COMPILATION-UNIT.
-
-EXPERIMENTAL INTERFACE: Subject to change."
-  (declare (type policy-quality min))
+See also :POLICY option in WITH-COMPILATION-UNIT."
+  (declare (type policy-quality min max))
   (when quality
-    (unless (policy-quality-name-p quality)
-      (error "~S is not a policy quality" quality))
-    ;; The dynamic policy object is immutable, otherwise a construct like
-    ;;  (let ((*policy-restrictions* *policy-restrictions*)) ...)
-    ;; could allow alterations inside the LET to leak out.
-    ;; The structure itself does not declare slots its read-only, because
-    ;; OPTIMIZE declaration processing uses it as a scratchpad.
-    (setf *policy-restrictions*
-          (acond (*policy-restrictions* (copy-structure it))
-                 (t (make-policy 0 0))))
-    (alter-policy *policy-restrictions* (policy-quality-name-p quality)
-                  min (plusp min)))
+    (let ((quality-id (policy-quality-name-p quality)))
+      (unless quality-id
+        (error "~S is not a policy quality" quality))
+      (when (> min max)
+        (error "MIN ~s should be not be greater than MAX ~s." min max))
+      ;; The dynamic policy object is immutable, otherwise a construct like
+      ;;  (let ((*policy-min* *policy-max*)) ...)
+      ;; could allow alterations inside the LET to leak out.
+      ;; The structure itself does not declare slots its read-only, because
+      ;; OPTIMIZE declaration processing uses it as a scratchpad.
+      (setf *policy-min*
+            (if *policy-min*
+                (copy-structure *policy-min*)
+                (make-policy 0 0))
+            *policy-max*
+            (if *policy-max*
+                (copy-structure *policy-max*)
+                (let ((policy (make-policy
+                               (1- (expt 2 (* 2 n-policy-primary-qualities)))
+                               0)))
+                  (setf (policy-dependent-qualities policy)
+                        (1- (expt 2
+                                  (* (- max-policy-qualities n-policy-primary-qualities)
+                                     2))))
+                  policy)))
+      (alter-policy *policy-min* quality-id min (plusp min))
+      (alter-policy *policy-max* quality-id max (< max 3))))
   ;; Return dotted pairs, not elements that look declaration-like.
-  (if *policy-restrictions*
-      (mapc (lambda (x) (rplacd x (cadr x)))
-            (policy-to-decl-spec *policy-restrictions*))
-      '()))
+  (flet ((policy-to-result (policy)
+           (and policy
+                (mapc (lambda (x) (rplacd x (cadr x)))
+                      (policy-to-decl-spec policy)))))
+    (values (policy-to-result *policy-min*)
+            (policy-to-result *policy-max*))))
 
 (defstruct (policy-dependent-quality (:copier nil))
   (name nil :type symbol :read-only t)
@@ -82,7 +92,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
                  (policy-dependent-quality-name
                   (elt **policy-dependent-qualities** index)))
              (if raw
-                 ;; Raw values are insensitive to *POLICY-RESTRICTIONS*.
+                 ;; Raw values are insensitive to *POLICY-MIN/MAX*.
                  (%%policy-quality policy index)
                  ;; Otherwise take the adjusted quality.
                  (%policy-quality policy index)))))
@@ -143,7 +153,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;;; because for deterministic comparison the list was always freshly
 ;;; consed so that destructive sorting could be done for canonicalization.
 (declaim (type policy *policy*)
-         (type (or policy null) *policy-restrictions*))
+         (type (or policy null) *policy-min* *policy-max*))
 
 ;; ANSI-specified default of 1 for each quality.
 (defglobal **baseline-policy** nil)
@@ -189,19 +199,21 @@ EXPERIMENTAL INTERFACE: Subject to change."
          (t
           form)))
 
-(macrolet ((extract-field (floor-expression-primary
-                           floor-expression-dependent)
+(macrolet ((extract-field (min-expression-primary min-expression-dependent
+                           max-expression-primary max-expression-dependent)
              `(if (minusp index)
                   (let ((byte-pos (* (lognot index) 2)))
-                    (max (ldb (byte 2 byte-pos)
-                              (policy-primary-qualities policy))
-                         ,floor-expression-primary))
+                    (min ,max-expression-primary
+                         (max ,min-expression-primary
+                              (ldb (byte 2 byte-pos)
+                                   (policy-primary-qualities policy)))))
                   (let ((byte-pos (* index 2)))
-                    (max (if (logbitp index (policy-presence-bits policy))
-                             (ldb (byte 2 byte-pos)
-                                  (policy-dependent-qualities policy))
-                             1)
-                         ,floor-expression-dependent))))
+                    (min ,max-expression-dependent
+                         (max ,min-expression-dependent
+                              (if (logbitp index (policy-presence-bits policy))
+                                  (ldb (byte 2 byte-pos)
+                                       (policy-dependent-qualities policy))
+                                  1))))))
            (define-getter (name &body body)
              `(defun ,name (policy index)
                 (declare (type policy policy)
@@ -212,24 +224,33 @@ EXPERIMENTAL INTERFACE: Subject to change."
                                index))
                 ,@body)))
 
-  ;; Return the value for quality INDEX in POLICY, using *POLICY-RESTRICTIONS*
+  ;; Return the value for quality INDEX in POLICY, using *POLICY-MIN/MAX*
   ;; Primary qualities are assumed to exist, however policy-restricting functions
   ;; can create a POLICY that indicates absence of primary qualities.
   ;; This does not affect RESTRICT-COMPILER-POLICY because a lower bound of 0
   ;; can be assumed for everything. SET-MACRO-POLICY might care though.
   (define-getter %policy-quality
-    (let ((floor *policy-restrictions*))
-      (macrolet ((quality-floor (get-byte)
-                   `(if floor (ldb (byte 2 byte-pos) (,get-byte floor)) 0)))
-        (extract-field (quality-floor policy-primary-qualities)
-                       (quality-floor policy-dependent-qualities)))))
+    (let ((min *policy-min*)
+          (max *policy-max*))
+      (macrolet ((quality-min (get-byte)
+                   `(if min
+                        (ldb (byte 2 byte-pos) (,get-byte min))
+                        0))
+                 (quality-max (get-byte)
+                   `(if max
+                        (ldb (byte 2 byte-pos) (,get-byte max))
+                        3)))
+        (extract-field (quality-min policy-primary-qualities)
+                       (quality-min policy-dependent-qualities)
+                       (quality-max policy-primary-qualities)
+                       (quality-max policy-dependent-qualities)))))
 
   ;; Return the unadjusted value for quality INDEX in POLICY.
   ;; This is used for converting a policy to a list of elements for display
   ;; and for verifying that after processing declarations, the new policy
   ;; matches the given declarations, thus implying no ambiguity.
   (define-getter %%policy-quality
-    (extract-field 0 0))) ; floor is always 0
+    (extract-field 0 0 3 3)))
 
 ;;; Forward declaration of %COERCE-TO-POLICY.
 ;;; Definition is in 'node' so that FUNCTIONAL and NODE types are defined.

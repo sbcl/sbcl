@@ -2876,7 +2876,8 @@
 ;; META: there's a test in compiler.impure.lisp that also tests
 ;; interaction of PROGV with (debug 3). These tests should be together.
 (with-test (:name :progv-and-restrict-compiler-policy)
-  (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+  (let ((sb-c::*policy-min* sb-c::*policy-min*)
+        (sb-c::*policy-max* sb-c::*policy-max*))
     (restrict-compiler-policy 'debug 3)
     (let ((fun (compile nil '(lambda (x)
                               (let ((i x))

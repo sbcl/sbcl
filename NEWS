@@ -18,6 +18,8 @@ changes relative to sbcl-1.3.14:
     This feature can only be enabled if #+immobile-space is enabled.
   * enhancement: undefined function errors can be restarted on x86-64, to
     either retry calling the function again or call a user supplied function.
+  * enhancement: sb-ext:restrict-compiler-policy accepts an upper bound in
+    addition to a lower bound.
   * defaults change: sb-ext:*disassemble-annotate* default to NIL, due to its
     poor reliability.
   * new feature: SB-LINKABLE-RUNTIME, allowing linking with extra object

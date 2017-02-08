@@ -237,7 +237,8 @@ Examples:
                        (summarize-compilation-unit (not succeeded-p)))))))))
     (if policy
         (let ((*policy* (process-optimize-decl policy (unless override *policy*)))
-              (*policy-restrictions* (unless override *policy-restrictions*)))
+              (*policy-min* (unless override *policy-min*))
+              (*policy-max* (unless override *policy-max*)))
           (with-it))
         (with-it))))
 

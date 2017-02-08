@@ -1469,10 +1469,12 @@
     (sb-ext:restrict-compiler-policy 'debug 0)))
 
 (with-test (:name :restrict-compiler-policy-result)
-  (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+  (let ((sb-c::*policy-min* sb-c::*policy-min*)
+        (sb-c::*policy-max* sb-c::*policy-max*))
     (sb-ext:restrict-compiler-policy 'safety 2)
     (checked-compile '(lambda () (declare (optimize (safety 0))))))
-  (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+  (let ((sb-c::*policy-min* sb-c::*policy-min*)
+        (sb-c::*policy-max* sb-c::*policy-max*))
     ;; Passing no arguments returns the current quality/value pairs.
     (assert (null (sb-ext:restrict-compiler-policy)))
     (let ((res (sb-ext:restrict-compiler-policy 'safety 2)))
