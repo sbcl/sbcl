@@ -123,8 +123,11 @@
 
 #!+(and immobile-code (host-feature sb-xc))
 (progn
-  (defun sb!vm::function-raw-address (name &optional (fun (awhen (find-fdefn name)
-                                                           (fdefn-fun it))))
+  ;; Use FDEFINITION because it strips encapsulations - whether that's
+  ;; the right behavior for it or not is a separate concern.
+  ;; If somebody tries (TRACE LENGTH) for example, it should not cause
+  ;; compilations to fail on account of LENGTH becoming a closure.
+  (defun sb!vm::function-raw-address (name &aux (fun (fdefinition name)))
     (let ((addr (and fun (get-lisp-obj-address fun))))
       (cond ((not addr)
              (error "Can't statically link to undefined function ~S" name))
