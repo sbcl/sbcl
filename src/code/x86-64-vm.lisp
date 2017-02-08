@@ -314,3 +314,23 @@
                       (ash nop-byte 40))
               (sap-ref-lispobj (int-sap fdefn-addr) (ash fdefn-fun-slot word-shift))
               fun)))))
+
+;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
+#!+immobile-space
+(defun find-called-object (address)
+  (when (<= immobile-space-start address immobile-space-end)
+    (let ((obj (alien-funcall (extern-alien "search_immobile_space" (function long long))
+                              address)))
+      (unless (eql obj 0)
+        (case (sap-ref-8 (int-sap obj) 0)
+         (#.fdefn-widetag
+          (make-lisp-obj (logior obj other-pointer-lowtag)))
+         (#.code-header-widetag
+          (let ((code (make-lisp-obj (logior obj other-pointer-lowtag))))
+            (dotimes (i (code-n-entries code))
+              (let ((f (%code-entry-point code i)))
+                (if (= (+ (get-lisp-obj-address f)
+                          (ash simple-fun-code-offset word-shift)
+                          (- fun-pointer-lowtag))
+                       address)
+                    (return f)))))))))))

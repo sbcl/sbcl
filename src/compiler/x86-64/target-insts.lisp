@@ -384,8 +384,7 @@
                 (when (and (or (eq inst jmp-inst)
                                (eq inst call-inst))
                            (funcall predicate
-                                    (+ (sb!disassem::sign-extend
-                                        (ldb (byte 32 8) dchunk) 32)
+                                    (+ (near-jump-displacement dchunk dstate)
                                        (dstate-next-addr dstate))))
                   (vector-push-extend (dstate-cur-addr dstate) relocs)))
               seg dstate nil))

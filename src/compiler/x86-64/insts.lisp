@@ -156,31 +156,17 @@
 
 #-sb-xc-host
 (defun maybe-note-lisp-callee (value dstate)
-  ;; Look for either an FDEFN or simple-fun entry at the specified value.
-  (binding* ((code (seg-code (dstate-segment dstate)) :exit-if-null)
-             (putative-fdefn
-              (+ value
-                 (- (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift))
-                 sb!vm:other-pointer-lowtag)))
-    ;; Taking a safe approach, scan code header for matching fdefn
-    ;; rather than assuming this is one.
-    (loop for i from sb!vm:code-constants-offset
-          below (code-header-words code)
-          for const = (code-header-ref code i)
-          when (and (typep const 'fdefn)
-                    (= putative-fdefn (get-lisp-obj-address const)))
-          do (return (note (lambda (stream) (princ const stream))
-                           dstate)))))
+  (let ((object (sb!vm::find-called-object value)))
+    (when object
+      (note (lambda (stream) (princ object stream)) dstate))))
 
 (define-arg-type displacement
   :sign-extend t
   :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
   :printer (lambda (value stream dstate)
-             #!+immobile-space
-             (when (typep value `(integer ,sb!vm:immobile-space-start
-                                          (,sb!vm:immobile-space-end)))
-               (maybe-note-lisp-callee value dstate))
-             (maybe-note-assembler-routine value nil dstate)
+             (or #!+immobile-space
+                 (and (integerp value) (maybe-note-lisp-callee value dstate))
+                 (maybe-note-assembler-routine value nil dstate))
              (print-label value stream dstate)))
 
 (define-arg-type accum
@@ -896,7 +882,7 @@
 
 (define-instruction-format (near-jump 40 :default-printer '(:name :tab label))
   (op    :field (byte 8 0))
-  (label :field (byte 32 8) :type 'displacement))
+  (label :field (byte 32 8) :type 'displacement :reader near-jump-displacement))
 
 (define-instruction-format (cond-set 24 :default-printer '('set cc :tab reg/mem))
   (prefix :field (byte 8 0) :value #b00001111)
