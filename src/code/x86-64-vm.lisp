@@ -81,11 +81,16 @@
   ;; This needn't be inside WITHOUT-GCING, because code fixups will point
   ;; only to objects that don't move except during save-lisp-and-die.
   ;; So there is no race with GC here.
-  ;; Note that genesis does not need the :NAMED-CALL case,
-  ;; because compile-file always puts code into immobile space.
+  ;; Note that:
+  ;;  (1) :NAMED-CALL occurs in both :RELATIVE and :ABSOLUTE kinds.
+  ;;      We can ignore the :RELATIVE kind.
+  ;;  (2) genesis does not need the :NAMED-CALL case,
+  ;;      because COMPILE-FILE always places code in immobile space,
+  ;;      and self-build does not use step instrumenting, so there are
+  ;;      no named calls using the sequence "MOV RAX, imm32 ; CALL RAX"
+  ;;      Hence SB!FASL::DO-COLD-FIXUP does not exactly mimic this logic.
   #!+immobile-space
-  (when (or (and (eq flavor :named-call) (not (sb!kernel::immobile-space-obj-p code)))
-            (eq flavor :immobile-object))
+  (when (and (eq kind :absolute) (member flavor '(:named-call :immobile-object)))
     (let ((fixups (%code-fixups code)))
       ;; Sanctifying the code component will compact these into a bignum.
       (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))
