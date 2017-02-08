@@ -3458,8 +3458,8 @@ register."
         ;; won't keep NEW-CALLEE pinned down. Once it's inside
         ;; CONTEXT, which is registered in thread->interrupt_contexts,
         ;; it will properly point to NEW-CALLEE.
-        #!+immobile-code
         (cond
+         #!+immobile-code
          ((fdefn-p callee) ; as above, should be in {target}-vm.lisp
           ;; Don't store the FDEFN in RAX, but the address of the raw_addr slot.
           (setf (context-register context callee-register-offset)

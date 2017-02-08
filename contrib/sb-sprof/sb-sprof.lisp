@@ -441,7 +441,7 @@ profiling, and :TIME for wallclock profiling.")
                                    sb-vm:other-pointer-lowtag)
                                 code-header-len))
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
-             (declare (ignorable di))
+             #+immobile-code (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
                     (values code (sap-int pc)))
                    (df
