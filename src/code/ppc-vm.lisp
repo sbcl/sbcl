@@ -2,16 +2,10 @@
 ;;;
 (in-package "SB!VM")
 
-#-sb-xc-host (progn
-(define-alien-type os-context-t (struct os-context-t-struct))
-
-
-;;;; MACHINE-TYPE
-
+#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "PowerPC")
-) ; end PROGN
 
 ;;;; FIXUP-CODE-OBJECT
 
@@ -51,33 +45,7 @@
 ;;;; hacked for types.
 
 #-sb-xc-host (progn
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
-  (context (* os-context-t)))
 
-(defun context-pc (context)
-  (declare (type (alien (* os-context-t)) context))
-  (int-sap (deref (context-pc-addr context))))
-
-(define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-long)
-  (context (* os-context-t))
-  (index int))
-
-(defun context-register (context index)
-  (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)))
-
-(define-alien-routine ("os_context_lr_addr" context-lr-addr) (* unsigned-long)
-  (context (* os-context-t)))
-
-(defun context-lr (context)
-  (declare (type (alien (* os-context-t)) context))
-  (int-sap (deref (context-lr-addr context))))
-
-(defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
 

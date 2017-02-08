@@ -1,14 +1,9 @@
 (in-package "SB!VM")
 
-#-sb-xc-host (progn
-(define-alien-type os-context-t (struct os-context-t-struct))
-
-;;;; MACHINE-TYPE
-
+#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "HPPA")
-) ; end PROGN
 
 ;;;; FIXUP-CODE-OBJECT
 (!with-bigvec-or-sap
@@ -55,30 +50,7 @@
                         (mask-field (byte 11 21) inst))))))))))
 
 #-sb-xc-host (progn
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
-  (context (* os-context-t)))
 
-(defun context-pc (context)
-  (declare (type (alien (* os-context-t)) context))
-  (int-sap (logandc2 (deref (context-pc-addr context)) 3)))
-
-(define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-int)
-  (context (* os-context-t))
-  (index int))
-
-;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
-;;; (Are they used in anything time-critical, or just the debugger?)
-(defun context-register (context index)
-  (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)))
-
-(defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
-
-#!+linux
 ;;; For now.
 (defun context-floating-point-modes (context)
   (declare (ignore context))

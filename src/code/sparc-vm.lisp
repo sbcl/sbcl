@@ -11,15 +11,10 @@
 (in-package "SB!VM")
 
 ;;; See x86-vm.lisp for a description of this.
-#-sb-xc-host (progn
-(define-alien-type os-context-t (struct os-context-t-struct))
-
-;;;; MACHINE-TYPE
-
+#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "SPARC")
-) ; end PROGN
 
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind)
@@ -47,29 +42,6 @@
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
 #-sb-xc-host (progn
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
-  (context (* os-context-t)))
-
-(defun context-pc (context)
-  (declare (type (alien (* os-context-t)) context))
-  (int-sap (deref (context-pc-addr context))))
-
-(define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-int)
-  (context (* os-context-t))
-  (index int))
-
-;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
-;;; (Are they used in anything time-critical, or just the debugger?)
-(defun context-register (context index)
-  (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)))
-
-(defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
-
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
 

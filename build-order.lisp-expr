@@ -249,6 +249,7 @@
 
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
+ ("src/code/share-vm" :not-host)
  #!+sparc ("src/code/sparc-vm")
  #!+hppa  ("src/code/hppa-vm")
  #!+x86   ("src/code/x86-vm"   :not-host)

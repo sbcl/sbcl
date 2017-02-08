@@ -10,31 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-;;;; OS-CONTEXT-T
-
-;;; a POSIX signal context, i.e. the type passed as the third
-;;; argument to an SA_SIGACTION-style signal handler
-;;;
-;;; The real type does have slots, but at Lisp level, we never
-;;; access them, or care about the size of the object. Instead, we
-;;; always refer to these objects by pointers handed to us by the C
-;;; runtime library, and ask the runtime library any time we need
-;;; information about the contents of one of these objects. Thus, it
-;;; works to represent this as an object with no slots.
-;;;
-;;; KLUDGE: It would be nice to have a type definition analogous to
-;;; C's "struct os_context_t;", for an incompletely specified object
-;;; which can only be referred to by reference, but I don't know how
-;;; to do that in the FFI, so instead we just this bogus no-slots
-;;; representation. -- WHN 20000730
-;;;
-;;; FIXME: Since SBCL, unlike CMU CL, uses this as an opaque type,
-;;; it's no longer architecture-dependent, and probably belongs in
-;;; some other package, perhaps SB-KERNEL.
-(define-alien-type os-context-t (struct os-context-t-struct))
-
-;;;; MACHINE-TYPE
 
 (defun machine-type ()
   "Return a string describing the type of the local machine."
@@ -102,48 +77,9 @@
 ;;;;      and internal error handling) the extra runtime cost should be
 ;;;;      negligible.
 
-(declaim (inline context-pc-addr))
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
-  ;; (Note: Just as in CONTEXT-REGISTER-ADDR, we intentionally use an
-  ;; 'unsigned *' interpretation for the 32-bit word passed to us by
-  ;; the C code, even though the C code may think it's an 'int *'.)
-  (context (* os-context-t)))
-
-(declaim (inline context-pc))
-(defun context-pc (context)
-  (declare (type (alien (* os-context-t)) context))
-  (let ((addr (context-pc-addr context)))
-    (declare (type (alien (* unsigned-int)) addr))
-    (int-sap (deref addr))))
-
-(declaim (inline context-register-addr))
-(define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-int)
-  ;; (Note the mismatch here between the 'int *' value that the C code
-  ;; may think it's giving us and the 'unsigned *' value that we
-  ;; receive. It's intentional: the C header files may think of
-  ;; register values as signed, but the CMU CL code tends to think of
-  ;; register values as unsigned, and might get bewildered if we ask
-  ;; it to work with signed values.)
-  (context (* os-context-t))
-  (index int))
-
 #!+(or linux win32)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
-
-(declaim (inline context-register))
-(defun context-register (context index)
-  (declare (type (alien (* os-context-t)) context))
-  (let ((addr (context-register-addr context index)))
-    (declare (type (alien (* unsigned-int)) addr))
-    (deref addr)))
-
-(defun %set-context-register (context index new)
-  (declare (type (alien (* os-context-t)) context))
-  (let ((addr (context-register-addr context index)))
-    (declare (type (alien (* unsigned-int)) addr))
-    (setf (deref addr) new)))
 
 (defun context-float-register (context index format)
   (declare (ignorable context index))
