@@ -1916,15 +1916,16 @@
                                      ;; be better -- APD, 2003-05-15
                                      (leaf-type var)))
                  (propagate-to-refs var (lvar-type arg))
-                 (let ((use-component (node-component use)))
-                   (prog1 (substitute-leaf-if
-                           (lambda (ref)
-                             (cond ((eq (node-component ref) use-component)
-                                    t)
-                                   (t
-                                    (aver (lambda-toplevelish-p (lambda-home fun)))
-                                    nil)))
-                           leaf var)))
+                 (unless (preserve-single-use-debug-var-p call var)
+                   (let ((use-component (node-component use)))
+                     (substitute-leaf-if
+                      (lambda (ref)
+                        (cond ((eq (node-component ref) use-component)
+                               t)
+                              (t
+                               (aver (lambda-toplevelish-p (lambda-home fun)))
+                               nil)))
+                      leaf var)))
                  t)))))
         ((and (null (rest (leaf-refs var)))
               (not (preserve-single-use-debug-var-p call var))
