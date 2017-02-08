@@ -352,3 +352,20 @@
           (inst add sap disp)
           (inst lea sap (make-ea :qword :base vector :disp disp))))))
 
+;;; Compare and swap
+(define-vop (signed-sap-cas-32)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg) :to (:eval 0))
+         (offset :scs (signed-reg) :to (:eval 0))
+         (oldval :scs (signed-reg) :target result)
+         (newval :scs (signed-reg)))
+  (:temporary (:sc dword-reg :offset eax-offset) eax)
+  (:arg-types system-area-pointer signed-num signed-num signed-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 5
+    (inst mov eax (reg-in-size oldval :dword))
+    (inst cmpxchg (make-ea :dword :base sap :index offset)
+          (reg-in-size newval :dword))
+    (inst mov (reg-in-size result :dword) eax)))
+

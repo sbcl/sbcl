@@ -20,6 +20,9 @@ changes relative to sbcl-1.3.14:
     either retry calling the function again or call a user supplied function.
   * enhancement: sb-ext:restrict-compiler-policy accepts an upper bound in
     addition to a lower bound.
+  * enhancement: #+immobile-code improves the speed of function calling.
+    Some delay may be noticed when redefining an existing function
+    from a saved core file however.
   * defaults change: sb-ext:*disassemble-annotate* default to NIL, due to its
     poor reliability.
   * new feature: SB-LINKABLE-RUNTIME, allowing linking with extra object

@@ -156,9 +156,8 @@
 
 #-sb-xc-host
 (defun maybe-note-lisp-callee (value dstate)
-  (let ((object (sb!vm::find-called-object value)))
-    (when object
-      (note (lambda (stream) (princ object stream)) dstate))))
+  (awhen (sb!vm::find-called-object value)
+    (note (lambda (stream) (princ it stream)) dstate)))
 
 (define-arg-type displacement
   :sign-extend t

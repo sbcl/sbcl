@@ -203,10 +203,16 @@ sufficiently motivated to do lengthy fixes."
   ;; SAVE-LISP-AND-DIE.)
     #!+gencgc
     (progn
-      ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
-      ;; prior causes compilation to occur into immobile space.
-      ;; Failing to see all immobile code would miss some relocs.
-      #!+immobile-code (sb!kernel::choose-code-component-order root-structures)
+      #!+immobile-code
+      (progn
+        ;; Perform static linkage. There seems to be no reason to have users
+        ;; decide whether they want this. Functions become un-statically-linked
+        ;; on demand, for TRACE, redefinition, etc.
+        (sb!vm::statically-link-core)
+        ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
+        ;; prior causes compilation to occur into immobile space.
+        ;; Failing to see all immobile code would miss some relocs.
+        (sb!kernel::choose-code-component-order root-structures))
       ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
       ;; access to it even after the GC has moved it.
       (setf sb!vm::*restart-lisp-function* #'restart-lisp)

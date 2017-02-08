@@ -263,6 +263,7 @@
 ;;; the current alien stack pointer; saved/restored for non-local exits
 (defvar *alien-stack-pointer*)
 
+#!+immobile-code
 (defun fun-immobilize (fun)
   (let ((code (allocate-code-object t 0 16)))
     (setf (%code-debug-info code) fun)
@@ -288,9 +289,12 @@
         (setf (sap-ref-32 sap i) #xFD60FF))) ; JMP [RAX-3]
     code))
 
+#!+immobile-code
 (defun %set-fdefn-fun (fdefn fun)
   (declare (type fdefn fdefn) (type function fun)
            (values function))
+  (unless (eql (sb!vm::fdefn-has-static-callers fdefn) 0)
+    (sb!vm::remove-static-links fdefn))
   (let ((trampoline (unless (and (simple-fun-p fun)
                                  (< (get-lisp-obj-address fun) (ash 1 32)))
                       (fun-immobilize fun)))) ; a newly made CODE object
@@ -334,3 +338,11 @@
                           (- fun-pointer-lowtag))
                        address)
                     (return f)))))))))))
+
+;;; Compute the PC that FDEFN will jump to when called.
+#!+immobile-code
+(defun fdefn-call-target (fdefn)
+  (let ((pc (+ (get-lisp-obj-address fdefn)
+               (- other-pointer-lowtag)
+               (ash fdefn-raw-addr-slot word-shift))))
+    (+ pc 5 (signed-sap-ref-32 (int-sap pc) 1)))) ; 5 = length of JMP

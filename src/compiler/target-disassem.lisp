@@ -2022,14 +2022,14 @@
   ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
   ;; used in an unboxed context, such as an ADD instruction,
   ;; might be seen as an address.
-  #!+(and immobile-space x86-64)
-  (let ((code (seg-code (dstate-segment dstate))))
-    (when code
-      (loop for i from sb!vm:code-constants-offset
-            below (code-header-words code)
-            for const = (code-header-ref code i)
-            when (eql (get-lisp-obj-address const) address)
-            return (note (lambda (s) (prin1-quoted-short const s)) dstate)))))
+  #!+immobile-space
+  (unless (eql address 0)
+    (let ((code (seg-code (dstate-segment dstate))))
+      (when code
+        (loop for i downfrom (1- (code-header-words code)) to sb!vm:code-constants-offset
+              for const = (code-header-ref code i)
+              when (eql (get-lisp-obj-address const) address)
+              return (note (lambda (s) (prin1-quoted-short const s)) dstate))))))
 
 (defun get-internal-error-name (errnum)
   (cadr (svref sb!c:+backend-internal-errors+ errnum)))
