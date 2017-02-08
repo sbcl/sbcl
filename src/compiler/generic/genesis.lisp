@@ -2474,17 +2474,19 @@ core and return a descriptor to it."
   (bug "CHARACTER-STRING[~D] dumped by cross-compiler." len))
 
 (define-cold-fop (fop-vector (size))
-  (let* ((result (allocate-vector-object *dynamic*
-                                         sb!vm:n-word-bits
-                                         size
-                                         sb!vm:simple-vector-widetag)))
-    (do ((index (1- size) (1- index)))
-        ((minusp index))
-      (declare (fixnum index))
-      (write-wordindexed result
-                         (+ index sb!vm:vector-data-offset)
-                         (pop-stack)))
-    result))
+  (if (zerop size)
+      *simple-vector-0-descriptor*
+      (let ((result (allocate-vector-object *dynamic*
+                                            sb!vm:n-word-bits
+                                            size
+                                            sb!vm:simple-vector-widetag)))
+        (do ((index (1- size) (1- index)))
+            ((minusp index))
+          (declare (fixnum index))
+          (write-wordindexed result
+                             (+ index sb!vm:vector-data-offset)
+                             (pop-stack)))
+        result)))
 
 (define-cold-fop (fop-spec-vector)
   (let* ((len (read-word-arg (fasl-input-stream)))
