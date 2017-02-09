@@ -148,6 +148,10 @@
                                    for i from 0
                                    collect `(ash (bvref bigvec ,index) ,(* i 8)))))
                  (defun (setf ,name) (new-value bigvec byte-index)
+                   ;; We don't carefully distinguish between signed and unsigned,
+                   ;; since there's only one setter function per byte size.
+                   (declare (type (or (signed-byte ,n) (unsigned-byte ,n))
+                                  new-value))
                    (setf ,@(loop for index in le-octet-indices
                                  for i from 0
                           append `((bvref bigvec ,index)
@@ -2130,13 +2134,7 @@ core and return a descriptor to it."
     (sb!vm::fixup-code-object code-object gspace-byte-offset value kind)
 
     #!+(or x86 x86-64)
-       ;; XXX: Note that un-fixed-up is read via bvref-word, which is
-       ;; 64 bits wide on x86-64, but the fixed-up value is written
-       ;; via bvref-32.  This would make more sense if we supported
-       ;; :absolute64 fixups, but apparently the cross-compiler
-       ;; doesn't dump them.
     (let* ((gspace-data (descriptor-mem code-object))
-           (un-fixed-up (bvref-word gspace-data gspace-byte-offset))
            (obj-start-addr (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask))
            (code-end-addr
             (+ obj-start-addr
@@ -2144,40 +2142,37 @@ core and return a descriptor to it."
                             sb!vm:short-header-max-words) sb!vm:word-shift)
                (descriptor-fixnum
                 (read-wordindexed code-object sb!vm:code-code-size-slot))))
-           (gspace-byte-address (gspace-byte-address
-                                 (descriptor-gspace code-object)))
+           (gspace-base (gspace-byte-address (descriptor-gspace code-object)))
            (in-dynamic-space
             (= (gspace-identifier (descriptor-intuit-gspace code-object))
-               dynamic-core-space-id)))
+               dynamic-core-space-id))
+           (addr (+ value (bvref-32 gspace-data gspace-byte-offset))))
 
       (declare (ignorable code-end-addr in-dynamic-space))
       (assert (= obj-start-addr
-                 (+ gspace-byte-address (descriptor-byte-offset code-object))))
+                 (+ gspace-base (descriptor-byte-offset code-object))))
+
       ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
       ;; Except for the use of saps, this is basically identical.
       (when (ecase kind
              (:absolute
-              (let ((fixed-up (+ value un-fixed-up)))
-                (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
-
-                ;; Absolute fixups are recorded if within the object for x86.
-                #!+x86 (and in-dynamic-space
-                            (< obj-start-addr fixed-up code-end-addr))
-
-                ;; Absolute :immobile-object fixups are recorded for x86-64.
-                #!+x86-64 (eq flavor :immobile-object)))
-
+              (setf (bvref-32 gspace-data gspace-byte-offset)
+                    (the (unsigned-byte 32) addr))
+              ;; Absolute fixups are recorded if within the object for x86.
+              #!+x86 (and in-dynamic-space
+                          (< obj-start-addr addr code-end-addr))
+              ;; Absolute :immobile-object fixups are recorded for x86-64.
+              #!+x86-64 (eq flavor :immobile-object))
              (:relative ; (used for arguments to X86 relative CALL instruction)
-              (let ((fixed-up (- (+ value un-fixed-up)
-                                 gspace-byte-address
-                                 gspace-byte-offset
-                                 4))) ; "length of CALL argument"
-                (setf (bvref-32 gspace-data gspace-byte-offset) fixed-up)
-                ;; Relative fixups are recorded if without the object.
-                #!+x86 (and in-dynamic-space
-                            (or (< fixed-up obj-start-addr)
-                                (> fixed-up code-end-addr)))
-                #!+x86-64 nil)))
+              (setf (bvref-32 gspace-data gspace-byte-offset)
+                    (the (signed-byte 32)
+                      (- addr (+ gspace-base gspace-byte-offset 4)))) ; 4 = size of rel32off
+              ;; Relative fixups are recorded if without the object.
+              ;; Except that read-only space contains calls to asm routines,
+              ;; and we don't record those fixups.
+              #!+x86 (and in-dynamic-space
+                          (not (< obj-start-addr addr code-end-addr)))
+              #!+x86-64 nil))
         (push after-header (gethash (descriptor-bits code-object)
                                     *code-fixup-notes*)))))
   code-object)
