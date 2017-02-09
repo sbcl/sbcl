@@ -268,7 +268,7 @@
                               required argument~:P; was asked to ~
                               find a method with specializers ~S~@:>"
            :format-arguments (list generic-function required-parameter-count
-                                   specializers)))))
+                                   (unparse-specializers generic-function specializers))))))
     (flet ((congruentp (other-method)
              (let ((other-specializers (method-specializers other-method)))
                (aver (= specializer-count (length other-specializers)))

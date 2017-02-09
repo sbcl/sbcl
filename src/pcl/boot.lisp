@@ -1912,6 +1912,10 @@ generic function lambda list ~S~:>"
 (defun ll-keyp-or-restp (bits)
   (logtest (lambda-list-keyword-mask '(&key &rest)) bits))
 
+(defun remove-methods (gf)
+  (loop for method in (generic-function-methods gf)
+        do (remove-method gf method)))
+
 (defun set-arg-info (gf &key new-method (lambda-list nil lambda-list-p)
                         argument-precedence-order)
   (let* ((arg-info (if (eq **boot-state** 'complete)
@@ -1936,9 +1940,14 @@ generic function lambda list ~S~:>"
             (unless (and (= nreq gf-nreq)
                          (= nopt gf-nopt)
                          (eq (ll-keyp-or-restp llks) gf-key/rest-p))
-              (error "The lambda-list ~S is incompatible with ~
-                     existing methods of ~S."
-                     lambda-list gf))))
+              (restart-case
+                  (error "New lambda-list ~S is incompatible with ~
+                          existing methods of ~S.~%~
+                          Old lambda-list ~s"
+                         lambda-list gf (arg-info-lambda-list arg-info))
+                (continue ()
+                  :report "Remove all methods."
+                  (remove-methods gf))))))
         (setf (arg-info-lambda-list arg-info)
               (if lambda-list-p
                   lambda-list
