@@ -2678,12 +2678,15 @@ register."
               (:more-context
                (setf more-context var))
               (:more-count
-               (setf more-count var)))
-            (let* ((sym (debug-var-symbol var))
-                   (found (assoc sym (binds))))
-              (if found
-                  (setf (second found) :ambiguous)
-                  (binds (list sym validity var)))))))
+               (setf more-count var))
+              (t
+               (let* ((sym (debug-var-symbol var))
+                      (found (assoc sym (binds))))
+                 (cond ((not sym))
+                       (found
+                        (setf (second found) :ambiguous))
+                       (t
+                        (binds (list sym validity var))))))))))
       (when (and more-context more-count)
         (let ((more (assoc 'sb!debug::more (binds))))
           (if more
