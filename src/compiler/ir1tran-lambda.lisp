@@ -1119,22 +1119,26 @@
                                   &key
                                   (source-name '.anonymous.)
                                   debug-name
-                                  system-lambda)
+                                  system-lambda
+                                  (policy (lexenv-policy *lexenv*)))
   (when (and (not debug-name) (eq '.anonymous. source-name))
     (setf debug-name (name-lambdalike fun)))
   (let* ((lambda-with-lexenv-p (eq (car fun) 'lambda-with-lexenv))
          (body (if lambda-with-lexenv-p
                    `(lambda ,@(cddr fun))
                    fun))
-         (*lexenv* (make-lexenv
-                    :default (if lambda-with-lexenv-p
-                                 (process-inline-lexenv (second fun))
-                                 (make-null-lexenv))
-                    ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
-                    ;; rather than the definition-site lexenv, since it seems
-                    ;; like a much more common case.
-                    :handled-conditions (lexenv-handled-conditions *lexenv*)
-                    :policy (lexenv-policy *lexenv*)))
+         (*lexenv*
+           (if lambda-with-lexenv-p
+               (make-lexenv
+                :default (process-inline-lexenv (second fun))
+                :handled-conditions (lexenv-handled-conditions *lexenv*)
+                :policy policy)
+               (make-almost-null-lexenv
+                policy
+                ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
+                ;; rather than the definition-site lexenv, since it seems
+                ;; like a much more common case.
+                (lexenv-handled-conditions *lexenv*))))
          (clambda (ir1-convert-lambda body
                                       :source-name source-name
                                       :debug-name debug-name

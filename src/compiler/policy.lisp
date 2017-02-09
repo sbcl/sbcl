@@ -344,6 +344,22 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
                  (push (cons quality raw-value) specified-qualities)
                  (alter-policy result index raw-value))))))))
 
+;;; Same as above but slightly more efficient
+(defun %augment-policy (quality value policy)
+  (let ((result (copy-policy policy)))
+    (alter-policy result quality value)))
+
+(defmacro augment-policy (quality value policy)
+  (let ((value-sym (gensym "VALUE"))
+        (policy-sym (gensym "POLICY")))
+    `(let ((,value-sym ,value)
+           (,policy-sym ,policy))
+       (if (policy ,policy-sym (> ,quality ,value-sym))
+           (%augment-policy ,(policy-quality-name-p quality)
+                            ,value-sym
+                            ,policy-sym)
+           ,policy-sym))))
+
 (defvar *macro-policy* nil)
 ;; Set an alternate policy that is used to compile all code within DEFMACRO,
 ;; MACROLET, DEFINE-COMPILER-MARO - whether they occur at toplevel or not -
