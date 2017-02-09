@@ -538,7 +538,11 @@
       (assert (eq (test-use-value return) value-lambda)))))
 
 (with-test (:name :unknown-key-restart)
-  (handler-bind ((error #'continue))
+  (handler-bind ((sb-ext:unknown-keyword-argument
+                   (lambda (c)
+                     (assert (eq (sb-ext:unknown-keyword-argument-name c)
+                                 :bogus))
+                     (continue c))))
     (assert (= (funcall (checked-compile '(lambda (&key abc) (1+ abc)))
                         :bogus 30 :abc 20)
                21))))

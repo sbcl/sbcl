@@ -922,7 +922,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                ;; versioning utility
                "ASSERT-VERSION->="
-
+               "UNKNOWN-KEYWORD-ARGUMENT"
+               "UNKNOWN-KEYWORD-ARGUMENT-NAME"
                "CALLABLE-CAST"))
 
    #s(sb-cold:package-data

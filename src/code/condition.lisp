@@ -961,6 +961,13 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                  (cell-error-name condition))
          (format stream "Attempt to call an undefined alien function.")))))
 
+(define-condition unknown-keyword-argument (program-error)
+  ((name :reader unknown-keyword-argument-name :initarg :name))
+  (:report
+   (lambda (condition stream)
+     (format stream "Unknown &KEY argument: ~S"
+             (unknown-keyword-argument-name condition)))))
+
 
 ;;;; various other (not specified by ANSI) CONDITIONs
 ;;;;
