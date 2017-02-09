@@ -62,10 +62,6 @@
 # define IMMEDIATE_POST_MORTEM
 #endif
 
-#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DRAGONFLY) || defined (LISP_FEATURE_DARWIN)
-#define LOCK_CREATE_THREAD
-#endif
-
 struct thread_post_mortem {
     os_thread_t os_thread;
     pthread_attr_t *os_attr;
@@ -80,9 +76,9 @@ struct thread *all_threads;
 
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
-#ifdef LOCK_CREATE_THREAD
+
 static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
-#endif
+
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
 #endif
@@ -288,21 +284,20 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 #endif
     int result;
     if (post_mortem) {
-#if defined(LOCK_CREATE_THREAD) && defined (LISP_FEATURE_DARWIN)
         /* The thread may exit before pthread_create() has finished
            initialization and it may write into already unmapped
            memory. This lock doesn't actually need to protect
            anything, just to make sure that at least one call to
            pthread_create() has finished.
 
-          Possible improvements: stash the address of the thread
-          struct for which a pthread is being created and don't lock
-          here if it's not the one being terminated. */
+           Possible improvements: stash the address of the thread
+           struct for which a pthread is being created and don't lock
+           here if it's not the one being terminated. */
         result = pthread_mutex_lock(&create_thread_lock);
         gc_assert(result == 0);
         result = pthread_mutex_unlock(&create_thread_lock);
         gc_assert(result == 0);
-#endif
+
         if ((result = pthread_join(post_mortem->os_thread, NULL))) {
             lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
                  strerror(result));
@@ -823,11 +818,10 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
      * all_threads until it's ready. */
     block_deferrable_signals(&oldset);
 
-#ifdef LOCK_CREATE_THREAD
+    /* See perform_thread_post_mortem for at least one reason why this lock is neccessary */
     retcode = pthread_mutex_lock(&create_thread_lock);
     gc_assert(retcode == 0);
     FSHOW_SIGNAL((stderr,"/create_os_thread: got lock\n"));
-#endif
 
     if((initcode = pthread_attr_init(th->os_attr)) ||
        /* call_into_lisp_first_time switches the stack for the initial
@@ -854,11 +848,10 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         r=0;
     }
 
-#ifdef LOCK_CREATE_THREAD
     retcode = pthread_mutex_unlock(&create_thread_lock);
     gc_assert(retcode == 0);
     FSHOW_SIGNAL((stderr,"/create_os_thread: released lock\n"));
-#endif
+
     thread_sigmask(SIG_SETMASK,&oldset,0);
     return r;
 }
@@ -900,14 +893,12 @@ void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
     int status, lock_ret;
-#ifdef LOCK_CREATE_THREAD
     /* KLUDGE: Stopping the thread during pthread_create() causes deadlock
      * on FreeBSD. */
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on create_thread_lock\n"));
     lock_ret = pthread_mutex_lock(&create_thread_lock);
     gc_assert(lock_ret == 0);
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock\n"));
-#endif
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock\n"));
     /* keep threads from starting while the world is stopped. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);      \
@@ -976,10 +967,9 @@ void gc_start_the_world()
 
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
-#ifdef LOCK_CREATE_THREAD
     lock_ret = pthread_mutex_unlock(&create_thread_lock);
     gc_assert(lock_ret == 0);
-#endif
+
 
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }
