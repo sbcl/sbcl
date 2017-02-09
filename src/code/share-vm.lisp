@@ -9,6 +9,9 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
+
+(defvar *current-internal-error-context*)
+
 ;;;; OS-CONTEXT-T
 
 ;;; a POSIX signal context, i.e. the type passed as the third

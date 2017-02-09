@@ -43,7 +43,6 @@
 (defvar *current-internal-error* nil)
 (defvar *current-internal-trap-number*)
 (defvar *current-internal-error-args*)
-(defvar *current-internal-error-context*)
 
 #!+undefined-fun-restarts
 (defun restart-undefined (name fdefn-or-symbol context)

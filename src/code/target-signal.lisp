@@ -212,51 +212,41 @@
 #!-(or linux android)
 (define-signal-handler sigsys-handler "bad argument to a system call")
 
-(defun sigint-handler (signal info context)
+(defun sigint-handler (signal info
+                       sb!kernel:*current-internal-error-context*)
   (declare (ignore signal info))
-  (declare (type system-area-pointer context))
-  (/show "in Lisp-level SIGINT handler" (sap-int context))
-  ;; Copy CONTEXT, since the SAP is stack allocated and it's going
-  ;; to be passed to another thread. See the below comment on the
-  ;; general idea whether it's a good thing to do at all.
-  (let ((context (int-sap (sap-int context))))
-    (flet ((interrupt-it ()
-             ;; This seems wrong to me on multi-threaded builds.  The
-             ;; closed-over signal context belongs to a SIGINT handler.
-             ;; But this function gets run through INTERRUPT-THREAD,
-             ;; i.e. in in a SIGPIPE handler, at a different point in time
-             ;; or even a different thread.  How do we know that the
-             ;; SIGINT's context structure from the other thread is still
-             ;; alive and meaningful?  Why do we care?  If we even need
-             ;; the context and PC, shouldn't they come from the SIGPIPE's
-             ;; context? --DFL
-             (with-alien ((context (* os-context-t) context))
-               (with-interrupts
-                 (let ((int (make-condition 'interactive-interrupt
-                                            :context context
-                                            :address (sap-int (sb!vm:context-pc context)))))
-                   ;; First SIGNAL, so that handlers can run.
-                   (signal int)
-                   ;; Then enter the debugger like BREAK.
-                   (%break 'sigint int))))))
-      #!+sb-safepoint
-      (let ((target (sb!thread::foreground-thread)))
-        ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
-        ;; interrupt right away, because deferrables are blocked.  Rather,
-        ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
-        ;; handler is done.  However, on safepoint builds, we don't use
-        ;; SIGPIPE and lack an appropriate mechanism to handle pending
-        ;; thruptions upon exit from signal handlers (and this situation is
-        ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
-        ;; explicitly at the end).  Only as long as safepoint builds pretend
-        ;; to cooperate with signals -- that is, as long as SIGINT-HANDLER
-        ;; is used at all -- detect this situation and work around it.
-        (if (eq target sb!thread:*current-thread*)
-            (interrupt-it)
-            (sb!thread:interrupt-thread target #'interrupt-it)))
-      #!-sb-safepoint
-      (sb!thread:interrupt-thread (sb!thread::foreground-thread)
-                                  #'interrupt-it))))
+  (flet ((interrupt-it ()
+           ;; SB!KERNEL:*CURRENT-INTERNAL-ERROR-CONTEXT* will
+           ;; either be bound in this thread by SIGINT-HANDLER or
+           ;; in the target thread by SIGPIPE-HANDLER.
+           (with-alien ((context (* os-context-t)
+                                 sb!kernel:*current-internal-error-context*))
+             (with-interrupts
+               (let ((int (make-condition 'interactive-interrupt
+                                          :context context
+                                          :address (sap-int (sb!vm:context-pc context)))))
+                 ;; First SIGNAL, so that handlers can run.
+                 (signal int)
+                 ;; Then enter the debugger like BREAK.
+                 (%break 'sigint int))))))
+    #!+sb-safepoint
+    (let ((target (sb!thread::foreground-thread)))
+      ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
+      ;; interrupt right away, because deferrables are blocked.  Rather,
+      ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
+      ;; handler is done.  However, on safepoint builds, we don't use
+      ;; SIGPIPE and lack an appropriate mechanism to handle pending
+      ;; thruptions upon exit from signal handlers (and this situation is
+      ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
+      ;; explicitly at the end).  Only as long as safepoint builds pretend
+      ;; to cooperate with signals -- that is, as long as SIGINT-HANDLER
+      ;; is used at all -- detect this situation and work around it.
+      (if (eq target sb!thread:*current-thread*)
+          (interrupt-it)
+          (sb!thread:interrupt-thread target #'interrupt-it)))
+    #!-sb-safepoint
+    (sb!thread:interrupt-thread (sb!thread::foreground-thread)
+                                #'interrupt-it)))
 
 #!-sb-wtimer
 (defun sigalrm-handler (signal info context)
@@ -274,8 +264,8 @@
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
 ;;; nothing to do so it's safe to receive spurious SIGPIPEs coming
 ;;; from the kernel.
-(defun sigpipe-handler (signal code context)
-  (declare (ignore signal code context))
+(defun sigpipe-handler (signal code sb!kernel:*current-internal-error-context*)
+  (declare (ignore signal code))
   (sb!thread::run-interruption))
 
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
