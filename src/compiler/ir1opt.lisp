@@ -1156,27 +1156,24 @@
       ;;
       ;; FIXME: We also convert in :INLINE & FUNCTIONAL-KIND case below. What
       ;; is it for?
-      (flet ((frob ()
-               (let* ((name (leaf-source-name leaf))
-                      (res (ir1-convert-inline-expansion
-                            name
-                            (defined-fun-inline-expansion leaf)
-                            leaf
-                            inlinep
-                            (info :function :info name))))
-                 ;; Allow backward references to this function from following
-                 ;; forms. (Reused only if policy matches.)
-                 (push res (defined-fun-functionals leaf))
-                 (change-ref-leaf ref res))))
+      (with-ir1-environment-from-node call
         (let ((fun (defined-fun-functional leaf)))
           (if (or (not fun)
                   (and (eq inlinep :inline) (functional-kind fun)))
               ;; Convert.
-              (if ir1-converting-not-optimizing-p
-                  (frob)
-                  (with-ir1-environment-from-node call
-                    (frob)
-                    (locall-analyze-component *current-component*)))
+              (let* ((name (leaf-source-name leaf))
+                     (res (ir1-convert-inline-expansion
+                           name
+                           (defined-fun-inline-expansion leaf)
+                           leaf
+                           inlinep
+                           (info :function :info name))))
+                ;; Allow backward references to this function from following
+                ;; forms. (Reused only if policy matches.)
+                (push res (defined-fun-functionals leaf))
+                (change-ref-leaf ref res)
+                (unless ir1-converting-not-optimizing-p
+                  (locall-analyze-component *current-component*)))
               ;; If we've already converted, change ref to the converted
               ;; functional.
               (change-ref-leaf ref fun))))

@@ -1372,7 +1372,7 @@
 ;;; corresponding to the current one, or NIL if no such functional exists.
 ;;;
 ;;; Also check that the parent of the functional is visible in the current
-;;; environment.
+;;; environment and is in the current component.
 (defun defined-fun-functional (defined-fun)
   (let ((functionals (defined-fun-functionals defined-fun)))
     (when functionals
@@ -1394,7 +1394,13 @@
       ;; have one.
       (let ((policy (lexenv-%policy *lexenv*)))
         (dolist (functional functionals)
-          (when (policy= policy (lexenv-%policy (functional-lexenv functional)))
+          (when (and (policy= policy (lexenv-%policy (functional-lexenv functional)))
+                     (eq (lambda-component
+                          (lambda-home
+                           (if (lambda-p functional)
+                               functional
+                               (optional-dispatch-main-entry functional))))
+                         *current-component*))
             (return functional)))))))
 
 ;;; Do stuff to delete the semantic attachments of a REF node. When
