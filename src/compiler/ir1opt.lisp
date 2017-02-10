@@ -1461,22 +1461,25 @@
   (aver (and (legal-fun-name-p source-name)
              (not (eql source-name '.anonymous.))))
   (node-ends-block call)
+  (setf (combination-lexenv call)
+        (make-lexenv :default (combination-lexenv call)
+                     :policy
+                     ;; The internal variables of a transform are not going to be
+                     ;; interesting to the debugger, so there's no sense in
+                     ;; suppressing the substitution of variables with only one use
+                     ;; (the extra variables can slow down constraint propagation).
+                     (augment-policy
+                      preserve-single-use-debug-variables
+                      0
+                      (lexenv-policy
+                       (combination-lexenv call)))))
   (with-ir1-environment-from-node call
     (with-component-last-block (*current-component*
                                 (block-next (node-block call)))
       (let ((new-fun (ir1-convert-inline-lambda
                       res
                       :debug-name (debug-name 'lambda-inlined source-name)
-                      :system-lambda t
-                      ;; The internal variables of a transform are not going to be
-                      ;; interesting to the debugger, so there's no sense in
-                      ;; suppressing the substitution of variables with only one use
-                      ;; (the extra variables can slow down constraint propagation).
-                      :policy (augment-policy
-                               preserve-single-use-debug-variables
-                               0
-                               (lexenv-policy
-                                (combination-lexenv call)))))
+                      :system-lambda t))
             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
