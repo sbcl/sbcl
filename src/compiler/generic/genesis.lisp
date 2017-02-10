@@ -2146,7 +2146,9 @@ core and return a descriptor to it."
            (in-dynamic-space
             (= (gspace-identifier (descriptor-intuit-gspace code-object))
                dynamic-core-space-id))
-           (addr (+ value (bvref-32 gspace-data gspace-byte-offset))))
+           (addr (+ value
+                    (sb!vm::sign-extend (bvref-32 gspace-data gspace-byte-offset)
+                                        32))))
 
       (declare (ignorable code-end-addr in-dynamic-space))
       (assert (= obj-start-addr
