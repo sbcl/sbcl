@@ -762,7 +762,7 @@
       'no-init
       (cadr binding)))
 
-(defun let*-bindings (bindings &aux names inits (seen (make-hash-table)))
+(defun let*-bindings (bindings &aux names inits (seen (make-hash-table :test #'eq)))
   (dolist (binding (reverse bindings) (values names inits))
     (let ((name (let*-binding-name binding)))
       (push (cons name (gethash name seen)) names)

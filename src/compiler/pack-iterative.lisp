@@ -263,7 +263,7 @@
   (let (component-vertices
         global-vertices
         local-vertices
-        (tn-vertex (make-hash-table)))
+        (tn-vertex (make-hash-table :test #'eq)))
     (loop for i upfrom 0
           for vertex in vertices
           do (let* ((tn (vertex-tn vertex))

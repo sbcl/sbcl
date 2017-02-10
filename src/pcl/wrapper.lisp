@@ -122,7 +122,7 @@
   (not (null (layout-invalid wrapper))))
 
 ;;; We only use this inside INVALIDATE-WRAPPER.
-(defvar *previous-nwrappers* (make-hash-table))
+(defvar *previous-nwrappers* (make-hash-table :test #'eq))
 
 (defun %invalidate-wrapper (owrapper state nwrapper)
   (aver (member state '(:flush :obsolete) :test #'eq))

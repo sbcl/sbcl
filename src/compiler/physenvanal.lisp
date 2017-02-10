@@ -255,7 +255,7 @@
                         ;; Many components have no escapes, so we
                         ;; allocate it lazily.
                         (setf *functional-escape-info*
-                              (make-hash-table))))
+                              (make-hash-table :test #'eq))))
              ((bool ok) (gethash functional table)))
     (if ok
         bool

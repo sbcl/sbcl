@@ -188,7 +188,7 @@
 
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
-  (let ((live-2blocks (make-hash-table)))
+  (let ((live-2blocks (make-hash-table :test #'eq)))
     (labels ((mark-2block (2block)
                (declare (type ir2-block 2block))
                (when (gethash 2block live-2blocks)

@@ -332,7 +332,7 @@
   (macrolet ((ensuref (place default)
                `(or ,place (setf ,place ,default)))
              (ensure-hash (place)
-               `(ensuref ,place (make-hash-table)))
+               `(ensuref ,place (make-hash-table :test #'eq)))
              (ensure-vec (place)
                `(ensuref ,place (make-array 8 :adjustable t :fill-pointer 0))))
     (etypecase y
