@@ -59,9 +59,9 @@
 (declaim (type (or null compiler-error-context node) *compiler-error-context*))
 (defvar *compiler-error-context* nil)
 
-;;; a hashtable mapping macro names to source context parsers. Each parser
+;;; a plist mapping macro names to source context parsers. Each parser
 ;;; function returns the source-context list for that form.
-(defvar *source-context-methods* (make-hash-table))
+(defglobal *source-context-methods* nil)
 
 ;;; documentation originally from cmu-user.tex:
 ;;;   This macro defines how to extract an abbreviated source context from
@@ -84,7 +84,7 @@
    style lambda-list used to parse the arguments. The Body should return a
    list of subforms suitable for a \"~{~S ~}\" format string."
   (with-unique-names (whole)
-    `(setf (gethash ',name *source-context-methods*)
+    `(setf (getf *source-context-methods* ',name)
            (lambda (,whole)
              (destructuring-bind ,lambda-list ,whole ,@body)))))
 
@@ -118,9 +118,9 @@
                              (declare (ignore x))
                              (list (first form) (second form))))
                          (context-fun
-                           (gethash (first form)
-                                    *source-context-methods*
-                                    context-fun-default)))
+                           (getf *source-context-methods*
+                                 (first form)
+                                 context-fun-default)))
                     (declare (type function context-fun))
                     (funcall context-fun (rest form))))
                  (t
