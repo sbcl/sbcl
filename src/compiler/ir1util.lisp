@@ -1355,7 +1355,17 @@
       (let ((defined-fun (gethash name *free-funs*)))
         (when (and defined-fun
                    (defined-fun-p defined-fun)
-                   (eq (defined-fun-functional defined-fun) fun))
+                   ;; Check that all the functionals have been converted by
+                   ;; LOCALL-ANALYZE-FUN-1
+                   (loop for functional in (defined-fun-functionals defined-fun)
+                         always
+                         (or (eq fun functional)
+                             (loop for ref in (leaf-refs functional)
+                                   for lvar = (node-lvar ref)
+                                   for dest = (and lvar (lvar-dest lvar))
+                                   always (or (node-to-be-deleted-p ref)
+                                              (and (basic-combination-p dest)
+                                                   (eq (basic-combination-kind dest) :local)))))))
           (remhash name *free-funs*))))))
 
 ;;; Return functional for DEFINED-FUN which has been converted in policy
