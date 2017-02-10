@@ -85,9 +85,10 @@
       (values (cdr w-e!) (cdr r-e!))))
 
 #+sb-thread
-(deftest* (frlock.1 :fails-on :win32)
+(deftest* (frlock.1)
     (handler-case
-        (sb-ext:with-timeout 60 (test-frlocks))
+        (sb-ext:with-timeout 10
+          (test-frlocks #+win32 :outer-write-pause #+win32 t ))
       (sb-ext:timeout (c)
         (error "~A" c)))
   nil
