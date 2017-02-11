@@ -737,19 +737,29 @@ the current thread are replaced with dummy objects which can safely escape."
     (when info
       (format stream " [~{~(~A~)~^,~}]" info)))
   (when print-frame-source
-    (let ((loc (sb!di:frame-code-location frame)))
-      (handler-case
-          (let ((source (handler-case
-                            (code-location-source-form loc 0)
-                          (error (c)
-                            (format stream "~&   error finding frame source: ~A" c)))))
-            (format stream "~%   source: ~S" source))
-        (sb!di:debug-condition ()
-          ;; This is mostly noise.
-          (when (eq :always print-frame-source)
-            (format stream "~&   no source available for frame")))
-        (error (c)
-          (format stream "~&   error printing frame source: ~A" c))))))
+    (let* ((loc (sb!di:frame-code-location frame))
+           (path (handler-case (sb!di:code-location-debug-source loc)
+                   (sb!di:no-debug-blocks ())
+                   (:no-error (source)
+                     (sb!di:debug-source-namestring source)))))
+      (when (or (eq print-frame-source :always)
+                ;; Avoid showing sources for internals,
+                ;; it will either fail anyway due to all the SB! and
+                ;; reader conditionals or show something nobody has
+                ;; any iterest in.
+                (not (eql (search "SYS:SRC;" path) 0)))
+        (handler-case
+            (let ((source (handler-case
+                              (code-location-source-form loc 0)
+                            (error (c)
+                              (format stream "~&   error finding frame source: ~A" c)))))
+              (format stream "~%   source: ~S" source))
+          (sb!di:debug-condition ()
+            ;; This is mostly noise.
+            (when (eq :always print-frame-source)
+              (format stream "~&   no source available for frame")))
+          (error (c)
+            (format stream "~&   error printing frame source: ~A" c)))))))
 
 ;;;; INVOKE-DEBUGGER
 

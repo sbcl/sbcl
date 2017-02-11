@@ -344,7 +344,6 @@
    "Operation was (/ 1 0)"
    '*
    "INTEGER-/-INTEGER"
-   "source: "
    "(THIS-WILL-BREAK 1)"
    "1]"
    "(/ X Y)"
