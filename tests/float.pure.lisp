@@ -424,3 +424,9 @@
                        (declare ((integer 0 1) exponent))
                        (eql 0d0 (scale-float -0.0d0 exponent))))
                     0))))
+
+(with-test (:name :complex-eql-all-constants)
+  (assert (funcall (checked-compile
+                    '(lambda ()
+                      (declare (optimize (debug 2)))
+                      (typep #c(1.0 1.0) '(member #c(1.0 1.0))))))))
