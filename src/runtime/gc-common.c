@@ -994,22 +994,28 @@ survived_gc_yet (lispobj obj)
 #endif
 }
 
-static inline int
-weak_hash_entry_alivep (lispobj weakness, lispobj key, lispobj value)
+static int survived_gc_yet_KEY(lispobj key, lispobj value) {
+    return survived_gc_yet(key);
+}
+static int survived_gc_yet_VALUE(lispobj key, lispobj value) {
+    return survived_gc_yet(value);
+}
+static int survived_gc_yet_AND(lispobj key, lispobj value) {
+    return survived_gc_yet(key) && survived_gc_yet(value);
+}
+static int survived_gc_yet_OR(lispobj key, lispobj value) {
+    return survived_gc_yet(key) || survived_gc_yet(value);
+}
+
+static int (*weak_hash_entry_alivep_fun(lispobj weakness))(lispobj,lispobj)
 {
     switch (weakness) {
-    case KEY:
-        return survived_gc_yet(key);
-    case VALUE:
-        return survived_gc_yet(value);
-    case KEY_OR_VALUE:
-        return (survived_gc_yet(key) || survived_gc_yet(value));
-    case KEY_AND_VALUE:
-        return (survived_gc_yet(key) && survived_gc_yet(value));
-    default:
-        gc_assert(0);
-        /* Shut compiler up. */
-        return 0;
+    case KEY: return survived_gc_yet_KEY;
+    case VALUE: return survived_gc_yet_VALUE;
+    case KEY_OR_VALUE: return survived_gc_yet_OR;
+    case KEY_AND_VALUE: return survived_gc_yet_AND;
+    case NIL: return NULL;
+    default: lose("Bad hash table weakness");
     }
 }
 
@@ -1085,30 +1091,24 @@ scav_hash_table_entries (struct hash_table *hash_table)
     }
 
     /* Work through the KV vector. */
-    for (i = 1; i < next_vector_length; i++) {
-        lispobj old_key = kv_vector[2*i];
-        lispobj value = kv_vector[2*i+1];
-        if ((weakness == NIL) ||
-            weak_hash_entry_alivep(weakness, old_key, value)) {
-
-            /* Scavenge the key and value. */
-            scavenge(&kv_vector[2*i],2);
-
-            /* If an EQ-based key has moved, mark the hash-table for
-             * rehashing. */
-            if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {
-                lispobj new_key = kv_vector[2*i];
-                // FIXME: many EQ-based sxhash values are insensitive
-                // to object movement. The most important one is SYMBOL,
-                // but others also carry around a hash value: LAYOUT, CLASSOID,
-                // and STANDARD-[FUNCALLABLE-]INSTANCE.
-                // If old_key is any of those, don't set needs_rehash_p.
-                if (old_key != new_key && new_key != empty_symbol) {
-                    hash_table->needs_rehash_p = T;
-                }
-            }
-        }
-    }
+    int (*alivep_test)(lispobj,lispobj) = weak_hash_entry_alivep_fun(weakness);
+#define SCAV_ENTRIES(aliveness_predicate) \
+    for (i = 1; i < next_vector_length; i++) {                                 \
+        lispobj old_key = kv_vector[2*i];                                      \
+        lispobj __attribute__((unused)) value = kv_vector[2*i+1];              \
+        if (aliveness_predicate) {                                             \
+            /* Scavenge the key and value. */                                  \
+            scavenge(&kv_vector[2*i], 2);                                      \
+            /* If an EQ-based key has moved, mark the hash-table for rehash */ \
+            if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {   \
+                lispobj new_key = kv_vector[2*i];                              \
+                if (old_key != new_key && new_key != empty_symbol)             \
+                    hash_table->needs_rehash_p = T;                            \
+    }}}
+    if (alivep_test)
+        SCAV_ENTRIES(alivep_test(old_key, value))
+    else
+        SCAV_ENTRIES(1)
 }
 
 sword_t
@@ -1200,7 +1200,7 @@ static inline void
 scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
                             lispobj *kv_vector, lispobj *index_vector,
                             lispobj *next_vector, lispobj *hash_vector,
-                            lispobj empty_symbol, lispobj weakness)
+                            lispobj empty_symbol, int (*alivep_test)(lispobj,lispobj))
 {
     unsigned index = *prev;
     while (index) {
@@ -1209,7 +1209,7 @@ scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
         lispobj value = kv_vector[2 * index + 1];
         gc_assert(key != empty_symbol);
         gc_assert(value != empty_symbol);
-        if (!weak_hash_entry_alivep(weakness, key, value)) {
+        if (!alivep_test(key, value)) {
             unsigned count = fixnum_value(hash_table->number_entries);
             gc_assert(count > 0);
             *prev = next;
@@ -1254,7 +1254,8 @@ scan_weak_hash_table (struct hash_table *hash_table)
     for (i = 0; i < length; i++) {
         scan_weak_hash_table_chain(hash_table, &index_vector[i],
                                    kv_vector, index_vector, next_vector,
-                                   hash_vector, empty_symbol, weakness);
+                                   hash_vector, empty_symbol,
+                                   weak_hash_entry_alivep_fun(weakness));
     }
 }
 
