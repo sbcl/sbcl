@@ -1347,26 +1347,18 @@
 
   (values))
 
+;;; This is called by locall-analyze-fun-1 after it convers a call to
+;;; FUN into a local call.
+;;; Presumably, the function can be no longer reused by new calls to
+;;; FUN, so the whole thing has to be removed from *FREE-FUNS*
 (defun note-local-functional (fun)
   (declare (type functional fun))
   (when (and (leaf-has-source-name-p fun)
              (eq (leaf-source-name fun) (functional-debug-name fun)))
-    (let ((name (leaf-source-name fun)))
-      (let ((defined-fun (gethash name *free-funs*)))
-        (when (and defined-fun
-                   (defined-fun-p defined-fun)
-                   ;; Check that all the functionals have been converted by
-                   ;; LOCALL-ANALYZE-FUN-1
-                   (loop for functional in (defined-fun-functionals defined-fun)
-                         always
-                         (or (eq fun functional)
-                             (loop for ref in (leaf-refs functional)
-                                   for lvar = (node-lvar ref)
-                                   for dest = (and lvar (lvar-dest lvar))
-                                   always (or (node-to-be-deleted-p ref)
-                                              (and (basic-combination-p dest)
-                                                   (eq (basic-combination-kind dest) :local)))))))
-          (remhash name *free-funs*))))))
+    (let* ((name (leaf-source-name fun))
+           (defined-fun (gethash name *free-funs*)))
+      (when (defined-fun-p defined-fun)
+        (remhash name *free-funs*)))))
 
 ;;; Return functional for DEFINED-FUN which has been converted in policy
 ;;; corresponding to the current one, or NIL if no such functional exists.
