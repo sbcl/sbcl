@@ -671,7 +671,7 @@
                  (simple-condition-format-control condition)
                  (simple-condition-format-arguments condition))
           (prin1 (class-name (class-of condition)) stream))
-      (format stream "~2I~@[~_~_~:{~:(~A~): ~S~:^, ~:_~}~]~_~_Stream: ~S"
+      (format stream "~2I~@[~:@_ ~:@_~:{~:(~A~): ~S~:^, ~:_~}~]~:@_ ~:@_Stream: ~S"
               (stream-error-position-info error-stream position)
               error-stream))))
 
