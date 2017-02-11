@@ -899,27 +899,20 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #!-win32
 (defun fd-type (fd)
   (declare (type unix-fd fd))
-  (let ((fmt (logand
-              s-ifmt
-              (or (with-alien ((buf (struct wrapped_stat)))
+  (let ((mode (or (with-alien ((buf (struct wrapped_stat)))
                     (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
                              (slot buf 'st-mode)
                              fd (addr buf)))
-                  0))))
-    (cond ((logtest s-ififo fmt)
-           :fifo)
-          ((logtest s-ifchr fmt)
-           :character)
-          ((logtest s-ifdir fmt)
-           :directory)
-          ((logtest s-ifblk fmt)
-           :block)
-          ((logtest s-ifreg fmt)
-           :regular)
-          ((logtest s-ifsock fmt)
-           :socket)
-          (t
-           :unknown))))
+                  0)))
+    (case (logand mode s-ifmt)
+      (#.s-ifchr :character)
+      (#.s-ifdir :directory)
+      (#.s-ifblk :block)
+      (#.s-ifreg :regular)
+      (#.s-ifsock :socket)
+      (#.s-iflnk :link)
+      (#.s-ififo :fifo)
+      (t :unknown))))
 
 ;;;; time.h
 
