@@ -34,7 +34,7 @@
 (in-package "SB-PCL")
 
 (defmethod wrapper-fetcher ((class funcallable-standard-class))
-  'fsc-instance-wrapper)
+  '%funcallable-instance-layout)
 
 (defmethod slots-fetcher ((class funcallable-standard-class))
   'fsc-instance-slots)

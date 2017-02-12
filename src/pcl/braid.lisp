@@ -36,7 +36,7 @@
                    (make-array (layout-length wrapper)
                                :initial-element +slot-unbound+)
                    #-compact-instance-header 0)))
-    (setf (std-instance-wrapper instance) wrapper)
+    (setf (%instance-layout instance) wrapper)
     instance))
 
 (define-condition unset-funcallable-instance-function
@@ -59,7 +59,7 @@
                 :format-control "~@<The function of funcallable instance ~
                                  ~S has not been set.~@:>"
                 :format-arguments (list fin))))
-    (setf (fsc-instance-wrapper fin) wrapper)
+    (setf (%funcallable-instance-layout fin) wrapper)
     fin))
 
 (defun classify-slotds (slotds)

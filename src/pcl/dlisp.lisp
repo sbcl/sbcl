@@ -218,12 +218,12 @@
                                ,@(unless class-slot-p
                                    `((setq slots
                                            (std-instance-slots ,instance))))
-                               (std-instance-wrapper ,instance))
+                               (%instance-layout ,instance))
                               ((fsc-instance-p ,instance)
                                ,@(unless class-slot-p
                                    `((setq slots
                                            (fsc-instance-slots ,instance))))
-                               (fsc-instance-wrapper ,instance)))))
+                               (%funcallable-instance-layout ,instance)))))
         (block access
           (when (and wrapper
                      (not (zerop (layout-clos-hash wrapper)))
@@ -384,18 +384,18 @@
      (with-unique-names (wrapper)
        `(cond ((std-instance-p ,argument)
                ,(if slots-var
-                    `(let ((,wrapper (std-instance-wrapper ,argument)))
+                    `(let ((,wrapper (%instance-layout ,argument)))
                        (when (layout-for-std-class-p ,wrapper)
                          (setq ,slots-var (std-instance-slots ,argument)))
                        ,wrapper)
-                    `(std-instance-wrapper ,argument)))
+                    `(%instance-layout ,argument)))
               ((fsc-instance-p ,argument)
                ,(if slots-var
-                    `(let ((,wrapper (fsc-instance-wrapper ,argument)))
+                    `(let ((,wrapper (%funcallable-instance-layout ,argument)))
                        (when (layout-for-std-class-p ,wrapper)
                          (setq ,slots-var (fsc-instance-slots ,argument)))
                        ,wrapper)
-                    `(fsc-instance-wrapper ,argument)))
+                    `(%funcallable-instance-layout ,argument)))
                (t (go ,miss-tag)))))
     ;; Sep92 PCL used to distinguish between some of these cases (and
     ;; spuriously exclude others).  Since in SBCL

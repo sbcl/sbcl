@@ -789,7 +789,7 @@
                          ,(layout-length wrapper)
                          ,@(when early-unbound-markers-p
                                  '(:initial-element +slot-unbound+)))))
-           (setf (std-instance-wrapper .instance.) ,wrapper)
+           (setf (%instance-layout .instance.) ,wrapper)
            (setf (std-instance-slots .instance.) .slots.)
            ,body
            .instance.)

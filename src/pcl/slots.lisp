@@ -43,7 +43,7 @@
                          (type-of (unbound-slot-instance condition))))))))
 
 (defmethod wrapper-fetcher ((class standard-class))
-  'std-instance-wrapper)
+  '%instance-layout)
 
 (defmethod slots-fetcher ((class standard-class))
   'std-instance-slots)
@@ -70,18 +70,18 @@
          ;; FIXME: If a backend supports two-word primitive instances
          ;; and double-wide CAS, it's probably best to use that.
          ;; Maybe we're inside a mutex here anyway though?
-         (let ((w1 (std-instance-wrapper i1))
+         (let ((w1 (%instance-layout i1))
                (s1 (std-instance-slots i1)))
-           (setf (std-instance-wrapper i1) (std-instance-wrapper i2))
+           (setf (%instance-layout i1) (%instance-layout i2))
            (setf (std-instance-slots i1) (std-instance-slots i2))
-           (setf (std-instance-wrapper i2) w1)
+           (setf (%instance-layout i2) w1)
            (setf (std-instance-slots i2) s1)))
         ((fsc-instance-p i1)
-         (let ((w1 (fsc-instance-wrapper i1))
+         (let ((w1 (%funcallable-instance-layout i1))
                (s1 (fsc-instance-slots i1)))
-           (setf (fsc-instance-wrapper i1) (fsc-instance-wrapper i2))
+           (setf (%funcallable-instance-layout i1) (%funcallable-instance-layout i2))
            (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
-           (setf (fsc-instance-wrapper i2) w1)
+           (setf (%funcallable-instance-layout i2) w1)
            (setf (fsc-instance-slots i2) s1)))
         (t
          (error "unrecognized instance type"))))

@@ -203,9 +203,9 @@
                (:flush
                 (let ((new (cadr state)))
                   (cond ((std-instance-p instance)
-                         (setf (std-instance-wrapper instance) new))
+                         (setf (%instance-layout instance) new))
                         ((fsc-instance-p instance)
-                         (setf (fsc-instance-wrapper instance) new))
+                         (setf (%funcallable-instance-layout instance) new))
                         (t
                          (bug "unrecognized instance type")))))
                (:obsolete

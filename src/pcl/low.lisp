@@ -89,8 +89,6 @@
 (declaim (inline fsc-instance-p))
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
-(defmacro fsc-instance-wrapper (fin)
-  `(%funcallable-instance-layout ,fin))
 (defmacro fsc-instance-slots (fin)
   `(%funcallable-instance-info ,fin sb!vm:instance-data-start))
 
@@ -180,7 +178,6 @@
 ;;; FIXME: what does the preceding comment mean? You can't use instance-slots
 ;;; on a structure. (Consider especially a structure of 0 slots.)
 (defmacro std-instance-slots (x) `(%instance-ref ,x sb!vm:instance-data-start))
-(defmacro std-instance-wrapper (x) `(%instance-layout ,x))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
