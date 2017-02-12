@@ -2174,8 +2174,8 @@ generic function lambda list ~S~:>"
 (defun make-early-gf (spec &optional lambda-list lambda-list-p
                       function argument-precedence-order source-location
                       documentation)
-  (let ((fin (allocate-standard-funcallable-instance
-              *sgf-wrapper* *sgf-slots-init*)))
+  (let ((fin (allocate-standard-funcallable-instance *sgf-wrapper*)))
+    (replace (fsc-instance-slots fin) *sgf-slots-init*)
     (set-funcallable-instance-function
      fin
      (or function

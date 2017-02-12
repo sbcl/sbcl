@@ -39,15 +39,6 @@
     (setf (std-instance-wrapper instance) wrapper)
     instance))
 
-(defmacro allocate-standard-funcallable-instance-slots
-    (wrapper &optional slots-init-p slots-init)
-  `(let ((no-of-slots (wrapper-no-of-instance-slots ,wrapper)))
-     ,(if slots-init-p
-          `(if ,slots-init-p
-               (make-array no-of-slots :initial-contents ,slots-init)
-               (make-array no-of-slots :initial-element +slot-unbound+))
-          `(make-array no-of-slots :initial-element +slot-unbound+))))
-
 (define-condition unset-funcallable-instance-function
     (reference-condition simple-error)
   ()
@@ -55,10 +46,11 @@
    :references (list '(:amop :generic-function allocate-instance)
                      '(:amop :function set-funcallable-instance-function))))
 
-(defun allocate-standard-funcallable-instance
-    (wrapper &optional (slots-init nil slots-init-p))
+(defun allocate-standard-funcallable-instance (wrapper)
   (let ((fin (%make-standard-funcallable-instance
-              nil (sb-impl::new-instance-hash-code))))
+              (make-array (wrapper-no-of-instance-slots wrapper)
+                          :initial-element +slot-unbound+)
+              (sb-impl::new-instance-hash-code))))
     (set-funcallable-instance-function
      fin
      #'(lambda (&rest args)
@@ -67,10 +59,7 @@
                 :format-control "~@<The function of funcallable instance ~
                                  ~S has not been set.~@:>"
                 :format-arguments (list fin))))
-    (setf (fsc-instance-wrapper fin) wrapper
-          (fsc-instance-slots fin)
-          (allocate-standard-funcallable-instance-slots
-           wrapper slots-init-p slots-init))
+    (setf (fsc-instance-wrapper fin) wrapper)
     fin))
 
 (defun classify-slotds (slotds)
