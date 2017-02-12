@@ -133,6 +133,9 @@
 (sb!xc:deftype format-control ()
   '(or string function))
 
+(sb!xc:deftype condition-designator-head ()
+  '(or format-control symbol condition sb!pcl::condition-class))
+
 (sb!xc:deftype restart-designator ()
   '(or (and symbol (not null)) restart))
 

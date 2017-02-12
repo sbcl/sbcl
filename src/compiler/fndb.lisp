@@ -1464,11 +1464,12 @@
 
 ;;;; from the "Conditions" chapter:
 
-(defknown error (t &rest t) nil)
-(defknown cerror (format-control t &rest t) null)
+(defknown (signal warn) (condition-designator-head &rest t) null)
+(defknown error (condition-designator-head &rest t) nil)
+(defknown cerror (format-control condition-designator-head &rest t) null)
 (defknown invalid-method-error (t format-control &rest t) *) ; FIXME: first arg is METHOD
 (defknown method-combination-error (format-control &rest t) *)
-(defknown (signal warn assert-error) (t &rest t) null)
+(defknown assert-error (t &rest t) null)
 (defknown check-type-error (t t type-specifier &optional (or null string)) t)
 (defknown invoke-debugger (condition) nil)
 (defknown break (&optional format-control &rest t) null)
