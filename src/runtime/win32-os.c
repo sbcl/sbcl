@@ -705,7 +705,7 @@ void os_preinit()
 static int translating_vfprintf(FILE*stream, const char *fmt, va_list args)
 {
     char translated[1024];
-    int i=0, delta = 0;
+    unsigned i=0, delta = 0;
 
     while (fmt[i-delta] && i<sizeof(translated)-1) {
         if((fmt[i-delta]=='%')&&
@@ -777,7 +777,8 @@ intptr_t win32_get_module_handle_by_address(os_vm_address_t addr)
                       ? result : 0);
 }
 
-void os_init(char *argv[], char *envp[])
+void os_init(char __attribute__((__unused__)) *argv[], 
+             char __attribute__((__unused__)) *envp[])
 {
     SYSTEM_INFO system_info;
     GetSystemInfo(&system_info);
@@ -912,13 +913,15 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 }
 
 void
-os_invalidate_free(os_vm_address_t addr, os_vm_size_t len)
+os_invalidate_free(os_vm_address_t addr,
+                   os_vm_size_t __attribute__((__unused__)) len)
 {
     AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
 }
 
 void
-os_invalidate_free_by_any_address(os_vm_address_t addr, os_vm_size_t len)
+os_invalidate_free_by_any_address(os_vm_address_t addr, 
+                                  os_vm_size_t __attribute__((__unused__)) len)
 {
     MEMORY_BASIC_INFORMATION minfo;
     AVERLAX(VirtualQuery(addr, &minfo, sizeof minfo));
@@ -1356,7 +1359,7 @@ EXCEPTION_DISPOSITION
 handle_exception(EXCEPTION_RECORD *exception_record,
                  struct lisp_exception_frame *exception_frame,
                  CONTEXT *win32_context,
-                 void *dispatcher_context)
+                 void __attribute__((__unused__)) *dispatcher_context)
 {
     if (!win32_context)
         /* Not certain why this should be possible, but let's be safe... */
@@ -1479,7 +1482,8 @@ carry_frame_pointer(os_context_register_t default_value)
 }
 
 void
-wos_install_interrupt_handlers(struct lisp_exception_frame *handler)
+wos_install_interrupt_handlers
+(struct lisp_exception_frame __attribute__((__unused__)) *handler)
 {
 #ifdef LISP_FEATURE_X86
     handler->next_frame = get_seh_frame();
@@ -1502,7 +1506,7 @@ wos_install_interrupt_handlers(struct lisp_exception_frame *handler)
 void *memmove(void *dest, const void *src, size_t n)
 {
     if (dest < src) {
-        int i;
+        size_t i;
         for (i = 0; i < n; i++) *(((char *)dest)+i) = *(((char *)src)+i);
     } else {
         while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
@@ -1765,7 +1769,6 @@ static int win32_read_console(HANDLE handle, void* buf, int count)
 {
     int result = 0;
     int nchars = count / sizeof(console_char);
-    sigset_t pendset;
 
     if (!nchars)
         return 0;
@@ -2091,7 +2094,7 @@ void scratch(void)
 }
 
 char *
-os_get_runtime_executable_path(int external)
+os_get_runtime_executable_path(int __attribute__((__unused__)) external)
 {
     char path[MAX_PATH + 1];
     DWORD bufsize = sizeof(path);
