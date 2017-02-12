@@ -777,7 +777,7 @@ intptr_t win32_get_module_handle_by_address(os_vm_address_t addr)
                       ? result : 0);
 }
 
-void os_init(char __attribute__((__unused__)) *argv[], 
+void os_init(char __attribute__((__unused__)) *argv[],
              char __attribute__((__unused__)) *envp[])
 {
     SYSTEM_INFO system_info;
@@ -920,7 +920,7 @@ os_invalidate_free(os_vm_address_t addr,
 }
 
 void
-os_invalidate_free_by_any_address(os_vm_address_t addr, 
+os_invalidate_free_by_any_address(os_vm_address_t addr,
                                   os_vm_size_t __attribute__((__unused__)) len)
 {
     MEMORY_BASIC_INFORMATION minfo;
@@ -1856,6 +1856,8 @@ win32_maybe_interrupt_io(void* thread)
                 pthread_mutex_lock(&ttyinput.lock);
                 pthread_cond_broadcast(&ttyinput.cond_has_data);
                 pthread_mutex_unlock(&ttyinput.lock);
+                done = 1;
+                goto unlock;
             }
             if (ptr_CancelSynchronousIo) {
                 pthread_mutex_lock(&th->os_thread->fiber_lock);
@@ -1864,6 +1866,7 @@ win32_maybe_interrupt_io(void* thread)
             }
             done |= !!ptr_CancelIoEx(h,NULL);
         }
+    unlock:
         pthread_mutex_unlock(&interrupt_io_lock);
     }
     return done;
