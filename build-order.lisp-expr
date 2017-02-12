@@ -183,16 +183,11 @@
 
  ("src/code/sysmacs" :not-host)
 
- ;; "assembly/assemfile" was here in the sequence inherited from
- ;; CMU CL worldcom.lisp, but also appears later in the sequence
- ;; inherited from CMU CL comcom.lisp. We shouldn't need two versions,
- ;; so I've deleted the one here. -- WHN 19990620
-
  ("src/code/target-error" :not-host)
 
  ("src/compiler/early-backend")
- ;; "src/code/toplevel.lisp" si the first to need this. It's generated
- ;; automatically by grovel_headers.c, i.e. it's not in CVS.
+ ;; "src/code/toplevel.lisp" is the first to need this. It's generated
+ ;; automatically by grovel_headers.c, i.e. it's not under source control.
  ("output/stuff-groveled-from-headers" :not-host)
 
  ("src/code/cold-error"  :not-host)
@@ -298,8 +293,6 @@
  ;;; convenient to stick them here)
 
  ("src/compiler/policies")
-
- ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
 
  ("src/compiler/macros")
 
@@ -447,15 +440,6 @@
  ("src/code/readtable")
  ("src/code/pathname")
 
- ;; KLUDGE: Much stuff above here is the type system and/or the INFO
- ;; system, not really the compiler proper. It might be easier to
- ;; understand the system if those things were split off into packages
- ;; SB-TYPE and SB-INFO and built in their own sections. -- WHN 20000124
-
- ;; In classic CMU CL (re)build order, these were done later, but
- ;; in building from scratch, these must be loaded before
- ;; "compiler/generic/objdef" in order to allow forms like
- ;; (DEFINE-PRIMITIVE-OBJECT (..) (CAR ..) ..) to work.
  ("src/compiler/fndb")
  ("src/compiler/generic/vm-fndb")
 
@@ -465,11 +449,6 @@
 
  ("src/compiler/bit-util")
 
- ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
- ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
- ;; before "compiler/main.lisp" so that those can be coded efficiently
- ;; (and so that they don't cause lots of annoying compiler warnings
- ;; about undefined types).
  ("src/compiler/fixup") ; for DEFSTRUCT FIXUP
  ("src/compiler/generic/core")
  ("src/code/thread")
