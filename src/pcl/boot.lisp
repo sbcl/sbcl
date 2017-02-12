@@ -2176,17 +2176,8 @@ generic function lambda list ~S~:>"
                       documentation)
   (let ((fin (allocate-standard-funcallable-instance *sgf-wrapper*)))
     (replace (fsc-instance-slots fin) *sgf-slots-init*)
-    (set-funcallable-instance-function
-     fin
-     (or function
-         (if (eq spec 'print-object)
-             #'(lambda (instance stream)
-                 (print-unreadable-object (instance stream :identity t)
-                   (format stream "std-instance")))
-             #'(lambda (&rest args)
-                 (declare (ignore args))
-                 (error "The function of the funcallable-instance ~S~
-                         has not been set." fin)))))
+    (when function
+      (set-funcallable-instance-function fin function))
     (setf (gdefinition spec) fin)
     (!bootstrap-set-slot 'standard-generic-function fin 'name spec)
     (!bootstrap-set-slot 'standard-generic-function fin
