@@ -90,6 +90,17 @@ int linux_supports_futex=0;
 /* Tired of writing arch_os_get_current_thread each time. */
 #define this_thread (arch_os_get_current_thread())
 
+/* Documented limit for ReadConsole/WriteConsole is 64K bytes.
+   Real limit observed on W2K-SP3 is somewhere in between 32KiB and 64Kib...
+*/
+#define MAX_CONSOLE_TCHARS 16384
+
+#ifdef LISP_FEATURE_SB_UNICODE
+typedef WCHAR console_char;
+#else
+typedef CHAR console_char;
+#endif
+
 /* wrappers for winapi calls that must be successful (like SBCL's
  * (aver ...) form). */
 
@@ -521,7 +532,7 @@ u32 os_get_build_time_shared_libraries(u32 excl_maximum,
             &image_optional_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
         IMAGE_IMPORT_DESCRIPTOR* image_import_descriptor =
             base + image_import_direntry->VirtualAddress;
-        u32 nlibrary, i,j;
+        u32 nlibrary, j;
 
         for (nlibrary=0u; nlibrary < excl_maximum
                           && image_import_descriptor->FirstThunk;
@@ -1546,24 +1557,6 @@ socket_input_available(HANDLE socket)
     return ret;
 }
 
-/* Unofficial but widely used property of console handles: they have
-   #b11 in two minor bits, opposed to other handles, that are
-   machine-word-aligned. Properly emulated even on wine.
-
-   Console handles are special in many aspects, e.g. they aren't NTDLL
-   system handles: kernel32 redirects console operations to CSRSS
-   requests. Using the hack below to distinguish console handles is
-   justified, as it's the only method that won't hang during
-   outstanding reads, won't try to lock NT kernel object (if there is
-   one; console isn't), etc. */
-int
-console_handle_p(HANDLE handle)
-{
-    return (handle != NULL)&&
-        (handle != INVALID_HANDLE_VALUE)&&
-        ((((int)(intptr_t)handle)&3)==3);
-}
-
 #ifdef LISP_FEATURE_SB_THREAD
 /* Atomically mark current thread as (probably) doing synchronous I/O
  * on handle, if no cancellation is requested yet (and return TRUE),
@@ -1601,43 +1594,23 @@ io_end_interruptible(HANDLE handle)
                                  handle, 0);
     pthread_mutex_unlock(&interrupt_io_lock);
 }
+#define WITH_INTERRUPTIBLE_IO(handle)      \
+    if (!io_begin_interruptible(handle)) { \
+      errno = EINTR;                       \
+      return -1;                           \
+    }                                      \
+    RUN_BODY_ONCE(xx, io_end_interruptible(handle))
+#else
+#define WITH_INTERRUPTIBLE_IO(handle)
+#endif
 
-/* Documented limit for ReadConsole/WriteConsole is 64K bytes.
-   Real limit observed on W2K-SP3 is somewhere in between 32KiB and 64Kib...
-*/
-#define MAX_CONSOLE_TCHARS 16384
-
-int
-win32_write_unicode_console(HANDLE handle, void * buf, int count)
+int console_handle_p(HANDLE handle)
 {
-    DWORD written = 0;
-    DWORD nchars;
-    BOOL result;
-    nchars = count>>1;
-    if (nchars>MAX_CONSOLE_TCHARS) nchars = MAX_CONSOLE_TCHARS;
-
-    if (!io_begin_interruptible(handle)) {
-        errno = EINTR;
-        return -1;
-    }
-    result = WriteConsoleW(handle,buf,nchars,&written,NULL);
-    io_end_interruptible(handle);
-
-    if (result) {
-        if (!written) {
-            errno = EINTR;
-            return -1;
-        } else {
-            return 2*written;
-        }
-    } else {
-        DWORD err = GetLastError();
-        odxprint(io,"WriteConsole fails => %u\n", err);
-        errno = (err==ERROR_OPERATION_ABORTED ? EINTR : EIO);
-        return -1;
-    }
+    DWORD mode;
+    return GetFileType(handle) == FILE_TYPE_CHAR &&
+        GetConsoleMode(handle, &mode);
 }
-
+#ifdef LISP_FEATURE_SB_THREAD
 /*
  * (AK writes:)
  *
@@ -1698,7 +1671,7 @@ win32_write_unicode_console(HANDLE handle, void * buf, int count)
  */
 
 struct {
-    WCHAR buffer[MAX_CONSOLE_TCHARS];
+    console_char buffer[MAX_CONSOLE_TCHARS];
     DWORD head, tail;
     pthread_mutex_t lock;
     pthread_cond_t cond_has_data;
@@ -1721,11 +1694,17 @@ tty_read_line_server()
             pthread_cond_wait(&ttyinput.cond_has_client,&ttyinput.lock);
 
         pthread_mutex_unlock(&ttyinput.lock);
-
+#ifdef LISP_FEATURE_SB_UNICODE
         ok = ReadConsoleW(ttyinput.handle,
                           &ttyinput.buffer[ttyinput.tail],
                           MAX_CONSOLE_TCHARS-ttyinput.tail,
                           &nchars,NULL);
+#else
+        ok = ReadConsole(ttyinput.handle,
+                         &ttyinput.buffer[ttyinput.tail],
+                         MAX_CONSOLE_TCHARS-ttyinput.tail,
+                         &nchars,NULL);
+#endif
 
         pthread_mutex_lock(&ttyinput.lock);
 
@@ -1782,11 +1761,10 @@ win32_tty_listen(HANDLE handle)
     return result;
 }
 
-static int
-tty_read_line_client(HANDLE handle, void* buf, int count)
+static int win32_read_console(HANDLE handle, void* buf, int count)
 {
     int result = 0;
-    int nchars = count / sizeof(WCHAR);
+    int nchars = count / sizeof(console_char);
     sigset_t pendset;
 
     if (!nchars)
@@ -1794,7 +1772,7 @@ tty_read_line_client(HANDLE handle, void* buf, int count)
     if (nchars>MAX_CONSOLE_TCHARS)
         nchars=MAX_CONSOLE_TCHARS;
 
-    count = nchars*sizeof(WCHAR);
+    count = nchars*sizeof(console_char);
 
     pthread_mutex_lock(&ttyinput.lock);
 
@@ -1822,7 +1800,7 @@ tty_read_line_client(HANDLE handle, void* buf, int count)
                 io_end_interruptible(ttyinput.handle);
             }
         }
-        result = sizeof(WCHAR)*(ttyinput.tail-ttyinput.head);
+        result = sizeof(console_char)*(ttyinput.tail-ttyinput.head);
         if (result > count) {
             result = count;
         }
@@ -1832,18 +1810,18 @@ tty_read_line_client(HANDLE handle, void* buf, int count)
                 LPWSTR ubuf = buf;
 
                 memcpy(buf,&ttyinput.buffer[ttyinput.head],count);
-                ttyinput.head += (result / sizeof(WCHAR));
+                ttyinput.head += (result / sizeof(console_char));
                 if (ttyinput.head == ttyinput.tail)
                     ttyinput.head = ttyinput.tail = 0;
 
-                for (nch=0;nch<result/sizeof(WCHAR);++nch) {
+                for (nch=0;nch<result/sizeof(console_char);++nch) {
                     if (ubuf[nch]==13) {
                         ++offset;
                     } else {
                         ubuf[nch-offset]=ubuf[nch];
                     }
                 }
-                result-=offset*sizeof(WCHAR);
+                result-=offset*sizeof(console_char);
 
             }
         } else {
@@ -1857,26 +1835,19 @@ unlock:
     return result;
 }
 
-int
-win32_read_unicode_console(HANDLE handle, void* buf, int count)
-{
-
-    int result;
-    result = tty_read_line_client(handle,buf,count);
-    return result;
-}
-
 boolean
 win32_maybe_interrupt_io(void* thread)
 {
     struct thread *th = thread;
     boolean done = 0;
+
     if (ptr_CancelIoEx) {
         pthread_mutex_lock(&interrupt_io_lock);
         HANDLE h = (HANDLE)
             InterlockedExchangePointer((volatile LPVOID *)
                                        &th->synchronous_io_handle_and_flag,
                                        (LPVOID)INVALID_HANDLE_VALUE);
+
         if (h && (h!=INVALID_HANDLE_VALUE)) {
             if (console_handle_p(h)) {
                 pthread_mutex_lock(&ttyinput.lock);
@@ -1899,6 +1870,39 @@ win32_maybe_interrupt_io(void* thread)
 static const LARGE_INTEGER zero_large_offset = {.QuadPart = 0LL};
 
 int
+win32_write_console(HANDLE handle, void * buf, int count)
+{
+    DWORD written = 0;
+    DWORD nchars = count / sizeof(console_char);
+    BOOL result;
+
+    if (nchars>MAX_CONSOLE_TCHARS) nchars = MAX_CONSOLE_TCHARS;
+
+    WITH_INTERRUPTIBLE_IO(handle) {
+#ifdef LISP_FEATURE_SB_UNICODE
+        result = WriteConsoleW(handle, buf, nchars, &written, NULL);
+#else
+        result = WriteConsole(handle, buf, nchars, &written, NULL);
+#endif
+    }
+
+    if (result) {
+        if (!written) {
+            errno = EINTR;
+            return -1;
+        } else {
+            return written * sizeof(console_char);
+
+        }
+    } else {
+        DWORD err = GetLastError();
+        odxprint(io,"WriteConsole fails => %u\n", err);
+        errno = (err==ERROR_OPERATION_ABORTED ? EINTR : EIO);
+        return -1;
+    }
+}
+
+int
 win32_unix_write(HANDLE handle, void * buf, int count)
 {
     DWORD written_bytes;
@@ -1909,11 +1913,9 @@ win32_unix_write(HANDLE handle, void * buf, int count)
     BOOL seekable;
     BOOL ok;
 
-#ifdef LISP_FEATURE_SB_THREAD
     if (console_handle_p(handle)) {
-        return win32_write_unicode_console(handle,buf,count);
+        return win32_write_console(handle,buf,count);
     }
-#endif
 
     overlapped.hEvent = self->private_events.events[0];
     seekable = SetFilePointerEx(handle,
@@ -1927,16 +1929,11 @@ win32_unix_write(HANDLE handle, void * buf, int count)
         overlapped.Offset = 0;
         overlapped.OffsetHigh = 0;
     }
-#ifdef LISP_FEATURE_SB_THREAD
-    if (!io_begin_interruptible(handle)) {
-        errno = EINTR;
-        return -1;
+
+    WITH_INTERRUPTIBLE_IO(handle) {
+        ok = WriteFile(handle, buf, count, &written_bytes, &overlapped);
     }
-#endif
-    ok = WriteFile(handle, buf, count, &written_bytes, &overlapped);
-#ifdef LISP_FEATURE_SB_THREAD
-    io_end_interruptible(handle);
-#endif
+
     if (ok) {
         goto done_something;
     } else {
@@ -1990,10 +1987,9 @@ win32_unix_read(HANDLE handle, void * buf, int count)
     LARGE_INTEGER file_position;
     BOOL seekable;
 
-#ifdef LISP_FEATURE_SB_THREAD
-    if (console_handle_p(handle))
-        return win32_read_unicode_console(handle,buf,count);
-#endif
+    if (console_handle_p(handle)) {
+        return win32_read_console(handle, buf, count);
+    }
 
     overlapped.hEvent = self->private_events.events[0];
     /* If it has a position, we won't try overlapped */
@@ -2009,17 +2005,10 @@ win32_unix_read(HANDLE handle, void * buf, int count)
         overlapped.OffsetHigh = 0;
     }
 
-#ifdef LISP_FEATURE_SB_THREAD
-    if (!io_begin_interruptible(handle)) {
-        errno = EINTR;
-        return -1;
+    WITH_INTERRUPTIBLE_IO(handle) {
+        ok = ReadFile(handle,buf,count,&read_bytes, &overlapped);
     }
-#endif
 
-    ok = ReadFile(handle,buf,count,&read_bytes, &overlapped);
-#ifdef LISP_FEATURE_SB_THREAD
-    io_end_interruptible(handle);
-#endif
     if (ok) {
         /* immediately */
         goto done_something;
@@ -2028,6 +2017,7 @@ win32_unix_read(HANDLE handle, void * buf, int count)
         if (errorCode == ERROR_HANDLE_EOF ||
             errorCode == ERROR_BROKEN_PIPE ||
             errorCode == ERROR_NETNAME_DELETED) {
+
             read_bytes = 0;
             goto done_something;
         }

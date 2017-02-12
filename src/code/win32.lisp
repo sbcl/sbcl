@@ -154,8 +154,11 @@
   (length dword)
   (nevents (* dword)))
 
-(define-alien-routine ("socket_input_available" socket-input-available) int
+(define-alien-routine "socket_input_available" int
   (socket handle))
+
+(define-alien-routine "console_handle_p" boolean
+  (handle handle))
 
 ;;; Listen for input on a Windows file handle.  Unlike UNIX, there
 ;;; isn't a unified interface to do this---we have to know what sort
@@ -164,22 +167,18 @@
 ;;; something that works.  Returns true if there could be input
 ;;; available, or false if there is not.
 (defun handle-listen (handle)
-  (with-alien ((avail dword)
-               (buf (array char #.input-record-size)))
-    (when
-        ;; Make use of the fact that console handles are technically no
-        ;; real handles, and unlike those, have these bits set:
-        (= 3 (logand 3 handle))
-      (return-from handle-listen
-        (alien-funcall (extern-alien "win32_tty_listen"
-                                     (function boolean handle))
-                       handle)))
-    (unless (zerop (peek-named-pipe handle nil 0 nil (addr avail) nil))
-      (return-from handle-listen (plusp avail)))
-    (let ((res (socket-input-available handle)))
-      (unless (zerop res)
-        (return-from handle-listen (= res 1))))
-    t))
+  (cond ((console-handle-p handle)
+         (alien-funcall (extern-alien "win32_tty_listen"
+                                      (function boolean handle))
+                        handle))
+        (t
+         (with-alien ((avail dword))
+           (unless (zerop (peek-named-pipe handle nil 0 nil (addr avail) nil))
+             (return-from handle-listen (plusp avail))))
+         (let ((res (socket-input-available handle)))
+           (unless (zerop res)
+             (return-from handle-listen (= res 1))))
+         t)))
 
 ;;; Listen for input on a C runtime file handle.  Returns true if
 ;;; there could be input available, or false if there is not.

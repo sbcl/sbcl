@@ -2554,16 +2554,13 @@
   ;; before we're ready (or after we think it's been deinitialized).
   (%makunbound '*available-buffers*))
 
-(defun stdstream-external-format (fd outputp)
-  #!-win32 (declare (ignore fd outputp))
-  (let* ((keyword #!+win32 (if (and (/= fd -1)
-                                    (logbitp 0 fd)
-                                    (logbitp 1 fd))
-                               :ucs-2
-                               (if outputp
-                                   (sb!win32::console-output-codepage)
-                                   (sb!win32::console-input-codepage)))
-                  #!-win32 (default-external-format))
+(defun stdstream-external-format (fd)
+  #!-win32 (declare (ignore fd))
+  (let* ((keyword (cond #!+(and win32 sb-unicode)
+                        ((sb!win32::console-handle-p fd)
+                         :ucs-2)
+                        (t
+                         (default-external-format))))
          (ef (get-external-format keyword))
          (replacement (ef-default-replacement-character ef)))
     `(,keyword :replacement ,replacement)))
@@ -2600,7 +2597,7 @@
                     :element-type :default
                     :serve-events inputp
                     :auto-close t
-                    :external-format (stdstream-external-format nul-handle outputp))))
+                    :external-format (stdstream-external-format nul-handle))))
                (stdio-stream (handle name inputp outputp)
                  (cond
                    #!+win32
@@ -2616,7 +2613,7 @@
                      :buffering :line
                      :element-type :default
                      :serve-events inputp
-                     :external-format (stdstream-external-format handle outputp))))))
+                     :external-format (stdstream-external-format handle))))))
         (setf *stdin*  (stdio-stream in  "standard input"  t   nil)
               *stdout* (stdio-stream out "standard output" nil t)
               *stderr* (stdio-stream err "standard error"  nil t))))
@@ -2630,8 +2627,7 @@
             (if tty
                 (make-fd-stream tty :name "the terminal"
                                     :input t :output t :buffering :line
-                                    :external-format (stdstream-external-format
-                                                      tty t)
+                                    :external-format (stdstream-external-format tty)
                                     :serve-events t
                                     :auto-close t)
                 (make-two-way-stream *stdin* *stdout*))))
