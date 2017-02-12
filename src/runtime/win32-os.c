@@ -69,7 +69,6 @@ os_vm_size_t os_vm_page_size;
 
 #include "gc.h"
 #include "gencgc-internal.h"
-#include <winsock2.h>
 #include <wincrypt.h>
 
 #if 0
@@ -1565,6 +1564,7 @@ console_handle_p(HANDLE handle)
         ((((int)(intptr_t)handle)&3)==3);
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
 /* Atomically mark current thread as (probably) doing synchronous I/O
  * on handle, if no cancellation is requested yet (and return TRUE),
  * otherwise clear thread's I/O cancellation flag and return false.
@@ -1894,6 +1894,7 @@ win32_maybe_interrupt_io(void* thread)
     }
     return done;
 }
+#endif
 
 static const LARGE_INTEGER zero_large_offset = {.QuadPart = 0LL};
 
@@ -1908,8 +1909,11 @@ win32_unix_write(HANDLE handle, void * buf, int count)
     BOOL seekable;
     BOOL ok;
 
-    if (console_handle_p(handle))
+#ifdef LISP_FEATURE_SB_THREAD
+    if (console_handle_p(handle)) {
         return win32_write_unicode_console(handle,buf,count);
+    }
+#endif
 
     overlapped.hEvent = self->private_events.events[0];
     seekable = SetFilePointerEx(handle,
@@ -1923,13 +1927,16 @@ win32_unix_write(HANDLE handle, void * buf, int count)
         overlapped.Offset = 0;
         overlapped.OffsetHigh = 0;
     }
+#ifdef LISP_FEATURE_SB_THREAD
     if (!io_begin_interruptible(handle)) {
         errno = EINTR;
         return -1;
     }
+#endif
     ok = WriteFile(handle, buf, count, &written_bytes, &overlapped);
+#ifdef LISP_FEATURE_SB_THREAD
     io_end_interruptible(handle);
-
+#endif
     if (ok) {
         goto done_something;
     } else {
@@ -1970,6 +1977,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
     return written_bytes;
 }
 
+
 int
 win32_unix_read(HANDLE handle, void * buf, int count)
 {
@@ -1982,8 +1990,10 @@ win32_unix_read(HANDLE handle, void * buf, int count)
     LARGE_INTEGER file_position;
     BOOL seekable;
 
+#ifdef LISP_FEATURE_SB_THREAD
     if (console_handle_p(handle))
         return win32_read_unicode_console(handle,buf,count);
+#endif
 
     overlapped.hEvent = self->private_events.events[0];
     /* If it has a position, we won't try overlapped */
@@ -1998,12 +2008,18 @@ win32_unix_read(HANDLE handle, void * buf, int count)
         overlapped.Offset = 0;
         overlapped.OffsetHigh = 0;
     }
+
+#ifdef LISP_FEATURE_SB_THREAD
     if (!io_begin_interruptible(handle)) {
         errno = EINTR;
         return -1;
     }
+#endif
+
     ok = ReadFile(handle,buf,count,&read_bytes, &overlapped);
+#ifdef LISP_FEATURE_SB_THREAD
     io_end_interruptible(handle);
+#endif
     if (ok) {
         /* immediately */
         goto done_something;
@@ -2099,27 +2115,35 @@ os_get_runtime_executable_path(int external)
     return copied_string(path);
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
 
 DWORD
 win32_wait_object_or_signal(HANDLE waitFor)
 {
+#ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = arch_os_get_current_thread();
     HANDLE handles[] = {waitFor, self->private_events.events[1]};
     return
-        WaitForMultipleObjects(2,handles, FALSE,INFINITE);
+        WaitForMultipleObjects(2,handles, FALSE, INFINITE);
+#else
+    return WaitForSingleObject(waitFor, INFINITE);
+#endif
 }
 
 DWORD
 win32_wait_for_multiple_objects_or_signal(HANDLE *handles, DWORD count)
 {
+#ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = arch_os_get_current_thread();
     handles[count] = self->private_events.events[1];
-
     return
         WaitForMultipleObjects(count + 1, handles, FALSE, INFINITE);
+#else
+    return
+        WaitForMultipleObjects(count, handles, FALSE, INFINITE);
+#endif
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
 /*
  * Portability glue for win32 waitable timers.
  *

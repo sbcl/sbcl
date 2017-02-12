@@ -65,7 +65,7 @@
   #include <sys/sysctl.h>
 #endif
 
-#ifdef _WIN32
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
   #include "pthreads_win32.h"
 #endif
 

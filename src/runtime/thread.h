@@ -386,12 +386,6 @@ void pop_gcing_safety(struct gcing_safety *from)
     }
 }
 
-/* Even with just -O1, gcc optimizes the jumps in this "loop" away
- * entirely, giving the ability to define WITH-FOO-style macros. */
-#define RUN_BODY_ONCE(prefix, finally_do)               \
-    int prefix##done = 0;                               \
-    for (; !prefix##done; finally_do, prefix##done = 1)
-
 #define WITH_GC_AT_SAFEPOINTS_ONLY_hygenic(var)        \
     struct gcing_safety var;                    \
     push_gcing_safety(&var);                    \

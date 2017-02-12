@@ -444,4 +444,10 @@ struct lisp_startup_options {
     boolean noinform;
 };
 
+/* Even with just -O1, gcc optimizes the jumps in this "loop" away
+ * entirely, giving the ability to define WITH-FOO-style macros. */
+#define RUN_BODY_ONCE(prefix, finally_do)               \
+    int prefix##done = 0;                               \
+    for (; !prefix##done; finally_do, prefix##done = 1)
+
 #endif /* _SBCL_RUNTIME_H_ */

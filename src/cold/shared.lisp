@@ -201,16 +201,8 @@
           ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")
-         ("(and win32 (not (and sb-thread
-                                sb-safepoint sb-thruption sb-wtimer
-                                sb-dynamic-core)))"
-          ":SB-WIN32 requires :SB-THREAD and related features")
-         ("(and sb-dynamic-core (not (and linkage-table sb-thread)))"
-          ;; Subtle memory corruption follows when sb-dynamic-core is
-          ;; active, and non-threaded allocation routines have not been
-          ;; updated to take the additional indirection into account.
-          ;; Let's avoid this unusual combination.
-          ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE and :SB-THREAD")
+         ("(and sb-dynamic-core (not linkage-table))"
+          ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
          ("(and sb-linkable-runtime (not sb-dynamic-core))"
           ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
          ("(and sb-linkable-runtime (not (or x86 x86-64)))"

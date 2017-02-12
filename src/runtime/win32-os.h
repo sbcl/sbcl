@@ -13,8 +13,8 @@
 #define SBCL_INCLUDED_WIN32_OS_H
 
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -35,6 +35,7 @@
 typedef sem_t os_sem_t;
 #else
 typedef void *siginfo_t;
+typedef int sigset_t;
 #endif
 
 typedef LPVOID os_vm_address_t;
