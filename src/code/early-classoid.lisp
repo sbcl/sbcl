@@ -139,6 +139,8 @@
   ;;      a depth when it isn't quite.
   (depthoid -1 :type layout-depthoid)
   ;; the number of top level descriptor cells in each instance
+  ;; For [FUNCALLABLE-]STANDARD-OBJECT instances, this is the slot vector
+  ;; length, not the primitive object length.
   (length 0 :type index)
   ;; If this layout has some kind of compiler meta-info, then this is
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.

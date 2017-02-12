@@ -28,8 +28,6 @@
 
 (defmacro wrapper-class (wrapper)
   `(classoid-pcl-class (layout-classoid ,wrapper)))
-(defmacro wrapper-no-of-instance-slots (wrapper)
-  `(layout-length ,wrapper))
 
 (declaim (inline make-wrapper-internal))
 (defun make-wrapper-internal (&key length classoid)

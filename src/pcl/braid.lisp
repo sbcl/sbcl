@@ -32,10 +32,10 @@
 (in-package "SB-PCL")
 
 (defun allocate-standard-instance (wrapper)
-  (let* ((no-of-slots (wrapper-no-of-instance-slots wrapper))
-         (instance (%make-standard-instance (make-array no-of-slots
-                                                        :initial-element +slot-unbound+)
-                                            #-compact-instance-header 0)))
+  (let ((instance (%make-standard-instance
+                   (make-array (layout-length wrapper)
+                               :initial-element +slot-unbound+)
+                   #-compact-instance-header 0)))
     (setf (std-instance-wrapper instance) wrapper)
     instance))
 
@@ -48,7 +48,7 @@
 
 (defun allocate-standard-funcallable-instance (wrapper)
   (let ((fin (%make-standard-funcallable-instance
-              (make-array (wrapper-no-of-instance-slots wrapper)
+              (make-array (layout-length wrapper)
                           :initial-element +slot-unbound+)
               (sb-impl::new-instance-hash-code))))
     (set-funcallable-instance-function
