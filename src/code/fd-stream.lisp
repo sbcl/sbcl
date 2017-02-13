@@ -947,7 +947,7 @@
 (defun sysread-may-block-p (stream)
   #!+win32
   ;; This answers T at EOF on win32, I think.
-  (not (sb!win32:fd-listen (fd-stream-fd stream)))
+  (not (sb!win32:handle-listen (fd-stream-fd stream)))
   #!-win32
   (not (sb!unix:unix-simple-poll (fd-stream-fd stream) :input 0)))
 
@@ -1924,7 +1924,7 @@
   (flush-input-buffer stream)
   #!+win32
   (progn
-    (sb!win32:fd-clear-input (fd-stream-fd stream))
+    (sb!win32:handle-clear-input (fd-stream-fd stream))
     (setf (fd-stream-listen stream) nil))
   #!-win32
   (catch 'eof-input-catcher
@@ -1944,7 +1944,7 @@
                   (or (not (eql (buffer-head ibuf) (buffer-tail ibuf)))
                       (fd-stream-listen fd-stream)
                       #!+win32
-                      (sb!win32:fd-listen (fd-stream-fd fd-stream))
+                      (sb!win32:handle-listen (fd-stream-fd fd-stream))
                       #!-win32
                       ;; If the read can block, LISTEN will certainly return NIL.
                       (if (sysread-may-block-p fd-stream)

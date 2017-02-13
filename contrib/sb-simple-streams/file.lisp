@@ -231,8 +231,7 @@
                    (sb-posix:syscall-error nil))
                  #+win32
                  (let ((mapping
-                        (sb-win32:create-file-mapping
-                         (sb-win32:get-osfhandle fd) nil 2 0 size nil)))
+                         (sb-win32:create-file-mapping fd nil 2 0 size nil)))
                    (typecase mapping
                      ((integer -1 0) nil)
                      (t (let ((sap (prog1 (sb-win32:map-view-of-file
