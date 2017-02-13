@@ -22,7 +22,11 @@ endif
 CFLAGS += -fno-omit-frame-pointer
 LINKFLAGS += -Wl,--export-dynamic
 
-GC_SRC = gencgc.c
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = gencgc.c marknsweepgc.c
+else
+  GC_SRC = gencgc.c
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers
