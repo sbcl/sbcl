@@ -1,4 +1,4 @@
-(defun load-sbcl-file (file)
+(defun load-sbcl-file (file &optional (exit t))
   (labels ((exit-sbcl (code)
              #+sbcl #.(if (eq :external
                               (nth-value 1 (find-symbol "EXIT" :sb-ext)))
@@ -15,4 +15,4 @@
       (abort ()
         :report "Abort building SBCL."
         (exit-sbcl 1)))
-    (exit-sbcl 0)))
+    (when exit (exit-sbcl 0))))

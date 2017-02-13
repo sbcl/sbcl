@@ -150,9 +150,5 @@ sb-kernel::(setf (dsd-default
 
 #+immobile-code (setq sb-c::*compile-to-memory-space* :dynamic)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
-(sb-ext:save-lisp-and-die
- (progn
-   ;; See comment in 'readtable.lisp'
-   (setf (readtable-base-char-preference *readtable*) :symbols)
-   ;; This is a base string since the flag wasn't set to NIL yet.
-   "output/sbcl.core"))
+;; See comments in 'readtable.lisp'
+(setf (readtable-base-char-preference *readtable*) :symbols)
