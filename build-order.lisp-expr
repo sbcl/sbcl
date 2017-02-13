@@ -516,6 +516,7 @@
 
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
+ ("src/compiler/generic/pinned-objects")
  ("src/compiler/generic/early-type-vops")
 
  ("src/assembly/target/support")

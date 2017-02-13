@@ -323,19 +323,3 @@
         (inst andcc zero-tn alloc-tn 3)
         ;; The C code needs to process this correctly and fixup alloc-tn.
         (inst t :ne pseudo-atomic-trap)))))
-
-
-(sb!xc:defmacro with-pinned-objects ((&rest objects) &body body)
-  "Arrange with the garbage collector that the pages occupied by
-OBJECTS will not be moved in memory for the duration of BODY.
-Useful for e.g. foreign calls where another thread may trigger
-garbage collection.  This is currently implemented by disabling GC"
-  #!-gencgc
-  (declare (ignore objects))            ;should we eval these for side-effect?
-  #!-gencgc
-  `(without-gcing
-    ,@body)
-  #!+gencgc
-  `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
-     (declare (truly-dynamic-extent *pinned-objects*))
-     ,@body))

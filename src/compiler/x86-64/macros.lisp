@@ -565,39 +565,6 @@
                value)
          (move result value)))))
 
-;;; helper for alien stuff.
-
-(sb!xc:defmacro with-pinned-objects ((&rest objects) &body body)
-  "Arrange with the garbage collector that the pages occupied by
-OBJECTS will not be moved in memory for the duration of BODY.
-Useful for e.g. foreign calls where another thread may trigger
-collection."
-  (if objects
-      (let ((pins (make-gensym-list (length objects)))
-            (wpo (sb!xc:gensym "WITH-PINNED-OBJECTS-THUNK")))
-        ;; BODY is stuffed in a function to preserve the lexical
-        ;; environment.
-        `(flet ((,wpo () (progn ,@body)))
-           ;; The cross-compiler prints either "unknown type: COMPILER-NOTE" at
-           ;; each use of W-P-O prior to 'ir1report' being compiled, or else
-           ;; "could not stack allocate". Kill it with fire :-(
-           (declare (muffle-conditions #+sb-xc compiler-note #-sb-xc t))
-           ;; PINS are dx-allocated in case the compiler for some
-           ;; unfathomable reason decides to allocate value-cells
-           ;; for them -- since we have DX value-cells on x86oid
-           ;; platforms this still forces them on the stack.
-           (dx-let ,(mapcar #'list pins objects)
-             (multiple-value-prog1 (,wpo)
-               ;; TOUCH-OBJECT has a VOP with an empty body: compiler
-               ;; thinks we're using the argument and doesn't flush
-               ;; the variable, but we don't have to pay any extra
-               ;; beyond that -- and MULTIPLE-VALUE-PROG1 keeps them
-               ;; live till the body has finished. *whew*
-               ,@(mapcar (lambda (pin)
-                           `(touch-object ,pin))
-                         pins)))))
-      `(progn ,@body)))
-
 ;;; Emit the most compact form of the test immediate instruction,
 ;;; using an 8 bit test when the immediate is only 8 bits and the
 ;;; value is one of the four low registers (rax, rbx, rcx, rdx) or the
