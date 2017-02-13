@@ -1,4 +1,74 @@
 ;;; Do warm init without compiling files.
+
+;;; There's a fair amount of machinery which is needed only at cold
+;;; init time, and should be discarded before freezing the final
+;;; system. We discard it by uninterning the associated symbols.
+;;; Rather than using a special table of symbols to be uninterned,
+;;; which might be tedious to maintain, instead we use a hack:
+;;; anything whose name matches a magic character pattern is
+;;; uninterned.
+;;; Additionally, you can specify an arbitrary way to destroy
+;;; random bootstrap stuff on per-package basis.
+(defun !unintern-init-only-stuff (&aux result)
+  (dolist (package (list-all-packages))
+    (sb-int:binding* ((s (find-symbol "!UNINTERN-SYMBOLS" package)
+                         :exit-if-null)
+                      (list (funcall s))
+                      (package (car list)))
+      (dolist (symbol (cdr list))
+        (fmakunbound symbol)
+        (unintern symbol package))))
+  sb-kernel::
+  (flet ((uninternable-p (symbol)
+           (let ((name (symbol-name symbol)))
+             (or (and (>= (length name) 1) (char= (char name 0) #\!))
+                 (and (>= (length name) 2) (string= name "*!" :end1 2))
+                 (memq symbol
+                       '(sb-c::sb!pcl sb-c::sb!impl sb-c::sb!kernel
+                         sb-c::sb!c sb-c::sb-int))))))
+    ;; A structure constructor name, in particular !MAKE-SAETP,
+    ;; can't be uninterned if referenced by a defstruct-description.
+    ;; So loop over all structure classoids and clobber any
+    ;; symbol that should be uninternable.
+    (maphash (lambda (classoid layout)
+               (when (structure-classoid-p classoid)
+                 (let ((dd (layout-info layout)))
+                   (setf (dd-constructors dd)
+                         (delete-if (lambda (x)
+                                      (and (consp x) (uninternable-p (car x))))
+                                    (dd-constructors dd))))))
+             (classoid-subclasses (find-classoid t)))
+    ;; Todo: perform one pass, then a full GC, then a final pass to confirm
+    ;; it worked. It shoud be an error if any uninternable symbols remain,
+    ;; but at present there are about 13 other "!" symbols with referers.
+    (with-package-iterator (iter (list-all-packages) :internal :external)
+      (loop (multiple-value-bind (winp symbol accessibility package) (iter)
+              (declare (ignore accessibility))
+              (unless winp
+                (return))
+              (when (uninternable-p symbol)
+                ;; Uninternable symbols which are referenced by other stuff
+                ;; can't disappear from the image, but we don't need to preserve
+                ;; their functions, so FMAKUNBOUND them. This doesn't have
+                ;; the intended effect if the function shares a code-component
+                ;; with non-cold-init lambdas. Though the cold-init function is
+                ;; never called post-build, it is not discarded. Also, I suspect
+                ;; that the following loop should print nothing, but it does:
+#|
+                (sb-vm::map-allocated-objects
+                  (lambda (obj type size)
+                    (declare (ignore size))
+                    (when (= type sb-vm:code-header-widetag)
+                      (let ((name (sb-c::debug-info-name
+                                   (sb-kernel:%code-debug-info obj))))
+                        (when (and (stringp name) (search "COLD-INIT-FORMS" name))
+                          (print obj)))))
+                  :dynamic)
+|#
+                (fmakunbound symbol)
+                (unintern symbol package))))))
+  result)
+
 (progn
   (defvar *compile-files-p* nil)
   "about to LOAD warm.lisp (with *compile-files-p* = NIL)")
@@ -74,7 +144,7 @@
 
   ;; Unintern no-longer-needed stuff before the possible PURIFY in
   ;; SAVE-LISP-AND-DIE.
-  #-sb-fluid (sb-impl::!unintern-init-only-stuff)
+  #-sb-fluid (!unintern-init-only-stuff)
 
   ;; A symbol whose INFO slot underwent any kind of manipulation
   ;; such that it now has neither properties nor globaldb info,

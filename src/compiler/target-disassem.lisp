@@ -2136,7 +2136,7 @@
       (or (find repr (cdr table) :test 'equalp)
           (car (push repr (cdr table)))))))
 
-(defun unintern-init-only-stuff ()
+(defun !unintern-symbols ()
   ;; Remove compile-time-only metadata. This preserves compatibility with the
   ;; older disassembler macros which wrapped GEN-ARG-TYPE-DEF-FORM and such
   ;; in (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE)), which in turn required that
@@ -2154,24 +2154,23 @@
   ;; But if you need all these macros to exist for some reason,
   ;; then define one of the two following features to keep them:
   #!+(or sb-fluid sb-retain-assembler-macros)
-  (return-from unintern-init-only-stuff)
+  (return-from !unintern-symbols nil)
 
   (do-symbols (symbol sb!assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format))
 
   ;; Get rid of functions that only make sense with metadata available.
-  (dolist (s '(%def-arg-type %def-inst-format %gen-arg-forms
-               all-arg-refs-relevant-p arg-or-lose arg-position arg-value-form
-               collect-labelish-operands collect-prefiltering-args
-               compare-fields-form compile-inst-printer compile-print
-               compile-printer-body compile-printer-list compile-test
-               correct-dchunk-bytespec-for-endianness
-               define-arg-type define-instruction-format
-               find-first-field-name find-printer-fun format-or-lose
-               gen-arg-forms make-arg-temp-bindings make-funstate massage-arg
-               maybe-listify modify-arg pd-error pick-printer-choice
-               preprocess-chooses preprocess-conditionals preprocess-printer
-               preprocess-test sharing-cons sharing-mapcar))
-    (fmakunbound s)
-    (unintern s 'sb-disassem)))
+  `("SB-DISASSEM"
+    %def-arg-type %def-inst-format %gen-arg-forms
+    all-arg-refs-relevant-p arg-or-lose arg-position arg-value-form
+    collect-labelish-operands collect-prefiltering-args
+    compare-fields-form compile-inst-printer compile-print
+    compile-printer-body compile-printer-list compile-test
+    correct-dchunk-bytespec-for-endianness
+    define-arg-type define-instruction-format
+    find-first-field-name find-printer-fun format-or-lose
+    gen-arg-forms make-arg-temp-bindings make-funstate massage-arg
+    maybe-listify modify-arg pd-error pick-printer-choice
+    preprocess-chooses preprocess-conditionals preprocess-printer
+    preprocess-test sharing-cons sharing-mapcar))

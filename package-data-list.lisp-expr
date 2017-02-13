@@ -2165,7 +2165,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "FTYPE-PROCLAMATION-MISMATCH-WARN"
                "FTYPE-PROCLAMATION-MISMATCH-ERROR"
 
-               "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
+               "!COLD-INIT"
                "!GLOBALDB-COLD-INIT"
                "!FOREIGN-COLD-INIT"
                "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"

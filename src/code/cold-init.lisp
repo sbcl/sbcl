@@ -12,72 +12,6 @@
 
 (in-package "SB!IMPL")
 
-;;;; burning our ships behind us
-
-;;; There's a fair amount of machinery which is needed only at cold
-;;; init time, and should be discarded before freezing the final
-;;; system. We discard it by uninterning the associated symbols.
-;;; Rather than using a special table of symbols to be uninterned,
-;;; which might be tedious to maintain, instead we use a hack:
-;;; anything whose name matches a magic character pattern is
-;;; uninterned.
-;;; Additionally, you can specify an arbitrary way to destroy
-;;; random bootstrap stuff on per-package basis.
-(defun !unintern-init-only-stuff ()
-  (dolist (package (list-all-packages))
-    (awhen (find-symbol "UNINTERN-INIT-ONLY-STUFF" package)
-      (format t "~&Calling ~/sb-impl::print-symbol-with-prefix/~%" it)
-      (funcall it)
-      (unintern it package)))
-  (flet ((uninternable-p (symbol)
-           (let ((name (symbol-name symbol)))
-             (or (and (>= (length name) 1) (char= (char name 0) #\!))
-                 (and (>= (length name) 2) (string= name "*!" :end1 2))
-                 (memq symbol
-                       '(sb!c::sb!pcl sb!c::sb!impl sb!c::sb!kernel
-                         sb!c::sb!c sb!c::sb!int))))))
-    ;; A structure constructor name, in particular !MAKE-SAETP,
-    ;; can't be uninterned if referenced by a defstruct-description.
-    ;; So loop over all structure classoids and clobber any
-    ;; symbol that should be uninternable.
-    (maphash (lambda (classoid layout)
-               (when (structure-classoid-p classoid)
-                 (let ((dd (layout-info layout)))
-                   (setf (dd-constructors dd)
-                         (delete-if (lambda (x)
-                                      (and (consp x) (uninternable-p (car x))))
-                                    (dd-constructors dd))))))
-             (classoid-subclasses (find-classoid t)))
-    ;; Todo: perform one pass, then a full GC, then a final pass to confirm
-    ;; it worked. It shoud be an error if any uninternable symbols remain,
-    ;; but at present there are about 13 other "!" symbols with referers.
-    (with-package-iterator (iter (list-all-packages) :internal :external)
-      (loop (multiple-value-bind (winp symbol accessibility package) (iter)
-              (declare (ignore accessibility))
-              (unless winp
-                (return))
-              (when (uninternable-p symbol)
-                ;; Uninternable symbols which are referenced by other stuff
-                ;; can't disappear from the image, but we don't need to preserve
-                ;; their functions, so FMAKUNBOUND them. This doesn't have
-                ;; the intended effect if the function shares a code-component
-                ;; with non-cold-init lambdas. Though the cold-init function is
-                ;; never called post-build, it is not discarded. Also, I suspect
-                ;; that the following loop should print nothing, but it does:
-#|
-                (sb-vm::map-allocated-objects
-                  (lambda (obj type size)
-                    (declare (ignore size))
-                    (when (= type sb-vm:code-header-widetag)
-                      (let ((name (sb-c::debug-info-name
-                                   (sb-kernel:%code-debug-info obj))))
-                        (when (and (stringp name) (search "COLD-INIT-FORMS" name))
-                          (print obj)))))
-                  :dynamic)
-|#
-                (fmakunbound symbol)
-                (unintern symbol package)))))))
-
 ;;;; putting ourselves out of our misery when things become too much to bear
 
 (declaim (ftype (function (simple-string) nil) !cold-lose))
@@ -487,15 +421,14 @@ process to continue normally."
   (values))
 
 (in-package "SB!INT")
-(defun unintern-init-only-stuff ()
-  (let ((this-package (find-package "SB-INT")))
+(defun !unintern-symbols ()
     ;; For some reason uninterning these:
     ;;    DEF!TYPE DEF!CONSTANT DEF!STRUCT
     ;; does not work, they stick around as uninterned symbols.
     ;; Some other macros must expand into them. Ugh.
-    (dolist (s '(defenum defun-cached with-globaldb-name
-                 .
-                 #!+sb-show ()
-                 #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
-                             /primitive-print /show /show0 /xhow)))
-      (unintern s this-package))))
+  '("SB-INT"
+    defenum defun-cached with-globaldb-name
+    .
+    #!+sb-show ()
+    #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
+                /primitive-print /show /show0 /xhow)))
