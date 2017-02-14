@@ -277,6 +277,10 @@ os_vm_address_t inflate_core_bytes(int fd, os_vm_offset_t offset,
 
 int merge_core_pages = -1;
 
+#ifdef LISP_FEATURE_LINUX
+os_vm_address_t anon_dynamic_space_start;
+#endif
+
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
@@ -369,6 +373,13 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
              * space 0. (We checked above that for GENCGC,
              * addr==DYNAMIC_SPACE_START.) */
             current_dynamic_space = (lispobj *)addr;
+#ifdef LISP_FEATURE_LINUX
+            anon_dynamic_space_start = addr + len;
+            // This assertion is here because of the test in zero_pages_with_mmap()
+            // which trusts that if addr > anon_dynamic_space_start
+            // then addr did not come from any file mapping.
+            gc_assert((lispobj)anon_dynamic_space_start > STATIC_SPACE_END);
+#endif
             break;
         case STATIC_CORE_SPACE_ID:
             if (addr != (os_vm_address_t)STATIC_SPACE_START) {

@@ -635,11 +635,30 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
     gc_assert(length >= gencgc_release_granularity);
     gc_assert((length % gencgc_release_granularity) == 0);
 
-    os_invalidate(addr, length);
-    new_addr = os_validate(addr, length);
-    if (new_addr == NULL || new_addr != addr) {
-        lose("remap_free_pages: page moved, 0x%08x ==> 0x%08x",
-             start, new_addr);
+#ifdef LISP_FEATURE_LINUX
+    extern os_vm_address_t anon_dynamic_space_start;
+    // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
+    // Linux treats it as a demand that the memory be 0-filled, or refreshed
+    // from a file that backs the range. BSD takes it as a hint that you don't
+    // care if the memory has to brought in from swap when next accessed,
+    // i.e. it's not a request to make a user-visible alteration to memory.
+    // So in theory this can bring a page in from the core file, if we happen
+    // to hit a page that resides in the portion of memory mapped by coreparse.
+    // In practice this should not happen because objects from a core file can't
+    // become garbage. Except in save-lisp-and-die they can, and we must be
+    // cautious not to resurrect bytes that originally came from the file.
+    if ((os_vm_address_t)addr >= anon_dynamic_space_start) {
+        if (madvise(addr, length, MADV_DONTNEED) != 0)
+            lose("madvise failed\n");
+    } else
+#endif
+    {
+        os_invalidate(addr, length);
+        new_addr = os_validate(addr, length);
+        if (new_addr == NULL || new_addr != addr) {
+            lose("remap_free_pages: page moved, 0x%08x ==> 0x%08x",
+                 start, new_addr);
+        }
     }
 
     for (i = start; i <= end; i++) {
