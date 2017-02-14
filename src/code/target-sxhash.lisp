@@ -225,6 +225,9 @@
 ;; These are also random numbers, but not lazily computed.
 (declaim (inline fsc-instance-hash))
 (defun fsc-instance-hash (fin)
+  #!+compact-instance-header
+  (sb!vm::get-header-data-high (%funcallable-instance-info fin 0))
+  #!-compact-instance-header
   (%funcallable-instance-info fin sb!pcl::fsc-instance-hash-slot-index))
 
 (defun sxhash (x)

@@ -47,10 +47,12 @@
                      '(:amop :function set-funcallable-instance-function))))
 
 (defun allocate-standard-funcallable-instance (wrapper)
-  (let ((fin (%make-standard-funcallable-instance
-              (make-array (layout-length wrapper)
-                          :initial-element +slot-unbound+)
-              (sb-impl::new-instance-hash-code))))
+  (let* ((slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
+         (fin (%make-standard-funcallable-instance
+               slots #-compact-instance-header (sb-impl::new-instance-hash-code))))
+    #+compact-instance-header
+    (set-header-data slots
+                     (ash (logand (sb-impl::new-instance-hash-code) #xFFFFFFFF) 24))
     (set-funcallable-instance-function
      fin
      #'(lambda (&rest args)

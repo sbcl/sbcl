@@ -141,7 +141,7 @@
   ;; KLUDGE: Note that neither of these slots is ever accessed by its
   ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
   ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
-  :slot-names (clos-slots hash-code)
+  :slot-names (clos-slots #!-compact-instance-header hash-code)
   :boa-constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name standard-classoid
@@ -159,9 +159,10 @@
 #!+(and compact-instance-header (not x86-64))
 (defconstant std-instance-hash-slot-index 1)
 #!-compact-instance-header
+(progn
 (defconstant std-instance-hash-slot-index 2)
 ;; The first data slot (either index 0 or 1) in the primitive funcallable
 ;; instance is the vector of CLOS slots. Following that is the hash.
-(defconstant fsc-instance-hash-slot-index (1+ sb!vm:instance-data-start))
+(defconstant fsc-instance-hash-slot-index (1+ sb!vm:instance-data-start)))
 
 (/show0 "finished with early-low.lisp")
