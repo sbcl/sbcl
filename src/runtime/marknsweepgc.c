@@ -821,7 +821,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
   unsigned char widetag = widetag_of(*obj);
-  lispobj __attribute__((unused)) funobj[1];
+  lispobj __attribute__((unused)) funobj[1], layout[1];
 
   switch (widetag) {
 #ifdef LISP_FEATURE_IMMOBILE_CODE
@@ -830,9 +830,18 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
 #endif
-  default:
-    return range_points_to_younger_p(obj+1, obj+n_words, gen, keep_gen, new_gen);
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+  case INSTANCE_HEADER_WIDETAG:
+    layout[0] = instance_layout(obj);
+    // Instances in immobile space don't (yet) have untagged slots.
+    // (The only ones are LAYOUTs, and they don't)
+    gc_assert(((struct layout*)native_pointer(layout[0]))->bitmap == make_fixnum(-1));
+    if (range_points_to_younger_p(layout, layout+1, gen, keep_gen, new_gen))
+        return 1;
+    // FALLTHROUGH_INTENDED
   }
+#endif
+  return range_points_to_younger_p(obj+1, obj+n_words, gen, keep_gen, new_gen);
 }
 
 static boolean
