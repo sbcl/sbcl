@@ -302,7 +302,7 @@
     (with-input-from-string (s (get-output-stream-string out))
       (loop for line = (read-line s nil)
             while line
-            do (assert targets)
+            do (assert targets nil "Line = ~a" line)
                #+nil
                (format *error-output* "Got: ~A~%" line)
                (let ((match (pop targets)))
@@ -371,6 +371,17 @@
    "(LAMBDA (X CONT)"
    '*
    "(FUNCALL CONT (1- X) CONT)"
+   "1]"))
+
+(with-test (:name (:debugger :bogus-debug-fun :source))
+  (test-debugger
+   "d
+    debugger-test-done!"
+   `(let ()
+      (#.(gensym)))
+   '*
+   "undefined function"
+   '*
    "1]"))
 
 (with-test (:name (disassemble :high-debug-eval))

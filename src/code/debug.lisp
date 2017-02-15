@@ -738,10 +738,12 @@ the current thread are replaced with dummy objects which can safely escape."
       (format stream " [~{~(~A~)~^,~}]" info)))
   (when print-frame-source
     (let* ((loc (sb!di:frame-code-location frame))
-           (path (handler-case (sb!di:code-location-debug-source loc)
-                   (sb!di:no-debug-blocks ())
-                   (:no-error (source)
-                     (sb!di:debug-source-namestring source)))))
+           (path (and (sb!di::compiled-debug-fun-p
+                       (sb!di:code-location-debug-fun loc))
+                      (handler-case (sb!di:code-location-debug-source loc)
+                        (sb!di:no-debug-blocks ())
+                        (:no-error (source)
+                          (sb!di:debug-source-namestring source))))))
       (when (or (eq print-frame-source :always)
                 ;; Avoid showing sources for internals,
                 ;; it will either fail anyway due to all the SB! and
