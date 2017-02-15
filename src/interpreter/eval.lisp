@@ -245,7 +245,7 @@
         (%eval form interpreter-env))))
 
 (defun !unintern-symbols ()
-  '("SB-INTERPRETER"
+  `("SB-INTERPRETER"
     %%eval ; got inlined
     ,@(let (macros)
         (do-symbols (s "SB-INTERPRETER" macros)
