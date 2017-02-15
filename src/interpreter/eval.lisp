@@ -245,11 +245,13 @@
         (%eval form interpreter-env))))
 
 (defun !unintern-symbols ()
-  `("SB-INTERPRETER"
-    %%eval ; got inlined
-    ,@(let (macros)
-        (do-symbols (s "SB-INTERPRETER" macros)
-          (when (and (eq (symbol-package s) this-pkg)
-                     (macro-function s)
-                     (not (member s '(defspecial do-decl-spec)))) ; for SB-CLTL2
-            (push s macros))))))
+  (let ((this-pkg (find-package "SB-INTERPRETER")))
+    `("SB-INTERPRETER"
+      %%eval ; got inlined
+      ,@(let (macros)
+          (do-symbols (s "SB-INTERPRETER" macros)
+            (when (and (eq (symbol-package s) this-pkg)
+                       (macro-function s)
+                       (not (member s '(defspecial with-subforms do-decl-spec)))) ; for SB-CLTL2
+              (push s macros)))
+          macros))))
