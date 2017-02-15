@@ -667,8 +667,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
     printf ' :undefined-fun-restarts' >> $ltf
     case "$sbcl_os" in
-    linux | darwin | openbsd)
-        # probably works on other BSDs, but not yet tested
+    linux | darwin | *bsd)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
