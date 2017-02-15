@@ -248,8 +248,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
              (find-form-eq this-form))
           ;; Hmm, would a &WHOLE argument would work better or worse in general?
             (t
-             (let* ((original-source-path
-                     (cddr (member 'original-source-start *current-path*)))
+             (let* ((original-source-path (source-path-original-source *current-path*))
                     (path (reverse original-source-path)))
                (when (file-info-subforms file-info)
                  (let ((form (elt (file-info-forms file-info) (car path))))
