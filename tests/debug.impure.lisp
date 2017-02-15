@@ -495,7 +495,7 @@
   (trace foo :break-after (and (setf *x* (sb-debug:arg 0)) nil))
   (foo 7))
 
-(defun frobbleize (arg) (declare (ignore arg)) (sb-debug:print-backtrace) 'win)
+(defun frobbleize (arg) (declare (ignore arg)) (sb-debug:list-backtrace) 'win)
 (defmethod low-debug-method ((self t))
   (declare (optimize (debug 0)))
   (frobbleize 'me) ; make this not a tail call, so it remains on stack
