@@ -993,17 +993,16 @@
                   (*allow-instrumenting* nil))
               (push (ctran-block start)
                     (gethash path *code-coverage-blocks*))
-              (let ((*allow-instrumenting* nil))
-                (ir1-convert start next nil
-                             `(locally
-                                  (declare (optimize speed
-                                                     (safety 0)
-                                                     (debug 0)
-                                                     (check-constant-modification 0)))
-                                ;; We're being naughty here, and
-                                ;; modifying constant data. That's ok,
-                                ;; we know what we're doing.
-                                (%rplacd ',store t))))
+              (ir1-convert start next nil
+                           `(locally
+                                (declare (optimize speed
+                                                   (safety 0)
+                                                   (debug 0)
+                                                   (check-constant-modification 0)))
+                              ;; We're being naughty here, and
+                              ;; modifying constant data. That's ok,
+                              ;; we know what we're doing.
+                              (%rplacd ',store t)))
               next)))
       start))
 
