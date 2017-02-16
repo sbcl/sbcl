@@ -2713,10 +2713,19 @@ register."
                (specs `(,name (debug-signal 'ambiguous-var-name
                                             :name ',name
                                             :frame ,n-frame))))))))
-      (let ((res (coerce `(lambda (,n-frame)
-                            (declare (ignorable ,n-frame))
-                            (symbol-macrolet ,(specs) ,form))
-                         'function)))
+      ;; Process the symbol macros outside of the function to avoid
+      ;; all those symbol-macrolets from showing in the sources if
+      ;; there is a problem evaluating this form
+      (let ((res (let ((sb!c:*lexenv* (make-null-lexenv)))
+                   (sb!c::funcall-in-symbol-macrolet-lexenv
+                    (specs)
+                    (lambda (&optional vars)
+                      (declare (ignore vars))
+                      (eval-in-lexenv `(lambda (,n-frame)
+                                         (declare (ignorable ,n-frame))
+                                         (progn ,form))
+                                      sb!c:*lexenv*))
+                    :eval))))
         (lambda (frame)
           ;; This prevents these functions from being used in any
           ;; location other than a function return location, so maybe
