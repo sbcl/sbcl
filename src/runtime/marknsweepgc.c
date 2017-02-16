@@ -1509,7 +1509,7 @@ lispobj alloc_layout(lispobj slots)
     // simple unboxed array so that heap-walking can skip in one step.
     // Probably only a performance issue for MAP-ALLOCATED-OBJECTS,
     // since scavenging know to skip by the object alignment anyway.
-    return (lispobj)l | INSTANCE_POINTER_LOWTAG;
+    return make_lispobj(l, INSTANCE_POINTER_LOWTAG);
 }
 
 #include "genesis/symbol.h"
@@ -1529,7 +1529,7 @@ lispobj alloc_sym(lispobj name)
     s->info = NIL;
     s->name = name;
     s->package = NIL;
-    return (lispobj)s | OTHER_POINTER_LOWTAG;
+    return make_lispobj(s, OTHER_POINTER_LOWTAG);
 }
 
 #include "genesis/fdefn.h"
@@ -1544,7 +1544,7 @@ lispobj alloc_fdefn(lispobj name)
     f->name = name;
     f->fun = NIL;
     f->raw_addr = 0;
-    return (lispobj)f | OTHER_POINTER_LOWTAG;
+    return make_lispobj(f, OTHER_POINTER_LOWTAG);
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_CODE
