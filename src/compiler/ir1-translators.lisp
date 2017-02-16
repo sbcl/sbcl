@@ -279,7 +279,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
 ;;;
 ;;; Call DEFINITIONIZE-FUN on each element of DEFINITIONS to find its
 ;;; in-lexenv representation, stuff the results into *LEXENV*, and
-;;; call FUN (with no arguments).
+;;; call FUN with the processed definitions.
 (defun %funcall-in-foomacrolet-lexenv (definitionize-fun
                                        definitionize-keyword
                                        definitions
@@ -298,9 +298,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
     (unless (= (length definitions)
                (length (remove-duplicates definitions :key #'first)))
       (compiler-style-warn "Duplicate definitions in ~S" definitions))
-    ;; I wonder how much of an compiler performance penalty this
-    ;; non-constant keyword is.
-    (funcall fun definitionize-keyword processed-definitions)))
+    (funcall fun processed-definitions)))
 
 ;;; Tweak LEXENV to include the DEFINITIONS from a MACROLET, then
 ;;; call FUN (with no arguments).
@@ -350,9 +348,8 @@ defined. NAME is the local macro name, LAMBDA-LIST is a DEFMACRO style
 destructuring lambda list, and the FORMS evaluate to the expansion."
   (funcall-in-macrolet-lexenv
    definitions
-   (lambda (&key funs)
-     (declare (ignore funs))
-     (ir1-translate-locally body start next result))
+   (lambda (&optional funs)
+     (ir1-translate-locally body start next result :funs funs))
    :compile))
 
 (defun symbol-macrolet-definitionize-fun (context)
@@ -393,7 +390,7 @@ Define the NAMES as symbol macros with the given EXPANSIONS. Within the
 body, references to a NAME will effectively be replaced with the EXPANSION."
   (funcall-in-symbol-macrolet-lexenv
    macrobindings
-   (lambda (&key vars)
+   (lambda (&optional vars)
      (ir1-translate-locally body start next result :vars vars))
    :compile))
 

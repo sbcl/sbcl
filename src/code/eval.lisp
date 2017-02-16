@@ -84,8 +84,8 @@
         (simple-eval-in-lexenv (first i) lexenv)
         (return (simple-eval-in-lexenv (first i) lexenv)))))
 
-(defun simple-eval-locally (exp lexenv &key vars)
-  (multiple-value-bind (body decls) (parse-body (rest exp) nil)
+(defun simple-eval-locally (exp lexenv &key vars funs)
+  (multiple-value-bind (body decls) (parse-body exp nil)
     (let ((lexenv
            ;; KLUDGE: Uh, yeah.  I'm not anticipating
            ;; winning any prizes for this code, which was
@@ -106,7 +106,7 @@
              ;; FIXME: VALUES declaration
              (sb!c::process-decls decls
                                   vars
-                                  nil
+                                  funs
                                   :lexenv lexenv
                                   :context :eval))))
       (simple-eval-progn-body body lexenv))))
@@ -229,29 +229,25 @@
                     (when e
                       (simple-eval-progn-body body lexenv)))))
                ((locally)
-                (simple-eval-locally exp lexenv))
+                (simple-eval-locally (rest exp) lexenv))
                ((macrolet)
-                (destructuring-bind (definitions &rest body)
-                    (rest exp)
-                  (let ((lexenv
-                          (let ((sb!c:*lexenv* lexenv))
-                            (sb!c::funcall-in-macrolet-lexenv
-                             definitions
-                             (lambda (&key funs)
-                               (declare (ignore funs))
-                               sb!c:*lexenv*)
-                             :eval))))
-                    (simple-eval-locally `(locally ,@body) lexenv))))
+                (destructuring-bind (definitions &rest body) (rest exp)
+                  (let ((sb!c:*lexenv* lexenv))
+                    (sb!c::funcall-in-macrolet-lexenv
+                     definitions
+                     (lambda (&optional funs)
+                       (simple-eval-locally body sb!c:*lexenv*
+                                            :funs funs))
+                     :eval))))
                ((symbol-macrolet)
                 (destructuring-bind (definitions &rest body) (rest exp)
-                  (multiple-value-bind (lexenv vars)
-                      (let ((sb!c:*lexenv* lexenv))
-                        (sb!c::funcall-in-symbol-macrolet-lexenv
-                         definitions
-                         (lambda (&key vars)
-                           (values sb!c:*lexenv* vars))
-                         :eval))
-                    (simple-eval-locally `(locally ,@body) lexenv :vars vars))))
+                  (let ((sb!c:*lexenv* lexenv))
+                    (sb!c::funcall-in-symbol-macrolet-lexenv
+                     definitions
+                     (lambda (&optional vars)
+                       (simple-eval-locally body sb!c:*lexenv*
+                                            :vars vars))
+                     :eval))))
                ((if)
                 (destructuring-bind (test then &optional else) (rest exp)
                   (eval-in-lexenv (if (eval-in-lexenv test lexenv)

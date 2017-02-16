@@ -1460,18 +1460,16 @@ necessary, since type inference may take arbitrarily long to converge.")
                      ((macrolet)
                       (funcall-in-macrolet-lexenv
                        magic
-                       (lambda (&key funs prepend)
-                         (declare (ignore funs))
-                         (aver (null prepend))
+                       (lambda (&optional funs)
                          (process-toplevel-locally body
                                                    path
-                                                   compile-time-too))
+                                                   compile-time-too
+                                                   :funs funs))
                        :compile))
                      ((symbol-macrolet)
                       (funcall-in-symbol-macrolet-lexenv
                        magic
-                       (lambda (&key vars prepend)
-                         (aver (null prepend))
+                       (lambda (&optional vars)
                          (process-toplevel-locally body
                                                    path
                                                    compile-time-too

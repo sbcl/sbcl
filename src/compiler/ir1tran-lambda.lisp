@@ -1105,8 +1105,8 @@
                                                 :funs macros))))
                        (:symbol-macro
                         (funcall-in-symbol-macrolet-lexenv bindings
-                                                           (lambda (&rest args)
-                                                             (declare (ignore args))
+                                                           (lambda (&optional vars)
+                                                             (declare (ignore vars))
                                                              (recurse body *lexenv*))
                                                            :compile))))))))
     (recurse inline-lexenv (make-null-lexenv))))

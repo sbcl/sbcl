@@ -561,10 +561,17 @@ is referred to by the expression."
             do (push (list* :variable name binding key value) user-data)))
         (:function
          (loop
-            for (name key value) in data
-            for binding1 = (find name pd-fvars :key #'sb-c::leaf-source-name :test #'equal)
-            for binding = (if binding1 binding1 (lexenv-find name funs))
-            do (push (list* :function name binding key value) user-data)))
+           for (name key value) in data
+           for binding = (or (loop for fvar in pd-fvars
+                                   for source-name = (if (consp fvar) ;; MACROLET
+                                                         (car fvar)
+                                                         (sb-c::leaf-source-name fvar))
+                                   when (equal name source-name)
+                                   return (if (consp fvar)
+                                              (cdr fvar)
+                                              fvar))
+                             (lexenv-find name funs))
+           do (push (list* :function name binding key value) user-data)))
         (:declare
          (destructuring-bind (decl-name . value) data
            (push (list* :declare decl-name value) user-data)))))

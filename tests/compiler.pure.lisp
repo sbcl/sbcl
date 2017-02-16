@@ -6199,3 +6199,17 @@
   (assert (nth-value 2 (checked-compile
                         `(lambda (l) (handler-bind ((error (lambda ()))) (funcall l)))
                         :allow-warnings t))))
+
+(with-test (:name (:ignore :macrolet))
+  (assert (eql
+           (funcall (checked-compile `(lambda ()
+                                        (macrolet ((f () 10))
+                                          (declare (ignorable #'f))
+                                          (f)))))
+           10))
+  (assert
+   (eql (assert-no-signal
+         (eval `(macrolet ((f () 10))
+                  (declare (ignorable #'f))
+                  (f))))
+        10)))

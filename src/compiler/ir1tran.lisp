@@ -1326,7 +1326,10 @@
         (when (fboundp name)
           (program-assert-symbol-home-package-unlocked
            context name "declaring the ftype of ~A"))
-        (let ((found (find name fvars :key #'leaf-source-name :test #'equal)))
+        (let ((found (find name fvars :key (lambda (x)
+                                             (unless (consp x) ;; macrolet
+                                               (leaf-source-name x)))
+                                      :test #'equal)))
           (cond
            (found
             (setf (leaf-type found) type)
@@ -1421,7 +1424,11 @@
   (let ((sense (cdr (assoc (first spec) *inlinep-translations* :test #'eq)))
         (new-fenv ()))
     (dolist (name (rest spec))
-      (let ((fvar (find name fvars :key #'leaf-source-name :test #'equal)))
+      (let ((fvar (find name fvars
+                        :key (lambda (x)
+                               (unless (consp x) ;; macrolet
+                                 (leaf-source-name x)))
+                        :test #'equal)))
         (if fvar
             (setf (functional-inlinep fvar) sense)
             (let ((found (find-lexically-apparent-fun
@@ -1448,7 +1455,10 @@
     (atom
      (find-in-bindings vars name))
     ((cons (eql function) (cons * null))
-     (find (cadr name) fvars :key #'leaf-source-name :test #'equal))
+     (find (cadr name) fvars :key (lambda (x)
+                                    (if (consp x) ;; MACROLET
+                                        (car x)
+                                        (leaf-source-name x))) :test #'equal))
     (t
      (compiler-error "Malformed function or variable name ~S." name))))
 
@@ -1489,9 +1499,12 @@
                       (t
                        "an unknown function"))
                 (second name)))))
-        ((and (consp var) (eq (car var) 'macro))
+        ((and (consp var)
+              (or (eq (car var) 'macro)
+                  (and (consp (cdr var))
+                       (eq (cadr var) 'macro))))
          ;; Just ignore the IGNORE decl: we don't currently signal style-warnings
-         ;; for unused symbol-macros, so there's no need to do anything.
+         ;; for unused macrolet or symbol-macros, so there's no need to do anything.
          )
         ((functional-p var)
          (setf (leaf-ever-used var) t))
@@ -1547,7 +1560,9 @@
                   (neq :indefinite extent))
              (let* ((fname (cadr name))
                     (bound-fun (find fname fvars
-                                     :key #'leaf-source-name
+                                     :key (lambda (x)
+                                            (unless (consp x) ;; macrolet
+                                              (leaf-source-name x)))
                                      :test #'equal))
                     (fun (or bound-fun (lexenv-find fname funs))))
                (etypecase fun
