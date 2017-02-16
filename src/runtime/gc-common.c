@@ -723,19 +723,12 @@ scav_instance(lispobj *where, lispobj header)
 static sword_t
 scav_funinstance(lispobj *where, lispobj header)
 {
-    lispobj* layout = (lispobj*)instance_layout(where);
-    if (!layout)
-        return 1;
-    layout = native_pointer((lispobj)layout);
-    // Must be an immobile layout, because if not, then we can't have
-    // compact headers, which means we'd be in scav_boxed instead of here.
-    // Ergo, no forwarding_pointer_p() check and all that.
-    if (__immobile_obj_gen_bits(layout) == from_space)
-        promote_immobile_obj(layout, 1);
-
-    sword_t nslots = instance_length(header) | 1;
-    scavenge(where+1, nslots);
-    return 1 + nslots;
+    // This works because the layout is in the header word of all instances,
+    // ordinary and funcallable, when compact headers are enabled.
+    // The trampoline slot in the funcallable-instance is raw, but can be
+    // scavenged, because it points to readonly space, never oldspace.
+    // (And for certain backends it looks like a fixnum, not a pointer)
+    return scav_instance(where, header);
 }
 #endif
 
