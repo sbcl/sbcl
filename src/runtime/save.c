@@ -44,6 +44,8 @@
 # include <zlib.h>
 #endif
 
+void smash_enclosing_state(lispobj init_function);
+
 /* write_runtime_options uses a simple serialization scheme that
  * consists of one word of magic, one word indicating whether options
  * are actually saved, and one word per struct field. */
@@ -238,45 +240,10 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                    boolean save_runtime_options,
                    int core_compression_level)
 {
-    struct thread *th;
     os_vm_offset_t core_start_pos;
     boolean verbose = !lisp_startup_options.noinform;
 
-#ifdef LISP_FEATURE_X86_64
-    untune_asm_routines_for_microarch();
-#endif
-
-    /* Smash the enclosing state. (Once we do this, there's no good
-     * way to go back, which is a sufficient reason that this ends up
-     * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
-    if (verbose) {
-        printf("[undoing binding stack and other enclosing state... ");
-        fflush(stdout);
-    }
-    for_each_thread(th) {       /* XXX really? */
-        unbind_to_here((lispobj *)th->binding_stack_start,th);
-        SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
-        SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
-    }
-    if (verbose) printf("done]\n");
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-    // It's better to wait to defrag until after the binding stack is undone,
-    // because we explicitly don't fixup code refs from stacks.
-    // i.e. if there *were* something on the binding stack that cared that code
-    // moved, it would be wrong. This way we can be sure we don't care.
-    if (code_component_order) {
-        // Assert that defrag will not move the init_function
-        gc_assert(!immobile_space_p(init_function));
-        if (verbose) {
-            printf("[defragmenting immobile space... ");
-            fflush(stdout);
-        }
-        defrag_immobile_space(code_component_order, verbose);
-        if (verbose) printf("done]\n");
-    }
-#endif
-
-    /* (Now we can actually start copying ourselves into the output file.) */
+    smash_enclosing_state(init_function);
 
     if (verbose) {
         printf("[saving current Lisp image into %s:\n", filename);
@@ -557,6 +524,48 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
     }
 
     return file;
+}
+
+void
+smash_enclosing_state(lispobj init_function) {
+    struct thread *th;
+    boolean verbose = !lisp_startup_options.noinform;
+
+#ifdef LISP_FEATURE_X86_64
+    untune_asm_routines_for_microarch();
+#endif
+
+    /* Smash the enclosing state. (Once we do this, there's no good
+     * way to go back, which is a sufficient reason that this ends up
+     * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
+    if (verbose) {
+        printf("[undoing binding stack and other enclosing state... ");
+        fflush(stdout);
+    }
+    for_each_thread(th) {       /* XXX really? */
+        unbind_to_here((lispobj *)th->binding_stack_start,th);
+        SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
+        SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
+    }
+    if (verbose) printf("done]\n");
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    // It's better to wait to defrag until after the binding stack is undone,
+    // because we explicitly don't fixup code refs from stacks.
+    // i.e. if there *were* something on the binding stack that cared that code
+    // moved, it would be wrong. This way we can be sure we don't care.
+    if (code_component_order) {
+        // Assert that defrag will not move the init_function
+        gc_assert(!immobile_space_p(init_function));
+        if (verbose) {
+            printf("[defragmenting immobile space... ");
+            fflush(stdout);
+        }
+        defrag_immobile_space(code_component_order, verbose);
+        if (verbose) printf("done]\n");
+    }
+#endif
+
+    /* (Now we can actually start copying ourselves into the output file.) */
 }
 
 #ifdef LISP_FEATURE_CHENEYGC
