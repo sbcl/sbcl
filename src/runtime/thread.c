@@ -490,7 +490,7 @@ attach_os_thread(init_thread_data *scribble)
      * keeping it initialized: */
     pthread_attr_init(th->os_attr);
 
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     /* On windows, arch_os_thread_init will take care of finding the
      * stack. */
     void *stack_addr;
