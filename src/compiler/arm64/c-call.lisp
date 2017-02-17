@@ -395,7 +395,9 @@
         (inst mov-sp r3-tn nsp-tn)
 
         ;; Call
-        (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
+        (load-immediate-word r4-tn (foreign-symbol-address
+                                    #!-sb-thread "funcall3"
+                                    #!+sb-thread "callback_wrapper_trampoline"))
         (inst blr r4-tn)
 
         ;; Result now on top of stack, put it in the right register
