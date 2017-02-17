@@ -44,6 +44,13 @@
 # include <zlib.h>
 #endif
 
+#if defined(LISP_FEATURE_SB_ELF_CORE)
+# include "sbcl_elf.h"
+#endif
+
+void smash_enclosing_state();
+void compact_immobile_space(lispobj init_function);
+
 /* write_runtime_options uses a simple serialization scheme that
  * consists of one word of magic, one word indicating whether options
  * are actually saved, and one word per struct field. */
@@ -238,46 +245,11 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                    boolean save_runtime_options,
                    int core_compression_level)
 {
-    struct thread *th = all_threads;
-    os_vm_offset_t core_start_pos;
     boolean verbose = !lisp_startup_options.noinform;
 
-    // Since SB-IMPL::DEINIT already checked for exactly 1 thread,
-    // losing here probably can't happen.
-    if (th->next)
-        lose("Can't save image with more than one executing thread");
-
-#ifdef LISP_FEATURE_X86_64
-    untune_asm_routines_for_microarch();
-#endif
-
-    /* Smash the enclosing state. (Once we do this, there's no good
-     * way to go back, which is a sufficient reason that this ends up
-     * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
-    if (verbose) {
-        printf("[undoing binding stack and other enclosing state... ");
-        fflush(stdout);
-    }
-    unbind_to_here((lispobj *)th->binding_stack_start,th);
-    set_current_catch_block(th, 0);
-    set_current_uwp_block(th, 0);
-    if (verbose) printf("done]\n");
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-    // It's better to wait to defrag until after the binding stack is undone,
-    // because we explicitly don't fixup code refs from stacks.
-    // i.e. if there *were* something on the binding stack that cared that code
-    // moved, it would be wrong. This way we can be sure we don't care.
-    if (code_component_order) {
-        // Assert that defrag will not move the init_function
-        gc_assert(!immobile_space_p(init_function));
-        if (verbose) {
-            printf("[defragmenting immobile space... ");
-            fflush(stdout);
-        }
-        defrag_immobile_space(code_component_order, verbose);
-        if (verbose) printf("done]\n");
-    }
-#endif
+    // Preparing to save.
+    smash_enclosing_state();
+    compact_immobile_space(init_function);
 
     /* (Now we can actually start copying ourselves into the output file.) */
 
@@ -286,7 +258,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         fflush(stdout);
     }
 
-    core_start_pos = ftell(file);
+    os_vm_offset_t core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
 
     write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
@@ -561,6 +533,252 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
 
     return file;
 }
+
+void
+smash_enclosing_state() {
+    struct thread *th = all_threads;
+    boolean verbose = !lisp_startup_options.noinform;
+
+    // Since SB-IMPL::DEINIT already checked for exactly 1 thread,
+    // losing here probably can't happen.
+    if (th->next)
+        lose("Can't save image with more than one executing thread");
+
+#ifdef LISP_FEATURE_X86_64
+    untune_asm_routines_for_microarch();
+#endif
+
+    /* Smash the enclosing state. (Once we do this, there's no good
+     * way to go back, which is a sufficient reason that this ends up
+     * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
+    if (verbose) {
+        printf("[undoing binding stack and other enclosing state... ");
+        fflush(stdout);
+    }
+    unbind_to_here((lispobj *)th->binding_stack_start,th);
+    set_current_catch_block(th, 0);
+    set_current_uwp_block(th, 0);
+    if (verbose) printf("done]\n");
+}
+
+void
+compact_immobile_space(lispobj init_function) {
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    // It's better to wait to defrag until after the binding stack is undone,
+    // because we explicitly don't fixup code refs from stacks.
+    // i.e. if there *were* something on the binding stack that cared that code
+    // moved, it would be wrong. This way we can be sure we don't care.
+    if (code_component_order) {
+        // Assert that defrag will not move the init_function
+        gc_assert(!immobile_space_p(init_function));
+        if (verbose) {
+            printf("[defragmenting immobile space... ");
+            fflush(stdout);
+        }
+        defrag_immobile_space(code_component_order, verbose);
+        if (verbose) printf("done]\n");
+    }
+#endif
+}
+
+#if defined(LISP_FEATURE_SB_ELF_CORE)
+
+int
+save_elf_section(FILE *f, const char *section, size_t offset)
+{
+    return fprintf(f, "--section-start %s=0x%zx\n", section, offset);
+}
+
+int
+save_linker_options(const char *filename, sbcl_elf_gc_area *areas, size_t size)
+{
+    const char *lds_ext = ".lds";
+    char linker_opts_file[PATH_MAX];
+
+    size_t flen = strlen(filename);
+    size_t extlen = strlen(lds_ext);
+    if (flen + extlen >= PATH_MAX) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    memcpy(linker_opts_file, filename, flen);
+    memcpy(linker_opts_file + flen, lds_ext, extlen);
+    linker_opts_file[flen + extlen] = '\0';
+
+    FILE *f = fopen(linker_opts_file, "w");
+    if (f == NULL) return -1;
+
+    size_t i;
+    for (i = 0; i < size; i++) {
+        save_elf_section(f, areas[i].name, areas[i].start);
+        save_elf_section(f, areas[i].zero_name, areas[i].free);
+    }
+
+    return fclose(f) == EOF ? -1 : 0;
+}
+
+boolean
+save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
+{
+    sbcl_elf e;
+    sbcl_elf_open(&e, fd);
+
+    // Preparing to save.
+    smash_enclosing_state();
+    compact_imobile_space(init_function);
+
+#if defined(LISP_FEATURE_GENCGC)
+    /* Flush the current_region, updating the tables. */
+     gc_alloc_update_all_page_tables(1);
+     update_dynamic_space_free_pointer();
+#endif
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+     prepare_immobile_space_for_save();
+#endif
+
+#if defined(LISP_FEATURE_GENCGC)
+    lispobj *dyn_start = (lispobj *)DYNAMIC_SPACE_START;
+#else
+    lispobj *dyn_start = (lispobj *)current_dynamic_space;
+#endif
+
+    lispobj *dyn_free = get_alloc_pointer();
+
+    enum gc_spaces_t {
+        READONLY,
+        STATIC,
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        IMMOBILE_FIXEDOBJ,
+        IMMOBILE_VARYOBJ,
+#endif
+        DYNAMIC
+    };
+    const int ELF_RO_CODE = SHF_ALLOC | SHF_EXECINSTR;
+    const int ELF_RW_CODE = SHF_ALLOC | SHF_EXECINSTR | SHF_WRITE;
+    sbcl_elf_gc_area areas[] = {
+        {
+            // Must be writeable because tune_asm_routines_for_microarch()
+            // writes into the code object for FILL-VECTOR/T.
+            // FIXME: figure out a way to move FILL-VECTOR/T elsewhere.
+            .name       = ".sbcl_readonly",
+            .flags      = ELF_RW_CODE,
+            .zero_name  = ".sbcl_readonly.zero",
+            .zero_flags = ELF_RO_CODE,
+            .start = (uintptr_t)READ_ONLY_SPACE_START,
+            .free  = (uintptr_t)read_only_space_free_pointer,
+            .end   = (uintptr_t)READ_ONLY_SPACE_END,
+        },
+        {
+            .name       = ".sbcl_static",
+            .flags      = ELF_RW_CODE,
+            .zero_name  = ".sbcl_static.zero",
+            .zero_flags = ELF_RW_CODE,
+            .start = (uintptr_t)STATIC_SPACE_START,
+            .free  = (uintptr_t)static_space_free_pointer,
+            .end   = (uintptr_t)STATIC_SPACE_END,
+        },
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        {
+            .name       = ".sbcl_immobile.fixedobj",
+            .flags      = ELF_RW_CODE,
+            .zero_name  = ".sbcl_immobile.fixedobj.zero",
+            .zero_flags = ELF_RW_CODE,
+            .start = (uintptr_t)IMMOBILE_SPACE_START,
+            .free  = (uintptr_t)immobile_fixedobj_free_pointer,
+            .end   = (uintptr_t)IMMOBILE_VARYOBJ_SUBSPACE_START,
+        },
+        {
+            .name       = ".sbcl_immobile.varyobj",
+            .flags      = ELF_RW_CODE,
+            .zero_name  = ".sbcl_immobile.varyobj.zero",
+            .zero_flags = ELF_RW_CODE,
+            .start = (uintptr_t)IMMOBILE_VARYOBJ_SUBSPACE_START,
+            .free  = (uintptr_t)immobile_space_free_pointer,
+            .end   = (uintptr_t)IMMOBILE_SPACE_END,
+        },
+#endif
+        {
+            .name       = ".sbcl_dynamic",
+            .flags      = ELF_RW_CODE,
+            .zero_name  = ".sbcl_dynamic.zero",
+            .zero_flags = ELF_RW_CODE,
+            .start = (uintptr_t)dyn_start,
+            .free  = (uintptr_t)dyn_free,
+            .end   = (uintptr_t)MAX_DYNAMIC_SPACE_END,
+        },
+    };
+
+    linked_in_core_data_struct data;
+    memset((void*)&data, 0, sizeof(data));
+
+    data.found                     = true;
+    data.initial_function          = init_function;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    data.immobile_fixedobj_space_offset = areas[IMMOBILE_FIXEDOBJ].start;
+    data.immobile_fixedobj_space_size =
+        areas[IMMOBILE_FIXEDOBJ].free - areas[IMMOBILE_FIXEDOBJ].start;
+    data.immobile_varyobj_space_offset = areas[IMMOBILE_VARYOBJ].start;
+    data.immobile_varyobj_space_size =
+        areas[IMMOBILE_VARYOBJ].free - areas[IMMOBILE_VARYOBJ].start;
+#endif
+    data.dynamic_space_free_offset = areas[DYNAMIC].free;
+    data.dynamic_space_size        = areas[DYNAMIC].end - areas[DYNAMIC].start;
+
+    size_t nareas = sizeof(areas) / sizeof(sbcl_elf_gc_area);
+    sbcl_elf_align_gc_areas(areas, nareas);
+    sbcl_elf_output_gc_areas(&e, areas, nareas);
+
+    // Mark the .o as not requiring an executable stack.
+    // The non-NULL pointer ensures the section is marked PROGBITS.
+    sbcl_elf_output_space(&e, ".note.GNU-stack", (void*)1, 0, 0);
+
+    size_t rodata_shndx = sbcl_elf_output_space(
+                              &e,
+                              ".rodata",
+                              (void*)&data,
+                              sizeof(data),
+                              SHF_ALLOC);
+    sbcl_buffer rodata;
+    sbcl_buffer_init(&rodata);
+
+    size_t off = sbcl_buffer_add(&rodata, (void*)&data, sizeof(data));
+    sbcl_elf_add_symtab_entry(
+        &e,
+        "linked_in_core_data",
+        STB_GLOBAL,
+        STT_OBJECT,
+        rodata_shndx,
+        off,
+        sizeof(data));
+
+    sbcl_elf_close(&e);
+
+    close(fd);
+    printf("Core saved.\n");
+
+    if (save_linker_options(filename, areas, nareas) < 0) {
+        lose("Failed to save linker options file");
+    }
+
+    exit(0);
+}
+
+boolean
+save_elf_core(char *filename, lispobj init_function)
+{
+    FILE *file = open_core_for_saving(filename);
+    if (file == NULL) {
+        perror(filename);
+        return 1;
+    }
+    int fd = fileno(file);
+
+    return save_elf_to_filehandle(fd, filename, init_function);
+}
+
+#endif // LISP_FEATURE_SB_ELF_CORE
 
 #ifdef LISP_FEATURE_CHENEYGC
 boolean
