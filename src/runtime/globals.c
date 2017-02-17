@@ -68,7 +68,7 @@ pthread_key_t specials=0;
 void globals_init(void)
 {
     /* Space, stack, and free pointer vars are initialized by
-     * validate() and coreparse(). */
+     * allocate_spaces() and coreparse(). */
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
     current_control_frame_pointer = (lispobj *)0;
 #endif

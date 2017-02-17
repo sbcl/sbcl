@@ -55,31 +55,36 @@ ensure_undefined_alien(void) {
 }
 
 void
-allocate_spaces(void)
+allocate_spaces(boolean already_allocated_core)
 {
 #ifdef PRINTNOISE
     printf("allocating memory ...");
     fflush(stdout);
 #endif
+
+    if (!already_allocated_core) {
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
     // Allocate the largest space(s) first,
     // since if that fails, it's game over.
 #ifdef LISP_FEATURE_GENCGC
-    ensure_space( (lispobj *)DYNAMIC_SPACE_START  , dynamic_space_size);
+        ensure_space( (lispobj *)DYNAMIC_SPACE_START  , dynamic_space_size);
 #else
-    ensure_space( (lispobj *)DYNAMIC_0_SPACE_START, dynamic_space_size);
-    ensure_space( (lispobj *)DYNAMIC_1_SPACE_START, dynamic_space_size);
+        ensure_space( (lispobj *)DYNAMIC_0_SPACE_START, dynamic_space_size);
+        ensure_space( (lispobj *)DYNAMIC_1_SPACE_START, dynamic_space_size);
 #endif
 #endif
 
-    ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
-    ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
+        ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
+        ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
+
+#if defined(IMMOBILE_SPACE_START) /*&& !defined(LISP_FEATURE_RELOCATABLE_HEAP)*/
+        ensure_space((lispobj *)IMMOBILE_SPACE_START, IMMOBILE_SPACE_SIZE);
+#endif
+    }
+
 #ifdef LISP_FEATURE_LINKAGE_TABLE
     ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START,
                   LINKAGE_TABLE_SPACE_SIZE);
-#endif
-#if defined(IMMOBILE_SPACE_START) /*&& !defined(LISP_FEATURE_RELOCATABLE_HEAP)*/
-    ensure_space((lispobj *)IMMOBILE_SPACE_START, IMMOBILE_SPACE_SIZE);
 #endif
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN

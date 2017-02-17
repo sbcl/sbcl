@@ -29,4 +29,6 @@ extern boolean save(char *filename, lispobj initfun, boolean prepend_runtime,
                     boolean compressed_core, int core_compression_level,
                     int application_type);
 
+boolean save_elf_core(char *filename, lispobj init_function);
+
 #endif
