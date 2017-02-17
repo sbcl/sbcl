@@ -24,6 +24,7 @@
 # endif
 #endif
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #if defined(LISP_FEATURE_SB_THREAD)
@@ -448,6 +449,19 @@ void *os_dlsym_default(char *name);
 struct lisp_startup_options {
     boolean noinform;
 };
+
+typedef struct {
+    bool found;
+    lispobj initial_function;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    size_t immobile_fixedobj_space_offset;
+    size_t immobile_fixedobj_space_size;
+    size_t immobile_varyobj_space_offset;
+    size_t immobile_varyobj_space_size;
+#endif
+    size_t dynamic_space_free_offset;
+    size_t dynamic_space_size;
+} linked_in_core_data_struct;
 
 /* Even with just -O1, gcc optimizes the jumps in this "loop" away
  * entirely, giving the ability to define WITH-FOO-style macros. */

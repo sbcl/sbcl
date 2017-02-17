@@ -26,6 +26,7 @@
 #include <sys/wait.h>
 #endif
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <sys/file.h>
 #include <sys/param.h>
@@ -60,6 +61,7 @@
 #include "save.h"
 #include "lispregs.h"
 #include "thread.h"
+#include "pseudo-atomic.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -431,6 +433,9 @@ void print_environment(int argc, char *argv[])
 }
 
 struct lisp_startup_options lisp_startup_options;
+linked_in_core_data_struct linked_in_core_data __attribute__((weak)) = {0};
+extern void immobile_space_coreparse(uword_t,uword_t);
+
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -467,24 +472,31 @@ main(int argc, char *argv[], char *envp[])
      * os_get_runtime_executable_path(1) isn't able to get an
      * externally-usable path later on. */
     saved_runtime_path = search_for_executable(argv[0]);
-
-    /* Check early to see if this executable has an embedded core,
-     * which also populates runtime_options if the core has runtime
-     * options */
     runtime_path = os_get_runtime_executable_path(0);
-    if (runtime_path || saved_runtime_path) {
-        os_vm_offset_t offset = search_for_embedded_core(
-            runtime_path ? runtime_path : saved_runtime_path);
-        if (offset != -1) {
-            embedded_core_offset = offset;
-            core = (runtime_path ? runtime_path :
-                    copied_string(saved_runtime_path));
-        } else {
-            if (runtime_path)
-                free(runtime_path);
+
+    if (linked_in_core_data.found) {
+        /* Set the core path to a valid string because OS-COLD-INIT-OR-REINIT
+         * doesn't like null pointers. */
+        core = "";
+        set_alloc_pointer(linked_in_core_data.dynamic_space_free_offset);
+        dynamic_space_size = linked_in_core_data.dynamic_space_size;
+    } else {
+        /* Check early to see if this executable has an embedded core,
+         * which also populates runtime_options if the core has runtime
+         * options */
+        if (runtime_path || saved_runtime_path) {
+            os_vm_offset_t offset = search_for_embedded_core(
+                runtime_path ? runtime_path : saved_runtime_path);
+            if (offset != -1) {
+                embedded_core_offset = offset;
+                core = (runtime_path ? runtime_path :
+                        copied_string(saved_runtime_path));
+            } else {
+                if (runtime_path)
+                    free(runtime_path);
+            }
         }
     }
-
 
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
@@ -513,16 +525,15 @@ main(int argc, char *argv[], char *envp[])
                 lisp_startup_options.noinform = 1;
                 ++argi;
             } else if (0 == strcmp(arg, "--core")) {
-                if (core) {
-                    lose("more than one core file specified\n");
-                } else {
-                    ++argi;
-                    if (argi >= argc) {
-                        lose("missing filename for --core argument\n");
-                    }
-                    core = copied_string(argv[argi]);
-                    ++argi;
+                if (linked_in_core_data.found || core) {
+                    lose("Cannot load a core file in an ELF-core binary\n");
                 }
+                ++argi;
+                if (argi >= argc) {
+                    lose("missing filename for --core argument\n");
+                }
+                core = copied_string(argv[argi]);
+                ++argi;
             } else if (0 == strcmp(arg, "--help")) {
                 /* I think this is the (or a) usual convention: upon
                  * seeing "--help" we immediately print our help
@@ -534,6 +545,9 @@ main(int argc, char *argv[], char *envp[])
                 print_version();
                 exit(0);
             } else if (0 == strcmp(arg, "--dynamic-space-size")) {
+                if (linked_in_core_data.found) {
+                    lose("--dynamic-space-size specified more than once\n");
+                }
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --dynamic-space-size");
@@ -555,6 +569,9 @@ main(int argc, char *argv[], char *envp[])
                 }
 #               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
+                if (linked_in_core_data.found) {
+                    lose("--control-stack-size specified more than once\n");
+                }
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --control-stack-size");
@@ -640,7 +657,7 @@ main(int argc, char *argv[], char *envp[])
     }
     dyndebug_init();
     arch_init();
-    allocate_spaces();
+    allocate_spaces(linked_in_core_data.found);
     gc_init();
 
     setup_locale();
@@ -673,17 +690,18 @@ main(int argc, char *argv[], char *envp[])
     }
     #endif
 
-    /* If no core file was specified, look for one. */
-    if (!core) {
+    if (!linked_in_core_data.found) {
+      /* If no core file was specified, look for one. */
+      if (!core) {
         core = search_for_core();
-    }
+      }
 
     if (!lisp_startup_options.noinform && embedded_core_offset == 0) {
         print_banner();
         fflush(stdout);
-    }
+      }
 
-    if (embedded_core_offset == 0) {
+      if (embedded_core_offset == 0) {
         /* Here we make a last attempt at recognizing an embedded core,
          * so that a file with an embedded core is a valid argument to
          * --core.  We take care that any decisions on special behaviour
@@ -693,18 +711,8 @@ main(int argc, char *argv[], char *envp[])
          * --core. */
         os_vm_offset_t offset = search_for_embedded_core(core);
         if (offset != -1)
-            embedded_core_offset = offset;
-    }
-
-    globals_init();
-
-    /* Doing this immediately after the core has been located
-     * and before any random malloc() calls occur improves the chance
-     * of mapping dynamic space at our preferred addres (if movable).
-     * If not movable, it was already mapped in allocate_spaces(). */
-    initial_function = load_core_file(core, embedded_core_offset);
-    if (initial_function == NIL) {
-        lose("couldn't find initial function\n");
+          embedded_core_offset = offset;
+      }
     }
 
 #if defined(SVR4) || defined(__linux__) || defined(__NetBSD__)
@@ -716,6 +724,27 @@ main(int argc, char *argv[], char *envp[])
 
     if (!disable_lossage_handler_p)
         enable_lossage_handler();
+
+    globals_init();
+
+    if (linked_in_core_data.found) {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        immobile_space_free_pointer = linked_in_core_data.immobile_fixedobj_space_offset;
+        immobile_space_coreparse(
+            linked_in_core_data.immobile_fixedobj_space_size,
+            linked_in_core_data.immobile_varyobj_space_size);
+#endif
+        initial_function = linked_in_core_data.initial_function;
+    } else {
+        /* Doing this immediately after the core has been located
+         * and before any random malloc() calls occur improves the chance
+         * of mapping dynamic space at our preferred addres (if movable).
+         * If not movable, it was already mapped in allocate_spaces(). */
+        initial_function = load_core_file(core, embedded_core_offset);
+    }
+    if (initial_function == NIL) {
+        lose("couldn't find initial function\n");
+    }
 
 #ifdef LISP_FEATURE_SB_DYNAMIC_CORE
     os_link_runtime();

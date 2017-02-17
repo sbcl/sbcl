@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/file.h>
 
 #include "sbcl.h"
@@ -563,6 +564,7 @@ smash_enclosing_state() {
 
 void
 compact_immobile_space(lispobj init_function) {
+    boolean verbose = !lisp_startup_options.noinform;
 #ifdef LISP_FEATURE_IMMOBILE_CODE
     // It's better to wait to defrag until after the binding stack is undone,
     // because we explicitly don't fixup code refs from stacks.
@@ -626,24 +628,17 @@ save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
 
     // Preparing to save.
     smash_enclosing_state();
-    compact_imobile_space(init_function);
-
-#if defined(LISP_FEATURE_GENCGC)
-    /* Flush the current_region, updating the tables. */
-     gc_alloc_update_all_page_tables(1);
-     update_dynamic_space_free_pointer();
-#endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-     prepare_immobile_space_for_save();
+    compact_immobile_space(init_function);
+    prepare_immobile_space_for_save();
 #endif
 
-#if defined(LISP_FEATURE_GENCGC)
+    /* Flush the current_region, updating the tables. */
+    gc_alloc_update_all_page_tables(1);
+    update_dynamic_space_free_pointer();
+
     lispobj *dyn_start = (lispobj *)DYNAMIC_SPACE_START;
-#else
-    lispobj *dyn_start = (lispobj *)current_dynamic_space;
-#endif
-
     lispobj *dyn_free = get_alloc_pointer();
 
     enum gc_spaces_t {

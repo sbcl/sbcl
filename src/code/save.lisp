@@ -31,6 +31,7 @@
 (define-alien-routine "gc_and_save" void
   (file c-string)
   (prepend-runtime int)
+  (c-linkable-core int)
   (save-runtime-options int)
   (compressed int)
   (compression-level int)
@@ -68,6 +69,7 @@
                                          (toplevel #'toplevel-init)
                                          (executable nil)
                                          (save-runtime-options nil)
+                                         (c-linkable-core nil)
                                          (purify t)
                                          (root-structures ())
                                          (environment-name "auxiliary")
@@ -102,6 +104,10 @@ The following &KEY arguments are defined:
      run. This also inhibits normal runtime option processing, causing
      all command line arguments to be passed to the toplevel.
      Meaningless if :EXECUTABLE is NIL.
+
+  :C-LINKABLE-CORE
+     If true, a the core is saved as a C-linkable object file.
+     Meaningless if :EXECUTABLE is T.
 
   :PURIFY
      If true (the default on cheneygc), do a purifying GC which moves all
@@ -243,6 +249,7 @@ sufficiently motivated to do lengthy fixes."
       ;; since the GC will invalidate the stack.
       (gc-and-save name
                    (foreign-bool executable)
+                   (foreign-bool c-linkable-core)
                    (foreign-bool save-runtime-options)
                    (foreign-bool compression)
                    (or compression 0)

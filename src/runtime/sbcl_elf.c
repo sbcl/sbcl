@@ -395,16 +395,21 @@ sbcl_elf_output_gc_areas(sbcl_elf *e, sbcl_elf_gc_area *areas, size_t size)
 {
   size_t i;
   for (i = 0; i < size; i++) {
-    sbcl_elf_output_space(
-        e, areas[i].name,
-        (void*)areas[i].start,
-        areas[i].free - areas[i].start,
-        areas[i].flags);
-    sbcl_elf_output_space(
-        e, areas[i].zero_name,
+    sbcl_elf_gc_area area = areas[i];
+    if (area.start < area.free) {
+      sbcl_elf_output_space(
+        e, area.name,
+        (void*)area.start,
+        area.free - area.start,
+        area.flags);
+    }
+    if (area.free < area.end) {
+      sbcl_elf_output_space(
+        e, area.zero_name,
         NULL,
-        areas[i].end - areas[i].free,
-        areas[i].zero_flags);
+        area.end - area.free,
+        area.zero_flags);
+    }
   }
   return;
 }
