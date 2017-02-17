@@ -97,7 +97,11 @@ libsbcl.a: $(OBJS) $(LIBELF_LIB)
 	rm -f $@ ; ar rcs $@ $(OBJS) $(LIBELF_OBJS)
 
 sbcl.mk:
-	( echo 'CC=$(CC)' ; \
+	( echo '# Parameters:' ; \
+	  echo '#   OUTPUT: the output binary path' ; \
+	  echo '#   CORE:   the ELF core file path' ; \
+	  echo '' ; \
+	  echo 'CC=$(CC)' ; \
 	  echo 'LD=$(LD)' ; \
 	  echo 'CFLAGS=$(CFLAGS)' ; \
 	  echo 'ASFLAGS=$(ASFLAGS)' ; \
@@ -108,6 +112,13 @@ sbcl.mk:
 	  if [ -n '$(LISP_FEATURE_SB_LINKABLE_RUNTIME)' ] ; then \
 	    echo 'LIBSBCL=$(LIBSBCL)' ; \
 	    echo 'USE_LIBSBCL=$(USE_LIBSBCL)' ; \
+	    echo '' ; \
+	    echo '# The current directory of this Makefile fragment' ; \
+	    echo '__CURDIR__ := $$(dir $$(abspath $$(lastword $$(MAKEFILE_LIST))))' ; \
+	    echo '' ; \
+	    echo 'sbcl_elf:' ; \
+	    echo '	$$(CC) $$(LINKFLAGS) -L$$(__CURDIR__)libelf -Wl,@$$(CORE).lds \' ; \
+	    echo '	-o $$(OUTPUT) $$(__CURDIR__)$$(LIBSBCL) $$(CORE) $$(LIBS)' ; \
 	  fi ; \
 	  : ) > $@
 
