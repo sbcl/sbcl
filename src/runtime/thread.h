@@ -322,6 +322,20 @@ static inline struct thread *arch_os_get_current_thread(void)
 #endif
 }
 
+inline static int lisp_thread_p(os_context_t *context) {
+#ifdef LISP_FEATURE_SB_THREAD
+    return pthread_getspecific(lisp_thread) != NULL;
+#elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+    char *csp = (char *)*os_context_sp_addr(context); 
+    return (char *)all_threads->control_stack_start < csp &&
+        (char *)all_threads->control_stack_end > (char *) csp;
+#else
+    /* Can't really tell since pthreads are required to get the
+       dimensions of the C stack. */
+    return 1;
+#endif
+}
+
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
 extern kern_return_t mach_lisp_thread_init(struct thread *thread);
 extern void mach_lisp_thread_destroy(struct thread *thread);
