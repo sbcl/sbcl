@@ -74,9 +74,17 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 
+ifdef LISP_FEATURE_SB_ELF_CORE
+  LIBELF_DIR := libelf
+include $(LIBELF_DIR)/build.mk
+  CPPFLAGS += -I$(LIBELF_INCLUDES)
+  LINKFLAGS += -L$(LIBELF_DIR)
+  LIBS += -l$(LIBELF_LIBNAME)
+endif
+
 targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
 
-$(TARGET): $(LIBSBCL)
+$(TARGET): $(LIBSBCL) $(LIBELF_LIB)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
 
 # ld -r -o sbcl.o works on Linux, but not on other platforms.
@@ -85,8 +93,8 @@ $(TARGET): $(LIBSBCL)
 sbcl.o: $(OBJS)
 	$(LD) $(__LDFLAGS__) -r -o $@ $^
 
-libsbcl.a: $(OBJS)
-	rm -f $@ ; ar rcs $@ $^
+libsbcl.a: $(OBJS) $(LIBELF_LIB)
+	rm -f $@ ; ar rcs $@ $(OBJS) $(LIBELF_OBJS)
 
 sbcl.mk:
 	( echo 'CC=$(CC)' ; \
@@ -116,7 +124,7 @@ sbcl.h: $(wildcard genesis/*.h)
 TAGS tags: $(SRCS)
 	etags $(SRCS) || true
 
-clean:
+clean: $(LIBELF_CLEAN)
 	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
 
 %.d: %.c sbcl.h
