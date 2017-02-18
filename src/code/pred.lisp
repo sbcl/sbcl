@@ -492,7 +492,6 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
         (t nil)))
 
 (/show0 "about to do test cases in pred.lisp")
-#!+sb-test
 (let ((test-cases `((0.0 ,(load-time-value (make-unportable-float :single-float-negative-zero)) t)
                     (0.0 1.0 nil)
                     (#c(1 0) #c(1.0 0.0) t)

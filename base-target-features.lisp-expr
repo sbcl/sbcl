@@ -70,13 +70,6 @@
  ;; the executable I'm running.
  :sb-doc
 
- ;; Do regression and other tests when building the system. You might
- ;; or might not want this if you're not a developer, depending on how
- ;; paranoid you are. You probably do want it if you are a developer.
- ;; This test does not affect the target system (in much the same way
- ;; as :sb-after-xc-core, below).
- :sb-test
-
  ;; Make more debugging information available (for debugging SBCL
  ;; itself). If you aren't hacking or troubleshooting SBCL itself,
  ;; you probably don't want this set.
