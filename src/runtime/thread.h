@@ -326,7 +326,7 @@ inline static int lisp_thread_p(os_context_t *context) {
 #ifdef LISP_FEATURE_SB_THREAD
     return pthread_getspecific(lisp_thread) != NULL;
 #elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    char *csp = (char *)*os_context_sp_addr(context); 
+    char *csp = (char *)*os_context_sp_addr(context);
     return (char *)all_threads->control_stack_start < csp &&
         (char *)all_threads->control_stack_end > (char *) csp;
 #else

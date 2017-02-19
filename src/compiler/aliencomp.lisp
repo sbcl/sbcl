@@ -377,12 +377,10 @@
 (deftransform note-local-alien-type ((info var) * * :important t)
   (alien-info-constant-or-abort info)
   (let ((info (lvar-value info)))
-    (/noshow "in DEFTRANSFORM NOTE-LOCAL-ALIEN-TYPE" info)
-    (/noshow (local-alien-info-force-to-memory-p info))
     (unless (local-alien-info-force-to-memory-p info)
       (let ((var-node (lvar-uses var)))
-        (/noshow var-node (ref-p var-node))
-        (when (ref-p var-node)
+        (when (and (ref-p var-node)
+                   (constant-reference-p var-node))
           (propagate-to-refs (ref-leaf var-node)
                              (specifier-type
                               (compute-alien-rep-type

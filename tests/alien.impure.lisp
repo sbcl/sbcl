@@ -492,3 +492,19 @@
 (with-test (:name :change-enum-type)
   (handler-bind ((error #'continue))
     (sb-alien-internals:parse-alien-type '(enum color yellow ochre) nil)))
+
+(with-test (:name :note-local-alien-type)
+  (let ((type (sb-alien::make-local-alien-info :type
+                                               (sb-alien-internals:parse-alien-type 'c-string nil))))
+    (assert (eql (funcall
+                  (checked-compile
+                   `(lambda (x)
+                      (declare (optimize (debug 2)))
+                      (let ((alien (sb-alien-internals:make-local-alien ',type)))
+                        (sb-alien-internals:note-local-alien-type ',type alien)
+                        (flet ((x ()
+                                 (setf alien x)))
+                          (x))
+                        alien)))
+                  31)
+                 31))))
