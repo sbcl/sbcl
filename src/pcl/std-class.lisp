@@ -1514,8 +1514,6 @@
             value)))
 
 (defvar *in-obsolete-instance-trap* nil)
-(defvar *the-wrapper-of-structure-object*
-  (class-wrapper (find-class 'structure-object)))
 
 (define-condition obsolete-structure (error)
   ((datum :reader obsolete-structure-datum :initarg :datum))
@@ -1606,8 +1604,7 @@
         instance added discarded plist)
 
        nwrapper))
-    (*in-obsolete-instance-trap*
-     *the-wrapper-of-structure-object*)
+    (*in-obsolete-instance-trap* #.(find-layout 'structure-object))
     (t
      (let ((*in-obsolete-instance-trap* t))
        (error 'obsolete-structure :datum instance)))))
