@@ -982,7 +982,8 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #!+darwin
 (defun nanosleep (secs nsecs)
   (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
-  (int-syscall ("sb_nanosleep" time-t int) secs nsecs))
+  (int-syscall ("sb_nanosleep" time-t int) secs nsecs)
+  nil)
 
 ;;;; sys/time.h
 

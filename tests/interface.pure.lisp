@@ -269,3 +269,10 @@
 
 (with-test (:name :bug-1095483)
   (assert-error (fboundp '(cas "foo"))))
+
+(with-test (:name :sleep-return-value)
+  (assert (equal (multiple-value-list
+                  (funcall
+                   (checked-compile `(lambda ()
+                                       (sleep 0.1)))))
+                 '(nil))))
