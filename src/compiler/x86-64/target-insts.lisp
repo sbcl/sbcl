@@ -452,10 +452,11 @@
 
 (defmacro do-immobile-functions ((code-var fun-var addr-var &key (if t)) &body body)
   ;; Loop over all code objects
-  `(let ((call (find-inst #xE8 (get-inst-space)))
-         (jmp  (find-inst #xE9 (get-inst-space)))
-         (dstate (make-dstate))
-         (seg (sb!disassem::%make-segment :sap-maker #'error)))
+  `(let* ((call (find-inst #xE8 (get-inst-space)))
+          (jmp  (find-inst #xE9 (get-inst-space)))
+          (dstate (make-dstate))
+          (sap (int-sap 0))
+          (seg (sb!disassem::%make-segment :sap-maker (lambda () sap))))
      (sb!vm::map-objects-in-range
       (lambda (,code-var obj-type obj-size)
         (declare (ignore obj-size))
@@ -466,6 +467,10 @@
                    (,addr-var (+ (get-lisp-obj-address ,fun-var)
                                  (- fun-pointer-lowtag)
                                  (ash simple-fun-code-offset word-shift))))
+              (with-pinned-objects (sap) ; Mutate SAP to point to fun
+                (setf (sap-ref-word (int-sap (get-lisp-obj-address sap))
+                                    (- n-word-bytes other-pointer-lowtag))
+                      ,addr-var))
               (setf (seg-virtual-location seg) ,addr-var
                     (seg-length seg)
                     (- (let ((next (%code-entry-point ,code-var (1+ fun-index))))
@@ -473,8 +478,7 @@
                              (- (get-lisp-obj-address next) fun-pointer-lowtag)
                              (+ (sap-int (code-instructions ,code-var))
                                 (%code-code-size ,code-var))))
-                       ,addr-var)
-                    (seg-sap-maker seg) (constantly (int-sap ,addr-var)))
+                       ,addr-var))
               ,@body))))
       ;; Slowness here is bothersome, especially for SB!VM::REMOVE-STATIC-LINKS,
       ;; so skip right over all fixedobj pages.
@@ -511,11 +515,12 @@
                                             callees exclude-callees))))
                    (let ((entry (sb!vm::fdefn-call-target fdefn)))
                      (when verbose
-                       (unless printed-fun-name
-                         (format t "#x~X ~S~%" (get-lisp-obj-address fun) fun)
-                         (setq printed-fun-name t))
-                       (format t "  @~x -> ~s [~x]~%"
-                               (dstate-cur-addr dstate) (fdefn-name fdefn) entry))
+                       (let ((*print-pretty* nil))
+                         (unless printed-fun-name
+                           (format t "#x~X ~S~%" (get-lisp-obj-address fun) fun)
+                           (setq printed-fun-name t))
+                         (format t "  @~x -> ~s [~x]~%"
+                                 (dstate-cur-addr dstate) (fdefn-name fdefn) entry)))
                      ;; Set the statically-linked flag
                      (setf (sb!vm::fdefn-has-static-callers fdefn) 1)
                      ;; Change the machine instruction
