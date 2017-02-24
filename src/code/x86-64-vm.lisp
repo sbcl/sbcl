@@ -175,6 +175,7 @@
 (defvar *alien-stack-pointer*)
 
 #!+immobile-code
+(progn
 (defun fun-immobilize (fun)
   (let ((code (allocate-code-object t 0 16)))
     (setf (%code-debug-info code) fun)
@@ -188,6 +189,8 @@
       ;; Otherwise just instructions 1 and 3 will do.
       ;; We could use the #xA1 opcode to save a byte, but that would
       ;; be another headache do deal with when relocating this code.
+      ;; There's precedent for this style of hand-assembly,
+      ;; in arch_write_linkage_table_jmp() and arch_do_displaced_inst().
       (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
             (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7))) ; disp
       (let ((i (if (/= (fun-subtype fun) funcallable-instance-header-widetag)
@@ -200,22 +203,42 @@
         (setf (sap-ref-32 sap i) #xFD60FF))) ; JMP [RAX-3]
     code))
 
-#!+immobile-code
+;;; Return T if FUN can't be called without loading RAX with its descriptor.
+;;; This is true of any funcallable instance which is not a GF, and closures.
+(defun fun-requires-simplifying-trampoline-p (fun)
+  (cond ((funcallable-instance-p fun)
+         ;; A funcallable-instance with no raw slots has no machine
+         ;; code within it, and thus requires an external trampoline.
+         (zerop (layout-bitmap (%funcallable-instance-layout fun))))
+        (t
+         (closurep fun))))
+
+(defun %set-fin-trampoline (fin)
+  (let ((sap (int-sap (- (get-lisp-obj-address fin) fun-pointer-lowtag)))
+        (insts-offs (ash (1+ funcallable-instance-info-offset) word-shift)))
+    (setf (sap-ref-word sap insts-offs) #xFFFFFFE9058B48 ; MOV RAX,[RIP-23]
+          (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF)) ; JMP [RAX-3]
+  fin)
+
 (defun %set-fdefn-fun (fdefn fun)
   (declare (type fdefn fdefn) (type function fun)
            (values function))
   (unless (eql (sb!vm::fdefn-has-static-callers fdefn) 0)
     (sb!vm::remove-static-links fdefn))
-  (let ((trampoline (unless (and (simple-fun-p fun)
-                                 (< (get-lisp-obj-address fun) (ash 1 32)))
+  (let ((trampoline (when (or (>= (get-lisp-obj-address fun) (ash 1 32))
+                              (fun-requires-simplifying-trampoline-p fun))
                       (fun-immobilize fun)))) ; a newly made CODE object
     (with-pinned-objects (fdefn trampoline fun)
       (binding* (((fun-entry-addr nop-byte)
+                  ;; The NOP-BYTE is an arbitrary value used to indicate the
+                  ;; kind of callee in the FDEFN-RAW-ADDR slot.
+                  ;; Though it should never be executed, it is a valid encoding.
                   (if trampoline
                       (values (sap-int (code-instructions trampoline)) #x90)
-                      (values (+ (get-lisp-obj-address fun)
-                                 (- fun-pointer-lowtag)
-                                 (ash simple-fun-code-offset word-shift)) 0)))
+                      (values (sap-ref-word (int-sap (get-lisp-obj-address fun))
+                                            (- (ash simple-fun-self-slot word-shift)
+                                               fun-pointer-lowtag))
+                              (if (simple-fun-p fun) 0 #x48))))
                  (fdefn-addr (- (get-lisp-obj-address fdefn) ; base of the object
                                 other-pointer-lowtag))
                  (fdefn-entry-addr (+ fdefn-addr ; address that callers jump to
@@ -229,6 +252,7 @@
                       (ash nop-byte 40))
               (sap-ref-lispobj (int-sap fdefn-addr) (ash fdefn-fun-slot word-shift))
               fun)))))
+) ; end PROGN
 
 ;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
 #!+immobile-space
@@ -240,6 +264,8 @@
         (case (sap-ref-8 (int-sap obj) 0)
          (#.fdefn-widetag
           (make-lisp-obj (logior obj other-pointer-lowtag)))
+         (#.funcallable-instance-header-widetag
+          (make-lisp-obj (logior obj fun-pointer-lowtag)))
          (#.code-header-widetag
           (let ((code (make-lisp-obj (logior obj other-pointer-lowtag))))
             (dotimes (i (code-n-entries code))

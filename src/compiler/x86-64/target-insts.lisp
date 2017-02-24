@@ -502,16 +502,11 @@
                (let ((fdefn (sb!vm::find-called-object
                              (+ (near-jump-displacement chunk dstate)
                                 (dstate-next-addr dstate)))))
-                 ;; It's possible that this could be extended to handle
-                 ;; calling a generic function. But the overhead of GFs
-                 ;; is so absurdly high in comparison to one extra jump
-                 ;; that it scarcely matters. Additionally, static-ness
-                 ;; is not relevant since GFs can always be mutated.
                  (when (and (fdefn-p fdefn)
                             (let ((callee (fdefn-fun fdefn)))
-                              (and (simple-fun-p callee)
-                                   (sb!kernel::immobile-space-obj-p callee)
-                                   (match-p (%simple-fun-name callee)
+                              (and (sb!kernel::immobile-space-obj-p callee)
+                                   (not (sb!vm::fun-requires-simplifying-trampoline-p callee))
+                                   (match-p (%fun-name callee)
                                             callees exclude-callees))))
                    (let ((entry (sb!vm::fdefn-call-target fdefn)))
                      (when verbose

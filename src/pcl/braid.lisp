@@ -48,8 +48,19 @@
 
 (defun allocate-standard-funcallable-instance (wrapper)
   (let* ((slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
-         (fin (%make-standard-funcallable-instance
-               slots #-compact-instance-header (sb-impl::new-instance-hash-code))))
+         (fin (cond #+(and compact-instance-header immobile-code)
+                    ((not (eql (layout-bitmap wrapper) -1))
+                     (let ((f (truly-the funcallable-instance
+                               (sb-sys:%primitive sb-vm::alloc-generic-function slots))))
+                       ;; Set layout prior to writing raw slots
+                       (setf (%funcallable-instance-layout f) wrapper)
+                       (sb-vm::%set-fin-trampoline f)))
+                    (t
+                     (let ((f (%make-standard-funcallable-instance
+                               slots
+                               #-compact-instance-header (sb-impl::new-instance-hash-code))))
+                       (setf (%funcallable-instance-layout f) wrapper)
+                       f)))))
     #+compact-instance-header
     (set-header-data slots
                      (ash (logand (sb-impl::new-instance-hash-code) #xFFFFFFFF) 24))
@@ -61,7 +72,6 @@
                 :format-control "~@<The function of funcallable instance ~
                                  ~S has not been set.~@:>"
                 :format-arguments (list fin))))
-    (setf (%funcallable-instance-layout fin) wrapper)
     fin))
 
 (defun classify-slotds (slotds)

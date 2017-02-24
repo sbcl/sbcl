@@ -559,19 +559,28 @@ arch_set_fp_modes(unsigned int mxcsr)
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_CODE
+/// Return the Lisp object that fdefn's raw_addr slot jumps to.
+/// This will either be:
+/// (1) a simple-fun,
+/// (2) a funcallable-instance with an embedded trampoline that makes
+///     it resemble a simple-fun in terms of call convention, or
+/// (3) a code-component with no simple-fun within it, that makes
+///     closures and other funcallable-instances look like simple-funs.
 lispobj fdefn_raw_referent(struct fdefn* fdefn) {
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
         unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"
           + *(int*)((char*)&fdefn->raw_addr + 1);
         switch (((unsigned char*)&fdefn->raw_addr)[5]) {
-        case 0x90: // closure/fin trampoline
-          return (raw_fun - offsetof(struct code, constants)) | OTHER_POINTER_LOWTAG;
         case 0x00: // no closure/fin trampoline
           // If the target address is in read-only space, then it's a jump or call
           // to an asm routine, and there is no corresponding simple-fun.
           // While we could locate and return the code-object, it's difficult to,
           // and there's no reason to - scavenging it is unnecessary.
           return raw_fun >= IMMOBILE_SPACE_START ? raw_fun - FUN_RAW_ADDR_OFFSET : 0;
+        case 0x48: // embedded funcallable instance trampoline
+          return (raw_fun - (4<<WORD_SHIFT)) | FUN_POINTER_LOWTAG;
+        case 0x90: // general closure/fin trampoline
+          return (raw_fun - offsetof(struct code, constants)) | OTHER_POINTER_LOWTAG;
         }
     } else if (fdefn->raw_addr == 0)
         return 0;

@@ -1557,6 +1557,28 @@ lispobj alloc_fdefn(lispobj name)
     return make_lispobj(f, OTHER_POINTER_LOWTAG);
 }
 
+#if defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
+#include "genesis/funcallable-instance.h"
+#define GF_SIZE (sizeof(struct funcallable_instance)/sizeof(lispobj)+2) /* = 6 */
+lispobj alloc_generic_function(lispobj slots)
+{
+    // GFs have no C header file to represent the layout, which is 6 words:
+    //   header, entry-point, fin-function, slots, raw data (x2)
+    lispobj* obj = (lispobj*)
+      alloc_immobile_obj(MAKE_ATTR(CEILING(GF_SIZE,2), // spacing
+                                   CEILING(GF_SIZE,2), // size
+                                   0),
+                         // 5 payload words following the header
+                         ((GF_SIZE-1)<<8) | FUNCALLABLE_INSTANCE_HEADER_WIDETAG,
+                         // KLUDGE: same page attributes as symbols,
+                         // so use the same hint.
+                         &symbol_page_hint);
+    ((struct funcallable_instance*)obj)->info[0] = slots;
+    ((struct funcallable_instance*)obj)->trampoline = (lispobj)(obj + 4);
+    return make_lispobj(obj, FUN_POINTER_LOWTAG);
+}
+#endif
+
 #ifdef LISP_FEATURE_IMMOBILE_CODE
 //// Defragmentation
 
@@ -1890,15 +1912,20 @@ void defrag_immobile_space(int* components)
     gc_assert(obj_type_histo[INSTANCE_HEADER_WIDETAG/4]);
 
     // Calculate space needed for fixedobj pages after defrag.
-    // page order is: layouts, fdefns, symbols
+    // page order is: layouts, fdefns, GFs, symbols
     int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
                                       LAYOUT_ALIGN / N_WORD_BYTES);
     int n_fdefn_pages = calc_n_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
-
+    int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_HEADER_WIDETAG/4],
+                                   6); // KLUDGE
+#if !(defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER))
+    gc_assert(n_fin_pages == 0);
+#endif
     char* layout_alloc_ptr = defrag_base;
     char* fdefn_alloc_ptr  = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;
+    char* fin_alloc_ptr    = fdefn_alloc_ptr + n_fdefn_pages * IMMOBILE_CARD_BYTES;
     char* symbol_alloc_ptr[N_SYMBOL_KINDS+1];
-    symbol_alloc_ptr[0]    = fdefn_alloc_ptr  + n_fdefn_pages  * IMMOBILE_CARD_BYTES;
+    symbol_alloc_ptr[0]    = fin_alloc_ptr + n_fin_pages * IMMOBILE_CARD_BYTES;
     for (i=0; i<N_SYMBOL_KINDS ; ++i)
       symbol_alloc_ptr[i+1] = symbol_alloc_ptr[i]
         + calc_n_pages(sym_kind_histo[i], SYMBOL_SIZE) * IMMOBILE_CARD_BYTES;
@@ -1981,6 +2008,10 @@ void defrag_immobile_space(int* components)
               alloc_ptr = &layout_alloc_ptr;
               lowtag = INSTANCE_POINTER_LOWTAG;
               break;
+            case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+              alloc_ptr = &fin_alloc_ptr;
+              lowtag = FUN_POINTER_LOWTAG;
+              break;
             case FDEFN_WIDETAG:
               alloc_ptr = &fdefn_alloc_ptr;
               break;
@@ -1997,17 +2028,43 @@ void defrag_immobile_space(int* components)
                 && (end & ALIGN_MASK) != 0)  // ok if exactly on the boundary
                 new = (lispobj*)(end & ~ALIGN_MASK); // snap to page
 #undef ALIGN_MASK
-#ifdef LISP_FEATURE_X86_64
-            // Fix displacement in JMP or CALL instruction.
-            if (widetag == FDEFN_WIDETAG)
-                adjust_fdefn_entrypoint(obj, (char*)new-(char*)obj,
-                                        (struct fdefn*)obj);
-#endif
             memcpy(tempspace_addr(new), obj, sizetab[widetag](obj) << WORD_SHIFT);
             set_forwarding_pointer(obj, make_lispobj(new, lowtag));
             *alloc_ptr = (char*)new + obj_spacing;
         }
     }
+#ifdef LISP_FEATURE_X86_64
+    // Fixup JMP offset in fdefns, and self pointers in funcallable instances.
+    // The former can not be done in the same pass as space permutation,
+    // because we don't know the order in which a generic function and its
+    // related fdefn will be reached. Were this attempted in a single pass,
+    // it could miss a GF that will be moved after the fdefn is moved.
+    // And it can't be done in fixup_space() because that does not know the
+    // original address of each fdefn, so can't compute the absolute callee.
+    for ( page_index = find_immobile_page_index(defrag_base) ;
+          page_index <= max_used_fixedobj_page ; ++page_index) {
+        int obj_spacing = page_obj_align(page_index) << WORD_SHIFT;
+        if (!obj_spacing) continue;
+        lispobj* obj = low_page_address(page_index);
+        lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
+        for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+            if (fixnump(*obj)) continue;
+            gc_assert(forwarding_pointer_p(obj));
+            lispobj* new = native_pointer(forwarding_pointer_value(obj));
+            switch (widetag_of(*tempspace_addr(new))) {
+            case FDEFN_WIDETAG:
+                // Fix displacement in JMP or CALL instruction.
+                adjust_fdefn_entrypoint(tempspace_addr(new),
+                                        (char*)new - (char*)obj,
+                                        (struct fdefn*)obj);
+                break;
+            case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+                tempspace_addr(new)[1] = (lispobj)(new + 4);
+                break;
+            }
+        }
+    }
+#endif  /* LISP_FEATURE_X86_64 */
 #endif  /* DEFRAGMENT_FIXEDOBJ_SUBSPACE */
 
 #ifdef LISP_FEATURE_X86_64
@@ -2054,6 +2111,13 @@ void defrag_immobile_space(int* components)
                     gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
                     old_obj = (lispobj*)(target_addr - offsetof(struct fdefn, raw_addr));
                     expect_widetag = FDEFN_WIDETAG;
+                } else if (*(unsigned long*)(unsigned long)target_addr
+                           == 0xFFFFFFFFE9058B48) {
+                    // "MOV RAX, [RIP-23]" (plus a byte of the next instruction)
+                    // indicates a funcallable instance with a self-contained trampoline.
+                    gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
+                    old_obj = (lispobj*)(long)(target_addr - (4*N_WORD_BYTES));
+                    expect_widetag = FUNCALLABLE_INSTANCE_HEADER_WIDETAG;
                 } else {
                     old_obj = (lispobj*)(target_addr - offsetof(struct simple_fun, code));
                     expect_widetag = SIMPLE_FUN_HEADER_WIDETAG;
