@@ -569,3 +569,15 @@
      (fact 4)
      (sb-interpreter::2-arg-* &rest)
      (fact 5))))
+
+(with-test (:name :deleted-args)
+  (let ((fun (checked-compile `(lambda (&rest ignore)
+                                 (declare (ignore ignore))
+                                 (error "x")))))
+    (assert (typep (block nil
+                     (handler-bind ((error
+                                      (lambda (c)
+                                        (return (values c
+                                                        (sb-debug:list-backtrace))))))
+                       (funcall fun)))
+                   'simple-error))))

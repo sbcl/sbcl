@@ -1535,7 +1535,7 @@ register."
   (declare (type (simple-array * (*)) args)
            (simple-vector vars))
   (let ((ele (aref args i)))
-    (cond ((not (symbolp ele)) (svref vars ele))
+    (cond ((typep ele 'index) (svref vars ele))
           ((eq ele sb!c::debug-info-var-deleted) :deleted)
           (t (error "malformed arguments description")))))
 
