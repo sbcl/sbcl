@@ -28,8 +28,10 @@ typedef struct sbcl_elf {
 typedef struct sbcl_elf_gc_area {
     char *name;
     int flags;
+    char *refsym;
     char *zero_name;
     int zero_flags;
+    char *zero_refsym;
     uintptr_t start;
     uintptr_t free;
     uintptr_t end;
@@ -76,5 +78,7 @@ size_t sbcl_elf_output_strtab(sbcl_elf *e, char *section_name, sbcl_buffer *strt
 size_t sbcl_elf_output_symtab(sbcl_elf *e);
 
 void sbcl_elf_align_gc_areas(sbcl_elf_gc_area *areas, size_t size);
+
+void sbcl_elf_output_section_reference(sbcl_elf *e, size_t shndx, char *refsym, size_t off);
 
 void sbcl_elf_output_gc_areas(sbcl_elf *e, sbcl_elf_gc_area *areas, size_t size);

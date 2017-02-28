@@ -47,6 +47,9 @@
 
 #if defined(LISP_FEATURE_SB_ELF_CORE)
 # include "sbcl_elf.h"
+
+# define SECTION_START_REFERENCE(name) \
+        int __section_ ## name __attribute__((weak)) = 0
 #endif
 
 void smash_enclosing_state(lispobj init_function);
@@ -610,6 +613,19 @@ save_linker_options(const char *filename, sbcl_elf_gc_area *areas, size_t size)
     return fclose(f) == EOF ? -1 : 0;
 }
 
+SECTION_START_REFERENCE(__sbcl_readonly_start);
+SECTION_START_REFERENCE(__sbcl_readonly_zero_start);
+SECTION_START_REFERENCE(__sbcl_static_start);
+SECTION_START_REFERENCE(__sbcl_static_zero_start);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+SECTION_START_REFERENCE(__sbcl_immobile_fixedobj_start);
+SECTION_START_REFERENCE(__sbcl_immobile_fixedobj_zero_start);
+SECTION_START_REFERENCE(__sbcl_immobile_varyobj_start);
+SECTION_START_REFERENCE(__sbcl_immobile_varyobj_zero_start);
+#endif
+SECTION_START_REFERENCE(__sbcl_dynamic_start);
+SECTION_START_REFERENCE(__sbcl_dynamic_zero_start);
+
 boolean
 save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
 {
@@ -658,8 +674,10 @@ save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
             // FIXME: figure out a way to move FILL-VECTOR/T elsewhere.
             .name       = ".sbcl_readonly",
             .flags      = ELF_RW_CODE,
+            .refsym     = "__section_sbcl_readonly_start",
             .zero_name  = ".sbcl_readonly.zero",
             .zero_flags = ELF_RO_CODE,
+            .zero_refsym = "__section_sbcl_readonly_zero_start",
             .start = (uintptr_t)READ_ONLY_SPACE_START,
             .free  = (uintptr_t)read_only_space_free_pointer,
             .end   = (uintptr_t)READ_ONLY_SPACE_END,
@@ -667,8 +685,10 @@ save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
         {
             .name       = ".sbcl_static",
             .flags      = ELF_RW_CODE,
+            .refsym     = "__section_sbcl_static_start",
             .zero_name  = ".sbcl_static.zero",
             .zero_flags = ELF_RW_CODE,
+            .zero_refsym = "__section_sbcl_static_zero_start",
             .start = (uintptr_t)STATIC_SPACE_START,
             .free  = (uintptr_t)static_space_free_pointer,
             .end   = (uintptr_t)STATIC_SPACE_END,
@@ -677,8 +697,10 @@ save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
         {
             .name       = ".sbcl_immobile.fixedobj",
             .flags      = ELF_RW_CODE,
+            .refsym     = "__section_sbcl_immobile_fixedobj_start",
             .zero_name  = ".sbcl_immobile.fixedobj.zero",
             .zero_flags = ELF_RW_CODE,
+            .zero_refsym = "__section_sbcl_immobile_fixedobj_zero_start",
             .start = (uintptr_t)IMMOBILE_SPACE_START,
             .free  = (uintptr_t)immobile_fixedobj_free_pointer,
             .end   = (uintptr_t)IMMOBILE_VARYOBJ_SUBSPACE_START,
@@ -686,8 +708,10 @@ save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
         {
             .name       = ".sbcl_immobile.varyobj",
             .flags      = ELF_RW_CODE,
+            .refsym     = "__section_sbcl_immobile_varyobj_start",
             .zero_name  = ".sbcl_immobile.varyobj.zero",
             .zero_flags = ELF_RW_CODE,
+            .zero_refsym = "__section_sbcl_immobile_varyobj_zero_start",
             .start = (uintptr_t)IMMOBILE_VARYOBJ_SUBSPACE_START,
             .free  = (uintptr_t)immobile_space_free_pointer,
             .end   = (uintptr_t)IMMOBILE_SPACE_END,
@@ -696,8 +720,10 @@ save_elf_to_filehandle(int fd, char *filename, lispobj init_function)
         {
             .name       = ".sbcl_dynamic",
             .flags      = ELF_RW_CODE,
+            .refsym     = "__section_sbcl_dynamic_start",
             .zero_name  = ".sbcl_dynamic.zero",
             .zero_flags = ELF_RW_CODE,
+            .zero_refsym = "__section_sbcl_dynamic_zero_start",
             .start = (uintptr_t)dyn_start,
             .free  = (uintptr_t)dyn_free,
             .end   = (uintptr_t)MAX_DYNAMIC_SPACE_END,

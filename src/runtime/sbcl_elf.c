@@ -391,21 +391,44 @@ sbcl_elf_align_gc_areas(sbcl_elf_gc_area *areas, size_t size)
 }
 
 void
+sbcl_elf_output_section_reference(sbcl_elf *e, size_t shndx, char *refsym, size_t off)
+{
+  sbcl_elf_add_symtab_entry(
+      e,
+      refsym,
+      STB_GLOBAL,
+      STT_NOTYPE,
+      shndx,
+      off,
+      // The symbol has no allocation so size is 0
+      0);
+}
+
+void
 sbcl_elf_output_gc_areas(sbcl_elf *e, sbcl_elf_gc_area *areas, size_t size)
 {
+  sbcl_buffer dummy;
+  sbcl_buffer_init(&dummy);
+  size_t off = sbcl_buffer_add(&dummy, NULL, 0);
+
   size_t i;
   for (i = 0; i < size; i++) {
-    sbcl_elf_output_space(
+    size_t code_shndx = sbcl_elf_output_space(
         e, areas[i].name,
         (void*)areas[i].start,
         areas[i].free - areas[i].start,
         areas[i].flags);
-    sbcl_elf_output_space(
+    sbcl_elf_output_section_reference(e, code_shndx, areas[i].refsym, off);
+
+    size_t zero_shndx = sbcl_elf_output_space(
         e, areas[i].zero_name,
         NULL,
         areas[i].end - areas[i].free,
         areas[i].zero_flags);
+    sbcl_elf_output_section_reference(e, zero_shndx, areas[i].zero_refsym, off);
   }
+
+  sbcl_buffer_destroy(&dummy);
   return;
 }
 
