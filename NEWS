@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.3.14:
+changes in sbcl-1.3.15 relative to sbcl-1.3.14:
   * minor incompatible change: the reader will when feasible create
     new symbols using a BASE-STRING for the print name.  Additionally,
     string literals can favor the base-string type if desired, though
