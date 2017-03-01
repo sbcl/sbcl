@@ -2446,8 +2446,8 @@ register."
 ;;; this to determine if the value stored is the actual value or an
 ;;; indirection cell.
 (defun indirect-value-cell-p (x)
-  (and (= (lowtag-of x) sb!vm:other-pointer-lowtag)
-       (= (widetag-of x) sb!vm:value-cell-header-widetag)))
+  (and (%other-pointer-p x)
+       (eql (%other-pointer-widetag x) sb!vm:value-cell-header-widetag)))
 
 ;;; Return three values reflecting the validity of DEBUG-VAR's value
 ;;; at BASIC-CODE-LOCATION:
