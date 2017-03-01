@@ -203,9 +203,9 @@
   (always-translatable))
 
 ;;; These two are mostly used for bit-bashing operations.
-(defknown %vector-raw-bits (t fixnum) sb!vm:word
+(defknown %vector-raw-bits (t index) sb!vm:word
   (flushable))
-(defknown (%set-vector-raw-bits) (t fixnum sb!vm:word) sb!vm:word
+(defknown (%set-vector-raw-bits) (t index sb!vm:word) sb!vm:word
   ())
 
 
@@ -225,7 +225,7 @@
     (simple-array * (*))
     (flushable movable))
 
-(defknown make-array-header ((unsigned-byte 8) (unsigned-byte 24)) array
+(defknown make-array-header ((unsigned-byte 8) (mod #.sb!xc:array-rank-limit)) array
   (flushable movable))
 
 (defknown make-array-header* (&rest t) array (flushable movable))
