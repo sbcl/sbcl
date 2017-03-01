@@ -258,16 +258,13 @@
                        n-word-bytes))))
 
           (:code
-           (values (tagged-object other-pointer-lowtag)
-                   code-header-widetag
-                   (round-to-dualword
-                    (+ (* (logand header-value short-header-max-words)
-                          n-word-bytes)
-                       (the fixnum
-                            (sap-ref-lispobj object-sap
-                                             (* code-code-size-slot
-                                                n-word-bytes)))))))
-
+           (let ((c (tagged-object other-pointer-lowtag)))
+             (values c
+                     code-header-widetag
+                     (round-to-dualword
+                      (+ (* (logand header-value short-header-max-words)
+                            n-word-bytes)
+                         (%code-code-size (truly-the code-component c)))))))
           (t
            (error "Unrecognized room-info-kind ~S in reconstitute-object"
                   (room-info-kind info)))))))))
