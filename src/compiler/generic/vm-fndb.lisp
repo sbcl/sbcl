@@ -114,6 +114,8 @@
   ()
   :result-arg 0)
 
+;;; Return the length of VECTOR.
+;;; Ordinary code should prefer to use (LENGTH (THE VECTOR FOO)) instead.
 (defknown vector-length (vector) index (flushable dx-safe))
 
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
@@ -121,10 +123,15 @@
 
 (defknown lowtag-of (t) (unsigned-byte #.sb!vm:n-lowtag-bits)
   (flushable movable))
+;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags.
+;;; When dealing with known other-pointers (dispatching on array
+;;; element type for example), %OTHER-POINTER-WIDETAG is faster.
 (defknown (widetag-of %other-pointer-widetag) (t)
   (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable movable))
 
+;;; Return the data from the header of object, which for GET-HEADER-DATA
+;;; must be an other-pointer, and for GET-CLOSURE-LENGTH a fun-pointer.
 (defknown (get-header-data get-closure-length) (t)
     (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))
   (flushable))
@@ -209,6 +216,9 @@
   ())
 
 
+;;; Allocate an unboxed, non-fancy vector with type code TYPE, length LENGTH,
+;;; and WORDS words long. Note: it is your responsibility to ensure that the
+;;; relation between LENGTH and WORDS is correct.
 (defknown allocate-vector ((unsigned-byte 8) index
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.
@@ -225,6 +235,7 @@
     (simple-array * (*))
     (flushable movable))
 
+;;; Allocate an array header with type code TYPE and rank RANK.
 (defknown make-array-header ((unsigned-byte 8) (mod #.sb!xc:array-rank-limit)) array
   (flushable movable))
 
@@ -419,7 +430,10 @@
 
 ;;;; code/function/fdefn object manipulation routines
 
+;;; Return a SAP pointing to the instructions part of CODE-OBJ.
 (defknown code-instructions (t) system-area-pointer (flushable movable))
+;;; Extract the INDEXth element from the header of CODE-OBJ. Can be
+;;; set with SETF.
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
 
@@ -435,8 +449,17 @@
 (defknown fdefn-fun (fdefn) (or function null) (flushable))
 (defknown (setf fdefn-fun) (function fdefn) t ())
 (defknown fdefn-makunbound (fdefn) t ())
+;;; FDEFN -> FUNCTION, trapping if not FBOUNDP
 (defknown safe-fdefn-fun (fdefn) function ())
 
+;;; Given either a closure or a simple-fun, return the underlying simple-fun.
+;;; FIXME: %SIMPLE-FUN-SELF is a somewhat poor name for this function.
+;;; The x86[-64] code defines %CLOSURE-FUN as nothing more than %SIMPLE-FUN-SELF,
+;;; and it's not clear whether that's because callers need the "simple" accessor
+;;; to work on closures, versus reluctance to define a %CLOSURE/SIMPLE-FUN-FUN
+;;; reader. %FUN-FUN works on all three function subtypes, but is nontrivial.
+;;; Preferably at least one accessor should get a new name,
+;;; so that %SIMPLE-FUN-SELF can mean what it says.
 (defknown %simple-fun-self (function) function
   (flushable))
 (defknown (setf %simple-fun-self) (function function) function
