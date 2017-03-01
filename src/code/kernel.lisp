@@ -81,17 +81,20 @@
 (deftype simple-fun ()
   '(satisfies simple-fun-p))
 
-(defun %simple-fun-doc (simple-fun)
-  (declare (simple-fun simple-fun))
-  (let ((info (%simple-fun-info simple-fun)))
-    (cond ((typep info '(or null string))
-           info)
-          ((simple-vector-p info)
-           nil)
-          ((consp info)
-           (car info))
-          (t
-           (bug "bogus INFO for ~S: ~S" simple-fun info)))))
+;;; Extract halves of SIMPLE-FUN-INFO, which is a string if it holds
+;;; documentation, a SIMPLE-VECTOR if XREFS,
+;;; or (CONS STRING SIMPLE-VECTOR) for both, or NIL if neither.
+(macrolet ((def (name info-part if-simple-vector if-string)
+             `(defun ,name (simple-fun)
+                (declare (simple-fun simple-fun))
+                (let ((info (%simple-fun-info simple-fun)))
+                  (typecase info
+                    (list (,info-part info))
+                    (simple-vector ,if-simple-vector)
+                    (string ,if-string)
+                    (t (bug "bogus INFO for ~S: ~S" simple-fun info)))))))
+  (def %simple-fun-doc   car nil info)
+  (def %simple-fun-xrefs cdr info nil))
 
 (defun (setf %simple-fun-doc) (doc simple-fun)
   (declare (type (or null string) doc)
@@ -110,18 +113,6 @@
                      (cdr info)))
                 (t
                  (bug "bogus INFO for ~S: ~S" simple-fun info))))))
-
-(defun %simple-fun-xrefs (simple-fun)
-  (declare (simple-fun simple-fun))
-  (let ((info (%simple-fun-info simple-fun)))
-    (cond ((typep info '(or null string))
-           nil)
-          ((simple-vector-p info)
-           info)
-          ((consp info)
-           (cdr info))
-          (t
-           (bug "bogus INFO for ~S: ~S" simple-fun info)))))
 
 ;;; Extract the arglist from the function header FUNC.
 (defun %simple-fun-arglist (func)
