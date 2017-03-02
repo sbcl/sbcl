@@ -25,8 +25,8 @@
 
 (let ((reader-specializers '(slot-object))
       (writer-specializers '(t slot-object)))
-  (defun ensure-accessor (type fun-name slot-name)
-    (unless (fboundp fun-name)
+  (defun ensure-accessor (fun-name) ; Make FUN-NAME exist as a GF if it doesn't
+    (destructuring-bind (slot-name type) (cddr fun-name)
       (multiple-value-bind (lambda-list specializers method-class initargs doc)
           (ecase type
             ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
@@ -47,8 +47,7 @@
         (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
           (add-method gf (make-a-method method-class
                                         () lambda-list specializers
-                                        initargs doc :slot-name slot-name)))))
-    t)
+                                        initargs doc :slot-name slot-name))))))
   ;; KLUDGE: this is maybe PCL bootstrap mechanism #6 or #7, invented
   ;; by CSR in June 2007.  Making the bootstrap sane is getting higher
   ;; on the "TODO: URGENT" list.

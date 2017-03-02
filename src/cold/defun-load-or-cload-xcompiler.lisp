@@ -270,6 +270,7 @@
             sb!pcl::class-wrapper
             sb!pcl::compute-gf-ftype
             sb!pcl::definition-source
+            sb!pcl::ensure-accessor
             sb!pcl:ensure-class-finalized)
           ;; CLOS-based packages
           '(sb!gray:stream-clear-input

@@ -139,6 +139,8 @@
     (setf (info :function :where-from name) :assumed))
   (let ((where (info :function :where-from name)))
     (when (and (eq where :assumed)
+               ;; Slot accessors are defined just-in-time, if not already.
+               (not (typep name '(cons (eql sb!pcl::slot-accessor))))
                ;; In the ordinary target Lisp, it's silly to report
                ;; undefinedness when the function is defined in the
                ;; running Lisp. But at cross-compile time, the current

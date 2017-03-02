@@ -96,8 +96,11 @@
 (defun find-or-create-fdefn (name)
   (or (find-fdefn name)
       ;; We won't reach here if the name was not legal
-      (get-info-value-initializing :function :definition name
-                                   (make-fdefn name))))
+      (let ((fdefn (get-info-value-initializing :function :definition name
+                                                (make-fdefn name))))
+        (when (typep name '(cons (eql sb!pcl::slot-accessor)))
+          (sb!pcl::ensure-accessor name))
+        fdefn)))
 
 ;;; Remove NAME's FTYPE information unless it was explicitly PROCLAIMED.
 ;;; The NEW-FUNCTION argument is presently unused, but could be used
