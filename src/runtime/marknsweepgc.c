@@ -833,6 +833,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
 #endif
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
   case INSTANCE_HEADER_WIDETAG:
+  case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
     layout[0] = instance_layout(obj);
     if (range_points_to_younger_p(layout, layout+1, gen, keep_gen, new_gen))
         return 1;
@@ -1603,12 +1604,16 @@ static lispobj adjust_fun_entrypoint(lispobj raw_entry)
     return raw_entry;  // otherwise it's one of those trampolines
 }
 
-static void adjust_fdefn_entrypoint(struct fdefn* fdefn, struct fdefn* new_fdefn)
+/// Fixup the fdefn at 'where' based on it moving by 'displacement'.
+/// 'fdefn_old' is needed for computing the pre-fixup callee if the
+/// architecture uses a call-relative instruction.
+static void adjust_fdefn_entrypoint(lispobj* where, int displacement,
+                                    struct fdefn* fdefn_old)
 {
+    struct fdefn* fdefn = (struct fdefn*)where;
     int callee_adjust = 0;
-    // Get the tagged object, either a simple-fun or a code component,
-    // referred to by the fdefn_raw_addr.
-    lispobj callee_old = fdefn_raw_referent(fdefn);
+    // Get the tagged object referred to by the fdefn_raw_addr.
+    lispobj callee_old = fdefn_raw_referent(fdefn_old);
     // If it's the undefined function trampoline, or the referent
     // did not move, then the callee_adjust stays 0.
     // Otherwise we adjust the rel32 field by the change in callee address.
@@ -1616,8 +1621,36 @@ static void adjust_fdefn_entrypoint(struct fdefn* fdefn, struct fdefn* new_fdefn
         lispobj callee_new = forwarding_pointer_value(native_pointer(callee_old));
         callee_adjust = callee_new - callee_old;
     }
-    *(int*)((char*)&fdefn->raw_addr + 1) +=
-      ((char*)fdefn - (char*)new_fdefn) + callee_adjust;
+#ifdef LISP_FEATURE_X86_64
+    *(int*)((char*)&fdefn->raw_addr + 1) += callee_adjust - displacement;
+#else
+#error "Can't adjust fdefn_raw_addr for this architecture"
+#endif
+}
+
+// Fix the layout of OBJ, and return the layout's address in tempspace.
+struct layout* fix_object_layout(lispobj* obj)
+{
+    // This works on instances, funcallable instances (and/or closures)
+    // but the latter only if the layout is in the header word.
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+    gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG
+              || widetag_of(*obj) == FUNCALLABLE_INSTANCE_HEADER_WIDETAG
+              || widetag_of(*obj) == CLOSURE_HEADER_WIDETAG);
+#else
+    gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG);
+#endif
+    lispobj layout = instance_layout(obj);
+    if (layout == 0) return 0;
+    if (forwarding_pointer_p(native_pointer(layout))) { // usually
+        layout = forwarding_pointer_value(native_pointer(layout));
+        set_instance_layout(obj, layout);
+    }
+    struct layout* native_layout = (struct layout*)
+        tempspace_addr(native_pointer(layout));
+    gc_assert(widetag_of(native_layout->header) == INSTANCE_HEADER_WIDETAG);
+    gc_assert(instance_layout((lispobj*)native_layout) == LAYOUT_OF_LAYOUT);
+    return native_layout;
 }
 
 /// It's tricky to try to use the scavtab[] functions for fixing up moved
@@ -1627,7 +1660,7 @@ static void adjust_fdefn_entrypoint(struct fdefn* fdefn, struct fdefn* new_fdefn
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
-    lispobj header_word, layout;
+    lispobj header_word;
     int widetag;
     long size;
     void fixup_immobile_refs(struct code*);
@@ -1649,20 +1682,15 @@ static void fixup_space(lispobj* where, size_t n_words)
                 || widetag == SAP_WIDETAG // Better not point to code!
                 || widetag == SIMD_PACK_WIDETAG
                 || unboxed_array_p(widetag)))
-            lose("Unhandled widetag in fixup_range: %p\n", (void*)header_word);
+            lose("Unhandled widetag in fixup_space: %p\n", (void*)header_word);
           break;
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+#endif
         case INSTANCE_HEADER_WIDETAG:
-          layout = instance_layout(where);
-          if (forwarding_pointer_p(native_pointer(layout))) { // usually
-              layout = forwarding_pointer_value(native_pointer(layout));
-              set_instance_layout(where, layout);
-          }
-          struct layout* native_layout = (struct layout*)
-              tempspace_addr(native_pointer(layout));
-          gc_assert(widetag_of(native_layout->header) == INSTANCE_HEADER_WIDETAG);
           instance_scan(adjust_words, where+1,
                         instance_length(header_word) | 1,
-                        native_layout->bitmap);
+                        fix_object_layout(where)->bitmap);
           break;
         case CODE_HEADER_WIDETAG:
           // Fixup the constant pool.
@@ -1678,14 +1706,8 @@ static void fixup_space(lispobj* where, size_t n_words)
         case CLOSURE_HEADER_WIDETAG:
           where[1] = adjust_fun_entrypoint(where[1]);
           // FALLTHROUGH_INTENDED
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-          // Funcallable instances - and soon, closures, but not yet - have their
-          // layout in the header word.
-          layout = instance_layout(where);
-          if (layout != 0 && forwarding_pointer_p(native_pointer(layout)))
-              set_instance_layout(where,
-                                  forwarding_pointer_value(native_pointer(layout)));
 #endif
           // skip the trampoline word at where[1]
           adjust_words(where+2, size-2);
@@ -1701,7 +1723,7 @@ static void fixup_space(lispobj* where, size_t n_words)
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
           if (static_space_p)
 #endif
-              adjust_fdefn_entrypoint((struct fdefn*)where, (struct fdefn*)where);
+              adjust_fdefn_entrypoint(where, 0, (struct fdefn*)where);
           break;
 
         // Special case because we might need to mark hashtables
@@ -1978,14 +2000,15 @@ void defrag_immobile_space(int* components)
 #ifdef LISP_FEATURE_X86_64
             // Fix displacement in JMP or CALL instruction.
             if (widetag == FDEFN_WIDETAG)
-                adjust_fdefn_entrypoint((struct fdefn*)obj, (struct fdefn*)new);
+                adjust_fdefn_entrypoint(obj, (char*)new-(char*)obj,
+                                        (struct fdefn*)obj);
 #endif
             memcpy(tempspace_addr(new), obj, sizetab[widetag](obj) << WORD_SHIFT);
             set_forwarding_pointer(obj, make_lispobj(new, lowtag));
             *alloc_ptr = (char*)new + obj_spacing;
         }
     }
-#endif
+#endif  /* DEFRAGMENT_FIXEDOBJ_SUBSPACE */
 
 #ifdef LISP_FEATURE_X86_64
     // Fix displacements in JMP and CALL instructions in code objects.
@@ -2022,6 +2045,10 @@ void defrag_immobile_space(int* components)
             if (immobile_space_p(target_addr)) {
                 lispobj* old_obj;
                 unsigned char expect_widetag;
+                // KLUDGE: It would be more proper to search for the Lisp object
+                // being called, rather than checking for a byte pattern.
+                // Problem: though gc_search_space() understands FPs, it doesn't
+                // work here, because objects aren't physically where the FP points.
                 if ((*(char*)(long)target_addr & 0xFE) == 0xE8) {  // JMP or CALL
                     // must be jumping into an fdefn
                     gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
