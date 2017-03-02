@@ -440,7 +440,7 @@ count_dont_move_pages(void)
 
 /* Work through the pages and add up the number of bytes used for the
  * given generation. */
-static os_vm_size_t
+static __attribute__((unused)) os_vm_size_t
 count_generation_bytes_allocated (generation_index_t gen)
 {
     page_index_t i;
@@ -4456,9 +4456,12 @@ general_alloc(sword_t nbytes, int page_type_flag)
         return general_alloc_internal(nbytes, page_type_flag, region, thread);
     } else if (UNBOXED_PAGE_FLAG == page_type_flag) {
         lispobj * obj;
-        gc_assert(0 == thread_mutex_lock(&allocation_lock));
+        int result;
+        result = thread_mutex_lock(&allocation_lock);
+        gc_assert(!result);
         obj = general_alloc_internal(nbytes, page_type_flag, &unboxed_region, thread);
-        gc_assert(0 == thread_mutex_unlock(&allocation_lock));
+        result = thread_mutex_unlock(&allocation_lock);
+        gc_assert(!result);
         return obj;
     } else {
         lose("bad page type flag: %d", page_type_flag);

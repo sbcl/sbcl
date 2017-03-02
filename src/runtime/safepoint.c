@@ -143,7 +143,8 @@ void
 gc_state_lock()
 {
     odxprint(safepoints,"GC state [%p] to be locked",gc_state.lock);
-    gc_assert(0==pthread_mutex_lock(&gc_state.lock));
+    int result = pthread_mutex_lock(&gc_state.lock);
+    gc_assert(!result);
     if (gc_state.master) {
         fprintf(stderr,"GC state lock glitch [%p] in thread %p phase %d\n",
                 gc_state.master,arch_os_get_current_thread(),gc_state.phase);
@@ -166,7 +167,8 @@ gc_state_unlock()
     odxprint(safepoints,"GC state to be unlocked in phase %d",gc_state.phase);
     gc_assert(arch_os_get_current_thread()==gc_state.master);
     gc_state.master = NULL;
-    gc_assert(0==pthread_mutex_unlock(&gc_state.lock));
+    int result = pthread_mutex_unlock(&gc_state.lock);
+    gc_assert(!result);
     odxprint(safepoints,"%s","GC state unlocked");
 }
 

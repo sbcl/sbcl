@@ -27,13 +27,10 @@
 #include "cheneygc-internal.h"
 #endif
 
-/* disabling gc assertions made no discernable difference to GC speed,
- * last I tried it - dan 2003.12.21
- *
- * And it's unsafe to do so while things like gc_assert(0 ==
- * thread_mutex_lock(&allocation_lock)) exist. - MG 2009-01-13
- */
-#if 1
+#ifdef NDEBUG
+# define gc_assert(ex) ((void)0)
+# define gc_assert_verbose(ex, fmt, ...) ((void)0)
+#else
 # define gc_assert(ex)                                                 \
 do {                                                                   \
     if (!(ex)) gc_abort();                                             \
@@ -45,9 +42,6 @@ do {                                                                   \
         gc_abort();                                                    \
     }                                                                  \
 } while (0)
-#else
-# define gc_assert(ex)
-# define gc_assert_verbose(ex, fmt, ...)
 #endif
 
 #define gc_abort()                                                     \

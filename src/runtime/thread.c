@@ -240,7 +240,8 @@ static void
 schedule_thread_post_mortem(struct thread *corpse)
 {
     pthread_detach(pthread_self());
-    gc_assert(!pthread_attr_destroy(corpse->os_attr));
+    int result = pthread_attr_destroy(corpse->os_attr);
+    gc_assert(!result);
 #if defined(LISP_FEATURE_WIN32)
     os_invalidate_free(corpse->os_address, THREAD_STRUCT_SIZE);
 #else
@@ -319,7 +320,9 @@ schedule_thread_post_mortem(struct thread *corpse)
         post_mortem = plan_thread_post_mortem(corpse);
 
 #ifdef CREATE_POST_MORTEM_THREAD
-        gc_assert(!pthread_create(&thread, NULL, perform_thread_post_mortem, post_mortem));
+        pthread_t thread;
+        int result = pthread_create(&thread, NULL, perform_thread_post_mortem, post_mortem);
+        gc_assert(!result);
 #else
         post_mortem = (struct thread_post_mortem *)
             swap_lispobjs((lispobj *)(void *)&pending_thread_post_mortem,
