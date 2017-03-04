@@ -2527,14 +2527,28 @@
                  #'test-case/incompatible)
              type1 type2 object1 object2))))))
 
-;;; LET* + VALUES declaration: while the declaration is a non-standard
-;;; and possibly a non-conforming extension, as long as we do support
-;;; it, we might as well get it right.
+;;; VALUES declaration: while the declaration is a non-standard and
+;;; possibly a non-conforming extension, as long as we do support it,
+;;; we might as well get it right.
 ;;;
-;;; Bug reported by Kaersten Poeck on sbcl-devel 20061023.
-(with-test (:name (compile let* declare values)
-            :fails-on :sbcl)
-  (checked-compile '(lambda () (let* () (declare (values list))))))
+;;; The first of the following two tests originally asserted that the
+;;; declaration _was_ allowed in a LET* form (The test was originally
+;;; added in reaction to a bug reported by Kaersten Poeck on
+;;; sbcl-devel 20061023). After commit
+;;; 498e00334f2b1ba87c3edd557bbce4247977a11d, the declaration is
+;;; accepted in LAMBDA but not LET*. The current form of the tests
+;;; reflects this.
+(with-test (:name (compile let* declare values))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile '(lambda () (let* () (declare (values list))))
+                       :allow-warnings t)
+    (declare (ignore fun failure-p))
+    (assert (= (length warnings) 1))))
+
+(with-test (:name (compile lambda declare values))
+  (let ((fun (checked-compile '(lambda (x) (declare (values list)) x))))
+    (assert (equal (sb-impl::%fun-type fun)
+                   '(function (t) (values list &optional))))))
 
 ;;; test for some problems with too large immediates in x86-64 modular
 ;;; arithmetic vops
