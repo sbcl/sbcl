@@ -161,11 +161,7 @@
           (error-tags tag)
           (errors tag)
           (errors
-           (let ((interr-symbol
-                   (sb!c::%interr-symbol-for-type-spec type)))
-             (if interr-symbol
-                 `(sb!c::%type-check-error/c ,var ',interr-symbol nil)
-                 `(sb!c::%type-check-error ,var ',type nil))))))
+           (sb!c::internal-type-error-call var type))))
 
       `(block ,block
          (tagbody

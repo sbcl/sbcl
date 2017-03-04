@@ -747,7 +747,7 @@ of specialized arrays is supported."
                                        ;; a cheaper one.
                                        (declare (optimize (speed 1)
                                                           (safety 1)))
-                                     (the-context ,type aref new-value)))
+                                     (the* (,type :context aref) new-value)))
                   ;; For specialized arrays, the return from
                   ;; data-vector-set would have to be reboxed to be a
                   ;; (Lisp) return value; instead, we use the

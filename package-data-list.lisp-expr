@@ -1577,7 +1577,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                                "%SIMD-PACK-LOW"
                                "%SIMD-PACK-HIGH")
                "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TAN-QUICK" "%TANH"
-               "THE-CONTEXT"
+               "THE*"
                "%UNARY-ROUND"
                "%UNARY-TRUNCATE"
                "%UNARY-TRUNCATE/SINGLE-FLOAT"

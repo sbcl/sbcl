@@ -199,7 +199,9 @@
            (data-vector-set string index new-value))
           #!+sb-unicode
           ((simple-array base-char (*))
-           (data-vector-set string index new-value))
+           (data-vector-set string index (the* (base-char :context aref
+                                                          :silent-conflict t)
+                                               new-value)))
           ((simple-array nil (*))
            (%type-check-error/c string 'nil-array-accessed-error nil))))))
 

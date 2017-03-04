@@ -1044,9 +1044,9 @@ unless :NAMED is also specified.")))
               (flet ((check (newval)
                        (if (eq type-spec t)
                            newval
-                           `(the-context ,type-spec
-                                         (:struct ,(dd-name dd) . ,(dsd-name dsd))
-                                         ,newval))))
+                           `(the* (,type-spec :context
+                                              (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                  ,newval))))
                 (ecase function
                   (:setf
                    ;; Instance setters take newval last, which matches
@@ -1628,9 +1628,9 @@ or they must be declared locally notinline at each call site.~@:>"
                                     (var (cadar arg)))
                                 (if (eq type t)
                                     var
-                                    `(the-context ,type
-                                                  (:struct ,(dd-name dd) . ,(dsd-name dsd))
-                                                  ,var))))
+                                    `(the* (,type :context
+                                                  (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                           ,var))))
                             (dd-slots dd) lambda-list))))))
   (destructuring-bind (llks &optional req opt rest keys aux) args
     (collect ((vars (copy-list req)) ; list of bound vars

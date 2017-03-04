@@ -359,6 +359,16 @@
           (setf (gethash spec *checkgen-used-types*) (cons 1 answer)))
       answer)))
 
+(defun internal-type-error-call (var type &optional context)
+  (let* ((external-spec (if (ctype-p type)
+                            (type-specifier type)
+                            type))
+         (interr-symbol
+           (%interr-symbol-for-type-spec external-spec)))
+    (if interr-symbol
+        `(%type-check-error/c ,var ',interr-symbol ',context)
+        `(%type-check-error ,var ',external-spec ',context))))
+
 ;;; Return a lambda form that we can convert to do a type check
 ;;; of the specified TYPES. TYPES is a list of the format returned by
 ;;; CAST-CHECK-TYPES.
@@ -374,14 +384,9 @@
                    (let* ((spec
                             (let ((*unparse-fun-type-simplify* t))
                               (type-specifier (second type))))
-                          (test (if (first type) `(not ,spec) spec))
-                          (external-spec (type-specifier (third type)))
-                          (interr-symbol
-                            (%interr-symbol-for-type-spec external-spec)))
+                          (test (if (first type) `(not ,spec) spec)))
                      `(unless (typep ,temp ',test)
-                        ,(if interr-symbol
-                             `(%type-check-error/c ,temp ',interr-symbol ',context)
-                             `(%type-check-error ,temp ',external-spec ',context)))))
+                        ,(internal-type-error-call temp (third type) context))))
                  temps
                  types)
        (values ,@temps))))

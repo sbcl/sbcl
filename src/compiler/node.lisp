@@ -1455,7 +1455,10 @@
   (vestigial-exit-entry-lexenv nil :type (or lexenv null))
   ;; the lvar which is checked
   (value (missing-arg) :type lvar)
-  (context nil))
+  (context nil)
+  ;; Avoid compile time type conflict warnings.
+  ;; Used by things that expand into ETYPECASE.
+  (silent-conflict nil :type boolean))
 (defprinter (cast :identity t)
   %type-check
   value

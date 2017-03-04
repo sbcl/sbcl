@@ -6391,3 +6391,14 @@
                             (let ((x (the (values &optional integer) (eval '(values)))))
                               (when x
                                 (setf x 10)))))))))
+
+#+sb-unicode
+(with-test (:name (:setf-schar :type-mismatch))
+  (let ((fun (checked-compile
+              `(lambda (a) (setf (schar a 0) #\HIRAGANA_LETTER_SMALL_TU)))))
+    (let ((string (string #\a))
+          (base-string (coerce "a" 'simple-base-string)))
+      (assert (eq (funcall fun string) #\HIRAGANA_LETTER_SMALL_TU))
+      (assert (equal string (string #\HIRAGANA_LETTER_SMALL_TU)))
+      (assert-error (funcall fun base-string) type-error)
+      (assert (equal base-string "a")))))

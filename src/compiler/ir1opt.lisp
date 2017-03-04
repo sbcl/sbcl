@@ -2353,19 +2353,26 @@
              ;; FIXME: Do it in one step.
              (let ((context (node-source-form cast))
                    (detail (lvar-all-sources (cast-value cast))))
-               (filter-lvar
-                value
-                (if (cast-single-value-p cast)
-                    `(list 'dummy)
-                    `(multiple-value-call #'list 'dummy)))
+               (unless (cast-silent-conflict cast)
+                 (filter-lvar
+                  value
+                  (if (cast-single-value-p cast)
+                      `(list 'dummy)
+                      `(multiple-value-call #'list 'dummy))))
                (filter-lvar
                 (cast-value cast)
                 ;; FIXME: Derived type.
-                `(%compile-time-type-error 'dummy
-                                           ',(type-specifier atype)
-                                           ',(type-specifier value-type)
-                                           ',detail
-                                           ',(compile-time-type-error-context context))))
+                (if (cast-silent-conflict cast)
+                    (let ((dummy-sym (gensym)))
+                     `(let ((,dummy-sym 'dummy))
+                        ,(internal-type-error-call dummy-sym atype
+                                                   (cast-context cast))
+                        ,dummy-sym))
+                    `(%compile-time-type-error 'dummy
+                                               ',(type-specifier atype)
+                                               ',(type-specifier value-type)
+                                               ',detail
+                                               ',(compile-time-type-error-context context)))))
              ;; KLUDGE: FILTER-LVAR does not work for non-returning
              ;; functions, so we declare the return type of
              ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type

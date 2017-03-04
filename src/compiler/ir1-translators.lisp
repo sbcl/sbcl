@@ -878,7 +878,7 @@ other."
 ;;;; the THE special operator, and friends
 
 ;;; A logic shared among THE and TRULY-THE.
-(defun the-in-policy (type value policy start next result &optional context)
+(defun the-in-policy (type value policy start next result)
   (let ((type (if (ctype-p type) type
                    (compiler-values-specifier-type type))))
     (cond ((or (eq type *wild-type*)
@@ -891,14 +891,17 @@ other."
                         (values-type-may-be-single-value-p type))
                     (ctypep (constant-form-value value)
                             (single-value-type type))))
-           (ir1-convert start next result value))
-          (t (let ((value-ctran (make-ctran))
-                   (value-lvar (make-lvar)))
-               (ir1-convert start value-ctran value-lvar value)
-               (let ((cast (make-cast value-lvar type policy context)))
-                 (link-node-to-previous-ctran cast value-ctran)
-                 (setf (lvar-dest value-lvar) cast)
-                 (use-continuation cast next result)))))))
+           (ir1-convert start next result value)
+           nil) ;; NIL is important, older SBCLs miscompiled (values &optional x) casts
+          (t
+           (let* ((value-ctran (make-ctran))
+                  (value-lvar (make-lvar))
+                  (cast (make-cast value-lvar type policy)))
+             (ir1-convert start value-ctran value-lvar value)
+             (link-node-to-previous-ctran cast value-ctran)
+             (setf (lvar-dest value-lvar) cast)
+             (use-continuation cast next result)
+             cast)))))
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
 ;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
@@ -935,9 +938,14 @@ Consequences are undefined if any result is not of the declared type
 care."
   (the-in-policy value-type form **zero-typecheck-policy** start next result))
 
-;;; Like THE but provides some context information to be presented when the type error is signalled
-(def-ir1-translator the-context ((value-type context form) start next result)
-  (the-in-policy value-type form (lexenv-policy *lexenv*) start next result context))
+;;; THE with some options for the CAST
+(def-ir1-translator the* (((value-type &key context silent-conflict) form)
+                          start next result)
+  (let ((cast (the-in-policy value-type form (lexenv-policy *lexenv*) start next result)))
+    (when cast
+
+      (setf (cast-context cast) context)
+      (setf (cast-silent-conflict cast) silent-conflict))))
 
 (def-ir1-translator bound-cast ((array bound index) start next result)
   (let ((check-bound-tran (make-ctran))
@@ -994,10 +1002,10 @@ care."
       (lambda (whole env)
         (declare (ignore env))
         `(the callable ,@(cdddr whole)))
-      (info :function :macro-function 'the-context)
+      (info :function :macro-function 'the*)
       (lambda (whole env)
         (declare (ignore env))
-        `(the ,(cadr whole) ,@(cdddr whole))))
+        `(the ,(caadr whole) ,@(cddr whole))))
 
 ;;;; SETQ
 

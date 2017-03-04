@@ -682,7 +682,8 @@
            (max (+ min (length opt)))
            (bounds (list min max)))
       (cond ((ll-kwds-keyp llks)
-             `(,(if (eq (cddr macro-context) 'define-compiler-macro)
+             `(,(if (typep macro-context
+                           '(cons t (cons t (eql define-compiler-macro))))
                     'cmacro-check-ds-list/&key
                     'check-ds-list/&key)
                 ,input ,@bounds ,pattern
