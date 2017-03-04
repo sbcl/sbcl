@@ -267,16 +267,10 @@
           ((lvar-single-value-p lvar)
            ;; exactly one value is consumed
            (principal-lvar-single-valuify lvar)
-           (flet ((get-type (type)
-                    (acond ((args-type-required type)
-                            (car it))
-                           ((args-type-optional type)
-                            (car it))
-                           (t (bug "type ~S is too hairy" type)))))
-             (values :simple (maybe-negate-check value
-                                                 (list (get-type ctype))
-                                                 (list (get-type atype))
-                                                 n-required))))
+           (values :simple (maybe-negate-check value
+                                               (list (single-value-type ctype))
+                                               (list (single-value-type atype))
+                                               n-required)))
           ((and (mv-combination-p dest)
                 (eq (mv-combination-kind dest) :local)
                 (singleton-p (mv-combination-args dest)))
@@ -411,10 +405,10 @@
                          (single-value-type atype))
                         (t
                          (make-values-type
-                          :required (values-type-out atype length)))))
+                          :required (values-type-in atype length)))))
            (dtype (node-derived-type cast))
            (dtype (make-values-type
-                   :required (values-type-out dtype length))))
+                   :required (values-type-in dtype length))))
       (setf (cast-asserted-type cast) atype)
       (setf (node-derived-type cast) dtype)))
 

@@ -6376,3 +6376,18 @@
                   (declare (ignorable #'f))
                   (f))))
         10)))
+
+(with-test (:name (:cast :values-&rest))
+  (assert (not (funcall (checked-compile
+                         `(lambda ()
+                            (values (the (values &rest integer)
+                                         (eval '(values))))))))))
+
+
+(with-test (:name (:cast :values-&optional))
+  (assert (not (funcall (checked-compile
+                         `(lambda ()
+                            (declare (optimize debug))
+                            (let ((x (the (values &optional integer) (eval '(values)))))
+                              (when x
+                                (setf x 10)))))))))
