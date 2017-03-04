@@ -1202,7 +1202,9 @@ Test case.
                (digest-local-call frame-ptr (cdr args))))))))
 
   (let ((n-args 0)
-        (fun (fdefinition fname)))
+        (fun (if (typep fname '(cons (eql sb-pcl::slot-accessor)))
+                 (sb-pcl::ensure-accessor fname)
+                 (fdefinition fname))))
     (multiple-value-setq (args n-args) (arglist-to-sexprs args))
 
     ;; Fold if every arg when trivially constant and the function is foldable.
