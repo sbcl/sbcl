@@ -116,12 +116,11 @@
   ;; Compiling this code should not cause a warning (because the
   ;; DECLARE turns *X* into a special variable as its name suggests it
   ;; should be).
-  (let ((fun (checked-compile `(lambda (n)
-                                 (let ((*x* n))
-                                   (declare (special *x*))
-                                   (funcall (symbol-function 'x-getter))
-                                   (print *x*))))))
-    (assert (functionp fun))))
+  (checked-compile `(lambda (n)
+                      (let ((*x* n))
+                        (declare (special *x*))
+                        (funcall (symbol-function 'x-getter))
+                        (print *x*)))))
 
 ;;; a bug in 0.7.4.11
 (with-test (:name (compile typep satisfies))
@@ -671,7 +670,7 @@
                  (let ((x (make-sequence 'vector 10 :initial-element 'a)))
                    (setf (aref x 4) 'b)
                    x))
-              :allow-notes t)))
+              :allow-notes nil)))
     (assert (equalp (funcall fun) #(a a a a b a a a a a)))))
 
 ;;; this is not a check for a bug, but rather a test of compiler
@@ -4649,9 +4648,7 @@
             :skipped-on :interpreter)
   (flet ((test (check lambda &rest args)
            (multiple-value-bind (fun failure-p warnings style-warnings notes)
-               (checked-compile lambda
-                                :allow-style-warnings t
-                                :allow-notes t)
+               (checked-compile lambda :allow-style-warnings t)
              (declare (ignore failure-p warnings style-warnings))
              (assert (eql check (when (some #'cell-note-p notes) t)))
              (if check
