@@ -145,12 +145,10 @@ weird stuff - see getaddrinfo(3) for the details."
 \(integer 0 255) with 4 elements in case of an IPv4 address and 16
 elements in case of an IPv6 address, or signals a NAME-SERVICE-ERROR.
 See gethostbyaddr(3) for details."
-    (declare (optimize speed)
-             (vector address))
-    (assert (member (length address) '(4 16) :test #'=))
+    (declare (optimize speed))
     (multiple-value-bind (sockaddr sockaddr-free sockaddr-size address-family)
-        (case (length address)
-          (4
+        (etypecase address
+          ((vector (unsigned-byte 8) 4)
            (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in)))
              #+darwin (setf (sockint::sockaddr-in-len sockaddr) 16)
              (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
@@ -160,7 +158,7 @@ See gethostbyaddr(3) for details."
              (values sockaddr #'sockint::free-sockaddr-in
                      (sb-alien:alien-size sockint::sockaddr-in :bytes)
                      sockint::af-inet)))
-          (16
+          ((vector (unsigned-byte 8) 16)
            (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in6)))
              (setf (sockint::sockaddr-in6-family sockaddr) sockint::af-inet6)
              (dotimes (i (length address))
