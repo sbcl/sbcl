@@ -2060,7 +2060,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type vector vector)
            (type ansi-stream stream))
   (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
-           (eq (stream-element-mode stream) 'unsigned-byte))
+           (memq (stream-element-mode stream) '(unsigned-byte :bivalent))
+           t)
       (and (typep vector '(simple-array (signed-byte 8) (*)))
            (eq (stream-element-mode stream) 'signed-byte))))
 
@@ -2300,11 +2301,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type ansi-stream stream)
            (type index start)
            (type sequence-end %end)
-           (values sequence))
-  (locally (declare (inline write-sequence/write-function))
-    (write-sequence/write-function
-     seq stream start %end (stream-element-mode stream)
-     (ansi-stream-out stream) (ansi-stream-bout stream)))
+           (values sequence)
+           (inline write-sequence/write-function))
+  (write-sequence/write-function
+   seq stream start %end (stream-element-mode stream)
+   (ansi-stream-out stream) (ansi-stream-bout stream))
   seq)
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
