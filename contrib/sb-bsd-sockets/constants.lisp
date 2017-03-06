@@ -119,8 +119,6 @@
 
  ;; for socket-receive
  (:type socklen-t "socklen_t")
- (:type size-t "size_t")
- (:type ssize-t "ssize_t")
 
                                         #|
  ;;; stat is nothing to do with sockets, but I keep it around for testing

@@ -137,15 +137,15 @@
                        (open-with-mode pathname flags mode)
                        (open-without-mode pathname flags))))))
     (def #-win32 "open" #+win32 "_open"))
-(define-call* "read" int minusp
-    (fd file-descriptor) (buf (* t)) (count int))
 (define-call "rename" int minusp (oldpath filename) (newpath filename))
 (define-call* "rmdir" int minusp (pathname filename))
 (define-call* "unlink" int minusp (pathname filename))
 (define-call #-netbsd "opendir" #+netbsd "_opendir"
     (* t) null-alien (pathname filename))
-(define-call* "write" int minusp
-  (fd file-descriptor) (buf (* t)) (count int))
+(define-call* "read" ssize-t minusp
+    (fd file-descriptor) (buf (* t)) (count size-t))
+(define-call* "write" ssize-t minusp
+  (fd file-descriptor) (buf (* t)) (count size-t))
 
 ;;; FIXME: to detect errors in readdir errno needs to be set to 0 and
 ;;; then checked, like it's done in sb-unix:readdir.
