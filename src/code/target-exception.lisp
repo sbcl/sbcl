@@ -101,13 +101,19 @@
          (code (slot record 'exception-code))
          (condition-name (cdr (assoc code *exception-code-map*)))
          (sb!debug:*stack-top-hint* (sb!kernel:find-interrupted-frame)))
-    (cond (condition-name
-           (if (subtypep condition-name 'arithmetic-error)
-               (multiple-value-bind (op operands)
-                   (sb!di::decode-arithmetic-error-operands context-sap)
-                 (error condition-name :operation op
-                                       :operands operands))
-               (error condition-name)))
+    (cond ((stringp condition-name)
+           (error condition-name))
+          ((and condition-name
+                (subtypep condition-name 'arithmetic-error))
+           (multiple-value-bind (op operands)
+               (sb!di::decode-arithmetic-error-operands context-sap)
+             (error condition-name :operation op
+                                   :operands operands)))
+          ((eq condition-name 'memory-fault-error)
+           (error 'memory-fault-error :address
+		  (sap-int (deref (slot record 'exception-information) 1))))
+          (condition-name
+           (error condition-name))
           ((= code +dbg-printexception-c+)
            (dbg-printexception-c record))
           (t
