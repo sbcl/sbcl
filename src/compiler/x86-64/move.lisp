@@ -115,7 +115,8 @@
     (sc-case y
       ((any-reg descriptor-reg)
        (if (sc-is x immediate)
-           (inst mov y (encode-value-if-immediate x))
+           (let ((val (encode-value-if-immediate x)))
+             (if (eql val 0) (zeroize y) (inst mov y val)))
            (move y x)))
       ((control-stack)
        (if (= (tn-offset fp) esp-offset)
