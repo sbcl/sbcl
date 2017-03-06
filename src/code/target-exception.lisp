@@ -58,8 +58,7 @@
      (cons +exception-stack-overflow+        'sb!kernel::control-stack-exhausted)
      ;; Various
      (cons-name +exception-single-step+)
-     (cons-name +exception-access-violation+) ; FIXME: should turn into MEMORY-FAULT-ERROR
-                                              ; plus the faulting address
+     (cons +exception-access-violation+ 'memory-fault-error)
      (cons-name +exception-array-bounds-exceeded+)
      (cons-name +exception-breakpoint+)
      (cons-name +exception-datatype-misalignment+)
