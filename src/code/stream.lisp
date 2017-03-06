@@ -2286,12 +2286,15 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
         (vector
          (with-array-data ((data seq) (offset-start start) (offset-end end)
                            :check-fill-pointer t)
-           (if (and (fd-stream-p stream)
-                    (compatible-vector-and-stream-element-types-p data stream))
-               (buffer-output stream data offset-start offset-end)
-               (write-vector data offset-start offset-end
-                             (compute-write-function
-                              (array-element-type seq))))))
+           (cond ((not (and (fd-stream-p stream)
+                            (compatible-vector-and-stream-element-types-p data stream)))
+                  (write-vector data offset-start offset-end
+                                (compute-write-function
+                                 (array-element-type seq))))
+                 ((eq (fd-stream-buffering stream) :none)
+                  (write-or-buffer-output stream data offset-start offset-end))
+                 (t
+                  (buffer-output stream data offset-start offset-end)))))
         (sequence
          (write-generic-sequence (compute-write-function nil)))))))
 (declaim (notinline write-sequence/write-function))
