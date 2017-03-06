@@ -154,6 +154,11 @@
                   (with-output-to-string (stream)
                     (describe #'add-method stream)))))
 
+(with-test (:name (describe sb-kernel:funcallable-instance))
+  (assert (search "Slots with :INSTANCE allocation"
+                  (with-output-to-string (stream)
+                    (describe #'class-name stream)))))
+
 
 ;;; Tests of documentation on types and classes
 

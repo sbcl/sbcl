@@ -227,7 +227,9 @@
 
 (defmethod describe-object ((x function) s)
   (print-standard-describe-header x s)
-  (describe-function nil x s))
+  (describe-function nil x s)
+  (when (funcallable-instance-p x)
+    (describe-instance x s)))
 
 (defmethod describe-object ((x class) s)
   (print-standard-describe-header x s)
