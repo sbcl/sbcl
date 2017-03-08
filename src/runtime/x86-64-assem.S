@@ -131,7 +131,6 @@ Lstack:
 #ifdef SUPPORT_FOMIT_FRAME_POINTER
 	/* If called through call_into_lisp_first_time, %r15 becomes invalid
 	 * here, but we will not return in that case. */
-        push   %rax /* double-word alignment */
 	push	%r15
 	mov	%rax,%r15
 #endif
@@ -224,7 +223,7 @@ LsingleValue:
 #ifdef SUPPORT_FOMIT_FRAME_POINTER
 	mov	%r15,%rbp	# orig rbp
 	pop	%r15		# orig r15
-	add	$16,%rsp	# no need for saved (overridden) rbp and alignment value
+	add	$8,%rsp		# no need for saved (overridden) rbp
 #else
 	leave
 #endif

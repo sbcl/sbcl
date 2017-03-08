@@ -221,7 +221,10 @@ initial_thread_trampoline(struct thread *th)
     protect_binding_stack_guard_page(1, NULL);
     protect_alien_stack_guard_page(1, NULL);
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    /* WIN32 has a special stack arrangment, calling
+     * call_into_lisp_first_time will put the new stack in the middle
+     * of the current stack */
+#if !defined(LISP_FEATURE_WIN32) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     return call_into_lisp_first_time(function,args,0);
 #else
     return funcall0(function);
