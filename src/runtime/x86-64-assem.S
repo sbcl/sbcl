@@ -131,6 +131,7 @@ Lstack:
 #ifdef SUPPORT_FOMIT_FRAME_POINTER
 	/* If called through call_into_lisp_first_time, %r15 becomes invalid
 	 * here, but we will not return in that case. */
+        push   %rax /* double-word alignment */
 	push	%r15
 	mov	%rax,%r15
 #endif
@@ -201,8 +202,8 @@ Ldone:
 Lcall:
 	call	*CLOSURE_FUN_OFFSET(%rax)
 	
-	/* If the function returned multiple values, it will return to
-	   this point.  Lose them */
+	/* If the function returned multiple values, the carry flag will be set.
+           Lose them */
 	jnc	LsingleValue	
 	mov	%rbx, %rsp
 LsingleValue:	
@@ -223,7 +224,7 @@ LsingleValue:
 #ifdef SUPPORT_FOMIT_FRAME_POINTER
 	mov	%r15,%rbp	# orig rbp
 	pop	%r15		# orig r15
-	add	$8,%rsp		# no need for saved (overridden) rbp
+	add	$16,%rsp	# no need for saved (overridden) rbp and alignment value
 #else
 	leave
 #endif
