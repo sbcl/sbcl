@@ -1857,16 +1857,13 @@ properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr)
         case CODE_HEADER_WIDETAG:
             /* Make sure we actually point to a function in the code object,
              * as opposed to a random point there. */
-            if (SIMPLE_FUN_HEADER_WIDETAG==widetag_of(native_pointer(pointer)[0]))
-                return 1;
-            else
-                return 0;
+            for_each_simple_fun(i, function, (struct code*)start_addr, 0, {
+               if ((lispobj)function == pointer-FUN_POINTER_LOWTAG) return 1;
+            })
+            return 0;
         case CLOSURE_HEADER_WIDETAG:
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-            if (pointer != make_lispobj(start_addr, FUN_POINTER_LOWTAG)) {
-                return 0;
-            }
-            break;
+            return make_lispobj(start_addr, FUN_POINTER_LOWTAG) == pointer;
         default:
             return 0;
         }
