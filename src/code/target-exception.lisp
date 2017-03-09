@@ -110,7 +110,7 @@
                                    :operands operands)))
           ((eq condition-name 'memory-fault-error)
            (error 'memory-fault-error :address
-		  (sap-int (deref (slot record 'exception-information) 1))))
+                  (sap-int (deref (slot record 'exception-information) 1))))
           (condition-name
            (error condition-name))
           ((= code +dbg-printexception-c+)
