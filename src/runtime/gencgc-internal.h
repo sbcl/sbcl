@@ -25,6 +25,7 @@
 #include "genesis/code.h"
 
 void gc_free_heap(void);
+extern page_index_t find_page_index(void *);
 extern void *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
@@ -138,43 +139,51 @@ void gc_set_region_empty(struct alloc_region *region);
 /*
  * predicates
  */
-/* Find the page index within the page_table for the given
- * address. Return -1 on failure. */
-static inline page_index_t
-find_page_index(void *addr)
+
+static inline boolean
+space_matches_p(lispobj obj, generation_index_t space,
+                page_index_t *store_page_index_here)
 {
-    extern void* heap_base;
-    if (addr >= heap_base) {
-        page_index_t index = ((pointer_sized_uint_t)addr -
-                              (pointer_sized_uint_t)heap_base) / GENCGC_CARD_BYTES;
-        if (index < page_table_pages)
-            return (index);
+    if (obj >= DYNAMIC_SPACE_START) {
+        page_index_t page_index=((pointer_sized_uint_t)obj
+                                 - DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
+        if (store_page_index_here) {
+            *store_page_index_here = page_index;
+        }
+        return ((page_index < page_table_pages) &&
+                (page_table[page_index].gen == space));
+    } else {
+        return 0;
     }
-    return (-1);
 }
 
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
-// Pretend pinned objects are not in oldspace so that they don't get moved.
-// Any lowtag bits on 'obj' are ignored.
 static boolean __attribute__((unused))
 from_space_p(lispobj obj)
 {
-    extern uword_t* pinned_dwords(page_index_t);
-    page_index_t page_index = find_page_index((void*)obj);
-    if (page_index < 0 || page_table[page_index].gen != from_space) return 0;
-    if (!page_table[page_index].has_pin_map) return 1;
-    int dword_in_page =
-        (obj - (lispobj)page_address(page_index)) >> (1+WORD_SHIFT);
-    return ((pinned_dwords(page_index)[dword_in_page / N_WORD_BITS]
-             >> (dword_in_page % N_WORD_BITS)) & 1) ^ 1;
+    extern boolean in_dontmove_nativeptr_p(page_index_t, lispobj*);
+    page_index_t page_index;
+
+    if (space_matches_p(obj, from_space, &page_index)) {
+        lispobj *native = native_pointer(obj);
+        if (in_dontmove_nativeptr_p(page_index, native)) {
+            // pretend it is not in oldspace to protect it from being moved
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        return 0;
+    }
 }
 static inline boolean
 new_space_p(lispobj obj)
 {
-    page_index_t page_index = find_page_index((void*)obj);
-    return page_index >= 0 && page_table[page_index].gen == new_space;
+    return space_matches_p(obj, new_space, NULL);
 }
+
+boolean in_dontmove_nativeptr_p(page_index_t page_index, lispobj *native_ptr);
 
 extern page_index_t last_free_page;
 extern boolean gencgc_partial_pickup;
