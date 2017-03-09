@@ -228,13 +228,16 @@
        `(defstruct ,type-name))
      (definition.define-condition (type-name)
        `(define-condition ,type-name () ()))
-     (define-type-tests (tag definition-name &rest args)
+     (define-type-tests (tag definition-name method class &rest args)
        (flet ((make-test-case (tag state &key check-describe)
-                (let ((type-name (apply #'sb-int::symbolicate
-                                        (append '(#:type.)
-                                                (sb-int:ensure-list tag)
-                                                (list '#:. state (gensym)))))
-                      (replacement 'replacement))
+                (let* ((method (and method (not (eq state :final))))
+                       (class (and class (not (eq state :final))))
+                       (type-name (apply #'sb-int::symbolicate
+                                         (append '(#:type.)
+                                                 (sb-int:ensure-list tag)
+                                                 (list '#:. state (gensym)))))
+                       (extra-warning-count (+ (if method 1 0) (if class 1 0)))
+                       (replacement 'replacement))
                   `(,@(unless (eq state :final)
                         `((,definition-name ,type-name)))
                     (declaim (deprecated
@@ -252,24 +255,28 @@
                              (declare (type (or null ,name) x)
                                       (ignore x)))
                            (typep nil ',name)
-                           (defmethod ,(gensym) ((x ,name)))
-                           (defclass ,(gensym) (,name) ())))
+                           ,@,(when method
+                                '`((defmethod ,(gensym) ((x ,name)))))
+                           ,@,(when class
+                                '`((defclass ,(gensym) (,name) ())))))
                        :replacements           '(,(string replacement))
                        :call                   nil
-                       :expected-warning-count '(integer 4 6)
+                       :expected-warning-count '(integer
+                                                 ,(+ 2 extra-warning-count)
+                                                 ,(+ 4 extra-warning-count))
                        :check-describe         ,check-describe))))))
          `(progn
             ,@(apply #'make-test-case tag :early args)
             ,@(apply #'make-test-case tag :late  args)
             ,@(apply #'make-test-case tag :final :check-describe t args)))))
 
-  (define-type-tests :undefined            definition.undefined
+  (define-type-tests :undefined            definition.undefined          nil nil
     :check-describe nil)
-  (define-type-tests (deftype :empty-body) definition.deftype.empty-body)
-  (define-type-tests (deftype :t-body)     definition.deftype.t-body)
-  (define-type-tests defclass              definition.defclass)
-  (define-type-tests defstruct             definition.defstruct)
-  (define-type-tests define-condition      definition.define-condition))
+  (define-type-tests (deftype :empty-body) definition.deftype.empty-body nil nil)
+  (define-type-tests (deftype :t-body)     definition.deftype.t-body     nil nil)
+  (define-type-tests defclass              definition.defclass           t   t)
+  (define-type-tests defstruct             definition.defstruct          t   nil)
+  (define-type-tests define-condition      definition.define-condition   t   nil))
 
 (with-test (:name (deprecated type :unrelated-class))
   (let ((name (gensym)))
