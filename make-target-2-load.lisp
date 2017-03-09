@@ -214,7 +214,7 @@ sb-kernel::(setf (dsd-default
 ;;; fasls. Since fasls should be compatible between images originating
 ;;; from the same SBCL build, REPACK-XREF is of no use after the
 ;;; target image has been built.
-#+sb-xref-for-internals (sb-c::repack-xref :verbose t)
+#+sb-xref-for-internals (sb-c::repack-xref :verbose 1)
 (with-unlocked-packages (#:sb-c)
   (fmakunbound 'sb-c::repack-xref))
 

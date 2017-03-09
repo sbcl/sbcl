@@ -75,7 +75,11 @@
 ;;; 3. Repack all xref data vectors using the updated
 ;;;    **MOST-COMMON-XREF-NAMES-BY-{INDEX,NAME}**.
 (defun repack-xref (&key (compact-name-count 256) verbose)
-  (let ((counts '())
+  (let ((verbose (ecase verbose
+                   ((nil) 0)
+                   ((1 2) verbose)
+                   ((t)   2)))
+        (counts '())
         (counts-by-name (make-hash-table :test #'equal))
         (all-unpacked '())
         (old-size 0)
@@ -119,7 +123,7 @@
       (let* ((sorted-names (mapcar #'car (stable-sort counts #'> :key #'cdr)))
              (new-names (subseq sorted-names 0 (min (length sorted-names)
                                                     compact-name-count))))
-        (when verbose
+        (when (>= verbose 2)
           (format t "; Updating most frequently cross-referenced names~%")
           (pprint-logical-block (*standard-output* new-names :per-line-prefix ";   ")
             (format t "~:[no cross references~;~:*~
@@ -134,7 +138,7 @@
              do (setf (gethash name table) i))))
 
       ;; Repack with updated **MOST-COMMON-XREF-NAMES-BY-{INDEX,NAME}**.
-      (when verbose
+      (when (>= verbose 1)
         (format t "; Repacking xref information~%"))
       (loop for (fun . unpacked) in all-unpacked do
            (let ((info (%simple-fun-info fun))
@@ -144,7 +148,7 @@
                                               (cons (car info) new-xrefs)
                                               new-xrefs)))))
 
-    (when verbose
+    (when (>= verbose 1)
       (format t ";   Old xref size ~11:D byte~:P~@
                  ;   New xref size ~11:D byte~:P~%"
               old-size new-size))))
