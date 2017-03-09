@@ -2411,38 +2411,6 @@ generic function lambda list ~S~:>"
                 (create-gf-lambda-list ll))))
         (arg-info-lambda-list arg-info))))
 
-(defmacro real-ensure-gf-internal (gf-class all-keys env)
-  `(progn
-     (cond ((symbolp ,gf-class)
-            (setq ,gf-class (find-class ,gf-class t ,env)))
-           ((classp ,gf-class))
-           (t
-            (error "The :GENERIC-FUNCTION-CLASS argument (~S) was neither a~%~
-                    class nor a symbol that names a class."
-                   ,gf-class)))
-     (unless (class-finalized-p ,gf-class)
-       (if (class-has-a-forward-referenced-superclass-p ,gf-class)
-           ;; FIXME: reference MOP documentation -- this is an
-           ;; additional requirement on our users
-           (error "The generic function class ~S is not finalizeable" ,gf-class)
-           (finalize-inheritance ,gf-class)))
-     (remf ,all-keys :generic-function-class)
-     (remf ,all-keys :environment)
-     (let ((combin (getf ,all-keys :method-combination)))
-       (etypecase combin
-         (cons
-          (setf (getf ,all-keys :method-combination)
-                (find-method-combination (class-prototype ,gf-class)
-                                         (car combin)
-                                         (cdr combin))))
-         ((or null method-combination))))
-    (let ((method-class (getf ,all-keys :method-class '.shes-not-there.)))
-      (unless (eq method-class '.shes-not-there.)
-        (setf (getf ,all-keys :method-class)
-              (cond ((classp method-class)
-                     method-class)
-                    (t (find-class method-class t ,env))))))))
-
 (defun note-gf-signature (fun-name lambda-list-p lambda-list)
   (unless lambda-list-p
     ;; Use the existing lambda-list, if any. It is reasonable to do eg.
@@ -2480,36 +2448,75 @@ generic function lambda list ~S~:>"
           (info :function :where-from fun-name) :defined-method)
     fun-name))
 
-(defun real-ensure-gf-using-class--generic-function
-       (existing
-        fun-name
-        &rest all-keys
-        &key environment (lambda-list nil lambda-list-p)
-        (generic-function-class 'standard-generic-function)
-        &allow-other-keys)
-  (real-ensure-gf-internal generic-function-class all-keys environment)
-  ;; KLUDGE: the above macro does SETQ on GENERIC-FUNCTION-CLASS,
-  ;; which is what makes the next line work
-  (unless (eq (class-of existing) generic-function-class)
-    (change-class existing generic-function-class))
-  (prog1
-      (apply #'reinitialize-instance existing all-keys)
-    (note-gf-signature fun-name lambda-list-p lambda-list)))
+(labels ((resolve-class (context class-or-name environment)
+           (cond ((symbolp class-or-name)
+                  (find-class class-or-name t environment))
+                 ((classp class-or-name)
+                  class-or-name)
+                 (t
+                  (error "~@<The ~A (~S) was neither a class nor a ~
+                          symbol that names a class.~@:>"
+                         context class-or-name))))
+         (resolve-and-finalize-class (class-or-name environment)
+           (let ((class (resolve-class ":GENERIC-FUNCTION-CLASS argument"
+                                       class-or-name environment)))
+             (if (class-has-a-forward-referenced-superclass-p class)
+                 ;; FIXME: reference MOP documentation -- this is an
+                 ;; additional requirement on our users
+                 (error "~@<The generic function class ~A is not ~
+                         finalizeable~@:>"
+                        class)
+                 (ensure-class-finalized class))))
+         (normalize-options (&rest options &key
+                                   environment
+                                   (lambda-list nil lambda-list-p)
+                                   (generic-function-class 'standard-generic-function)
+                                   &allow-other-keys)
+           (let ((class (resolve-and-finalize-class
+                         generic-function-class environment)))
+             (collect ((initargs))
+               (doplist (key value) options
+                 (case key
+                   ((:environment :generic-function-class))
+                   (:method-combination
+                    (initargs
+                     key
+                     (etypecase value
+                       (cons
+                        (destructuring-bind (type . options) value
+                          (find-method-combination
+                           (class-prototype class) type options)))
+                       (method-combination
+                        value))))
+                   (:method-class
+                    (initargs key (resolve-class ":METHOD-CLASS argument"
+                                                 value environment)))
+                   (t
+                    (initargs key value))))
+               (values class lambda-list lambda-list-p (initargs))))))
 
-(defun real-ensure-gf-using-class--null
-       (existing
-        fun-name
-        &rest all-keys
-        &key environment (lambda-list nil lambda-list-p)
-             (generic-function-class 'standard-generic-function)
-        &allow-other-keys)
-  (declare (ignore existing))
-  (real-ensure-gf-internal generic-function-class all-keys environment)
-  (prog1
-      (setf (gdefinition fun-name)
-            (apply #'make-instance generic-function-class
-                   :name fun-name all-keys))
-    (note-gf-signature fun-name lambda-list-p lambda-list)))
+  (defun real-ensure-gf-using-class--generic-function
+      (existing fun-name &rest options &key &allow-other-keys)
+    (multiple-value-bind
+          (generic-function-class lambda-list lambda-list-p initargs)
+        (apply #'normalize-options options)
+      (unless (eq (class-of existing) generic-function-class)
+        (change-class existing generic-function-class))
+      (prog1
+          (apply #'reinitialize-instance existing initargs)
+        (note-gf-signature fun-name lambda-list-p lambda-list))))
+
+  (defun real-ensure-gf-using-class--null
+      (existing fun-name &rest options &key &allow-other-keys)
+    (declare (ignore existing))
+    (multiple-value-bind
+          (generic-function-class lambda-list lambda-list-p initargs)
+        (apply #'normalize-options options)
+      (prog1
+          (setf (gdefinition fun-name)
+                (apply #'make-instance generic-function-class
+                       :name fun-name initargs))
+        (note-gf-signature fun-name lambda-list-p lambda-list)))))
 
 (defun safe-gf-arg-info (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
