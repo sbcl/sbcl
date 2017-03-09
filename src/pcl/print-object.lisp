@@ -152,7 +152,7 @@
   (print-unreadable-object (obj stream :type t)
     (format stream "~D" (cpd-count obj))))
 
-(defmethod print-object ((self eql-specializer) stream)
+(defmethod print-object ((self specializer-with-object) stream)
   (let ((have-obj (slot-boundp self 'object)))
     (print-unreadable-object (self stream :type t :identity (not have-obj))
       (when have-obj

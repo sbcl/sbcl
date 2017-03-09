@@ -561,6 +561,8 @@
 ;;; and vestiges of PROTOTYPE specializers
 (defclass standard-specializer (specializer) ())
 
+;;; Note that this class cannot define the OBJECT slot and
+;;; SPECIALIZER-OBJECT reader because of bootstrapping limitations.
 (defclass specializer-with-object (specializer) ())
 
 (defclass exact-class-specializer (specializer) ())
@@ -572,12 +574,15 @@
            :reader specializer-class
            :reader specializer-object)))
 
-(defclass class-prototype-specializer (standard-specializer specializer-with-object)
+(defclass class-prototype-specializer (standard-specializer
+                                       specializer-with-object)
   ((object :initarg :class
            :reader specializer-class
            :reader specializer-object)))
 
-(defclass eql-specializer (standard-specializer exact-class-specializer specializer-with-object)
+(defclass eql-specializer (standard-specializer
+                           exact-class-specializer
+                           specializer-with-object)
   ((object :initarg :object :reader specializer-object
            :reader eql-specializer-object)
    ;; Because EQL specializers are interned, any two putative instances
