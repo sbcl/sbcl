@@ -179,6 +179,41 @@ bootstrapping.
       (or)
       real-make-specializer-form-using-class/cons))
 
+    (specializer-type-specifier
+     standard
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method specializer)
+      ()
+      real-specializer-type-specifier/specializer)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method symbol)
+      ()
+      real-specializer-type-specifier/symbol)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method t)
+      ()
+      real-specializer-type-specifier/t)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method class-eq-specializer)
+      ()
+      real-specializer-type-specifier/class-eq-specializer)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method eql-specializer)
+      ()
+      real-specializer-type-specifier/eql-specializer)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method structure-class)
+      ()
+      real-specializer-type-specifier/structure-class)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method system-class)
+      ()
+      real-specializer-type-specifier/system-class)
+     ((proto-generic-function proto-method specializer)
+      (standard-generic-function standard-method class)
+      ()
+      real-specializer-type-specifier/class))
+
     (parse-specializer-using-class
      standard
      ((generic-function specializer)
@@ -665,159 +700,245 @@ generic function lambda list ~S~:>"
                      when (eq 'special (car specifier))
                      append (cdr specifier))))
 
+;;; A helper function for creating Python-friendly type declarations
+;;; in DEFMETHOD forms.
+;;;
+;;; This function operates on
+;;; * non-parsed specializers, i.e. class names and extended
+;;;   specializer syntaxes
+;;; * parsed specializers, i.e. CLASSes, EQL-SPECIALIZERs,
+;;;   CLASS-EQ-SPECIALIZERs and generic SPECIALIZERs
+;;;
+;;; We're too lazy to cons up a new environment for this, so we just
+;;; pass in the list of locally declared specials in addition to the
+;;; old environment.
+(defun parameter-specializer-declaration-in-defmethod
+    (proto-generic-function proto-method parameter specializer specials env)
+  (flet ((declare-type (type)
+           (return-from parameter-specializer-declaration-in-defmethod
+             (case type
+               ((nil) '(ignorable))
+               (t     `(type ,type ,parameter))))))
+    (cond
+      ((not (eq **boot-state** 'complete))
+       ;; KLUDGE: PCL, in its wisdom, sometimes calls methods with
+       ;; types which don't match their specializers. (Specifically,
+       ;; it calls ENSURE-CLASS-USING-CLASS (T NULL) with a non-NULL
+       ;; second argument.) Hopefully it only does this kind of
+       ;; weirdness when bootstrapping.. -- WHN 20000610
+       (declare-type nil))
+
+      ;; Independent of SPECIALIZER, bail out if the PARAMETER is
+      ;; known to be a special variable. Our rebinding magic for SETQ
+      ;; cases doesn't work right there as SET, (SETF SYMBOL-VALUE),
+      ;; etc. make things undecidable.
+      ((or (var-special-p parameter env) (member parameter specials))
+       (declare-type nil))
+
+      ;; Bail out on SLOT-OBJECT special case.
+      ;;
+      ;; KLUDGE: For some low-level implementation classes, perhaps
+      ;; because of some problems related to the incomplete
+      ;; integration of PCL into SBCL's type system, some specializer
+      ;; classes can't be declared as argument types. E.g.
+      ;;   (DEFMETHOD FOO ((X SLOT-OBJECT))
+      ;;     (DECLARE (TYPE SLOT-OBJECT X))
+      ;;     ..)
+      ;; loses when
+      ;;   (DEFSTRUCT BAR A B)
+      ;;   (FOO (MAKE-BAR))
+      ;; perhaps because of the way that STRUCTURE-OBJECT inherits
+      ;; both from SLOT-OBJECT and from SB-KERNEL:INSTANCE. In an
+      ;; effort to sweep such problems under the rug, we exclude these
+      ;; problem cases by blacklisting them here. -- WHN 2001-01-19
+      ((eq specializer 'slot-object)
+       (declare-type nil))
+
+      ;; Bail out on  unparsed EQL-specializers.
+      ;;
+      ;; KLUDGE: ANSI, in its wisdom, says that EQL-SPECIALIZER-FORMs
+      ;; in EQL specializers are evaluated at DEFMETHOD expansion
+      ;; time. Thus, although one might think that in
+      ;;   (DEFMETHOD FOO ((X PACKAGE)
+      ;;                   (Y (EQL 12))
+      ;;      ..))
+      ;; the PACKAGE and (EQL 12) forms are both parallel type names,
+      ;; they're not, as is made clear when you do
+      ;;   (DEFMETHOD FOO ((X PACKAGE)
+      ;;                   (Y (EQL 'BAR)))
+      ;;     ..)
+      ;; where Y needs to be a symbol named "BAR", not some cons made
+      ;; by (CONS 'QUOTE 'BAR). I.e. when the EQL-SPECIALIZER-FORM is
+      ;; (EQL 'X), it requires an argument to be of type (EQL X). It'd
+      ;; be easy to transform one to the other, but it'd be somewhat
+      ;; messier to do so while ensuring that the EQL-SPECIALIZER-FORM
+      ;; is only EVAL'd once. (The new code wouldn't be messy, but
+      ;; it'd require a big transformation of the old code.) So
+      ;; instead we punt.  -- WHN 20000610
+      ((typep specializer '(cons (eql eql)))
+       (declare-type nil))
+
+      ;; Parsed specializer objects, i.e. CLASS, EQL-SPECIALIZER,
+      ;; CLASS-EQ-SPECIALIZER and generic SPECIALIZER.
+      ;;
+      ;; Also unparsed specializers other than EQL: these have to be
+      ;; either class names or extended specializers.
+      ;;
+      ;; For these, we can usually make Python very happy.
+      ;;
+      ;; KLUDGE: Since INFO doesn't work right for class objects here,
+      ;; and they are valid specializers, see if the specializer is
+      ;; a named class, and use the name in that case -- otherwise
+      ;; the class instance is ok, since info will just return NIL, NIL.
+      ;;
+      ;; We still need to deal with the class case too, but at
+      ;; least #.(find-class 'integer) and integer as equivalent
+      ;; specializers with this.
+      (t
+       (declare-type (specializer-type-specifier
+                      proto-generic-function proto-method specializer))))))
+
 (defun make-method-lambda-internal (proto-gf proto-method method-lambda env)
-  (declare (ignore proto-gf proto-method))
   (check-method-lambda method-lambda 'make-method-lambda)
-  (multiple-value-bind (real-body declarations documentation)
-      (parse-body (cddr method-lambda) t)
-    ;; We have the %METHOD-NAME declaration in the place where we expect it only
-    ;; if there is are no non-standard prior MAKE-METHOD-LAMBDA methods -- or
-    ;; unless they're fantastically unintrusive.
-    (let* ((method-name *method-name*)
-           (method-lambda-list *method-lambda-list*)
-           ;; Macroexpansion caused by code-walking may call make-method-lambda and
-           ;; end up with wrong values
-           (*method-name* nil)
-           (*method-lambda-list* nil)
-           (generic-function-name (when method-name (car method-name)))
-           (specialized-lambda-list (or method-lambda-list
-                                        (ecase (car method-lambda)
-                                          (lambda (second method-lambda))
-                                          (named-lambda (third method-lambda)))))
-           ;; the method-cell is a way of communicating what method a
-           ;; method-function implements, for the purpose of
-           ;; NO-NEXT-METHOD.  We need something that can be shared
-           ;; between function and initargs, but not something that
-           ;; will be coalesced as a constant (because we are naughty,
-           ;; oh yes) with the expansion of any other methods in the
-           ;; same file.  -- CSR, 2007-05-30
-           (method-cell (list (make-symbol "METHOD-CELL"))))
-      (multiple-value-bind (parameters lambda-list specializers)
-          (parse-specialized-lambda-list specialized-lambda-list)
-        (let* ((required-parameters
-                (mapcar (lambda (r s) (declare (ignore s)) r)
-                        parameters
-                        specializers))
-               (slots (mapcar #'list required-parameters))
-               (class-declarations
-                `(declare
-                  ;; These declarations seem to be used by PCL to pass
-                  ;; information to itself; when I tried to delete 'em
-                  ;; ca. 0.6.10 it didn't work. I'm not sure how
-                  ;; they work, but note the (VAR-DECLARATION '%CLASS ..)
-                  ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN 2000-12-30
-                  ,@(remove nil
-                            (mapcar (lambda (a s) (and (symbolp s)
-                                                       (neq s t)
-                                                       `(%class ,a ,s)))
-                                    parameters
-                                    specializers))
-                  ;; These TYPE declarations weren't in the original
-                  ;; PCL code, but the Python compiler likes them a
-                  ;; lot. (We're telling the compiler about our
-                  ;; knowledge of specialized argument types so that
-                  ;; it can avoid run-time type dispatch overhead,
-                  ;; which can be a huge win for Python.)
-                  ,@(let ((specials (declared-specials declarations)))
-                      (mapcar (lambda (par spec)
-                                (parameter-specializer-declaration-in-defmethod
-                                 par spec specials env))
-                              parameters
-                              specializers))))
-               (method-lambda
-                ;; Remove the documentation string and insert the
-                ;; appropriate class declarations. The documentation
-                ;; string is removed to make it easy for us to insert
-                ;; new declarations later, they will just go after the
-                ;; CADR of the method lambda. The class declarations
-                ;; are inserted to communicate the class of the method's
-                ;; arguments to the code walk.
-                `(lambda ,lambda-list
-                   ;; The default ignorability of method parameters
-                   ;; doesn't seem to be specified by ANSI. PCL had
-                   ;; them basically ignorable but was a little
-                   ;; inconsistent. E.g. even though the two
-                   ;; method definitions
-                   ;;   (DEFMETHOD FOO ((X T) (Y T)) "Z")
-                   ;;   (DEFMETHOD FOO ((X T) Y) "Z")
-                   ;; are otherwise equivalent, PCL treated Y as
-                   ;; ignorable in the first definition but not in the
-                   ;; second definition. We make all required
-                   ;; parameters ignorable as a way of systematizing
-                   ;; the old PCL behavior. -- WHN 2000-11-24
-                   (declare (ignorable ,@required-parameters))
-                   ,class-declarations
-                   ,@declarations
-                   (block ,(fun-name-block-name generic-function-name)
-                     ,@real-body)))
-               (constant-value-p (and (null (cdr real-body))
-                                      (constantp (car real-body))))
-               (constant-value (and constant-value-p
-                                    (constant-form-value (car real-body))))
-               (plist (and constant-value-p
-                           (or (typep constant-value
-                                      '(or number character))
-                               (and (symbolp constant-value)
-                                    (symbol-package constant-value)))
-                           (list :constant-value constant-value)))
-               (applyp (dolist (p lambda-list nil)
-                         (cond ((memq p '(&optional &rest &key))
-                                (return t))
-                               ((eq p '&aux)
-                                (return nil))))))
-          (multiple-value-bind (walked-lambda call-next-method-p setq-p
-                                parameters-setqd)
-              (walk-method-lambda method-lambda
-                                  required-parameters
-                                  env
-                                  slots)
-            (multiple-value-bind (walked-lambda-body
-                                  walked-declarations
-                                  walked-documentation)
-                (parse-body (cddr walked-lambda) t)
-              (declare (ignore walked-documentation))
-              (when (some #'cdr slots)
-                (let ((slot-name-lists (slot-name-lists-from-slots slots)))
-                  (setq plist
-                        `(,@(when slot-name-lists
-                                  `(:slot-name-lists ,slot-name-lists))
-                            ,@plist))
-                  (setq walked-lambda-body
-                        `((pv-binding (,required-parameters
-                                       ,slot-name-lists
-                                       (load-time-value
-                                        (intern-pv-table
-                                         :slot-name-lists ',slot-name-lists)))
-                            ,@walked-lambda-body)))))
-              (when (and (memq '&key lambda-list)
-                         (not (memq '&allow-other-keys lambda-list)))
-                (let ((aux (memq '&aux lambda-list)))
-                  (setq lambda-list (nconc (ldiff lambda-list aux)
-                                           (list '&allow-other-keys)
-                                           aux))))
-              (values `(lambda (.method-args. .next-methods.)
-                         (simple-lexical-method-functions
-                             (,lambda-list .method-args. .next-methods.
-                                           :call-next-method-p
-                                           ,(when call-next-method-p t)
-                                           :setq-p ,setq-p
-                                           :parameters-setqd ,parameters-setqd
-                                           :method-cell ,method-cell
-                                           :applyp ,applyp)
-                           ,@walked-declarations
-                           (locally
-                               (declare (disable-package-locks
-                                         %parameter-binding-modified))
-                             (symbol-macrolet ((%parameter-binding-modified
-                                                ',@parameters-setqd))
-                               (declare (enable-package-locks
-                                         %parameter-binding-modified))
-                               ,@walked-lambda-body))))
-                      `(,@(when call-next-method-p `(method-cell ,method-cell))
-                          ,@(when (member call-next-method-p '(:simple nil))
-                                  '(simple-next-method-call t))
-                          ,@(when plist `(plist ,plist))
-                          ,@(when documentation `(:documentation ,documentation)))))))))))
+
+  (binding* (((real-body declarations documentation)
+              (parse-body (cddr method-lambda) t))
+             ;; We have the %METHOD-NAME declaration in the place
+             ;; where we expect it only if there is are no
+             ;; non-standard prior MAKE-METHOD-LAMBDA methods -- or
+             ;; unless they're fantastically unintrusive.
+             (method-name *method-name*)
+             (method-lambda-list *method-lambda-list*)
+             ;; Macroexpansion caused by code-walking may call
+             ;; make-method-lambda and end up with wrong values
+             (*method-name* nil)
+             (*method-lambda-list* nil)
+             (generic-function-name (when method-name (car method-name)))
+             ;; the method-cell is a way of communicating what method
+             ;; a method-function implements, for the purpose of
+             ;; NO-NEXT-METHOD.  We need something that can be shared
+             ;; between function and initargs, but not something that
+             ;; will be coalesced as a constant (because we are
+             ;; naughty, oh yes) with the expansion of any other
+             ;; methods in the same file.  -- CSR, 2007-05-30
+             (method-cell (list (make-symbol "METHOD-CELL")))
+             ((parameters lambda-list specializers)
+              (parse-specialized-lambda-list
+               (or method-lambda-list
+                   (ecase (car method-lambda)
+                     (lambda (second method-lambda))
+                     (named-lambda (third method-lambda))))))
+             (required-parameters (subseq parameters 0 (length specializers)))
+             (slots (mapcar #'list required-parameters))
+             (class-declarations
+              `(declare
+                ;; These declarations seem to be used by PCL to pass
+                ;; information to itself; when I tried to delete 'em
+                ;; ca. 0.6.10 it didn't work. I'm not sure how they
+                ;; work, but note the (VAR-DECLARATION '%CLASS ..)
+                ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN
+                ;; 2000-12-30
+                ,@(mapcan (lambda (parameter specializer)
+                            (when (typep specializer '(and symbol (not (eql t))))
+                              (list `(%class ,parameter ,specializer))))
+                          parameters specializers)
+                ;; These TYPE declarations weren't in the original PCL
+                ;; code, but the Python compiler likes them a
+                ;; lot. (We're telling the compiler about our
+                ;; knowledge of specialized argument types so that it
+                ;; can avoid run-time type dispatch overhead, which
+                ;; can be a huge win for Python.)
+                ,@(let ((specials (declared-specials declarations)))
+                    (mapcar (lambda (par spec)
+                              (parameter-specializer-declaration-in-defmethod
+                               proto-gf proto-method par spec specials env))
+                            parameters specializers))))
+             (method-lambda
+              ;; Remove the documentation string and insert the
+              ;; appropriate class declarations. The documentation
+              ;; string is removed to make it easy for us to insert
+              ;; new declarations later, they will just go after the
+              ;; CADR of the method lambda. The class declarations
+              ;; are inserted to communicate the class of the method's
+              ;; arguments to the code walk.
+              `(lambda ,lambda-list
+                 ;; The default ignorability of method parameters
+                 ;; doesn't seem to be specified by ANSI. PCL had
+                 ;; them basically ignorable but was a little
+                 ;; inconsistent. E.g. even though the two
+                 ;; method definitions
+                 ;;   (DEFMETHOD FOO ((X T) (Y T)) "Z")
+                 ;;   (DEFMETHOD FOO ((X T) Y) "Z")
+                 ;; are otherwise equivalent, PCL treated Y as
+                 ;; ignorable in the first definition but not in the
+                 ;; second definition. We make all required
+                 ;; parameters ignorable as a way of systematizing
+                 ;; the old PCL behavior. -- WHN 2000-11-24
+                 (declare (ignorable ,@required-parameters))
+                 ,class-declarations
+                 ,@declarations
+                 (block ,(fun-name-block-name generic-function-name)
+                   ,@real-body)))
+             (constant-value-p (and (null (cdr real-body))
+                                    (constantp (car real-body))))
+             (constant-value (when constant-value-p
+                               (constant-form-value (car real-body))))
+             (plist (when (and constant-value-p
+                               (or (typep constant-value '(or number character))
+                                   (and (symbolp constant-value)
+                                        (symbol-package constant-value))))
+                         (list :constant-value constant-value)))
+             (applyp (dolist (p lambda-list nil)
+                       (cond ((memq p '(&optional &rest &key))
+                              (return t))
+                             ((eq p '&aux)
+                              (return nil)))))
+             ((walked-lambda call-next-method-p setq-p parameters-setqd)
+              (walk-method-lambda
+               method-lambda required-parameters env slots))
+             ((walked-lambda-body walked-declarations)
+              (parse-body (cddr walked-lambda) t)))
+    (when (some #'cdr slots)
+      (let ((slot-name-lists (slot-name-lists-from-slots slots)))
+        (setf plist
+              `(,@(when slot-name-lists
+                    `(:slot-name-lists ,slot-name-lists))
+                  ,@plist)
+              walked-lambda-body
+              `((pv-binding (,required-parameters
+                             ,slot-name-lists
+                             (load-time-value
+                              (intern-pv-table
+                               :slot-name-lists ',slot-name-lists)))
+                  ,@walked-lambda-body)))))
+    (when (and (memq '&key lambda-list)
+               (not (memq '&allow-other-keys lambda-list)))
+      (let ((aux (memq '&aux lambda-list)))
+        (setq lambda-list (nconc (ldiff lambda-list aux)
+                                 (list '&allow-other-keys)
+                                 aux))))
+    (values `(lambda (.method-args. .next-methods.)
+               (simple-lexical-method-functions
+                   (,lambda-list .method-args. .next-methods.
+                                 :call-next-method-p
+                                 ,(when call-next-method-p t)
+                                 :setq-p ,setq-p
+                                 :parameters-setqd ,parameters-setqd
+                                 :method-cell ,method-cell
+                                 :applyp ,applyp)
+                 ,@walked-declarations
+                 (locally (declare (disable-package-locks
+                                    %parameter-binding-modified))
+                   (symbol-macrolet ((%parameter-binding-modified
+                                      ',@parameters-setqd))
+                     (declare (enable-package-locks
+                               %parameter-binding-modified))
+                     ,@walked-lambda-body))))
+            `(,@(when call-next-method-p `(method-cell ,method-cell))
+              ,@(when (member call-next-method-p '(:simple nil))
+                  '(simple-next-method-call t))
+              ,@(when plist `(plist ,plist))
+              ,@(when documentation `(:documentation ,documentation))))))
 
 (defun real-make-method-specializers-form
     (proto-generic-function proto-method specializer-names environment)
@@ -885,6 +1006,156 @@ generic function lambda list ~S~:>"
   (setf (gdefinition 'make-specializer-form-using-class)
         (symbol-function 'real-make-specializer-form-using-class)))
 
+(defun real-specializer-type-specifier/specializer
+    (proto-generic-function proto-method specializer)
+  (declare (ignore proto-generic-function proto-method))
+  ;; TODO later protocol-unimplemented-error?
+  (style-warn "~@<No method on ~S for specializer ~S~@:>"
+              'specializer-type-specifier specializer)
+  nil)
+
+(labels ((warn-parse (specializer &optional condition)
+           (style-warn
+            "~@<Cannot parse specializer ~S in ~S~@[: ~A~].~@:>"
+            specializer 'specializer-type-specifier condition))
+         (warn-find (condition name proto-generic-function proto-method)
+           (warn condition
+                 :format-control
+                 "~@<Cannot find type for specializer ~
+                  ~/sb-ext:print-symbol-with-prefix/ when executing ~S ~
+                  for a ~/sb-ext:print-type-specifier/ of a ~
+                  ~/sb-ext:print-type-specifier/.~@:>"
+                 :format-arguments
+                 (list name 'specializer-type-specifier
+                       (class-name (class-of proto-method))
+                       (class-name (class-of proto-generic-function)))))
+         (class-name-type-specifier (name proto-generic-function proto-method)
+           (let ((kind (info :type :kind name)))
+             (case kind
+               (:primitive
+                name)
+               (:defined
+                ;; This can happen if NAME is a DEFTYPE.
+                (warn-find 'simple-warning
+                           name proto-generic-function proto-method))
+               ((:instance :forthcoming-defclass-type)
+                ;; CLOS classes are too expensive to check (as opposed
+                ;; to STRUCTURE-CLASS and SYSTEM-CLASS).
+                nil)
+               (t
+                ;; TODO proper warning condition?
+                (warn-find 'simple-style-warning
+                           name proto-generic-function proto-method)
+                nil)))))
+
+  ;;; Non-parsed class specializers, i.e. class names
+  ;;;
+  ;;; Extended generic function classes with specializers which are
+  ;;; designated by symbols have to install their own methods
+  ;;; specialized on symbol to replace this logic.
+
+  (defun real-specializer-type-specifier/symbol
+      (proto-generic-function proto-method specializer)
+    (let ((specializer
+           (handler-case
+               ;; Usually tries to find the class named
+               ;; SPECIALIZER. Can do something different when there
+               ;; is a non-default method on
+               ;; PARSE-SPECIALIZER-USING-CLASS.
+               (parse-specializer-using-class
+                proto-generic-function specializer)
+             (class-not-found-error ()
+               ;; SPECIALIZER does not name a class, but maybe it is
+               ;; known to name a :forthcoming-defclass-type.
+               ;; CLASS-NAME-TYPE-SPECIFIER will emit the warning and
+               ;; return nil if not.
+               (class-name-type-specifier
+                specializer proto-generic-function proto-method))
+             (error (condition)
+               ;; This can only happen if there is an EQL-specialized
+               ;; method on PARSE-SPECIALIZER-USING-CLASS matching
+               ;; SPECIALIZER that signals an error.
+               (warn-parse specializer condition)
+               nil))))
+      (when specializer
+        (specializer-type-specifier
+         proto-generic-function proto-method specializer))))
+
+  ;;; Non-parsed extended specializer with default syntax
+  ;;; i.e. (SPECIALIZER-KIND &rest SPECIFIC-SYNTAX)
+
+  (defun real-specializer-type-specifier/t
+      (proto-generic-function proto-method specializer)
+    (let ((specializer
+           (handler-case
+               (parse-specializer-using-class
+                proto-generic-function specializer)
+             (error (condition)
+               ;; This can happen, for example, if SPECIALIZER does
+               ;; not designate any extended specializer or if it does
+               ;; but then does not conform to the respective extended
+               ;; specializer syntax.
+               (warn-parse specializer condition)
+               nil))))
+      (when specializer
+        (specializer-type-specifier
+         proto-generic-function proto-method specializer))))
+
+  ;;; Parsed EQL and CLASS-EQ specializers
+
+  (defun real-specializer-type-specifier/class-eq-specializer
+      (proto-generic-function proto-method specializer)
+    (specializer-type-specifier
+     proto-generic-function proto-method (specializer-class specializer)))
+
+  (defun real-specializer-type-specifier/eql-specializer
+      (proto-generic-function proto-method specializer)
+    (declare (ignore proto-generic-function proto-method))
+    `(eql ,(eql-specializer-object specializer)))
+
+  ;;; Parsed class specializers
+
+  (defun real-specializer-type-specifier/structure-class
+      (proto-generic-function proto-method specializer)
+    (declare (ignore proto-generic-function proto-method))
+    (class-name specializer))
+
+  (defun real-specializer-type-specifier/system-class
+      (proto-generic-function proto-method specializer)
+    (declare (ignore proto-generic-function proto-method))
+    (class-name specializer))
+
+  (defun real-specializer-type-specifier/class
+      (proto-generic-function proto-method specializer)
+    (let ((name (class-name specializer)))
+      ;; Make sure SPECIALIZER has a proper class name and that name
+      ;; designates the class SPECIALIZER in the global environment.
+      (when (and (typep name '(and symbol (not null)))
+                 (eq specializer (find-class name nil)))
+        (class-name-type-specifier
+         name proto-generic-function proto-method)))))
+
+(defun real-specializer-type-specifier
+    (proto-generic-function proto-method specializer)
+  (macrolet
+      ((delegations ()
+         `(typecase specializer
+            ,@(mapcar
+               (lambda (type)
+                 (let ((function-name
+                         (symbolicate
+                          'real-specializer-type-specifier '#:/ type)))
+                   `(,type
+                     (,function-name
+                      proto-generic-function proto-method specializer))))
+               '(specializer symbol t class-eq-specializer eql-specializer
+                 structure-class system-class class)))))
+    (delegations)))
+
+(unless (fboundp 'specializer-type-specifier)
+  (setf (gdefinition 'specializer-type-specifier)
+        (symbol-function 'real-specializer-type-specifier)))
+
 (defun real-parse-specializer-using-class (generic-function specializer)
   (let ((result (specializer-from-type specializer)))
     (if (specializerp result)
@@ -922,131 +1193,6 @@ generic function lambda list ~S~:>"
 (unless (fboundp 'unparse-specializer-using-class)
   (setf (gdefinition 'unparse-specializer-using-class)
         (symbol-function 'real-unparse-specializer-using-class)))
-
-;;; a helper function for creating Python-friendly type declarations
-;;; in DEFMETHOD forms.
-;;;
-;;; We're too lazy to cons up a new environment for this, so we just pass in
-;;; the list of locally declared specials in addition to the old environment.
-(defun parameter-specializer-declaration-in-defmethod
-    (parameter specializer specials env)
-  (cond ((and (consp specializer)
-              (eq (car specializer) 'eql))
-         ;; KLUDGE: ANSI, in its wisdom, says that
-         ;; EQL-SPECIALIZER-FORMs in EQL specializers are evaluated at
-         ;; DEFMETHOD expansion time. Thus, although one might think
-         ;; that in
-         ;;   (DEFMETHOD FOO ((X PACKAGE)
-         ;;                   (Y (EQL 12))
-         ;;      ..))
-         ;; the PACKAGE and (EQL 12) forms are both parallel type
-         ;; names, they're not, as is made clear when you do
-         ;;   (DEFMETHOD FOO ((X PACKAGE)
-         ;;                   (Y (EQL 'BAR)))
-         ;;     ..)
-         ;; where Y needs to be a symbol named "BAR", not some cons
-         ;; made by (CONS 'QUOTE 'BAR). I.e. when the
-         ;; EQL-SPECIALIZER-FORM is (EQL 'X), it requires an argument
-         ;; to be of type (EQL X). It'd be easy to transform one to
-         ;; the other, but it'd be somewhat messier to do so while
-         ;; ensuring that the EQL-SPECIALIZER-FORM is only EVAL'd
-         ;; once. (The new code wouldn't be messy, but it'd require a
-         ;; big transformation of the old code.) So instead we punt.
-         ;; -- WHN 20000610
-         '(ignorable))
-        ((member specializer
-                 ;; KLUDGE: For some low-level implementation
-                 ;; classes, perhaps because of some problems related
-                 ;; to the incomplete integration of PCL into SBCL's
-                 ;; type system, some specializer classes can't be
-                 ;; declared as argument types. E.g.
-                 ;;   (DEFMETHOD FOO ((X SLOT-OBJECT))
-                 ;;     (DECLARE (TYPE SLOT-OBJECT X))
-                 ;;     ..)
-                 ;; loses when
-                 ;;   (DEFSTRUCT BAR A B)
-                 ;;   (FOO (MAKE-BAR))
-                 ;; perhaps because of the way that STRUCTURE-OBJECT
-                 ;; inherits both from SLOT-OBJECT and from
-                 ;; SB-KERNEL:INSTANCE. In an effort to sweep such
-                 ;; problems under the rug, we exclude these problem
-                 ;; cases by blacklisting them here. -- WHN 2001-01-19
-                 (list 'slot-object #+nil (find-class 'slot-object)))
-         '(ignorable))
-        ((not (eq **boot-state** 'complete))
-         ;; KLUDGE: PCL, in its wisdom, sometimes calls methods with
-         ;; types which don't match their specializers. (Specifically,
-         ;; it calls ENSURE-CLASS-USING-CLASS (T NULL) with a non-NULL
-         ;; second argument.) Hopefully it only does this kind of
-         ;; weirdness when bootstrapping.. -- WHN 20000610
-         '(ignorable))
-        ((typep specializer 'eql-specializer)
-         `(type (eql ,(eql-specializer-object specializer)) ,parameter))
-        ((or (var-special-p parameter env) (member parameter specials))
-         ;; Don't declare types for special variables -- our rebinding magic
-         ;; for SETQ cases don't work right there as SET, (SETF SYMBOL-VALUE),
-         ;; etc. make things undecidable.
-         '(ignorable))
-        (t
-         ;; Otherwise, we can usually make Python very happy.
-         ;;
-         ;; KLUDGE: Since INFO doesn't work right for class objects here,
-         ;; and they are valid specializers, see if the specializer is
-         ;; a named class, and use the name in that case -- otherwise
-         ;; the class instance is ok, since info will just return NIL, NIL.
-         ;;
-         ;; We still need to deal with the class case too, but at
-         ;; least #.(find-class 'integer) and integer as equivalent
-         ;; specializers with this.
-         (let* ((specializer-nameoid
-                 (if (and (typep specializer 'class)
-                          (let ((name (class-name specializer)))
-                            (and name (symbolp name)
-                                 (eq specializer (find-class name nil)))))
-                     (class-name specializer)
-                     specializer))
-                (kind (info :type :kind specializer-nameoid)))
-
-           (flet ((specializer-nameoid-class ()
-                    (typecase specializer-nameoid
-                      (symbol (find-class specializer-nameoid nil))
-                      (class specializer-nameoid)
-                      (class-eq-specializer
-                       (specializer-class specializer-nameoid))
-                      (t nil))))
-             (ecase kind
-               ((:primitive) `(type ,specializer-nameoid ,parameter))
-               ((:defined)
-                (let ((class (specializer-nameoid-class)))
-                  ;; CLASS can be null here if the user has
-                  ;; erroneously tried to use a defined type as a
-                  ;; specializer; it can be a non-SYSTEM-CLASS if
-                  ;; the user defines a type and calls (SETF
-                  ;; FIND-CLASS) in a consistent way.
-                  (when (and class (typep class 'system-class))
-                    `(type ,(class-name class) ,parameter))))
-               ((:instance nil)
-                (let ((class (specializer-nameoid-class)))
-                  (cond
-                    (class
-                     (if (typep class '(or system-class structure-class))
-                         `(type ,class ,parameter)
-                         ;; don't declare CLOS classes as parameters;
-                         ;; it's too expensive.
-                         '(ignorable)))
-                    (t
-                     ;; we can get here, and still not have a failure
-                     ;; case, by doing MOP programming like (PROGN
-                     ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
-                     ;; ...)).  Best to let the user know we haven't
-                     ;; been able to extract enough information:
-                     (style-warn
-                      "~@<can't find type for specializer ~S in ~S.~@:>"
-                      specializer-nameoid
-                      'parameter-specializer-declaration-in-defmethod)
-                     '(ignorable)))))
-               ((:forthcoming-defclass-type)
-                '(ignorable))))))))
 
 ;;; For passing a list (groveled by the walker) of the required
 ;;; parameters whose bindings are modified in the method body to the

@@ -2473,9 +2473,10 @@ package is deprecated in favour of SB-MOP."
                "MAKE-METHOD-LAMBDA-USING-SPECIALIZERS"
                "MAKE-METHOD-SPECIALIZERS-FORM"
 
+               "SPECIALIZER-TYPE-SPECIFIER"
+               "MAKE-SPECIALIZER-FORM-USING-CLASS"
                "PARSE-SPECIALIZER-USING-CLASS"
                "UNPARSE-SPECIALIZER-USING-CLASS"
-               "MAKE-SPECIALIZER-FORM-USING-CLASS"
 
                "+SLOT-UNBOUND+"
 
