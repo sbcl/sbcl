@@ -337,6 +337,12 @@ is_lisp_immediate(lispobj obj)
             || (widetag_of(obj) == UNBOUND_MARKER_WIDETAG));
 }
 
+static inline int
+is_cons_half(lispobj obj)
+{
+    return is_lisp_pointer(obj) || is_lisp_immediate(obj);
+}
+
 /* Convert from a lispobj with type bits to a native (ordinary
  * C/assembly) pointer to the beginning of the object. */
 static inline lispobj *

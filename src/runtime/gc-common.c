@@ -1799,12 +1799,12 @@ component_ptr_from_pc(lispobj *pc)
 }
 
 /* Scan an area looking for an object which encloses the given pointer.
- * Return the object start on success or NULL on failure. */
+ * Return the object start on success, or NULL on failure. */
 lispobj *
 gc_search_space(lispobj *start, size_t words, lispobj *pointer)
 {
     while (words > 0) {
-        size_t count = 1;
+        size_t count = 2;
         lispobj *forwarded_start;
 
         if (forwarding_pointer_p(start))
@@ -1812,11 +1812,8 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
         else
             forwarded_start = start;
         lispobj thing = *forwarded_start;
-        /* If thing is an immediate then this is a cons. */
-        if (is_lisp_pointer(thing) || is_lisp_immediate(thing))
-            count = 2;
-        else
-            count = (sizetab[widetag_of(thing)])(forwarded_start);
+        if (!is_cons_half(thing))
+             count = (sizetab[widetag_of(thing)])(forwarded_start);
 
         /* Check whether the pointer is within this object. */
         if ((pointer >= start) && (pointer < (start+count))) {
@@ -1869,26 +1866,14 @@ properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr)
         }
         break;
     case LIST_POINTER_LOWTAG:
-        if (pointer != make_lispobj(start_addr, LIST_POINTER_LOWTAG)) {
-            return 0;
-        }
-        /* Is it plausible cons? */
-        if ((is_lisp_pointer(start_addr[0]) ||
-             is_lisp_immediate(start_addr[0])) &&
-            (is_lisp_pointer(start_addr[1]) ||
-             is_lisp_immediate(start_addr[1])))
-            break;
-        else {
-            return 0;
-        }
+        return make_lispobj(start_addr, LIST_POINTER_LOWTAG) == pointer
+            && is_cons_half(start_addr[0])  // Is it plausible?
+            && is_cons_half(start_addr[1]);
+
     case INSTANCE_POINTER_LOWTAG:
-        if (pointer != make_lispobj(start_addr, INSTANCE_POINTER_LOWTAG)) {
-            return 0;
-        }
-        if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
-            return 0;
-        }
-        break;
+        return make_lispobj(start_addr, INSTANCE_POINTER_LOWTAG) == pointer
+            && widetag_of(*start_addr) == INSTANCE_HEADER_WIDETAG;
+
     case OTHER_POINTER_LOWTAG:
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)

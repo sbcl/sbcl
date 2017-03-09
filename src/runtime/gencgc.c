@@ -2345,13 +2345,9 @@ pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
 
     lispobj header = *mark_which_pointer;
     int size = 2;
-    // Don't bother calling a sizing function for fixnums or pointers.
-    // The object pointed to must be a cons.
-    if (!fixnump(header) && !is_lisp_pointer(header)) {
+    // Don't bother calling a sizing function for cons cells.
+    if (!is_cons_half(header))
         size = (sizetab[widetag_of(header)])(mark_which_pointer);
-        if (size == 1 && (lowtag_of(header) == 9 || lowtag_of(header) == 2))
-            size = 2;
-    }
     gc_assert(size % 2 == 0);
     unsigned int end_dword_index = begin_dword_index + size / 2;
     unsigned int index;

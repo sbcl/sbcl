@@ -1691,7 +1691,7 @@ static void fixup_space(lispobj* where, size_t n_words)
     while (where < end) {
         gc_assert(!forwarding_pointer_p(where));
         header_word = *where;
-        if (is_lisp_pointer(header_word) || is_lisp_immediate(header_word)) {
+        if (is_cons_half(header_word)) {
             adjust_words(where, 2); // A cons.
             where += 2;
             continue;
