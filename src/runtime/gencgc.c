@@ -2062,7 +2062,7 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
      * properly_tagged_descriptor_p(), so pick them off here. */
     if (((lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) &&
          page_table[addr_page_index].large_object)
-        || !properly_tagged_descriptor_p((lispobj)addr, object_start))
+        || !properly_tagged_descriptor_p(addr, object_start))
         return 0;
 
     return object_start;

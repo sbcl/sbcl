@@ -199,7 +199,7 @@ static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
 }
 struct vector *symbol_name(lispobj*);
 
-extern int properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr);
+extern int properly_tagged_descriptor_p(void *pointer, lispobj *start_addr);
 
 extern void scavenge_control_stack(struct thread *th);
 extern void scrub_control_stack(void);

@@ -1831,8 +1831,9 @@ gc_search_space3(lispobj *start, void* limit, void *pointer)
  * and start_addr is the address of the enclosing object.
  */
 int
-properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr)
+properly_tagged_descriptor_p(void *thing, lispobj *start_addr)
 {
+    lispobj pointer = (lispobj)thing;
     if (!is_lisp_pointer(pointer)) {
         return 0;
     }
@@ -2041,7 +2042,7 @@ valid_lisp_pointer_p(lispobj *pointer)
 #endif
         ((start=search_static_space(pointer))!=NULL) ||
         ((start=search_read_only_space(pointer))!=NULL))
-        return properly_tagged_descriptor_p((lispobj)pointer, start);
+        return properly_tagged_descriptor_p(pointer, start);
     else
         return 0;
 }
