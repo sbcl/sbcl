@@ -148,14 +148,17 @@ gc_general_alloc(sword_t nbytes, int page_type_flag, int quick_p)
 extern void *gc_general_alloc(word_t nbytes,int page_type_flag,int quick_p);
 #endif
 
+#define CHECK_COPY_PRECONDITIONS(object, nwords) \
+    gc_assert(is_lisp_pointer(object)); \
+    gc_assert(from_space_p(object)); \
+    gc_assert((nwords & 0x01) == 0)
+
 static inline lispobj
 gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 {
     lispobj *new;
 
-    gc_assert(is_lisp_pointer(object));
-    gc_assert(from_space_p(object));
-    gc_assert((nwords & 0x01) == 0);
+    CHECK_COPY_PRECONDITIONS(object, nwords);
 
     /* Allocate space. */
     new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);

@@ -1461,13 +1461,10 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
 static lispobj
 general_copy_large_object(lispobj object, word_t nwords, boolean boxedp)
 {
-    int tag;
     lispobj *new;
     page_index_t first_page;
 
-    gc_assert(is_lisp_pointer(object));
-    gc_assert(from_space_p(object));
-    gc_assert((nwords & 0x01) == 0);
+    CHECK_COPY_PRECONDITIONS(object, nwords);
 
     if ((nwords > 1024*1024) && gencgc_verbose) {
         FSHOW((stderr, "/general_copy_large_object: %d bytes\n",
@@ -1587,9 +1584,6 @@ general_copy_large_object(lispobj object, word_t nwords, boolean boxedp)
         return(object);
 
     } else {
-        /* Get tag of object. */
-        tag = lowtag_of(object);
-
         /* Allocate space. */
         new = gc_general_alloc(nwords*N_WORD_BYTES,
                                (boxedp ? BOXED_PAGE_FLAG : UNBOXED_PAGE_FLAG),
@@ -1599,7 +1593,7 @@ general_copy_large_object(lispobj object, word_t nwords, boolean boxedp)
         memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
 
         /* Return Lisp pointer of new object. */
-        return ((lispobj) new) | tag;
+        return make_lispobj(new, lowtag_of(object));
     }
 }
 
