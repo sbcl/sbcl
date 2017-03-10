@@ -1801,34 +1801,27 @@ component_ptr_from_pc(lispobj *pc)
 /* Scan an area looking for an object which encloses the given pointer.
  * Return the object start on success, or NULL on failure. */
 lispobj *
-gc_search_space(lispobj *start, size_t words, lispobj *pointer)
+gc_search_space3(lispobj *start, void* limit, void *pointer)
 {
-    while (words > 0) {
-        size_t count = 2;
-        lispobj *forwarded_start;
+    if (pointer < (void*)start || pointer >= limit) return NULL;
 
+    while ((void*)start < limit) {
+        lispobj *forwarded_start;
         if (forwarding_pointer_p(start))
             forwarded_start = native_pointer(forwarding_pointer_value(start));
         else
             forwarded_start = start;
         lispobj thing = *forwarded_start;
+        size_t count = 2;
         if (!is_cons_half(thing))
              count = (sizetab[widetag_of(thing)])(forwarded_start);
 
         /* Check whether the pointer is within this object. */
-        if ((pointer >= start) && (pointer < (start+count))) {
-            /* found it! */
-            /*FSHOW((stderr,"/found %x in %x %x\n", pointer, start, thing));*/
-            return(start);
-        }
-
-        /* Round up the count. */
-        count = CEILING(count,2);
+        if (pointer < (void*)(start+count)) return start;
 
         start += count;
-        words -= count;
     }
-    return (NULL);
+    return NULL;
 }
 
 /* Helper for valid_lisp_pointer_p (below) and

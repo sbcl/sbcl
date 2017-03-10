@@ -191,7 +191,12 @@ lispobj *search_static_space(void *pointer);
 lispobj *search_immobile_space(void *pointer);
 lispobj *search_dynamic_space(void *pointer);
 
-lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
+lispobj *gc_search_space3(lispobj *start, void *limit, void *pointer);
+static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
+    return gc_search_space3(start,
+                            (void*)(1+((lispobj)pointer | LOWTAG_MASK)),
+                            pointer);
+}
 struct vector *symbol_name(lispobj*);
 
 extern int properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr);

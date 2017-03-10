@@ -481,9 +481,7 @@ void immobile_space_preserve_pointer(void* addr)
             || !(varyobj_page_gens_augmented(page_index) & (1<<from_space))
             || (start = varyobj_scan_start(page_index)) > (lispobj*)addr)
             return;
-        header_addr = gc_search_space(start,
-                                      native_pointer((lispobj)addr)+2 - start,
-                                      (lispobj*)addr);
+        header_addr = gc_search_space(start, addr);
         if (!header_addr ||
             immobile_filler_p(header_addr) ||
             (widetag_of(*header_addr) != CODE_HEADER_WIDETAG &&
@@ -1441,9 +1439,7 @@ search_immobile_space(void *pointer)
             } else {
                 start = (lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START;
             }
-            lispobj* found = gc_search_space(start,
-                                             (((lispobj*)pointer)+2)-start,
-                                             (lispobj*)pointer);
+            lispobj* found = gc_search_space(start, pointer);
             return (found && immobile_filler_p(found)) ? 0 : found;
         } else if ((lispobj)pointer < SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value) {
             char *page_base = (char*)((lispobj)pointer & ~(IMMOBILE_CARD_BYTES-1));
@@ -1454,10 +1450,7 @@ search_immobile_space(void *pointer)
                 char *end = begin + (page_obj_size(page_index) << WORD_SHIFT);
                 if ((char*)pointer < end) return (lispobj*)begin;
             } else {
-                start = (lispobj*)page_base;
-                return (gc_search_space(start,
-                                        (((lispobj*)pointer)+2)-start,
-                                        (lispobj*)pointer));
+                return gc_search_space((lispobj*)page_base, pointer);
             }
         }
     }

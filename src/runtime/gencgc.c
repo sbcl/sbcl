@@ -1975,9 +1975,7 @@ search_read_only_space(void *pointer)
     lispobj *end = (lispobj *) SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
-    return (gc_search_space(start,
-                            (((lispobj *)pointer)+2)-start,
-                            (lispobj *) pointer));
+    return gc_search_space(start, pointer);
 }
 
 lispobj *
@@ -1987,9 +1985,7 @@ search_static_space(void *pointer)
     lispobj *end = (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
-    return (gc_search_space(start,
-                            (((lispobj *)pointer)+2)-start,
-                            (lispobj *) pointer));
+    return gc_search_space(start, pointer);
 }
 
 /* a faster version for searching the dynamic space. This will work even
@@ -2004,9 +2000,7 @@ search_dynamic_space(void *pointer)
     if ((page_index == -1) || page_free_p(page_index))
         return NULL;
     start = (lispobj *)page_scan_start(page_index);
-    return (gc_search_space(start,
-                            (((lispobj *)pointer)+2)-start,
-                            (lispobj *)pointer));
+    return gc_search_space(start, pointer);
 }
 
 // Return the starting address of the object containing 'addr'
@@ -4282,7 +4276,7 @@ gencgc_pickup_dynamic(void)
 
         if (!gencgc_partial_pickup) {
             page_table[page].allocated = BOXED_PAGE_FLAG;
-            first=gc_search_space(prev,(ptr+2)-prev,ptr);
+            first=gc_search_space3(prev, (ptr+2), ptr);
             if(ptr == first)
                 prev=ptr;
             page_table[page].scan_start_offset =

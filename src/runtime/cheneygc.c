@@ -359,9 +359,7 @@ search_read_only_space(void *pointer)
     lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
-    return (gc_search_space(start,
-                            (((lispobj *)pointer)+2)-start,
-                            (lispobj *)pointer));
+    return gc_search_space(start, pointer);
 }
 
 lispobj *
@@ -371,9 +369,7 @@ search_static_space(void *pointer)
     lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
-    return (gc_search_space(start,
-                            (((lispobj *)pointer)+2)-start,
-                            (lispobj *)pointer));
+    return gc_search_space(start, pointer);
 }
 
 lispobj *
@@ -383,9 +379,7 @@ search_dynamic_space(void *pointer)
     lispobj *end = (lispobj *) dynamic_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
-    return (gc_search_space(start,
-                            (((lispobj *)pointer)+2)-start,
-                            (lispobj *)pointer));
+    return gc_search_space(start, pointer);
 }
 
 /* initialization.  if gc_init can be moved to after core load, we could
