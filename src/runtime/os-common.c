@@ -233,6 +233,8 @@ void os_link_runtime()
 #endif  /* sb-dynamic-core */
 
 #ifndef LISP_FEATURE_WIN32
+
+/* Remap a part of an already existing mapping to a file */
 void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_address_t actual;
