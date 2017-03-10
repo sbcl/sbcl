@@ -1884,13 +1884,10 @@ properly_tagged_descriptor_p(lispobj pointer, lispobj *start_addr)
         }
 #endif
 
-        if (pointer != make_lispobj(start_addr, OTHER_POINTER_LOWTAG)) {
+        if (pointer != make_lispobj(start_addr, OTHER_POINTER_LOWTAG)
+            || !other_immediate_lowtag_p(*start_addr))
             return 0;
-        }
-        /* Is it plausible?  Not a cons. XXX should check the headers. */
-        if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
-            return 0;
-        }
+
         switch (widetag_of(start_addr[0])) {
         case UNBOUND_MARKER_WIDETAG:
         case NO_TLS_VALUE_MARKER_WIDETAG:
