@@ -2045,15 +2045,11 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
     lispobj* object_start = search_dynamic_space(addr);
     if (!object_start) return 0;
 
-    /* If the containing object is a code object, presume that the
-     * pointer is valid, simply because it could be an unboxed return
-     * address.
-     * FIXME: only if the addr points to a simple-fun instruction area
-     * should we skip the stronger tests. Otherwise, require a properly
-     * tagged pointer to the code component or an embedded simple-fun
-     * (or LRA?) just as with any other kind of object. */
-    if (widetag_of(*object_start) == CODE_HEADER_WIDETAG)
-      return object_start;
+    /* If the containing object is a code object and 'addr' points
+     * anywhere beyond the boxed words,
+     * presume it to be a valid unboxed return address. */
+    if (instruction_ptr_p(addr, object_start))
+        return object_start;
 
     /* Large object pages only contain ONE object, and it will never
      * be a CONS.  However, arrays and bignums can be allocated larger

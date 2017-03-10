@@ -470,41 +470,36 @@ void immobile_space_preserve_pointer(void* addr)
     if (page_index < 0)
         return;
 
-    lispobj* header_addr;
+    lispobj* object_start;
+    int promote = 0;
     if (page_index >= FIRST_VARYOBJ_PAGE) {
         // Restrict addr to lie below IMMOBILE_SPACE_FREE_POINTER.
         // This way, if the gens byte is nonzero but there is
         // a final array acting as filler on the remainder of the
         // final page, we won't accidentally find that.
-        lispobj* start;
-        if ((lispobj)addr >= SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value
-            || !(varyobj_page_gens_augmented(page_index) & (1<<from_space))
-            || (start = varyobj_scan_start(page_index)) > (lispobj*)addr)
-            return;
-        header_addr = gc_search_space(start, addr);
-        if (!header_addr ||
-            immobile_filler_p(header_addr) ||
-            (widetag_of(*header_addr) != CODE_HEADER_WIDETAG &&
-             !properly_tagged_descriptor_p(addr, header_addr)))
-            return;
+        lispobj* scan_start;
+        promote = (lispobj)addr < SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value
+            && (varyobj_page_gens_augmented(page_index) & (1<<from_space)) != 0
+            && (scan_start = varyobj_scan_start(page_index)) <= (lispobj*)addr
+            && (object_start = gc_search_space(scan_start, addr)) != 0
+            && (instruction_ptr_p(addr, object_start)
+                || properly_tagged_descriptor_p(addr, object_start))
+            && !immobile_filler_p(object_start);
     } else if (fixedobj_pages[page_index].gens & (1<<from_space)) {
         int obj_spacing = (page_obj_align(page_index) << WORD_SHIFT);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
         dprintf((logfile,"Pointer %p is to immobile page %d, object %d\n",
                  addr, page_index, obj_index));
         char* page_start_addr = (char*)((uword_t)addr & ~(IMMOBILE_CARD_BYTES-1));
-        header_addr = (lispobj*)(page_start_addr + obj_index * obj_spacing);
-        if (fixnump(*header_addr) ||
-            (lispobj*)addr >= header_addr + page_obj_size(page_index) ||
-            !properly_tagged_descriptor_p(addr, header_addr))
-           return;
-    } else {
-        return;
+        object_start = (lispobj*)(page_start_addr + obj_index * obj_spacing);
+        promote = !fixnump(*object_start)
+            && (lispobj*)addr < object_start + page_obj_size(page_index)
+            && properly_tagged_descriptor_p(addr, object_start);
     }
-    if (__immobile_obj_gen_bits(header_addr) == from_space) {
+    if (promote && __immobile_obj_gen_bits(object_start) == from_space) {
         dprintf((logfile,"immobile obj @ %p (<- %p) is conservatively live\n",
                  header_addr, addr));
-        promote_immobile_obj(header_addr, 0);
+        promote_immobile_obj(object_start, 0);
     }
 }
 

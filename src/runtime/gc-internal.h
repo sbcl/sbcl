@@ -199,6 +199,11 @@ static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
 }
 struct vector *symbol_name(lispobj*);
 
+static inline int instruction_ptr_p(void *pointer, lispobj *start_addr)
+{
+    return widetag_of(*start_addr) == CODE_HEADER_WIDETAG &&
+        pointer >= (void*)(start_addr + code_header_words(*start_addr));
+}
 extern int properly_tagged_descriptor_p(void *pointer, lispobj *start_addr);
 
 extern void scavenge_control_stack(struct thread *th);
