@@ -60,11 +60,11 @@
         layout))
      (t
       (make-wrapper-internal
-       :bitmap (if (or #+(and immobile-code compact-instance-header)
-                       (member name '(generic-function
-                                      standard-generic-function)))
-                   +fsc-layout-bitmap+
-                   -1)
+       :bitmap (cond #+(and immobile-code compact-instance-header)
+                     ((member name '(generic-function
+                                     standard-generic-function))
+                      +fsc-layout-bitmap+)
+                     (t -1))
        :length length
        :classoid (make-standard-classoid
                   :name name :pcl-class class))))))
@@ -81,10 +81,10 @@
     ((or (typep class 'std-class)
          (typep class 'forward-referenced-class))
      (make-wrapper-internal
-      :bitmap (if (or #+(and immobile-code compact-instance-header)
-                      (eq (class-of class) *the-class-funcallable-standard-class*))
-                  +fsc-layout-bitmap+
-                  -1)
+      :bitmap (cond #+(and immobile-code compact-instance-header)
+                    ((eq (class-of class) *the-class-funcallable-standard-class*)
+                     +fsc-layout-bitmap+)
+                    (t -1))
       :length length
       :classoid
       (let ((owrap (class-wrapper class)))
