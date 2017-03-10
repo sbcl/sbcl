@@ -237,8 +237,6 @@ static inline boolean immobile_space_p(lispobj obj)
   return IMMOBILE_SPACE_START <= obj && obj < IMMOBILE_SPACE_END;
 }
 
-// Note that find_page_index is in gencgc,
-// but because this is inline and needed by 2 files, it's in a header.
 typedef int low_page_index_t;
 static inline low_page_index_t find_immobile_page_index(void *addr)
 {

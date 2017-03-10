@@ -258,19 +258,8 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
             || (page_starts_contiguous_block_p(page_index + 1)));
 }
 
-/* Find the page index within the page_table for the given
- * address. Return -1 on failure. */
-inline page_index_t
-find_page_index(void *addr)
-{
-    if (addr >= heap_base) {
-        page_index_t index = ((pointer_sized_uint_t)addr -
-                              (pointer_sized_uint_t)heap_base) / GENCGC_CARD_BYTES;
-        if (index < page_table_pages)
-            return (index);
-    }
-    return (-1);
-}
+/// External function for calling from Lisp.
+page_index_t ext_find_page_index(void *addr) { return find_page_index(addr); }
 
 static os_vm_size_t
 npage_bytes(page_index_t npages)
@@ -2084,19 +2073,6 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
 
     return object_start;
 #endif
-}
-
-boolean
-in_dontmove_nativeptr_p(page_index_t page_index, lispobj *native_ptr)
-{
-    in_use_marker_t *markers = pinned_dwords(page_index);
-    if (markers) {
-        lispobj *begin = page_address(page_index);
-        int dword_in_page = (native_ptr - begin) / 2;
-        return (markers[dword_in_page / N_WORD_BITS] >> (dword_in_page % N_WORD_BITS)) & 1;
-    } else {
-        return 0;
-    }
 }
 
 /* Adjust large bignum and vector objects. This will adjust the
