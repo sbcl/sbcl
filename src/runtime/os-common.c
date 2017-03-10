@@ -231,3 +231,17 @@ void os_link_runtime()
         lose("Undefined aliens in cold init.");
 }
 #endif  /* sb-dynamic-core */
+
+#ifndef LISP_FEATURE_WIN32
+void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
+{
+    os_vm_address_t actual;
+
+    actual = mmap(addr, len, OS_VM_PROT_ALL, MAP_PRIVATE | MAP_FIXED,
+                  fd, (off_t) offset);
+    if (actual == MAP_FAILED || (addr && (addr != actual))) {
+        perror("mmap");
+        lose("unexpected mmap(%d, %d, ...) failure\n", addr, len);
+    }
+}
+#endif

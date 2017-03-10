@@ -175,8 +175,8 @@ lose:
  * def to something like ifdef nommapoverlap */
 /* currently hpux only */
 #ifdef LISP_FEATURE_HPUX
-os_vm_address_t copy_core_bytes(int fd, os_vm_offset_t offset,
-                                os_vm_address_t addr, int len)
+void copy_core_bytes(int fd, os_vm_offset_t offset,
+                     os_vm_address_t addr, int len)
 {
   unsigned char buf[4096];
   int c,x;
@@ -202,14 +202,13 @@ os_vm_address_t copy_core_bytes(int fd, os_vm_offset_t offset,
     memcpy(addr+x, buf, 4096);
   }
   os_flush_icache(addr, len);
-  return addr;
 }
 #endif
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 # define ZLIB_BUFFER_SIZE (1u<<16)
-os_vm_address_t inflate_core_bytes(int fd, os_vm_offset_t offset,
-                                   os_vm_address_t addr, int len)
+void inflate_core_bytes(int fd, os_vm_offset_t offset,
+                        os_vm_address_t addr, int len)
 {
     z_stream stream;
     unsigned char buf[ZLIB_BUFFER_SIZE];
@@ -270,7 +269,6 @@ os_vm_address_t inflate_core_bytes(int fd, os_vm_offset_t offset,
     }
 
     inflateEnd(&stream);
-    return addr;
 }
 # undef ZLIB_BUFFER_SIZE
 #endif
@@ -305,27 +303,20 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
         uword_t len = os_vm_page_size * entry->page_count;
         if (len != 0) {
-            os_vm_address_t real_addr;
             FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
                    len, len, (uword_t)addr));
             if (compressed) {
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-                real_addr = inflate_core_bytes(fd, offset + file_offset, addr, len);
+                inflate_core_bytes(fd, offset + file_offset, addr, len);
 #else
                 lose("This runtime was not built with zlib-compressed core support... aborting\n");
 #endif
             } else {
 #ifdef LISP_FEATURE_HPUX
-                real_addr = copy_core_bytes(fd, offset + file_offset, addr, len);
+                copy_core_bytes(fd, offset + file_offset, addr, len);
 #else
-                real_addr = os_map(fd, offset + file_offset, addr, len);
+                os_map(fd, offset + file_offset, addr, len);
 #endif
-            }
-            if (real_addr != addr) {
-                lose("file mapped in wrong place! "
-                     "(0x%08x != 0x%08lx)\n",
-                     real_addr,
-                     addr);
             }
         }
 

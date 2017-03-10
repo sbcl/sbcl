@@ -65,21 +65,6 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
     }
 }
 
-os_vm_address_t
-os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
-{
-    os_vm_address_t actual;
-    actual = mmap(addr, len,
-                OS_VM_PROT_ALL,
-                MAP_PRIVATE | MAP_FILE | MAP_FIXED,
-                fd, (off_t) offset);
-    if (actual == MAP_FAILED || (addr && (addr != actual))) {
-        perror("mmap");
-        lose("os_map(): mmap() failure\n");
-    }
-    return actual;
-}
-
 void
 os_protect(os_vm_address_t addr, os_vm_size_t len, os_vm_prot_t prot)
 {

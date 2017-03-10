@@ -84,10 +84,10 @@ extern void os_invalidate(os_vm_address_t addr, os_vm_size_t len);
 
 /* This maps a file into memory, or calls lose(..) for various
  * failures. */
-extern os_vm_address_t os_map(int fd,
-                              int offset,
-                              os_vm_address_t addr,
-                              os_vm_size_t len);
+extern void os_map(int fd,
+                   int offset,
+                   os_vm_address_t addr,
+                   os_vm_size_t len);
 
 /* This presumably flushes the instruction cache, if that can be done
  * explicitly. (It doesn't seem to be an issue for the i386 port,
