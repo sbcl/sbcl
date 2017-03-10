@@ -7,8 +7,8 @@
       #!+big-endian :big-endian)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; Minumum observed value, not authoritative.
-  (setf *backend-page-bytes* 4096))
+  ;; Can be in the range 4K-64K
+  (setf *backend-page-bytes* 65536))
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
