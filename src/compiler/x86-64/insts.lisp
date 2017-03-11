@@ -2597,10 +2597,6 @@
 (define-instruction simple-fun-header-word (segment)
   (:emitter
    (emit-header-data segment simple-fun-header-widetag)))
-
-(define-instruction lra-header-word (segment)
-  (:emitter
-   (emit-header-data segment return-pc-header-widetag)))
 
 ;;;; Instructions required to do floating point operations using SSE
 

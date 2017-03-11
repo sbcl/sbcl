@@ -280,7 +280,6 @@ trans_code_header(lispobj object)
     return (lispobj) LOW_WORD(ncode) | OTHER_POINTER_LOWTAG;
 }
 
-
 static sword_t
 size_code_header(lispobj *where)
 {
@@ -288,7 +287,7 @@ size_code_header(lispobj *where)
          + code_instruction_words(((struct code *)where)->code_size);
 }
 
-#if !defined(LISP_FEATURE_X86) && ! defined(LISP_FEATURE_X86_64)
+#ifdef RETURN_PC_HEADER_WIDETAG
 static sword_t
 scav_return_pc_header(lispobj *where, lispobj object)
 {
@@ -296,7 +295,6 @@ scav_return_pc_header(lispobj *where, lispobj object)
          where, (uword_t) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
-#endif /* LISP_FEATURE_X86 */
 
 static lispobj
 trans_return_pc_header(lispobj object)
@@ -314,6 +312,7 @@ trans_return_pc_header(lispobj object)
 
     return ((lispobj) LOW_WORD(ncode) + offset) | OTHER_POINTER_LOWTAG;
 }
+#endif /* RETURN_PC_HEADER_WIDETAG */
 
 /* On the 386, closures hold a pointer to the raw address instead of the
  * function object, so we can use CALL [$FDEFN+const] to invoke
@@ -1611,7 +1610,9 @@ gc_init_tables(void)
     transother[COMPLEX_ARRAY_WIDETAG] = trans_boxed;
     transother[CODE_HEADER_WIDETAG] = trans_code_header;
     transother[SIMPLE_FUN_HEADER_WIDETAG] = trans_fun_header;
+#ifdef RETURN_PC_HEADER_WIDETAG
     transother[RETURN_PC_HEADER_WIDETAG] = trans_return_pc_header;
+#endif
     transother[CLOSURE_HEADER_WIDETAG] = trans_short_boxed;
     transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_short_boxed;
     transother[VALUE_CELL_HEADER_WIDETAG] = trans_boxed;

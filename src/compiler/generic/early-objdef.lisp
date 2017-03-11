@@ -189,7 +189,8 @@
   funcallable-instance-header-widetag       ;  32   39  32   39
 
   ;; x86[-64] does not have objects with this widetag,
-  ;; but conditionalizing it would disturb this lovely table.
+  #!+(or x86 x86-64) unused00-widetag
+  #!-(or x86 x86-64)
   return-pc-header-widetag                  ;  36   3D  36   3D
 
   value-cell-header-widetag                 ;  3A   41  3A   41
