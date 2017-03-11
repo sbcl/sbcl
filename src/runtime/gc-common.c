@@ -1752,29 +1752,30 @@ gc_init_tables(void)
 }
 
 
+static lispobj *search_spaces(void *pointer)
+{
+    lispobj *start;
+    if (((start = search_dynamic_space(pointer)) != NULL) ||
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        ((start = search_immobile_space(pointer)) != NULL) ||
+#endif
+        ((start = search_static_space(pointer)) != NULL) ||
+        ((start = search_read_only_space(pointer)) != NULL))
+        return start;
+    return NULL;
+}
+
 /* Find the code object for the given pc, or return NULL on
    failure. */
 lispobj *
 component_ptr_from_pc(lispobj *pc)
 {
-    lispobj *object = NULL;
+    lispobj *object = search_spaces(pc);
 
-    if ( (object = search_read_only_space(pc)) )
-        ;
-    else if ( (object = search_static_space(pc)) )
-        ;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    else if ( (object = search_immobile_space(pc)) )
-        ;
-#endif
-    else
-        object = search_dynamic_space(pc);
+    if (object != NULL && widetag_of(*object) == CODE_HEADER_WIDETAG)
+        return object;
 
-    if (object) /* if we found something */
-        if (widetag_of(*object) == CODE_HEADER_WIDETAG)
-            return(object);
-
-    return (NULL);
+    return NULL;
 }
 
 /* Scan an area looking for an object which encloses the given pointer.
@@ -2012,18 +2013,12 @@ properly_tagged_descriptor_p(void *thing, lispobj *start_addr)
  * be reflected in the name.
  */
 int
-valid_lisp_pointer_p(lispobj *pointer)
+valid_lisp_pointer_p(lispobj pointer)
 {
-    lispobj *start;
-    if (((start=search_dynamic_space(pointer))!=NULL) ||
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        ((start=search_immobile_space(pointer))!=NULL) ||
-#endif
-        ((start=search_static_space(pointer))!=NULL) ||
-        ((start=search_read_only_space(pointer))!=NULL))
-        return properly_tagged_descriptor_p(pointer, start);
-    else
-        return 0;
+    lispobj *start = search_spaces((void*)pointer);
+    if (start != NULL)
+        return properly_tagged_descriptor_p((void*)pointer, start);
+    return 0;
 }
 
 boolean
