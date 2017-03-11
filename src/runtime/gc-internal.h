@@ -153,6 +153,10 @@ extern void *gc_general_alloc(word_t nbytes,int page_type_flag,int quick_p);
     gc_assert(from_space_p(object)); \
     gc_assert((nwords & 0x01) == 0)
 
+#define CHECK_COPY_POSTCONDITIONS(copy, lowtag) \
+    gc_assert(lowtag_of(copy) == lowtag); \
+    gc_assert(!from_space_p(copy));
+
 static inline lispobj
 gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 {

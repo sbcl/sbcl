@@ -168,8 +168,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
         set_forwarding_pointer(first_pointer,copy);
     }
 
-    gc_assert(lowtag_of(copy) == FUN_POINTER_LOWTAG);
-    gc_assert(!from_space_p(copy));
+    CHECK_COPY_POSTCONDITIONS(copy, FUN_POINTER_LOWTAG);
 
     *where = copy;
 
@@ -415,16 +414,15 @@ static lispobj trans_list(lispobj object);
 static sword_t
 scav_list_pointer(lispobj *where, lispobj object)
 {
-    lispobj first;
+    lispobj copy;
     gc_assert(lowtag_of(object) == LIST_POINTER_LOWTAG);
 
-    first = trans_list(object);
-    gc_assert(first != object);
+    copy = trans_list(object);
+    gc_assert(copy != object);
 
-    gc_assert(lowtag_of(first) == LIST_POINTER_LOWTAG);
-    gc_assert(!from_space_p(first));
+    CHECK_COPY_POSTCONDITIONS(copy, LIST_POINTER_LOWTAG);
 
-    *where = first;
+    *where = copy;
     return 1;
 }
 
@@ -492,29 +490,27 @@ trans_list(lispobj object)
 static sword_t
 scav_other_pointer(lispobj *where, lispobj object)
 {
-    lispobj first, *first_pointer;
+    lispobj copy, *first_pointer;
 
     gc_assert(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     /* Object is a pointer into from space - not FP. */
     first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
-    first = (transother[widetag_of(*first_pointer)])(object);
+    copy = (transother[widetag_of(*first_pointer)])(object);
 
     // If the object was large, then instead of transporting it,
     // gencgc might simply promote the pages and return the same pointer.
     // That decision is made in general_copy_large_object().
-    if (first != object) {
-        set_forwarding_pointer(first_pointer, first);
+    if (copy != object) {
+        set_forwarding_pointer(first_pointer, copy);
 #ifdef LISP_FEATURE_GENCGC
-        *where = first;
+        *where = copy;
 #endif
     }
 #ifndef LISP_FEATURE_GENCGC
-    *where = first;
+    *where = copy;
 #endif
-    gc_assert(lowtag_of(first) == OTHER_POINTER_LOWTAG);
-    gc_assert(!from_space_p(first));
-
+    CHECK_COPY_POSTCONDITIONS(copy, OTHER_POINTER_LOWTAG);
     return 1;
 }
 
