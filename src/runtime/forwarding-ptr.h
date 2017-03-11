@@ -29,7 +29,7 @@ forwarding_pointer_value(lispobj *pointer) {
 #endif
 }
 static inline lispobj
-set_forwarding_pointer(lispobj * pointer, lispobj newspace_copy) {
+set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
   // The object at 'pointer' might already have been forwarded,
   // but that's ok. Such occurs primarily when dealing with
   // code components, because code can be forwarded by scavenging any

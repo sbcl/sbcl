@@ -430,55 +430,37 @@ scav_list_pointer(lispobj *where, lispobj object)
 static lispobj
 trans_list(lispobj object)
 {
-    lispobj new_list_pointer;
-    struct cons *cons, *new_cons;
-    lispobj cdr;
-
-    cons = (struct cons *) native_pointer(object);
-
     /* Copy 'object'. */
-    new_cons = (struct cons *)
+    struct cons *copy = (struct cons *)
         gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
-    new_cons->car = cons->car;
-    new_cons->cdr = cons->cdr; /* updated later */
-    new_list_pointer = make_lispobj(new_cons, LIST_POINTER_LOWTAG);
-
+    lispobj new_list_pointer = make_lispobj(copy, LIST_POINTER_LOWTAG);
+    copy->car = CONS(object)->car;
     /* Grab the cdr: set_forwarding_pointer will clobber it in GENCGC  */
-    cdr = cons->cdr;
-
-    set_forwarding_pointer((lispobj *)cons, new_list_pointer);
+    lispobj cdr = CONS(object)->cdr;
+    set_forwarding_pointer((lispobj *)CONS(object), new_list_pointer);
 
     /* Try to linearize the list in the cdr direction to help reduce
      * paging. */
-    while (1) {
-        lispobj  new_cdr;
-        struct cons *cdr_cons, *new_cdr_cons;
-
-        if(lowtag_of(cdr) != LIST_POINTER_LOWTAG ||
-           !from_space_p(cdr) ||
-           forwarding_pointer_p((lispobj *)native_pointer(cdr)))
+    while (lowtag_of(cdr) == LIST_POINTER_LOWTAG && from_space_p(cdr)) {
+        lispobj* native_cdr = (lispobj*)CONS(cdr);
+        if (forwarding_pointer_p(native_cdr)) {  // Might as well fix now.
+            cdr = forwarding_pointer_value(native_cdr);
             break;
-
-        cdr_cons = (struct cons *) native_pointer(cdr);
-
+        }
         /* Copy 'cdr'. */
-        new_cdr_cons = (struct cons*)
+        struct cons *cdr_copy = (struct cons*)
             gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
-        new_cdr_cons->car = cdr_cons->car;
-        new_cdr_cons->cdr = cdr_cons->cdr;
-        new_cdr = make_lispobj(new_cdr_cons, LIST_POINTER_LOWTAG);
-
+        cdr_copy->car = ((struct cons*)native_cdr)->car;
         /* Grab the cdr before it is clobbered. */
-        cdr = cdr_cons->cdr;
-        set_forwarding_pointer((lispobj *)cdr_cons, new_cdr);
-
-        /* Update the cdr of the last cons copied into new space to
-         * keep the newspace scavenge from having to do it. */
-        new_cons->cdr = new_cdr;
-
-        new_cons = new_cdr_cons;
+        lispobj next = ((struct cons*)native_cdr)->cdr;
+        /* Set cdr of the predecessor, and store an FP. */
+        set_forwarding_pointer(native_cdr,
+                               copy->cdr = make_lispobj(cdr_copy,
+                                                        LIST_POINTER_LOWTAG));
+        copy = cdr_copy;
+        cdr = next;
     }
-
+    copy->cdr = cdr;
     return new_list_pointer;
 }
 
