@@ -1911,16 +1911,9 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 static lispobj
 trans_boxed_large(lispobj object)
 {
-    lispobj header;
-    uword_t length;
-
     gc_assert(is_lisp_pointer(object));
-
-    header = *((lispobj *) native_pointer(object));
-    length = HeaderValue(header) + 1;
-    length = CEILING(length, 2);
-
-    return copy_large_object(object, length);
+    return copy_large_object(object,
+                             (HeaderValue(*native_pointer(object)) | 1) + 1);
 }
 
 /*
