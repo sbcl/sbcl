@@ -591,7 +591,6 @@ pscav(lispobj *addr, long nwords, boolean constant)
 {
     lispobj thing, *thingp, header;
     long count = 0; /* (0 = dummy init value to stop GCC warning) */
-    struct vector *vector;
 
     while (nwords > 0) {
         thing = *addr;
@@ -662,118 +661,35 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 break;
 
               case SIMPLE_ARRAY_NIL_WIDETAG:
-                count = 2;
-                break;
-
               case SIMPLE_BASE_STRING_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length)+1,8)+2,2);
-                break;
-
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-            case SIMPLE_CHARACTER_STRING_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length)+1,32)+2,2);
-                break;
+              case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
-
               case SIMPLE_BIT_VECTOR_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),1)+2,2);
-                break;
-
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),2)+2,2);
-                break;
-
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),4)+2,2);
-                break;
-
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
-#endif
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),8)+2,2);
-                break;
-
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
-#endif
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),16)+2,2);
-                break;
-
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
-
-              case SIMPLE_ARRAY_FIXNUM_WIDETAG:
               case SIMPLE_ARRAY_UNSIGNED_FIXNUM_WIDETAG:
-
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
               case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
-#endif
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),32)+2,2);
-                break;
-
-#if N_WORD_BITS == 64
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+              case SIMPLE_ARRAY_FIXNUM_WIDETAG:
+              case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+              case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+              case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
               case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+              case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
 #endif
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),64)+2,2);
-                break;
-#endif
-
               case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length), 32) + 2,
-                                2);
-                break;
-
               case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
-#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
               case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
-#endif
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length), 64) + 2,
-                                2);
-                break;
-
-#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
-              case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
-                vector = (struct vector *)addr;
-#ifdef LISP_FEATURE_SPARC
-                count = fixnum_value(vector->length)*4+2;
-#endif
-                break;
-#endif
-
-#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
               case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
-                vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length), 128) + 2,
-                                2);
+                count = sizetab[widetag_of(thing)](addr);
                 break;
-#endif
-
-#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
-              case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
-                vector = (struct vector *)addr;
-#ifdef LISP_FEATURE_SPARC
-                count = fixnum_value(vector->length)*8+2;
-#endif
-                break;
-#endif
 
               case CODE_HEADER_WIDETAG:
                 gc_abort(); /* no code headers in static space */
