@@ -388,7 +388,6 @@ search_dynamic_space(void *pointer)
 void
 gc_init(void)
 {
-    gc_init_tables();
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 }
 

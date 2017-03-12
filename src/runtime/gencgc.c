@@ -4158,7 +4158,6 @@ gc_init(void)
     /* We do not need to zero */
     gc_assert(page_table_pinned_dwords);
 
-    gc_init_tables();
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
 

@@ -3828,6 +3828,7 @@ initially undefined function references:~2%")
                        (format stream "#endif~%"))))
         (out-to "config" (write-config-h stream))
         (out-to "constants" (write-constants-h stream))
+        (out-to "gc-tables" (sb!vm::write-gc-tables stream))
         #!+sb-ldb
         (out-to "tagnames" (write-tagnames-h stream))
         (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<

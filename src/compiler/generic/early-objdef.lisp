@@ -50,8 +50,8 @@
 ;;;
 ;;; If you change the tag layout, check the various functions in
 ;;; src/runtime/runtime.h to see if they need to be updated, along
-;;; with print_obj() in src/runtime/print.c, possibly gc_init_tables()
-;;; in src/runtime/gc-common-c and possibly the code in src/code/room.
+;;; with print_obj() in src/runtime/print.c, possibly 'late-objdef.lisp'
+;;; and possibly the code in src/code/room.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
