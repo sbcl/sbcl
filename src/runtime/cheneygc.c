@@ -315,7 +315,7 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
                 nwords = 1;
                 break;
             case OTHER_POINTER_LOWTAG:
-                pointer = (lispobj *) native_pointer(object);
+                pointer = native_pointer(object);
                 header = *pointer;
                 type = widetag_of(header);
                 nwords = (sizetab[type])(pointer);

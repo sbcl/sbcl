@@ -254,7 +254,7 @@ search_cmd(char **ptr)
             return;
         }
         if (more_p(ptr)) {
-            addr = (lispobj *)native_pointer((uword_t)parse_addr(ptr, 1));
+            addr = native_pointer((uword_t)parse_addr(ptr, 1));
             if (more_p(ptr)) {
                 count = parse_number(ptr);
             }

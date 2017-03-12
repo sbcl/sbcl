@@ -149,7 +149,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
     gc_assert(lowtag_of(object) == FUN_POINTER_LOWTAG);
 
     /* Object is a pointer into from_space - not a FP. */
-    first_pointer = (lispobj *) native_pointer(object);
+    first_pointer = native_pointer(object);
 
     /* must transport object -- object may point to either a function
      * header, a closure function header, or to a closure header. */
@@ -397,7 +397,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
     gc_assert(copy != object);
 #endif
 
-    first_pointer = (lispobj *) native_pointer(object);
+    first_pointer = native_pointer(object);
     set_forwarding_pointer(first_pointer,copy);
     *where = copy;
 
@@ -921,7 +921,7 @@ void scan_weak_pointers(void)
          * out. */
 
         if (from_space_p(value)) {
-            first_pointer = (lispobj *)native_pointer(value);
+            first_pointer = native_pointer(value);
 
             if (forwarding_pointer_p(first_pointer)) {
               wp->value = LOW_WORD(forwarding_pointer_value(first_pointer));
@@ -1014,11 +1014,10 @@ static int (*weak_hash_entry_alivep_fun(lispobj weakness))(lispobj,lispobj)
 static inline lispobj *
 get_array_data (lispobj array, int widetag, uword_t *length)
 {
-    if (is_lisp_pointer(array) &&
-        (widetag_of(*(lispobj *)native_pointer(array)) == widetag)) {
+    if (is_lisp_pointer(array) && widetag_of(*native_pointer(array)) == widetag) {
         if (length != NULL)
-            *length = fixnum_value(((lispobj *)native_pointer(array))[1]);
-        return ((lispobj *)native_pointer(array)) + 2;
+            *length = fixnum_value(native_pointer(array)[1]);
+        return native_pointer(array) + 2;
     } else {
         return NULL;
     }
@@ -1073,10 +1072,9 @@ scav_hash_table_entries (struct hash_table *hash_table)
 
     empty_symbol = kv_vector[1];
     /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
-    if (widetag_of(*(lispobj *)native_pointer(empty_symbol)) !=
-        SYMBOL_HEADER_WIDETAG) {
+    if (widetag_of(*native_pointer(empty_symbol)) != SYMBOL_HEADER_WIDETAG) {
         lose("not a symbol where empty-hash-table-slot symbol expected: %x\n",
-             *(lispobj *)native_pointer(empty_symbol));
+             *native_pointer(empty_symbol));
     }
 
     /* Work through the KV vector. */
@@ -1152,7 +1150,7 @@ scav_vector (lispobj *where, lispobj object)
              CEILING(sizeof(struct hash_table) / sizeof(lispobj), 2));
 
     /* Cross-check the kv_vector. */
-    if (where != (lispobj *)native_pointer(hash_table->table)) {
+    if (where != native_pointer(hash_table->table)) {
         lose("hash_table table!=this table %x\n", hash_table->table);
     }
 
@@ -1283,7 +1281,7 @@ trans_lose(lispobj object)
 {
     lose("no transport function for object %p (widetag 0x%x)\n",
          (void*)object,
-         widetag_of(*(lispobj*)native_pointer(object)));
+         widetag_of(*native_pointer(object)));
     return NIL; /* bogus return value to satisfy static type checking */
 }
 

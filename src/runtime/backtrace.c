@@ -166,7 +166,7 @@ print_entry_name (lispobj name)
         }
         putchar(')');
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
-        lispobj *object = (lispobj *) native_pointer(name);
+        lispobj *object = native_pointer(name);
         if (widetag_of(*object) == SYMBOL_HEADER_WIDETAG) {
             struct symbol *symbol = (struct symbol *) object;
             if (symbol->package != NIL) {
@@ -259,7 +259,7 @@ code_pointer(lispobj object)
     lispobj *headerp, header;
     int type, len;
 
-    headerp = (lispobj *) native_pointer(object);
+    headerp = native_pointer(object);
     header = *headerp;
     type = widetag_of(header);
 

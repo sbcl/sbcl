@@ -3081,7 +3081,7 @@ verify_space(lispobj *start, size_t words)
                     >= page_table[page_index].bytes_used)
                     lose ("Ptr %p @ %p sees unallocated space.\n", thing, start);
                 /* Check that it doesn't point to a forwarding pointer! */
-                if (*((lispobj *)native_pointer(thing)) == 0x01) {
+                if (*native_pointer(thing) == 0x01) {
                     lose("Ptr %p @ %p sees forwarding ptr.\n", thing, start);
                 }
                 /* Check that its not in the RO space as it would then be a

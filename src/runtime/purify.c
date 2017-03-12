@@ -154,7 +154,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     nwords = CEILING(1 + HeaderValue(header), 2);
 
     /* Allocate it */
-    old = (lispobj *)native_pointer(thing);
+    old = native_pointer(thing);
     new = newspace_alloc(nwords,constant);
 
     /* Copy it. */
@@ -201,7 +201,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     nwords = CEILING(1 + HeaderValue(header), 2);
 
     /* Allocate it */
-    old = (lispobj *)native_pointer(thing);
+    old = native_pointer(thing);
     new = newspace_alloc(nwords, 0);    /* inconstant */
 
     /* Copy it. */
@@ -230,7 +230,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
     nwords = CEILING(1 + HeaderValue(header), 2);
 
     /* Allocate it */
-    old = (lispobj *)native_pointer(thing);
+    old = native_pointer(thing);
     new = newspace_alloc(nwords,1);     /* always constant */
 
     /* copy it. */
@@ -351,7 +351,7 @@ ptrans_func(lispobj thing, lispobj header)
     else {
         /* It's some kind of closure-like thing. */
         nwords = CEILING(1 + HeaderValue(header), 2);
-        old = (lispobj *)native_pointer(thing);
+        old = native_pointer(thing);
 
         /* Allocate the new one.  FINs *must* not go in read_only
          * space.  Closures can; they never change */
@@ -382,7 +382,7 @@ ptrans_returnpc(lispobj thing, lispobj header)
     code = thing - HeaderValue(header)*sizeof(lispobj);
 
     /* Make sure it's been transported. */
-    new = *(lispobj *)native_pointer(code);
+    new = *native_pointer(code);
     if (!forwarding_pointer_p(new))
         new = ptrans_code(code);
 
@@ -417,7 +417,7 @@ ptrans_list(lispobj thing, boolean constant)
         length++;
     } while (lowtag_of(thing) == LIST_POINTER_LOWTAG &&
              dynamic_pointer_p(thing) &&
-             !(forwarding_pointer_p(*(lispobj *)native_pointer(thing))));
+             !(forwarding_pointer_p(*native_pointer(thing))));
 
     /* Scavenge the list we just copied. */
     pscav((lispobj *)orig, length * WORDS_PER_CONS, constant);
@@ -599,7 +599,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
             /* It's a pointer. Is it something we might have to move? */
             if (dynamic_pointer_p(thing)) {
                 /* Maybe. Have we already moved it? */
-                thingp = (lispobj *)native_pointer(thing);
+                thingp = native_pointer(thing);
                 header = *thingp;
                 if (is_lisp_pointer(header) && forwarding_pointer_p(header))
                     /* Yep, so just copy the forwarding pointer. */

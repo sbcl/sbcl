@@ -30,7 +30,7 @@ from_space_p(lispobj object)
        descriptors, so this assertion's not applicable
        gc_assert(is_lisp_pointer(object));
     */
-    ptr = (lispobj *) native_pointer(object);
+    ptr = native_pointer(object);
 
     return ((from_space <= ptr) &&
             (ptr < from_space_free_pointer));
@@ -43,7 +43,7 @@ new_space_p(lispobj object)
 
     /*    gc_assert(is_lisp_pointer(object)); */
 
-    ptr = (lispobj *) native_pointer(object);
+    ptr = native_pointer(object);
 
     return ((new_space <= ptr) &&
             (ptr < new_space_free_pointer));

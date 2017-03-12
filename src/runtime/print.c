@@ -537,7 +537,7 @@ static void brief_otherptr(lispobj obj)
     int type;
     struct symbol *symbol;
 
-    ptr = (lispobj *) native_pointer(obj);
+    ptr = native_pointer(obj);
 
     if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
             printf("(invalid address)");
@@ -655,7 +655,7 @@ static void print_otherptr(lispobj obj)
         int count, type, index;
         char buffer[16];
 
-        ptr = (lispobj*) native_pointer(obj);
+        ptr = native_pointer(obj);
         if (ptr == NULL) {
                 printf(" (NULL Pointer)");
                 return;
