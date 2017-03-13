@@ -108,6 +108,17 @@
 (compile-load "test-data-3")
 (test-2)
 
+;;; Another file, with some branches
+(compile-load "test-data-branching-forms")
+
+(test-branching-forms)
+(report)
+
+;; Complete expression coverage
+(assert (= 13
+           (sb-cover::ok-of (getf sb-cover::*counts* :expression))
+           (sb-cover::all-of (getf sb-cover::*counts* :expression))))
+
 ;; Clean up after the tests
 (map nil #'delete-file
      (directory (merge-pathnames #p"*.html" *output-directory*)))

@@ -66,12 +66,14 @@
 
 ;;;; various conditional constructs
 
-(flet ((prognify (forms)
-         (cond ((singleton-p forms) (car forms))
-               ((not forms) nil)
+(flet ((prognify (forms env)
+         (cond ((not forms) nil)
+               ((and (singleton-p forms)
+                     (sb!c:policy env (= sb!c:store-coverage-data 0)))
+                (car forms))
                (t `(progn ,@forms)))))
   ;; COND defined in terms of IF
-  (sb!xc:defmacro cond (&rest clauses)
+  (sb!xc:defmacro cond (&rest clauses &environment env)
     (named-let make-clauses ((clauses clauses))
       (if (endp clauses)
           nil
@@ -92,20 +94,20 @@
                                  (not more))
                             ;; THE to preserve non-toplevelness for FOO in
                             ;;   (COND (T (FOO)))
-                            `(the t ,(prognify forms))
+                            `(the t ,(prognify forms env))
                             `(if ,test
-                                 ,(prognify forms)
+                                 ,(prognify forms env)
                                  ,(when more (make-clauses more))))))))))))
 
-  (sb!xc:defmacro when (test &body forms)
+  (sb!xc:defmacro when (test &body forms &environment env)
   "If the first argument is true, the rest of the forms are
 evaluated as a PROGN."
-  `(if ,test ,(prognify forms)))
+  `(if ,test ,(prognify forms env)))
 
-  (sb!xc:defmacro unless (test &body forms)
+  (sb!xc:defmacro unless (test &body forms &environment env)
   "If the first argument is not true, the rest of the forms are
 evaluated as a PROGN."
-  `(if ,test nil ,(prognify forms))))
+  `(if ,test nil ,(prognify forms env))))
 
 (sb!xc:defmacro and (&rest forms)
   (named-let expand-forms ((nested nil) (forms forms))
