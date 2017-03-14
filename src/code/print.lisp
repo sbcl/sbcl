@@ -1659,9 +1659,12 @@ variable: an unreadable object representing the error is printed instead.")
   (let* ((name (%fun-name object))
          (proper-name-p (and (legal-fun-name-p name) (fboundp name)
                              (eq (fdefinition name) object))))
+    ;; ":TYPE T" is no good, since CLOSURE doesn't have full-fledged status.
     (print-unreadable-object (object stream :identity (not proper-name-p))
-      (format stream "~:[FUNCTION~;CLOSURE~]~@[ ~S~]"
-              (closurep object)
+      (format stream "~A~@[ ~S~]"
+              ;; TYPE-OF is so that GFs print as #<STANDARD-GENERIC-FUNCTION>
+              ;; and not #<FUNCTION> before SRC;PCL;PRINT-OBJECT is loaded.
+              (if (closurep object) 'closure (type-of object))
               name))))
 
 ;;;; catch-all for unknown things
