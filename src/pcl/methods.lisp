@@ -1561,7 +1561,7 @@
 (let (initial-print-object-cache)
   (defun standard-compute-discriminating-function (gf)
     (let ((dfun-state (slot-value gf 'dfun-state)))
-          (when (special-case-for-compute-discriminating-function-p gf)
+      (when (special-case-for-compute-discriminating-function-p gf)
             ;; if we have a special case for
             ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
             ;; special cases implemented as of 2006-05-09) any information
@@ -1569,16 +1569,16 @@
             (aver (null dfun-state)))
           (typecase dfun-state
             (null
-             (when (eq gf #'compute-applicable-methods)
+             (when (eq gf (load-time-value #'compute-applicable-methods t))
                (update-all-c-a-m-gf-info gf))
              (cond
-               ((eq gf #'slot-value-using-class)
+               ((eq gf (load-time-value #'slot-value-using-class t))
                 (update-slot-value-gf-info gf 'reader)
                 #'slot-value-using-class-dfun)
-               ((eq gf #'(setf slot-value-using-class))
+               ((eq gf (load-time-value #'(setf slot-value-using-class) t))
                 (update-slot-value-gf-info gf 'writer)
                 #'setf-slot-value-using-class-dfun)
-               ((eq gf #'slot-boundp-using-class)
+               ((eq gf (load-time-value #'slot-boundp-using-class t))
                 (update-slot-value-gf-info gf 'boundp)
                 #'slot-boundp-using-class-dfun)
                ;; KLUDGE: PRINT-OBJECT is not a special-case in the sense
@@ -1586,12 +1586,8 @@
                ;; However, it is important that the machinery for printing
                ;; conditions for stack and heap exhaustion, and the
                ;; restarts offered by the debugger, work without consuming
-               ;; many extra resources.  This way (testing by name of GF
-               ;; rather than by identity) was the only way I found to get
-               ;; this to bootstrap, given that the PRINT-OBJECT generic
-               ;; function is only set up later, in
-               ;; SRC;PCL;PRINT-OBJECT.LISP.  -- CSR, 2008-06-09
-               ((eq (slot-value gf 'name) 'print-object)
+               ;; many extra resources.  -- CSR, 2008-06-09
+               ((eq gf (locally (declare (optimize (safety 0))) #'print-object))
                 (let ((nkeys (nth-value 3 (get-generic-fun-info gf))))
                   (cond ((/= nkeys 1)
                          ;; KLUDGE: someone has defined a method
