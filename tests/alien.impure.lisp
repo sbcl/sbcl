@@ -508,3 +508,9 @@
                         alien)))
                   31)
                  31))))
+
+(with-test (:name :memoize-coerce-to-interpreted-fun)
+  (let* ((form1 '(lambda (x) x))
+         (form2 (copy-tree form1)))
+    (assert (eq (sb-alien::coerce-to-interpreted-function form1)
+                (sb-alien::coerce-to-interpreted-function form2)))))

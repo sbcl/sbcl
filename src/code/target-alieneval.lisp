@@ -658,8 +658,22 @@ null byte."
 
 ;;;; NATURALIZE, DEPORT, EXTRACT-ALIEN-VALUE, DEPOSIT-ALIEN-VALUE
 
-(defun coerce-to-interpreted-function (lambda-form)
-  (let (#!+sb-eval
+;;; There is little cost to making an interpreted function,
+;;; however it is even better if we can share the function object,
+;;; especially with sb-fasteval which avoids work on repeated invocations.
+;;; sb-eval doesn't optimize its IR in the same way,
+;;; but this is still a boon from a memory consumption stance.
+;;;
+;;; GLOBALDB-SXHASHOID serves as a nice hash function for this purpose anyway.
+;;; Arguably we could key the cache off the internalized alien-type object
+;;; which induced creation of an interpreted lambda, rather than the s-expr,
+;;; but we'd need to get the TYPE and the method {NATURALIZE, DEPORT, etc} here,
+;;; so it would be a more invasive change.
+;;;
+(defun-cached (coerce-to-interpreted-function
+               :hash-bits 8 :hash-function #'sb!c::globaldb-sxhashoid)
+    ((lambda-form equal))
+  (let (#!+(or sb-eval sb-fasteval)
         (*evaluator-mode* :interpret))
     (coerce lambda-form 'function)))
 
