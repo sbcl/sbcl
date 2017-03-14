@@ -266,3 +266,22 @@
     ;; ensure that the lambda environment could not be handled by the interpreter
     (assert (eql (second answer) t))
     (assert (eql (third answer) 3))))
+
+(test-util:with-test (:name :exited-block)
+  (handler-case (funcall (let ((x 1)) (block b (lambda () (return-from b)))))
+    (condition (c)
+      (assert (and (typep c 'sb-int:simple-control-error)
+                   (search "exited block" (simple-condition-format-control c)))))
+    (:no-error (&rest whatever) (error "Expected an error"))))
+
+(test-util:with-test (:name :exited-tagbody)
+  (handler-case (funcall
+                 (block zot
+                   (tagbody
+                    (return-from zot (let ((x 1)) (lambda () (go foo))))
+                    foo)))
+     (condition (c)
+       (assert (and (typep c 'sb-int:simple-control-error)
+                    (search "exited tagbody"
+                            (simple-condition-format-control c)))))
+     (:no-error (&rest whatever) (error "Expected an error"))))
