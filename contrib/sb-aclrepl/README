@@ -22,7 +22,7 @@ EXAMPLE ~/.sbclrc FILE
 #+aclrepl
 (progn
   (setq sb-aclrepl:*max-history* 100)
-  (setf (sb-aclrepl:alias "asdc") 
+  (setf (sb-aclrepl:alias "asdc")
        #'(lambda (sys) (asdf:operate 'asdf:compile-op sys)))
   (sb-aclrepl:alias "l" (sys) (asdf:operate 'asdf:load-op sys))
   (sb-aclrepl:alias "t" (sys) (asdf:operate 'asdf:test-op sys))

@@ -31,7 +31,7 @@
 ;;; Keep this (mostly) lined up with 'early-objdef' for sanity's sake!
 #+sb-xc-host
 (defparameter *scav/trans/size*
-  `((bignum "unboxed" )
+  `((bignum "unboxed")
     (ratio "boxed")
     (single-float ,(or #!+64-bit "immediate" "unboxed"))
     (double-float "unboxed")

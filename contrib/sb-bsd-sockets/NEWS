@@ -26,7 +26,7 @@ Fixed bug in af_file support.
 Changes in 0.53 - Thu Jan 31 2002
 
 By popular request (two people, at last count) this works in CMUCL again.
-Also, some documentation updates, a really silly bug in make-instance 
+Also, some documentation updates, a really silly bug in make-instance
 fixed, and support for the TCP_NODELAY socket option
 
 Changes in 0.52 - Tue Jan 8 2002
@@ -38,7 +38,7 @@ confused to see version numbers go backwards.
 Changes in 0.5.1 - Mon Jan 7 2002
 
 Support for AF_FILE (formerly known as Unix-domain) sockets; both
-stream and datagram.  
+stream and datagram.
 
 MAKE-INET-SOCKET has been deprecated (but is still there).  New code is
 encouraged to write (make-instance 'inet-socket ...) instead
@@ -82,11 +82,11 @@ Now works (passes tests) in
 - Debian x86 GNU/Linux (Debian CMUCL 2.4.19)
 - Debian x86 GNU/Linux (SBCL 0.6.5)
 
-Some CMUCL-on-FreeBSD changes (mostly involve commenting stuff out).  Doesn't 
+Some CMUCL-on-FreeBSD changes (mostly involve commenting stuff out).  Doesn't
 work, though (but might in SBCL/FreeBSD)
 
-The Solaris changes comprised disabling bits and fixing an 
-endianness problem. 
+The Solaris changes comprised disabling bits and fixing an
+endianness problem.
 
 
 Changes in 0.37 -  Sat May 20 2000
@@ -98,7 +98,7 @@ Changes in 0.36 -  Thu May 11 2000
 
 Some documentation cleanups
 
-New functions NON-BLOCKING-MODE and (SETF NON-BLOCKING-MODE) 
+New functions NON-BLOCKING-MODE and (SETF NON-BLOCKING-MODE)
 
 EINTR now generates a INTERRUPTED-ERROR condition
 
@@ -113,7 +113,7 @@ A bad bug in the CMUCL code (which caused the EXTENSIONS package to
 disappear - oops...) was found and fixed
 
 
-Changes in 0.3  -  Apr 17 2000 
+Changes in 0.3  -  Apr 17 2000
 
 Now works with SBCL (0.6.1, 0.6.2) in addition to CMUCL.
 

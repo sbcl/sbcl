@@ -5,7 +5,7 @@ I probably have opinions about how to do most of these.  Even if not,
 I almost certainly have opinions on how not to.  Send me a proposal
 before spending serious amounts of time on it.
 
-- the rest of the functions.  A socket-send that doesn't use streams 
+- the rest of the functions.  A socket-send that doesn't use streams
 would be a good one
 
 - the rest of the errors

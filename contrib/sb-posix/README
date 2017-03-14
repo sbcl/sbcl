@@ -74,24 +74,24 @@ streams can be passed to these functions.
 
 ** file-descriptor
 
-A file-descriptor is a non-negative small integer.  
+A file-descriptor is a non-negative small integer.
 
 A file-stream is a designator for a file-descriptor: the streams file
-descriptor is extracted.  Note that mixing io operations on a stream 
+descriptor is extracted.  Note that mixing io operations on a stream
 with operations directly on its descriptor may produce unexpected
 results if the stream is buffered.
 
 ** filename
 
-A filename is a string.  
+A filename is a string.
 
 A pathname is a designator for a filename: the filename is computed
 using the same mechanism as the implementation would use to map
 pathnames to OS filenames internally.
 
-In an implementation that supports pathnames to files on other hosts, 
-using mechanisms not available to the underlying OS (for example, 
-using an FTP or HTTP client in the Lisp implementation), the effect 
+In an implementation that supports pathnames to files on other hosts,
+using mechanisms not available to the underlying OS (for example,
+using an FTP or HTTP client in the Lisp implementation), the effect
 of supplying this interface with a pathname to such a file is undefined.
 
 
@@ -114,7 +114,7 @@ A vector of CHARACTER is a designator for a buffer: it is converted to
 a buffer of appropriate start and length using an implementation-
 defined transformation that obviously depends on the implementation's
 representation of characters.  This may or may not involve creating a
-copy of the data.  
+copy of the data.
 
 Implementations may optionally extend these designators to include
 other types - for example, types that already exist in the
@@ -151,8 +151,8 @@ converts any valid designator for the type into an object of said type.
 This example is merely an example: actual output will vary between
 systems, implementations and environments
 
-(with-open-file (o "/tmp/foo" :direction :output) 
-  (sb-posix:file-descriptor o)) 
+(with-open-file (o "/tmp/foo" :direction :output)
+  (sb-posix:file-descriptor o))
 => 4
 
 [ TBD: some memorable and nicely uniform protocol for transforming
@@ -166,7 +166,7 @@ The calling convention is modelled after that of CMUCL's UNIX package:
 in particular, it's like the C interface except that
 
 a) length arguments are omitted or optional where the sensible value
-is obvious.  For example, 
+is obvious.  For example,
 
 (read fd buffer &optional (length (length buffer))) => bytes-read
 
