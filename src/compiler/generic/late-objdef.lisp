@@ -132,7 +132,8 @@
              (loop for i from 0 for x across contents
                    when (zerop (mod i 4))
                    do (format stream "~%  ")
-                   do (format stream "~31@<~A~A~:[~;,~]~>"
+                   do (format stream "~V@<~A~A~:[~;,~]~>"
+                              (if (= (mod i 4) 3) 0 31)
                               prefix (or x "lose") (< i 256)))
              (format stream "~%};~%")))
       (write-table "sword_t (*scavtab[256])(lispobj *where, lispobj object)"
