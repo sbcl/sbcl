@@ -3817,6 +3817,19 @@ initially undefined function references:~2%")
         (ensure-directories-exist filename)
         (with-open-file (stream filename :direction :output :if-exists :supersede)
           (write-makefile-features stream)))
+
+      ;; This ".inc" file explicitly does NOT get an inclusion guard.
+      ;; It may not be the best approach, but it's a heck of a lot better
+      ;; than what was done before.
+      (with-open-file (stream (format nil "~A/specialized-vectors.inc" c-header-dir-name)
+                              :direction :output :if-exists :supersede)
+        (write-boilerplate stream)
+        (dovector (x (sort (copy-seq sb!vm:*specialized-array-element-type-properties*)
+                           #'< :key #'sb!vm:saetp-typecode))
+          (let ((type (sb!vm::saetp-primitive-type-name x)))
+            (unless (eq type 'simple-vector)
+              (format stream " case ~A_WIDETAG:~%" (c-name (string type)))))))
+
       (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
                    `(with-open-file (stream (format nil "~A/~A.h" c-header-dir-name ,name)
                                             :direction :output :if-exists :supersede)
