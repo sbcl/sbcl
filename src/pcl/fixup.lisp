@@ -24,7 +24,40 @@
 (in-package "SB-PCL")
 
 (!fix-early-generic-functions)
-(!fix-ensure-accessor-specializers)
+
+(fmakunbound 'ensure-accessor)
+(defun ensure-accessor (fun-name) ; Make FUN-NAME exist as a GF if it doesn't
+  (destructuring-bind (slot-name method) (cddr fun-name)
+    ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
+    ;; behaviour for non-slot-objects too?
+    (let ((reader-specializers (load-time-value (list (find-class 'slot-object)) t))
+          (writer-specializers (load-time-value (list (find-class 't)
+                                                      (find-class 'slot-object)) t)))
+      (multiple-value-bind (lambda-list specializers method-class initargs doc)
+          (ecase method
+            (reader
+             (values '(object) reader-specializers 'global-reader-method
+                     (make-std-reader-method-function 'slot-object slot-name)
+                     "automatically-generated reader method"))
+            (writer
+             (values '(new-value object) writer-specializers
+                     'global-writer-method
+                     (make-std-writer-method-function 'slot-object slot-name)
+                     "automatically-generated writer method"))
+            (boundp
+             (values '(object) reader-specializers 'global-boundp-method
+                     (make-std-boundp-method-function 'slot-object slot-name)
+                     "automatically-generated boundp method")))
+        (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
+          (add-method gf (make-a-method method-class
+                                        () lambda-list specializers
+                                        initargs doc :slot-name slot-name)))))))
+
+(dolist (gf-name *!temporary-ensure-accessor-functions*)
+  ; (format t "~&Genericizing ~S~%" gf-name)
+  (fmakunbound gf-name)
+  (ensure-accessor gf-name))
+
 (compute-standard-slot-locations)
 (dolist (s '(condition function structure-object))
   (dohash ((k v) (classoid-subclasses (find-classoid s)))

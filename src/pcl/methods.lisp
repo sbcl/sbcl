@@ -396,13 +396,18 @@
 (defmethod initialize-instance :after ((gf standard-generic-function)
                                        &key (lambda-list nil lambda-list-p)
                                        argument-precedence-order)
-  (with-slots (arg-info) gf
+  ;; FIXME: Because ARG-INFO is a STRUCTURE-OBJECT, it does not get
+  ;; a permutation vector, and therefore the code that SLOT-VALUE transforms
+  ;; to winds up punting to #'(SLOT-ACCESSOR :GLOBAL ARG-INFO READER).
+  ;; Using SLOT-VALUE the "slow" way sidesteps some bootstrap issues.
+  (declare (notinline slot-value))
+  (progn ; WAS: with-slots (arg-info) gf
     (if lambda-list-p
         (set-arg-info gf
                       :lambda-list lambda-list
                       :argument-precedence-order argument-precedence-order)
         (set-arg-info gf))
-    (when (arg-info-valid-p arg-info)
+    (when (arg-info-valid-p (slot-value gf 'arg-info))
       (update-dfun gf))))
 
 (defmethod reinitialize-instance :around
@@ -1560,6 +1565,7 @@
 ;;; function of a standard-generic-function
 (let (initial-print-object-cache)
   (defun standard-compute-discriminating-function (gf)
+    (declare (notinline slot-value))
     (let ((dfun-state (slot-value gf 'dfun-state)))
       (when (special-case-for-compute-discriminating-function-p gf)
             ;; if we have a special case for

@@ -1203,7 +1203,7 @@ Test case.
 
   (let ((n-args 0)
         (fun (if (typep fname '(cons (eql sb-pcl::slot-accessor)))
-                 (sb-pcl::ensure-accessor fname) ; FIXME: forward ref
+                 (funcall 'sb-pcl::ensure-accessor fname)
                  (fdefinition fname))))
     (multiple-value-setq (args n-args) (arglist-to-sexprs args))
 
