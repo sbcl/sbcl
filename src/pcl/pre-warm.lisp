@@ -51,7 +51,7 @@
 ;;; confused.
 #-sb-xc-host ; host doesn't need
 (!defstruct-with-alternate-metaclass %method-function
-  :slot-names (fast-function name)
+  :slot-names (fast-function)
   :boa-constructor %make-method-function
   :superclass-name function
   :metaclass-name static-classoid

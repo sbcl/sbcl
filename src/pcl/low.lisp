@@ -124,7 +124,7 @@
   (when (valid-function-name-p fun)
     (setq fun (fdefinition fun)))
   (typecase fun
-    (%method-function (setf (%method-function-name fun) new-name))
+    (%method-function fun)
     ;; a closure potentially becomes a different closure
     (closure (setq fun (sb!impl::set-closure-name fun new-name)))
     (t (setf (%fun-name fun) new-name)))

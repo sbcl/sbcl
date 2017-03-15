@@ -767,7 +767,7 @@
                                 ,@(cdddr lmf-params))
                             ,@inner-decls
                             ,@body-sans-decls))))
-                 (mf (%make-method-function fmf nil)))
+                 (mf (%make-method-function fmf)))
             (set-funcallable-instance-function
              mf (method-function-from-fast-function fmf ',(getf initargs 'plist)))
             mf)

@@ -179,7 +179,7 @@
               'standard-method gf-name
               (if qualifier (list qualifier)) specializers lambda-list
               `(:function
-                ,(let ((mf (%make-method-function fmf nil)))
+                ,(let ((mf (%make-method-function fmf)))
                    (sb-mop:set-funcallable-instance-function
                     mf (method-function-from-fast-function fmf arg-info))
                    mf)

@@ -157,7 +157,7 @@
                                  (fast-method-call
                                   (let* ((fmf (fast-method-call-function emf))
                                          (fun (method-function-from-fast-method-call emf))
-                                         (mf (%make-method-function fmf nil)))
+                                         (mf (%make-method-function fmf)))
                                     (set-funcallable-instance-function mf fun)
                                     (make-instance 'standard-method
                                                    :specializers nil ; XXX
