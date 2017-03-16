@@ -1813,7 +1813,7 @@ static void
 pair_interior_pointer(os_context_t *context, uword_t pointer,
                       uword_t *saved_offset, int *register_pair)
 {
-    int i;
+    unsigned int i;
 
     /*
      * I (RLT) think this is trying to find the boxed register that is
@@ -1826,7 +1826,7 @@ pair_interior_pointer(os_context_t *context, uword_t pointer,
     *register_pair = -1;
     for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
         uword_t reg;
-        sword_t offset;
+        uword_t offset;
         int index;
 
         index = boxed_registers[i];
@@ -1858,7 +1858,7 @@ pair_interior_pointer(os_context_t *context, uword_t pointer,
 static void
 scavenge_interrupt_context(os_context_t * context)
 {
-    int i;
+    unsigned int i;
 
     /* FIXME: The various #ifdef noise here is precisely that: noise.
      * Is it possible to fold it into the macrology so that we have
