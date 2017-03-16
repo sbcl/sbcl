@@ -252,12 +252,8 @@
                                    ;; its own way of making closures, which requires
                                    ;; that the length be a compile-time constant.
                                    :alloc-trans %copy-closure)
-  ;; %CLOSURE-FUN should never be invoked on x86[-64].
-  ;; The above remark at %SIMPLE-FUN-SELF is relevant in its sentiment,
-  ;; but actually no longer true - the confusing situation is not caught
-  ;; until too late. But at least this one was nonfatal.
-  #!-(or x86 x86-64) (fun :init :arg :ref-trans %closure-fun)
-  #!+(or x86 x86-64) (fun :init :arg)
+  (fun :init :arg :ref-trans #!+(or x86 x86-64) %closure-callee
+                             #!-(or x86 x86-64) %closure-fun)
   (info :rest-p t))
 
 (!define-primitive-object (funcallable-instance

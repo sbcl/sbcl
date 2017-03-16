@@ -71,6 +71,7 @@
 (deftype closure ()
   '(satisfies closurep))
 
+;;; FIXME: this should probably exclude the closure name slot, if named
 (defmacro do-closure-values ((value closure) &body body)
   (with-unique-names (i nclosure)
     `(let ((,nclosure ,closure))

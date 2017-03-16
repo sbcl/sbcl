@@ -44,6 +44,7 @@
     ;; debugging a GC problem caused by applying %SIMPLE-FUN-ARGLIST to
     ;; a closure. -- WHN 2001-06-05)
     (t
+     ;; FIXME: what about #+sb-fasteval ?
      #+sb-eval
      (if (typep fun 'sb-eval::interpreted-function)
          (sb-eval::interpreted-function-lambda-list fun)

@@ -466,8 +466,9 @@
   ())
 (defknown %simple-fun-type (function) t (flushable))
 
-(defknown %closure-fun (function) function
-  (flushable))
+#!+(or x86 x86-64)
+(defknown sb!vm::%closure-callee (function) fixnum (flushable))
+(defknown %closure-fun (function) function (flushable))
 
 (defknown %closure-index-ref (function index) t
   (flushable))

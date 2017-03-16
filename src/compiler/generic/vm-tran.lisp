@@ -24,6 +24,15 @@
           #!+sb-fasteval (not (sb!interpreter:interpreted-function-p ,x))
           #!+sb-eval (not (sb!eval:interpreted-function-p ,x)))))
 
+;;; Make sure we have %CLOSURE-CALLEE and %CLOSURE-FUN regardless
+;;; of platform. "CALLEE" is whatever is in the 'fun' slot.
+#!+(or x86 x86-64)
+(define-source-transform %closure-fun (closure)
+  `(%simple-fun-self ,closure))
+#!-(or x86 x86-64)
+(define-source-transform sb!vm::%closure-callee (closure)
+  `(%closure-fun ,closure))
+
 (define-source-transform char-int (x)
   `(char-code ,x))
 

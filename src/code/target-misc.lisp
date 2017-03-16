@@ -84,16 +84,11 @@
            ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
            ;; the fact that we actually want to create 1 additional slot.
            ;; So in effect, asking for N-WORDS does exactly the right thing.
-           (copy
-            (sb!vm::%copy-closure n-words
-                                  #!+(or x86 x86-64)
-                                  ;; FIXME: %CLOSURE-FUN should do what it says,
-                                  ;; no more, no less - read the damn slot.
-                                  (with-pinned-objects (closure) ; Pedantic. It's pinned anyway.
-                                    (sap-ref-lispobj (int-sap (get-lisp-obj-address closure))
-                                                     (- sb!vm:n-word-bytes sb!vm:fun-pointer-lowtag)))
-                                  #!-(or x86 x86-64)
-                                  (%closure-fun closure))))
+           (copy (with-pinned-objects ((%closure-fun closure))
+                   ;; If %CLOSURE-CALLEE manifests as a fixnum, it remains
+                   ;; valid across GC due to %CLOSURE-FUN being pinned
+                   ;; until after the new closure is made.
+                   (sb!vm::%copy-closure n-words (sb!vm::%closure-callee closure)))))
       (with-pinned-objects (copy)
         (loop with sap = (int-sap (get-lisp-obj-address copy))
               for i from 0 below (1- n-words)

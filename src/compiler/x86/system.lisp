@@ -210,12 +210,6 @@
                    :disp (- fun-pointer-lowtag
                             (* simple-fun-code-offset n-word-bytes))))))
 
-;;; The closure function slot is a pointer to raw code on X86 instead
-;;; of a pointer to the code function object itself. This VOP is used
-;;; to reference the function object given the closure object.
-(define-source-transform %closure-fun (closure)
-  `(%simple-fun-self ,closure))
-
 (define-vop (%set-fun-self)
   (:policy :fast-safe)
   (:translate (setf %simple-fun-self))
