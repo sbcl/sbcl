@@ -43,6 +43,7 @@
 
 ;;; FIXME: Whether COERCE actually knows how to make a float out of a
 ;;; long is another question. This stuff still needs testing.
+(define-alien-type os-context-register-t unsigned-long-long)
 (define-alien-routine ("os_context_fpregister_addr" context-float-register-addr)
     (* os-context-register-t)
   (context (* os-context-t) :in)
