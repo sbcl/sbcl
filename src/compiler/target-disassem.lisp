@@ -260,24 +260,14 @@
 
 ;;;; function ops
 
-(defun fun-self (fun) ; FIXME: remove
-  (declare (type compiled-function fun))
-  (%fun-fun fun))
-
-(defun fun-code (fun)
-  (declare (type compiled-function fun))
-  (fun-code-header (fun-self fun)))
-
-(defun fun-address (fun)
-  (declare (type compiled-function fun))
-  (- (get-lisp-obj-address (%fun-fun fun)) sb!vm:fun-pointer-lowtag))
-
 ;;; the offset of FUNCTION from the start of its code-component's
 ;;; instruction area
-(defun fun-insts-offset (function)
+(defun fun-insts-offset (function) ; FUNCTION *must* be pinned
   (declare (type compiled-function function))
-  (- (fun-address function)
-     (sap-int (code-instructions (fun-code function)))))
+  (let ((simple-fun (%fun-fun function)))
+    (- (get-lisp-obj-address simple-fun)
+       sb!vm:fun-pointer-lowtag
+       (sap-int (code-instructions (fun-code-header simple-fun))))))
 
 ;;; the offset of FUNCTION from the start of its code-component
 (defun fun-offset (function)
@@ -286,11 +276,6 @@
 
 ;;;; operations on code-components (which hold the instructions for
 ;;;; one or more functions)
-
-;;; Return the length of the instruction area in CODE-COMPONENT.
-(defun code-inst-area-length (code-component)
-  (declare (type code-component code-component))
-  (%code-code-size code-component))
 
 (defun segment-offs-to-code-offs (offset segment)
   (without-gcing
@@ -1138,7 +1123,7 @@
 ;;; just for fun
 (defun print-fun-headers (function)
   (declare (type compiled-function function))
-  (let* ((self (fun-self function))
+  (let* ((self (%fun-fun function))
          (code (fun-code-header self)))
     (format t "Code-header ~S: size: ~S~%" code (%code-code-size code))
     (loop for i below (code-n-entries code)
@@ -1405,8 +1390,8 @@
 ;;; instructions for FUNCTION.
 (defun get-fun-segments (function)
   (declare (type compiled-function function))
-  (let* ((function (fun-self function))
-         (code (fun-code function))
+  (let* ((function (%fun-fun function))
+         (code (fun-code-header function))
          (fun-map (code-fun-map code))
          (fname (%simple-fun-name function))
          (sfcache (make-source-form-cache)))
@@ -1454,12 +1439,12 @@
                           (setf nil-block-seen-p t))))
                  (setf last-debug-fun
                        (sb!di::make-compiled-debug-fun fmap-entry code)))))))
-        (let ((max-offset (code-inst-area-length code)))
+        (let ((max-offset (%code-code-size code)))
           (when (and first-block-seen-p last-debug-fun)
             (add-seg last-offset
                      (- max-offset last-offset)
                      last-debug-fun))
-          (if (null segments)
+          (if (null segments) ; FIXME: when does this happen? Comment PLEASE
               (let ((offs (fun-insts-offset function)))
                 (list
                  (make-code-segment code offs (- max-offset offs))))
@@ -1472,7 +1457,7 @@
 (defun get-code-segments (code
                           &optional
                           (start-offset 0)
-                          (length (code-inst-area-length code)))
+                          (length (%code-code-size code)))
   (declare (type code-component code)
            (type offset start-offset)
            (type disassem-length length))
@@ -1510,7 +1495,7 @@
                                                          code))))))
             (when last-debug-fun
               (add-seg last-offset
-                       (- (code-inst-area-length code) last-offset)
+                       (- (%code-code-size code) last-offset)
                        last-debug-fun))))))
     (if (null segments)
         (list (make-code-segment code start-offset length))
@@ -1671,7 +1656,7 @@
                         (sap-int
                          (code-instructions code-component)))))
                 (when (or (< code-offs 0)
-                          (> code-offs (code-inst-area-length code-component)))
+                          (> code-offs (%code-code-size code-component)))
                   (error "address ~X not in the code component ~S"
                          address code-component))
                 (get-code-segments code-component code-offs length))
@@ -1691,7 +1676,7 @@
            (type (member t nil) use-labels))
   (let* ((code-component
           (if (functionp code-component)
-              (fun-code code-component)
+              (fun-code-header code-component)
               code-component))
          (dstate (make-dstate))
          (segments (get-code-segments code-component)))
