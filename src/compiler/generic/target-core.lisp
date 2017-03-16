@@ -66,6 +66,15 @@
           (aver (eql (ldb (byte 32 24) header-data) 0))
           (set-header-data code (dpb newval (byte 32 24) header-data)))))
   (let ((fun (%primitive sb!c:compute-fun code offset)))
+    ;; x86 backends store the address of the entrypoint in 'self'
+    #!+(or x86 x86-64)
+    (with-pinned-objects (fun)
+      (setf (%simple-fun-self fun)
+            (%make-lisp-obj (+ (get-lisp-obj-address fun)
+                               (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
+                               (- sb!vm:fun-pointer-lowtag)))))
+    ;; non-x86 backends store the function itself (what else?) in 'self'
+    #!-(or x86 x86-64)
     (setf (%simple-fun-self fun) fun)
     fun))
 

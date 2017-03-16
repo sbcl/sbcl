@@ -460,8 +460,6 @@
 #!+(or x86 x86-64) ; Other backends should *NEVER* call this.
 (defknown %simple-fun-self (function) function
   (flushable))
-(defknown (setf %simple-fun-self) (function function) function
-  ())
 (defknown %simple-fun-type (function) t (flushable))
 
 #!+(or x86 x86-64)

@@ -2015,8 +2015,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SIMPLE-FUN-DOC"
                "%SIMPLE-FUN-INFO"
                "%SIMPLE-FUN-NAME"
-               "%SIMPLE-FUN-NEXT"
-               "%SIMPLE-FUN-SELF"
+               "%SIMPLE-FUN-NEXT" ; FIXME: remove
+               "%SIMPLE-FUN-SELF" ; FIXME: don't export
                "%SIMPLE-FUN-TYPE"
                "%SIMPLE-FUN-XREFS"
 

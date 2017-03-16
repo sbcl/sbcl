@@ -190,26 +190,11 @@
 (!define-primitive-object (simple-fun :type function
                                      :lowtag fun-pointer-lowtag
                                      :widetag simple-fun-header-widetag)
-  #!-(or x86 x86-64) (self :set-trans (setf %simple-fun-self))
-  ;; FIXME: we don't currently detect/prevent at compile-time the bad
-  ;; scenario this comment claims to disallow, as determined by re-enabling
-  ;; these SET- and REF- specifiers, which led to a cold-init crash.
-  #!+(or x86 x86-64) (self
-          ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
-          ;; :REF-TRANS here in this case. Instead, there's separate
-          ;; DEFKNOWN/DEFINE-VOP/DEFTRANSFORM stuff in
-          ;; compiler/x86/system.lisp to define and declare them by
-          ;; hand. I don't know why this is, but that's (basically)
-          ;; the way it was done in CMU CL, and it works. (It's not
-          ;; exactly the same way it was done in CMU CL in that CMU
-          ;; CL's allows duplicate DEFKNOWNs, blithely overwriting any
-          ;; previous data associated with the previous DEFKNOWN, and
-          ;; that property was used to mask the definitions here. In
-          ;; SBCL as of 0.6.12.64 that's not allowed -- too confusing!
-          ;; -- so we have to explicitly suppress the DEFKNOWNish
-          ;; stuff here in order to allow this old hack to work in the
-          ;; new world. -- WHN 2001-08-82
-          )
+  ;; All three function primitive-objects have the first word after the header
+  ;; as some kind of entry point, either the address to jump to, in the case
+  ;; of x86, or the Lisp function to jump to, for everybody else.
+  (self :set-known ()
+        :set-trans (setf %simple-fun-self))
   (name :ref-known (flushable)
         :ref-trans %simple-fun-name
         :set-known ()
