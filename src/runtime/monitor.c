@@ -212,30 +212,28 @@ regs_cmd(char **ptr)
 #ifdef reg_BSP
     printf("BSP\t=\t%p\n", get_binding_stack_pointer(thread));
 #else
-    /* printf("BSP\t=\t0x%08lx\n",
-           (unsigned long)SymbolValue(BINDING_STACK_POINTER)); */
+    /* printf("BSP\t=\t%p\n", (void*)SymbolValue(BINDING_STACK_POINTER)); */
     printf("\n");
 #endif
 
 #ifdef LISP_FEATURE_GENCGC
-    /* printf("DYNAMIC\t=\t0x%08lx\n", DYNAMIC_SPACE_START); */
+    /* printf("DYNAMIC\t=\t%p\n", (void*)DYNAMIC_SPACE_START); */
 #else
     printf("STATIC\t=\t%p   ",
-           SymbolValue(STATIC_SPACE_FREE_POINTER, thread));
-    printf("RDONLY\t=\t0x%08lx   ",
-           (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER, thread));
-    printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)current_dynamic_space);
+           (void*)SymbolValue(STATIC_SPACE_FREE_POINTER, thread));
+    printf("RDONLY\t=\t%p   ",
+           (void*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER, thread));
+    printf("DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
 #endif
 
 #ifdef reg_ALLOC
-    printf("ALLOC\t=\t0x%08lx\n", (unsigned long)dynamic_space_free_pointer);
+    printf("ALLOC\t=\t%p\n", (void*)dynamic_space_free_pointer);
 #else
-    printf("ALLOC\t=\t0x%08lx\n",
-           (unsigned long)SymbolValue(ALLOCATION_POINTER, thread));
+    printf("ALLOC\t=\t%p\n", (void*)SymbolValue(ALLOCATION_POINTER, thread));
 #endif
 
 #ifndef LISP_FEATURE_GENCGC
-    printf("TRIGGER\t=\t0x%08lx\n", (unsigned long)current_auto_gc_trigger);
+    printf("TRIGGER\t=\t%p\n", (void*)current_auto_gc_trigger);
 #endif
 }
 

@@ -349,7 +349,7 @@ previous_info(struct call_info *info)
     lispobj lra;
 
     if (!cs_valid_pointer_p(info->frame)) {
-        printf("Bogus callee value (0x%08lx).\n", (uword_t)info->frame);
+        printf("Bogus callee value (0x%lx).\n", (long)info->frame);
         return 0;
     }
 
