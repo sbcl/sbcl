@@ -94,7 +94,13 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst srl res res n-widetag-bits)))
+    (let* ((n-size-bits (integer-length short-header-max-words))
+           (lshift (- n-word-bits (+ n-size-bits n-widetag-bits))))
+      ;; To avoid constructing a 15-bit mask which would require another
+      ;; instruction, (ldb (byte n-size-bits n-widetag-bits) ...)
+      ;; is done as "shift left, shift right" discarding bits out both ends.
+      (inst sll res res lshift)
+      (inst srl res res (+ lshift n-widetag-bits)))))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

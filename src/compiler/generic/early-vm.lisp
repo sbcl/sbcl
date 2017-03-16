@@ -106,8 +106,10 @@
 ;; their generation number is stored in the header, so we have to know
 ;; how much to mask off to obtain the payload size.
 ;; Objects whose payload gets capped to this limit are considered
-;; "tiny_boxed" objects in the sizetab[] array in 'gc-common'.
-(defconstant short-header-max-words #xffff)
+;; "short_boxed" objects in the sizetab[] array in 'gc-common'.
+;; Additionally there are "tiny_boxed" objects, the payload length of
+;; which can be expressed in 8 bits.
+(defconstant short-header-max-words #x7fff)
 
 ;;; Is X a fixnum in the target Lisp?
 #+sb-xc-host

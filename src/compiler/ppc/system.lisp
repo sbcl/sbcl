@@ -93,7 +93,9 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst srwi res res n-widetag-bits)))
+    ;; Shift right by 8 bits (i.e. rotate left 24)
+    ;; and take the 15 rightmost bits.
+    (inst rlwinm res res 24 17 31)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

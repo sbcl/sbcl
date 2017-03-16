@@ -100,7 +100,8 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst shr res n-widetag-bits)))
+    (inst shr res n-widetag-bits)
+    (inst and res short-header-max-words)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

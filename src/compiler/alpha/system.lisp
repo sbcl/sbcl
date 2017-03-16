@@ -91,9 +91,12 @@
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst srl res n-widetag-bits res)))
+    (inst srl res n-widetag-bits res)
+    (inst li short-header-max-words temp)
+    (inst and res temp res)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

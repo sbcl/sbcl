@@ -99,8 +99,7 @@
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
     (inst shr res n-widetag-bits)
-    ;; In case there are closures in immobile space.
-    #!+immobile-space (inst and res short-header-max-words)))
+    (inst and res short-header-max-words)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

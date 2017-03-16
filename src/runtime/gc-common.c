@@ -722,19 +722,19 @@ static sword_t size_boxed(lispobj *where)
     return CEILING(length, 2);
 }
 
-static lispobj trans_short_boxed(lispobj object) // 2 byte size
+static lispobj trans_short_boxed(lispobj object) // Payload count expressed in 15 bits
 {
-    sword_t length = (HeaderValue(*native_pointer(object)) & 0xFFFF) + 1;
+    sword_t length = (HeaderValue(*native_pointer(object)) & SHORT_HEADER_MAX_WORDS) + 1;
     return copy_object(object, CEILING(length, 2));
 }
 
 static sword_t size_short_boxed(lispobj *where)
 {
-    sword_t length = (HeaderValue(*where) & 0xFFFF) + 1;
+    sword_t length = (HeaderValue(*where) & SHORT_HEADER_MAX_WORDS) + 1;
     return CEILING(length, 2);
 }
 
-static lispobj trans_tiny_boxed(lispobj object)
+static lispobj trans_tiny_boxed(lispobj object) // Payload count expressed in 8 bits
 {
     sword_t length = (HeaderValue(*native_pointer(object)) & 0xFF) + 1;
     return copy_object(object, CEILING(length, 2));
