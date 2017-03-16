@@ -1251,6 +1251,7 @@ register."
      (bogus-debug-fun-%name debug-fun))))
 
 (defun interrupted-frame-error (frame)
+  (declare (special sb!kernel::*current-internal-error*))
   (when (and (compiled-frame-p frame)
              (compiled-frame-escaped frame)
              sb!kernel::*current-internal-error*

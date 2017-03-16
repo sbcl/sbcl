@@ -178,22 +178,19 @@
   (let ((text "attempt to THROW to a tag that does not exist: ~S"))
     #!+sb-fasteval
     (when (listp tag)
-      (let* ((frame (find-interrupted-frame))
-             (name (sb!di:debug-fun-name (sb!di:frame-debug-fun frame))))
-        ;; KLUDGE: can't inline due to build ordering problem.
-        (declare (notinline sb!di:frame-debug-fun))
-        (let ((down (and (eq name 'sb!c::unwind) ; is this tautological ?
-                         (sb!di:frame-down frame))))
-          (when frame
-            (case (sb!di:debug-fun-name (sb!di:frame-debug-fun down))
-              ((return-from)
-               (setq text "attempt to RETURN-FROM an exited block: ~S"
+      (binding* ((frame (find-interrupted-frame))
+                 (name (sb!di:debug-fun-name (sb!di:frame-debug-fun frame)))
+                 (down (and (eq name 'sb!c::unwind) ; is this tautological ?
+                            (sb!di:frame-down frame)) :exit-if-null))
+        (case (sb!di:debug-fun-name (sb!di:frame-debug-fun down))
+         ((return-from)
+          (setq text "attempt to RETURN-FROM an exited block: ~S"
                      ;; block name was wrapped in a cons
-                     tag (car tag)))
-              ((go)
+                tag (car tag)))
+         ((go)
                      ;; FIXME: can we reverse-engineer the tag name from
                      ;; the object that was thrown, for a better diagnostic?
-               (setq text "attempt to GO into an exited tagbody")))))))
+          (setq text "attempt to GO into an exited tagbody")))))
     (error 'simple-control-error
            :format-control text :format-arguments (list tag))))
 
@@ -371,7 +368,8 @@
 ;;; memory. Similarly we pass the amounts in special variables as
 ;;; there may be multiple threads running into trouble at the same
 ;;; time. The condition is created by GC-REINIT.
-(defvar *heap-exhausted-error-condition*)
+(define-load-time-global *heap-exhausted-error-condition*
+  (make-condition 'heap-exhausted-error))
 (defvar *heap-exhausted-error-available-bytes*)
 (defvar *heap-exhausted-error-requested-bytes*)
 

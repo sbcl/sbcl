@@ -106,9 +106,7 @@
   (setq *gc-inhibit* nil)
   (gc)
   (setf *n-bytes-freed-or-purified* 0
-        *gc-run-time* 0
-        ;; See comment in interr.lisp
-        *heap-exhausted-error-condition* (make-condition 'heap-exhausted-error)))
+        *gc-run-time* 0))
 
 (declaim (ftype (sfunction () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()

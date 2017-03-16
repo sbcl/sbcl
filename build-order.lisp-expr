@@ -660,10 +660,10 @@
  ("src/code/timer" :not-host)
 
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
- ("src/code/interr" :not-host)
  ("src/code/gc"     :not-host)
  ("src/code/purify" :not-host)
  ("src/code/debug-int" :not-host)
+ ("src/code/interr" :not-host)
 
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
