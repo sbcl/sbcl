@@ -246,7 +246,12 @@
   (return-point :c-type "unsigned char" :rest-p t))
 
 (!define-primitive-object (closure :lowtag fun-pointer-lowtag
-                                  :widetag closure-header-widetag)
+                                   :widetag closure-header-widetag
+                                   ;; This allocator is %COPY-foo because it's only
+                                   ;; used when renaming a closure. The compiler has
+                                   ;; its own way of making closures, which requires
+                                   ;; that the length be a compile-time constant.
+                                   :alloc-trans %copy-closure)
   ;; %CLOSURE-FUN should never be invoked on x86[-64].
   ;; The above remark at %SIMPLE-FUN-SELF is relevant in its sentiment,
   ;; but actually no longer true - the confusing situation is not caught

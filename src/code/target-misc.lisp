@@ -63,66 +63,60 @@
     (sb!interpreter:interpreted-function (sb!interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(!defglobal *closure-name-marker* '#.(make-symbol ".CLOSURE-NAME."))
-(defun closure-name (closure)
-  (declare (closure closure))
-  (let ((len (get-closure-length closure)))
-    (if (and (>= len 4)
-             ;; The number of closure-values is 1- the len.
-             ;; The index of the last value is 1- that.
-             ;; The index of the name-marker is 1- that.
-             ;; (closure index 0 is the first closed-over value)
-             (eq (%closure-index-ref closure (- len 3))
-                 (load-time-value *closure-name-marker* t)))
-        (values (%closure-index-ref closure (- len 2)) t)
-        (values nil nil))))
+(defconstant +closure-header-namedp+ #x800000)
+(macrolet ((closure-header-word (closure)
+             `(sap-ref-word (int-sap (get-lisp-obj-address ,closure))
+                            (- sb!vm:fun-pointer-lowtag))))
+  (defun closure-name (closure)
+    (declare (closure closure))
+    (if (logtest (with-pinned-objects (closure) (closure-header-word closure))
+                 +closure-header-namedp+)
+        ;; GET-CLOSURE-LENGTH counts the 'fun' slot
+        (values (%closure-index-ref closure (- (get-closure-length closure) 2)) t)
+        (values nil nil)))
 
-;; Add 2 "slots" to the payload of a closure, one for the magic symbol
-;; signifying that there is a name, and one for the name itself.
-(defun nameify-closure (closure)
-  (declare (closure closure))
-  (let* ((physical-len (get-closure-length closure)) ; excluding header
-         ;; subtract 1 because physical-len includes the trampoline word.
-         (new-n-closure-vals (+ 2 (1- physical-len)))
-         ;; Closures and funcallable-instances are pretty much the same to GC.
-         ;; They're both varying-length boxed-payload objects.
-         ;; But funcallable-instance has <tramp, function, info>
-         ;; where closure has <tramp, info> so subtract 1 more word.
-         (copy (%make-funcallable-instance (1- new-n-closure-vals))))
-    (with-pinned-objects (closure copy)
-      ;; change the widetag from funcallable-instance to closure.
-      (setf (sap-ref-word (int-sap (get-lisp-obj-address copy))
-                          (- sb!vm:fun-pointer-lowtag))
-            (logior (ash (+ physical-len 2) 8) sb!vm:closure-header-widetag))
-      (macrolet ((word (obj index)
-                   `(sap-ref-lispobj (int-sap (get-lisp-obj-address ,obj))
-                                     (+ (- sb!vm:fun-pointer-lowtag)
-                                        (ash ,index sb!vm:word-shift)))))
-        (loop for i from 1 to physical-len
-              do (setf (word copy i) (word closure i)))
-        (setf (word copy (1+ physical-len)) *closure-name-marker*)))
-    copy))
+  ;; Return a new object that has 1 more slot than CLOSURE,
+  ;; and frob its header bit signifying that it is named.
+  (defun nameify-closure (closure)
+    (declare (closure closure))
+    (let* ((n-words (get-closure-length closure)) ; excluding header
+           ;; N-WORDS includes the trampoline, so the number of slots we would
+           ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
+           ;; the fact that we actually want to create 1 additional slot.
+           ;; So in effect, asking for N-WORDS does exactly the right thing.
+           (copy
+            (sb!vm::%copy-closure n-words
+                                  #!+(or x86 x86-64)
+                                  ;; FIXME: %CLOSURE-FUN should do what it says,
+                                  ;; no more, no less - read the damn slot.
+                                  (with-pinned-objects (closure) ; Pedantic. It's pinned anyway.
+                                    (sap-ref-lispobj (int-sap (get-lisp-obj-address closure))
+                                                     (- sb!vm:n-word-bytes sb!vm:fun-pointer-lowtag)))
+                                  #!-(or x86 x86-64)
+                                  (%closure-fun closure))))
+      (with-pinned-objects (copy)
+        (loop with sap = (int-sap (get-lisp-obj-address copy))
+              for i from 0 below (1- n-words)
+              for ofs from (- (ash 2 sb!vm:word-shift) sb!vm:fun-pointer-lowtag)
+                        by sb!vm:n-word-bytes
+              do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
+        (setf (closure-header-word copy) ; Update the header
+              (logior (closure-header-word copy) +closure-header-namedp+)))
+      copy))
 
-;; Rename a closure. Doing so changes its identity unless it was already named.
-;; To do this without allocating a new closure, we'd need an interface that
-;; requests a placeholder from the outset. One possibility is that
-;; (NAMED-LAMBDA NIL (x) ...) would allocate the name, initially stored as nil.
-;; In that case, the simple-fun's debug-info could also contain a bit that
-;; indicates that all closures over it are named, eliminating the storage
-;; and check for *closure-name-marker* in the closure values.
-(defun set-closure-name (closure new-name)
-  (declare (closure closure))
-  (unless (nth-value 1 (closure-name closure))
-    (setq closure (nameify-closure closure)))
-  ;; There are no closure slot setters, and in fact SLOT-SET
-  ;; does not exist in a variant that takes a non-constant index.
-  (with-pinned-objects (closure)
-    (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address closure))
-                           (+ (- sb!vm:fun-pointer-lowtag)
-                              (ash (get-closure-length closure)
-                                   sb!vm:word-shift)))
-          new-name))
-  closure)
+  ;; Rename a closure. Doing so changes its identity unless it was already named.
+  (defun set-closure-name (closure new-name)
+    (declare (closure closure))
+    (unless (logtest (with-pinned-objects (closure) (closure-header-word closure))
+                     +closure-header-namedp+)
+      (setq closure (nameify-closure closure)))
+    ;; There are no closure slot setters, and in fact SLOT-SET
+    ;; does not exist in a variant that takes a non-constant index.
+    (with-pinned-objects (closure)
+      (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address closure))
+                             (- (ash (get-closure-length closure) sb!vm:word-shift)
+                                sb!vm:fun-pointer-lowtag)) new-name))
+    closure))
 
 ;;; a SETFable function to return the associated debug name for FUN
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),

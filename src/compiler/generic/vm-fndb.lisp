@@ -472,6 +472,9 @@
 (defknown %closure-index-ref (function index) t
   (flushable))
 
+;; T argument is for the 'fun' slot.
+(defknown sb!vm::%copy-closure (index t) function (flushable))
+
 (defknown %fun-fun (function) function (flushable recursive))
 
 (defknown %make-funcallable-instance (index) function
