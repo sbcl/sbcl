@@ -92,7 +92,7 @@ static inline lispobj *
 newspace_alloc(long nwords, int constantp)
 {
     lispobj *ret;
-    nwords=CEILING(nwords,2);
+    gc_assert((nwords &1 ) == 0);
     if(constantp) {
         if(read_only_free + nwords >= (lispobj *)READ_ONLY_SPACE_END) {
             lose("Ran out of read-only space while purifying!\n");
@@ -142,20 +142,16 @@ pscav_later(lispobj *where, long count)
 static lispobj
 ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 {
-    long nwords;
-    lispobj result, *new, *old;
-
-    nwords = CEILING(1 + HeaderValue(header), 2);
-
     /* Allocate it */
-    old = native_pointer(thing);
-    new = newspace_alloc(nwords,constant);
+    lispobj *old = native_pointer(thing);
+    long nwords = sizetab[widetag_of(header)](old);
+    lispobj *new = newspace_alloc(nwords,constant);
 
     /* Copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = make_lispobj(new, lowtag_of(thing));
+    lispobj result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     /* Scavenge it. */
@@ -188,26 +184,21 @@ ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 static lispobj
 ptrans_fdefn(lispobj thing, lispobj header)
 {
-    long nwords;
-    lispobj result, *new, *old, oldfn;
-    struct fdefn *fdefn;
-
-    nwords = CEILING(1 + HeaderValue(header), 2);
-
     /* Allocate it */
-    old = native_pointer(thing);
-    new = newspace_alloc(nwords, 0);    /* inconstant */
+    lispobj *old = native_pointer(thing);
+    long nwords = sizetab[widetag_of(header)](old);
+    lispobj *new = newspace_alloc(nwords, 0);    /* inconstant */
 
     /* Copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = make_lispobj(new, lowtag_of(thing));
+    lispobj result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     /* Scavenge the function. */
-    fdefn = (struct fdefn *)new;
-    oldfn = fdefn->fun;
+    struct fdefn *fdefn = (struct fdefn *)new;
+    lispobj oldfn = fdefn->fun;
     pscav(&fdefn->fun, 1, 0);
     if ((char *)oldfn + FUN_RAW_ADDR_OFFSET == fdefn->raw_addr)
         fdefn->raw_addr = (char *)fdefn->fun + FUN_RAW_ADDR_OFFSET;
@@ -218,20 +209,16 @@ ptrans_fdefn(lispobj thing, lispobj header)
 static lispobj
 ptrans_unboxed(lispobj thing, lispobj header)
 {
-    long nwords;
-    lispobj result, *new, *old;
-
-    nwords = CEILING(1 + HeaderValue(header), 2);
-
     /* Allocate it */
-    old = native_pointer(thing);
-    new = newspace_alloc(nwords,1);     /* always constant */
+    lispobj *old = native_pointer(thing);
+    long nwords = sizetab[widetag_of(header)](old);
+    lispobj *new = newspace_alloc(nwords, 1);     /* always constant */
 
     /* copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = make_lispobj(new , lowtag_of(thing));
+    lispobj result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     return result;
@@ -300,12 +287,8 @@ ptrans_code(lispobj thing)
 static lispobj
 ptrans_func(lispobj thing, lispobj header)
 {
-    long nwords;
-    lispobj code, *new, *old, result;
-    struct simple_fun *function;
-
-    /* Thing can either be a function header, a closure function
-     * header, a closure, or a funcallable-instance. If it's a closure
+    /* Thing can either be a function header,
+     * a closure, or a funcallable-instance. If it's a closure
      * or a funcallable-instance, we do the same as ptrans_boxed.
      * Otherwise we have to do something strange, 'cause it is buried
      * inside a code object. */
@@ -316,11 +299,9 @@ ptrans_func(lispobj thing, lispobj header)
          * scavenged, because if it had been scavenged, forwarding pointers
          * would have been left behind for all the entry points. */
 
-        function = (struct simple_fun *)native_pointer(thing);
-        code =
-            make_lispobj
-            ((native_pointer(thing) -
-              (HeaderValue(function->header))), OTHER_POINTER_LOWTAG);
+        struct simple_fun *function = (struct simple_fun *)native_pointer(thing);
+        lispobj code = make_lispobj(native_pointer(thing) - HeaderValue(function->header),
+                                    OTHER_POINTER_LOWTAG);
 
         /* This will cause the function's header to be replaced with a
          * forwarding pointer. */
@@ -329,23 +310,22 @@ ptrans_func(lispobj thing, lispobj header)
 
         /* So we can just return that. */
         return function->header;
-    }
-    else {
+    } else {
         /* It's some kind of closure-like thing. */
-        nwords = CEILING(1 + HeaderValue(header), 2);
-        old = native_pointer(thing);
+        lispobj *old = native_pointer(thing);
+        long nwords = sizetab[widetag_of(header)](old);
 
         /* Allocate the new one.  FINs *must* not go in read_only
          * space.  Closures can; they never change */
 
-        new = newspace_alloc
+        lispobj *new = newspace_alloc
             (nwords,(widetag_of(header)!=FUNCALLABLE_INSTANCE_HEADER_WIDETAG));
 
         /* Copy it. */
         bcopy(old, new, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
-        result = make_lispobj(new, lowtag_of(thing));
+        lispobj result = make_lispobj(new, lowtag_of(thing));
         *old = result;
 
         /* Scavenge it. */
@@ -358,13 +338,11 @@ ptrans_func(lispobj thing, lispobj header)
 static lispobj
 ptrans_returnpc(lispobj thing, lispobj header)
 {
-    lispobj code, new;
-
     /* Find the corresponding code object. */
-    code = thing - HeaderValue(header)*sizeof(lispobj);
+    lispobj code = thing - HeaderValue(header)*sizeof(lispobj);
 
     /* Make sure it's been transported. */
-    new = *native_pointer(code);
+    lispobj new = *native_pointer(code);
     if (!forwarding_pointer_p(new))
         new = ptrans_code(code);
 
