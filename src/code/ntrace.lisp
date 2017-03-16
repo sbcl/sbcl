@@ -135,9 +135,7 @@
           (values (get-def) t)))
      (typecase res
        (closure
-        (values (sb-kernel:%closure-fun res)
-                named-p
-                :compiled-closure))
+        (values (%closure-fun res) named-p :compiled-closure))
        (funcallable-instance
         (values res named-p :funcallable-instance))
        ;; FIXME: What about SB!EVAL:INTERPRETED-FUNCTION -- it gets picked off
@@ -265,7 +263,7 @@
                     (or (not wherein)
                         (trace-wherein-p frame wherein)))))
        (when conditionp
-         (let ((sb-kernel:*current-level-in-print* 0)
+         (let ((*current-level-in-print* 0)
                (*standard-output* (make-string-output-stream))
                (*in-trace* t))
            (ecase (trace-info-report info)
@@ -308,7 +306,7 @@
                  (or (cdr entry)
                      (let ((cond (trace-info-condition-after info)))
                        (and cond (apply #'funcall (cdr cond) frame values)))))
-        (let ((sb-kernel:*current-level-in-print* 0)
+        (let ((*current-level-in-print* 0)
               (*standard-output* (make-string-output-stream))
               (*in-trace* t))
           (ecase (trace-info-report info)
