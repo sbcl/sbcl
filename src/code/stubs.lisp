@@ -33,7 +33,6 @@
   (def (setf %simple-fun-arglist) (new-value func))
   (def %simple-fun-name)
   (def (setf %simple-fun-name) (new-value func))
-  (def %simple-fun-self)
   (def closurep)
   (def %closure-fun)
   (def %closure-index-ref (closure index))

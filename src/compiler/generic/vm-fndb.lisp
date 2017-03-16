@@ -452,14 +452,12 @@
 ;;; FDEFN -> FUNCTION, trapping if not FBOUNDP
 (defknown safe-fdefn-fun (fdefn) function ())
 
-;;; Given either a closure or a simple-fun, return the underlying simple-fun.
-;;; FIXME: %SIMPLE-FUN-SELF is a somewhat poor name for this function.
-;;; The x86[-64] code defines %CLOSURE-FUN as nothing more than %SIMPLE-FUN-SELF,
-;;; and it's not clear whether that's because callers need the "simple" accessor
-;;; to work on closures, versus reluctance to define a %CLOSURE/SIMPLE-FUN-FUN
-;;; reader. %FUN-FUN works on all three function subtypes, but is nontrivial.
-;;; Preferably at least one accessor should get a new name,
-;;; so that %SIMPLE-FUN-SELF can mean what it says.
+;;; FIXME: only the x86 backends need the %SIMPLE-FUN-SELF reader,
+;;; and ironically they only need it for closures (non-simple funs).
+;;; The proper fix is actually to delete %SIMPLE-FUN-SELF,
+;;; and have the vops that currently translate %SIMPLE-FUN-SELF
+;;; be changed to translate %CLOSURE-FUN instead.
+#!+(or x86 x86-64) ; Other backends should *NEVER* call this.
 (defknown %simple-fun-self (function) function
   (flushable))
 (defknown (setf %simple-fun-self) (function function) function

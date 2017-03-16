@@ -190,8 +190,7 @@
 (!define-primitive-object (simple-fun :type function
                                      :lowtag fun-pointer-lowtag
                                      :widetag simple-fun-header-widetag)
-  #!-(or x86 x86-64) (self :ref-trans %simple-fun-self
-               :set-trans (setf %simple-fun-self))
+  #!-(or x86 x86-64) (self :set-trans (setf %simple-fun-self))
   ;; FIXME: we don't currently detect/prevent at compile-time the bad
   ;; scenario this comment claims to disallow, as determined by re-enabling
   ;; these SET- and REF- specifiers, which led to a cold-init crash.

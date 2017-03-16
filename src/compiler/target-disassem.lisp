@@ -260,11 +260,9 @@
 
 ;;;; function ops
 
-;;; This is a stupid name when we really mean fun->simple-fun.
-;;; And what's the point of ruling out some funcallable instances?
-(defun fun-self (fun)
+(defun fun-self (fun) ; FIXME: remove
   (declare (type compiled-function fun))
-  (%simple-fun-self (%fun-fun fun)))
+  (%fun-fun fun))
 
 (defun fun-code (fun)
   (declare (type compiled-function fun))

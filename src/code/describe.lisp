@@ -51,7 +51,7 @@
      (sb-interpreter:fun-lambda-expression fun))
     (function
      (let* ((name (%fun-name fun))
-            (fun (%simple-fun-self (%fun-fun fun)))
+            (fun (%fun-fun fun))
             (code (sb-di::fun-code-header fun))
             (info (sb-kernel:%code-debug-info code))
             (source (if info (sb-c::debug-info-source info))))
