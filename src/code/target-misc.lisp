@@ -84,8 +84,11 @@
            ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
            ;; the fact that we actually want to create 1 additional slot.
            ;; So in effect, asking for N-WORDS does exactly the right thing.
-           (copy (with-pinned-objects ((%closure-fun closure))
-                   ;; If %CLOSURE-CALLEE manifests as a fixnum, it remains
+           (copy #!-(or x86 x86-64)
+                 (sb!vm::%copy-closure n-words (%closure-fun closure))
+                 #!+(or x86 x86-64)
+                 (with-pinned-objects ((%closure-fun closure))
+                   ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                    ;; valid across GC due to %CLOSURE-FUN being pinned
                    ;; until after the new closure is made.
                    (sb!vm::%copy-closure n-words (sb!vm::%closure-callee closure)))))

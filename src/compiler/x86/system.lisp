@@ -198,13 +198,18 @@
                    :disp (- fun-pointer-lowtag other-pointer-lowtag)))
     (inst add func code)))
 
-(define-vop (%simple-fun-self)
+;;; This vop is quite magical - because 'closure-fun' is a raw program counter,
+;;; as soon as it's loaded into a register, it prevents the underlying fun from
+;;; being transported by GC. It's even subtler in that sense than COMPUTE-FUN,
+;;; which doesn't pin a *different* object produced from thin air.
+;;; (It's output operand is embedded in the object pointed to by its input)
+(define-vop (%closure-fun)
   (:policy :fast-safe)
-  (:translate %simple-fun-self)
+  (:translate %closure-fun)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
   (:generator 3
-    (loadw result function simple-fun-self-slot fun-pointer-lowtag)
+    (loadw result function closure-fun-slot fun-pointer-lowtag)
     (inst lea result
           (make-ea :byte :base result
                    :disp (- fun-pointer-lowtag

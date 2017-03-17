@@ -452,18 +452,9 @@
 ;;; FDEFN -> FUNCTION, trapping if not FBOUNDP
 (defknown safe-fdefn-fun (fdefn) function ())
 
-;;; FIXME: only the x86 backends need the %SIMPLE-FUN-SELF reader,
-;;; and ironically they only need it for closures (non-simple funs).
-;;; The proper fix is actually to delete %SIMPLE-FUN-SELF,
-;;; and have the vops that currently translate %SIMPLE-FUN-SELF
-;;; be changed to translate %CLOSURE-FUN instead.
-#!+(or x86 x86-64) ; Other backends should *NEVER* call this.
-(defknown %simple-fun-self (function) function
-  (flushable))
 (defknown %simple-fun-type (function) t (flushable))
 
-#!+(or x86 x86-64)
-(defknown sb!vm::%closure-callee (function) fixnum (flushable))
+#!+(or x86 x86-64) (defknown sb!vm::%closure-callee (function) fixnum (flushable))
 (defknown %closure-fun (function) function (flushable))
 
 (defknown %closure-index-ref (function index) t
