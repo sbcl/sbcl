@@ -1592,6 +1592,32 @@ static lispobj* tempspace_addr(void* address)
     }
 }
 
+/* Search for an object during defragmentation */
+static lispobj* defrag_search_varyobj_subspace(lispobj addr)
+{
+    low_page_index_t page = find_immobile_page_index((void*)(long)addr);
+    lispobj *where = varyobj_scan_start(page);
+    size_t count;
+    do {
+        if (immobile_filler_p(where)) {
+            count = sizetab[widetag_of(*where)](where);
+        } else {
+            gc_assert(forwarding_pointer_p(where));
+            lispobj *forwarded_obj = native_pointer(forwarding_pointer_value(where));
+            lispobj *temp_obj = tempspace_addr(forwarded_obj);
+            count = sizetab[widetag_of(*temp_obj)](temp_obj);
+            if ((lispobj*)(uword_t)addr < where+count) {
+                int widetag = widetag_of(*temp_obj);
+                gc_assert(widetag == CODE_HEADER_WIDETAG ||
+                          widetag == FDEFN_WIDETAG ||
+                          widetag == FUNCALLABLE_INSTANCE_HEADER_WIDETAG);
+                return where;
+            }
+        }
+    } while ((where += count) <= (lispobj*)(uword_t)addr);
+    lose("Can't find jump target");
+}
+
 static void adjust_words(lispobj *where, sword_t n_words)
 {
     int i;
@@ -2084,34 +2110,16 @@ void defrag_immobile_space(int* components)
             // Both this code and the jumped-to code can move.
             // For this component, adjust by the displacement by (old - new).
             // If the jump target moved, also adjust by its (new - old).
-            // The target address can be either a JMP or CALL instruction
-            // which resides in an fdefn, or a simple-fun.  They can easily
-            // be told apart by the first byte.
+            // The target address can point to one of:
+            //  - an FDEFN raw addr slot (fixedobj subspace)
+            //  - funcallable-instance with self-contained trampoline (ditto)
+            //  - a simple-fun that was statically linked (varyobj subspace)
             if (immobile_space_p(target_addr)) {
-                lispobj* old_obj;
-                unsigned char expect_widetag;
-                // KLUDGE: It would be more proper to search for the Lisp object
-                // being called, rather than checking for a byte pattern.
-                if ((*(char*)(long)target_addr & 0xFE) == 0xE8) {  // JMP or CALL
-                    // must be jumping into an fdefn
-                    gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
-                    old_obj = (lispobj*)(target_addr - offsetof(struct fdefn, raw_addr));
-                    expect_widetag = FDEFN_WIDETAG;
-                } else if (*(unsigned long*)(unsigned long)target_addr
-                           == 0xFFFFFFFFE9058B48) {
-                    // "MOV RAX, [RIP-23]" (plus a byte of the next instruction)
-                    // indicates a funcallable instance with a self-contained trampoline.
-                    gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
-                    old_obj = (lispobj*)(long)(target_addr - (4*N_WORD_BYTES));
-                    expect_widetag = FUNCALLABLE_INSTANCE_HEADER_WIDETAG;
-                } else {
-                    old_obj = (lispobj*)(target_addr - offsetof(struct simple_fun, code));
-                    expect_widetag = SIMPLE_FUN_HEADER_WIDETAG;
-                }
-                lispobj* new_obj = !forwarding_pointer_p(old_obj) ? old_obj :
-                  native_pointer(forwarding_pointer_value(old_obj));
-                gc_assert(widetag_of(*tempspace_addr(new_obj)) == expect_widetag);
-                target_adjust = (int)((char*)new_obj - (char*)old_obj);
+                lispobj *obj = target_addr < IMMOBILE_VARYOBJ_SUBSPACE_START
+                  ? search_immobile_space((void*)(uword_t)target_addr)
+                  : defrag_search_varyobj_subspace(target_addr);
+                target_adjust = (int)((char*)native_pointer(forwarding_pointer_value(obj))
+                                      - (char*)obj);
             }
             // If the instruction to fix has moved, then adjust for
             // its new address, and perform the fixup in tempspace.
