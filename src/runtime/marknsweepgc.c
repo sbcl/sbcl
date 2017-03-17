@@ -2092,8 +2092,6 @@ void defrag_immobile_space(int* components)
                 unsigned char expect_widetag;
                 // KLUDGE: It would be more proper to search for the Lisp object
                 // being called, rather than checking for a byte pattern.
-                // Problem: though gc_search_space() understands FPs, it doesn't
-                // work here, because objects aren't physically where the FP points.
                 if ((*(char*)(long)target_addr & 0xFE) == 0xE8) {  // JMP or CALL
                     // must be jumping into an fdefn
                     gc_assert(target_addr < IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);

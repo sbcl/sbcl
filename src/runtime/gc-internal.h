@@ -198,11 +198,11 @@ lispobj *search_static_space(void *pointer);
 lispobj *search_immobile_space(void *pointer);
 lispobj *search_dynamic_space(void *pointer);
 
-lispobj *gc_search_space3(lispobj *start, void *limit, void *pointer);
+lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);
 static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
-    return gc_search_space3(start,
-                            (void*)(1+((lispobj)pointer | LOWTAG_MASK)),
-                            pointer);
+    return gc_search_space3(pointer,
+                            start,
+                            (void*)(1+((lispobj)pointer | LOWTAG_MASK)));
 }
 struct vector *symbol_name(lispobj*);
 

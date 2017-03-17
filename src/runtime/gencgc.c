@@ -4156,7 +4156,7 @@ gencgc_pickup_dynamic(void)
 
         if (!gencgc_partial_pickup) {
             page_table[page].allocated = BOXED_PAGE_FLAG;
-            first=gc_search_space3(prev, (ptr+2), ptr);
+            first = gc_search_space3(ptr, prev, (ptr+2));
             if(ptr == first)
                 prev=ptr;
             page_table[page].scan_start_offset =
