@@ -91,13 +91,29 @@ scavenge(lispobj *start, sword_t n_words)
     lispobj *end = start + n_words;
     lispobj *object_ptr;
 
+    // GENCGC only:
+    // * With 32-bit words, is_lisp_pointer(object) returns true if object_ptr
+    //   points to a forwarding pointer, so we need a sanity check inside the
+    //   branch for is_lisp_pointer(). For maximum efficiency, check that only
+    //   after from_space_p() returns false, so that valid pointers into
+    //   from_space incur no extra test. This could be improved further by
+    //   skipping the FP check if 'object' points within dynamic space, i.e.,
+    //   when find_page_index() returns >= 0. That would entail injecting
+    //   from_space_p() explicitly into the loop, so as to separate the
+    //   "was a page found at all" condition from the page generation test.
+
+    // * With 64-bit words, is_lisp_pointer(object) is false when object_ptr
+    //   points to a forwarding pointer, and the fixnump() test also returns
+    //   false, so we'll indirect through scavtab[]. This will safely invoke
+    //   scav_lose(), detecting corruption without any extra cost.
+    //   The major difference between that and the explicit test is that you
+    //   won't see 'start' and 'n_words', but if you need those, chances are
+    //   you'll want to run under an external debugger in the first place.
+    //   [And btw it sure would be nice to assert statically
+    //   that is_lisp_pointer(0x01) is indeed false]
+
     for (object_ptr = start; object_ptr < end;) {
         lispobj object = *object_ptr;
-#ifdef LISP_FEATURE_GENCGC
-        if (forwarding_pointer_p(object_ptr))
-            lose("unexpected forwarding pointer in scavenge: %p, start=%p, n=%ld\n",
-                 object_ptr, start, n_words);
-#endif
         if (is_lisp_pointer(object)) {
             if (from_space_p(object)) {
                 /* It currently points to old space. Check for a
@@ -120,6 +136,11 @@ scavenge(lispobj *start, sword_t n_words)
                 object_ptr++;
 #endif
             } else {
+#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
+                if (forwarding_pointer_p(object_ptr))
+                    lose("unexpected forwarding pointer in scavenge: %p, start=%p, n=%ld\n",
+                         object_ptr, start, n_words);
+#endif
                 /* It points somewhere other than oldspace. Leave it
                  * alone. */
                 object_ptr++;
