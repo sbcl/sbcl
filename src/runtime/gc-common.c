@@ -85,6 +85,20 @@ copy_code_object(lispobj object, sword_t nwords)
 
 static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+static const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
+extern uword_t *page_table_pinned_dwords;
+
+static inline boolean __attribute__((unused))
+pinned_p(lispobj obj, page_index_t page)
+{
+    if (!page_table[page].has_pin_map) return 0;
+    int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
+    uword_t *bits = &page_table_pinned_dwords[page * (n_dwords_in_card/N_WORD_BITS)];
+    return (bits[dword_num / N_WORD_BITS] >> (dword_num % N_WORD_BITS)) & 1;
+}
+#endif
+
 void
 scavenge(lispobj *start, sword_t n_words)
 {
@@ -112,29 +126,33 @@ scavenge(lispobj *start, sword_t n_words)
     //   [And btw it sure would be nice to assert statically
     //   that is_lisp_pointer(0x01) is indeed false]
 
+#define FIX_POINTER() { \
+    lispobj *ptr = native_pointer(object); \
+    if (forwarding_pointer_p(ptr)) \
+        *object_ptr = LOW_WORD(forwarding_pointer_value(ptr)); \
+    else /* Scavenge that pointer. */ \
+        (void)scavtab[widetag_of(object)](object_ptr, object); \
+    }
+
     for (object_ptr = start; object_ptr < end;) {
         lispobj object = *object_ptr;
         if (is_lisp_pointer(object)) {
-            if (from_space_p(object)) {
-                /* It currently points to old space. Check for a
-                 * forwarding pointer. */
-                lispobj *ptr = native_pointer(object);
-                if (forwarding_pointer_p(ptr)) {
-                    /* Yes, there's a forwarding pointer. */
-                    *object_ptr = LOW_WORD(forwarding_pointer_value(ptr));
-                    object_ptr++;
-                } else {
-                    /* Scavenge that pointer. */
-                    object_ptr +=
-                        (scavtab[widetag_of(object)])(object_ptr, object);
-                }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+            page_index_t page;
+            // It would be fine, though suboptimal, to use from_space_p() here.
+            // If it returns false, we don't want to call immobile_space_p()
+            // unless the pointer is *not* into dynamic space.
+            if ((page = find_page_index((void*)object)) >= 0) {
+                if (page_table[page].gen == from_space && !pinned_p(object, page))
+                    FIX_POINTER();
             } else if (immobile_space_p(object)) {
                 lispobj *ptr = native_pointer(object);
                 if (immobile_obj_gen_bits(ptr) == from_space)
                     promote_immobile_obj(ptr, 1);
-                object_ptr++;
-#endif
+            }
+#else
+            if (from_space_p(object)) {
+                FIX_POINTER();
             } else {
 #if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
                 if (forwarding_pointer_p(object_ptr))
@@ -143,8 +161,9 @@ scavenge(lispobj *start, sword_t n_words)
 #endif
                 /* It points somewhere other than oldspace. Leave it
                  * alone. */
-                object_ptr++;
             }
+#endif
+            object_ptr++;
         }
         else if (fixnump(object)) {
             /* It's a fixnum: really easy.. */
