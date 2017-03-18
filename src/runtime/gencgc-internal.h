@@ -165,10 +165,9 @@ from_space_p(lispobj obj)
     page_index_t page_index = find_page_index((void*)obj);
     if (page_index < 0 || page_table[page_index].gen != from_space) return 0;
     if (!page_table[page_index].has_pin_map) return 1;
-    int dword_in_page =
-        (obj - (lispobj)page_address(page_index)) >> (1+WORD_SHIFT);
-    return ((pinned_dwords(page_index)[dword_in_page / N_WORD_BITS]
-             >> (dword_in_page % N_WORD_BITS)) & 1) ^ 1;
+    int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
+    return ((pinned_dwords(page_index)[dword_num / N_WORD_BITS]
+             >> (dword_num % N_WORD_BITS)) & 1) ^ 1;
 }
 static inline boolean
 new_space_p(lispobj obj)
