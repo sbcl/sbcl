@@ -18,7 +18,7 @@
 ;;; itself, anyway, so we just make this a no-op.
 (defmacro sb!vm::with-float-traps-masked (traps &body body)
   (declare (ignore traps))
-  ;; FIXME: should become STYLE-WARNING?
+  #+nil
   (format *error-output*
           "~&(can't portably mask float traps, proceeding anyway)~%")
   `(progn ,@body))
