@@ -258,7 +258,11 @@ doing so may interfere with results reported by eg. TIME.")
                    gc-run-time-ms processor-cycles eval-calls
                    lambdas-converted page-faults bytes-consed
                    aborted)
-  (let ((total-run-time-us (+ user-run-time-us system-run-time-us)))
+  (let ((total-run-time-us (+ user-run-time-us system-run-time-us))
+        ;; Arbitrary truncation of the timing output is worthless,
+        ;; and it's only an artifact of the use of a single format control,
+        ;; not "by design" that it should respect *print-length*.
+        (*print-length* nil))
     (format *trace-output*
             "~&Evaluation took:~%~
                          ~@<  ~@;~/sb-impl::format-milliseconds/ of real time~%~

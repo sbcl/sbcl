@@ -276,3 +276,11 @@
                    (checked-compile `(lambda ()
                                        (sleep 0.1)))))
                  '(nil))))
+
+(with-test (:name :time-no-print-length-abbreviation)
+  (let ((s (make-string-output-stream)))
+    (let ((*trace-output* s))
+      (time (progn)))
+    (let ((str (get-output-stream-string s)))
+      (assert (and (>= (count #\newline str) 4)
+                   (search "bytes consed" str))))))
