@@ -907,9 +907,6 @@ static lispobj
 trans_weak_pointer(lispobj object)
 {
     lispobj copy;
-#ifndef LISP_FEATURE_GENCGC
-    struct weak_pointer *wp;
-#endif
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
 #if defined(DEBUG_WEAK)
@@ -921,12 +918,14 @@ trans_weak_pointer(lispobj object)
 
     copy = copy_object(object, WEAK_POINTER_NWORDS);
 #ifndef LISP_FEATURE_GENCGC
-    wp = (struct weak_pointer *) native_pointer(copy);
+    struct weak_pointer *wp = (struct weak_pointer *) native_pointer(copy);
 
     gc_dcheck(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
     /* Push the weak pointer onto the list of weak pointers. */
-    wp->next = (struct weak_pointer *)LOW_WORD(weak_pointers);
-    weak_pointers = wp;
+    if (weak_pointer_breakable_p(wp)) {
+        wp->next = (struct weak_pointer *)LOW_WORD(weak_pointers);
+        weak_pointers = wp;
+    }
 #endif
     return copy;
 }
@@ -942,7 +941,6 @@ void scan_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointers, next_wp = NULL; wp != NULL; wp = next_wp) {
-        lispobj value = wp->value;
         lispobj *first_pointer;
         gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
 
@@ -951,8 +949,8 @@ void scan_weak_pointers(void)
         if (next_wp == wp) /* gencgc uses a ref to self for end of list */
             next_wp = NULL;
 
-        if (!is_lisp_pointer(value))
-            continue;
+        lispobj value = wp->value;
+        gc_assert(is_lisp_pointer(value));
 
         /* Now, we need to check whether the object has been forwarded. If
          * it has been, the weak pointer is still good and needs to be
@@ -977,6 +975,8 @@ void scan_weak_pointers(void)
                 wp->broken = T;
         }
 #endif
+        else
+            lose("unbreakable pointer %p", wp);
     }
 }
 

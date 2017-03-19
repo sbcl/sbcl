@@ -18,6 +18,7 @@
 
 #include "genesis/code.h"
 #include "genesis/simple-fun.h"
+#include "genesis/weak-pointer.h"
 #include "thread.h"
 #include "interr.h"
 
@@ -328,5 +329,18 @@ static inline boolean immobile_filler_p(lispobj* obj) {
   instance_ptr[0] = (layout << 32) | (instance_ptr[0] & 0xFFFFFFFF)
 
 #endif /* immobile space */
+
+static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
+{
+    lispobj pointee;
+    return wp->broken != T &&
+        is_lisp_pointer(pointee = wp->value) &&
+        (from_space_p(pointee)
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+         || (immobile_space_p(pointee) &&
+             immobile_obj_gen_bits(native_pointer(pointee)) == from_space)
+#endif
+            );
+}
 
 #endif /* _GC_INTERNAL_H_ */

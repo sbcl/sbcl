@@ -1938,7 +1938,7 @@ scav_weak_pointer(lispobj *where, lispobj object)
      */
     struct weak_pointer * wp = (struct weak_pointer*)where;
 
-    if (NULL == wp->next) {
+    if (NULL == wp->next && weak_pointer_breakable_p(wp)) {
         wp->next = weak_pointers;
         weak_pointers = wp;
         if (NULL == wp->next)
