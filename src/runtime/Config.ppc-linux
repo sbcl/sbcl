@@ -10,7 +10,7 @@
 # files for more information.
 
 CFLAGS += -m32
-LINKFLAGS += -v -rdynamic -m32
+LINKFLAGS += -rdynamic -m32
 NM = ./linux-nm
 
 ASSEM_SRC = ppc-assem.S ldso-stubs.S
