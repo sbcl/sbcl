@@ -191,7 +191,7 @@
     (inst lea rsp-tn
           (make-ea :qword :base rbp-tn
                           :disp (- (* n-word-bytes
-                                      (- (max 3 (sb-allocated-size 'stack))
+                                      (- (sb-allocated-size 'stack)
                                          sp->fp-offset)))))))
 
 ;;; This is emitted directly before either a known-call-local, call-local,
@@ -217,7 +217,8 @@
   (:generator 2
     (inst lea res (make-ea :qword :base rsp-tn
                            :disp (- (* sp->fp-offset n-word-bytes))))
-    (inst sub rsp-tn (* (max nargs 3) n-word-bytes))))
+    (inst sub rsp-tn (* (max nargs (sb!c::sb-size (sb-or-lose 'stack)))
+                        n-word-bytes))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-REF
@@ -1095,19 +1096,19 @@
     (inst neg temp)
 
     ;; Allocate the space on the stack.
-    ;; stack = rbp + sp->fp-offset - (max 3 frame-size) - (nargs - fixed)
+    ;; stack = rbp + sp->fp-offset - frame-size - (nargs - fixed)
     ;; if we'd move SP backward, swap the meaning of rsp and source;
     ;; otherwise, we'd be accessing values below SP, and that's no good
     ;; if a signal interrupts this code sequence.  In that case, store
     ;; the final value in rsp after the stack-stack memmove loop.
-    (inst lea (if (<= fixed (max 3 (sb-allocated-size 'stack)))
+    (inst lea (if (<= fixed (sb-allocated-size 'stack))
                   rsp-tn
                   source)
           (make-ea :qword :base rbp-tn
                           :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
                           :disp (* n-word-bytes
                                    (- (+ sp->fp-offset fixed)
-                                      (max 3 (sb-allocated-size 'stack))))))
+                                      (sb-allocated-size 'stack)))))
 
     ;; Now: nargs>=1 && nargs>fixed
 
@@ -1117,7 +1118,7 @@
            ;; r-a-c is 3, so the aver is OK. If the calling convention
            ;; ever changes, the logic above with LEA will have to be
            ;; adjusted.
-           (aver (<= fixed (max 3 (sb-allocated-size 'stack))))
+           (aver (<= fixed (sb-allocated-size 'stack)))
            ;; We must stop when we run out of stack args, not when we
            ;; run out of more args.
            ;; Number to copy = nargs-3
@@ -1133,7 +1134,7 @@
 
     ;; Initialize R8 to be the end of args.
     ;; Swap with SP if necessary to mirror the previous condition
-    (inst lea (if (<= fixed (max 3 (sb-allocated-size 'stack)))
+    (inst lea (if (<= fixed (sb-allocated-size 'stack))
                   source
                   rsp-tn)
           (make-ea :qword :base rbp-tn
@@ -1141,8 +1142,8 @@
                           :disp (* sp->fp-offset n-word-bytes)))
 
     ;; src: rbp + temp + sp->fp
-    ;; dst: rbp + temp + sp->fp + (fixed - (max 3 [stack-size]))
-    (let ((delta (- fixed (max 3 (sb-allocated-size 'stack))))
+    ;; dst: rbp + temp + sp->fp + (fixed - [stack-size])
+    (let ((delta (- fixed (sb-allocated-size 'stack)))
           (loop (gen-label))
           (fixnum->word (ash 1 (- word-shift n-fixnum-tag-bits))))
       (cond ((zerop delta)) ; no-op move
@@ -1185,8 +1186,7 @@
                                     (- sp->fp-offset
                                        (+ 1
                                           (- i fixed)
-                                          (max 3 (sb-allocated-size
-                                                  'stack))))))
+                                          (sb-allocated-size 'stack)))))
               (nth i *register-arg-tns*))
 
         (incf i)
@@ -1206,7 +1206,7 @@
           (make-ea :qword :base rbp-tn
                    :disp (* n-word-bytes
                             (- sp->fp-offset
-                               (max 3 (sb-allocated-size 'stack))))))
+                               (sb-allocated-size 'stack)))))
 
     DONE))
 
