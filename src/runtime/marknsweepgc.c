@@ -173,9 +173,7 @@ static inline void assign_generation(lispobj* obj, generation_index_t gen)
 // Turn a grey node black.
 static inline void set_visited(lispobj* obj)
 {
-#ifdef DEBUG
-    gc_assert(__immobile_obj_gen_bits(obj) == new_space);
-#endif
+    gc_dcheck(__immobile_obj_gen_bits(obj) == new_space);
     ((generation_index_t*)obj)[3] |= IMMOBILE_OBJ_VISITED_FLAG;
 }
 #else
@@ -310,9 +308,7 @@ lispobj alloc_immobile_obj(int page_attributes, lispobj header, int* hint)
   int spacing_in_bytes = OBJ_SPACING(page_attributes) << WORD_SHIFT;
 
   page = *hint;
-#ifdef DEBUG
-  gc_assert(low_page_address(page) < (void*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value);
-#endif
+  gc_dcheck(low_page_address(page) < (void*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value);
   do {
       page_data = low_page_address(page);
       obj_ptr = page_data + fixedobj_pages[page].free_index;

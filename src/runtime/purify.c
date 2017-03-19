@@ -92,7 +92,7 @@ static inline lispobj *
 newspace_alloc(long nwords, int constantp)
 {
     lispobj *ret;
-    gc_assert((nwords &1 ) == 0);
+    gc_assert((nwords & 1) == 0);
     if(constantp) {
         if(read_only_free + nwords >= (lispobj *)READ_ONLY_SPACE_END) {
             lose("Ran out of read-only space while purifying!\n");

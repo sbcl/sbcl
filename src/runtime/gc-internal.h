@@ -27,6 +27,14 @@
 #include "cheneygc-internal.h"
 #endif
 
+/// Enable extra debug-only checks if DEBUG
+#ifdef DEBUG
+# define gc_dcheck(ex) gc_assert(ex)
+#else
+# define gc_dcheck(ex) ((void)0)
+#endif
+
+/// Disable all assertions if NDEBUG
 #ifdef NDEBUG
 # define gc_assert(ex) ((void)0)
 # define gc_assert_verbose(ex, fmt, ...) ((void)0)
@@ -149,13 +157,13 @@ extern void *gc_general_alloc(word_t nbytes,int page_type_flag,int quick_p);
 #endif
 
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
-    gc_assert(is_lisp_pointer(object)); \
-    gc_assert(from_space_p(object)); \
-    gc_assert((nwords & 0x01) == 0)
+    gc_dcheck(is_lisp_pointer(object)); \
+    gc_dcheck(from_space_p(object)); \
+    gc_dcheck((nwords & 0x01) == 0)
 
 #define CHECK_COPY_POSTCONDITIONS(copy, lowtag) \
-    gc_assert(lowtag_of(copy) == lowtag); \
-    gc_assert(!from_space_p(copy));
+    gc_dcheck(lowtag_of(copy) == lowtag); \
+    gc_dcheck(!from_space_p(copy));
 
 static inline lispobj
 gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
