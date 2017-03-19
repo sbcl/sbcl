@@ -1925,9 +1925,6 @@ trans_boxed_large(lispobj object)
  * maintained within the objects which causes writes to the pages. A
  * limited attempt is made to avoid unnecessary writes, but this needs
  * a re-think. */
-#define WEAK_POINTER_NWORDS \
-    CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
-
 static sword_t
 scav_weak_pointer(lispobj *where, lispobj object)
 {

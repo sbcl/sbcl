@@ -903,9 +903,6 @@ DEF_SPECIALIZED_VECTOR(vector_long_float, length * LONG_FLOAT_SIZE)
 DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE))
 #endif
 
-#define WEAK_POINTER_NWORDS \
-        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
-
 static lispobj
 trans_weak_pointer(lispobj object)
 {

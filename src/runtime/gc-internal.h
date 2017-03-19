@@ -121,6 +121,9 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
 #define SIMPLE_FUN_SCAV_START(fun_ptr) &fun_ptr->name
 #define SIMPLE_FUN_SCAV_NWORDS(fun_ptr) ((lispobj*)fun_ptr->code - &fun_ptr->name)
 
+#define WEAK_POINTER_NWORDS \
+        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
+
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h.  FIXME: Perhaps these constants
  * should be there, or at least defined on gencgc only? */

@@ -339,9 +339,6 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 
 /* weak pointers */
 
-#define WEAK_POINTER_NWORDS \
-        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
-
 static sword_t
 scav_weak_pointer(lispobj *where, lispobj object)
 {
