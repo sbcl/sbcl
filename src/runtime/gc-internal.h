@@ -122,20 +122,17 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
 #define SIMPLE_FUN_SCAV_START(fun_ptr) &fun_ptr->name
 #define SIMPLE_FUN_SCAV_NWORDS(fun_ptr) ((lispobj*)fun_ptr->code - &fun_ptr->name)
 
-#define WEAK_POINTER_NWORDS \
-        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
-
 /* values for the *_alloc_* parameters, also see the commentary for
- * struct page in gencgc-internal.h.  FIXME: Perhaps these constants
- * should be there, or at least defined on gencgc only? */
+ * struct page in gencgc-internal.h. These constants are used in gc-common,
+ * so they can't easily be made gencgc-only */
 #define FREE_PAGE_FLAG 0
 #define BOXED_PAGE_FLAG 1
 #define UNBOXED_PAGE_FLAG 2
 #define OPEN_REGION_PAGE_FLAG 4
 #define CODE_PAGE_FLAG        (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
 
-#define ALLOC_BOXED 0
-#define ALLOC_UNBOXED 1
+// Gencgc distinguishes between "quick" and "ordinary" requests.
+// Even on cheneygc we need this flag, but it's actually just ignored.
 #define ALLOC_QUICK 1
 
 #ifdef LISP_FEATURE_GENCGC
@@ -329,6 +326,9 @@ static inline boolean immobile_filler_p(lispobj* obj) {
   instance_ptr[0] = (layout << 32) | (instance_ptr[0] & 0xFFFFFFFF)
 
 #endif /* immobile space */
+
+#define WEAK_POINTER_NWORDS \
+        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
 static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
 {

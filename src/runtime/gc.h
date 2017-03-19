@@ -17,9 +17,8 @@
 #define _GC_H_
 
 #include "sbcl.h"
+#include "os.h"
 #include <stdint.h>
-
-#define PAGE_BYTES BACKEND_PAGE_BYTES
 
 typedef intptr_t page_index_t;
 #ifdef LISP_FEATURE_WIN32
@@ -30,19 +29,16 @@ typedef intptr_t page_index_t;
 #define PAGE_INDEX_FMT "d"
 #endif
 
+// This decl should probably be be in gencgc-internal,
+// except it can't be: collect_garbage() receives a generation number.
 typedef signed char generation_index_t;
 
 extern void gc_init(void);
 extern void gc_initialize_pointers(void);
 extern void collect_garbage(generation_index_t last_gen);
 
-
-#include "os.h"
-
 extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
-
-#include "fixnump.h"
 
 extern boolean maybe_gc(os_context_t *context);
 
