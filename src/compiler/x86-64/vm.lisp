@@ -509,7 +509,6 @@
 ;;; RBP-16 on.
 (defconstant return-pc-save-offset 0)
 (defconstant ocfp-save-offset 1)
-(defconstant code-save-offset 2)
 ;;; Let SP be the stack pointer before CALLing, and FP is the frame
 ;;; pointer after the standard prologue. SP +
 ;;; FRAME-WORD-OFFSET(SP->FP-OFFSET + I) = FP + FRAME-WORD-OFFSET(I).
