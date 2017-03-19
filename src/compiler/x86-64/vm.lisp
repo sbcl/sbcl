@@ -183,7 +183,8 @@
 
 (define-storage-base float-registers :finite :size 16)
 
-(define-storage-base stack :unbounded :size 3 :size-increment 1)
+;;; Start from 2, for the old RBP (aka OCFP) and return address
+(define-storage-base stack :unbounded :size 2 :size-increment 1)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
 (define-storage-base noise :unbounded :size 2)
