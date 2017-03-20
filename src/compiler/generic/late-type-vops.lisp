@@ -216,3 +216,5 @@
 
 #!+sb-simd-pack
 (!define-type-vop simd-pack-p (simd-pack-widetag))
+
+(!define-type-vop unbound-marker-p (unbound-marker-widetag))

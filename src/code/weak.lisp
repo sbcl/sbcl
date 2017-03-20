@@ -21,15 +21,7 @@
 If the referent of WEAK-POINTER has been garbage collected,
 returns the values NIL and NIL."
   (declare (type weak-pointer weak-pointer))
-  ;; We don't need to wrap this with a WITHOUT-GCING, because once we
-  ;; have extracted the value, our reference to it will keep the weak
-  ;; pointer from becoming broken. We just have to make sure the
-  ;; compiler won't reorder these primitives.
-  ;;
-  ;; FIXME: Might it be a good idea to tweak the DEFKNOWNs for
-  ;; %WEAK-POINTER-VALUE and %WEAK-POINTER-BROKEN, so that the
-  ;; compiler will never try to reorder them even in code where we
-  ;; neglect to frame them in a LET?
-  (let ((value (sb!c::%weak-pointer-value weak-pointer))
-        (broken (sb!c::%weak-pointer-broken weak-pointer)))
-    (values value (not broken))))
+  (let ((value (sb!vm::%weak-pointer-value weak-pointer)))
+    (if (sb!vm::unbound-marker-p value)
+        (values nil nil)
+        (values value t))))

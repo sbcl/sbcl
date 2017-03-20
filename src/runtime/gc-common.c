@@ -930,18 +930,10 @@ trans_weak_pointer(lispobj object)
     return copy;
 }
 
-static sword_t
-size_weak_pointer(lispobj *where)
-{
-    return WEAK_POINTER_NWORDS;
-}
-
-
 void scan_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointers, next_wp = NULL; wp != NULL; wp = next_wp) {
-        lispobj *first_pointer;
         gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
 
         next_wp = wp->next;
@@ -949,30 +941,21 @@ void scan_weak_pointers(void)
         if (next_wp == wp) /* gencgc uses a ref to self for end of list */
             next_wp = NULL;
 
-        lispobj value = wp->value;
-        gc_assert(is_lisp_pointer(value));
+        gc_assert(is_lisp_pointer(wp->value));
+        lispobj *value = native_pointer(wp->value);
 
         /* Now, we need to check whether the object has been forwarded. If
          * it has been, the weak pointer is still good and needs to be
-         * updated. Otherwise, the weak pointer needs to be nil'ed
-         * out. */
+         * updated. Otherwise, the weak pointer needs to be broken. */
 
-        if (from_space_p(value)) {
-            first_pointer = native_pointer(value);
-
-            if (forwarding_pointer_p(first_pointer)) {
-              wp->value = LOW_WORD(forwarding_pointer_value(first_pointer));
-            } else {
-            /* Break it. */
-                wp->value = NIL;
-                wp->broken = T;
-            }
+        if (from_space_p((lispobj)value)) {
+            wp->value = forwarding_pointer_p(value) ?
+                LOW_WORD(forwarding_pointer_value(value)) : UNBOUND_MARKER_WIDETAG;
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-          else if (immobile_space_p(value) &&
-                   immobile_obj_gen_bits(native_pointer(value)) == from_space) {
-                wp->value = NIL;
-                wp->broken = T;
+          else if (immobile_space_p((lispobj)value) &&
+                   immobile_obj_gen_bits(value) == from_space) {
+                wp->value = UNBOUND_MARKER_WIDETAG;
         }
 #endif
         else

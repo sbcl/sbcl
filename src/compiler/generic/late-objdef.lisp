@@ -55,7 +55,7 @@
     (character "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")
-    (weak-pointer "lose" "weak_pointer")
+    (weak-pointer "lose" "weak_pointer" "boxed")
     (instance-header "instance")
     (fdefn ,(or #!+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
 

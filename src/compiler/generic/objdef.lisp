@@ -275,12 +275,8 @@
                                        :lowtag other-pointer-lowtag
                                        :widetag weak-pointer-widetag
                                        :alloc-trans make-weak-pointer)
-  ;; FIXME: SB!C should be almost *anything* but that. Probably SB!KERNEL
-  (value :ref-trans sb!c::%weak-pointer-value :ref-known (flushable)
+  (value :ref-trans %weak-pointer-value :ref-known (flushable)
          :init :arg)
-  (broken :type (member t nil)
-          :ref-trans sb!c::%weak-pointer-broken :ref-known (flushable)
-          :init :null)
   (next :c-type #!-alpha "struct weak_pointer *" #!+alpha "u32"))
 
 ;;;; other non-heap data blocks

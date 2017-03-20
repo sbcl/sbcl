@@ -332,10 +332,10 @@ static inline boolean immobile_filler_p(lispobj* obj) {
 
 static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
 {
-    lispobj pointee;
-    return wp->broken != T &&
-        is_lisp_pointer(pointee = wp->value) &&
-        (from_space_p(pointee)
+    lispobj pointee = wp->value;
+    // A broken weak-pointer's value slot has unbound-marker
+    // which does not satisfy is_lisp_pointer().
+    return is_lisp_pointer(pointee) && (from_space_p(pointee)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
          || (immobile_space_p(pointee) &&
              immobile_obj_gen_bits(native_pointer(pointee)) == from_space)

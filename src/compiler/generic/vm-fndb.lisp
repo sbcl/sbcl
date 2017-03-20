@@ -64,6 +64,7 @@
            #!+64-bit
            signed-byte-64-p
            weak-pointer-p code-component-p lra-p
+           sb!vm::unbound-marker-p
            simple-fun-p
            closurep
            funcallable-instance-p)
