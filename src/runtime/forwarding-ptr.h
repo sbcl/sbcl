@@ -14,6 +14,17 @@ forwarding_pointer_p(lispobj *pointer) {
 #ifdef LISP_FEATURE_GENCGC
     return (first_word == 0x01);
 #else
+    // FIXE: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
+    // an extra test here, which theoretically slowed things down.
+    // This was in response to 044e22192c25578efceedba042554dc9a96124c6
+    // which caused cheneygc to break. But now the latter revision has been
+    // reverted due to performance degradation in gencgc.
+    // The right fix is probably that search_spaces() should use its own
+    // special version of gc_search_space for ldb. That is unfortunately
+    // made difficult by the call chain:
+    //   search_spaces() -> search_{foo}_space() -> gc_search_space().
+    // which requires informing gc_search_space() to be more careful,
+    // and similarly forwarding_pointer_p().
     return (is_lisp_pointer(first_word)
             && in_gc_p() /* cheneygc new_space_p() is broken when not in gc */
             && new_space_p(first_word));
