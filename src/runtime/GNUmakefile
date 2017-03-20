@@ -46,13 +46,13 @@ include genesis/Makefile.features
 include Config
 
 # Disable PIE when possible
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e no-pie),)
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 CFLAGS += -fno-pie
 LINKFLAGS += -no-pie
 LDFLAGS += -no-pie
 __LDFLAGS__ += -no-pie
 endif
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e nopie),)
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
 CFLAGS += -fno-pie
 LINKFLAGS += -nopie
 LDFLAGS += -nopie
