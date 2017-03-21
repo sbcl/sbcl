@@ -2515,7 +2515,7 @@
                                     pathname))
                        (t nil)))
                     ((and (eql errno #!-win32 sb!unix:eexist
-                                     #!+win32 sb!win32::error_already_exists)
+                                     #!+win32 sb!win32::error_file_exists)
                           (null if-exists))
                      nil)
                     (t
