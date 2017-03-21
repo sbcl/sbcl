@@ -89,8 +89,7 @@ static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 static const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
 extern uword_t *page_table_pinned_dwords;
 
-static inline boolean __attribute__((unused))
-pinned_p(lispobj obj, page_index_t page)
+static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     if (!page_table[page].has_pin_map) return 0;
     int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
@@ -986,36 +985,58 @@ void scan_weak_pointers(void)
 struct hash_table *weak_hash_tables = NULL;
 
 /* Return true if OBJ has already survived the current GC. */
-static inline int
-survived_gc_yet (lispobj obj)
+static inline int pointer_survived_gc_yet(lispobj obj)
 {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    /* If an immobile object's generation# is that of 'from_space', but has been
-       visited (i.e. is live), then it is conceptually not in 'from_space'.
-       This can happen when and only when _not_ raising the generation number.
-       Since the gen_bits() accessor returns the visited bit, the byte value
-       is numerically unequal to 'from_space', which is what we want */
-    return !is_lisp_pointer(obj)
-      || (immobile_space_p(obj)
-          ? immobile_obj_gen_bits(native_pointer(obj)) != from_space
-          : (!from_space_p(obj) || forwarding_pointer_p(native_pointer(obj))));
+#ifdef LISP_FEATURE_CHENEYGC
+    // This is the most straightforward definition.
+    return (!from_space_p(obj) || forwarding_pointer_p(native_pointer(obj)));
 #else
-    return (!is_lisp_pointer(obj) || !from_space_p(obj) ||
-            forwarding_pointer_p(native_pointer(obj)));
+    /* Check for a pointer to dynamic space before considering immobile space.
+       Based on the relative size of the spaces, this should be a win because
+       if the object is in the dynamic space and not the 'from' generation
+       we don't want to test immobile_space_p() at all.
+       Additionally, pinned_p() is both more expensive and less likely than
+       forwarding_pointer_p(), so we want to reverse those conditions, which
+       would not be possible with pinned_p() buried inside from_space_p(). */
+    page_index_t page_index = find_page_index((void*)obj);
+    if (page_index >= 0)
+        return page_table[page_index].gen != from_space ||
+               forwarding_pointer_p(native_pointer(obj)) ||
+               pinned_p(obj, page_index);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (immobile_space_p(obj))
+        return immobile_obj_gen_bits(native_pointer(obj)) != from_space;
+#endif
+    return 1;
 #endif
 }
 
+#ifdef EMPTY_HT_SLOT /* only if it's a static symbol */
+// "ish" because EMPTY_HT_SLOT is of course a pointer.
+#  define ht_cell_nonpointerish(x) (!is_lisp_pointer(x) || x==EMPTY_HT_SLOT)
+#else
+#  define ht_cell_nonpointerish(x) !is_lisp_pointer(x)
+#endif
+
 static int survived_gc_yet_KEY(lispobj key, lispobj value) {
-    return survived_gc_yet(key);
+    return ht_cell_nonpointerish(key) || pointer_survived_gc_yet(key);
 }
 static int survived_gc_yet_VALUE(lispobj key, lispobj value) {
-    return survived_gc_yet(value);
+    return ht_cell_nonpointerish(value) || pointer_survived_gc_yet(value);
 }
 static int survived_gc_yet_AND(lispobj key, lispobj value) {
-    return survived_gc_yet(key) && survived_gc_yet(value);
+    int key_nonpointer = ht_cell_nonpointerish(key);
+    int val_nonpointer = ht_cell_nonpointerish(value);
+    if (key_nonpointer && val_nonpointer) return 1;
+    return (key_nonpointer || pointer_survived_gc_yet(key))
+        && (val_nonpointer || pointer_survived_gc_yet(value));
 }
 static int survived_gc_yet_OR(lispobj key, lispobj value) {
-    return survived_gc_yet(key) || survived_gc_yet(value);
+    int key_nonpointer = ht_cell_nonpointerish(key);
+    int val_nonpointer = ht_cell_nonpointerish(value);
+    if (key_nonpointer || val_nonpointer) return 1;
+    // Both MUST be pointers
+    return pointer_survived_gc_yet(key) || pointer_survived_gc_yet(value);
 }
 
 static int (*weak_hash_entry_alivep_fun(lispobj weakness))(lispobj,lispobj)
