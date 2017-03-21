@@ -470,9 +470,10 @@
                                      (slow-result (handler-case
                                                       (apply slow call-args)
                                                     (division-by-zero () :div0))))
-                                (if (eql fast-result slow-result)
-                                    (print (list :ok `(,op ,@args) :=> fast-result))
-                                    (error "oops: ~S, ~S" args call-args)))))))))))
+                                (if (not (eql fast-result slow-result))
+                                    (error "oops: ~S, ~S" args call-args)
+                                    #+nil (print (list :ok `(,op ,@args) :=> fast-result))
+                                    ))))))))))
 
 ;;; (TRUNCATE <unsigned-word> <constant unsigned-word>) is optimized
 ;;; to use multiplication instead of division. This propagates to FLOOR,
@@ -560,9 +561,9 @@
         results)
     (dolist (base (cons bignum numbers))
       (dolist (power numbers)
-        (format t "(expt ~s ~s) => " base power)
+        #+nil (format t "(expt ~s ~s) => " base power)
         (let ((result (expt base power)))
-          (format t "~s~%" result)
+          #+nil (format t "~s~%" result)
           (push result results))))
     (assert (every #'numberp results))))
 
@@ -583,6 +584,8 @@
              (and (nearly-equal-p (realpart x) (realpart y))
                   (nearly-equal-p (imagpart x) (imagpart y))))
            (print-result (msg base power got expected)
+             (declare (ignorable msg base power got expected))
+             #+nil
              (format t "~a (expt ~s ~s)~%got      ~s~%expected ~s~%"
                      msg base power got expected)))
     (let ((n-broken 0))

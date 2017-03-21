@@ -139,7 +139,7 @@
                         floating-point-underflow
                         simple-bit-vector)))
   (dolist (type standard-types)
-    (format t "~&~S~%" type)
+    #+nil (format t "~&~S~%" type)
     (assert (not (sb-kernel:unknown-type-p (sb-kernel:specifier-type type))))
     (assert (atom (sb-kernel:type-specifier (sb-kernel:specifier-type type))))))
 

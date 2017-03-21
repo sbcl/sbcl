@@ -14,7 +14,7 @@ forwarding_pointer_p(lispobj *pointer) {
 #ifdef LISP_FEATURE_GENCGC
     return (first_word == 0x01);
 #else
-    // FIXE: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
+    // FIXME: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
     // an extra test here, which theoretically slowed things down.
     // This was in response to 044e22192c25578efceedba042554dc9a96124c6
     // which caused cheneygc to break. But now the latter revision has been
