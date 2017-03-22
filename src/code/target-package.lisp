@@ -971,13 +971,16 @@ implementation it is ~S." *!default-package-use-list*)
                      (let ((symbol ; Symbol kind: 1=keyword, 2=other interned
                             (%make-symbol (if (eq package *keyword-package*) 1 2)
                                           symbol-name)))
+                       ;; Simultaneous INTERN calls must not return an incompletely
+                       ;; initialized object, so that
+                       ;; (symbol-package (intern x #<pkg>)) = #<pkg>
+                       (%set-symbol-package symbol package)
                        (add-symbol (cond ((eq package *keyword-package*)
                                           (%set-symbol-value symbol symbol)
                                           (package-external-symbols package))
                                          (t
                                           (package-internal-symbols package)))
                                    symbol)
-                       (%set-symbol-package symbol package)
                        (values symbol nil))))))))))
 
 ;;; Check internal and external symbols, then scan down the list

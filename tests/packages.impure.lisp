@@ -883,3 +883,30 @@ if a restart was invoked."
             threads))
     (let ((results (mapcar #'sb-thread:join-thread threads)))
       (assert (not (find :fail results))))))
+
+;;; This test is a bit weak in that prior to the fix for what it tests,
+;;; it didn't fail often enough to convincingly show that there was a problem.
+;;; Nonetheless it did sometimes fail, and now should never fail.
+(with-test (:name :concurrent-intern-bad-published-symbol-package
+                  ;; No point in wasting time on concurrency bugs otherwise
+                  :skipped-on '(not :sb-thread))
+  ;; Confirm that the compiler does not know that KEYWORDICATE
+  ;; returns a KEYWORD (so the answer isn't constant-folded)
+  (assert (sb-kernel:type= (sb-int:info :function :type 'sb-int:keywordicate)
+                           (sb-kernel:find-classoid 'function)))
+  (let ((sema (sb-thread:make-semaphore))
+        (n-threads 10))
+    (dotimes (i 10) ; number of trials
+      (let ((threads))
+        (dotimes (i n-threads)
+          (push (make-join-thread
+                 (lambda ()
+                   (sb-thread:wait-on-semaphore sema)
+                   (keywordp (sb-int:keywordicate "BLUB"))))
+                threads))
+        (sb-thread:signal-semaphore sema n-threads)
+        (let ((count 0))
+          (dolist (thread threads)
+            (when (sb-thread:join-thread thread) (incf count)))
+          (unintern (sb-int:keywordicate "BLUB") "KEYWORD")
+          (assert (= count n-threads)))))))
