@@ -85,7 +85,7 @@ copy_code_object(lispobj object, sword_t nwords)
 
 static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifdef LISP_FEATURE_GENCGC
 static const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
 extern uword_t *page_table_pinned_dwords;
 
