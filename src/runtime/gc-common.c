@@ -184,25 +184,15 @@ static lispobj trans_short_boxed(lispobj object);
 static sword_t
 scav_fun_pointer(lispobj *where, lispobj object)
 {
-    lispobj *first_pointer;
-    lispobj copy;
-
     gc_dcheck(lowtag_of(object) == FUN_POINTER_LOWTAG);
 
     /* Object is a pointer into from_space - not a FP. */
-    first_pointer = native_pointer(object);
+    lispobj *first_pointer = native_pointer(object);
 
     /* must transport object -- object may point to either a function
      * header, a funcallable instance header, or a closure header. */
-
-    switch (widetag_of(*first_pointer)) {
-    case SIMPLE_FUN_HEADER_WIDETAG:
-        copy = trans_fun_header(object);
-        break;
-    default:
-        copy = trans_short_boxed(object);
-        break;
-    }
+    lispobj copy = widetag_of(*first_pointer) == SIMPLE_FUN_HEADER_WIDETAG
+      ? trans_fun_header(object) : trans_short_boxed(object);
 
     if (copy != object) {
         /* Set forwarding pointer */
@@ -314,9 +304,7 @@ scav_code_header(lispobj *where, lispobj header)
 static lispobj
 trans_code_header(lispobj object)
 {
-    struct code *ncode;
-
-    ncode = trans_code((struct code *) native_pointer(object));
+    struct code *ncode = trans_code((struct code *) native_pointer(object));
     return (lispobj) LOW_WORD(ncode) | OTHER_POINTER_LOWTAG;
 }
 
@@ -339,16 +327,12 @@ scav_return_pc_header(lispobj *where, lispobj object)
 static lispobj
 trans_return_pc_header(lispobj object)
 {
-    struct simple_fun *return_pc;
-    uword_t offset;
-    struct code *code, *ncode;
-
-    return_pc = (struct simple_fun *) native_pointer(object);
-    offset = HeaderValue(return_pc->header) * N_WORD_BYTES;
+    struct simple_fun *return_pc = (struct simple_fun *) native_pointer(object);
+    uword_t offset = HeaderValue(return_pc->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
-    code = (struct code *) ((uword_t) return_pc - offset);
-    ncode = trans_code(code);
+    struct code *code = (struct code *) ((uword_t) return_pc - offset);
+    struct code *ncode = trans_code(code);
 
     return ((lispobj) LOW_WORD(ncode) + offset) | OTHER_POINTER_LOWTAG;
 }
@@ -364,11 +348,8 @@ trans_return_pc_header(lispobj object)
 static sword_t
 scav_closure_header(lispobj *where, lispobj object)
 {
-    struct closure *closure;
-    lispobj fun;
-
-    closure = (struct closure *)where;
-    fun = closure->fun - FUN_RAW_ADDR_OFFSET;
+    struct closure *closure = (struct closure *)where;
+    lispobj fun = closure->fun - FUN_RAW_ADDR_OFFSET;
     scavenge(&fun, 1);
 #ifdef LISP_FEATURE_GENCGC
     /* The function may have moved so update the raw address. But
@@ -393,16 +374,12 @@ scav_fun_header(lispobj *where, lispobj object)
 static lispobj
 trans_fun_header(lispobj object)
 {
-    struct simple_fun *fheader;
-    uword_t offset;
-    struct code *code, *ncode;
-
-    fheader = (struct simple_fun *) native_pointer(object);
-    offset = HeaderValue(fheader->header) * N_WORD_BYTES;
+    struct simple_fun *fheader = (struct simple_fun *) native_pointer(object);
+    uword_t offset = HeaderValue(fheader->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
-    code = (struct code *) ((uword_t) fheader - offset);
-    ncode = trans_code(code);
+    struct code *code = (struct code *) ((uword_t) fheader - offset);
+    struct code *ncode = trans_code(code);
 
     return ((lispobj) LOW_WORD(ncode) + offset) | FUN_POINTER_LOWTAG;
 }
@@ -423,17 +400,12 @@ trans_instance(lispobj object)
 static sword_t
 scav_instance_pointer(lispobj *where, lispobj object)
 {
-    lispobj copy, *first_pointer;
-
     /* Object is a pointer into from space - not a FP. */
-    copy = trans_instance(object);
+    lispobj copy = trans_instance(object);
 
-#ifdef LISP_FEATURE_GENCGC
     gc_dcheck(copy != object);
-#endif
 
-    first_pointer = native_pointer(object);
-    set_forwarding_pointer(first_pointer,copy);
+    set_forwarding_pointer(native_pointer(object), copy);
     *where = copy;
 
     return 1;
@@ -449,10 +421,9 @@ static lispobj trans_list(lispobj object);
 static sword_t
 scav_list_pointer(lispobj *where, lispobj object)
 {
-    lispobj copy;
     gc_dcheck(lowtag_of(object) == LIST_POINTER_LOWTAG);
 
-    copy = trans_list(object);
+    lispobj copy = trans_list(object);
     gc_dcheck(copy != object);
 
     CHECK_COPY_POSTCONDITIONS(copy, LIST_POINTER_LOWTAG);
@@ -507,13 +478,11 @@ trans_list(lispobj object)
 static sword_t
 scav_other_pointer(lispobj *where, lispobj object)
 {
-    lispobj copy, *first_pointer;
-
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     /* Object is a pointer into from space - not FP. */
-    first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
-    copy = (transother[widetag_of(*first_pointer)])(object);
+    lispobj *first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
+    lispobj copy = transother[widetag_of(*first_pointer)](object);
 
     // If the object was large, then instead of transporting it,
     // gencgc might simply promote the pages and return the same pointer.
@@ -781,9 +750,7 @@ static sword_t size_tiny_boxed(lispobj *where)
 static sword_t
 scav_fdefn(lispobj *where, lispobj object)
 {
-    struct fdefn *fdefn;
-
-    fdefn = (struct fdefn *)where;
+    struct fdefn *fdefn = (struct fdefn *)where;
 
     /* FSHOW((stderr, "scav_fdefn, function = %p, raw_addr = %p\n",
        fdefn->fun, fdefn->raw_addr)); */
