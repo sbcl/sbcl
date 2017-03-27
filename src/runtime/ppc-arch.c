@@ -271,14 +271,11 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 static int
 allocation_trap_p(os_context_t * context)
 {
-    int result;
     unsigned int *pc;
     unsigned inst;
     unsigned opcode;
     unsigned src;
-    unsigned dst;
-
-    result = 0;
+    unsigned __attribute__((unused)) dst;
 
     /*
      * First, the instruction has to be a TWLGE temp, NL3, which has the
@@ -331,7 +328,8 @@ handle_allocation_trap(os_context_t * context)
 {
     unsigned int *pc;
     unsigned int inst;
-    unsigned int target, target_ptr, end_addr;
+    unsigned int target;
+    unsigned int __attribute__((unused)) target_ptr, end_addr;
     unsigned int opcode;
     int size;
     boolean were_in_lisp;
@@ -496,9 +494,9 @@ handle_allocation_trap(os_context_t * context)
      * instructions when threading is enabled and four instructions
      * otherwise. */
 #ifdef LISP_FEATURE_SB_THREAD
-    (*os_context_pc_addr(context)) = pc + 2;
+    (*os_context_pc_addr(context)) = (unsigned int)(pc + 2);
 #else
-    (*os_context_pc_addr(context)) = pc + 4;
+    (*os_context_pc_addr(context)) = (unsigned int)(pc + 4);
 #endif
 
 }

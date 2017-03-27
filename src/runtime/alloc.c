@@ -23,7 +23,7 @@
 #ifdef LISP_FEATURE_GENCGC
 lispobj alloc_code_object (unsigned boxed, unsigned unboxed) {
     struct code * code;
-    struct thread *th = arch_os_get_current_thread();
+    struct thread __attribute__((unused)) *th = arch_os_get_current_thread();
     /* boxed is the number of constants, add other slots, align it to
      * two words, so that the code start is aligned, and convert it to
      * bytes. */

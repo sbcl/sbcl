@@ -202,7 +202,7 @@ kill_cmd(char **ptr)
 static void
 regs_cmd(char **ptr)
 {
-    struct thread *thread=arch_os_get_current_thread();
+    struct thread __attribute__((unused)) *thread=arch_os_get_current_thread();
 
     printf("CSP\t=\t%p   ", access_control_stack_pointer(thread));
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
