@@ -147,8 +147,8 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
     } else {
 #if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
         if (forwarding_pointer_p(object_ptr))
-          lose("unexpected forwarding pointer in scavenge: %p, start=%p, n=%ld\n",
-               object_ptr, start, n_words);
+          lose("unexpected forwarding pointer in scavenge @ %p\n",
+               object_ptr);
 #endif
         /* It points somewhere other than oldspace. Leave it
          * alone. */
