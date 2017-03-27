@@ -2564,13 +2564,13 @@ scavenge_generations(generation_index_t from, generation_index_t to)
      * have been written to. */
     for (i = 0; i < page_table_pages; i++) {
         if (page_allocated_p(i)
-            && (page_table[i].bytes_used != 0)
+            && (page_bytes_used(i) != 0)
             && (page_table[i].gen == generation)
             && (page_table[i].write_protected_cleared != 0)) {
             FSHOW((stderr, "/scavenge_generation() %d\n", generation));
             FSHOW((stderr,
                    "/page bytes_used=%d scan_start_offset=%lu dont_move=%d\n",
-                    page_table[i].bytes_used,
+                    page_bytes_used(i),
                     scan_start_offset(page_table[i]),
                     page_table[i].dont_move));
             lose("write to protected page %d in scavenge_generation()\n", i);
@@ -2806,7 +2806,7 @@ scavenge_newspace_generation(generation_index_t generation)
          * have been written to. */
         for (i = 0; i < page_table_pages; i++) {
             if (page_allocated_p(i)
-                && (page_table[i].bytes_used != 0)
+                && (page_bytes_used(i) != 0)
                 && (page_table[i].gen == generation)
                 && (page_table[i].write_protected_cleared != 0)
                 && (page_table[i].dont_move == 0)) {
@@ -2932,7 +2932,7 @@ print_ptr(lispobj *addr)
                 pi1,
                 page_table[pi1].allocated,
                 page_table[pi1].gen,
-                page_table[pi1].bytes_used,
+                page_bytes_used(pi1),
                 scan_start_offset(page_table[pi1]),
                 page_table[pi1].dont_move);
     fprintf(stderr,"  %x %x %x %x (%x) %x %x %x %x\n",
