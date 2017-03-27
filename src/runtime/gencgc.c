@@ -3008,7 +3008,7 @@ verify_space(lispobj *start, size_t words)
                 /* If it's within the dynamic space it should point to a used page. */
                 if (!page_allocated_p(page_index))
                     lose ("Ptr %p @ %p sees free page.\n", thing, start);
-                if ((char*)thing - (char*)page_address(page_index) >= page_bytes_used(page_index))
+                if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
                     lose ("Ptr %p @ %p sees unallocated space.\n", thing, start);
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*native_pointer(thing) == 0x01) {
