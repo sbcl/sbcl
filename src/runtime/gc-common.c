@@ -421,12 +421,6 @@ trans_instance(lispobj object)
 }
 
 static sword_t
-size_instance(lispobj *where)
-{
-    return 1 + (instance_length(*where)|1);
-}
-
-static sword_t
 scav_instance_pointer(lispobj *where, lispobj object)
 {
     lispobj copy, *first_pointer;
@@ -540,12 +534,6 @@ scav_other_pointer(lispobj *where, lispobj object)
 /*
  * immediate, boxed, and unboxed objects
  */
-
-static sword_t
-size_pointer(lispobj *where)
-{
-    return 1;
-}
 
 static sword_t
 scav_immediate(lispobj *where, lispobj object)
@@ -838,14 +826,6 @@ trans_unboxed(lispobj object)
     sword_t length = HeaderValue(*native_pointer(object)) + 1;
     return copy_unboxed_object(object, CEILING(length, 2));
 }
-
-static sword_t
-size_unboxed(lispobj *where)
-{
-    sword_t length = HeaderValue(*where) + 1;
-    return CEILING(length, 2);
-}
-
 
 /* vector-like objects */
 static lispobj

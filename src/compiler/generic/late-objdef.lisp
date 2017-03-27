@@ -31,6 +31,10 @@
 ;;; Keep this (mostly) lined up with 'early-objdef' for sanity's sake!
 #+sb-xc-host
 (defparameter *scav/trans/size*
+ (mapcar
+  (lambda (entry)
+    (cons (symbol-value (symbolicate (car entry) "-WIDETAG"))
+          (cdr entry)))
   `((bignum "unboxed")
     (ratio "boxed")
     (single-float ,(or #!+64-bit "immediate" "unboxed"))
@@ -56,7 +60,7 @@
     (sap "unboxed")
     (unbound-marker "immediate")
     (weak-pointer "lose" "weak_pointer" "boxed")
-    (instance-header "instance")
+    (instance-header "instance" "instance" "short_boxed")
     (fdefn ,(or #!+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
 
     (no-tls-value-marker "immediate")
@@ -101,7 +105,7 @@
 
     (complex-bit-vector "boxed")
     (complex-vector "boxed")
-    (complex-array "boxed")))
+    (complex-array "boxed"))))
 
 #+sb-xc-host
 (defun write-gc-tables (stream)
@@ -121,12 +125,10 @@
                  (setf (svref scavtab i) (format nil "~A_pointer" pointer-kind)
                        (svref sizetab i) "pointer"))))))
     (dolist (entry *scav/trans/size*)
-      (destructuring-bind (prefix scav &optional (trans scav) (size trans)) entry
-        (let ((widetag (symbol-value (find-symbol (format nil "~A-WIDETAG" prefix)
-                                                  'sb!vm))))
-          (setf (svref scavtab widetag) scav
-                (svref transtab widetag) trans
-                (svref sizetab widetag) size))))
+      (destructuring-bind (widetag scav &optional (trans scav) (size trans)) entry
+        (setf (svref scavtab widetag) scav
+              (svref transtab widetag) trans
+              (svref sizetab widetag) size)))
     (flet ((write-table (decl prefix contents)
              (format stream "~A = {" decl)
              (loop for i from 0 for x across contents
@@ -140,5 +142,9 @@
                    "scav_" scavtab)
       (write-table "lispobj (*transother[256])(lispobj object)"
                    "trans_" transtab)
+      (format stream "#define size_pointer size_immediate~%")
+      (format stream "#define size_unboxed size_boxed~%")
       (write-table "sword_t (*sizetab[256])(lispobj *where)"
-                   "size_" sizetab))))
+                   "size_" sizetab)
+      (format stream "#undef size_pointer~%")
+      (format stream "#undef size_unboxed~%"))))
