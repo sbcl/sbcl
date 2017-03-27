@@ -221,7 +221,11 @@ static inline int instruction_ptr_p(void *pointer, lispobj *start_addr)
     return widetag_of(*start_addr) == CODE_HEADER_WIDETAG &&
         pointer >= (void*)(start_addr + code_header_words(*start_addr));
 }
-extern int properly_tagged_descriptor_p(void *pointer, lispobj *start_addr);
+extern int properly_tagged_p_internal(lispobj pointer, lispobj *start_addr);
+static inline int properly_tagged_descriptor_p(void *pointer, lispobj *start_addr) {
+  return is_lisp_pointer((lispobj)pointer) &&
+    properly_tagged_p_internal((lispobj)pointer, start_addr);
+}
 
 extern void scavenge_control_stack(struct thread *th);
 extern void scrub_control_stack(void);

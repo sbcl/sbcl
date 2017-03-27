@@ -47,6 +47,7 @@
 
 #include "gc.h"
 #include "gc-internal.h"
+#include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
@@ -398,21 +399,6 @@ void update_immobile_nursery_bits()
 #endif
 }
 
-#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-#define MAXIMUM_STRING_WIDETAG SIMPLE_CHARACTER_STRING_WIDETAG
-#else
-#define MAXIMUM_STRING_WIDETAG SIMPLE_BASE_STRING_WIDETAG
-#endif
-
-static inline boolean unboxed_array_p(int widetag)
-{
-    // This is not an exhaustive test for unboxed objects,
-    // but it's enough to avoid some unnecessary scavenging.
-    return (widetag >= SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG
-            && widetag <= MAXIMUM_STRING_WIDETAG
-            && widetag != SIMPLE_VECTOR_WIDETAG);
-}
-
 /* Turn a white object grey. Also enqueue the object for re-scan if required */
 void
 promote_immobile_obj(lispobj *ptr, int rescan) // a native pointer
@@ -420,7 +406,7 @@ promote_immobile_obj(lispobj *ptr, int rescan) // a native pointer
     if (widetag_of(*ptr) == SIMPLE_FUN_HEADER_WIDETAG)
         ptr = (lispobj*)code_obj_from_simple_fun((struct simple_fun*)ptr);
     gc_assert(__immobile_obj_gen_bits(ptr) == from_space);
-    int pointerish = !unboxed_array_p(widetag_of(*ptr));
+    int pointerish = !unboxed_obj_widetag_p(widetag_of(*ptr));
     assign_generation(ptr, (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG) | new_space);
     low_page_index_t page_index = find_immobile_page_index(ptr);
 
@@ -871,8 +857,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
         sword_t length = fixnum_value(((struct vector *)obj)->length);
         begin = obj + 2; // skip the header and length
         end = obj + CEILING(length + 2, 2);
-    } else if (widetag >= SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG &&
-               widetag <= MAXIMUM_STRING_WIDETAG) {
+    } else if (unboxed_obj_widetag_p(widetag)) {
         return 0;
     } else {
         lose("Unexpected widetag @ %p", obj);
@@ -1715,10 +1700,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         size = sizetab[widetag](where);
         switch (widetag) {
         default:
-          if (!(widetag <= COMPLEX_DOUBLE_FLOAT_WIDETAG
-                || widetag == SAP_WIDETAG // Better not point to code!
-                || widetag == SIMD_PACK_WIDETAG
-                || unboxed_array_p(widetag)))
+          if (!unboxed_obj_widetag_p(widetag))
             lose("Unhandled widetag in fixup_space: %p\n", (void*)header_word);
           break;
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER

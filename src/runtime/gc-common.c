@@ -44,6 +44,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#define WANT_SCAV_TRANS_SIZE_TABLES
 #include "gc-internal.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
@@ -1362,54 +1363,45 @@ gc_search_space3(void *pointer, lispobj *start, void *limit)
  *
  * pointer is the pointer to check validity of,
  * and start_addr is the address of the enclosing object.
+ *
+ * This is actually quite simple to check: because the heap state is assumed
+ * consistent, and 'start_addr' is known good, having come from
+ * gc_search_space(), only the 'pointer' argument is dubious.
+ * So make 'start_addr' into a tagged pointer and see if that matches 'pointer'.
+ * If it does, then 'pointer' is valid.
  */
 int
-properly_tagged_descriptor_p(void *thing, lispobj *start_addr)
+properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 {
-    lispobj pointer = (lispobj)thing;
-    if (!is_lisp_pointer(pointer)) {
-        return 0;
-    }
+    // If a headerless object, confirm that 'pointer' is a list pointer.
+    // Given the precondition that the heap is in a valid state,
+    // it may be assumed that one check of is_cons_half() suffices;
+    // we don't need to check the other half.
+    lispobj header = *start_addr;
+    if (is_cons_half(header))
+        return make_lispobj(start_addr, LIST_POINTER_LOWTAG) == pointer;
 
-    /* Check that the object pointed to is consistent with the pointer
-     * low tag. */
-    switch (lowtag_of(pointer)) {
-    case FUN_POINTER_LOWTAG:
-        /* Start_addr should be the enclosing code object, or a closure
-         * header. */
-        switch (widetag_of(*start_addr)) {
-        case CODE_HEADER_WIDETAG:
-            /* Make sure we actually point to a function in the code object,
-             * as opposed to a random point there. */
-            for_each_simple_fun(i, function, (struct code*)start_addr, 0, {
-               if ((lispobj)function == pointer-FUN_POINTER_LOWTAG) return 1;
-            })
-            return 0;
-        case CLOSURE_HEADER_WIDETAG:
-        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-            return make_lispobj(start_addr, FUN_POINTER_LOWTAG) == pointer;
-        default:
-            return 0;
-        }
-        break;
-    case LIST_POINTER_LOWTAG:
-        return make_lispobj(start_addr, LIST_POINTER_LOWTAG) == pointer
-            && is_cons_half(start_addr[0])  // Is it plausible?
-            && is_cons_half(start_addr[1]);
+    // Because this heap object was not deemed to be a cons,
+    // it must be an object header. Don't need a check except when paranoid.
+    gc_dcheck(other_immediate_lowtag_p(header));
 
-    case INSTANCE_POINTER_LOWTAG:
-        return make_lispobj(start_addr, INSTANCE_POINTER_LOWTAG) == pointer
-            && widetag_of(*start_addr) == INSTANCE_HEADER_WIDETAG;
+    // The space of potential widetags has 64 elements, not 256,
+    // because of the constant low 2 bits.
+    int widetag = widetag_of(header);
+    int lowtag = lowtag_for_widetag[widetag>>2];
+    if (lowtag && make_lispobj(start_addr, lowtag) == pointer)
+        return 1; // instant win
 
-    case OTHER_POINTER_LOWTAG:
-
+    if (widetag == CODE_HEADER_WIDETAG) {
+        // Check for RETURN_PC_HEADER first since it's quicker.
+        // Then consider the embedded simple-funs.
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
         /* The all-architecture test below is good as far as it goes,
          * but an LRA object is similar to a FUN-POINTER: It is
          * embedded within a CODE-OBJECT pointed to by start_addr, and
          * cannot be found by simply walking the heap, therefore we
          * need to check for it. -- AB, 2010-Jun-04 */
-        if ((widetag_of(start_addr[0]) == CODE_HEADER_WIDETAG)) {
+        if (lowtag_of(pointer) == OTHER_POINTER_LOWTAG) {
             lispobj *potential_lra = native_pointer(pointer);
             if ((widetag_of(potential_lra[0]) == RETURN_PC_HEADER_WIDETAG) &&
                 ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
@@ -1417,80 +1409,15 @@ properly_tagged_descriptor_p(void *thing, lispobj *start_addr)
             }
         }
 #endif
-
-        if (pointer != make_lispobj(start_addr, OTHER_POINTER_LOWTAG)
-            || !other_immediate_lowtag_p(*start_addr))
-            return 0;
-
-        switch (widetag_of(start_addr[0])) {
-        case UNBOUND_MARKER_WIDETAG:
-        case NO_TLS_VALUE_MARKER_WIDETAG:
-        case CHARACTER_WIDETAG:
-#if N_WORD_BITS == 64
-        case SINGLE_FLOAT_WIDETAG:
-#endif
-            return 0;
-
-            /* only pointed to by function pointers? */
-        case CLOSURE_HEADER_WIDETAG:
-        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-            return 0;
-
-        case INSTANCE_HEADER_WIDETAG:
-            return 0;
-
-            /* the valid other immediate pointer objects */
-        case SIMPLE_VECTOR_WIDETAG:
-        case RATIO_WIDETAG:
-        case COMPLEX_WIDETAG:
-#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
-        case COMPLEX_SINGLE_FLOAT_WIDETAG:
-#endif
-#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
-        case COMPLEX_DOUBLE_FLOAT_WIDETAG:
-#endif
-#ifdef COMPLEX_LONG_FLOAT_WIDETAG
-        case COMPLEX_LONG_FLOAT_WIDETAG:
-#endif
-#ifdef SIMD_PACK_WIDETAG
-        case SIMD_PACK_WIDETAG:
-#endif
-        case SIMPLE_ARRAY_WIDETAG:
-        case COMPLEX_BASE_STRING_WIDETAG:
-#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
-        case COMPLEX_CHARACTER_STRING_WIDETAG:
-#endif
-        case COMPLEX_VECTOR_NIL_WIDETAG:
-        case COMPLEX_BIT_VECTOR_WIDETAG:
-        case COMPLEX_VECTOR_WIDETAG:
-        case COMPLEX_ARRAY_WIDETAG:
-        case VALUE_CELL_HEADER_WIDETAG:
-        case SYMBOL_HEADER_WIDETAG:
-        case FDEFN_WIDETAG:
-        case CODE_HEADER_WIDETAG:
-        case BIGNUM_WIDETAG:
-#if N_WORD_BITS != 64
-        case SINGLE_FLOAT_WIDETAG:
-#endif
-        case DOUBLE_FLOAT_WIDETAG:
-#ifdef LONG_FLOAT_WIDETAG
-        case LONG_FLOAT_WIDETAG:
-#endif
-#include "genesis/specialized-vectors.inc"
-        case SAP_WIDETAG:
-        case WEAK_POINTER_WIDETAG:
-            break;
-
-        default:
-            return 0;
+        if (lowtag_of(pointer) == FUN_POINTER_LOWTAG) {
+            struct simple_fun *pfun =
+                (struct simple_fun*)(pointer-FUN_POINTER_LOWTAG);
+            for_each_simple_fun(i, function, (struct code*)start_addr, 0, {
+                if (pfun == function) return 1;
+            })
         }
-        break;
-    default:
-        return 0;
     }
-
-    /* looks good */
-    return 1;
+    return 0; // no good
 }
 
 /* META: Note the ambiguous word "validate" in the comment below.

@@ -47,6 +47,7 @@
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "alloc.h"
+#include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
 #include "genesis/fdefn.h"
@@ -2066,20 +2067,16 @@ maybe_adjust_large_object(lispobj *where)
     int boxed;
 
     /* Check whether it's a vector or bignum object. */
-    switch (widetag_of(where[0])) {
-    case SIMPLE_VECTOR_WIDETAG:
+    lispobj widetag = widetag_of(where[0]);
+    if (widetag == SIMPLE_VECTOR_WIDETAG)
         boxed = BOXED_PAGE_FLAG;
-        break;
-    case BIGNUM_WIDETAG:
-#include "genesis/specialized-vectors.inc"
+    else if (specialized_vector_widetag_p(widetag) || widetag == BIGNUM_WIDETAG)
         boxed = UNBOXED_PAGE_FLAG;
-        break;
-    default:
+    else
         return;
-    }
 
     /* Find its current size. */
-    nwords = (sizetab[widetag_of(where[0])])(where);
+    nwords = sizetab[widetag](where);
 
     first_page = find_page_index((void *)where);
     gc_assert(first_page >= 0);
