@@ -478,9 +478,9 @@ void immobile_space_preserve_pointer(void* addr)
             && (varyobj_page_gens_augmented(page_index) & (1<<from_space)) != 0
             && (scan_start = varyobj_scan_start(page_index)) <= (lispobj*)addr
             && (object_start = gc_search_space(scan_start, addr)) != 0
+            && !immobile_filler_p(object_start)
             && (instruction_ptr_p(addr, object_start)
-                || properly_tagged_descriptor_p(addr, object_start))
-            && !immobile_filler_p(object_start);
+                || properly_tagged_descriptor_p(addr, object_start));
     } else if (fixedobj_pages[page_index].gens & (1<<from_space)) {
         int obj_spacing = (page_obj_align(page_index) << WORD_SHIFT);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
