@@ -540,7 +540,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                      * The low bits of each word are allocation flags.
                      */
                     if ((word=data[i])) {
-                        page_table[offset].scan_start_offset = word & ~0x03;
+                        set_page_scan_start_offset(offset, word & ~0x03);
                         page_table[offset].allocated = word & 0x03;
                     }
                     i++;

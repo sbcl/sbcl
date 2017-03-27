@@ -304,16 +304,22 @@
 (progn
   (define-alien-type (struct page)
       (struct page
-              (start signed)
+              ;; To cut down the size of the page table, the scan_start_offset
+              ;; - a/k/a "start" - is measured in 4-byte integers regardless
+              ;; of word size. This is fine for 32-bit address space,
+              ;; but if 64-bit then we have to scale the value. Additionally
+              ;; there is a fallback for when even the scaled value is too big.
+              ;; (None of this matters to Lisp code for the most part)
+              (start #!+64-bit (unsigned 32) #!-64-bit signed)
               ;; On platforms with small enough GC pages, this field
               ;; will be a short. On platforms with larger ones, it'll
               ;; be an int.
+              ;; Measured in bytes; the low bit has to be masked off.
               (bytes-used (unsigned
                            #.(if (typep gencgc-card-bytes '(unsigned-byte 16))
                                  16
                                  32)))
               (flags (unsigned 8))
-              (has-dontmove-dwords (unsigned 8))
               (gen (signed 8))))
   #!+immobile-space
   (progn
@@ -432,7 +438,9 @@
           of-type (integer -1 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
           from 0 below last-free-page
           for next-page-addr from (+ start page-size) by page-size
-          for page-bytes-used = (slot (deref page-table page-index) 'bytes-used)
+          for page-bytes-used
+              ;; The low bits of bytes-used is the need-to-zero flag.
+              = (logandc1 1 (slot (deref page-table page-index) 'bytes-used))
 
           when (< page-bytes-used gencgc-card-bytes)
           do (progn

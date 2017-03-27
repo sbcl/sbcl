@@ -29,6 +29,18 @@ extern void *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
 
+#if N_WORD_BITS == 64
+  // It's more economical to store scan_start_offset using 4 bytes than 8.
+  // Doing so makes struct page fit in 8 bytes if bytes_used takes 2 bytes.
+  //   scan_start_offset = 4
+  //   bytes_used        = 2
+  //   flags             = 1
+  //   gen               = 1
+  // If bytes_used takes 4 bytes, then the above is 10 bytes which is padded to
+  // 12, which is still an improvement over the 16 that it would have been.
+# define CONDENSED_PAGE_TABLE
+#endif
+
 #if GENCGC_CARD_BYTES > USHRT_MAX
 # if GENCGC_CARD_BYTES > UINT_MAX
 #   error "GENCGC_CARD_BYTES unexpectedly large."
@@ -57,14 +69,24 @@ struct page {
      * through a heap page (either for conservative root validation or
      * for scavenging).
      */
-    os_vm_size_t scan_start_offset;
+#ifdef CONDENSED_PAGE_TABLE
+    // The low bit of the offset indicates the scale factor:
+    // 0 = double-lispwords, 1 = gc cards. Large objects are card-aligned,
+    // and this representation allows for a 32TB contiguous block using 32K
+    // card size. Larger allocations will have pages that can't directly
+    // store the full offset. That has to be dealt with by the accessor.
+    unsigned int scan_start_offset_;
+#else
+    os_vm_size_t scan_start_offset_;
+#endif
 
     /* the number of bytes of this page that are used. This may be less
      * than the actual bytes used for pages within the current
      * allocation regions. It should be 0 for all unallocated pages (not
      * hard to achieve).
+     * When read, the low bit has to be masked off.
      */
-    page_bytes_t bytes_used;
+    page_bytes_t bytes_used_;
 
     unsigned char
         /* This is set when the page is write-protected. This should
@@ -92,30 +114,84 @@ struct page {
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
         dont_move :1,
+        /* If this page is not a large object page and contains
+         * any objects which are pinned */
+        has_pin_map :1,
         /* If the page is part of a large object then this flag is
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
-        large_object :1,
-        /* Cleared if the page is known to contain only zeroes. */
-        need_to_zero :1;
+        large_object :1;
 
-    /* If a page has a conservative pointer to it it will have
-       an associated map of words that are in use, for wiping.
-       This bit can differ from dont_move because not all pages
-       that are pinned are going through word-wise wiping,
-       at this time those are multi-page object's pages. */
-    /* I am starting a new 8-bit word here because 32 bit overflew the old
-       one.  Might be worth reviting by somebody with lots of platforms
-       at hand.
-     */
-    signed char has_pin_map;
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
      * allocation region pages - this allows the space of an object to
      * be easily determined. */
     generation_index_t gen;
 };
+struct page *page_table;
 
+#ifndef CONDENSED_PAGE_TABLE
+
+// 32-bit doesn't need magic to reduce the size of scan_start_offset.
+#define set_page_scan_start_offset(index,val) \
+  page_table[index].scan_start_offset_ = val
+#define page_scan_start_offset(index) page_table[index].scan_start_offset_
+
+#else
+
+/// A "condensed" offset reduces page table size, which improves scan locality.
+/// As stored, the offset is scaled down either by card size or double-lispwords.
+/// If the offset is the maximum, then we must check if the page pointed to by
+/// that offset is actually the start of a region, and retry if not.
+/// For debugging the iterative algorithm it helps to use a max value
+/// that is less than UINT_MAX to get a pass/fail more quickly.
+
+//#define SCAN_START_OFS_MAX 0x3fff
+#define SCAN_START_OFS_MAX UINT_MAX
+
+#define page_scan_start_offset(index) \
+  (page_table[index].scan_start_offset_ != SCAN_START_OFS_MAX \
+    ? (os_vm_size_t)(page_table[index].scan_start_offset_ & ~1) \
+       << ((page_table[index].scan_start_offset_ & 1)?(GENCGC_CARD_SHIFT-1):WORD_SHIFT) \
+    : scan_start_offset_iterated(index))
+
+static os_vm_size_t __attribute__((unused))
+scan_start_offset_iterated(page_index_t index)
+{
+    // The low bit of the MAX is the 'scale' bit. The max pages we can look
+    // backwards is therefore the max shifted right by 1 bit.
+    page_index_t tot_offset_in_pages = 0;
+    unsigned int offset;
+    do {
+        page_index_t lookback_page = index - tot_offset_in_pages;
+        offset = page_table[lookback_page].scan_start_offset_;
+        tot_offset_in_pages += offset >> 1;
+    } while (offset == SCAN_START_OFS_MAX);
+    return (os_vm_size_t)tot_offset_in_pages << GENCGC_CARD_SHIFT;
+}
+
+#define set_page_scan_start_offset(index, ofs) \
+  { unsigned int lsb_ = ((ofs) & (GENCGC_CARD_BYTES-1)) == 0; \
+    os_vm_size_t scaled_ = ((ofs) >> (lsb_ ? GENCGC_CARD_SHIFT-1 : WORD_SHIFT)) | lsb_; \
+    if (scaled_ > SCAN_START_OFS_MAX) gc_assert(lsb_ == 1); \
+    page_table[index].scan_start_offset_ = \
+        scaled_ > SCAN_START_OFS_MAX ? SCAN_START_OFS_MAX : scaled_; }
+
+#endif
+
+/// There is some additional cleverness that could potentially be had -
+/// the "need_to_zero" bit (a/k/a "page dirty") is obviously 1 if the page
+/// contains objects. Only for an empty page must we distinguish between pages
+/// not needing be zero-filled before next use and those which must be.
+/// Thus, masking off the dirty bit could be avoided by not storing it for
+/// any in-use page. But since that's not what we do - we set the bit to 1
+/// as soon as a page is used - we do have to mask off the bit.
+#define page_bytes_used(index) (page_table[index].bytes_used_ & ~1)
+#define page_need_to_zero(index) (page_table[index].bytes_used_ & 1)
+#define set_page_bytes_used(index,val) \
+  page_table[index].bytes_used_ = (val) | page_need_to_zero(index)
+#define set_page_need_to_zero(index,val) \
+  page_table[index].bytes_used_ = page_bytes_used(index) | val
 
 /* values for the page.allocated field */
 
