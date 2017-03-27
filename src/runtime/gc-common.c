@@ -98,12 +98,8 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
 }
 #endif
 
-void
-scavenge(lispobj *start, sword_t n_words)
+static inline void scav1(lispobj* object_ptr, lispobj object)
 {
-    lispobj *end = start + n_words;
-    lispobj *object_ptr;
-
     // GENCGC only:
     // * With 32-bit words, is_lisp_pointer(object) returns true if object_ptr
     //   points to a forwarding pointer, so we need a sanity check inside the
@@ -132,36 +128,44 @@ scavenge(lispobj *start, sword_t n_words)
     else /* Scavenge that pointer. */ \
         (void)scavtab[widetag_of(object)](object_ptr, object); \
     }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    page_index_t page;
+    // It would be fine, though suboptimal, to use from_space_p() here.
+    // If it returns false, we don't want to call immobile_space_p()
+    // unless the pointer is *not* into dynamic space.
+    if ((page = find_page_index((void*)object)) >= 0) {
+        if (page_table[page].gen == from_space && !pinned_p(object, page))
+            FIX_POINTER();
+    } else if (immobile_space_p(object)) {
+        lispobj *ptr = native_pointer(object);
+        if (immobile_obj_gen_bits(ptr) == from_space)
+            promote_immobile_obj(ptr, 1);
+    }
+#else
+    if (from_space_p(object)) {
+        FIX_POINTER();
+    } else {
+#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
+        if (forwarding_pointer_p(object_ptr))
+          lose("unexpected forwarding pointer in scavenge: %p, start=%p, n=%ld\n",
+               object_ptr, start, n_words);
+#endif
+        /* It points somewhere other than oldspace. Leave it
+         * alone. */
+    }
+#endif
+}
+
+// Scavenge a block of memory from 'start' to 'end'
+// that may contain object headers.
+void heap_scavenge(lispobj *start, lispobj *end)
+{
+    lispobj *object_ptr;
 
     for (object_ptr = start; object_ptr < end;) {
         lispobj object = *object_ptr;
         if (is_lisp_pointer(object)) {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-            page_index_t page;
-            // It would be fine, though suboptimal, to use from_space_p() here.
-            // If it returns false, we don't want to call immobile_space_p()
-            // unless the pointer is *not* into dynamic space.
-            if ((page = find_page_index((void*)object)) >= 0) {
-                if (page_table[page].gen == from_space && !pinned_p(object, page))
-                    FIX_POINTER();
-            } else if (immobile_space_p(object)) {
-                lispobj *ptr = native_pointer(object);
-                if (immobile_obj_gen_bits(ptr) == from_space)
-                    promote_immobile_obj(ptr, 1);
-            }
-#else
-            if (from_space_p(object)) {
-                FIX_POINTER();
-            } else {
-#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
-                if (forwarding_pointer_p(object_ptr))
-                    lose("unexpected forwarding pointer in scavenge: %p, start=%p, n=%ld\n",
-                         object_ptr, start, n_words);
-#endif
-                /* It points somewhere other than oldspace. Leave it
-                 * alone. */
-            }
-#endif
+            scav1(object_ptr, object);
             object_ptr++;
         }
         else if (fixnump(object)) {
@@ -176,6 +180,19 @@ scavenge(lispobj *start, sword_t n_words)
     // is subtly wrong with the heap, so definitely always do it.
     gc_assert_verbose(object_ptr == end, "Final object pointer %p, start %p, end %p\n",
                       object_ptr, start, end);
+}
+
+// Scavenge a block of memory from 'start' extending for 'n_words'
+// that must not contain any object headers.
+sword_t scavenge(lispobj *start, sword_t n_words)
+{
+    lispobj *end = start + n_words;
+    lispobj *object_ptr;
+    for (object_ptr = start; object_ptr < end; object_ptr++) {
+        lispobj object = *object_ptr;
+        if (is_lisp_pointer(object)) scav1(object_ptr, object);
+    }
+    return n_words;
 }
 
 static lispobj trans_fun_header(lispobj object); /* forward decls */
@@ -524,12 +541,6 @@ size_immediate(lispobj *where)
 }
 
 
-static sword_t
-scav_boxed(lispobj *where, lispobj object)
-{
-    return 1;
-}
-
 boolean positive_bignum_logbitp(int index, struct bignum* bignum)
 {
   /* If the bignum in the layout has another pointer to it (besides the layout)
@@ -685,12 +696,22 @@ scav_instance(lispobj *where, lispobj header)
 #endif
 
     sword_t nslots = instance_length(header) | 1;
-    lispobj bitmap = ((struct layout*)layout)->bitmap;
-    if (bitmap == make_fixnum(-1))
+    lispobj lbitmap = ((struct layout*)layout)->bitmap;
+    if (lbitmap == make_fixnum(-1))
         scavenge(where+1, nslots);
-    else
-        instance_scan(scavenge, where+1, nslots, bitmap);
-
+    else if (!fixnump(lbitmap))
+        instance_scan((void(*)(lispobj*,sword_t))scavenge,
+                      where+1, nslots, lbitmap);
+    else {
+        sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS; // signed integer!
+        sword_t n = nslots;
+        lispobj obj;
+        for ( ; n-- ; bitmap >>= 1) {
+            ++where;
+            if ((bitmap & 1) && is_lisp_pointer(obj = *where))
+                scav1(where, obj);
+        }
+    }
     return 1 + nslots;
 }
 
@@ -707,42 +728,27 @@ scav_funinstance(lispobj *where, lispobj header)
 }
 #endif
 
-static lispobj trans_boxed(lispobj object)
-{
-    gc_dcheck(is_lisp_pointer(object));
-    sword_t length = HeaderValue(*native_pointer(object)) + 1;
-    return copy_object(object, CEILING(length, 2));
-}
+//// Boxed object scav/trans/size functions
 
-static sword_t size_boxed(lispobj *where)
-{
-    sword_t length = HeaderValue(*where) + 1;
-    return CEILING(length, 2);
-}
+#define BOXED_NWORDS(obj) (1+(HeaderValue(obj) | 1))
+// Payload count expressed in 15 bits
+#define SHORT_BOXED_NWORDS(obj) (1+((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1))
+// Payload count expressed in 8 bits
+#define TINY_BOXED_NWORDS(obj) (1+((HeaderValue(obj) & 0xFF) | 1))
 
-static lispobj trans_short_boxed(lispobj object) // Payload count expressed in 15 bits
-{
-    sword_t length = (HeaderValue(*native_pointer(object)) & SHORT_HEADER_MAX_WORDS) + 1;
-    return copy_object(object, CEILING(length, 2));
-}
+#define DEF_SCAV_BOXED(suffix, sizer) \
+  static sword_t __attribute__((unused)) \
+  scav_##suffix(lispobj *where, lispobj header) { \
+      return scavenge(where, sizer(header)); \
+  } \
+  static lispobj trans_##suffix(lispobj object) { \
+      return copy_object(object, sizer(*native_pointer(object))); \
+  } \
+  static sword_t size_##suffix(lispobj *where) { return sizer(*where); }
 
-static sword_t size_short_boxed(lispobj *where)
-{
-    sword_t length = (HeaderValue(*where) & SHORT_HEADER_MAX_WORDS) + 1;
-    return CEILING(length, 2);
-}
-
-static lispobj trans_tiny_boxed(lispobj object) // Payload count expressed in 8 bits
-{
-    sword_t length = (HeaderValue(*native_pointer(object)) & 0xFF) + 1;
-    return copy_object(object, CEILING(length, 2));
-}
-
-static sword_t size_tiny_boxed(lispobj *where)
-{
-    sword_t length = (HeaderValue(*where) & 0xFF) + 1;
-    return CEILING(length, 2);
-}
+DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
+DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
+DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
 /* 'cause the raw-addr has a function lowtag. */

@@ -47,15 +47,15 @@
     ;; The scavenge function for fun-header is basically "lose",
     ;; but it's only defined on non-x86 platforms for some reason.
     (simple-fun-header ,(or #!+(or x86 x86-64) "lose" "fun_header") "fun_header" "lose")
-    (closure-header ,(or #!+(or x86 x86-64) "closure_header" "boxed")
+    (closure-header ,(or #!+(or x86 x86-64) "closure_header" "short_boxed")
                     "short_boxed")
-    (funcallable-instance-header ,(or #!+compact-instance-header "funinstance" "boxed")
+    (funcallable-instance-header ,(or #!+compact-instance-header "funinstance" "short_boxed")
                                  "short_boxed")
     ;; These have a scav and trans function, but no size function.
     #!-(or x86 x86-64) (return-pc-header "return_pc_header" "return_pc_header" "lose")
 
     (value-cell-header "boxed")
-    (symbol-header "boxed" "tiny_boxed")
+    (symbol-header "tiny_boxed")
     (character "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")

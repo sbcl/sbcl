@@ -2170,7 +2170,8 @@ static void
 scavenge_pinned_range(void* page_base, int start, int count)
 {
     // 'start' and 'count' are expressed in units of dwords
-    scavenge((lispobj*)page_base + 2*start, 2*count);
+    lispobj *where = (lispobj*)page_base + 2*start;
+    heap_scavenge(where, where + 2*count);
 }
 
 static void
@@ -2538,9 +2539,9 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                     break;
             }
             if (!write_protected) {
-                scavenge(page_address(i),
-                         ((uword_t)(page_bytes_used(last_page) + npage_bytes(last_page-i)))
-                         /N_WORD_BYTES);
+                heap_scavenge(page_address(i),
+                              (lispobj*)((char*)page_address(last_page)
+                                         + page_bytes_used(last_page)));
 
                 /* Now scan the pages and write protect those that
                  * don't have pointers to younger generations. */
@@ -2663,12 +2664,10 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
             /* Do a limited check for write-protected pages.  */
             if (!all_wp) {
-                sword_t nwords = (page_bytes_used(last_page) + npage_bytes(last_page-i)
-                                  + page_scan_start_offset(i)) / N_WORD_BYTES;
                 new_areas_ignore_page = last_page;
-
-                scavenge(page_scan_start(i), nwords);
-
+                heap_scavenge(page_scan_start(i),
+                              (lispobj*)((char*)page_address(last_page)
+                                         + page_bytes_used(last_page)));
             }
             i = last_page;
         }
@@ -2778,9 +2777,10 @@ scavenge_newspace_generation(generation_index_t generation)
             for (i = 0; i < previous_new_areas_index; i++) {
                 page_index_t page = (*previous_new_areas)[i].page;
                 size_t offset = (*previous_new_areas)[i].offset;
-                size_t size = (*previous_new_areas)[i].size / N_WORD_BYTES;
-                gc_assert((*previous_new_areas)[i].size % N_WORD_BYTES == 0);
-                scavenge(page_address(page)+offset, size);
+                size_t size = (*previous_new_areas)[i].size;
+                gc_assert(size % N_WORD_BYTES == 0);
+                lispobj *start = (lispobj*)((char*)page_address(page) + offset);
+                heap_scavenge(start, (lispobj*)((char*)start + size));
             }
 
             scav_weak_hash_tables();
@@ -3427,7 +3427,6 @@ static void
 garbage_collect_generation(generation_index_t generation, int raise)
 {
     page_index_t i;
-    uword_t static_space_size;
     struct thread *th;
 
     gc_assert(generation <= HIGHEST_NORMAL_GENERATION);
@@ -3650,15 +3649,13 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 
     /* Scavenge static space. */
-    static_space_size =
-        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
-        (lispobj *)STATIC_SPACE_START;
     if (gencgc_verbose > 1) {
         FSHOW((stderr,
                "/scavenge static space: %d bytes\n",
-               static_space_size * sizeof(lispobj)));
+               SymbolValue(STATIC_SPACE_FREE_POINTER,0) - STATIC_SPACE_START));
     }
-    scavenge( (lispobj *) STATIC_SPACE_START, static_space_size);
+    heap_scavenge((lispobj*)STATIC_SPACE_START,
+                  (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as

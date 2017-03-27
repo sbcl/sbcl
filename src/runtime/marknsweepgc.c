@@ -512,7 +512,6 @@ static void full_scavenge_immobile_newspace()
         if (!(fixedobj_pages[page].gens & bit)) continue;
         // Skip amount within the loop is in bytes.
         int obj_spacing = page_obj_align(page) << WORD_SHIFT;
-        int n_words     = page_obj_size(page);
         lispobj* obj    = low_page_address(page);
         // Use an inclusive, not exclusive, limit. On pages with dense packing
         // (i.e. non-LAYOUT), if the object size does not evenly divide the page
@@ -524,7 +523,8 @@ static void full_scavenge_immobile_newspace()
         for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             if (!fixnump(*obj) && __immobile_obj_gen_bits(obj) == new_space) {
                 set_visited(obj);
-                scavenge(obj, n_words);
+                lispobj header = *obj;
+                scavtab[widetag_of(header)](obj, header);
             }
         }
     }
@@ -540,12 +540,14 @@ static void full_scavenge_immobile_newspace()
         lispobj* obj = varyobj_scan_start(page);
         do {
             lispobj* limit = (lispobj*)low_page_address(page) + WORDS_PER_PAGE;
-            int widetag, n_words;
+            int n_words;
             for ( ; obj < limit ; obj += n_words ) {
-                n_words = sizetab[widetag = widetag_of(*obj)](obj);
+                lispobj header = *obj;
                 if (__immobile_obj_gen_bits(obj) == new_space) {
                     set_visited(obj);
-                    scavenge(obj, n_words);
+                    n_words = scavtab[widetag_of(header)](obj, header);
+                } else {
+                    n_words = sizetab[widetag_of(header)](obj);
                 }
             }
             page = find_immobile_page_index(obj);
@@ -595,7 +597,8 @@ void scavenge_immobile_newspace()
                   --immobile_scav_queue_count;
               if (!(__immobile_obj_gen_bits(obj) & IMMOBILE_OBJ_VISITED_FLAG)) {
                 set_visited(obj);
-                scavenge(obj, sizetab[widetag_of(*obj)](obj));
+                lispobj header = *obj;
+                scavtab[widetag_of(header)](obj, header);
               }
           } while (i != queue_index_to);
       }
@@ -640,7 +643,6 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
         if (fixedobj_page_wp(page) || !(fixedobj_pages[page].gens & genmask))
             continue;
         int obj_spacing = page_obj_align(page) << WORD_SHIFT;
-        int n_words = page_obj_size(page);
         lispobj* obj = low_page_address(page);
         lispobj* limit = (lispobj*)((char*)obj +
                                     IMMOBILE_CARD_BYTES - obj_spacing);
@@ -651,7 +653,8 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
         do {
             if (!fixnump(*obj) && (genmask >> (gen=__immobile_obj_gen_bits(obj)) & 1)) {
                 if (gen == new_space) { set_visited(obj); }
-                scavenge(obj, n_words);
+                lispobj header = *obj;
+                scavtab[widetag_of(header)](obj, header);
             }
         } while ((obj = (lispobj*)((char*)obj + obj_spacing)) <= limit);
     }
@@ -664,12 +667,14 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
         lispobj* obj = varyobj_scan_start(page);
         do {
             lispobj* limit = (lispobj*)low_page_address(page) + WORDS_PER_PAGE;
-            int widetag, n_words, gen;
+            int n_words, gen;
             for ( ; obj < limit ; obj += n_words ) {
-                n_words = sizetab[widetag = widetag_of(*obj)](obj);
+                lispobj header = *obj;
                 if (genmask >> (gen=__immobile_obj_gen_bits(obj)) & 1) {
                     if (gen == new_space) { set_visited(obj); }
-                    scavenge(obj, n_words);
+                    n_words = scavtab[widetag_of(header)](obj, header);
+                } else {
+                    n_words = sizetab[widetag_of(header)](obj);
                 }
             }
             page = find_immobile_page_index(obj);
