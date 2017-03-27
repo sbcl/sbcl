@@ -193,7 +193,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
     first_pointer = native_pointer(object);
 
     /* must transport object -- object may point to either a function
-     * header, a closure function header, or to a closure header. */
+     * header, a funcallable instance header, or a closure header. */
 
     switch (widetag_of(*first_pointer)) {
     case SIMPLE_FUN_HEADER_WIDETAG:
