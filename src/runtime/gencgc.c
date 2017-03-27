@@ -214,15 +214,11 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
             && (page_table[page].gen == generation));
 }
 
-/* To map addresses to page structures the address of the first page
- * is needed. */
-void *heap_base = NULL;
-
 /* Calculate the start address for the given page number. */
 inline void *
 page_address(page_index_t page_num)
 {
-    return (heap_base + (page_num * GENCGC_CARD_BYTES));
+    return (DYNAMIC_SPACE_START + (page_num * GENCGC_CARD_BYTES));
 }
 
 /* Calculate the address where the allocation region associated with
@@ -4039,8 +4035,6 @@ gc_init(void)
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
-
-    heap_base = (void*)DYNAMIC_SPACE_START;
 
     /* The page structures are initialized implicitly when page_table
      * is allocated with "calloc" above. Formerly we had the following

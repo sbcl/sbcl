@@ -220,10 +220,9 @@ void gc_set_region_empty(struct alloc_region *region);
 static inline page_index_t
 find_page_index(void *addr)
 {
-    extern void* heap_base;
-    if (addr >= heap_base) {
+    if (addr >= DYNAMIC_SPACE_START) {
         page_index_t index = ((pointer_sized_uint_t)addr -
-                              (pointer_sized_uint_t)heap_base) / GENCGC_CARD_BYTES;
+                              (pointer_sized_uint_t)DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
         if (index < page_table_pages)
             return (index);
     }

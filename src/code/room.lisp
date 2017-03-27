@@ -338,7 +338,6 @@
   (define-alien-routine ("ext_find_page_index" find-page-index)
     long (index signed))
   (define-alien-variable "last_free_page" sb!kernel::page-index-t)
-  (define-alien-variable "heap_base" (* t))
   (define-alien-variable "page_table" (* (struct page))))
 
 (declaim (inline code-header-words))
@@ -429,7 +428,7 @@
           with page-size = (ash gencgc-card-bytes (- n-fixnum-tag-bits))
           ;; This magic dance gets us an unboxed aligned pointer as a
           ;; FIXNUM.
-          with start = (sap-ref-lispobj (alien-sap (addr heap-base)) 0)
+          with start = (%make-lisp-obj (current-dynamic-space-start))
           with end = start
 
           ;; This is our page range. The type constraint is far too generous,
