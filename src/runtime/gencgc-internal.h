@@ -45,11 +45,9 @@ int gencgc_handle_wp_violation(void *);
 # if GENCGC_CARD_BYTES > UINT_MAX
 #   error "GENCGC_CARD_BYTES unexpectedly large."
 # else
-#   define PAGE_BYTES_FMT "u"
     typedef unsigned int page_bytes_t;
 # endif
 #else
-# define PAGE_BYTES_FMT "hu"
   typedef unsigned short page_bytes_t;
 #endif
 
@@ -128,7 +126,7 @@ struct page {
      * be easily determined. */
     generation_index_t gen;
 };
-struct page *page_table;
+extern struct page *page_table;
 
 #ifndef CONDENSED_PAGE_TABLE
 
@@ -220,7 +218,7 @@ void gc_set_region_empty(struct alloc_region *region);
 static inline page_index_t
 find_page_index(void *addr)
 {
-    if (addr >= DYNAMIC_SPACE_START) {
+    if (addr >= (void*)DYNAMIC_SPACE_START) {
         page_index_t index = ((pointer_sized_uint_t)addr -
                               (pointer_sized_uint_t)DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
         if (index < page_table_pages)

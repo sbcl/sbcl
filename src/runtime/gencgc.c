@@ -166,6 +166,7 @@ static boolean conservative_stack = 1;
  * This helps to quickly map between an address and its page structure.
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
+struct page *page_table;
 
 in_use_marker_t *page_table_pinned_dwords;
 size_t pins_map_size_in_bytes;
@@ -218,7 +219,7 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
 inline void *
 page_address(page_index_t page_num)
 {
-    return (DYNAMIC_SPACE_START + (page_num * GENCGC_CARD_BYTES));
+    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_CARD_BYTES));
 }
 
 /* Calculate the address where the allocation region associated with
@@ -4387,7 +4388,7 @@ gencgc_handle_wp_violation(void* fault_addr)
                         "  boxed_region.first_page: %"PAGE_INDEX_FMT","
                         "  boxed_region.last_page %"PAGE_INDEX_FMT"\n"
                         "  page.scan_start_offset: %"OS_VM_SIZE_FMT"\n"
-                        "  page.bytes_used: %"PAGE_BYTES_FMT"\n"
+                        "  page.bytes_used: %u\n"
                         "  page.allocated: %d\n"
                         "  page.write_protected: %d\n"
                         "  page.write_protected_cleared: %d\n"
