@@ -1104,8 +1104,11 @@ scav_vector (lispobj *where, lispobj object)
     /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
      * hash tables in the Lisp HASH-TABLE code to indicate need for
      * special GC support. */
-    if ((HeaderValue(object) & 0xFF) == subtype_VectorNormal)
-        return 1;
+    if ((HeaderValue(object) & 0xFF) == subtype_VectorNormal) {
+      sword_t length = fixnum_value(((struct vector*)where)->length);
+      scavenge(where + 2, length);
+      return CEILING(length + 2, 2);
+    }
 
     kv_length = fixnum_value(where[1]);
     /*FSHOW((stderr,"/kv_length = %d\n", kv_length));*/
