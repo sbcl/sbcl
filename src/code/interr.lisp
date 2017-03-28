@@ -127,7 +127,15 @@
 (deferr undefined-fun-error (fdefn-or-symbol)
   (let ((name (etypecase fdefn-or-symbol
                 (symbol fdefn-or-symbol)
-                (fdefn (fdefn-name fdefn-or-symbol))))
+                (fdefn (let ((name (fdefn-name fdefn-or-symbol)))
+                         ;; fasteval stores weird things in the NAME slot
+                         ;; of fdefns of special forms. Have to grab the
+                         ;; special form name out of that.
+                         (cond #!+(and sb-fasteval immobile-code)
+                               ((and (listp name) (functionp (car name)))
+                                (cadr (%fun-name (car name))))
+                               (t
+                                name))))))
         #!+undefined-fun-restarts
         context)
     (cond #!+undefined-fun-restarts
