@@ -551,10 +551,47 @@ int sb_gettimeofday(struct timeval *tp, void *tzp)
 }
 
 #ifndef LISP_FEATURE_DARWIN /* reimplements nanosleep in darwin-os.c  */
-int sb_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
+void sb_nanosleep(time_t sec, int nsec)
 {
-        return nanosleep(rqtp, rmtp);
+    struct timespec rqtp = {sec, nsec};
+    struct timespec rmtp;
+
+    while(nanosleep(&rqtp, &rmtp) && errno == EINTR) {
+        rqtp = rmtp;
+        /* The old lisp version stated
+           ;; KLUDGE: On Darwin, if an interrupt cases nanosleep to
+           ;; take longer than the requested time, the call will
+           ;; return with EINT and (unsigned)-1 seconds in the
+           ;; remainder timespec, which would cause us to enter
+           ;; nanosleep again for ~136 years. So, we check that the
+           ;; remainder time is actually decreasing.
+           ;;
+           ;; It would be neat to do this bit of defensive
+           ;; programming on all platforms, but unfortunately on
+           ;; Linux, REM can be a little higher than REQ if the
+           ;; nanosleep() call is interrupted quickly enough,
+           ;; probably due to the request being rounded up to the
+           ;; nearest HZ. This would cause the sleep to return way
+           ;; too early.
+           #!+darwin
+           (let ((rem-sec (slot rem 'tv-sec))
+           (rem-nsec (slot rem 'tv-nsec)))
+           (when (or (> secs rem-sec)
+           (and (= secs rem-sec) (>= nsecs rem-nsec)))
+           ;; Update for next round.
+           (setf secs  rem-sec
+           nsecs rem-nsec)
+           t)
+
+           but the Darwin variant is implemented elsewhere
+        */
+    }
 }
+#else
+/* nanosleep() is not re-entrant on some versions of Darwin and is
+ * reimplemented it using the underlying syscalls.
+ */
+void sb_nanosleep(time_t sec, int nsec);
 #endif
 
 int sb_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,

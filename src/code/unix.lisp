@@ -937,49 +937,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   ;; type is N-WORD-BITS wide.
   (daylight-savings-p (boolean 32) :out))
 
-#!-(or win32 darwin)
-(defun nanosleep (secs nsecs)
-  (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
-  (with-alien ((req (struct timespec))
-               (rem (struct timespec)))
-    (setf (slot req 'tv-sec) secs
-          (slot req 'tv-nsec) nsecs)
-    (loop while (and (eql eintr
-                          (nth-value 1
-                                     (int-syscall ("sb_nanosleep" (* (struct timespec))
-                                                                  (* (struct timespec)))
-                                                  (addr req) (addr rem))))
-                     ;; KLUDGE: On Darwin, if an interrupt cases nanosleep to
-                     ;; take longer than the requested time, the call will
-                     ;; return with EINT and (unsigned)-1 seconds in the
-                     ;; remainder timespec, which would cause us to enter
-                     ;; nanosleep again for ~136 years. So, we check that the
-                     ;; remainder time is actually decreasing.
-                     ;;
-                     ;; It would be neat to do this bit of defensive
-                     ;; programming on all platforms, but unfortunately on
-                     ;; Linux, REM can be a little higher than REQ if the
-                     ;; nanosleep() call is interrupted quickly enough,
-                     ;; probably due to the request being rounded up to the
-                     ;; nearest HZ. This would cause the sleep to return way
-                     ;; too early.
-                     #!+darwin
-                     (let ((rem-sec (slot rem 'tv-sec))
-                           (rem-nsec (slot rem 'tv-nsec)))
-                       (when (or (> secs rem-sec)
-                                 (and (= secs rem-sec) (>= nsecs rem-nsec)))
-                         ;; Update for next round.
-                         (setf secs  rem-sec
-                               nsecs rem-nsec)
-                         t)))
-          do (setf (slot req 'tv-sec) (slot rem 'tv-sec)
-                   (slot req 'tv-nsec) (slot rem 'tv-nsec)))))
-
-;;; nanosleep() is not re-entrant on some versions of Darwin,
-;;; this reimplements it using the underlying syscalls.
-;;; It uses a different interface to avoid copying code with a
-;;; different license.
-#!+darwin
 (defun nanosleep (secs nsecs)
   (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
   (int-syscall ("sb_nanosleep" time-t int) secs nsecs)
