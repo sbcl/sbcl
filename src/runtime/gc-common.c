@@ -731,21 +731,24 @@ scav_funinstance(lispobj *where, lispobj header)
 
 //// Boxed object scav/trans/size functions
 
-#define BOXED_NWORDS(obj) (1+(HeaderValue(obj) | 1))
+/// These sizing macros return the number of *payload* words,
+/// exclusive of the object header word. Payload length is always
+/// an odd number so that total word count is an even number.
+#define BOXED_NWORDS(obj) (HeaderValue(obj) | 1)
 // Payload count expressed in 15 bits
-#define SHORT_BOXED_NWORDS(obj) (1+((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1))
+#define SHORT_BOXED_NWORDS(obj) ((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1)
 // Payload count expressed in 8 bits
-#define TINY_BOXED_NWORDS(obj) (1+((HeaderValue(obj) & 0xFF) | 1))
+#define TINY_BOXED_NWORDS(obj) ((HeaderValue(obj) & 0xFF) | 1)
 
 #define DEF_SCAV_BOXED(suffix, sizer) \
   static sword_t __attribute__((unused)) \
   scav_##suffix(lispobj *where, lispobj header) { \
-      return scavenge(where, sizer(header)); \
+      return scavenge(where+1, sizer(header)); \
   } \
   static lispobj trans_##suffix(lispobj object) { \
-      return copy_object(object, sizer(*native_pointer(object))); \
+      return copy_object(object, 1 + sizer(*native_pointer(object))); \
   } \
-  static sword_t size_##suffix(lispobj *where) { return sizer(*where); }
+  static sword_t size_##suffix(lispobj *where) { return 1 + sizer(*where); }
 
 DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
