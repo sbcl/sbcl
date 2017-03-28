@@ -195,7 +195,6 @@ scan_start_offset_iterated(page_index_t index)
 
 
 extern page_index_t page_table_pages;
-extern struct page *page_table;
 
 
 /* forward declarations */
