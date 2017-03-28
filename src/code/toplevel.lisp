@@ -114,15 +114,27 @@ means to wait indefinitely.")
 
 ;;;; miscellaneous external functions
 
+(declaim (inline split-ratio-for-sleep))
+(defun split-ratio-for-sleep (seconds)
+  (declare (ratio seconds)
+           (muffle-conditions t))
+  (multiple-value-bind (quot rem) (truncate (numerator seconds)
+                                            (denominator seconds))
+    (values quot
+            (* rem
+               #.(if (sb!xc:typep 1000000000 'fixnum)
+                     '(truncate 1000000000 (denominator seconds))
+                     ;; Can't truncate a bignum by a fixnum without consing
+                     '(* 10 (truncate 100000000 (denominator seconds))))))))
+
 (defun split-seconds-for-sleep (seconds)
   (declare (muffle-conditions t))
-  (declare (optimize speed))
   ;; KLUDGE: This whole thing to avoid consing floats
   (flet ((split-float ()
            (let ((whole-seconds (truly-the fixnum (%unary-truncate seconds))))
              (values whole-seconds
                      (truly-the (integer 0 #.(expt 10 9))
-                                (%unary-truncate (* (- seconds (float whole-seconds))
+                                (%unary-truncate (* (- seconds (float whole-seconds seconds))
                                                     (load-time-value 1f9 t))))))))
     (declare (inline split-float))
     (typecase seconds
@@ -131,14 +143,7 @@ means to wait indefinitely.")
       ((double-float 0d0 #.(float sb!xc:most-positive-fixnum 1d0))
        (split-float))
       (ratio
-       (multiple-value-bind (quot rem) (truncate (numerator seconds)
-                                                 (denominator seconds))
-         (values quot
-                 (* rem
-                    #.(if (sb!xc:typep 1000000000 'fixnum)
-                          '(truncate 1000000000 (denominator seconds))
-                          ;; Can't truncate a bignum by a fixnum without consing
-                          '(* 10 (truncate 100000000 (denominator seconds))))))))
+       (split-ratio-for-sleep seconds))
       (t
        (multiple-value-bind (sec frac)
            (truncate seconds)
@@ -157,17 +162,28 @@ any non-negative real number."
            :datum seconds
            :expected-type '(real 0)))
   #!-(and win32 (not sb-thread))
-  (multiple-value-bind (sec nsec)
-      (if (integerp seconds)
-          (values seconds 0)
-          (split-seconds-for-sleep seconds))
-    ;; nanosleep() accepts time_t as the first argument, but on some platforms
-    ;; it is restricted to 100 million seconds. Maybe someone can actually
-    ;; have a reason to sleep for over 3 years?
-    (loop while (> sec (expt 10 8))
-          do (decf sec (expt 10 8))
-             (sb!unix:nanosleep (expt 10 8) 0))
-    (sb!unix:nanosleep sec nsec))
+  (typecase seconds
+    #!-win32
+    (double-float
+     (sb!unix::nanosleep-double seconds))
+    #!-win32
+    (single-float
+     (sb!unix::nanosleep-float seconds))
+    (t
+     (multiple-value-bind (sec nsec)
+         (if (integerp seconds)
+             (values seconds 0)
+             #!-win32
+             (split-ratio-for-sleep seconds)
+             #!+win32
+             (split-seconds-for-sleep seconds))
+       ;; nanosleep() accepts time_t as the first argument, but on some platforms
+       ;; it is restricted to 100 million seconds. Maybe someone can actually
+       ;; have a reason to sleep for over 3 years?
+       (loop while (> sec (expt 10 8))
+             do (decf sec (expt 10 8))
+                (sb!unix:nanosleep (expt 10 8) 0))
+       (sb!unix:nanosleep sec nsec))))
   #!+(and win32 (not sb-thread))
   (sb!win32:millisleep (truncate (* seconds 1000)))
   nil)

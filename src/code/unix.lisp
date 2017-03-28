@@ -936,10 +936,22 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   ;; KLUDGE: the runtime `boolean' is defined as `int', but the alien
   ;; type is N-WORD-BITS wide.
   (daylight-savings-p (boolean 32) :out))
-
+#-win32
 (defun nanosleep (secs nsecs)
-  (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
-  (int-syscall ("sb_nanosleep" time-t int) secs nsecs)
+  (alien-funcall (extern-alien "sb_nanosleep" (function int time-t int))
+                 secs nsecs)
+  nil)
+
+#-win32
+(defun nanosleep-double (seconds)
+  (alien-funcall (extern-alien "sb_nanosleep_double" (function (values) double))
+                 seconds)
+  nil)
+
+#-win32
+(defun nanosleep-float (seconds)
+  (alien-funcall (extern-alien "sb_nanosleep_float" (function (values) float))
+                 seconds)
   nil)
 
 ;;;; sys/time.h

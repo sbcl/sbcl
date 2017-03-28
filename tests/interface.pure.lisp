@@ -284,3 +284,7 @@
     (let ((str (get-output-stream-string s)))
       (assert (and (>= (count #\newline str) 4)
                    (search "bytes consed" str))))))
+
+(with-test (:name :split-seconds-for-sleep)
+  (assert (< (nth-value 1 (sb-impl::split-seconds-for-sleep 7.2993028420866d7))
+             1000000000)))

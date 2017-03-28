@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <math.h>
 
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
@@ -591,8 +592,22 @@ void sb_nanosleep(time_t sec, int nsec)
 /* nanosleep() is not re-entrant on some versions of Darwin and is
  * reimplemented it using the underlying syscalls.
  */
-void sb_nanosleep(time_t sec, int nsec);
+int sb_nanosleep(time_t sec, int nsec);
 #endif
+
+void sb_nanosleep_double(double seconds) {
+    /* Some (which?) platforms, apparently, can't sleep more than 100
+       million seconds */
+    for (; seconds > 0; seconds -= 100000000.0) {
+        long sec = truncl(seconds);
+        long nsec = truncl((seconds - (double) sec) * 1e9);
+        sb_nanosleep(sec, nsec);
+
+    }
+}
+void sb_nanosleep_float(float seconds) {
+    sb_nanosleep_double(seconds);
+}
 
 int sb_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     struct timeval *timeout)
