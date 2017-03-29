@@ -2470,6 +2470,17 @@ update_page_write_prot(page_index_t page)
     return (wp_it);
 }
 
+/* Is this page holding a normal (non-hashtable) large-object
+ * simple-vector? */
+static inline boolean large_simple_vector_p(page_index_t page) {
+    if (!page_table[page].large_object)
+        return 0;
+    lispobj object = *(lispobj *)page_address(page);
+    return widetag_of(object) == SIMPLE_VECTOR_WIDETAG &&
+        ((HeaderValue(object) & 0xFF) == subtype_VectorNormal);
+
+}
+
 /* Scavenge all generations from FROM to TO, inclusive, except for
  * new_space which needs special handling, as new objects may be
  * added which are not checked here - use scavenge_newspace generation.
@@ -2525,29 +2536,56 @@ scavenge_generations(generation_index_t from, generation_index_t to)
             /* This should be the start of a region */
             gc_assert(page_starts_contiguous_block_p(i));
 
-            /* Now work forward until the end of the region */
-            for (last_page = i; ; last_page++) {
-                write_protected =
-                    write_protected && page_table[last_page].write_protected;
-                if (page_ends_contiguous_block_p(last_page, generation))
-                    break;
-            }
-            if (!write_protected) {
-                heap_scavenge(page_address(i),
-                              (lispobj*)((char*)page_address(last_page)
-                                         + page_bytes_used(last_page)));
-
-                /* Now scan the pages and write protect those that
-                 * don't have pointers to younger generations. */
-                if (enable_page_protection) {
-                    for (j = i; j <= last_page; j++) {
-                        num_wp += update_page_write_prot(j);
+            if (large_simple_vector_p(i)) {
+                /* Scavenge only the unprotected pages of a
+                 * large-object vector, other large objects could be
+                 * handled as well, but vectors are easier to deal
+                 * with and are more likely to grow to very large
+                 * sizes where avoiding scavenging the whole thing is
+                 * worthwile */
+                if (!page_table[i].write_protected) {
+                    scavenge((lispobj*)page_address(i) + 2,
+                             GENCGC_CARD_BYTES - 2);
+                    update_page_write_prot(i);
+                }
+                for (last_page = i + 1; ; last_page++) {
+                    if (page_ends_contiguous_block_p(last_page, generation)) {
+                        if (!page_table[last_page].write_protected) {
+                            scavenge(page_address(last_page), page_bytes_used(last_page));
+                            update_page_write_prot(last_page);
+                        }
+                        break;
+                    }
+                    if (!page_table[last_page].write_protected) {
+                        scavenge(page_address(last_page), GENCGC_CARD_BYTES);
+                        update_page_write_prot(last_page);
                     }
                 }
-                if ((gencgc_verbose > 1) && (num_wp != 0)) {
-                    FSHOW((stderr,
-                           "/write protected %d pages within generation %d\n",
-                           num_wp, generation));
+            } else {
+                /* Now work forward until the end of the region */
+                for (last_page = i; ; last_page++) {
+                    write_protected =
+                        write_protected && page_table[last_page].write_protected;
+                    if (page_ends_contiguous_block_p(last_page, generation))
+                        break;
+                }
+                if (!write_protected) {
+                    heap_scavenge(page_address(i),
+                                  (lispobj*)((char*)page_address(last_page)
+                                             + page_bytes_used(last_page)));
+
+                    /* Now scan the pages and write protect those that
+                     * don't have pointers to younger generations. */
+                    if (enable_page_protection) {
+                        for (j = i; j <= last_page; j++) {
+                            num_wp += update_page_write_prot(j);
+                        }
+                    }
+                    if ((gencgc_verbose > 1) && (num_wp != 0)) {
+                        FSHOW((stderr,
+                               "/write protected %d pages within generation %d\n",
+                               num_wp, generation));
+                    }
                 }
             }
             i = last_page;
