@@ -730,7 +730,7 @@ scav_funinstance(lispobj *where, lispobj header)
 #define DEF_SCAV_BOXED(suffix, sizer) \
   static sword_t __attribute__((unused)) \
   scav_##suffix(lispobj *where, lispobj header) { \
-      return scavenge(where+1, sizer(header)); \
+      return 1 + scavenge(where+1, sizer(header)); \
   } \
   static lispobj trans_##suffix(lispobj object) { \
       return copy_object(object, 1 + sizer(*native_pointer(object))); \
