@@ -2477,7 +2477,7 @@ static inline boolean large_simple_vector_p(page_index_t page) {
         return 0;
     lispobj object = *(lispobj *)page_address(page);
     return widetag_of(object) == SIMPLE_VECTOR_WIDETAG &&
-        ((HeaderValue(object) & 0xFF) == subtype_VectorNormal);
+        (HeaderValue(object) & 0xFF) == subtype_VectorNormal;
 
 }
 
@@ -2545,19 +2545,21 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                  * worthwile */
                 if (!page_table[i].write_protected) {
                     scavenge((lispobj*)page_address(i) + 2,
-                             GENCGC_CARD_BYTES - 2);
+                             (GENCGC_CARD_BYTES - 2) / N_WORD_BYTES);
                     update_page_write_prot(i);
                 }
                 for (last_page = i + 1; ; last_page++) {
+                    lispobj* start = page_address(last_page);
+                    write_protected = page_table[last_page].write_protected;
                     if (page_ends_contiguous_block_p(last_page, generation)) {
-                        if (!page_table[last_page].write_protected) {
-                            scavenge(page_address(last_page), page_bytes_used(last_page));
+                        if (!write_protected) {
+                            scavenge(start, page_bytes_used(last_page) / N_WORD_BYTES);
                             update_page_write_prot(last_page);
                         }
                         break;
                     }
-                    if (!page_table[last_page].write_protected) {
-                        scavenge(page_address(last_page), GENCGC_CARD_BYTES);
+                    if (!write_protected) {
+                        scavenge(start, GENCGC_CARD_BYTES / N_WORD_BYTES);
                         update_page_write_prot(last_page);
                     }
                 }
