@@ -2545,7 +2545,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                  * worthwile */
                 if (!page_table[i].write_protected) {
                     scavenge((lispobj*)page_address(i) + 2,
-                             (GENCGC_CARD_BYTES - 2) / N_WORD_BYTES);
+                             GENCGC_CARD_BYTES / N_WORD_BYTES - 2);
                     update_page_write_prot(i);
                 }
                 for (last_page = i + 1; ; last_page++) {
