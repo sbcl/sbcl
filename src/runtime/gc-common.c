@@ -65,6 +65,15 @@ struct weak_pointer *weak_pointers;
 
 os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 
+/// These sizing macros return the number of *payload* words,
+/// exclusive of the object header word. Payload length is always
+/// an odd number so that total word count is an even number.
+#define BOXED_NWORDS(obj) (HeaderValue(obj) | 1)
+// Payload count expressed in 15 bits
+#define SHORT_BOXED_NWORDS(obj) ((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1)
+// Payload count expressed in 8 bits
+#define TINY_BOXED_NWORDS(obj) ((HeaderValue(obj) & 0xFF) | 1)
+
 /*
  * copying objects
  */
@@ -351,9 +360,10 @@ trans_return_pc_header(lispobj object)
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 static sword_t
-scav_closure_header(lispobj *where, lispobj object)
+scav_closure(lispobj *where, lispobj header)
 {
     struct closure *closure = (struct closure *)where;
+    int payload_words = SHORT_BOXED_NWORDS(header);
     lispobj fun = closure->fun - FUN_RAW_ADDR_OFFSET;
     scavenge(&fun, 1);
 #ifdef LISP_FEATURE_GENCGC
@@ -362,7 +372,9 @@ scav_closure_header(lispobj *where, lispobj object)
     if (closure->fun != fun + FUN_RAW_ADDR_OFFSET)
         closure->fun = fun + FUN_RAW_ADDR_OFFSET;
 #endif
-    return 2;
+    // Payload includes 'fun' which was just looked at, so subtract it.
+    scavenge(closure->info, payload_words - 1);
+    return 1 + payload_words;
 }
 #endif
 
@@ -718,15 +730,6 @@ scav_funinstance(lispobj *where, lispobj header)
 #endif
 
 //// Boxed object scav/trans/size functions
-
-/// These sizing macros return the number of *payload* words,
-/// exclusive of the object header word. Payload length is always
-/// an odd number so that total word count is an even number.
-#define BOXED_NWORDS(obj) (HeaderValue(obj) | 1)
-// Payload count expressed in 15 bits
-#define SHORT_BOXED_NWORDS(obj) ((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1)
-// Payload count expressed in 8 bits
-#define TINY_BOXED_NWORDS(obj) ((HeaderValue(obj) & 0xFF) | 1)
 
 #define DEF_SCAV_BOXED(suffix, sizer) \
   static sword_t __attribute__((unused)) \
