@@ -2434,15 +2434,13 @@ update_page_write_prot(page_index_t page)
             if (lowtag_of((lispobj)ptr) != FUN_POINTER_LOWTAG) {
                 obj_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
             } else if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG) {
-                struct code* code =
-                  code_obj_from_simple_fun((struct simple_fun *)
-                                           ((lispobj)ptr - FUN_POINTER_LOWTAG));
+                lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate
                 // the guard conditions here.
                 if ((lispobj)code >= IMMOBILE_VARYOBJ_SUBSPACE_START
-                    && widetag_of(code->header) == CODE_HEADER_WIDETAG)
-                    obj_gen = __immobile_obj_generation((lispobj*)code);
+                    && widetag_of(*code) == CODE_HEADER_WIDETAG)
+                    obj_gen = __immobile_obj_generation(code);
             }
             // A bogus generation number implies a not-really-pointer,
             // but it won't cause misbehavior.

@@ -404,7 +404,7 @@ void
 promote_immobile_obj(lispobj *ptr, int rescan) // a native pointer
 {
     if (widetag_of(*ptr) == SIMPLE_FUN_HEADER_WIDETAG)
-        ptr = (lispobj*)code_obj_from_simple_fun((struct simple_fun*)ptr);
+        ptr = fun_code_header(ptr);
     gc_assert(__immobile_obj_gen_bits(ptr) == from_space);
     int pointerish = !unboxed_obj_widetag_p(widetag_of(*ptr));
     assign_generation(ptr, (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG) | new_space);

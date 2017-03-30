@@ -285,9 +285,6 @@ static inline low_page_index_t find_immobile_page_index(void *addr)
 int immobile_obj_younger_p(lispobj,generation_index_t);
 void promote_immobile_obj(lispobj*,int);
 
-// Maximum number of boxed words in a code component
-#define CODE_HEADER_COUNT_MASK 0xFFFFFF
-
 #define IMMOBILE_OBJ_VISITED_FLAG    0x10
 #define IMMOBILE_OBJ_GENERATION_MASK 0x0f // mask off the VISITED flag
 
@@ -297,20 +294,11 @@ void promote_immobile_obj(lispobj*,int);
 // because a simple-fun header does not contain a generation.
 #define __immobile_obj_generation(x) (__immobile_obj_gen_bits(x) & IMMOBILE_OBJ_GENERATION_MASK)
 
-static inline struct code *code_obj_from_simple_fun(struct simple_fun *fun)
-{
-  // The upper 4 bytes of any function header will point to its layout,
-  // so mask those bytes off.
-  uword_t offset = (HeaderValue(fun->header) & CODE_HEADER_COUNT_MASK)
-                   * N_WORD_BYTES;
-  return (struct code *)((uword_t)fun - offset);
-}
-
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer
 {
   if (widetag_of(*pointer) == SIMPLE_FUN_HEADER_WIDETAG)
-    pointer = (lispobj*)code_obj_from_simple_fun((struct simple_fun*)pointer);
+    pointer = fun_code_header(pointer);
   return ((generation_index_t*)pointer)[3];
 }
 // Faster way when we know that the object can't be a simple-fun,
