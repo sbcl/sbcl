@@ -226,6 +226,17 @@ find_page_index(void *addr)
     return (-1);
 }
 
+static const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
+extern uword_t *page_table_pinned_dwords;
+
+static inline boolean pinned_p(lispobj obj, page_index_t page)
+{
+    if (!page_table[page].has_pin_map) return 0;
+    int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
+    uword_t *bits = &page_table_pinned_dwords[page * (n_dwords_in_card/N_WORD_BITS)];
+    return (bits[dword_num / N_WORD_BITS] >> (dword_num % N_WORD_BITS)) & 1;
+}
+
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
 // Pretend pinned objects are not in oldspace so that they don't get moved.
@@ -233,13 +244,10 @@ find_page_index(void *addr)
 static boolean __attribute__((unused))
 from_space_p(lispobj obj)
 {
-    extern uword_t* pinned_dwords(page_index_t);
     page_index_t page_index = find_page_index((void*)obj);
-    if (page_index < 0 || page_table[page_index].gen != from_space) return 0;
-    if (!page_table[page_index].has_pin_map) return 1;
-    int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
-    return ((pinned_dwords(page_index)[dword_num / N_WORD_BITS]
-             >> (dword_num % N_WORD_BITS)) & 1) ^ 1;
+    return page_index >= 0
+        && page_table[page_index].gen == from_space
+        && !pinned_p(obj, page_index);
 }
 static inline boolean
 new_space_p(lispobj obj)

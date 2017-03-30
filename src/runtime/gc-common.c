@@ -86,19 +86,6 @@ copy_code_object(lispobj object, sword_t nwords)
 
 static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 
-#ifdef LISP_FEATURE_GENCGC
-static const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
-extern uword_t *page_table_pinned_dwords;
-
-static inline boolean pinned_p(lispobj obj, page_index_t page)
-{
-    if (!page_table[page].has_pin_map) return 0;
-    int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
-    uword_t *bits = &page_table_pinned_dwords[page * (n_dwords_in_card/N_WORD_BITS)];
-    return (bits[dword_num / N_WORD_BITS] >> (dword_num % N_WORD_BITS)) & 1;
-}
-#endif
-
 static inline void scav1(lispobj* object_ptr, lispobj object)
 {
     // GENCGC only:

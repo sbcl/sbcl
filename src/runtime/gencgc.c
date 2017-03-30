@@ -801,7 +801,6 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
     }
 }
 
-const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
 in_use_marker_t *
 pinned_dwords(page_index_t page)
 {
