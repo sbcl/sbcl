@@ -4061,7 +4061,7 @@ gc_init(void)
     gc_init_immobile();
 #endif
 
-    size_t pins_map_size_in_bytes =
+    pins_map_size_in_bytes =
       (n_dwords_in_card / N_WORD_BITS) * sizeof (uword_t) * page_table_pages;
     /* We use mmap directly here so that we can use a minimum of
        system calls per page during GC.
