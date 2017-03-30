@@ -672,19 +672,20 @@ static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
     lispobj* layout = (lispobj*)instance_layout(where);
-    if (!layout)
-        return 1;
-    layout = native_pointer((lispobj)layout);
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    if (__immobile_obj_gen_bits(layout) == from_space)
-        promote_immobile_obj(layout, 1);
-#else
-    if (forwarding_pointer_p(layout))
-        layout = native_pointer(forwarding_pointer_value(layout));
-#endif
+    lispobj lbitmap = make_fixnum(-1);
 
+    if (layout) {
+        layout = native_pointer((lispobj)layout);
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+        if (__immobile_obj_gen_bits(layout) == from_space)
+            promote_immobile_obj(layout, 1);
+#else
+        if (forwarding_pointer_p(layout))
+            layout = native_pointer(forwarding_pointer_value(layout));
+#endif
+        lbitmap = ((struct layout*)layout)->bitmap;
+    }
     sword_t nslots = instance_length(header) | 1;
-    lispobj lbitmap = ((struct layout*)layout)->bitmap;
     if (lbitmap == make_fixnum(-1))
         scavenge(where+1, nslots);
     else if (!fixnump(lbitmap))
