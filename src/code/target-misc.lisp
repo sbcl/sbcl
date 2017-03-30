@@ -122,7 +122,8 @@
 (defun %fun-name (function)
   (case (fun-subtype function)
     (#.sb!vm:funcallable-instance-header-widetag
-     (let ((layout (%funcallable-instance-layout function)))
+     (let (#!+(or sb-eval sb-fasteval)
+           (layout (%funcallable-instance-layout function)))
        ;; We know that funcallable-instance-p is true,
        ;; and so testing via TYPEP would be wasteful.
        (cond #!+sb-eval
