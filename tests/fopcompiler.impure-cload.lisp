@@ -141,3 +141,10 @@
                  '((CMACRO-MFOO 3) (CMACRO-FFOO 3)
                    (CMACRO-MFOO 2) (CMACRO-FFOO 2)
                    (CMACRO-MFOO 1) (CMACRO-FFOO 1)))))
+
+(when (eval nil)
+  (lambda () #.(find-package "CL")))
+
+(with-test (:name :skip-load-form)
+  (assert (eq #.(find-package "CL")
+              (eval '(find-package "CL")))))

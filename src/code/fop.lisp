@@ -509,6 +509,10 @@
   (fop-funcall* (fasl-input-stream) (operand-stack) (skip-until)))
 (!define-fop 56 (fop-funcall-for-effect () nil)
   (fop-funcall* (fasl-input-stream) (operand-stack) (skip-until)))
+
+;;; For LOAD-TIME-VALUE which is used for MAKE-LOAD-FORM
+(!define-fop 57 (fop-funcall-no-skip)
+  (fop-funcall* (fasl-input-stream) (operand-stack) nil))
 
 ;;;; fops for fixing up circularities
 

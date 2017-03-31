@@ -17,7 +17,7 @@
 ;;; the dumper handle and our best guess at the type of the object.
 ;;; It would be nice if L-T-V forms were generally eligible
 ;;; for fopcompilation, as it could eliminate special cases below.
-(defun compile-load-time-value (form)
+(defun compile-load-time-value (form &optional no-skip)
   (acond ((typecase form
             ;; This case is important for dumping packages as constants
             ;; in cold-init, but works fine in the normal target too.
@@ -43,7 +43,8 @@
           (values (sb!fasl::dump-pop *compile-object*) (specifier-type it)))
          (t
           (let ((lambda (compile-load-time-stuff form t)))
-            (values (fasl-dump-load-time-value-lambda lambda *compile-object*)
+            (values (fasl-dump-load-time-value-lambda lambda *compile-object*
+                                                      no-skip)
                     (let ((type (leaf-type lambda)))
                       (if (fun-type-p type)
                           (single-value-type (fun-type-returns type))

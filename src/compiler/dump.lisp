@@ -498,13 +498,16 @@
 
 ;;; Emit a funcall of the function and return the handle for the
 ;;; result.
-(defun fasl-dump-load-time-value-lambda (fun file)
+(defun fasl-dump-load-time-value-lambda (fun file no-skip)
   (declare (type sb!c::clambda fun) (type fasl-output file))
   (let ((handle (gethash (sb!c::leaf-info fun)
                          (fasl-output-entry-table file))))
     (aver handle)
     (dump-push handle file)
-    (dump-fop 'fop-funcall file)
+    ;; Can't skip MAKE-LOAD-FORM due to later references
+    (if no-skip
+        (dump-fop 'fop-funcall-no-skip file)
+        (dump-fop 'fop-funcall file))
     (dump-byte 0 file))
   (dump-pop file))
 

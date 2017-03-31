@@ -2074,7 +2074,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
                              (setf (sb!fasl::fasl-output-table-free fasl) (1+ index))
                              index))
                           (t
-                           (compile-load-time-value creation-form)))
+                           (compile-load-time-value creation-form t)))
                     fasl)
                    nil)
                (compiler-error "circular references in creation form for ~S"
