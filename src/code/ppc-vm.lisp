@@ -45,7 +45,12 @@
 ;;;; hacked for types.
 
 #-sb-xc-host (progn
+(define-alien-routine ("os_context_lr_addr" context-lr-addr) (* unsigned-long)
+  (context (* os-context-t)))
 
+(defun context-lr (context)
+  (declare (type (alien (* os-context-t)) context))
+  (int-sap (deref (context-lr-addr context))))
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
 
