@@ -300,7 +300,7 @@ catch_exception_raise(mach_port_t exception_port,
     x86_avx_state64_t float_state;
     mach_msg_type_number_t float_state_count = avx_supported? x86_AVX_STATE64_COUNT : x86_FLOAT_STATE64_COUNT;
     x86_avx_state64_t *target_float_state;
-    int float_state_flavor = avx_supported? x86_AVX_STATE64 : x86_FLOAT_STATE64_COUNT;
+    int float_state_flavor = avx_supported? x86_AVX_STATE64 : x86_FLOAT_STATE64;
 #else
     x86_float_state64_t float_state;
     mach_msg_type_number_t float_state_count = x86_FLOAT_STATE64_COUNT;
