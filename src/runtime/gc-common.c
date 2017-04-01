@@ -823,8 +823,18 @@ trans_ratio_or_complex(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
     lispobj* x = native_pointer(object);
+    lispobj a = x[1];
+    lispobj b = x[2];
 
-    if (fixnump(x[1]) && fixnump(x[2])) {
+    /* A zero ratio or complex means it was just allocated by fixed-alloc and 
+       a bignum can still be written there. Not a problem with a conservative GC
+       since it will be pinned down. */
+    if (fixnump(a) && fixnump(b)
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        && a && b
+#endif
+        )
+ {
       return copy_unboxed_object(object, 4);
     }
     return copy_object(object, 4);
