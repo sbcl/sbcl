@@ -376,22 +376,27 @@ alloc_tramp:
         mov     x0, reg_TMP // size
 
 #ifdef LISP_FEATURE_SB_THREAD
+        stp     reg_CFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
         str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
 #else
+        ldr	reg_NFP, =current_control_frame_pointer
+	str	reg_CFP, [reg_NFP]
+	ldr	reg_OCFP, =current_control_stack_pointer
+	str	reg_CSP, [reg_OCFP]
+
         ldr     reg_TMP, =foreign_function_call_active
         str     reg_TMP, [reg_TMP]
 #endif
         // Create a new frame
-        add     reg_CSP,reg_CSP, #32+96
-        stp     reg_CFP,reg_NULL,[reg_CSP, #-128]
-        stp     reg_CODE,reg_LR,[reg_CSP, #-112]
+        add     reg_CSP,reg_CSP, #32+80
+        stp     reg_CFP,reg_NULL,[reg_CSP, #-112]
+        stp     reg_CODE,reg_LR,[reg_CSP, #-96]
 
-        stp     reg_R0,reg_R1, [reg_CSP,#-96]
-        stp     reg_R2,reg_R3, [reg_CSP,#-80]
-        stp     reg_R4,reg_R5, [reg_CSP,#-64]
-        stp     reg_R6,reg_R7, [reg_CSP,#-48]
-        stp     reg_R8,reg_R9, [reg_CSP,#-32]
-        stp     x20,reg_LEXENV, [reg_CSP,#-16]
+        stp     reg_R0,reg_R1, [reg_CSP,#-80]
+        stp     reg_R2,reg_R3, [reg_CSP,#-64]
+        stp     reg_R4,reg_R5, [reg_CSP,#-48]
+        stp     reg_R6,reg_R7, [reg_CSP,#-32]
+        stp     reg_R8,reg_R9, [reg_CSP,#-16]
 
         stp     q0, q1, [sp,#-512]!
         stp     q2,q3, [sp,#32]
@@ -429,16 +434,15 @@ alloc_tramp:
         ldp     q2,q3, [sp,#32]
         ldp     q0, q1, [sp],#512
 
-        ldp     x20, reg_LEXENV, [reg_CSP, #-16]
-        ldp     reg_R8,reg_R9, [reg_CSP,#-32]
-        ldp     reg_R6,reg_R7, [reg_CSP,#-48]
-        ldp     reg_R4,reg_R5, [reg_CSP,#-64]
-        ldp     reg_R2,reg_R3, [reg_CSP,#-80]
-        ldp     reg_R0,reg_R1, [reg_CSP,#-96]
+        ldp     reg_R8,reg_R9, [reg_CSP,#-16]
+        ldp     reg_R6,reg_R7, [reg_CSP,#-32]
+        ldp     reg_R4,reg_R5, [reg_CSP,#-48]
+        ldp     reg_R2,reg_R3, [reg_CSP,#-64]
+        ldp     reg_R0,reg_R1, [reg_CSP,#-80]
 
-        ldr     reg_LR,[reg_CSP,#-104]
+        ldr     reg_LR,[reg_CSP,#-88]
 
-        sub     reg_CSP, reg_CSP, #32+96 // deallocate the frame
+        sub     reg_CSP, reg_CSP, #32+80 // deallocate the frame
 
         // foreign_function_call_active
 #ifdef LISP_FEATURE_SB_THREAD
