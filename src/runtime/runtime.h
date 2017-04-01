@@ -337,12 +337,6 @@ is_lisp_immediate(lispobj obj)
             || (widetag_of(obj) == UNBOUND_MARKER_WIDETAG));
 }
 
-static inline int
-is_cons_half(lispobj obj)
-{
-    return is_lisp_pointer(obj) || is_lisp_immediate(obj);
-}
-
 /* Convert from a lispobj with type bits to a native (ordinary
  * C/assembly) pointer to the beginning of the object. */
 static inline lispobj *
@@ -408,6 +402,25 @@ other_immediate_lowtag_p(lispobj header)
 {
     /* These lowtags are spaced 4 apart throughout the lowtag space. */
     return (lowtag_of(header) & 3) == OTHER_IMMEDIATE_0_LOWTAG;
+}
+
+static inline int
+is_cons_half(lispobj obj)
+{
+    /* A word that satisfies other_immediate_lowtag_p is a headered object
+     * and can not be half of a cons, except that widetags which satisfy
+     * other_immediate and are Lisp immediates can be half of a cons */
+    return !other_immediate_lowtag_p(obj)
+#if N_WORD_BITS == 64
+      || (((1LU<<(CHARACTER_WIDETAG>>2)) |
+           (1LU<<(SINGLE_FLOAT_WIDETAG>>2)) |
+           (1LU<<(UNBOUND_MARKER_WIDETAG>>2))) >> (widetag_of(obj) >> 2)) & 1;
+#else
+      /* The above bit-shifting approach is not applicable
+       * since we can't employ a 64-bit unsigned integer constant. */
+      || widetag_of(obj) == CHARACTER_WIDETAG
+      || widetag_of(obj) == UNBOUND_MARKER_WIDETAG;
+#endif
 }
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
