@@ -161,16 +161,16 @@ void heap_scavenge(lispobj *start, lispobj *end)
 
     for (object_ptr = start; object_ptr < end;) {
         lispobj object = *object_ptr;
-        if (is_lisp_pointer(object)) {
-            scav1(object_ptr, object);
-            object_ptr++;
-        }
-        else if (fixnump(object)) {
-            /* It's a fixnum: really easy.. */
-            object_ptr++;
-        } else {
+        if (other_immediate_lowtag_p(object))
             /* It's some sort of header object or another. */
             object_ptr += (scavtab[widetag_of(object)])(object_ptr, object);
+        else {  // it's a cons
+            if (is_lisp_pointer(object))
+                scav1(object_ptr, object);
+            object = *++object_ptr;
+            if (is_lisp_pointer(object))
+                scav1(object_ptr, object);
+            ++object_ptr;
         }
     }
     // This assertion is usually the one that fails when something
@@ -521,10 +521,33 @@ scav_other_pointer(lispobj *where, lispobj object)
  * immediate, boxed, and unboxed objects
  */
 
+ /* The immediate object scavenger basically wants to be "scav_cons",
+  * and so returns 2. To see why it's right, observe that scavenge() will
+  * not invoke a scavtab entry on any object except for one satisfying
+  * is_lisp_pointer(). So if a scavtab[] function got here,
+  * then it must be via heap_scavenge(). But heap_scavenge() should only
+  * dispatch via scavtab[] if it thought it saw an object header.
+  * So why do we act like it saw a cons? Because conses can contain an
+  * immediate object that satisfies both other_immediate_lowtag_p()
+  * and is_lisp_immediate(), namely, the objects specifically mentioned at
+  * is_cons_half(). So heap_scavenge() is nearly testing is_cons_half()
+  * but even more efficiently, by ignoring the unusual immediate widetags
+  * until we get to scav_immediate.
+  *
+  * And just to hammer the point home: we won't blow past the end of a specific
+  * range of words when scavenging a binding or control stack or anything else,
+  * because scavenge() skips immediate objects all by itself,
+  * or rather it skips anything not satisfying is_lisp_pointer().
+  *
+  * As to the unbound marker, see rev. 09c78105eabc6bf2b339f421d4ed1df4678003db
+  * which says that we might see it in conses for reasons somewhat unknown.
+  */
 static sword_t
 scav_immediate(lispobj *where, lispobj object)
 {
-    return 1;
+    object = *++where;
+    if (is_lisp_pointer(object)) scav1(where, object);
+    return 2;
 }
 
 static lispobj
