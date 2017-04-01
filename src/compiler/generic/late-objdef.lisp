@@ -36,10 +36,10 @@
     (cons (symbol-value (symbolicate (car entry) "-WIDETAG"))
           (cdr entry)))
   `((bignum "unboxed")
-    (ratio "boxed")
+    (ratio "boxed" "ratio_or_complex" "boxed")
     (single-float ,(or #!+64-bit "immediate" "unboxed"))
     (double-float "unboxed")
-    (complex "boxed")
+    (complex "boxed" "ratio_or_complex" "boxed")
     (complex-single-float "unboxed")
     (complex-double-float "unboxed")
 

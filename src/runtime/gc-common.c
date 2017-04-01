@@ -817,6 +817,18 @@ trans_unboxed(lispobj object)
     sword_t length = HeaderValue(*native_pointer(object)) + 1;
     return copy_unboxed_object(object, CEILING(length, 2));
 }
+
+static lispobj
+trans_ratio_or_complex(lispobj object)
+{
+    gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
+    lispobj* x = native_pointer(object);
+
+    if (fixnump(x[1]) && fixnump(x[2])) {
+      return copy_unboxed_object(object, 4);
+    }
+    return copy_object(object, 4);
+}
 
 /* vector-like objects */
 static lispobj
