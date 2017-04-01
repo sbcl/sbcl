@@ -93,7 +93,6 @@ collect_garbage(generation_index_t ignore)
 #endif
     unsigned long size_retained;
     lispobj *current_static_space_free_pointer;
-    unsigned long static_space_size;
     unsigned long binding_stack_size;
     sigset_t old;
     struct thread *th=arch_os_get_current_thread();
@@ -159,20 +158,21 @@ collect_garbage(generation_index_t ignore)
         (lispobj *)get_binding_stack_pointer(th) -
         (lispobj *)th->binding_stack_start;
 #ifdef PRINTNOISE
-    printf("Scavenging the binding stack %x - %x (%d words) ...\n",
-           th->binding_stack_start,get_binding_stack_pointer(th),
+    printf("Scavenging the binding stack %p - %p (%d words) ...\n",
+           th->binding_stack_start, get_binding_stack_pointer(th),
            (int)(binding_stack_size));
 #endif
     scavenge(((lispobj *)th->binding_stack_start), binding_stack_size);
 
-    static_space_size =
-        current_static_space_free_pointer - (lispobj *) STATIC_SPACE_START;
 #ifdef PRINTNOISE
-    printf("Scavenging static space %x - %x (%d words) ...\n",
-           STATIC_SPACE_START,current_static_space_free_pointer,
-           (int)(static_space_size));
+    printf("Scavenging static space %p - %p (%d words) ...\n",
+           (void*)STATIC_SPACE_START,
+           current_static_space_free_pointer,
+           (int)(current_static_space_free_pointer
+                 - (lispobj *) STATIC_SPACE_START));
 #endif
-    scavenge(((lispobj *)STATIC_SPACE_START), static_space_size);
+    heap_scavenge(((lispobj *)STATIC_SPACE_START),
+                  current_static_space_free_pointer);
 
     /* Scavenge newspace. */
 #ifdef PRINTNOISE
@@ -270,7 +270,7 @@ scavenge_newspace(void)
         /*      printf("here=%lx, new_space_free_pointer=%lx\n",
                 here,new_space_free_pointer); */
         next = new_space_free_pointer;
-        scavenge(here, next - here);
+        heap_scavenge(here, next);
         scav_weak_hash_tables();
         here = next;
     }
