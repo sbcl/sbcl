@@ -826,7 +826,7 @@ trans_ratio_or_complex(lispobj object)
     lispobj a = x[1];
     lispobj b = x[2];
 
-    /* A zero ratio or complex means it was just allocated by fixed-alloc and 
+    /* A zero ratio or complex means it was just allocated by fixed-alloc and
        a bignum can still be written there. Not a problem with a conservative GC
        since it will be pinned down. */
     if (fixnump(a) && fixnump(b)
