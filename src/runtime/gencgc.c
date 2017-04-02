@@ -473,7 +473,7 @@ write_generation_stats(FILE *file)
     fprintf(file,
             " Gen StaPg UbSta LaSta LUbSt Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
 
-    for (i = 0; i < SCRATCH_GENERATION; i++) {
+    for (i = 0; i <= SCRATCH_GENERATION; i++) {
         page_index_t j;
         page_index_t boxed_cnt = 0;
         page_index_t unboxed_cnt = 0;
