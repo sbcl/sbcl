@@ -452,6 +452,7 @@ handle_allocation_trap(os_context_t * context)
 #endif
 
     {
+        extern lispobj* alloc(sword_t);
         struct interrupt_data *data =
             arch_os_get_current_thread()->interrupt_data;
         data->allocation_trap_context = context;
