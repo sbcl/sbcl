@@ -2264,6 +2264,9 @@ pin_object(lispobj* object)
 {
     // Calls to pinned_p() have the lowtag bits present, but 'object' does not.
     // Therefore just shift them out now, and when calling pinned_p.
+    // This also improves the hash, since no extra mixing of the address bits
+    // is done by the hash algorithm. Consider a page entirely of instances:
+    // the lowtag is poor information, and we'd rather have more address bits.
     uword_t key = (uword_t)object >> (1+WORD_SHIFT);
     if (!hopscotch_containsp(&pinned_objects, key)) {
         hopscotch_put(&pinned_objects, key, 1);

@@ -33,23 +33,6 @@ void hopscotch_integrity_check(tableptr,char*,int);
 #define hash(x) x
 #define INTEGRITY_CHECK(when) {}
 
-/// The following "good" hash function slows GC down a lot.
-/// Don't use it.
-/// (Maybe there will be other places where we want it)
-#if 0
-/// C translation of Java code available at
-/// https://android.googlesource.com/platform/libcore/+/49965c1/ojluni/src/main/java/sun/misc/Hashing.java
-static uword_t hash(uword_t h)
-{
-  h += (h << 15) ^ 0xffffcd7d;
-  h ^= (h >> 10);
-  h += (h <<  3);
-  h ^= (h >>  6);
-  h += (h <<  2) + (h << 14);
-  return h ^ (h >> 16);
-}
-#endif
-
 /// Set a single bit in the hop mask for logical cell at 'index'
 static inline void set_hop_bit(tableptr ht, unsigned index, int bit)
 {
@@ -93,16 +76,6 @@ void hopscotch_init() // Called once on runtime startup, from gc_init().
     usable_size(cached_alloc[0]) = n_bytes_per_slice - ALLOCATION_OVERHEAD;
     usable_size(cached_alloc[1]) = n_bytes_per_slice - ALLOCATION_OVERHEAD;
 }
-
-#if 0
-void show_cache(char* when)
-{
-    printf("cache %s is %p: %lx and %p: %lx\n",
-           when,
-           cached_alloc[0], (cached_alloc[0] ? usable_size(cached_alloc[0]) : 0),
-           cached_alloc[1], (cached_alloc[1] ? usable_size(cached_alloc[1]) : 0));
-}
-#endif
 
 /* Return the address of at least 'nbytes' of storage.
  * This is not a general-purpose thing - it's only intended to keep
