@@ -166,7 +166,9 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 struct hopscotch_table pinned_objects;
+#endif
 
 /* In GC cards that have conservative pointers to them, should we wipe out
  * dwords in there that are not used, so that they do not act as false
@@ -2143,6 +2145,13 @@ maybe_adjust_large_object(lispobj *where)
     return;
 }
 
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+#  define hopscotch_init()
+#  define hopscotch_reset(a)
+#  define scavenge_pinned_ranges()
+#  define wipe_nonpinned_words()
+#  define hopscotch_create(a,b,c,d)
+#  define hopscotch_log_stats(a)
 /* After scavenging of the roots is done, we go back to the pinned objects
  * and look within them for pointers. While heap_scavenge() could certainly
  * do this, it would potentially lead to extra work, since we can't know
@@ -2150,6 +2159,7 @@ maybe_adjust_large_object(lispobj *where)
  * no telltale forwarding-pointer. The easiest thing to do is defer all
  * pinned objects to a subsequent pass, as is done here.
  */
+#else
 static void
 scavenge_pinned_ranges()
 {
@@ -2278,6 +2288,7 @@ pin_object(lispobj* object)
         }
     }
 }
+#endif
 
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.

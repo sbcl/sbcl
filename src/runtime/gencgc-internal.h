@@ -229,12 +229,16 @@ find_page_index(void *addr)
     return (-1);
 }
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     return page_table[page].has_pins
         && hopscotch_containsp(&pinned_objects, obj>>(1+WORD_SHIFT));
 }
+#else
+#  define pinned_p(obj, page) (0)
+#endif
 
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
