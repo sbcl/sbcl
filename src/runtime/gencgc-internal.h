@@ -248,12 +248,6 @@ from_space_p(lispobj obj)
         && page_table[page_index].gen == from_space
         && !pinned_p(obj, page_index);
 }
-static inline boolean
-new_space_p(lispobj obj)
-{
-    page_index_t page_index = find_page_index((void*)obj);
-    return page_index >= 0 && page_table[page_index].gen == new_space;
-}
 
 extern page_index_t last_free_page;
 extern boolean gencgc_partial_pickup;
