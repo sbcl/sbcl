@@ -1883,6 +1883,7 @@
 
 (define-instruction nop (segment)
   (:printer byte ((op #b10010000)))
+  (:printer ext-reg/mem-no-width ((op '(#x1F 0))))
   (:emitter
    (emit-byte segment #b10010000)))
 
