@@ -780,15 +780,6 @@
 
 ;;; Array type unions have some tricky semantics.
 
-;; borrowed from 'info.impure.lisp' - FIXME: put in test-util
-;; and make it accept with either lists or vectors.
-(defun shuffle (list)
-  (let ((vector (coerce list 'vector)))
-    (loop for lim from (1- (length vector)) downto 0
-          for chosen = (random (1+ lim))
-          do (rotatef (aref vector chosen) (aref vector lim)))
-    (coerce vector 'list)))
-
 (macrolet
     ((disunity-test (name type-specifier-1 type-specifier-2)
        `(with-test (:name ,name)

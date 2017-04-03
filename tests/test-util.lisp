@@ -6,7 +6,7 @@
            #:make-kill-thread #:make-join-thread
            #:checked-compile #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
-           #:runtime #:split-string))
+           #:runtime #:split-string #:shuffle))
 
 (in-package :test-util)
 
@@ -323,3 +323,15 @@
         for end = (position delimiter string) then (position delimiter string :start begin)
         collect (subseq string begin end)
         while end))
+
+(defun shuffle (sequence)
+  (typecase sequence
+    (list
+     (coerce (shuffle (coerce sequence 'vector)) 'list))
+    (vector ; destructive
+     (let ((vector sequence))
+       (loop for lim from (1- (length vector)) downto 0
+             for chosen = (random (1+ lim))
+             unless (= chosen lim)
+             do (rotatef (aref vector chosen) (aref vector lim)))
+       vector))))

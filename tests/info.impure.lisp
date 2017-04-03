@@ -167,13 +167,6 @@
       (try `(setf ,s))
       (try `(cas ,s)))))
 
-(defun shuffle (vector) ; destructive
-  (loop for lim from (1- (length vector)) downto 0
-        for chosen = (random (1+ lim))
-        unless (= chosen lim)
-        do (rotatef (aref vector chosen) (aref vector lim)))
-  vector)
-
 (test-util:with-test (:name :quick-packed-info-insert)
   ;; Exercise some bit patterns that touch the sign bit on 32-bit machines.
   (loop repeat 10
@@ -187,7 +180,7 @@
       ;; Randomize because maybe there's an ordering constraint more
       ;; complicated than fdefn always getting to be first.
       ;; (there isn't, but could be)
-      (dolist (num (coerce (shuffle (coerce type-nums 'vector)) 'list))
+      (dolist (num (coerce (test-util:shuffle (coerce type-nums 'vector)) 'list))
         (let ((val (format nil "value for ~D" num)))
           (setq iv1 (quick-packed-info-insert iv1 num val)
                 iv2 (%packed-info-insert ; not PACKED-INFO-INSERT
@@ -219,7 +212,7 @@
         (a (make-array 1 :element-type 'sb-ext:word)))
     (let* ((aux-keys '(0 a b c d e f g h nil i j k l m n o p setf q r s))
            (info-types (loop for i from 1 below 64 collect i))
-           (work (shuffle (coerce (crossprod aux-keys info-types) 'vector)))
+           (work (test-util:shuffle (coerce (crossprod aux-keys info-types) 'vector)))
            (n (floor (length work) 4))
            (threads))
       (dotimes (i 4)
@@ -283,7 +276,7 @@
     (dotimes (i n-threads)
       ;; Insert the integers [-n .. -2]. Keys 0 and -1 are illegal.
       (setf (aref worklists i)
-            (shuffle (integer-range (- (1+ n-inserts)) -2))))
+            (test-util:shuffle (integer-range (- (1+ n-inserts)) -2))))
     (dotimes (i n-threads)
       (push (sb-thread:make-thread
              (lambda (worklist me)
