@@ -57,12 +57,11 @@
 #include "genesis/instance.h"
 #include "genesis/layout.h"
 #include "gencgc.h"
+#include "hopscotch.h"
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 #include "genesis/cons.h"
 #endif
-#ifdef LISP_FEATURE_X86
 #include "forwarding-ptr.h"
-#endif
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
@@ -167,9 +166,7 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
-
-in_use_marker_t *page_table_pinned_dwords;
-size_t pins_map_size_in_bytes;
+struct hopscotch_table pinned_objects;
 
 /* In GC cards that have conservative pointers to them, should we wipe out
  * dwords in there that are not used, so that they do not act as false
@@ -801,14 +798,6 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
     }
 }
 
-in_use_marker_t *
-pinned_dwords(page_index_t page)
-{
-    if (page_table[page].has_pin_map)
-        return &page_table_pinned_dwords[page * (n_dwords_in_card/N_WORD_BITS)];
-    return NULL;
-}
-
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -874,8 +863,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         page_table[first_page].gen = gc_alloc_generation;
         page_table[first_page].large_object = 0;
         set_page_scan_start_offset(first_page, 0);
-        // wiping should have free()ed and :=NULL
-        gc_assert(pinned_dwords(first_page) == NULL);
     }
 
     gc_assert(page_table[first_page].allocated == page_type_flag);
@@ -1919,6 +1906,9 @@ trans_boxed_large(lispobj object)
  * maintained within the objects which causes writes to the pages. A
  * limited attempt is made to avoid unnecessary writes, but this needs
  * a re-think. */
+/* FIXME: now that we have non-Lisp hashtables in the GC, it might make sense
+ * to stop chaining weak pointers through a slot in the object, as a remedy to
+ * the above concern. It would also shorten the object by 2 words. */
 static sword_t
 scav_weak_pointer(lispobj *where, lispobj object)
 {
@@ -2153,95 +2143,137 @@ maybe_adjust_large_object(lispobj *where)
     return;
 }
 
-/*
- * Why is this restricted to protected objects only?
- * Because the rest of the page has been scavenged already,
- * and since that leaves forwarding pointers in the unprotected
- * areas you cannot scavenge it again until those are gone.
+/* After scavenging of the roots is done, we go back to the pinned objects
+ * and look within them for pointers. While heap_scavenge() could certainly
+ * do this, it would potentially lead to extra work, since we can't know
+ * whether any given object has been examined at least once, since there is
+ * no telltale forwarding-pointer. The easiest thing to do is defer all
+ * pinned objects to a subsequent pass, as is done here.
  */
-static void
-scavenge_pinned_range(void* page_base, int start, int count)
-{
-    // 'start' and 'count' are expressed in units of dwords
-    lispobj *where = (lispobj*)page_base + 2*start;
-    heap_scavenge(where, where + 2*count);
-}
-
 static void
 scavenge_pinned_ranges()
 {
-    page_index_t page;
-    for (page = 0; page < last_free_page; page++) {
-        in_use_marker_t* bitmap = pinned_dwords(page);
-        if (bitmap)
-            bitmap_scan(bitmap,
-                        GENCGC_CARD_BYTES / (2*N_WORD_BYTES) / N_WORD_BITS,
-                        0, scavenge_pinned_range, page_address(page));
+    int i;
+    for_each_hopscotch_cell(i, pinned_objects) {
+        uword_t key = pinned_objects.keys[i];
+        if (key) {
+            lispobj* obj = (lispobj*)(key << (1+WORD_SHIFT));
+            lispobj header = *obj;
+            // Never invoke scavenger on a simple-fun, just code components.
+            if (is_cons_half(header))
+              scavenge(obj, 2);
+            else if (widetag_of(header) != SIMPLE_FUN_HEADER_WIDETAG)
+              scavtab[widetag_of(header)](obj, header);
+        }
     }
 }
 
-static void wipe_range(void* page_base, int start, int count)
-{
-    bzero((lispobj*)page_base + 2*start, count*2*N_WORD_BYTES);
+static int addrcmp(const void* a, const void* b) {  // For qsort()
+    return *(uword_t*)a - *(uword_t*)b;
 }
 
 static void
 wipe_nonpinned_words()
 {
-    page_index_t i;
-    in_use_marker_t* bitmap;
-
-    for (i = 0; i < last_free_page; i++) {
-        if (page_table[i].dont_move && (bitmap = pinned_dwords(i)) != 0) {
-            bitmap_scan(bitmap,
-                        GENCGC_CARD_BYTES / (2*N_WORD_BYTES) / N_WORD_BITS,
-                        BIT_SCAN_INVERT | BIT_SCAN_CLEAR,
-                        wipe_range, page_address(i));
-            page_table[i].has_pin_map = 0;
-            // move the page to newspace
-            int used = page_bytes_used(i);
-            generations[new_space].bytes_allocated += used;
-            generations[page_table[i].gen].bytes_allocated -= used;
-            page_table[i].gen = new_space;
+    // Loop over the keys in pinned_objects and pack them densely into
+    // the same array - pinned_objects.keys[] - but skip any simple-funs.
+    // Also undo the right-shift. Admittedly this is abstraction breakage.
+    int limit = hopscotch_max_key_index(pinned_objects);
+    int n_pins = 0, i;
+    for (i = 0; i <= limit; ++i) {
+        uword_t key = pinned_objects.keys[i];
+        if (key) {
+            lispobj* obj = (lispobj*)(key<<(1+WORD_SHIFT));
+            // No need to check for is_cons_half() - it will be false
+            // on a simple-fun header, and that's the correct answer.
+            if (widetag_of(*obj) != SIMPLE_FUN_HEADER_WIDETAG)
+                pinned_objects.keys[n_pins++] = (uword_t)obj;
         }
     }
-#ifndef LISP_FEATURE_WIN32
-    madvise(page_table_pinned_dwords, pins_map_size_in_bytes, MADV_DONTNEED);
+    // Store a sentinel at the end. Even if n_pins = table capacity (unlikely),
+    // it is safe to write one more word, because the hops[] array immediately
+    // follows the keys[] array in memory.  At worst we stomp on hops[0]
+    // which is irrelevant since the table has already been rendered unusable
+    // by stealing its key array for a different purpose.
+    pinned_objects.keys[n_pins] = 0;
+    // Order by ascending address, stopping short of the sentinel.
+    qsort(pinned_objects.keys, n_pins, sizeof (uword_t), addrcmp);
+#if 0
+    printf("Sorted pin list:\n");
+    for (i = 0; i < n_pins; ++i) {
+      lispobj* obj = (lispobj*)pinned_objects.keys[i];
+      if (!is_cons_half(*obj))
+           printf("%p: %5d words\n", obj, (int)sizetab[widetag_of(*obj)](obj));
+      else printf("%p: CONS\n", obj);
+    }
 #endif
+    // Each entry in the pinned objects demarcates two ranges to be cleared:
+    // - the range preceding it back to either the page start, or prior object.
+    // - the range after it, up to the lesser of page bytes used or next object.
+    uword_t preceding_object = 0;
+    uword_t this_page_end = 0;
+#define page_base_address(x) (x&~(GENCGC_CARD_BYTES-1))
+    for (i = 0; i < n_pins; ++i) {
+        // Handle the preceding range. If this object is on the same page as
+        // its predecessor, then intervening bytes were already zeroed.
+        // If not, then start a new page and do some bookkeeping.
+        lispobj* obj = (lispobj*)pinned_objects.keys[i];
+        uword_t this_page_base = page_base_address((uword_t)obj);
+        /* printf("i=%d obj=%p base=%p\n", i, obj, (void*)this_page_base); */
+        if (this_page_base > page_base_address(preceding_object)) {
+            bzero((void*)this_page_base, (uword_t)obj - this_page_base);
+            // Move the page to newspace
+            page_index_t page = find_page_index(obj);
+            int used = page_bytes_used(page);
+            this_page_end = this_page_base + used;
+            /* printf("    Clearing %p .. %p (limit=%p)\n",
+               (void*)this_page_base, obj, (void*)this_page_end); */
+            generations[new_space].bytes_allocated += used;
+            generations[page_table[page].gen].bytes_allocated -= used;
+            page_table[page].gen = new_space;
+            page_table[page].has_pins = 0;
+        }
+        // Handle the following range.
+        lispobj word = *obj;
+        size_t nwords = is_cons_half(word) ? 2 : sizetab[widetag_of(word)](obj);
+        uword_t range_start = (uword_t)(obj + nwords);
+        uword_t range_end = this_page_end;
+        // There is always an i+1'th key due to the sentinel value.
+        if (page_base_address(pinned_objects.keys[i+1]) == this_page_base)
+            range_end = pinned_objects.keys[i+1];
+        /* printf("    Clearing %p .. %p\n", (void*)range_start, (void*)range_end); */
+        bzero((void*)range_start, range_end - range_start);
+        preceding_object = (uword_t)obj;
+    }
 }
 
-static void __attribute__((unused))
-pin_words(page_index_t pageindex, lispobj *mark_which_pointer)
+/* Add 'object' to the hashtable, and if the object is a code component,
+ * then also add all of the embedded simple-funs.
+ * The rationale for the extra work on code components is that without it,
+ * every test of pinned_p() on an object would have to check if the pointer
+ * is to a simple-fun - entailing an extra read of the header - and mapping
+ * to its code component if so.  Since more calls to pinned_p occur than to
+ * pin_object, the extra burden should be on this function.
+ * Experimentation bears out that this is the better technique.
+ * Also, we wouldn't often expect code components in the collected generation
+ * so the extra work here is quite minimal, even if it can generally add to
+ * the number of keys in the hashtable.
+ */
+static void
+pin_object(lispobj* object)
 {
-    gc_assert(mark_which_pointer);
-    if (!page_table[pageindex].has_pin_map) {
-        page_table[pageindex].has_pin_map = 1;
-#ifdef DEBUG
-        {
-          int i;
-          in_use_marker_t* map = pinned_dwords(pageindex);
-          for (i=0; i<n_dwords_in_card/N_WORD_BITS; ++i)
-            gc_assert(map[i] == 0);
+    // Calls to pinned_p() have the lowtag bits present, but 'object' does not.
+    // Therefore just shift them out now, and when calling pinned_p.
+    uword_t key = (uword_t)object >> (1+WORD_SHIFT);
+    if (!hopscotch_containsp(&pinned_objects, key)) {
+        hopscotch_put(&pinned_objects, key, 1);
+        if (widetag_of(*object) == CODE_HEADER_WIDETAG) {
+          for_each_simple_fun(i, fun, (struct code*)object, 0, {
+              key = (uword_t)fun >> (1+WORD_SHIFT);
+              hopscotch_put(&pinned_objects, key, 1);
+          })
         }
-#endif
     }
-    lispobj *page_base = page_address(pageindex);
-    unsigned int begin_dword_index = (mark_which_pointer - page_base) / 2;
-    in_use_marker_t *bitmap = pinned_dwords(pageindex);
-    if (bitmap[begin_dword_index/N_WORD_BITS]
-        & ((uword_t)1 << (begin_dword_index % N_WORD_BITS)))
-      return; // already seen this object
-
-    lispobj header = *mark_which_pointer;
-    int size = 2;
-    // Don't bother calling a sizing function for cons cells.
-    if (!is_cons_half(header))
-        size = (sizetab[widetag_of(header)])(mark_which_pointer);
-    gc_assert(size % 2 == 0);
-    unsigned int end_dword_index = begin_dword_index + size / 2;
-    unsigned int index;
-    for (index = begin_dword_index; index < end_dword_index; index++)
-        bitmap[index/N_WORD_BITS] |= (uword_t)1 << (index % N_WORD_BITS);
 }
 
 /* Take a possible pointer to a Lisp object and mark its page in the
@@ -2349,8 +2381,10 @@ preserve_pointer(void *addr)
     /* Do not do this for multi-page objects.  Those pages do not need
      * object wipeout anyway.
      */
-    if (do_wipe_p && i == first_page) // single-page object
-        pin_words(first_page, object_start);
+    if (do_wipe_p && i == first_page) { // single-page object
+       pin_object(object_start);
+       page_table[i].has_pins = 1;
+    }
 #endif
 
     /* Check that the page is now static. */
@@ -3438,7 +3472,7 @@ move_pinned_pages_to_newspace()
         if (page_table[i].dont_move &&
             /* dont_move is cleared lazily, so validate the space as well. */
             page_table[i].gen == from_space) {
-            if (pinned_dwords(i) && do_wipe_p) {
+            if (do_wipe_p && page_table[i].has_pins) {
                 // do not move to newspace after all, this will be word-wiped
                 continue;
             }
@@ -3493,12 +3527,17 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[new_space].alloc_large_start_page = 0;
     generations[new_space].alloc_large_unboxed_start_page = 0;
 
+    hopscotch_reset(&pinned_objects);
     /* Before any pointers are preserved, the dont_move flags on the
      * pages need to be cleared. */
+    /* FIXME: consider moving this bitmap into its own range of words,
+     * out of the page table. Then we can just bzero() it.
+     * This will also obviate the extra test at the comment
+     * "dont_move is cleared lazily" in move_pinned_pages_to_newspace().
+     */
     for (i = 0; i < last_free_page; i++)
         if(page_table[i].gen==from_space) {
             page_table[i].dont_move = 0;
-            gc_assert(pinned_dwords(i) == NULL);
         }
 
     /* Un-write-protect the old-space pages. This is essential for the
@@ -3744,6 +3783,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables(0);
+    hopscotch_log_stats(&pinned_objects);
 
     /* Free the pages in oldspace, but not those marked dont_move. */
     free_oldspace();
@@ -4061,15 +4101,9 @@ gc_init(void)
     gc_init_immobile();
 #endif
 
-    pins_map_size_in_bytes =
-      (n_dwords_in_card / N_WORD_BITS) * sizeof (uword_t) * page_table_pages;
-    /* We use mmap directly here so that we can use a minimum of
-       system calls per page during GC.
-       All we need here now is a madvise(DONTNEED) at the end of GC. */
-    page_table_pinned_dwords
-      = (in_use_marker_t*)os_validate(NULL, pins_map_size_in_bytes);
-    /* We do not need to zero */
-    gc_assert(page_table_pinned_dwords);
+    hopscotch_init();
+    hopscotch_create(&pinned_objects, 0 /* no values */,
+                     32 /* logical bin count */, 0 /* default range */);
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;

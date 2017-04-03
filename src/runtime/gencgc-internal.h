@@ -23,6 +23,7 @@
 #include "gc.h"
 #include "gencgc-alloc-region.h"
 #include "genesis/code.h"
+#include "hopscotch.h"
 
 void gc_free_heap(void);
 extern void *page_address(page_index_t);
@@ -112,9 +113,11 @@ struct page {
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
         dont_move :1,
+        // FIXME: this should be identical to (dont_move & !large_object),
+        // so we don't need to store it as a bit unto itself.
         /* If this page is not a large object page and contains
          * any objects which are pinned */
-        has_pin_map :1,
+        has_pins :1,
         /* If the page is part of a large object then this flag is
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
@@ -226,15 +229,11 @@ find_page_index(void *addr)
     return (-1);
 }
 
-static const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
-extern uword_t *page_table_pinned_dwords;
-
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
-    if (!page_table[page].has_pin_map) return 0;
-    int dword_num = (obj & (GENCGC_CARD_BYTES-1)) >> (1+WORD_SHIFT);
-    uword_t *bits = &page_table_pinned_dwords[page * (n_dwords_in_card/N_WORD_BITS)];
-    return (bits[dword_num / N_WORD_BITS] >> (dword_num % N_WORD_BITS)) & 1;
+    extern struct hopscotch_table pinned_objects;
+    return page_table[page].has_pins
+        && hopscotch_containsp(&pinned_objects, obj>>(1+WORD_SHIFT));
 }
 
 // Return true only if 'obj' must be *physically* transported to survive gc.

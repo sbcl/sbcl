@@ -644,7 +644,7 @@ void bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
     uword_t sense = (flags & BIT_SCAN_INVERT) ? ~0L : 0;
     int start_word_index = 0;
     int shift = 0;
-    in_use_marker_t word;
+    uword_t word;
 
     flags = flags & BIT_SCAN_CLEAR;
 
