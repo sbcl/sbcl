@@ -30,8 +30,13 @@ typedef struct hopscotch_table* tableptr;
 void hopscotch_integrity_check(tableptr,char*,int);
 
 #define table_size(table) (1+(table).mask)
-#define hash(x) x
 #define INTEGRITY_CHECK(when) {}
+
+/// XOR values based on the page number and the relative index into the page.
+/// Disregard lowtag bits.
+static inline int hash(lispobj x) {
+    return (x >> GENCGC_CARD_SHIFT) ^ (x >> (1+WORD_SHIFT));
+}
 
 /// Set a single bit in the hop mask for logical cell at 'index'
 static inline void set_hop_bit(tableptr ht, unsigned index, int bit)
@@ -154,7 +159,12 @@ static void hopscotch_realloc(tableptr ht, boolean valuesp, int size, char hop_r
     // small hashtables. The reference algorithm uses a fixed max hop of 32,
     // but fewer is better, and our pinned object table tends to be very small.
     if (hop_range == 0) { // Let us pick.
-        if      (size <=   1024) hop_range =  8;
+        // The arbitrary cutoff of 1023 is based on the observed final size
+        // of 2063 (=2048+15) with commonly fewer than 80 items.
+        // Collisions must have been so frequent that the only way out
+        // was to bump the table size and rehash. We may as well allow more
+        // probes at smaller sizes for the sake of improved table density.
+        if      (size <=   1023) hop_range =  8;
         else if (size <=  16384) hop_range = 16;
         else                     hop_range = 32;
     }
@@ -175,6 +185,7 @@ static void hopscotch_realloc(tableptr ht, boolean valuesp, int size, char hop_r
     ht->mem_size  = storage_size;
     ht->mask      = size - 1;
     ht->hop_range = hop_range;
+    ht->threshold = n_keys * 13 / 16; // target load ~= 81.25%
     ht->hops      = (unsigned*)((char*)ht->keys + sizeof (uword_t) * n_keys);
     ht->values    = !valuesp ? 0 :
         (unsigned*)((char*)ht->hops + sizeof (int) * size);
@@ -336,8 +347,10 @@ int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
     if (ht->keys[desired_index] == 0) {  // Instant win
         put_pair(desired_index, key, val);
         set_hop_bit(ht, desired_index, 0);
-        return ++ht->count;
+        return ++ht->count;  // Allow rehash threshold to be exceeded
     }
+    if (!ht->rehashing && ht->count >= ht->threshold)
+        return hopscotch_put(hopscotch_resize_up(ht), key, val);
     // 'limit' is the inclusive bound on cell indices.
     int limit = hopscotch_max_key_index(*ht);
     int free_index = desired_index;

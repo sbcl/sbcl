@@ -933,20 +933,21 @@ void scan_weak_pointers(void)
         if (next_wp == wp) /* gencgc uses a ref to self for end of list */
             next_wp = NULL;
 
-        gc_assert(is_lisp_pointer(wp->value));
-        lispobj *value = native_pointer(wp->value);
+        lispobj pointee = wp->value;
+        gc_assert(is_lisp_pointer(pointee));
+        lispobj *objaddr = native_pointer(pointee);
 
         /* Now, we need to check whether the object has been forwarded. If
          * it has been, the weak pointer is still good and needs to be
          * updated. Otherwise, the weak pointer needs to be broken. */
 
-        if (from_space_p((lispobj)value)) {
-            wp->value = forwarding_pointer_p(value) ?
-                LOW_WORD(forwarding_pointer_value(value)) : UNBOUND_MARKER_WIDETAG;
+        if (from_space_p(pointee)) {
+            wp->value = forwarding_pointer_p(objaddr) ?
+                LOW_WORD(forwarding_pointer_value(objaddr)) : UNBOUND_MARKER_WIDETAG;
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-          else if (immobile_space_p((lispobj)value) &&
-                   immobile_obj_gen_bits(value) == from_space) {
+          else if (immobile_space_p(pointee) &&
+                   immobile_obj_gen_bits(objaddr) == from_space) {
                 wp->value = UNBOUND_MARKER_WIDETAG;
         }
 #endif

@@ -17,12 +17,13 @@ struct hopscotch_table {
     unsigned*  hops;
     unsigned*  values;
     unsigned   mask;
-    int hop_range;
-    int count;
-    int mem_size;  // in bytes, for zero-filling when done using
+    int  hop_range;
+    int  count;
+    int  threshold;  // max count before sizing up
+    int  prev_size;  // in cells, as specified to hopscotch_create()
+    int  mem_size;   // in bytes, for zero-filling when done using
     // Statistics
     struct { int n_seeks, n_probes; } hit, miss;
-    int  prev_size;  // in cells, as specified to hopscotch_create()
     char resized;    // set to 1 if sized up since last reset
     char rehashing;  // set to 1 during rehash
 };
@@ -47,7 +48,8 @@ void hopscotch_log_stats(struct hopscotch_table*);
  */
 #define hopscotch_max_key_index(table) ((table).mask+(table).hop_range-1)
 
-#define for_each_hopscotch_cell(loopvar, tablevar) \
-  for(loopvar=hopscotch_max_key_index(tablevar) ; loopvar >= 0 ; --loopvar)
+#define for_each_hopscotch_key(indexvar, keyvar, tablevar) \
+  for(indexvar=hopscotch_max_key_index(tablevar) ; indexvar >= 0 ; --indexvar) \
+    if ((keyvar=tablevar.keys[indexvar])!=0)
 
 #endif

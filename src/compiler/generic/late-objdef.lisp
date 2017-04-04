@@ -130,6 +130,7 @@
                       (ldb (byte 32 0) bits) (ldb (byte 32 32) bits))
     (format stream "~%}~%"))
 
+  (format stream "extern unsigned char lowtag_for_widetag[64];~%")
   (format stream "~%#ifdef WANT_SCAV_TRANS_SIZE_TABLES~%")
   (let ((a (make-array 64 :initial-element 0)))
     (dolist (entry *scav/trans/size*)

@@ -2164,17 +2164,15 @@ static void
 scavenge_pinned_ranges()
 {
     int i;
-    for_each_hopscotch_cell(i, pinned_objects) {
-        uword_t key = pinned_objects.keys[i];
-        if (key) {
-            lispobj* obj = (lispobj*)(key << (1+WORD_SHIFT));
-            lispobj header = *obj;
-            // Never invoke scavenger on a simple-fun, just code components.
-            if (is_cons_half(header))
-              scavenge(obj, 2);
-            else if (widetag_of(header) != SIMPLE_FUN_HEADER_WIDETAG)
-              scavtab[widetag_of(header)](obj, header);
-        }
+    lispobj key;
+    for_each_hopscotch_key(i, key, pinned_objects) {
+        lispobj* obj = native_pointer(key);
+        lispobj header = *obj;
+        // Never invoke scavenger on a simple-fun, just code components.
+        if (is_cons_half(header))
+            scavenge(obj, 2);
+        else if (widetag_of(header) != SIMPLE_FUN_HEADER_WIDETAG)
+            scavtab[widetag_of(header)](obj, header);
     }
 }
 
@@ -2187,13 +2185,13 @@ wipe_nonpinned_words()
 {
     // Loop over the keys in pinned_objects and pack them densely into
     // the same array - pinned_objects.keys[] - but skip any simple-funs.
-    // Also undo the right-shift. Admittedly this is abstraction breakage.
+    // Admittedly this is abstraction breakage.
     int limit = hopscotch_max_key_index(pinned_objects);
     int n_pins = 0, i;
     for (i = 0; i <= limit; ++i) {
-        uword_t key = pinned_objects.keys[i];
+        lispobj key = pinned_objects.keys[i];
         if (key) {
-            lispobj* obj = (lispobj*)(key<<(1+WORD_SHIFT));
+            lispobj* obj = native_pointer(key);
             // No need to check for is_cons_half() - it will be false
             // on a simple-fun header, and that's the correct answer.
             if (widetag_of(*obj) != SIMPLE_FUN_HEADER_WIDETAG)
@@ -2270,20 +2268,16 @@ wipe_nonpinned_words()
  * the number of keys in the hashtable.
  */
 static void
-pin_object(lispobj* object)
+pin_object(lispobj object)
 {
-    // Calls to pinned_p() have the lowtag bits present, but 'object' does not.
-    // Therefore just shift them out now, and when calling pinned_p.
-    // This also improves the hash, since no extra mixing of the address bits
-    // is done by the hash algorithm. Consider a page entirely of instances:
-    // the lowtag is poor information, and we'd rather have more address bits.
-    uword_t key = (uword_t)object >> (1+WORD_SHIFT);
-    if (!hopscotch_containsp(&pinned_objects, key)) {
-        hopscotch_put(&pinned_objects, key, 1);
-        if (widetag_of(*object) == CODE_HEADER_WIDETAG) {
-          for_each_simple_fun(i, fun, (struct code*)object, 0, {
-              key = (uword_t)fun >> (1+WORD_SHIFT);
-              hopscotch_put(&pinned_objects, key, 1);
+    if (!hopscotch_containsp(&pinned_objects, object)) {
+        hopscotch_put(&pinned_objects, object, 1);
+        struct code* maybe_code = (struct code*)native_pointer(object);
+        if (widetag_of(maybe_code->header) == CODE_HEADER_WIDETAG) {
+          for_each_simple_fun(i, fun, maybe_code, 0, {
+              hopscotch_put(&pinned_objects,
+                            make_lispobj(fun, FUN_POINTER_LOWTAG),
+                            1);
           })
         }
     }
@@ -2396,7 +2390,10 @@ preserve_pointer(void *addr)
      * object wipeout anyway.
      */
     if (do_wipe_p && i == first_page) { // single-page object
-       pin_object(object_start);
+       lispobj word = *object_start;
+       int lowtag = is_cons_half(word) ?
+           LIST_POINTER_LOWTAG : lowtag_for_widetag[widetag_of(word)>>2];
+       pin_object(make_lispobj(object_start, lowtag));
        page_table[i].has_pins = 1;
     }
 #endif

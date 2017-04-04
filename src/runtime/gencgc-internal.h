@@ -234,7 +234,7 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     return page_table[page].has_pins
-        && hopscotch_containsp(&pinned_objects, obj>>(1+WORD_SHIFT));
+        && hopscotch_containsp(&pinned_objects, obj);
 }
 #else
 #  define pinned_p(obj, page) (0)
