@@ -335,8 +335,7 @@ os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
     }
 
 #ifdef LISP_FEATURE_ALPHA
-
-    len=(len+(os_vm_page_size-1))&(~(os_vm_page_size-1));
+    len=os_round_up_size_to_page(len);
     under_2gb_free_pointer+=len;
 #endif
 
