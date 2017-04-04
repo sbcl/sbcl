@@ -299,6 +299,7 @@ tableptr hopscotch_resize_up(tableptr ht)
     ht->mem_size  = copy.mem_size;
     ht->mask      = copy.mask;
     ht->hop_range = copy.hop_range;
+    ht->threshold = copy.threshold;
     ht->keys      = copy.keys;
     ht->hops      = copy.hops;
     ht->values    = copy.values;
