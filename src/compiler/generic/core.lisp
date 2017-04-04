@@ -11,6 +11,11 @@
 
 (in-package "SB!C")
 
+;;; This derived constant can defined only after compiler/target/backend-parms
+;;; is compiled. So for lack of a better place, here it is.
+#!+gencgc
+(defconstant sb!vm:gencgc-card-shift (1- (integer-length sb!vm:gencgc-card-bytes)))
+
 ;;; A CORE-OBJECT structure holds the state needed to resolve cross-component
 ;;; references during in-core compilation.
 (defstruct (core-object

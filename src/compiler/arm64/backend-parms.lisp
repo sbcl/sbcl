@@ -14,7 +14,6 @@
 ;;; writes to old generations are logged.  With mprotect-based write
 ;;; barriers, this must be a multiple of the OS page size.
 (defconstant gencgc-card-bytes *backend-page-bytes*)
-(defconstant gencgc-card-shift (1- (integer-length gencgc-card-bytes)))
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
