@@ -49,7 +49,15 @@
 (defun fill-table (table n-things)
   (let ((lisp-ht (make-hash-table :test 'eq)))
     (dotimes (i n-things)
-      (let ((k (max 1 (random (ash 1 20)))) ; 0 is the unused cell marker
+      ;; Pick a random small integer key, but don't pick the empty marker (0).
+      ;; Also shift left left by N-LOWTAG-BITS, because the hash function
+      ;; is optimized specifically for object addresses.
+      ;; In particular it discards that many bits from the hash, and the table
+      ;; is unable to handle collisions to such a degree that the max hop
+      ;; is exceeded. Resize will keep happening until mmap() fails.
+      ;; This is not something worth "fixing" unless someone reports a real
+      ;; problem.  GC is much faster with a dumb hash but fast table.
+      (let ((k (ash (max 1 (random (ash 1 20))) sb-vm:n-lowtag-bits))
             (v (random (ash 1 29))))
         ;; The C code can't deal with a key already present
         (loop while (gethash k lisp-ht)
