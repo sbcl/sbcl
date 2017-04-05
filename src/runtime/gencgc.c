@@ -176,10 +176,6 @@ struct hopscotch_table pinned_objects;
  * but in testing it is both reliable and no noticeable slowdown. */
 int do_wipe_p = 1;
 
-static inline boolean page_allocated_p(page_index_t page) {
-    return (page_table[page].allocated != FREE_PAGE_FLAG);
-}
-
 static inline boolean page_no_region_p(page_index_t page) {
     return !(page_table[page].allocated & OPEN_REGION_PAGE_FLAG);
 }
@@ -387,7 +383,7 @@ count_write_protect_generation_pages(generation_index_t generation)
     page_index_t i, count = 0;
 
     for (i = 0; i < last_free_page; i++)
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_table[i].gen == generation)
             && (page_table[i].write_protected == 1))
             count++;
@@ -402,7 +398,7 @@ count_generation_pages(generation_index_t generation)
     page_index_t count = 0;
 
     for (i = 0; i < last_free_page; i++)
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_table[i].gen == generation))
             count++;
     return count;
@@ -415,7 +411,7 @@ count_dont_move_pages(void)
     page_index_t i;
     page_index_t count = 0;
     for (i = 0; i < last_free_page; i++) {
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_table[i].dont_move != 0)) {
             ++count;
         }
@@ -432,7 +428,7 @@ count_generation_bytes_allocated (generation_index_t gen)
     page_index_t i;
     os_vm_size_t result = 0;
     for (i = 0; i < last_free_page; i++) {
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_table[i].gen == gen))
             result += page_bytes_used(i);
     }
@@ -2426,7 +2422,7 @@ update_page_write_prot(page_index_t page)
     sword_t num_words = page_bytes_used(page) / N_WORD_BYTES;
 
     /* Shouldn't be a free page. */
-    gc_assert(page_allocated_p(page));
+    gc_assert(!page_free_p(page));
     gc_assert(page_bytes_used(page) != 0);
 
     /* Skip if it's already write-protected, pinned, or unboxed */
@@ -2452,7 +2448,7 @@ update_page_write_prot(page_index_t page)
         /* Check that it's in the dynamic space */
         if ((index = find_page_index(ptr)) != -1) {
             if (/* Does it point to a younger or the temp. generation? */
-                (page_allocated_p(index)
+                (!page_free_p(index)
                  && (page_bytes_used(index) != 0)
                  && ((page_table[index].gen < gen)
                      || (page_table[index].gen == SCRATCH_GENERATION)))
@@ -2641,7 +2637,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
     /* Check that none of the write_protected pages in this generation
      * have been written to. */
     for (i = 0; i < page_table_pages; i++) {
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_bytes_used(i) != 0)
             && (page_table[i].gen == generation)
             && (page_table[i].write_protected_cleared != 0)) {
@@ -2882,7 +2878,7 @@ scavenge_newspace_generation(generation_index_t generation)
         /* Check that none of the write_protected pages in this generation
          * have been written to. */
         for (i = 0; i < page_table_pages; i++) {
-            if (page_allocated_p(i)
+            if (!page_free_p(i)
                 && (page_bytes_used(i) != 0)
                 && (page_table[i].gen == generation)
                 && (page_table[i].write_protected_cleared != 0)
@@ -2909,7 +2905,7 @@ unprotect_oldspace(void)
     uword_t region_bytes = 0;
 
     for (i = 0; i < last_free_page; i++) {
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_bytes_used(i) != 0)
             && (page_table[i].gen == from_space)) {
 
@@ -2979,7 +2975,7 @@ free_oldspace(void)
             last_page++;
         }
         while ((last_page < last_free_page)
-               && page_allocated_p(last_page)
+               && !page_free_p(last_page)
                && (page_bytes_used(last_page) != 0)
                && (page_table[last_page].gen == from_space));
 
@@ -3083,7 +3079,7 @@ verify_space(lispobj *start, size_t words)
             /* Does it point to the dynamic space? */
             if (page_index != -1) {
                 /* If it's within the dynamic space it should point to a used page. */
-                if (!page_allocated_p(page_index))
+                if (page_free_p(page_index))
                     lose ("Ptr %p @ %p sees free page.\n", thing, start);
                 if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
                     lose ("Ptr %p @ %p sees unallocated space.\n", thing, start);
@@ -3303,7 +3299,7 @@ walk_generation(void (*proc)(lispobj*,size_t),
     int genmask = generation >= 0 ? 1 << generation : ~0;
 
     for (i = 0; i < last_free_page; i++) {
-        if (page_allocated_p(i)
+        if (!page_free_p(i)
             && (page_bytes_used(i) != 0)
             && ((1 << page_table[i].gen) & genmask)) {
             page_index_t last_page;
@@ -3845,7 +3841,7 @@ update_dynamic_space_free_pointer(void)
     page_index_t last_page = -1, i;
 
     for (i = 0; i < last_free_page; i++)
-        if (page_allocated_p(i) && (page_bytes_used(i) != 0))
+        if (!page_free_p(i) && (page_bytes_used(i) != 0))
             last_page = i;
 
     last_free_page = last_page+1;
@@ -3892,7 +3888,7 @@ remap_free_pages (page_index_t from, page_index_t to, int forcibly)
         return remap_page_range(from, to);
 
     for (first_page = from; first_page <= to; first_page++) {
-        if (page_allocated_p(first_page) || !page_need_to_zero(first_page))
+        if (!page_free_p(first_page) || !page_need_to_zero(first_page))
             continue;
 
         last_page = first_page + 1;
@@ -4199,7 +4195,7 @@ gencgc_pickup_dynamic(void)
     do {
         lispobj *first,*ptr= (lispobj *)page_address(page);
 
-        if (!gencgc_partial_pickup || page_allocated_p(page)) {
+        if (!gencgc_partial_pickup || !page_free_p(page)) {
           /* It is possible, though rare, for the saved page table
            * to contain free pages below alloc_ptr. */
           page_table[page].gen = gen;
