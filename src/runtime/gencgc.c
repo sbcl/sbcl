@@ -176,13 +176,18 @@ struct hopscotch_table pinned_objects;
  * but in testing it is both reliable and no noticeable slowdown. */
 int do_wipe_p = 1;
 
+/// Constants defined in gc-internal:
+///   #define BOXED_PAGE_FLAG 1
+///   #define UNBOXED_PAGE_FLAG 2
+///   #define OPEN_REGION_PAGE_FLAG 4
+
 static inline boolean page_no_region_p(page_index_t page) {
     return !(page_table[page].allocated & OPEN_REGION_PAGE_FLAG);
 }
 
+/// Return true if  'allocated' bits are: {001, 010, 011}, false if 1zz or 000.
 static inline boolean page_allocated_no_region_p(page_index_t page) {
-    return ((page_table[page].allocated & (UNBOXED_PAGE_FLAG | BOXED_PAGE_FLAG))
-            && page_no_region_p(page));
+    return (page_table[page].allocated ^ OPEN_REGION_PAGE_FLAG) > OPEN_REGION_PAGE_FLAG;
 }
 
 static inline boolean page_free_p(page_index_t page) {
@@ -193,14 +198,16 @@ static inline boolean page_boxed_p(page_index_t page) {
     return (page_table[page].allocated & BOXED_PAGE_FLAG);
 }
 
+/// Return true if 'allocated' bits are: {001, 011}, false otherwise.
+/// i.e. true of pages which could hold boxed or partially boxed objects.
 static inline boolean page_boxed_no_region_p(page_index_t page) {
-    return page_boxed_p(page) && page_no_region_p(page);
+    return (page_table[page].allocated & 5) == BOXED_PAGE_FLAG;
 }
 
+/// Return true if page MUST NOT hold boxed objects (including code).
 static inline boolean page_unboxed_p(page_index_t page) {
     /* Both flags set == boxed code page */
-    return ((page_table[page].allocated & UNBOXED_PAGE_FLAG)
-            && !page_boxed_p(page));
+    return (page_table[page].allocated & 3) == UNBOXED_PAGE_FLAG;
 }
 
 static inline boolean protect_page_p(page_index_t page, generation_index_t generation) {

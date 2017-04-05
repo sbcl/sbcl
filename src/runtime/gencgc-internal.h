@@ -88,16 +88,6 @@ struct page {
     page_bytes_t bytes_used_;
 
     unsigned char
-        /* This is set when the page is write-protected. This should
-         * always reflect the actual write_protect status of a page.
-         * (If the page is written into, we catch the exception, make
-         * the page writable, and clear this flag.) */
-        write_protected :1,
-        /* This flag is set when the above write_protected flag is
-         * cleared by the SIGBUS handler (or SIGSEGV handler, for some
-         * OSes). This is useful for re-scavenging pages that are
-         * written during a GC. */
-        write_protected_cleared :1,
         /*  000 free
          *  ?01 boxed data
          *  ?10 unboxed data
@@ -110,6 +100,16 @@ struct page {
          * If the page is free the following slots are invalid, except
          * for the bytes_used which must be zero. */
         allocated :3,
+        /* This is set when the page is write-protected. This should
+         * always reflect the actual write_protect status of a page.
+         * (If the page is written into, we catch the exception, make
+         * the page writable, and clear this flag.) */
+        write_protected :1,
+        /* This flag is set when the above write_protected flag is
+         * cleared by the SIGBUS handler (or SIGSEGV handler, for some
+         * OSes). This is useful for re-scavenging pages that are
+         * written during a GC. */
+        write_protected_cleared :1,
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
         dont_move :1,
