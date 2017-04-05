@@ -233,7 +233,8 @@ page_scan_start(page_index_t page_index)
 static inline boolean
 page_starts_contiguous_block_p(page_index_t page_index)
 {
-    return page_scan_start_offset(page_index) == 0;
+    // Don't use the preprocessor macro: 0 means 0.
+    return page_table[page_index].scan_start_offset_ == 0;
 }
 
 /* True if the page is the last page in a contiguous block. */

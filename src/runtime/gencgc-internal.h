@@ -171,12 +171,22 @@ scan_start_offset_iterated(page_index_t index)
     return (os_vm_size_t)tot_offset_in_pages << GENCGC_CARD_SHIFT;
 }
 
+/// This is a macro, but it could/should be an inline function.
+/// Problem is that we need gc_assert() which is in gc-internal,
+/// and it's easy enough for GC to flip around some stuff, but then
+/// you have a different problem that more things get messed up,
+/// such as {foo}-os.c. Basically we have inclusion order issues
+/// that nobody ever bothers to deal with, in addition to the fact
+/// that a something-internal header is *directly* included by others.
+/// (Indirect inclusion should be allowed, direct should not be)
 #define set_page_scan_start_offset(index, ofs) \
-  { unsigned int lsb_ = ((ofs) & (GENCGC_CARD_BYTES-1)) == 0; \
-    os_vm_size_t scaled_ = ((ofs) >> (lsb_ ? GENCGC_CARD_SHIFT-1 : WORD_SHIFT)) | lsb_; \
-    if (scaled_ > SCAN_START_OFS_MAX) gc_assert(lsb_ == 1); \
-    page_table[index].scan_start_offset_ = \
-        scaled_ > SCAN_START_OFS_MAX ? SCAN_START_OFS_MAX : scaled_; }
+  { os_vm_size_t ofs_ = ofs; \
+    unsigned int lsb_ = ofs_!=0 && !(ofs_ & (GENCGC_CARD_BYTES-1)); \
+    os_vm_size_t scaled_ = \
+     (ofs_ >> (lsb_ ? GENCGC_CARD_SHIFT-1 : WORD_SHIFT)) | lsb_; \
+    if (scaled_ > SCAN_START_OFS_MAX) \
+     { gc_assert(lsb_ == 1); scaled_ = SCAN_START_OFS_MAX; } \
+    page_table[index].scan_start_offset_ = scaled_; }
 
 #endif
 
