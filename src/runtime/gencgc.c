@@ -2181,9 +2181,15 @@ scavenge_pinned_ranges()
 }
 
 static int addrcmp(const void* a, const void* b) {  // For qsort()
-    return *(uword_t*)a - *(uword_t*)b;
+    sword_t diff = *(uword_t*)a - *(uword_t*)b;
+    return diff < 0 ? -1 : (diff > 0 ? 1 : 0);
 }
 
+/* Zero out the byte ranges on small object pages marked dont_move,
+ * carefully skipping over objects in the pin hashtable.
+ * TODO: by recording an additional bit per page indicating whether
+ * there is more than one pinned object on it, we could avoid qsort()
+ * except in the case where there is more than one. */
 static void
 wipe_nonpinned_words()
 {
@@ -2204,9 +2210,9 @@ wipe_nonpinned_words()
     }
     // Store a sentinel at the end. Even if n_pins = table capacity (unlikely),
     // it is safe to write one more word, because the hops[] array immediately
-    // follows the keys[] array in memory.  At worst we stomp on hops[0]
-    // which is irrelevant since the table has already been rendered unusable
-    // by stealing its key array for a different purpose.
+    // follows the keys[] array in memory.  At worst, 2 elements of hops[]
+    // are clobbered, which is irrelevant since the table has already been
+    // rendered unusable by stealing its key array for a different purpose.
     pinned_objects.keys[n_pins] = 0;
     // Order by ascending address, stopping short of the sentinel.
     qsort(pinned_objects.keys, n_pins, sizeof (uword_t), addrcmp);

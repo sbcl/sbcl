@@ -253,7 +253,6 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
 // Pretend pinned objects are not in oldspace so that they don't get moved.
-// Any lowtag bits on 'obj' are ignored.
 static boolean __attribute__((unused))
 from_space_p(lispobj obj)
 {
