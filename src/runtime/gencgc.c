@@ -181,10 +181,6 @@ int do_wipe_p = 1;
 ///   #define UNBOXED_PAGE_FLAG 2
 ///   #define OPEN_REGION_PAGE_FLAG 4
 
-static inline boolean page_no_region_p(page_index_t page) {
-    return !(page_table[page].allocated & OPEN_REGION_PAGE_FLAG);
-}
-
 /// Return true if  'allocated' bits are: {001, 010, 011}, false if 1zz or 000.
 static inline boolean page_allocated_no_region_p(page_index_t page) {
     return (page_table[page].allocated ^ OPEN_REGION_PAGE_FLAG) > OPEN_REGION_PAGE_FLAG;
