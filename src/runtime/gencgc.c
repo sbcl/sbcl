@@ -3064,7 +3064,8 @@ verify_space(lispobj *start, size_t words)
          (uword_t)start < SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
 #endif
 
-    while (words > 0) {
+    lispobj *end = start + words;
+    while (start < end) {
         size_t count = 1;
         lispobj thing = *start;
         lispobj __attribute__((unused)) pointee;
@@ -3140,11 +3141,11 @@ verify_space(lispobj *start, size_t words)
                     lose("Ptr %p @ %p sees junk.\n", thing, start);
                 }
             }
-        } else {
-            if (!(fixnump(thing))) {
-                /* skip fixnums */
-                switch(widetag_of(*start)) {
-
+        } else if (is_lisp_immediate(thing) || /* skip immediates */
+                   widetag_of(thing) == NO_TLS_VALUE_MARKER_WIDETAG) {
+        } else if (unboxed_obj_widetag_p(widetag_of(thing))) {
+            count = sizetab[widetag_of(thing)](start);
+        } else switch(widetag_of(thing)) {
                     /* boxed objects */
                 case SIMPLE_VECTOR_WIDETAG:
                 case RATIO_WIDETAG:
@@ -3159,14 +3160,13 @@ verify_space(lispobj *start, size_t words)
                 case COMPLEX_VECTOR_WIDETAG:
                 case COMPLEX_ARRAY_WIDETAG:
                 case CLOSURE_HEADER_WIDETAG:
+                // FIXME: x86-64 can have partially unboxed FINs. The raw words
+                // are at the moment valid fixnums by blind luck.
                 case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
                 case VALUE_CELL_HEADER_WIDETAG:
                 case SYMBOL_HEADER_WIDETAG:
-                case CHARACTER_WIDETAG:
-#if N_WORD_BITS == 64
-                case SINGLE_FLOAT_WIDETAG:
-#endif
-                case UNBOUND_MARKER_WIDETAG:
+                case WEAK_POINTER_WIDETAG:
+                    // skip 1 word; any following words are descriptors
                     break;
                 case FDEFN_WIDETAG:
 #ifdef LISP_FEATURE_IMMOBILE_CODE
@@ -3215,45 +3215,11 @@ verify_space(lispobj *start, size_t words)
                         count = nheader_words + code_instruction_words(code->code_size);
                         break;
                     }
-
-                    /* unboxed objects */
-                case BIGNUM_WIDETAG:
-#if N_WORD_BITS != 64
-                case SINGLE_FLOAT_WIDETAG:
-#endif
-                case DOUBLE_FLOAT_WIDETAG:
-#ifdef COMPLEX_LONG_FLOAT_WIDETAG
-                case LONG_FLOAT_WIDETAG:
-#endif
-#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
-                case COMPLEX_SINGLE_FLOAT_WIDETAG:
-#endif
-#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
-                case COMPLEX_DOUBLE_FLOAT_WIDETAG:
-#endif
-#ifdef COMPLEX_LONG_FLOAT_WIDETAG
-                case COMPLEX_LONG_FLOAT_WIDETAG:
-#endif
-#ifdef SIMD_PACK_WIDETAG
-                case SIMD_PACK_WIDETAG:
-#endif
-#include "genesis/specialized-vectors.inc"
-                case SAP_WIDETAG:
-                case WEAK_POINTER_WIDETAG:
-#ifdef NO_TLS_VALUE_MARKER_WIDETAG
-                case NO_TLS_VALUE_MARKER_WIDETAG:
-#endif
-                    count = (sizetab[widetag_of(*start)])(start);
-                    break;
-
                 default:
                     lose("Unhandled widetag %p at %p\n",
                          widetag_of(*start), start);
-                }
-            }
         }
         start += count;
-        words -= count;
     }
 }
 
