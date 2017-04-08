@@ -113,10 +113,6 @@ generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 1;
 /* Should we do a pre-scan verify of generation 0 before it's GCed? */
 boolean pre_verify_gen_0 = 0;
 
-/* Should we print a note when code objects are found in the dynamic space
- * during a heap verify? */
-boolean verify_dynamic_code_check = 0;
-
 #ifdef LISP_FEATURE_X86
 /* Should we check code objects for fixup errors after they are transported? */
 boolean check_code_fixups = 0;
@@ -3054,7 +3050,6 @@ static void
 verify_space(lispobj *start, size_t words)
 {
     extern int valid_lisp_pointer_p(lispobj);
-    int is_in_dynamic_space = (find_page_index((void*)start) != -1);
     int is_in_readonly_space =
         (READ_ONLY_SPACE_START <= (uword_t)start &&
          (uword_t)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
@@ -3189,19 +3184,6 @@ verify_space(lispobj *start, size_t words)
                     break;
                 case CODE_HEADER_WIDETAG:
                     {
-                        /* Check that it's not in the dynamic space.
-                         * FIXME: Isn't is supposed to be OK for code
-                         * objects to be in the dynamic space these days? */
-                        /* It is for byte compiled code, but there's
-                         * no byte compilation in SBCL anymore. */
-                        if (is_in_dynamic_space
-                            /* Only when enabled */
-                            && verify_dynamic_code_check) {
-                            FSHOW((stderr,
-                                   "/code object at %p in the dynamic space\n",
-                                   start));
-                        }
-
                         struct code *code = (struct code *) start;
                         sword_t nheader_words = code_header_words(code->header);
                         /* Scavenge the boxed section of the code data block */
