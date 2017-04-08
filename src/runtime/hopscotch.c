@@ -186,9 +186,8 @@ static void hopscotch_realloc(tableptr ht, boolean valuesp, int size, char hop_r
     ht->mask      = size - 1;
     ht->hop_range = hop_range;
     ht->threshold = n_keys * 13 / 16; // target load ~= 81.25%
-    ht->hops      = (unsigned*)((char*)ht->keys + sizeof (uword_t) * n_keys);
-    ht->values    = !valuesp ? 0 :
-        (unsigned*)((char*)ht->hops + sizeof (int) * size);
+    ht->hops      = (unsigned*)(ht->keys + n_keys);
+    ht->values    = valuesp ? (int*)(ht->hops + size) : 0;
 }
 
 /* Initialize 'ht' for first use, which entails zeroing the counters

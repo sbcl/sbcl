@@ -15,7 +15,7 @@
 struct hopscotch_table {
     uword_t*   keys;
     unsigned*  hops;
-    unsigned*  values;
+    int*       values;
     unsigned   mask;
     int  hop_range;
     int  count;
