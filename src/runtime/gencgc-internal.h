@@ -266,3 +266,7 @@ extern page_index_t last_free_page;
 extern boolean gencgc_partial_pickup;
 
 #endif
+
+extern void
+walk_generation(void (*proc)(lispobj*,lispobj*),
+                generation_index_t generation);

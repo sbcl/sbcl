@@ -1797,10 +1797,6 @@ static void fixup_space(lispobj* where, size_t n_words)
     }
 }
 
-extern void
-walk_generation(void (*proc)(lispobj*,size_t),
-                generation_index_t generation);
-
 int* immobile_space_reloc_index;
 int* immobile_space_relocs;
 

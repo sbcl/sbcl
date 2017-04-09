@@ -3047,7 +3047,7 @@ is_in_stack_space(lispobj ptr)
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
 static void
-verify_space(lispobj *start, size_t words)
+verify_range(lispobj *start, size_t words)
 {
     extern int valid_lisp_pointer_p(lispobj);
     int is_in_readonly_space =
@@ -3165,9 +3165,9 @@ verify_space(lispobj *start, size_t words)
                     break;
                 case FDEFN_WIDETAG:
 #ifdef LISP_FEATURE_IMMOBILE_CODE
-                    verify_space(start + 1, 2);
+                    verify_range(start + 1, 2);
                     pointee = fdefn_raw_referent((struct fdefn*)start);
-                    verify_space(&pointee, 1);
+                    verify_range(&pointee, 1);
                     count = 4;
 #endif
                     break;
@@ -3178,7 +3178,7 @@ verify_space(lispobj *start, size_t words)
                             ((struct layout*)
                              native_pointer(instance_layout(start)))->bitmap;
                         sword_t nslots = instance_length(thing) | 1;
-                        instance_scan(verify_space, start+1, nslots, bitmap);
+                        instance_scan(verify_range, start+1, nslots, bitmap);
                         count = 1 + nslots;
                     }
                     break;
@@ -3187,12 +3187,12 @@ verify_space(lispobj *start, size_t words)
                         struct code *code = (struct code *) start;
                         sword_t nheader_words = code_header_words(code->header);
                         /* Scavenge the boxed section of the code data block */
-                        verify_space(start + 1, nheader_words - 1);
+                        verify_range(start + 1, nheader_words - 1);
 
                         /* Scavenge the boxed section of each function
                          * object in the code data block. */
                         for_each_simple_fun(i, fheaderp, code, 1, {
-                            verify_space(SIMPLE_FUN_SCAV_START(fheaderp),
+                            verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
                                          SIMPLE_FUN_SCAV_NWORDS(fheaderp)); });
                         count = nheader_words + code_instruction_words(code->code_size);
                         break;
@@ -3203,6 +3203,9 @@ verify_space(lispobj *start, size_t words)
         }
         start += count;
     }
+}
+static void verify_space(lispobj *start, lispobj *end) {
+    verify_range(start, end-start);
 }
 
 static void verify_dynamic_space();
@@ -3224,32 +3227,24 @@ verify_gc(void)
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
     verify_space((lispobj*)IMMOBILE_SPACE_START,
-                 (lispobj*)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0)
-                 - (lispobj*)IMMOBILE_SPACE_START);
+                 (lispobj*)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0));
     verify_space((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-                 (lispobj*)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0)
-                 - (lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START);
+                 (lispobj*)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
 #endif
-    sword_t read_only_space_size =
-        (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0)
-        - (lispobj*)READ_ONLY_SPACE_START;
-    sword_t static_space_size =
-        (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0)
-        - (lispobj*)STATIC_SPACE_START;
     struct thread *th;
     for_each_thread(th) {
-    sword_t binding_stack_size =
-        (lispobj*)get_binding_stack_pointer(th)
-            - (lispobj*)th->binding_stack_start;
-        verify_space(th->binding_stack_start, binding_stack_size);
+        verify_space(th->binding_stack_start,
+                     (lispobj*)get_binding_stack_pointer(th));
     }
-    verify_space((lispobj*)READ_ONLY_SPACE_START, read_only_space_size);
-    verify_space((lispobj*)STATIC_SPACE_START   , static_space_size);
+    verify_space((lispobj*)READ_ONLY_SPACE_START,
+                 (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+    verify_space((lispobj*)STATIC_SPACE_START,
+                 (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
     verify_dynamic_space();
 }
 
 void
-walk_generation(void (*proc)(lispobj*,size_t),
+walk_generation(void (*proc)(lispobj*,lispobj*),
                 generation_index_t generation)
 {
     page_index_t i;
@@ -3275,9 +3270,8 @@ walk_generation(void (*proc)(lispobj*,size_t),
                 if (page_ends_contiguous_block_p(last_page, page_table[i].gen))
                     break;
 
-            proc(page_address(i),
-                 ((uword_t)(page_bytes_used(last_page) + npage_bytes(last_page-i)))
-                         / N_WORD_BYTES);
+            proc(page_address(i), (lispobj*)((char*)page_address(last_page) +
+                                             page_bytes_used(last_page)));
             i = last_page;
         }
     }
