@@ -858,6 +858,23 @@ size_vector(lispobj *where)
     return CEILING(length + 2, 2);
 }
 
+static inline uword_t
+NWORDS(uword_t x, uword_t n_bits)
+{
+    /* A good compiler should be able to constant-fold this whole thing,
+       even with the conditional. */
+    if(n_bits <= N_WORD_BITS) {
+        uword_t elements_per_word = N_WORD_BITS/n_bits;
+
+        return CEILING(x, elements_per_word)/elements_per_word;
+    }
+    else {
+        /* FIXME: should have some sort of assertion that N_WORD_BITS
+           evenly divides n_bits */
+        return x * (n_bits/N_WORD_BITS);
+    }
+}
+
 #define DEF_SCAV_TRANS_SIZE_UB(nbits) \
   DEF_SPECIALIZED_VECTOR(vector_unsigned_byte_##nbits, NWORDS(length, nbits))
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
