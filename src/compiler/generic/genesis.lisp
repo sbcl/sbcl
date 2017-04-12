@@ -3172,6 +3172,17 @@ core and return a descriptor to it."
                   #!-(and win32 x86-64) "LU"
                   nil)
             constants))
+    ;; And still one more
+    #!+64-bit
+    (let ((c 'sb!vm::immediate-widetags-mask))
+      (push (list (c-symbol-name c)
+                  1
+                  (logior (ash 1 (ash sb!vm:character-widetag -2))
+                          (ash 1 (ash sb!vm:single-float-widetag -2))
+                          (ash 1 (ash sb!vm:unbound-marker-widetag -2)))
+                  "LU"
+                  nil)
+            constants))
     (setf constants
           (sort constants
                 (lambda (const1 const2)

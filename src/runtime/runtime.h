@@ -412,9 +412,7 @@ is_cons_half(lispobj obj)
      * other_immediate and are Lisp immediates can be half of a cons */
     return !other_immediate_lowtag_p(obj)
 #if N_WORD_BITS == 64
-      || (((1LU<<(CHARACTER_WIDETAG>>2)) |
-           (1LU<<(SINGLE_FLOAT_WIDETAG>>2)) |
-           (1LU<<(UNBOUND_MARKER_WIDETAG>>2))) >> (widetag_of(obj) >> 2)) & 1;
+        || ((uword_t)IMMEDIATE_WIDETAGS_MASK >> (widetag_of(obj) >> 2)) & 1;
 #else
       /* The above bit-shifting approach is not applicable
        * since we can't employ a 64-bit unsigned integer constant. */
