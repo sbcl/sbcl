@@ -529,6 +529,8 @@
      (let (*print-circle*)
        (format nil "when setting an element of (ARRAY ~s)"
                type)))
+    ((eql :ftype)
+     "from the function type declaration.")
     (t
      context)))
 

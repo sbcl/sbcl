@@ -972,37 +972,29 @@ and no value was provided for it." name))))))))))
              (dtype (when return
                       (lvar-derived-type (return-result return)))))
         (cond
-          ((and dtype (not (values-types-equal-or-intersect dtype
-                                                            type-returns)))
-           (note-lossage
-             "The result type from ~A:~%  ~
-              ~/sb!impl:print-type/~@
-              conflicts with the definition's result type:~%  ~
-              ~/sb!impl:print-type/"
-            where type-returns dtype)
-           nil)
-          (*lossage-detected* nil)
-          ((not really-assert) t)
-          (t
+          (really-assert
            ;; REALLY-ASSERT can be T or `(:NOT . ,vars) where the latter is
            ;; a list of vars for which compiling will *not* generate
            ;; an automatic check.
            (let ((policy (lexenv-policy (functional-lexenv functional))))
-             (when (and (policy policy (> type-check 0))
+             (when (and return
+                        (policy policy (> type-check 0))
                         (or (eq really-assert t)
                             (not (member :result (cdr really-assert)))))
                (assert-lvar-type (return-result return) type-returns
-                                 policy)))
-           (loop for var in vars and type in types do
+                                 policy
+                                 :ftype)))
+           (loop for var in vars
+                 for type in types do
                  (cond ((basic-var-sets var)
                         (when (and unwinnage-fun
                                    (not (csubtypep (leaf-type var) type)))
                           (funcall unwinnage-fun
                                    #.(#+sb-xc sb!impl::!xc-preprocess-format-control
                                       #-sb-xc identity
-                                    "Assignment to argument: ~S~%  ~
-                                     prevents use of assertion from function ~
-                                     type ~A:~% ~/sb!impl:print-type/~%")
+                                      "Assignment to argument: ~S~%  ~
+                                       prevents use of assertion from function ~
+                                       type ~A:~% ~/sb!impl:print-type/~%")
                                    (leaf-debug-name var) where type)))
                        ((and (listp really-assert) ; (:NOT . ,vars)
                              (member (lambda-var-%source-name var)
@@ -1012,6 +1004,18 @@ and no value was provided for it." name))))))))))
                         (let ((s-type (make-single-value-type type)))
                           (dolist (ref (leaf-refs var))
                             (derive-node-type ref s-type))))))
+           t)
+          ((and dtype
+                (not (values-types-equal-or-intersect dtype
+                                                      type-returns)))
+           (note-lossage
+            "The result type from ~A:~%  ~
+             ~/sb!impl:print-type/~@
+             conflicts with the definition's result type:~%  ~
+             ~/sb!impl:print-type/"
+            where type-returns dtype)
+           nil)
+          (t
            t))))))
 
 ;;; Manipulate the poorly-named :REALLY-ASSERT value.
@@ -1149,85 +1153,105 @@ and no value was provided for it." name))))))))))
                unportable because THROW and CATCH use EQ comparison)~@:>"
              (rest sources) (first sources) (lvar-type tag)))))))
 
-(defun %compile-time-type-error (values atype dtype detail context)
+(defun %compile-time-type-error (values atype dtype detail code-context cast-context)
   (declare (ignore dtype))
-  (if (and (consp atype) (eq (car atype) 'values))
-      (if (singleton-p detail)
-          (error 'simple-type-error
-                 :datum (car values)
-                 :expected-type atype
-                 :format-control
-                  "~@<Value set ~2I~_[~{~S~^ ~}] ~I~_from ~S in~_~A ~
-                   ~I~_is not of type ~
+  (cond ((eq cast-context :ftype)
+         (error 'simple-type-error
+                :datum (car values)
+                :expected-type atype
+                :format-control
+                "~@<Values ~2I~_[~{~S~^ ~}] ~I~_from ~S in~_~A ~
+                   ~I~_is not of the declared return type of the function ~
                    ~2I~_~/sb!impl:print-type-specifier/.~:>"
-                 :format-arguments (list values
-                                         (first detail) context
-                                         atype))
-          (error 'simple-type-error
-                 :datum (car values)
-                 :expected-type atype
-                 :format-control
-                  "~@<Value set ~2I~_[~{~S~^ ~}] ~
+                :format-arguments (list values
+                                        (first detail) code-context
+                                        atype)))
+        ((and (consp atype) (eq (car atype) 'values))
+         (if (singleton-p detail)
+             (error 'simple-type-error
+                    :datum (car values)
+                    :expected-type atype
+                    :format-control
+                    "~@<Values ~2I~_[~{~S~^ ~}] ~I~_from ~S in~_~A ~
+                     ~I~_is not of type ~
+                    ~2I~_~/sb!impl:print-type-specifier/.~:>"
+                    :format-arguments (list values
+                                            (first detail) code-context
+                                            atype))
+             (error 'simple-type-error
+                    :datum (car values)
+                    :expected-type atype
+                    :format-control
+                    "~@<Values ~2I~_[~{~S~^ ~}] ~
                    ~I~_from ~2I~_~{~S~^~#[~; or ~:;, ~]~} ~
                    ~I~_of ~2I~_~S ~I~_in~_~A ~I~_is not of type ~
                    ~2I~_~/sb!impl:print-type-specifier/.~:>"
-                 :format-arguments (list values
-                                         (rest detail) (first detail)
-                                         context
-                                         atype)))
-      (if (singleton-p detail)
-          (error 'simple-type-error
-                 :datum (car values)
-                 :expected-type atype
-                 :format-control
-                  "~@<Value of ~S in ~_~A ~I~_is ~2I~_~S, ~
+                    :format-arguments (list values
+                                            (rest detail) (first detail)
+                                            code-context
+                                            atype))))
+        ((singleton-p detail)
+         (error 'simple-type-error
+                :datum (car values)
+                :expected-type atype
+                :format-control
+                "~@<Value of ~S in ~_~A ~I~_is ~2I~_~S, ~
                    ~I~_not a ~2I~_~/sb!impl:print-type-specifier/.~:@>"
-                 :format-arguments (list (car detail) context
-                                         (car values)
-                                         atype))
-          (error 'simple-type-error
-                 :datum (car values)
-                 :expected-type atype
-                 :format-control
-                  "~@<Value from ~2I~_~{~S~^~#[~; or ~:;, ~]~} ~
+                :format-arguments (list (car detail) code-context
+                                        (car values)
+                                        atype)))
+        (t
+         (error 'simple-type-error
+                :datum (car values)
+                :expected-type atype
+                :format-control
+                "~@<Value from ~2I~_~{~S~^~#[~; or ~:;, ~]~} ~
                    ~I~_of ~2I~_~S ~I~_in~_~A ~I~_is ~2I~_~S, ~
                    ~I~_not a ~2I~_~/sb!impl:print-type-specifier/.~:@>"
-                 :format-arguments (list (rest detail) (first detail) context
-                                         (car values)
-                                         atype)))))
+                :format-arguments (list (rest detail) (first detail) code-context
+                                        (car values)
+                                        atype)))))
 
 (defoptimizer (%compile-time-type-error ir2-convert)
-    ((objects atype dtype detail context) node block)
-  (declare (ignore objects context))
+    ((objects atype dtype detail code-context cast-context) node block)
+  (declare (ignore objects code-context))
   (let ((*compiler-error-context* node))
     (setf (node-source-path node)
           (cdr (node-source-path node)))
     (let ((atype (lvar-value atype))
           (dtype (lvar-value dtype))
           (detail (lvar-value detail)))
-      (unless (eq atype nil)
-          (if (singleton-p detail)
-              (let ((detail (first detail)))
-                (if (constantp detail)
-                    (warn 'type-warning
-                          :format-control
-                           "~@<Constant ~2I~_~S ~Iconflicts with its ~
+      (cond ((eq atype nil))
+            ((eq (lvar-value cast-context) :ftype)
+             (warn 'type-warning
+                   :format-control
+                   "~@<Derived type of ~S is ~2I~_~S, ~
+                    ~I~_conflicting with the declared function return type ~
+                    ~2I~_~/sb!impl:print-type-specifier/.~@:>"
+                   :format-arguments (list detail dtype atype)))
+            ((singleton-p detail)
+             (let ((detail (first detail)))
+               (if (constantp detail)
+                   (warn 'type-warning
+                         :format-control
+                         "~@<Constant ~2I~_~S ~Iconflicts with its ~
                             asserted type ~
                             ~2I~_~/sb!impl::print-type-specifier/.~@:>"
-                          :format-arguments (list (eval detail) atype))
-                    (warn 'type-warning
-                          :format-control
-                           "~@<Derived type of ~S is ~2I~_~S, ~
+                         :format-arguments (list (eval detail) atype))
+                   (warn 'type-warning
+                         :format-control
+                         "~@<Derived type of ~S is ~2I~_~S, ~
                             ~I~_conflicting with its asserted type ~
                             ~2I~_~/sb!impl:print-type-specifier/.~@:>"
-                          :format-arguments (list detail dtype atype))))
-              (warn 'type-warning
-                    :format-control
-                     "~@<Derived type of ~2I~_~{~S~^~#[~; and ~:;, ~
+                         :format-arguments (list detail dtype atype)))))
+            (t
+             (warn 'type-warning
+                   :format-control
+                   "~@<Derived type of ~2I~_~{~S~^~#[~; and ~:;, ~
                       ~]~} ~I~_in ~2I~_~S ~I~_is ~
                       ~2I~_~/sb!impl:print-type-specifier/, ~
                       ~I~_conflicting with their asserted type ~
                       ~2I~_~/sb!impl:print-type-specifier/.~@:>"
-                    :format-arguments (list (rest detail) (first detail)
-                                            dtype atype)))))
+                   :format-arguments (list (rest detail) (first detail)
+                                           dtype atype)))))
     (ir2-convert-full-call node block)))

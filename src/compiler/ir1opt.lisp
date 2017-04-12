@@ -2372,7 +2372,8 @@
                                                ',(type-specifier atype)
                                                ',(type-specifier value-type)
                                                ',detail
-                                               ',(compile-time-type-error-context context)))))
+                                               ',(compile-time-type-error-context context)
+                                               ',(cast-context cast)))))
              ;; KLUDGE: FILTER-LVAR does not work for non-returning
              ;; functions, so we declare the return type of
              ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type

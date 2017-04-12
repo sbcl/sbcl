@@ -2758,3 +2758,11 @@
                                  (setf (cdr x) 10d0))))
         (list (list nil)))
     (ctu:assert-no-consing (funcall fun list))))
+
+
+(with-test (:name :ftype-return-type-conflict)
+  (declaim (ftype (function () fixnum) ftype-return-type-conflict))
+  (assert-error (funcall (checked-compile `(sb-int:named-lambda ftype-return-type-conflict () nil)
+                                          :allow-warnings t
+                                          :allow-failure t))
+                type-error))
