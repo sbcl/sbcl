@@ -3204,8 +3204,9 @@ verify_range(lispobj *start, size_t words)
         start += count;
     }
 }
-static void verify_space(lispobj *start, lispobj *end) {
+static uword_t verify_space(lispobj *start, lispobj *end) {
     verify_range(start, end-start);
+    return 0;
 }
 
 static void verify_dynamic_space();
@@ -3243,8 +3244,11 @@ verify_gc(void)
     verify_dynamic_space();
 }
 
-void
-walk_generation(void (*proc)(lispobj*,lispobj*),
+/* Call 'proc' with pairs of addresses demarcating ranges in the
+ * specified generation.
+ * Stop if any invocation returns non-zero, and return that value */
+uword_t
+walk_generation(uword_t (*proc)(lispobj*,lispobj*),
                 generation_index_t generation)
 {
     page_index_t i;
@@ -3270,11 +3274,16 @@ walk_generation(void (*proc)(lispobj*,lispobj*),
                 if (page_ends_contiguous_block_p(last_page, page_table[i].gen))
                     break;
 
-            proc(page_address(i), (lispobj*)((char*)page_address(last_page) +
-                                             page_bytes_used(last_page)));
+            uword_t result =
+                proc(page_address(i),
+                     (lispobj*)(page_bytes_used(last_page)
+                                + (char*)page_address(last_page)));
+            if (result) return result;
+
             i = last_page;
         }
     }
+    return 0;
 }
 static void verify_generation(generation_index_t generation)
 {
