@@ -177,9 +177,7 @@ sb-kernel::(progn
               (datum (maybe-string (type-error-datum condition))))
           (if (and type datum)
               (print-unreadable-object (condition stream :type t)
-                (format stream "~@<expected-type: ~
-                                 ~/sb-impl:print-type-specifier/~_datum: ~
-                                 ~A~:@>"
+                (format stream "~@<expected-type: ~A ~_datum: ~A~:@>"
                         type datum))
               (call-next-method))))
       (call-next-method)))
