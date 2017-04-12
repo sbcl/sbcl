@@ -3060,8 +3060,9 @@ verify_range(lispobj *start, size_t words)
 #endif
 
     lispobj *end = start + words;
-    while (start < end) {
-        size_t count = 1;
+    size_t count;
+    for ( ; start < end ; start += count) {
+        count = 1;
         lispobj thing = *start;
         lispobj __attribute__((unused)) pointee;
 
@@ -3136,72 +3137,53 @@ verify_range(lispobj *start, size_t words)
                     lose("Ptr %p @ %p sees junk.\n", thing, start);
                 }
             }
-        } else if (is_lisp_immediate(thing) || /* skip immediates */
-                   widetag_of(thing) == NO_TLS_VALUE_MARKER_WIDETAG) {
-        } else if (unboxed_obj_widetag_p(widetag_of(thing))) {
-            count = sizetab[widetag_of(thing)](start);
-        } else switch(widetag_of(thing)) {
-                    /* boxed objects */
-                case SIMPLE_VECTOR_WIDETAG:
-                case RATIO_WIDETAG:
-                case COMPLEX_WIDETAG:
-                case SIMPLE_ARRAY_WIDETAG:
-                case COMPLEX_BASE_STRING_WIDETAG:
-#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
-                case COMPLEX_CHARACTER_STRING_WIDETAG:
-#endif
-                case COMPLEX_VECTOR_NIL_WIDETAG:
-                case COMPLEX_BIT_VECTOR_WIDETAG:
-                case COMPLEX_VECTOR_WIDETAG:
-                case COMPLEX_ARRAY_WIDETAG:
-                case CLOSURE_HEADER_WIDETAG:
-                // FIXME: x86-64 can have partially unboxed FINs. The raw words
-                // are at the moment valid fixnums by blind luck.
-                case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-                case VALUE_CELL_HEADER_WIDETAG:
-                case SYMBOL_HEADER_WIDETAG:
-                case WEAK_POINTER_WIDETAG:
-                    // skip 1 word; any following words are descriptors
-                    break;
-                case FDEFN_WIDETAG:
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-                    verify_range(start + 1, 2);
-                    pointee = fdefn_raw_referent((struct fdefn*)start);
-                    verify_range(&pointee, 1);
-                    count = 4;
-#endif
-                    break;
-
-                case INSTANCE_HEADER_WIDETAG:
-                    if (instance_layout(start)) {
-                        lispobj bitmap =
-                            ((struct layout*)
-                             native_pointer(instance_layout(start)))->bitmap;
-                        sword_t nslots = instance_length(thing) | 1;
-                        instance_scan(verify_range, start+1, nslots, bitmap);
-                        count = 1 + nslots;
-                    }
-                    break;
-                case CODE_HEADER_WIDETAG:
-                    {
-                        struct code *code = (struct code *) start;
-                        sword_t nheader_words = code_header_words(code->header);
-                        /* Scavenge the boxed section of the code data block */
-                        verify_range(start + 1, nheader_words - 1);
-
-                        /* Scavenge the boxed section of each function
-                         * object in the code data block. */
-                        for_each_simple_fun(i, fheaderp, code, 1, {
-                            verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
-                                         SIMPLE_FUN_SCAV_NWORDS(fheaderp)); });
-                        count = nheader_words + code_instruction_words(code->code_size);
-                        break;
-                    }
-                default:
-                    lose("Unhandled widetag %p at %p\n",
-                         widetag_of(*start), start);
+            continue;
         }
-        start += count;
+        int widetag = widetag_of(thing);
+        if (is_lisp_immediate(thing) || widetag == NO_TLS_VALUE_MARKER_WIDETAG) {
+            /* skip immediates */
+        } else if (!(other_immediate_lowtag_p(widetag)
+                     && lowtag_for_widetag[widetag>>2])) {
+            lose("Unhandled widetag %p at %p\n", widetag, start);
+        } else if (unboxed_obj_widetag_p(widetag)) {
+            count = sizetab[widetag](start);
+        } else switch(widetag) {
+                    /* boxed or partially boxed objects */
+            // FIXME: x86-64 can have partially unboxed FINs. The raw words
+            // are at the moment valid fixnums by blind luck.
+            case INSTANCE_HEADER_WIDETAG:
+                if (instance_layout(start)) {
+                    sword_t nslots = instance_length(thing) | 1;
+                    instance_scan(verify_range, start+1, nslots,
+                                  ((struct layout*)
+                                   native_pointer(instance_layout(start)))->bitmap);
+                    count = 1 + nslots;
+                }
+                break;
+            case CODE_HEADER_WIDETAG:
+                {
+                struct code *code = (struct code *) start;
+                sword_t nheader_words = code_header_words(code->header);
+                /* Scavenge the boxed section of the code data block */
+                verify_range(start + 1, nheader_words - 1);
+
+                /* Scavenge the boxed section of each function
+                 * object in the code data block. */
+                for_each_simple_fun(i, fheaderp, code, 1, {
+                    verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
+                                 SIMPLE_FUN_SCAV_NWORDS(fheaderp)); });
+                count = nheader_words + code_instruction_words(code->code_size);
+                break;
+                }
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+            case FDEFN_WIDETAG:
+                verify_range(start + 1, 2);
+                pointee = fdefn_raw_referent((struct fdefn*)start);
+                verify_range(&pointee, 1);
+                count = CEILING(sizeof (struct fdefn)/sizeof(lispobj), 2);
+                break;
+#endif
+        }
     }
 }
 static uword_t verify_space(lispobj *start, lispobj *end) {
