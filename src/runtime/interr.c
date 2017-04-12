@@ -172,6 +172,7 @@ void print_constant(os_context_t *context, int offset) {
     }
 }
 
+#include "genesis/errnames.h"
 char *internal_error_descriptions[] = {INTERNAL_ERROR_NAMES};
 char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
 /* internal error handler for when the Lisp error system doesn't exist

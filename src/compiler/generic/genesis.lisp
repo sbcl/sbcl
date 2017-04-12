@@ -3210,12 +3210,6 @@ core and return a descriptor to it."
         for i from 0
         when (stringp description)
         do (format t "#define ~A ~D~%" (c-symbol-name name) i))
-  ;; C code needs strings for describe_internal_error()
-  (format t "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
-          (map 'list 'sb!kernel::!c-stringify-internal-error
-               sb!c:+backend-internal-errors+))
-  (format t "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
-          (map 'list #'cddr sb!c:+backend-internal-errors+))
 
   ;; I'm not really sure why this is in SB!C, since it seems
   ;; conceptually like something that belongs to SB!VM. In any case,
@@ -3253,6 +3247,14 @@ core and return a descriptor to it."
     (format t "#define ~A_MASK 0x~X /* ~:*~A */~%"
             (c-symbol-name symbol)
             (sb!xc:mask-field (symbol-value symbol) -1))))
+
+(defun write-errnames-h (stream)
+  ;; C code needs strings for describe_internal_error()
+  (format stream "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
+          (map 'list 'sb!kernel::!c-stringify-internal-error
+               sb!c:+backend-internal-errors+))
+  (format stream "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
+          (map 'list #'cddr sb!c:+backend-internal-errors+)))
 
 #!+sb-ldb
 (defun write-tagnames-h (out)
@@ -3852,6 +3854,7 @@ initially undefined function references:~2%")
                        (format stream "#endif~%"))))
         (out-to "config" (write-config-h stream))
         (out-to "constants" (write-constants-h stream))
+        (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb!vm::write-gc-tables stream))
         #!+sb-ldb
         (out-to "tagnames" (write-tagnames-h stream))
