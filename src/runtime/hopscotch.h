@@ -15,7 +15,7 @@
 struct hopscotch_table {
     uword_t*   keys;
     unsigned*  hops;
-    int*       values;
+    sword_t*   values;
     unsigned   mask;
     int  hop_range;
     int  count;
@@ -24,17 +24,19 @@ struct hopscotch_table {
     int  mem_size;   // in bytes, for zero-filling when done using
     // Statistics
     struct { int n_seeks, n_probes; } hit, miss;
+    char value_size; // number of bytes in a value: 0,1,2,4,8
     char resized;    // set to 1 if sized up since last reset
     char rehashing;  // set to 1 during rehash
 };
 
 void hopscotch_init();
 void hopscotch_create(struct hopscotch_table*,boolean,int,char);
-int hopscotch_put(struct hopscotch_table*,uword_t,unsigned);
-int hopscotch_get(struct hopscotch_table*,uword_t);
+int hopscotch_insert(struct hopscotch_table*,uword_t,sword_t);
+int hopscotch_put(struct hopscotch_table*,uword_t,sword_t);
+sword_t hopscotch_get(struct hopscotch_table*,uword_t);
 int hopscotch_containsp(struct hopscotch_table*,uword_t);
 void hopscotch_reset(struct hopscotch_table*);
-void hopscotch_log_stats(struct hopscotch_table*);
+void hopscotch_log_stats(struct hopscotch_table*,char*);
 
 /* This confuses me every time I look at it, so here's an example-
  * Suppose (unrealistically) that a table has a hop range of 4,

@@ -21,14 +21,15 @@
 #else
 #include <pthread.h> // only because of our dang non-self-contained .h files
 #endif
-#ifdef COLLECT_STATISTICS
-#include <stdio.h>
-#endif
 
 #include "genesis/constants.h"
 #include "runtime.h"
 #include "gc-internal.h" // for os_validate()
 #include "hopscotch.h"
+#include <stdint.h>
+#ifdef HOPSCOTCH_INSTRUMENT
+#include <stdio.h>
+#endif
 
 typedef struct hopscotch_table* tableptr;
 void hopscotch_integrity_check(tableptr,char*,int);
@@ -56,6 +57,29 @@ static inline void set_hop_mask(tableptr ht, unsigned index, unsigned bits)
 static inline unsigned get_hop_mask(tableptr ht, unsigned index)
 {
     return ht->hops[index];
+}
+static void set_val(tableptr ht, int index, sword_t val)
+{
+    switch(ht->value_size) {
+#ifdef LISP_FEATURE_64_BIT
+    case 8: ht->values[index] = val; break;
+#endif
+    case 4: ((int32_t*)ht->values)[index] = val; break;
+    case 2: ((int16_t*)ht->values)[index] = val; break;
+    case 1: ((int8_t* )ht->values)[index] = val; break;
+    }
+}
+static sword_t get_val(tableptr ht, int index)
+{
+    switch(ht->value_size) {
+#ifdef LISP_FEATURE_64_BIT
+    case 8: return ht->values[index];
+#endif
+    case 4: return ((int32_t*)ht->values)[index];
+    case 2: return ((int16_t*)ht->values)[index];
+    case 1: return ((int8_t *)ht->values)[index];
+    }
+    return 1;
 }
 
 /// Hopscotch storage allocation granularity.
@@ -157,7 +181,7 @@ static void cached_deallocate(char* mem, int zero_fill_length)
  * 'valuesp' makes a hash-map if true; a hash-set if false.
  * Hop range will be selected automatically if specified as 0.
  */
-static void hopscotch_realloc(tableptr ht, boolean valuesp, int size, char hop_range)
+static void hopscotch_realloc(tableptr ht, int size, char hop_range)
 {
     // Somewhat arbitrary criteria that improve the worst-case probes for
     // small hashtables. The reference algorithm uses a fixed max hop of 32,
@@ -177,9 +201,8 @@ static void hopscotch_realloc(tableptr ht, boolean valuesp, int size, char hop_r
     // The last few logical cells in the key array can use physical cells
     // at indices greater than 'size'; there's no wrapping back to index 0.
     int n_keys = size + (hop_range - 1);
-    unsigned storage_size = sizeof (uword_t) * n_keys
-        + sizeof (int) * size // hop bitmasks
-        + (valuesp ? (sizeof (int) * n_keys) : 0); // values
+    unsigned storage_size = (sizeof (uword_t) + ht->value_size) * n_keys
+        + sizeof (int) * size; // hop bitmasks
 
     if (ht->keys)
         gc_assert(usable_size(ht->keys) >= storage_size);
@@ -191,15 +214,24 @@ static void hopscotch_realloc(tableptr ht, boolean valuesp, int size, char hop_r
     ht->hop_range = hop_range;
     ht->threshold = n_keys * 13 / 16; // target load ~= 81.25%
     ht->hops      = (unsigned*)(ht->keys + n_keys);
-    ht->values    = valuesp ? (int*)(ht->hops + size) : 0;
+    // Values will be properly aligned no matter what,
+    // because the largest alignment we'd need is 8 bytes,
+    // which is twice the alignment of a hop entry,
+    // and 'size' is an even number.
+    ht->values    = ht->value_size ? (sword_t*)(ht->hops + size) : 0;
 }
 
 /* Initialize 'ht' for first use, which entails zeroing the counters
  * and allocating storage.
  */
-void hopscotch_create(tableptr ht, boolean valuesp, int size, char hop_range)
+void hopscotch_create(tableptr ht, int bytes_per_value,
+                      int size, char hop_range)
 {
     gc_assert((size & (size-1)) == 0); // ensure power-of-2
+    switch (bytes_per_value) {
+    case 0: case 1: case 2: case 4: case 8: break;
+    default: lose("Bad value size");
+    }
     ht->count = 0;
     ht->rehashing = 0;
     ht->resized = 0;
@@ -210,8 +242,9 @@ void hopscotch_create(tableptr ht, boolean valuesp, int size, char hop_range)
     ht->hit .n_seeks = ht->hit .n_probes = 0;
     ht->miss.n_seeks = ht->miss.n_probes = 0;
     //
+    ht->value_size = bytes_per_value;
     ht->keys = 0; // Forces allocation of backing storage.
-    hopscotch_realloc(ht, valuesp, size, hop_range);
+    hopscotch_realloc(ht, size, hop_range);
 }
 
 /* Delete the storage associated with 'ht' */
@@ -243,7 +276,7 @@ void hopscotch_reset(tableptr ht)
     if (size > (ht->prev_size << 1)
         || (size == ht->prev_size && !ht->resized && size > 8))
         // Halve the size for the next GC cycle
-        hopscotch_realloc(ht, ht->values != 0, size >> 1, 0);
+        hopscotch_realloc(ht, size >> 1, 0);
     ht->prev_size = size;
     ht->resized = 0;
     INTEGRITY_CHECK("after reset");
@@ -272,17 +305,17 @@ tableptr hopscotch_resize_up(tableptr ht)
     int i;
     do {
         size *= 2;
-        hopscotch_create(&copy, ht->values != 0, size, 0);
+        hopscotch_create(&copy, ht->value_size, size, 0);
         copy.rehashing = 1; // Causes put() to return 0 on failure
         if (ht->values) {
             for(i=old_max_index ; i >= 0 ; --i)
               if (ht->keys[i])
-                if (!hopscotch_put(&copy, ht->keys[i], ht->values[i]))
+                if (!hopscotch_insert(&copy, ht->keys[i], get_val(ht,i)))
                   break;
         } else {
             for(i=old_max_index ; i >= 0 ; --i)
               if (ht->keys[i])
-                if (!hopscotch_put(&copy, ht->keys[i], 1)) {
+                if (!hopscotch_insert(&copy, ht->keys[i], 1)) {
 #if 0
                   fprintf(stderr, "resize failed with new size %d, hop_range %d\n",
                           size, copy.hop_range);
@@ -311,15 +344,15 @@ tableptr hopscotch_resize_up(tableptr ht)
     return ht;
 }
 
-void hopscotch_log_stats(tableptr ht)
+void hopscotch_log_stats(tableptr ht, char *tablename)
 {
-#ifdef COLLECT_STATISTICS
+#ifdef HOPSCOTCH_INSTRUMENT
     static FILE *hh_logfile;
     if (!hh_logfile)
       hh_logfile = fopen("hash-stats.txt","a");
     fprintf(hh_logfile,
-            "hopscotch: ct=%5d cap=%5d LF=%f seek=%5d+%5d probe/seek=%f+%f (hit+miss)\n",
-            ht->count,
+            "[hopscotch]: %s ct=%5d cap=%5d LF=%f seek=%5d+%5d probe/seek=%f+%f (hit+miss)\n",
+            tablename, ht->count,
             (ht->mask + ht->hop_range),
             (float)ht->count / (ht->mask + ht->hop_range),
             ht->hit.n_seeks, ht->miss.n_seeks,
@@ -340,10 +373,10 @@ static inline unsigned int bitmask_of_width(int n) {
     return (0xFFFFFFFFU >> (32 - n));
 }
 
-#define put_pair(i,k,v) ht->keys[i] = k; if(ht->values) ht->values[i] = v
+#define put_pair(i,k,v) ht->keys[i] = k; if(ht->values) set_val(ht, i, v)
 
 /* Add key/val to 'ht'. 'val' is ignored for a hash-set */
-int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
+int hopscotch_insert(tableptr ht, uword_t key, sword_t val)
 {
     // 'desired_index' is where 'key' logically belongs, but it
     // may physically go in any cell to the right up to (range-1) away.
@@ -354,7 +387,7 @@ int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
         return ++ht->count;  // Allow rehash threshold to be exceeded
     }
     if (!ht->rehashing && ht->count >= ht->threshold)
-        return hopscotch_put(hopscotch_resize_up(ht), key, val);
+        return hopscotch_insert(hopscotch_resize_up(ht), key, val);
     // 'limit' is the inclusive bound on cell indices.
     int limit = hopscotch_max_key_index(*ht);
     int free_index = desired_index;
@@ -362,7 +395,7 @@ int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
     while (ht->keys[++free_index] != 0) // While cell is occupied
         if (free_index == limit)
             return ht->rehashing ? 0 : // fail if rehash table is too small
-                hopscotch_put(hopscotch_resize_up(ht), key, val);
+                hopscotch_insert(hopscotch_resize_up(ht), key, val);
 
     // 'free_index' is where *some* item could go,
     // but it might be too far away for this key.
@@ -401,7 +434,7 @@ int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
             int victim = ffs(masked_bits) - 1;  // ffs() is 1-based
             int physical_elt = logical_bin + victim;
             // Relocate the contents of 'physical_elt' to 'free_index'
-            put_pair(free_index, ht->keys[physical_elt], ht->values[physical_elt]);
+            put_pair(free_index, ht->keys[physical_elt], get_val(ht, physical_elt));
             put_pair(physical_elt, 0, 0);
             // This logical bin no longer owns the index where the victim was,
             // but does own the index where it got moved to.
@@ -412,7 +445,7 @@ int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
         }
     }
     // Too many collisions and not enough room to move things around.
-    return ht->rehashing ? 0 : hopscotch_put(hopscotch_resize_up(ht), key, val);
+    return ht->rehashing ? 0 : hopscotch_insert(hopscotch_resize_up(ht), key, val);
 #undef put_pair
 }
 
@@ -424,12 +457,13 @@ int hopscotch_put(tableptr ht, uword_t key, unsigned int val)
 /// to use the mask bits and/or record the number of key comparisons.
 /// Statistics gathering also slows us down a lot, so only do it when
 /// making comparative benchmarks, not in real-world use.
-#ifdef COLLECT_STATISTICS
-#define probe(mask,i,retval) ++probes; if (ht->keys[i] == key) { \
-      ++ht->hit.n_seeks; ht->hit.n_probes += probes; \
-      return retval; }
+#ifdef HOPSCOTCH_INSTRUMENT
+#define probe(mask,i,action) ++probes; if (ht->keys[i] == key) { \
+    ++ht->hit.n_seeks; ht->hit.n_probes += probes; action; }
+#define tally_miss(table,n) ++table->miss.n_seeks; table->miss.n_probes += n
 #else
-#define probe(mask,i,retval) if (ht->keys[i] == key) return retval
+#define probe(mask,i,action) if (ht->keys[i] == key) action;
+#define tally_miss(table,n)
 #endif
 
 /* Test for membership in a hashset. Return 1 or 0. */
@@ -438,20 +472,18 @@ int hopscotch_containsp(tableptr ht, uword_t key)
     // index needn't be 'long' but the code generated is better with it.
     unsigned long index = hash(key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
-#ifdef COLLECT_STATISTICS
-    int probes = 0;
-#endif
+    int __attribute__((unused)) probes = 0;
     // *** Use care when modifying this code, and benchmark it thoroughly! ***
     // TODO: use XMM register to test 2 keys at once if properly aligned.
     if (bits & 0xff) {
-        probe((1<<0), index+0, 1);
-        probe((1<<1), index+1, 1);
-        probe((1<<2), index+2, 1);
-        probe((1<<3), index+3, 1);
-        probe((1<<4), index+4, 1);
-        probe((1<<5), index+5, 1);
-        probe((1<<6), index+6, 1);
-        probe((1<<7), index+7, 1);
+        probe((1<<0), index+0, return 1);
+        probe((1<<1), index+1, return 1);
+        probe((1<<2), index+2, return 1);
+        probe((1<<3), index+3, return 1);
+        probe((1<<4), index+4, return 1);
+        probe((1<<5), index+5, return 1);
+        probe((1<<6), index+6, return 1);
+        probe((1<<7), index+7, return 1);
     }
     // There's a trade-off to be made: checking for fewer bits at a time
     // (such as by "bits & 0x0f") would give finer grain to the set of
@@ -461,48 +493,74 @@ int hopscotch_containsp(tableptr ht, uword_t key)
     while ((bits >>= 8) != 0) {
         index += 8;
         if (bits & 0xff) {
-            probe((1<<0), index+0, 1);
-            probe((1<<1), index+1, 1);
-            probe((1<<2), index+2, 1);
-            probe((1<<3), index+3, 1);
-            probe((1<<4), index+4, 1);
-            probe((1<<5), index+5, 1);
-            probe((1<<6), index+6, 1);
-            probe((1<<7), index+7, 1);
+            probe((1<<0), index+0, return 1);
+            probe((1<<1), index+1, return 1);
+            probe((1<<2), index+2, return 1);
+            probe((1<<3), index+3, return 1);
+            probe((1<<4), index+4, return 1);
+            probe((1<<5), index+5, return 1);
+            probe((1<<6), index+6, return 1);
+            probe((1<<7), index+7, return 1);
         }
     }
-#ifdef COLLECT_STATISTICS
-    ++ht->miss.n_seeks;
-    ht->miss.n_probes += probes;
-#endif
+    tally_miss(ht, probes);
     return 0;
 }
 
 /* Return the value associated with 'key', or -1 if not found */
-int hopscotch_get(tableptr ht, uword_t key)
+sword_t hopscotch_get(tableptr ht, uword_t key)
 {
     int index = hash(key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
-#ifdef COLLECT_STATISTICS
-    int probes = 0;
-#endif
+    int __attribute__((unused)) probes = 0;
     // This is not as blazingly fast as the hand-unrolled loop
     // in containsp(), but the GC does not need it, so ...
     while (bits) {
         if (bits & 0xf) {
-            probe(1, index+0, ht->values[index+0]);
-            probe(2, index+1, ht->values[index+1]);
-            probe(4, index+2, ht->values[index+2]);
-            probe(8, index+3, ht->values[index+3]);
+            probe(1, index+0, goto found0);
+            probe(2, index+1, goto found1);
+            probe(4, index+2, goto found2);
+            probe(8, index+3, goto found3);
         }
         index += 4;
         bits >>= 4;
     }
-#ifdef COLLECT_STATISTICS
-    ++ht->miss.n_seeks;
-    ht->miss.n_probes += probes;
-#endif
+    tally_miss(ht, probes);
     return -1;
+found3: ++index;
+found2: ++index;
+found1: ++index;
+found0:
+    return get_val(ht, index);
+}
+
+/* Update or insert a key/value pair. Return nonzero if
+ * the key was inserted, or zero if the key existed. */
+int hopscotch_put(tableptr ht, uword_t key, sword_t val)
+{
+    int index = hash(key) & ht->mask;
+    unsigned bits = get_hop_mask(ht, index);
+    int __attribute__((unused)) probes = 0;
+    // This is not as blazingly fast as the hand-unrolled loop
+    // in containsp(), but the GC does not need it, so ...
+    while (bits) {
+        if (bits & 0xf) {
+            probe(1, index+0, goto found0);
+            probe(2, index+1, goto found1);
+            probe(4, index+2, goto found2);
+            probe(8, index+3, goto found3);
+        }
+        index += 4;
+        bits >>= 4;
+    }
+    tally_miss(ht, probes);
+    return hopscotch_insert(ht, key, val);
+found3: ++index;
+found2: ++index;
+found1: ++index;
+found0:
+    set_val(ht, index, val);
+    return 0;
 }
 
 #undef probe
@@ -566,10 +624,11 @@ void hopscotch_integrity_check(tableptr ht, char*when, int verbose)
             fail = 1;
           }
           fprintf(s, " %4d: %04x", i, i <= ht->mask ? get_hop_mask(ht,i) : 0);
-          if (key)
-            fprintf(s, " %12p -> %d",
-                    (void*)(key<<(1+WORD_SHIFT)),
-                    (int)(ht->mask & hash(key)));
+          if (key) {
+            fprintf(s, " %12p -> %d", key, (int)(ht->mask & hash(key)));
+            if (ht->values)
+              fprintf(s, " {val=%lx}", hopscotch_get(ht, key));
+          }
           putc('\n', s);
       }
     }

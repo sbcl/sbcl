@@ -2273,13 +2273,13 @@ static void
 pin_object(lispobj object)
 {
     if (!hopscotch_containsp(&pinned_objects, object)) {
-        hopscotch_put(&pinned_objects, object, 1);
+        hopscotch_insert(&pinned_objects, object, 1);
         struct code* maybe_code = (struct code*)native_pointer(object);
         if (widetag_of(maybe_code->header) == CODE_HEADER_WIDETAG) {
           for_each_simple_fun(i, fun, maybe_code, 0, {
-              hopscotch_put(&pinned_objects,
-                            make_lispobj(fun, FUN_POINTER_LOWTAG),
-                            1);
+              hopscotch_insert(&pinned_objects,
+                               make_lispobj(fun, FUN_POINTER_LOWTAG),
+                               1);
           })
         }
     }
@@ -3733,7 +3733,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables(0);
-    hopscotch_log_stats(&pinned_objects);
+    hopscotch_log_stats(&pinned_objects, "pins");
 
     /* Free the pages in oldspace, but not those marked dont_move. */
     free_oldspace();
