@@ -2147,7 +2147,7 @@ maybe_adjust_large_object(lispobj *where)
 #  define scavenge_pinned_ranges()
 #  define wipe_nonpinned_words()
 #  define hopscotch_create(a,b,c,d,e)
-#  define hopscotch_log_stats(a)
+#  define hopscotch_log_stats(a,b)
 /* After scavenging of the roots is done, we go back to the pinned objects
  * and look within them for pointers. While heap_scavenge() could certainly
  * do this, it would potentially lead to extra work, since we can't know
