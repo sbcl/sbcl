@@ -3269,9 +3269,9 @@ core and return a descriptor to it."
                          (tailwise-equal (string symbol) tail))
                collect symbol into tags
                finally (return (sort tags #'< :key #'symbol-value))))
-       (write-tags (kind limit ash-count)
-         (format out "~%static const char *~(~A~)_names[] = {~%"
-                 (subseq kind 1))
+       (write-tags (visibility kind limit ash-count)
+         (format out "~%~Aconst char *~(~A~)_names[] = {~%"
+                 visibility (subseq kind 1))
          (let ((tags (list-sorted-tags kind)))
            (dotimes (i limit)
              (if (eql i (ash (or (symbol-value (first tags)) -1) ash-count))
@@ -3281,10 +3281,10 @@ core and return a descriptor to it."
                (write-string "," out))
              (terpri out)))
          (write-line "};" out)))
-    (write-tags "-LOWTAG" sb!vm:lowtag-limit 0)
+    (write-tags "static " "-LOWTAG" sb!vm:lowtag-limit 0)
     ;; this -2 shift depends on every OTHER-IMMEDIATE-?-LOWTAG
     ;; ending with the same 2 bits. (#b10)
-    (write-tags "-WIDETAG" (ash (1+ sb!vm:widetag-mask) -2) -2))
+    (write-tags "" "-WIDETAG" (ash (1+ sb!vm:widetag-mask) -2) -2))
   ;; Inform print_otherptr() of all array types that it's too dumb to print
   (let ((array-type-bits (make-array 32 :initial-element 0)))
     (flet ((toggle (b)
