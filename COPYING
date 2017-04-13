@@ -15,6 +15,8 @@ All changes to SBCL since the fork from CMU CL have been released into
 the public domain in jurisdictions where this is possible, or under
 the FreeBSD licence where not.
 
+The CityHash mix function as adapted in hopscotch.c has an MIT license.
+
 Thus, there are no known obstacles to copying, using, and modifying
 SBCL freely, as long as copyright notices of MIT, Symbolics, Xerox and
 Gerd Moellmann are retained.

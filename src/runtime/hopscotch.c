@@ -39,8 +39,24 @@ void hopscotch_integrity_check(tableptr,char*,int);
 
 /// XOR values based on the page number and the relative index into the page.
 /// Disregard lowtag bits.
-static inline int hash(lispobj x) {
-    return (x >> GENCGC_CARD_SHIFT) ^ (x >> (1+WORD_SHIFT));
+static inline uint32_t hash(tableptr ht, lispobj x) {
+    return ht->hashfun ? ht->hashfun(x) :
+      (x >> GENCGC_CARD_SHIFT) ^ (x >> (1+WORD_SHIFT));
+}
+
+/// From https://github.com/google/cityhash/blob/master/src/city.cc
+/// which attributes it in turn to
+/// https://github.com/PeterScott/murmur3/blob/master/murmur3.c
+/// The right shift by N_LOWTAG_BITS is specific to SBCL.
+uint32_t hopscotch_hmix(uword_t key)
+{
+  uint32_t h = key >> N_LOWTAG_BITS;
+  h ^= h >> 16;
+  h *= 0x85ebca6b;
+  h ^= h >> 13;
+  h *= 0xc2b2ae35;
+  h ^= h >> 16;
+  return h;
 }
 
 /// Set a single bit in the hop mask for logical cell at 'index'
@@ -81,6 +97,12 @@ static sword_t get_val(tableptr ht, int index)
     }
     return 1;
 }
+#ifdef LISP_FEATURE_64_BIT
+static sword_t get_val8(tableptr ht, int index) { return ht->values[index]; }
+#endif
+static sword_t get_val4(tableptr ht, int index) { return ((int32_t*)ht->values)[index]; }
+static sword_t get_val2(tableptr ht, int index) { return ((int16_t*)ht->values)[index]; }
+static sword_t get_val1(tableptr ht, int index) { return ((int8_t *)ht->values)[index]; }
 
 /// Hopscotch storage allocation granularity.
 /// Our usual value of "page size" is the GC page size, which is
@@ -224,14 +246,21 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
 /* Initialize 'ht' for first use, which entails zeroing the counters
  * and allocating storage.
  */
-void hopscotch_create(tableptr ht, int bytes_per_value,
-                      int size, char hop_range)
+void hopscotch_create(tableptr ht, uint32_t (*hashfun)(uword_t),
+                      int bytes_per_value, int size, char hop_range)
 {
     gc_assert((size & (size-1)) == 0); // ensure power-of-2
     switch (bytes_per_value) {
-    case 0: case 1: case 2: case 4: case 8: break;
+    case 0: ht->get_value = 0; break; // no value getter
+    case 1: ht->get_value = get_val1; break;
+    case 2: ht->get_value = get_val2; break;
+    case 4: ht->get_value = get_val4; break;
+#ifdef LISP_FEATURE_64_BIT
+    case 8: ht->get_value = get_val8; break;
+#endif
     default: lose("Bad value size");
     }
+    ht->hashfun = hashfun;
     ht->count = 0;
     ht->rehashing = 0;
     ht->resized = 0;
@@ -305,7 +334,7 @@ tableptr hopscotch_resize_up(tableptr ht)
     int i;
     do {
         size *= 2;
-        hopscotch_create(&copy, ht->value_size, size, 0);
+        hopscotch_create(&copy, ht->hashfun, ht->value_size, size, 0);
         copy.rehashing = 1; // Causes put() to return 0 on failure
         if (ht->values) {
             for(i=old_max_index ; i >= 0 ; --i)
@@ -380,7 +409,7 @@ int hopscotch_insert(tableptr ht, uword_t key, sword_t val)
 {
     // 'desired_index' is where 'key' logically belongs, but it
     // may physically go in any cell to the right up to (range-1) away.
-    int desired_index = hash(key) & ht->mask;
+    int desired_index = hash(ht, key) & ht->mask;
     if (ht->keys[desired_index] == 0) {  // Instant win
         put_pair(desired_index, key, val);
         set_hop_bit(ht, desired_index, 0);
@@ -470,7 +499,7 @@ int hopscotch_insert(tableptr ht, uword_t key, sword_t val)
 int hopscotch_containsp(tableptr ht, uword_t key)
 {
     // index needn't be 'long' but the code generated is better with it.
-    unsigned long index = hash(key) & ht->mask;
+    unsigned long index = hash(ht, key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
     int __attribute__((unused)) probes = 0;
     // *** Use care when modifying this code, and benchmark it thoroughly! ***
@@ -507,10 +536,10 @@ int hopscotch_containsp(tableptr ht, uword_t key)
     return 0;
 }
 
-/* Return the value associated with 'key', or -1 if not found */
-sword_t hopscotch_get(tableptr ht, uword_t key)
+/* Return the value associated with 'key', or 'notfound' if not found */
+sword_t hopscotch_get(tableptr ht, uword_t key, sword_t notfound)
 {
-    int index = hash(key) & ht->mask;
+    int index = hash(ht, key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
     int __attribute__((unused)) probes = 0;
     // This is not as blazingly fast as the hand-unrolled loop
@@ -526,7 +555,7 @@ sword_t hopscotch_get(tableptr ht, uword_t key)
         bits >>= 4;
     }
     tally_miss(ht, probes);
-    return -1;
+    return notfound;
 found3: ++index;
 found2: ++index;
 found1: ++index;
@@ -538,7 +567,7 @@ found0:
  * the key was inserted, or zero if the key existed. */
 int hopscotch_put(tableptr ht, uword_t key, sword_t val)
 {
-    int index = hash(key) & ht->mask;
+    int index = hash(ht, key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
     int __attribute__((unused)) probes = 0;
     // This is not as blazingly fast as the hand-unrolled loop
@@ -566,6 +595,7 @@ found0:
 #undef probe
 
 #if 0
+#include <stdio.h>
 int popcount(unsigned x)
 {
   int count = 0;
@@ -617,7 +647,7 @@ void hopscotch_integrity_check(tableptr ht, char*when, int verbose)
             fprintf(s, "      ");
           else if (claimed!=-1) {
             fprintf(s, "[%4d]", claimed);
-            if ((int)(ht->mask & hash(key)) != claimed)
+            if ((int)(ht->mask & hash(ht, key)) != claimed)
               lose("key hashes to wrong logical cell?");
           } else { // should have been claimed
             fprintf(s, " **** ");
@@ -625,9 +655,9 @@ void hopscotch_integrity_check(tableptr ht, char*when, int verbose)
           }
           fprintf(s, " %4d: %04x", i, i <= ht->mask ? get_hop_mask(ht,i) : 0);
           if (key) {
-            fprintf(s, " %12p -> %d", key, (int)(ht->mask & hash(key)));
+            fprintf(s, " %lx -> %d", key, (int)(ht->mask & hash(ht, key)));
             if (ht->values)
-              fprintf(s, " {val=%lx}", hopscotch_get(ht, key));
+              fprintf(s, " {val=%lx}", hopscotch_get(ht, key, -1));
           }
           putc('\n', s);
       }

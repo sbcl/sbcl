@@ -2146,7 +2146,7 @@ maybe_adjust_large_object(lispobj *where)
 #  define hopscotch_reset(a)
 #  define scavenge_pinned_ranges()
 #  define wipe_nonpinned_words()
-#  define hopscotch_create(a,b,c,d)
+#  define hopscotch_create(a,b,c,d,e)
 #  define hopscotch_log_stats(a)
 /* After scavenging of the roots is done, we go back to the pinned objects
  * and look within them for pointers. While heap_scavenge() could certainly
@@ -4055,6 +4055,7 @@ gc_init(void)
 
     hopscotch_init();
     hopscotch_create(&pinned_objects, 0 /* no values */,
+                     HOPSCOTCH_HASH_FUN_DEFAULT,
                      32 /* logical bin count */, 0 /* default range */);
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;

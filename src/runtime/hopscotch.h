@@ -16,6 +16,8 @@ struct hopscotch_table {
     uword_t*   keys;
     unsigned*  hops;
     sword_t*   values;
+    sword_t    (*get_value)(struct hopscotch_table*,int);
+    uint32_t   (*hashfun)(uword_t);
     unsigned   mask;
     int  hop_range;
     int  count;
@@ -30,13 +32,19 @@ struct hopscotch_table {
 };
 
 void hopscotch_init();
-void hopscotch_create(struct hopscotch_table*,boolean,int,char);
+void hopscotch_create(struct hopscotch_table*,uint32_t(*)(uword_t),int,int,char);
+void hopscotch_delete(struct hopscotch_table*);
 int hopscotch_insert(struct hopscotch_table*,uword_t,sword_t);
 int hopscotch_put(struct hopscotch_table*,uword_t,sword_t);
-sword_t hopscotch_get(struct hopscotch_table*,uword_t);
+sword_t hopscotch_get(struct hopscotch_table*,uword_t,sword_t);
 int hopscotch_containsp(struct hopscotch_table*,uword_t);
 void hopscotch_reset(struct hopscotch_table*);
 void hopscotch_log_stats(struct hopscotch_table*,char*);
+
+uint32_t hopscotch_hmix(uword_t);
+
+#define HOPSCOTCH_HASH_FUN_DEFAULT 0
+#define HOPSCOTCH_HASH_FUN_MIX hopscotch_hmix
 
 /* This confuses me every time I look at it, so here's an example-
  * Suppose (unrealistically) that a table has a hop range of 4,
