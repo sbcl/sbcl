@@ -3366,7 +3366,7 @@ write_protect_generation_pages(generation_index_t generation)
 
 #if defined(LISP_FEATURE_SB_THREAD) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 static void
-preserve_context_registers (os_context_t *c)
+preserve_context_registers (void (*proc)(os_context_register_t), os_context_t *c)
 {
     void **ptr;
     /* On Darwin the signal context isn't a contiguous block of memory,
@@ -3374,36 +3374,36 @@ preserve_context_registers (os_context_t *c)
      */
 #if defined(LISP_FEATURE_DARWIN)||defined(LISP_FEATURE_WIN32)
 #if defined LISP_FEATURE_X86
-    preserve_pointer((void*)*os_context_register_addr(c,reg_EAX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_ECX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_EDX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_EBX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
-    preserve_pointer((void*)*os_context_pc_addr(c));
+    proc(*os_context_register_addr(c,reg_EAX));
+    proc(*os_context_register_addr(c,reg_ECX));
+    proc(*os_context_register_addr(c,reg_EDX));
+    proc(*os_context_register_addr(c,reg_EBX));
+    proc(*os_context_register_addr(c,reg_ESI));
+    proc(*os_context_register_addr(c,reg_EDI));
+    proc(*os_context_pc_addr(c));
 #elif defined LISP_FEATURE_X86_64
-    preserve_pointer((void*)*os_context_register_addr(c,reg_RAX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_RCX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_RDX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_RBX));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_RSI));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_RDI));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R8));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R9));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R10));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R11));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R12));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R13));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R14));
-    preserve_pointer((void*)*os_context_register_addr(c,reg_R15));
-    preserve_pointer((void*)*os_context_pc_addr(c));
+    proc(*os_context_register_addr(c,reg_RAX));
+    proc(*os_context_register_addr(c,reg_RCX));
+    proc(*os_context_register_addr(c,reg_RDX));
+    proc(*os_context_register_addr(c,reg_RBX));
+    proc(*os_context_register_addr(c,reg_RSI));
+    proc(*os_context_register_addr(c,reg_RDI));
+    proc(*os_context_register_addr(c,reg_R8));
+    proc(*os_context_register_addr(c,reg_R9));
+    proc(*os_context_register_addr(c,reg_R10));
+    proc(*os_context_register_addr(c,reg_R11));
+    proc(*os_context_register_addr(c,reg_R12));
+    proc(*os_context_register_addr(c,reg_R13));
+    proc(*os_context_register_addr(c,reg_R14));
+    proc(*os_context_register_addr(c,reg_R15));
+    proc(*os_context_pc_addr(c));
 #else
     #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
 #endif
 #endif
 #if !defined(LISP_FEATURE_WIN32)
     for(ptr = ((void **)(c+1))-1; ptr>=(void **)c; ptr--) {
-        preserve_pointer(*ptr);
+        proc((os_context_register_t)*ptr);
     }
 #endif
 }
@@ -3550,7 +3550,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 long k = fixnum_value(
                     SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 while (k > 0)
-                    preserve_context_registers(th->interrupt_contexts[--k]);
+                    preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
+                                               th->interrupt_contexts[--k]);
             }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
@@ -3568,7 +3569,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     if (esp1>=(void **)th->control_stack_start &&
                         esp1<(void **)th->control_stack_end) {
                         if(esp1<esp) esp=esp1;
-                        preserve_context_registers(c);
+                        preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
+                                                   c);
                     }
                 }
             }
