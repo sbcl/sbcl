@@ -1155,20 +1155,17 @@ scav_hash_table_entries (struct hash_table *hash_table)
 sword_t
 scav_vector (lispobj *where, lispobj object)
 {
-    uword_t kv_length;
+    sword_t kv_length = fixnum_value(where[1]);
     struct hash_table *hash_table;
 
     /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
      * hash tables in the Lisp HASH-TABLE code to indicate need for
      * special GC support. */
     if ((HeaderValue(object) & 0xFF) == subtype_VectorNormal) {
-      sword_t length = fixnum_value(((struct vector*)where)->length);
-      scavenge(where + 2, length);
-      return CEILING(length + 2, 2);
+ normal:
+      scavenge(where + 2, kv_length);
+      return CEILING(kv_length + 2, 2);
     }
-
-    kv_length = fixnum_value(where[1]);
-    /*FSHOW((stderr,"/kv_length = %d\n", kv_length));*/
 
     /* Scavenge element 0, which may be a hash-table structure. */
     scavenge(where+2, 1);
@@ -1183,8 +1180,7 @@ scav_vector (lispobj *where, lispobj object)
                 "hash-table from multiple threads. Any accesses to "
                 "hash-tables shared between threads should be protected "
                 "by locks.\n", (void*)&where[2]);
-        // We've scavenged three words.
-        return 3;
+        goto normal;
     }
     hash_table = (struct hash_table *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
@@ -1203,8 +1199,7 @@ scav_vector (lispobj *where, lispobj object)
 
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
-    scavenge((lispobj *)hash_table,
-             CEILING(sizeof(struct hash_table) / sizeof(lispobj), 2));
+    scav_instance((lispobj *)hash_table, hash_table->header);
 
     /* Cross-check the kv_vector. */
     if (where != native_pointer(hash_table->table)) {
