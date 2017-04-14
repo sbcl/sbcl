@@ -16,14 +16,7 @@
  * that provides a guaranteed bound on number of probes.
  */
 
-#if defined(LISP_FEATURE_WIN32)
-#include "pthreads_win32.h"
-#else
-#include <pthread.h> // only because of our dang non-self-contained .h files
-#endif
-
-#include "genesis/constants.h"
-#include "runtime.h"
+#include "os.h"
 #include "gc-internal.h" // for os_validate()
 #include "hopscotch.h"
 #include <stdint.h>
