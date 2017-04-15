@@ -1320,22 +1320,24 @@ interactive."
 (defun get-foreground ()
   #!-sb-thread t
   #!+sb-thread
-  (let ((was-foreground t))
+  (let ((session *session*)
+        (was-foreground t))
     (loop
      (/show0 "Looping in GET-FOREGROUND")
-     (with-session-lock (*session*)
-       (let ((int-t (session-interactive-threads *session*)))
-         (when (eq (car int-t) *current-thread*)
+     (with-session-lock (session)
+       (symbol-macrolet
+           ((interactive-threads (session-interactive-threads session)))
+         (when (eq (first interactive-threads) *current-thread*)
            (unless was-foreground
              (format *query-io* "Resuming thread ~A~%" *current-thread*))
            (return-from get-foreground t))
          (setf was-foreground nil)
-         (unless (member *current-thread* int-t)
-           (setf (cdr (last int-t))
+         (unless (member *current-thread* interactive-threads)
+           (setf (cdr (last interactive-threads))
                  (list *current-thread*)))
          (condition-wait
-          (session-interactive-threads-queue *session*)
-          (session-lock *session*)))))))
+          (session-interactive-threads-queue session)
+          (session-lock session)))))))
 
 (defun release-foreground (&optional next)
   "Background this thread.  If NEXT is supplied, arrange for it to
@@ -1343,15 +1345,17 @@ have the foreground next."
   #!-sb-thread (declare (ignore next))
   #!-sb-thread nil
   #!+sb-thread
-  (with-session-lock (*session*)
-    (when (rest (session-interactive-threads *session*))
-      (setf (session-interactive-threads *session*)
-            (delete *current-thread* (session-interactive-threads *session*))))
-    (when next
-      (setf (session-interactive-threads *session*)
-            (list* next
-                   (delete next (session-interactive-threads *session*)))))
-    (condition-broadcast (session-interactive-threads-queue *session*))))
+  (let ((session *session*))
+    (with-session-lock (session)
+      (symbol-macrolet
+          ((interactive-threads (session-interactive-threads session)))
+        (when (rest interactive-threads)
+          (setf interactive-threads
+                (delete *current-thread* interactive-threads)))
+        (when next
+          (setf interactive-threads
+                (list* next (delete next interactive-threads))))
+        (condition-broadcast (session-interactive-threads-queue session))))))
 
 (defun interactive-threads (&optional (session *session*))
   "Return the interactive threads of SESSION defaulting to the current
