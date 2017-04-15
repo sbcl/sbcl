@@ -29,6 +29,8 @@ changes relative to sbcl-1.3.17:
   * optimization: various printer and FORMAT performance enhancements.
   * bug fix: GET-FOREGROUND no longer fails in case all other interactive
     threads exit (lp#1682671, reported by Syll)
+  * bug fix: RELEASE-FOREGROUND always removes the current thread from the
+    list of interactive threads. (lp#1682867, reported by Syll)
 
 changes in sbcl-1.3.17 relative to sbcl-1.3.16:
   * enhancement: memory overhead from the garbage collector's metadata

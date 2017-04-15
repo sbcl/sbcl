@@ -1290,11 +1290,10 @@ on this semaphore, then N of them is woken up."
   "Kill all threads in session except for this one.  Does nothing if current
 thread is not the foreground thread."
   ;; FIXME: threads created in other threads may escape termination
-  (let ((to-kill
-         (with-session-lock (*session*)
-           (and (eq *current-thread*
-                    (car (session-interactive-threads *session*)))
-                (session-threads *session*)))))
+  (let* ((session *session*)
+         (to-kill (with-session-lock (session)
+                    (and (eq *current-thread* (foreground-thread session))
+                         (session-threads session)))))
     ;; do the kill after dropping the mutex; unwind forms in dying
     ;; threads may want to do session things
     (dolist (thread to-kill)
@@ -1354,9 +1353,8 @@ have the foreground next."
     (with-session-lock (session)
       (symbol-macrolet
           ((interactive-threads (session-interactive-threads session)))
-        (when (rest interactive-threads)
-          (setf interactive-threads
-                (delete *current-thread* interactive-threads)))
+        (setf interactive-threads
+              (delete *current-thread* interactive-threads))
         (when next
           (setf interactive-threads
                 (list* next (delete next interactive-threads))))

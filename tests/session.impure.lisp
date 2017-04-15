@@ -88,3 +88,13 @@
 
       (wait-for-state :done)
       (get-foreground-quietly))))
+
+(with-test (:name (sb-thread:release-foreground :bug-1682867))
+  (let ((thread (make-join-thread (lambda ())
+                                  :name "release-foreground test thread")))
+    (sb-thread:release-foreground thread)
+    (let ((interactive-threads
+           (sb-thread::with-session-lock (sb-thread::*session*)
+             (copy-list (sb-thread::interactive-threads)))))
+      (assert (not (member sb-thread::*current-thread*
+                           interactive-threads))))))
