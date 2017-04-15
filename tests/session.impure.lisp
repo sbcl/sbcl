@@ -23,6 +23,10 @@
                             (output (make-broadcast-stream)))
   (make-two-way-stream input output))
 
+(defun get-foreground-quietly ()
+  (let ((*query-io* (make-quiet-io-stream)))
+    (sb-thread::get-foreground)))
+
 ;; this used to deadlock on session-lock
 (with-test (:name (:no-session-deadlock))
   (make-join-thread (lambda () (sb-ext:gc))))
@@ -56,3 +60,31 @@
       (assert (search "Type HELP for debugger help" output))
       (assert (search "[CONTINUE" output))
       (assert (search "Return from BREAK" output)))))
+
+;;; The sequence of actions in this test creates a situation in which
+;;; the list of interactive threads of the current session contains a
+;;; single thread.
+(with-test (:name (sb-thread::get-foreground :inifite-loop :bug-1682671))
+  (let ((state nil)
+        (lock (sb-thread:make-mutex :name "get-foreground test lock"))
+        (variable (sb-thread:make-waitqueue :name "get-foreground test waitqueue")))
+    (flet ((enter-state (new-state)
+             (sb-thread:with-mutex (lock)
+               (setf state new-state)
+               (sb-thread:condition-notify variable)))
+           (wait-for-state (goal)
+             (sb-thread:with-mutex (lock)
+               (loop :until (eq state goal) :do
+                  (sb-thread:condition-wait variable lock)))))
+
+      (make-join-thread (lambda ()
+                          (enter-state :ready)
+                          (get-foreground-quietly)
+                          (enter-state :done))
+                        :name "get-foreground test thread 2")
+
+      (wait-for-state :ready)
+      (sb-thread:release-foreground)
+
+      (wait-for-state :done)
+      (get-foreground-quietly))))

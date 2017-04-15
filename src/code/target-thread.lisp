@@ -1327,17 +1327,22 @@ interactive."
      (with-session-lock (session)
        (symbol-macrolet
            ((interactive-threads (session-interactive-threads session)))
-         (when (eq (first interactive-threads) *current-thread*)
-           (unless was-foreground
-             (format *query-io* "Resuming thread ~A~%" *current-thread*))
-           (return-from get-foreground t))
-         (setf was-foreground nil)
-         (unless (member *current-thread* interactive-threads)
-           (setf (cdr (last interactive-threads))
-                 (list *current-thread*)))
-         (condition-wait
-          (session-interactive-threads-queue session)
-          (session-lock session)))))))
+         (cond
+           ((null interactive-threads)
+            (setf was-foreground nil
+                  interactive-threads (list *current-thread*)))
+           ((not (eq (first interactive-threads) *current-thread*))
+            (setf was-foreground nil)
+            (unless (member *current-thread* interactive-threads)
+              (setf interactive-threads
+                    (append interactive-threads (list *current-thread*))))
+            (condition-wait
+             (session-interactive-threads-queue session)
+             (session-lock session)))
+           (t
+            (unless was-foreground
+              (format *query-io* "Resuming thread ~A~%" *current-thread*))
+            (return-from get-foreground t))))))))
 
 (defun release-foreground (&optional next)
   "Background this thread.  If NEXT is supplied, arrange for it to
