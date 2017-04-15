@@ -98,3 +98,15 @@
              (copy-list (sb-thread::interactive-threads)))))
       (assert (not (member sb-thread::*current-thread*
                            interactive-threads))))))
+
+;;; On termination, interactive (including foreground) threads remove
+;;; themselves from the list of interactive threads in their
+;;; session. However, this did not previously include broadcasting the
+;;; interactive threads waitqueue, resulting in GET-FOREGROUND hanging
+;;; after termination of the previous foreground thread.
+(with-test (:name (sb-thread::get-foreground :hang :missing-broadcast))
+  (let ((thread (make-join-thread
+                 (lambda () (sleep 1))
+                 :name "get-foreground hang missing-broadcast test")))
+    (sb-thread:release-foreground thread)
+    (get-foreground-quietly)))

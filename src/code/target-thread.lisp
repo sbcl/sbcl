@@ -1214,11 +1214,14 @@ on this semaphore, then N of them is woken up."
 
 (defun %delete-thread-from-session (thread session)
   (with-session-lock (session)
-    (setf (session-threads session)
-          ;; DELQ never conses, but DELETE does. (FIXME)
-          (delq thread (session-threads session))
-          (session-interactive-threads session)
-          (delq thread (session-interactive-threads session)))))
+    (let ((was-foreground (eq thread (foreground-thread session))))
+      (setf (session-threads session)
+            ;; DELQ never conses, but DELETE does. (FIXME)
+            (delq thread (session-threads session))
+            (session-interactive-threads session)
+            (delq thread (session-interactive-threads session)))
+      (when was-foreground
+        (condition-broadcast (session-interactive-threads-queue session))))))
 
 (defun call-with-new-session (fn)
   (%delete-thread-from-session *current-thread* *session*)
