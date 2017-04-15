@@ -1881,18 +1881,29 @@ scavenge_interrupt_context(os_context_t * context)
 
     /* Scavenge all boxed registers in the context. */
     for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
-        int index;
-        lispobj foo;
+        os_context_register_t *boxed_reg;
+        lispobj datum;
 
-        index = boxed_registers[i];
-        foo = *os_context_register_addr(context, index);
-        scavenge(&foo, 1);
-        *os_context_register_addr(context, index) = foo;
+        /* We can't "just" cast os_context_register_addr() to a
+         * pointer to lispobj and pass it to scavenge, because some
+         * systems can have a wider register width than we use for
+         * lisp objects, and on big-endian systems casting a pointer
+         * to a narrower target type doesn't work properly.
+         * Therefore, we copy the value out to a temporary lispobj
+         * variable, scavenge there, and copy the value back in.
+         *
+         * FIXME: lispobj is unsigned, os_context_register_t may be
+         * signed or unsigned, are we truncating or sign-extending
+         * values here that shouldn't be modified?  Possibly affects
+         * any architecture that has 32-bit and 64-bit variants where
+         * we run in 32-bit mode on 64-bit hardware when the OS is set
+         * up for 64-bit from the start.  Or an environment with
+         * 32-bit addresses and 64-bit registers. */
 
-        /* this is unlikely to work as intended on bigendian
-         * 64 bit platforms */
-
-        scavenge((lispobj *) os_context_register_addr(context, index), 1);
+        boxed_reg = os_context_register_addr(context, boxed_registers[i]);
+        datum = *boxed_reg;
+        scavenge(&datum, 1);
+        *boxed_reg = datum;
     }
 
     /* Now that the scavenging is done, repair the various interior
