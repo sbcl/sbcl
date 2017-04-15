@@ -770,10 +770,6 @@
 
 (format t "~&gc test done~%")
 
-;; this used to deadlock on session-lock
-(with-test (:name (:no-session-deadlock))
-  (make-join-thread (lambda () (sb-ext:gc))))
-
 (defun exercise-syscall (fn reference-errno)
   (make-kill-thread
    (lambda ()
@@ -825,27 +821,6 @@
 (sb-ext:gc :full t)
 
 (format t "~&thread startup sigmask test done~%")
-
-(with-test (:name (:debugger-no-hang-on-session-lock-if-interrupted)
-                  :fails-on :win32)
-  #+win32 (error "user would have to touch a key interactively to proceed")
-  (sb-debug::enable-debugger)
-  (let* ((main-thread *current-thread*)
-         (interruptor-thread
-          (make-thread (lambda ()
-                         (sleep 2)
-                         (interrupt-thread main-thread
-                                           (lambda ()
-                                             (with-interrupts
-                                               (break))))
-                         (sleep 2)
-                         (interrupt-thread main-thread #'continue))
-                       :name "interruptor")))
-    (with-session-lock (*session*)
-      (sleep 3))
-    (loop while (thread-alive-p interruptor-thread))))
-
-(format t "~&session lock test done~%")
 
 ;; expose thread creation races by exiting quickly
 (with-test (:name (:no-thread-creation-race :light))
