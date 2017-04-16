@@ -19,8 +19,9 @@
   (let ((ht (sb-alien::%make-alien 100))) ; overestimate the C structure size
     (sb-sys:without-gcing
         (alien-funcall (extern-alien "hopscotch_create"
-                                     (function void system-area-pointer int int int))
+                                     (function void system-area-pointer int int int int))
                        ht
+                       0 ; default hash function
                        bytes-per-value
                        32 ; size
                        8)) ; hop range
@@ -39,9 +40,10 @@
   ;; GET doesn't need to inhibit GC
   (let ((result
          (alien-funcall (extern-alien "hopscotch_get"
-                                      (function long system-area-pointer unsigned))
+                                      (function long system-area-pointer unsigned long))
                         table
-                        (the fixnum key))))
+                        (the fixnum key)
+                        -1)))
     (unless (eql result -1)
       (sb-kernel:make-lisp-obj
        (logand result sb-ext:most-positive-word)))))
@@ -49,7 +51,7 @@
 (defun fill-table (table n-things value-bits)
   (let ((lisp-ht (make-hash-table :test 'eq))
         ;; Don't feel like dealing with signed-ness.
-        (max-value (ash 1 (- value-bits 2)))) ; exclusive bound
+        (max-value (ash 1 (- value-bits 1 sb-vm:n-fixnum-tag-bits)))) ; exclusive bound
     (dotimes (i n-things)
       ;; Pick a random small integer key, but don't pick the empty marker (0).
       ;; Also shift left left by N-LOWTAG-BITS, because the hash function
