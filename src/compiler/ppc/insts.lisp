@@ -1999,7 +1999,7 @@
   :pinned
   (:delay 0)
   (:emitter
-   (emit-header-data segment simple-fun-header-widetag)))
+   (emit-header-data segment simple-fun-widetag)))
 
 (define-instruction lra-header-word (segment)
   :pinned

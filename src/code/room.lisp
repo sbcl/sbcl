@@ -48,7 +48,7 @@
       (make-room-info :name 'bignum
                       :kind :other))
 
-(setf (svref *meta-room-info* closure-header-widetag)
+(setf (svref *meta-room-info* closure-widetag)
       (make-room-info :name 'closure
                       :kind :closure))
 
@@ -69,7 +69,7 @@
       (make-room-info :name 'instance
                       :kind :instance))
 
-(setf (svref *meta-room-info* funcallable-instance-header-widetag)
+(setf (svref *meta-room-info* funcallable-instance-widetag)
       (make-room-info :name 'funcallable-instance
                       :kind :closure))
 

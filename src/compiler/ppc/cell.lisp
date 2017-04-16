@@ -261,7 +261,7 @@
   (:generator 38
     (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
-      (inst cmpwi type simple-fun-header-widetag)
+      (inst cmpwi type simple-fun-widetag)
       ;;(inst mr lip function)
       (inst addi lip function
             (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag))

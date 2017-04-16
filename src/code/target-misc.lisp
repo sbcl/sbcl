@@ -20,9 +20,9 @@
   (declare (function function))
   ;; It's too bad that TYPECASE isn't able to generate equivalent code.
   (case (fun-subtype function)
-    (#.sb!vm:closure-header-widetag
+    (#.sb!vm:closure-widetag
      (%closure-fun function))
-    (#.sb!vm:funcallable-instance-header-widetag
+    (#.sb!vm:funcallable-instance-widetag
      ;; %FUNCALLABLE-INSTANCE-FUNCTION is not known to return a FUNCTION.
      ;; Is that right? Shouldn't we always initialize to something
      ;; that is a function, such as an error-signaling trampoline?
@@ -121,7 +121,7 @@
 ;;; or NIL if there's none
 (defun %fun-name (function)
   (case (fun-subtype function)
-    (#.sb!vm:funcallable-instance-header-widetag
+    (#.sb!vm:funcallable-instance-widetag
      (let (#!+(or sb-eval sb-fasteval)
            (layout (%funcallable-instance-layout function)))
        ;; We know that funcallable-instance-p is true,
@@ -140,7 +140,7 @@
                                    function)
               (return-from %fun-name
                 (sb!mop:generic-function-name function))))))
-    (#.sb!vm:closure-header-widetag
+    (#.sb!vm:closure-widetag
      (multiple-value-bind (name namedp) (closure-name function)
        (when namedp
          (return-from %fun-name name)))))

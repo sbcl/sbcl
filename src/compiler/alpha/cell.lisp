@@ -142,7 +142,7 @@
   (:generator 38
     (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
-      (inst xor type simple-fun-header-widetag type)
+      (inst xor type simple-fun-widetag type)
       (inst addq function
             (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
             lip)

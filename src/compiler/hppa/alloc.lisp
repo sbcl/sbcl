@@ -170,7 +170,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation
-        (result nil temp closure-header-widetag
+        (result nil temp closure-widetag
          (+ length closure-info-offset)
          stack-allocate-p :lowtag fun-pointer-lowtag)
       (storew function result closure-fun-slot fun-pointer-lowtag))))

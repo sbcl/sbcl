@@ -193,7 +193,7 @@
       ;; in arch_write_linkage_table_jmp() and arch_do_displaced_inst().
       (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
             (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7))) ; disp
-      (let ((i (if (/= (fun-subtype fun) funcallable-instance-header-widetag)
+      (let ((i (if (/= (fun-subtype fun) funcallable-instance-widetag)
                    7
                    (let ((disp8 (- (ash funcallable-instance-function-slot
                                         word-shift)
@@ -264,7 +264,7 @@
         (case (sap-ref-8 (int-sap obj) 0)
          (#.fdefn-widetag
           (make-lisp-obj (logior obj other-pointer-lowtag)))
-         (#.funcallable-instance-header-widetag
+         (#.funcallable-instance-widetag
           (make-lisp-obj (logior obj fun-pointer-lowtag)))
          (#.code-header-widetag
           (let ((code (make-lisp-obj (logior obj other-pointer-lowtag))))

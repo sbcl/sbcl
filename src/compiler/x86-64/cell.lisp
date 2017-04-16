@@ -359,7 +359,7 @@
           (make-ea :byte :base function
                    :disp (- (* simple-fun-code-offset n-word-bytes)
                             fun-pointer-lowtag)))
-    (inst cmp (reg-in-size type :byte) simple-fun-header-widetag)
+    (inst cmp (reg-in-size type :byte) simple-fun-widetag)
     (inst jmp :e NORMAL-FUN)
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
     NORMAL-FUN

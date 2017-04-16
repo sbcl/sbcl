@@ -252,7 +252,7 @@
     (inst lea raw
           (make-ea-for-object-slot function simple-fun-code-offset
                                    fun-pointer-lowtag))
-    (inst cmp type simple-fun-header-widetag)
+    (inst cmp type simple-fun-widetag)
     (inst jmp :e normal-fn)
     (inst lea raw (make-fixup 'closure-tramp :assembly-routine))
     NORMAL-FN

@@ -128,7 +128,7 @@
         (load-immediate-word pa-flag
                              (logior
                               (ash (1- size) n-widetag-bits)
-                              closure-header-widetag))
+                              closure-widetag))
         (storew pa-flag result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 

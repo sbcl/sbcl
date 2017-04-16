@@ -129,7 +129,7 @@
         (allocation result alloc-size fun-pointer-lowtag
                     :stack-p stack-allocate-p
                     :temp-tn temp)
-        (inst li temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
+        (inst li temp (logior (ash (1- size) n-widetag-bits) closure-widetag))
         (storew temp result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 

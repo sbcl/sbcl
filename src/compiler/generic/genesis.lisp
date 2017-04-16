@@ -1905,7 +1905,7 @@ core and return a descriptor to it."
       (error "Duplicate DEFUN for ~S" warm-name))
     ;; There can't be any closures or funcallable instances.
     (aver (= (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)
-             sb!vm:simple-fun-header-widetag))
+             sb!vm:simple-fun-widetag))
     (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (let ((fun-entry-addr
@@ -2847,7 +2847,7 @@ core and return a descriptor to it."
              ((word-offset fn)
               (compute-fun code-object fun-index)))
     (write-memory fn (make-other-immediate-descriptor
-                      word-offset sb!vm:simple-fun-header-widetag))
+                      word-offset sb!vm:simple-fun-widetag))
     #!+(or x86 x86-64) ; store a machine-native pointer to the function entry
     ;; note that the bit pattern looks like fixnum due to alignment
     (write-wordindexed/raw fn sb!vm:simple-fun-self-slot

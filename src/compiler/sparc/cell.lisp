@@ -133,7 +133,7 @@
   (:generator 38
     (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
-      (inst cmp type simple-fun-header-widetag)
+      (inst cmp type simple-fun-widetag)
       (inst b :eq normal-fn)
       (inst move lip function)
       (inst li lip (make-fixup 'closure-tramp :assembly-routine))

@@ -14,7 +14,7 @@
                                    fun-pointer-lowtag))))
     ((:temp lra-tn descriptor-reg lra-offset)
      (:temp temp non-descriptor-reg nl0-offset))
-  (inst word simple-fun-header-widetag) ;; header
+  (inst word simple-fun-widetag) ;; header
   (inst word (make-fixup 'undefined-tramp-tagged
                          :assembly-routine)) ;; self
   (dotimes (i (- simple-fun-code-offset 2))
@@ -85,7 +85,7 @@
                (+ funcallable-instance-tramp-header
                   fun-pointer-lowtag))))
   nil
-  (inst word simple-fun-header-widetag) ;;header
+  (inst word simple-fun-widetag) ;;header
   (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine)) ;; self
   (dotimes (i (- simple-fun-code-offset 2))
     (inst word nil-value))

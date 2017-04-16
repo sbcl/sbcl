@@ -124,7 +124,7 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (inst li
-            (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
+            (logior (ash (1- size) n-widetag-bits) closure-widetag)
             temp)
       (pseudo-atomic (:extra (if stack-allocate-p 0 alloc-size))
         (cond (stack-allocate-p

@@ -162,7 +162,7 @@
   ;; if we already know that FUNCTION is a function.
   ;; It will signal a type error if not, which is the right thing to do anyway.
   ;; (this isn't quite a true predicate)
-  (and (= (fun-subtype function) sb!vm:closure-header-widetag)
+  (and (= (fun-subtype function) sb!vm:closure-widetag)
        ;; Prior to cold-init fixing up the load-time-value, this compares
        ;; %closure-fun to 0, which is ok - it returns NIL.
        (eq (load-time-value (%closure-fun (symbol-function '%coerce-name-to-fun))

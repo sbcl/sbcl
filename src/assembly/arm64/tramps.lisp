@@ -14,7 +14,7 @@
                                    fun-pointer-lowtag))))
     ()
   HEADER
-  (inst dword simple-fun-header-widetag)
+  (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'undefined-tramp-tagged
                          :assembly-routine))
   (dotimes (i (- simple-fun-code-offset 2))
@@ -33,7 +33,7 @@
                                    fun-pointer-lowtag))))
     ((:temp r8-tn unsigned-reg r8-offset))
   HEADER
-  (inst dword simple-fun-header-widetag)
+  (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'undefined-alien-tramp-tagged
                          :assembly-routine))
   (dotimes (i (- simple-fun-code-offset 2))
@@ -51,7 +51,7 @@
                                 (+ xclosure-tramp
                                    fun-pointer-lowtag))))
     ()
-  (inst dword simple-fun-header-widetag)
+  (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'closure-tramp-tagged
                          :assembly-routine))
   (dotimes (i (- simple-fun-code-offset 2))
@@ -70,7 +70,7 @@
                                 (+ xfuncallable-instance-tramp
                                    fun-pointer-lowtag))))
     ()
-  (inst dword simple-fun-header-widetag)
+  (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'funcallable-instance-tramp :assembly-routine))
   (dotimes (i (- simple-fun-code-offset 2))
     (inst dword nil-value))

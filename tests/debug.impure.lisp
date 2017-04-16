@@ -31,15 +31,15 @@
   (declare (type function fun))
   ;; The Lisp-level type FUNCTION can conceal a multitude of sins..
   (case (sb-kernel:widetag-of fun)
-    (#.sb-vm:simple-fun-header-widetag
+    (#.sb-vm:simple-fun-widetag
       (sb-kernel:%simple-fun-arglist fun))
-    (#.sb-vm:closure-header-widetag
+    (#.sb-vm:closure-widetag
      (get-arglist (sb-kernel:%closure-fun fun)))
     ;; In code/describe.lisp, ll. 227 (%describe-fun), we use a scheme
     ;; like above, and it seems to work. -- MNA 2001-06-12
     ;;
     ;; (There might be other cases with arglist info also.
-    ;; SIMPLE-FUN-HEADER-WIDETAG and CLOSURE-HEADER-WIDETAG just
+    ;; SIMPLE-FUN-WIDETAG and CLOSURE-WIDETAG just
     ;; happen to be the two case that I had my nose rubbed in when
     ;; debugging a GC problem caused by applying %SIMPLE-FUN-ARGLIST to
     ;; a closure. -- WHN 2001-06-05)

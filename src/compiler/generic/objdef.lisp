@@ -189,7 +189,7 @@
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
 (!define-primitive-object (simple-fun :type function
                                      :lowtag fun-pointer-lowtag
-                                     :widetag simple-fun-header-widetag)
+                                     :widetag simple-fun-widetag)
   ;; All three function primitive-objects have the first word after the header
   ;; as some kind of entry point, either the address to jump to, in the case
   ;; of x86, or the Lisp function to jump to, for everybody else.
@@ -230,7 +230,7 @@
   (return-point :c-type "unsigned char" :rest-p t))
 
 (!define-primitive-object (closure :lowtag fun-pointer-lowtag
-                                   :widetag closure-header-widetag
+                                   :widetag closure-widetag
                                    ;; This allocator is %COPY-foo because it's only
                                    ;; used when renaming a closure. The compiler has
                                    ;; its own way of making closures, which requires
@@ -242,7 +242,7 @@
 
 (!define-primitive-object (funcallable-instance
                           :lowtag fun-pointer-lowtag
-                          :widetag funcallable-instance-header-widetag
+                          :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
   (trampoline :init :funcallable-instance-tramp)
   ;; TODO: if we can switch places of 'function' and 'fsc-instance-slots'

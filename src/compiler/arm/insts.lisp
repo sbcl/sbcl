@@ -388,7 +388,7 @@
 
 (define-instruction simple-fun-header-word (segment)
   (:emitter
-   (emit-header-data segment simple-fun-header-widetag)))
+   (emit-header-data segment simple-fun-widetag)))
 
 (define-instruction lra-header-word (segment)
   (:emitter
@@ -1186,7 +1186,7 @@
         (inst ldr temp (@ lip (- other-pointer-lowtag)))
         ;; And finally we use the header value (a count in words),
         ;; plus the fact that the top two bits of the widetag are
-        ;; clear (SIMPLE-FUN-HEADER-WIDETAG is #x2A and
+        ;; clear (SIMPLE-FUN-WIDETAG is #x2A and
         ;; RETURN-PC-HEADER-WIDETAG is #x36) to compute the boxed
         ;; address of the code component.
         (inst sub code lip (lsr temp (- 8 word-shift))))))))

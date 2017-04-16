@@ -291,7 +291,7 @@
     (let ((size (+ length closure-info-offset)))
       (allocation result (pad-data-block size) node stack-allocate-p
                   fun-pointer-lowtag)
-      (storew* (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
+      (storew* (logior (ash (1- size) n-widetag-bits) closure-widetag)
                result 0 fun-pointer-lowtag (not stack-allocate-p)))
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
     (storew temp result closure-fun-slot fun-pointer-lowtag))))

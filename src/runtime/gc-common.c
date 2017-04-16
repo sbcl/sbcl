@@ -205,7 +205,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
 
     /* must transport object -- object may point to either a function
      * header, a funcallable instance header, or a closure header. */
-    lispobj copy = widetag_of(*first_pointer) == SIMPLE_FUN_HEADER_WIDETAG
+    lispobj copy = widetag_of(*first_pointer) == SIMPLE_FUN_WIDETAG
       ? trans_fun_header(object) : trans_short_boxed(object);
 
     if (copy != object) {

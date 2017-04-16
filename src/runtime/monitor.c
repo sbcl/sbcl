@@ -285,7 +285,7 @@ search_cmd(char **ptr)
         obj = *end;
         addr = end;
         end += 2;
-        if (widetag_of(obj) == SIMPLE_FUN_HEADER_WIDETAG) {
+        if (widetag_of(obj) == SIMPLE_FUN_WIDETAG) {
             print((uword_t)addr | FUN_POINTER_LOWTAG);
         } else if (other_immediate_lowtag_p(obj)) {
             print((lispobj)addr | OTHER_POINTER_LOWTAG);

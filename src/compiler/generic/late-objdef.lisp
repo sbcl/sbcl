@@ -46,9 +46,9 @@
     (code-header "code_header")
     ;; The scavenge function for fun-header is basically "lose",
     ;; but it's only defined on non-x86 platforms for some reason.
-    (simple-fun-header ,(or #!+(or x86 x86-64) "lose" "fun_header") "fun_header" "lose")
-    (closure-header ,(or #!+(or x86 x86-64) "closure" "short_boxed") "short_boxed")
-    (funcallable-instance-header ,(or #!+compact-instance-header "funinstance" "short_boxed")
+    (simple-fun ,(or #!+(or x86 x86-64) "lose" "fun_header") "fun_header" "lose")
+    (closure ,(or #!+(or x86 x86-64) "closure" "short_boxed") "short_boxed")
+    (funcallable-instance ,(or #!+compact-instance-header "funinstance" "short_boxed")
                                  "short_boxed")
     ;; These have a scav and trans function, but no size function.
     #!-(or x86 x86-64) (return-pc-header "return_pc_header" "return_pc_header" "lose")

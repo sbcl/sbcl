@@ -256,7 +256,7 @@
     (inst add-sub lip function (- (* simple-fun-code-offset n-word-bytes)
                                   fun-pointer-lowtag))
     (load-type type function (- fun-pointer-lowtag))
-    (inst cmp type simple-fun-header-widetag)
+    (inst cmp type simple-fun-widetag)
     (inst b :eq SIMPLE-FUN)
     (load-inline-constant lip '(:fixup closure-tramp :assembly-routine) lip)
     SIMPLE-FUN

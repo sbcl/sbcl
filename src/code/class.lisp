@@ -882,8 +882,8 @@ between the ~A definition and the ~A definition"
      (random-class) ; used for unknown type codes
 
      (function
-      :codes (#.sb!vm:closure-header-widetag
-              #.sb!vm:simple-fun-header-widetag)
+      :codes (#.sb!vm:closure-widetag
+              #.sb!vm:simple-fun-widetag)
       :state :read-only
       :prototype-form (function (lambda () 42)))
 

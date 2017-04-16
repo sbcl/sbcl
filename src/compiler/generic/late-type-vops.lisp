@@ -112,11 +112,11 @@
 
 (!define-type-vop fdefn-p (fdefn-widetag))
 
-(!define-type-vop closurep (closure-header-widetag))
+(!define-type-vop closurep (closure-widetag))
 
-(!define-type-vop simple-fun-p (simple-fun-header-widetag))
+(!define-type-vop simple-fun-p (simple-fun-widetag))
 
-(!define-type-vop funcallable-instance-p (funcallable-instance-header-widetag))
+(!define-type-vop funcallable-instance-p (funcallable-instance-widetag))
 
 (!define-type-vop array-header-p
   (simple-array-widetag

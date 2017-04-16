@@ -185,9 +185,9 @@
 
   code-header-widetag                       ;  26   2D  26   2D
 
-  simple-fun-header-widetag                 ;  2A   31  2A   31
-  closure-header-widetag                    ;  2E   35  2E   35
-  funcallable-instance-header-widetag       ;  32   39  32   39
+  simple-fun-widetag                        ;  2A   31  2A   31
+  closure-widetag                           ;  2E   35  2E   35
+  funcallable-instance-widetag              ;  32   39  32   39
 
   ;; x86[-64] does not have objects with this widetag,
   #!+(or x86 x86-64) unused00-widetag
@@ -269,10 +269,13 @@
 ))
 
 (defconstant-eqx +fun-header-widetags+
-    '#.(list funcallable-instance-header-widetag
-             simple-fun-header-widetag
-             closure-header-widetag)
+    '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)
   #'equal)
+
+;;; Don't use these. They're for Slime, ltk, Conium, hu.dwim.debug
+;;; and who-knows-what-else.
+(defconstant simple-fun-header-widetag simple-fun-widetag)
+(defconstant closure-header-widetag closure-widetag)
 
 ;;; the different vector subtypes
 (defenum ()

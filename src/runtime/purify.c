@@ -293,7 +293,7 @@ ptrans_func(lispobj thing, lispobj header)
      * Otherwise we have to do something strange, 'cause it is buried
      * inside a code object. */
 
-    if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG) {
+    if (widetag_of(header) == SIMPLE_FUN_WIDETAG) {
 
         /* We can only end up here if the code object has not been
          * scavenged, because if it had been scavenged, forwarding pointers
@@ -319,7 +319,7 @@ ptrans_func(lispobj thing, lispobj header)
          * space.  Closures can; they never change */
 
         lispobj *new = newspace_alloc
-            (nwords,(widetag_of(header)!=FUNCALLABLE_INSTANCE_HEADER_WIDETAG));
+            (nwords,(widetag_of(header)!=FUNCALLABLE_INSTANCE_WIDETAG));
 
         /* Copy it. */
         bcopy(old, new, nwords * sizeof(lispobj));
@@ -545,7 +545,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 gc_abort(); /* no code headers in static space */
                 break;
 
-              case SIMPLE_FUN_HEADER_WIDETAG:
+              case SIMPLE_FUN_WIDETAG:
               case RETURN_PC_HEADER_WIDETAG:
                 /* We should never hit any of these, 'cause they occur
                  * buried in the middle of code objects. */

@@ -97,7 +97,7 @@
            (when (typep obj 'class)
              (when (slot-boundp obj 'sb-pcl::%documentation)
                (clear-it (slot-value obj 'sb-pcl::%documentation)))))
-          (#.sb-vm:funcallable-instance-header-widetag
+          (#.sb-vm:funcallable-instance-widetag
            (when (typep obj 'standard-generic-function)
              (when (slot-boundp obj 'sb-pcl::%documentation)
                (clear-it (slot-value obj 'sb-pcl::%documentation)))))))

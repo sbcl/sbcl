@@ -2167,7 +2167,7 @@ scavenge_pinned_ranges()
         // Never invoke scavenger on a simple-fun, just code components.
         if (is_cons_half(header))
             scavenge(obj, 2);
-        else if (widetag_of(header) != SIMPLE_FUN_HEADER_WIDETAG)
+        else if (widetag_of(header) != SIMPLE_FUN_WIDETAG)
             scavtab[widetag_of(header)](obj, header);
     }
 }
@@ -2196,7 +2196,7 @@ wipe_nonpinned_words()
             lispobj* obj = native_pointer(key);
             // No need to check for is_cons_half() - it will be false
             // on a simple-fun header, and that's the correct answer.
-            if (widetag_of(*obj) != SIMPLE_FUN_HEADER_WIDETAG)
+            if (widetag_of(*obj) != SIMPLE_FUN_WIDETAG)
                 pinned_objects.keys[n_pins++] = (uword_t)obj;
         }
     }
@@ -2480,7 +2480,7 @@ update_page_write_prot(page_index_t page)
             int obj_gen = gen; // Make comparison fail if we fall through
             if (lowtag_of((lispobj)ptr) != FUN_POINTER_LOWTAG) {
                 obj_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
-            } else if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG) {
+            } else if (widetag_of(header) == SIMPLE_FUN_WIDETAG) {
                 lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate

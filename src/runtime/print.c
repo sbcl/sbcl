@@ -800,7 +800,7 @@ static void print_otherptr(lispobj obj)
                 print_slots(code_slots, count-1, ptr);
                 break;
 
-            case SIMPLE_FUN_HEADER_WIDETAG:
+            case SIMPLE_FUN_WIDETAG:
                 print_obj("code: ",
                           make_lispobj(native_pointer((lispobj)(ptr-1))
                                        -(HeaderValue(header)&0xFFFF),
@@ -815,12 +815,12 @@ static void print_otherptr(lispobj obj)
                 break;
 #endif
 
-            case CLOSURE_HEADER_WIDETAG:
+            case CLOSURE_WIDETAG:
                 print_slots(closure_slots,
                             count & SHORT_HEADER_MAX_WORDS, ptr);
                 break;
 
-            case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+            case FUNCALLABLE_INSTANCE_WIDETAG:
                 print_slots(funcallable_instance_slots,
                             count & SHORT_HEADER_MAX_WORDS, ptr);
                 break;

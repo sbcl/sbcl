@@ -143,7 +143,7 @@
     (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
       (inst nop)
-      (inst xor type simple-fun-header-widetag)
+      (inst xor type simple-fun-widetag)
       (inst beq type normal-fn)
       (inst addu lip function
             (- (ash simple-fun-code-offset word-shift)

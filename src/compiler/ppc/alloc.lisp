@@ -136,11 +136,11 @@
               (inst clrrwi. result csp-tn n-lowtag-bits)
               (inst addi csp-tn csp-tn alloc-size)
               (inst ori result result fun-pointer-lowtag)
-              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag)))
+              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag)))
             (progn
               (allocation result (pad-data-block size)
                           fun-pointer-lowtag :temp-tn temp :flag-tn pa-flag)
-              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))))
+              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag))))
         (storew temp result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 

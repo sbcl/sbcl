@@ -138,7 +138,7 @@
         (emit-label closure-tramp-fixup)
         (inst word (make-fixup 'closure-tramp :assembly-routine)))
       (load-type type function (- fun-pointer-lowtag))
-      (inst cmp type simple-fun-header-widetag)
+      (inst cmp type simple-fun-widetag)
       (inst mov :eq lip function)
       (inst load-from-label :ne lip lip closure-tramp-fixup)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)

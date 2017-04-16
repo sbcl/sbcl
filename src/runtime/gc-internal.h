@@ -96,7 +96,7 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
       do {                                                                  \
        struct simple_fun* fun_var = (struct simple_fun*)(_insts_+_offset_); \
        if (assertp)                                                         \
-         gc_assert(widetag_of(fun_var->header)==SIMPLE_FUN_HEADER_WIDETAG); \
+         gc_assert(widetag_of(fun_var->header)==SIMPLE_FUN_WIDETAG);        \
        guts ;                                                               \
        _offset_ = ((unsigned int*)_insts_)[index_var];                      \
       } while (++index_var < _nfuns_);                                      \
@@ -279,7 +279,7 @@ void promote_immobile_obj(lispobj*,int);
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer
 {
-  if (widetag_of(*pointer) == SIMPLE_FUN_HEADER_WIDETAG)
+  if (widetag_of(*pointer) == SIMPLE_FUN_WIDETAG)
     pointer = fun_code_header(pointer);
   return ((generation_index_t*)pointer)[3];
 }

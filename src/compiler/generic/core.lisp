@@ -138,7 +138,7 @@
              (error "Can't statically link to undefined function ~S" name))
             ((not (<= sb!vm:immobile-space-start addr sb!vm:immobile-space-end))
              (error "Can't statically link to ~S: code is movable" name))
-            ((neq (fun-subtype fun) sb!vm:simple-fun-header-widetag)
+            ((neq (fun-subtype fun) sb!vm:simple-fun-widetag)
              (error "Can't statically link to ~S: non-simple function" name))
             (t
              (sap-ref-word (int-sap addr)

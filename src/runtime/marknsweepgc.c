@@ -403,7 +403,7 @@ void update_immobile_nursery_bits()
 void
 promote_immobile_obj(lispobj *ptr, int rescan) // a native pointer
 {
-    if (widetag_of(*ptr) == SIMPLE_FUN_HEADER_WIDETAG)
+    if (widetag_of(*ptr) == SIMPLE_FUN_WIDETAG)
         ptr = fun_code_header(ptr);
     gc_assert(__immobile_obj_gen_bits(ptr) == from_space);
     int pointerish = !unboxed_obj_widetag_p(widetag_of(*ptr));
@@ -813,7 +813,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
 #endif
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
   case INSTANCE_HEADER_WIDETAG:
-  case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+  case FUNCALLABLE_INSTANCE_WIDETAG:
     layout[0] = instance_layout(obj);
     if (range_points_to_younger_p(layout, layout+1, gen, keep_gen, new_gen))
         return 1;
@@ -1543,7 +1543,7 @@ lispobj alloc_generic_function(lispobj slots)
                                    CEILING(GF_SIZE,2), // size
                                    0),
                          // 5 payload words following the header
-                         ((GF_SIZE-1)<<8) | FUNCALLABLE_INSTANCE_HEADER_WIDETAG,
+                         ((GF_SIZE-1)<<8) | FUNCALLABLE_INSTANCE_WIDETAG,
                          // KLUDGE: same page attributes as symbols,
                          // so use the same hint.
                          &symbol_page_hint);
@@ -1596,7 +1596,7 @@ static lispobj* defrag_search_varyobj_subspace(lispobj addr)
                 int widetag = widetag_of(*temp_obj);
                 gc_assert(widetag == CODE_HEADER_WIDETAG ||
                           widetag == FDEFN_WIDETAG ||
-                          widetag == FUNCALLABLE_INSTANCE_HEADER_WIDETAG);
+                          widetag == FUNCALLABLE_INSTANCE_WIDETAG);
                 return where;
             }
         }
@@ -1657,8 +1657,8 @@ struct layout* fix_object_layout(lispobj* obj)
     // but the latter only if the layout is in the header word.
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG
-              || widetag_of(*obj) == FUNCALLABLE_INSTANCE_HEADER_WIDETAG
-              || widetag_of(*obj) == CLOSURE_HEADER_WIDETAG);
+              || widetag_of(*obj) == FUNCALLABLE_INSTANCE_WIDETAG
+              || widetag_of(*obj) == CLOSURE_WIDETAG);
 #else
     gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG);
 #endif
@@ -1704,7 +1704,7 @@ static void fixup_space(lispobj* where, size_t n_words)
             lose("Unhandled widetag in fixup_space: %p\n", (void*)header_word);
           break;
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+        case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
         case INSTANCE_HEADER_WIDETAG:
           instance_scan(adjust_words, where+1,
@@ -1722,11 +1722,11 @@ static void fixup_space(lispobj* where, size_t n_words)
           if (((struct code*)where)->fixups)
               fixup_immobile_refs((struct code*)where);
           break;
-        case CLOSURE_HEADER_WIDETAG:
+        case CLOSURE_WIDETAG:
           where[1] = adjust_fun_entrypoint(where[1]);
           // FALLTHROUGH_INTENDED
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+        case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
           // skip the trampoline word at where[1]
           adjust_words(where+2, size-2);
@@ -1909,7 +1909,7 @@ void defrag_immobile_space(int* components)
     int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
                                       LAYOUT_ALIGN / N_WORD_BYTES);
     int n_fdefn_pages = calc_n_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
-    int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_HEADER_WIDETAG/4],
+    int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
                                    6); // KLUDGE
 #if !(defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER))
     gc_assert(n_fin_pages == 0);
@@ -2001,7 +2001,7 @@ void defrag_immobile_space(int* components)
               alloc_ptr = &layout_alloc_ptr;
               lowtag = INSTANCE_POINTER_LOWTAG;
               break;
-            case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+            case FUNCALLABLE_INSTANCE_WIDETAG:
               alloc_ptr = &fin_alloc_ptr;
               lowtag = FUN_POINTER_LOWTAG;
               break;
@@ -2051,7 +2051,7 @@ void defrag_immobile_space(int* components)
                                         (char*)new - (char*)obj,
                                         (struct fdefn*)obj);
                 break;
-            case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+            case FUNCALLABLE_INSTANCE_WIDETAG:
                 tempspace_addr(new)[1] = (lispobj)(new + 4);
                 break;
             }

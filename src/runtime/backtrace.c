@@ -207,7 +207,7 @@ print_entry_points (struct code *code)
 {
     int n_funs = code_n_funs(code);
     for_each_simple_fun(index, fun, code, 0, {
-        if (widetag_of(fun->header) != SIMPLE_FUN_HEADER_WIDETAG) {
+        if (widetag_of(fun->header) != SIMPLE_FUN_WIDETAG) {
             printf("%p: bogus function entry", fun);
             return;
         }
@@ -267,7 +267,7 @@ code_pointer(lispobj object)
         case CODE_HEADER_WIDETAG:
             break;
         case RETURN_PC_HEADER_WIDETAG:
-        case SIMPLE_FUN_HEADER_WIDETAG:
+        case SIMPLE_FUN_WIDETAG:
             len = HEADER_LENGTH(header);
             if (len == 0)
                 headerp = NULL;
