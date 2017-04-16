@@ -165,6 +165,7 @@
 ;; and simple vector of T to SIMPLE-VECTOR-T. Just because CL says that
 ;; SIMPLE-VECTOR means the latter doesn't make it right for SBCL internals.
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defenum (;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
           ;; a long, horrible death.  --njf, 2004-08-09
@@ -265,7 +266,13 @@
   complex-bit-vector-widetag                ;  EA   F5  E2   ED
   complex-vector-widetag                    ;  EE   F9  E6   F1
   complex-array-widetag                     ;  F2   FD  EA   F5
-)
+))
+
+(defconstant-eqx +fun-header-widetags+
+    '#.(list funcallable-instance-header-widetag
+             simple-fun-header-widetag
+             closure-header-widetag)
+  #'equal)
 
 ;;; the different vector subtypes
 (defenum ()

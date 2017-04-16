@@ -438,10 +438,7 @@
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
 
-(defknown fun-subtype (function)
-  (member #.sb!vm:simple-fun-header-widetag
-          #.sb!vm:closure-header-widetag
-          #.sb!vm:funcallable-instance-header-widetag)
+(defknown fun-subtype (function) (member . #.sb!vm::+fun-header-widetags+)
   (flushable))
 
 (defknown make-fdefn (t) fdefn (flushable movable))

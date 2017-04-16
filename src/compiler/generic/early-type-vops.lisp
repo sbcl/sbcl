@@ -14,11 +14,6 @@
   (list unbound-marker-widetag character-widetag
         #!+64-bit single-float-widetag))
 
-(defparameter *fun-header-widetags*
-  (list funcallable-instance-header-widetag
-        simple-fun-header-widetag
-        closure-header-widetag))
-
 ;; Given a list of widetags in HEADERS, compress into a minimal list of ranges
 ;; and/or singletons that should be tested.
 ;; FIXME: At present the "is it effectively a one-sided test" is re-implemented
@@ -105,8 +100,8 @@
                        (remove single-float-widetag *immediate-types*)
                        *immediate-types*)
                    :test #'eql))
-         (function-p (if (intersection headers *fun-header-widetags*)
-                         (if (subsetp headers *fun-header-widetags*)
+         (function-p (if (intersection headers +fun-header-widetags+)
+                         (if (subsetp headers +fun-header-widetags+)
                              t
                              (error "can't test for mix of function subtypes ~
                                      and normal header types"))

@@ -140,12 +140,8 @@
           (setf (aref a (ash widetag -2))
                 (case widetag
                   (#.instance-header-widetag instance-pointer-lowtag)
-                  ((#.funcallable-instance-header-widetag
-                    #.closure-header-widetag
-                    #.simple-fun-header-widetag)
-                   fun-pointer-lowtag)
-                  (t
-                   other-pointer-lowtag))))))
+                  (#.+fun-header-widetags+ fun-pointer-lowtag)
+                  (t other-pointer-lowtag))))))
     (let ((contents (format nil "~{0x~x,~} " (coerce a 'list))))
       (format stream
               "unsigned char lowtag_for_widetag[64] = {~{~%  ~A~}~%};~%"
