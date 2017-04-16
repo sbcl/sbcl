@@ -810,7 +810,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-            case RETURN_PC_HEADER_WIDETAG:
+            case RETURN_PC_WIDETAG:
                 print_obj("code: ", obj - (count * 4));
                 break;
 #endif

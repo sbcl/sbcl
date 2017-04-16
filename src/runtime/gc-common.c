@@ -329,7 +329,7 @@ size_code_header(lispobj *where)
          + code_instruction_words(((struct code *)where)->code_size);
 }
 
-#ifdef RETURN_PC_HEADER_WIDETAG
+#ifdef RETURN_PC_WIDETAG
 static sword_t
 scav_return_pc_header(lispobj *where, lispobj object)
 {
@@ -350,7 +350,7 @@ trans_return_pc_header(lispobj object)
 
     return ((lispobj) LOW_WORD(ncode) + offset) | OTHER_POINTER_LOWTAG;
 }
-#endif /* RETURN_PC_HEADER_WIDETAG */
+#endif /* RETURN_PC_WIDETAG */
 
 /* On the 386, closures hold a pointer to the raw address instead of the
  * function object, so we can use CALL [$FDEFN+const] to invoke
@@ -1458,7 +1458,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
          * need to check for it. -- AB, 2010-Jun-04 */
         if (lowtag_of(pointer) == OTHER_POINTER_LOWTAG) {
             lispobj *potential_lra = native_pointer(pointer);
-            if ((widetag_of(potential_lra[0]) == RETURN_PC_HEADER_WIDETAG) &&
+            if ((widetag_of(potential_lra[0]) == RETURN_PC_WIDETAG) &&
                 ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
                 return 1; /* It's as good as we can verify. */
             }

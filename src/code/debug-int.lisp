@@ -973,7 +973,7 @@ register."
             (let ((widetag (widetag-of object)))
               (cond ((= widetag sb!vm:code-header-widetag)
                      object)
-                    ((= widetag sb!vm:return-pc-header-widetag)
+                    ((= widetag sb!vm:return-pc-widetag)
                      (lra-code-header object))
                     (t
                      nil))))))))
@@ -3307,7 +3307,7 @@ register."
             ;; but its position and value depend on the offsets
             ;; and alignment of code object slots.
             (sap-ref-word dst-start (- sb!vm:n-word-bits))
-            (+ sb!vm:return-pc-header-widetag
+            (+ sb!vm:return-pc-widetag
                (logandc2 (+ code-constants-offset
                             bogus-lra-constants
                             2)

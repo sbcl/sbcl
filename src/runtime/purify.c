@@ -436,7 +436,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case CODE_HEADER_WIDETAG:
         return ptrans_code(thing);
 
-      case RETURN_PC_HEADER_WIDETAG:
+      case RETURN_PC_WIDETAG:
         return ptrans_returnpc(thing, header);
 
       case FDEFN_WIDETAG:
@@ -546,7 +546,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 break;
 
               case SIMPLE_FUN_WIDETAG:
-              case RETURN_PC_HEADER_WIDETAG:
+              case RETURN_PC_WIDETAG:
                 /* We should never hit any of these, 'cause they occur
                  * buried in the middle of code objects. */
                 gc_abort();

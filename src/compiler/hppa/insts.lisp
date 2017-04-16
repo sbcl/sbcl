@@ -1570,7 +1570,7 @@
   (:cost 0)
   (:delay 0)
   (:emitter
-   (emit-header-data segment return-pc-header-widetag)))
+   (emit-header-data segment return-pc-widetag)))
 
 
 (defun emit-compute-inst (segment vop src label temp dst calc)

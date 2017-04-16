@@ -266,7 +266,7 @@ code_pointer(lispobj object)
     switch (type) {
         case CODE_HEADER_WIDETAG:
             break;
-        case RETURN_PC_HEADER_WIDETAG:
+        case RETURN_PC_WIDETAG:
         case SIMPLE_FUN_WIDETAG:
             len = HEADER_LENGTH(header);
             if (len == 0)

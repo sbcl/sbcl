@@ -534,7 +534,7 @@
 
 (define-instruction lra-header-word (segment)
   (:emitter
-   (emit-header-data segment return-pc-header-widetag)))
+   (emit-header-data segment return-pc-widetag)))
 
 ;;;; Addressing mode 1 support
 

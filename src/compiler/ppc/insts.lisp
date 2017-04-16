@@ -2005,7 +2005,7 @@
   :pinned
   (:delay 0)
   (:emitter
-   (emit-header-data segment return-pc-header-widetag)))
+   (emit-header-data segment return-pc-widetag)))
 
 
 ;;;; Instructions for converting between code objects, functions, and lras.

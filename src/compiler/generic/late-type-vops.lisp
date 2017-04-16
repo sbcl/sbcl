@@ -108,7 +108,7 @@
 
 (!define-type-vop code-component-p (code-header-widetag))
 
-#!-(or x86 x86-64) (!define-type-vop lra-p (return-pc-header-widetag))
+#!-(or x86 x86-64) (!define-type-vop lra-p (return-pc-widetag))
 
 (!define-type-vop fdefn-p (fdefn-widetag))
 

@@ -192,7 +192,7 @@
   ;; x86[-64] does not have objects with this widetag,
   #!+(or x86 x86-64) unused00-widetag
   #!-(or x86 x86-64)
-  return-pc-header-widetag                  ;  36   3D  36   3D
+  return-pc-widetag                         ;  36   3D  36   3D
 
   value-cell-widetag                        ;  3A   41  3A   41
   symbol-widetag                            ;  3E   45  3E   45

@@ -191,7 +191,7 @@
   ; either use 16 or 20, finetune it...
   (inst addi 19 nl0 lra) ; then setup the new LRA (rest of this routine after branch)
   (inst bv lip :nullify t)
-  (inst word return-pc-header-widetag)
+  (inst word return-pc-widetag)
   ; ok, we are back from the lisp-call, lets return to c
   ; FIX-lav: steal more stuff from call_into_lisp here, ideally the whole thing
   (inst move ocfp-tn csp-tn) ; dont think we should ever get here

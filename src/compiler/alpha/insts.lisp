@@ -647,7 +647,7 @@
 (define-instruction lra-header-word (segment)
   (:cost 0)
   (:emitter
-   (emit-header-data segment return-pc-header-widetag)))
+   (emit-header-data segment return-pc-widetag)))
 
 (defun emit-compute-inst (segment vop dst src label temp calc)
   (declare (ignore temp))

@@ -51,7 +51,7 @@
     (funcallable-instance ,(or #!+compact-instance-header "funinstance" "short_boxed")
                                  "short_boxed")
     ;; These have a scav and trans function, but no size function.
-    #!-(or x86 x86-64) (return-pc-header "return_pc_header" "return_pc_header" "lose")
+    #!-(or x86 x86-64) (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
     (symbol "tiny_boxed")
