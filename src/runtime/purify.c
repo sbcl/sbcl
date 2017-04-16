@@ -565,7 +565,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 count = pscav_fdefn((struct fdefn *)addr);
                 break;
 
-              case INSTANCE_HEADER_WIDETAG:
+              case INSTANCE_WIDETAG:
                 {
                     struct layout *layout
                         = (struct layout *)native_pointer(instance_layout(addr));

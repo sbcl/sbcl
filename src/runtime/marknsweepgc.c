@@ -812,7 +812,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
 #endif
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-  case INSTANCE_HEADER_WIDETAG:
+  case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
     layout[0] = instance_layout(obj);
     if (range_points_to_younger_p(layout, layout+1, gen, keep_gen, new_gen))
@@ -1204,7 +1204,7 @@ void gc_init_immobile()
 static inline int immobile_obj_spacing(lispobj header_word, lispobj *obj,
                                        int actual_size)
 {
-    if (widetag_of(header_word) == INSTANCE_HEADER_WIDETAG &&
+    if (widetag_of(header_word) == INSTANCE_WIDETAG &&
         instance_layout(obj) == LAYOUT_OF_LAYOUT)
         return LAYOUT_ALIGN / N_WORD_BYTES;
     else
@@ -1242,7 +1242,7 @@ void immobile_space_coreparse(uword_t address, uword_t len)
         low_page_index_t last_page = 0;
         for ( ; obj < limit ; obj += n_words ) {
             n_words = sizetab[widetag_of(*obj)](obj);
-            if (obj[1] == 0 && (obj[0] == INSTANCE_HEADER_WIDETAG ||
+            if (obj[1] == 0 && (obj[0] == INSTANCE_WIDETAG ||
                                 obj[0] == 0)) {
                 if (obj[0]) {
                     // Round up to the next immobile page.
@@ -1371,7 +1371,7 @@ void prepare_immobile_space_for_save()
     if ((lispobj)limit & (IMMOBILE_CARD_BYTES-1)) { // Last page is partially used.
         gc_assert(*limit == SIMPLE_ARRAY_FIXNUM_WIDETAG);
         // Write an otherwise illegal object at the free pointer.
-        limit[0] = INSTANCE_HEADER_WIDETAG; // 0 payload length
+        limit[0] = INSTANCE_WIDETAG; // 0 payload length
         limit[1] = 0; // no layout
     }
 }
@@ -1481,7 +1481,7 @@ lispobj alloc_layout(lispobj slots)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                          (LAYOUT_OF_LAYOUT << 32) |
 #endif
-                         (LAYOUT_SIZE-1)<<8 | INSTANCE_HEADER_WIDETAG,
+                         (LAYOUT_SIZE-1)<<8 | INSTANCE_WIDETAG,
                          &layout_page_hint);
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     l->slots[0] = LAYOUT_OF_LAYOUT;
@@ -1656,11 +1656,11 @@ struct layout* fix_object_layout(lispobj* obj)
     // This works on instances, funcallable instances (and/or closures)
     // but the latter only if the layout is in the header word.
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG
+    gc_assert(widetag_of(*obj) == INSTANCE_WIDETAG
               || widetag_of(*obj) == FUNCALLABLE_INSTANCE_WIDETAG
               || widetag_of(*obj) == CLOSURE_WIDETAG);
 #else
-    gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG);
+    gc_assert(widetag_of(*obj) == INSTANCE_WIDETAG);
 #endif
     lispobj layout = instance_layout(obj);
     if (layout == 0) return 0;
@@ -1670,7 +1670,7 @@ struct layout* fix_object_layout(lispobj* obj)
     }
     struct layout* native_layout = (struct layout*)
         tempspace_addr(native_pointer(layout));
-    gc_assert(widetag_of(native_layout->header) == INSTANCE_HEADER_WIDETAG);
+    gc_assert(widetag_of(native_layout->header) == INSTANCE_WIDETAG);
     gc_assert(instance_layout((lispobj*)native_layout) == LAYOUT_OF_LAYOUT);
     return native_layout;
 }
@@ -1706,7 +1706,7 @@ static void fixup_space(lispobj* where, size_t n_words)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
-        case INSTANCE_HEADER_WIDETAG:
+        case INSTANCE_WIDETAG:
           instance_scan(adjust_words, where+1,
                         instance_length(header_word) | 1,
                         fix_object_layout(where)->bitmap);
@@ -1855,15 +1855,15 @@ static char* compute_defrag_start_address()
     // For technical reasons, objects on the first few pages created by genesis
     // must never move at all. So figure out where the end of that subspace is.
     lispobj* obj = (lispobj*)IMMOBILE_SPACE_START;
-    gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG);
+    gc_assert(widetag_of(*obj) == INSTANCE_WIDETAG);
     while (instance_layout(obj) != LAYOUT_OF_PACKAGE) {
        obj = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-       gc_assert(widetag_of(*obj) == INSTANCE_HEADER_WIDETAG);
+       gc_assert(widetag_of(*obj) == INSTANCE_WIDETAG);
     }
     // Now find a page that does NOT have a package.
     do {
         obj = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-    } while (widetag_of(*obj) == INSTANCE_HEADER_WIDETAG
+    } while (widetag_of(*obj) == INSTANCE_WIDETAG
              && instance_layout(obj) == LAYOUT_OF_PACKAGE);
     return (char*)obj;
 }
@@ -1902,11 +1902,11 @@ void defrag_immobile_space(int* components)
             }
         }
     }
-    gc_assert(obj_type_histo[INSTANCE_HEADER_WIDETAG/4]);
+    gc_assert(obj_type_histo[INSTANCE_WIDETAG/4]);
 
     // Calculate space needed for fixedobj pages after defrag.
     // page order is: layouts, fdefns, GFs, symbols
-    int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
+    int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_WIDETAG/4],
                                       LAYOUT_ALIGN / N_WORD_BYTES);
     int n_fdefn_pages = calc_n_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
     int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
@@ -1953,7 +1953,7 @@ void defrag_immobile_space(int* components)
     varyobj_tempspace.start = calloc(varyobj_tempspace.n_bytes, 1);
 
     printf("%d+%d+%d+%d objects... ",
-           obj_type_histo[INSTANCE_HEADER_WIDETAG/4],
+           obj_type_histo[INSTANCE_WIDETAG/4],
            obj_type_histo[FDEFN_WIDETAG/4],
            (sym_kind_histo[0]+sym_kind_histo[1]+
             sym_kind_histo[2]+sym_kind_histo[3]),
@@ -1997,7 +1997,7 @@ void defrag_immobile_space(int* components)
             int lowtag = OTHER_POINTER_LOWTAG;
             int widetag = widetag_of(word);
             switch (widetag) {
-            case INSTANCE_HEADER_WIDETAG:
+            case INSTANCE_WIDETAG:
               alloc_ptr = &layout_alloc_ptr;
               lowtag = INSTANCE_POINTER_LOWTAG;
               break;

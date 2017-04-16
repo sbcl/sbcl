@@ -3151,7 +3151,7 @@ verify_range(lispobj *start, size_t words)
                     /* boxed or partially boxed objects */
             // FIXME: x86-64 can have partially unboxed FINs. The raw words
             // are at the moment valid fixnums by blind luck.
-            case INSTANCE_HEADER_WIDETAG:
+            case INSTANCE_WIDETAG:
                 if (instance_layout(start)) {
                     sword_t nslots = instance_length(thing) | 1;
                     instance_scan(verify_range, start+1, nslots,

@@ -44,7 +44,7 @@
        :cas-trans %compare-and-swap-cdr))
 
 (!define-primitive-object (instance :lowtag instance-pointer-lowtag
-                                   :widetag instance-header-widetag
+                                   :widetag instance-widetag
                                    :alloc-trans %make-instance)
   (slots :rest-p t))
 

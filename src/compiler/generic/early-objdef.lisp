@@ -200,7 +200,7 @@
   sap-widetag                               ;  46   4D  46   4D
   unbound-marker-widetag                    ;  4A   51  4A   51
   weak-pointer-widetag                      ;  4E   55  4E   55
-  instance-header-widetag                   ;  52   59  52   59
+  instance-widetag                          ;  52   59  52   59
   fdefn-widetag                             ;  56   5D  56   5D
 
   no-tls-value-marker-widetag               ;  5A   61  5A   61

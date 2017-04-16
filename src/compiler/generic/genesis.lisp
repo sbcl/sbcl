@@ -625,7 +625,7 @@
                        (logior layout-length
                                #!+compact-instance-header
                                (if layout (ash (descriptor-bits layout) 24) 0))
-                       sb!vm:instance-header-widetag)
+                       sb!vm:instance-widetag)
     #!-compact-instance-header
     (write-wordindexed des sb!vm:instance-slots-offset layout)
     des))
@@ -3812,7 +3812,7 @@ initially undefined function references:~2%")
         ;; objects that look like conses (due to the tail of 0 words).
         (let ((des (allocate-object *immobile-varyobj* 1 ; 1 word in total
                                     sb!vm:instance-pointer-lowtag nil)))
-          (write-wordindexed/raw des 0 sb!vm:instance-header-widetag)
+          (write-wordindexed/raw des 0 sb!vm:instance-widetag)
           (write-wordindexed/raw des sb!vm:instance-slots-offset 0))
         (cold-set 'sb!vm:*immobile-space-free-pointer*
                   (make-random-descriptor

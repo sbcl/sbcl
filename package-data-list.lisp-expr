@@ -3038,7 +3038,7 @@ structure representations"
                                    "SORT-INLINE-CONSTANTS"
                                    "EMIT-INLINE-CONSTANT")
                "INSTANCE-DATA-START"
-               "INSTANCE-HEADER-WIDETAG" "INSTANCE-POINTER-LOWTAG"
+               "INSTANCE-WIDETAG" "INSTANCE-POINTER-LOWTAG"
                "INSTANCE-SLOTS-OFFSET" "INSTANCE-USAGE"
                "INTERIOR-REG-SC-NUMBER" "INTERNAL-ERROR-ARGS"
                "INTERRUPTED-FLAG"

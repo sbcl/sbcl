@@ -65,7 +65,7 @@
       (make-room-info :name 'code
                       :kind :code))
 
-(setf (svref *meta-room-info* instance-header-widetag)
+(setf (svref *meta-room-info* instance-widetag)
       (make-room-info :name 'instance
                       :kind :instance))
 
@@ -607,7 +607,7 @@
     (map-allocated-objects
      (lambda (obj type size)
        (declare (optimize (speed 3)))
-       (when (eql type instance-header-widetag)
+       (when (eql type instance-widetag)
          (incf total-objects)
          (let* ((classoid (layout-classoid (%instance-layout obj)))
                 (found (gethash classoid totals))
@@ -725,7 +725,7 @@
                     (fresh-line stream)
                     (let ((str (write-to-string obj :level 5 :length 10
                                                 :pretty nil)))
-                      (unless (eql type instance-header-widetag)
+                      (unless (eql type instance-widetag)
                         (format stream "~S: " (type-of obj)))
                       (format stream "~A~%"
                               (subseq str 0 (min (length str) 60))))))))))

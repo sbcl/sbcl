@@ -779,7 +779,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             // FIXME: This case looks unreachable. print_struct() does it
-            case INSTANCE_HEADER_WIDETAG:
+            case INSTANCE_WIDETAG:
                 NEWLINE_OR_RETURN;
                 count &= SHORT_HEADER_MAX_WORDS;
                 printf("length = %ld", (long) count);

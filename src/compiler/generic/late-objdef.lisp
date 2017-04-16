@@ -59,7 +59,7 @@
     (sap "unboxed")
     (unbound-marker "immediate")
     (weak-pointer "lose" "weak_pointer" "boxed")
-    (instance-header "instance" "instance" "short_boxed")
+    (instance "instance" "instance" "short_boxed")
     (fdefn ,(or #!+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
 
     (no-tls-value-marker "immediate")
@@ -139,7 +139,7 @@
         (unless (eq scav "immediate")
           (setf (aref a (ash widetag -2))
                 (case widetag
-                  (#.instance-header-widetag instance-pointer-lowtag)
+                  (#.instance-widetag instance-pointer-lowtag)
                   (#.+fun-header-widetags+ fun-pointer-lowtag)
                   (t other-pointer-lowtag))))))
     (let ((contents (format nil "~{0x~x,~} " (coerce a 'list))))

@@ -1184,7 +1184,7 @@ scav_vector (lispobj *where, lispobj object)
     }
     hash_table = (struct hash_table *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
-    if (widetag_of(hash_table->header) != INSTANCE_HEADER_WIDETAG) {
+    if (widetag_of(hash_table->header) != INSTANCE_WIDETAG) {
         lose("hash table not instance (%x at %x)\n",
              hash_table->header,
              hash_table);

@@ -93,7 +93,7 @@
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let ((f (sb-kernel:%code-entry-point obj i)))
                (clear-it (sb-kernel:%simple-fun-doc f)))))
-          (#.sb-vm:instance-header-widetag
+          (#.sb-vm:instance-widetag
            (when (typep obj 'class)
              (when (slot-boundp obj 'sb-pcl::%documentation)
                (clear-it (slot-value obj 'sb-pcl::%documentation)))))
