@@ -140,7 +140,7 @@
   (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-    (with-fixed-allocation (result pa-flag value-cell-header-widetag
+    (with-fixed-allocation (result pa-flag value-cell-widetag
                             value-cell-size :stack-allocate-p stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 

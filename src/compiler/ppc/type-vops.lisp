@@ -184,7 +184,7 @@
            (is-symbol-label (if not-p drop-thru target)))
       (inst cmpw value null-tn)
       (inst beq is-symbol-label)
-      (test-type value target not-p (symbol-header-widetag) :temp temp)
+      (test-type value target not-p (symbol-widetag) :temp temp)
       (emit-label drop-thru))))
 
 (define-vop (consp type-predicate)

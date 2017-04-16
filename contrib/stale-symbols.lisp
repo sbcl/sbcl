@@ -66,7 +66,7 @@
        (declare (optimize (safety 0))
                 (ignore size))
        (block mapper
-         (when (eql type sb-vm:symbol-header-widetag)
+         (when (eql type sb-vm:symbol-widetag)
            (ignore-errors
              (let ((refs (let ((res nil)
                                (count 0))

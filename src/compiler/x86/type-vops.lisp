@@ -337,7 +337,7 @@
       (inst jmp :e is-symbol-label)
       (inst test al-tn other-pointer-lowtag)
       (inst jmp :nz (if not-p target drop-thru))
-      (inst cmp widetag-tn symbol-header-widetag)
+      (inst cmp widetag-tn symbol-widetag)
       (inst jmp (if not-p :ne :e) target))
     DROP-THRU))
 

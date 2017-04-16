@@ -992,8 +992,8 @@ Experimental: interface subject to change."
            (call (symbol-package object))))
         (sb-kernel::random-class
          (case (sb-kernel:widetag-of object)
-           (#.sb-vm::value-cell-header-widetag
-            (call (sb-kernel::value-cell-ref object)))
+           (#.sb-vm:value-cell-widetag
+            (call (sb-kernel:value-cell-ref object)))
            (t
             (warn "~&MAP-ROOT: Unknown widetag ~S: ~S~%"
                   (sb-kernel:widetag-of object) object)))))))

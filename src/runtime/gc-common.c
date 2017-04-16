@@ -1126,7 +1126,7 @@ scav_hash_table_entries (struct hash_table *hash_table)
 
     empty_symbol = kv_vector[1];
     /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
-    if (widetag_of(*native_pointer(empty_symbol)) != SYMBOL_HEADER_WIDETAG) {
+    if (widetag_of(*native_pointer(empty_symbol)) != SYMBOL_WIDETAG) {
         lose("not a symbol where empty-hash-table-slot symbol expected: %x\n",
              *native_pointer(empty_symbol));
     }

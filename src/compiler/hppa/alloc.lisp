@@ -183,7 +183,7 @@
   (:info stack-allocate-p)
   (:generator 10
     (with-fixed-allocation
-        (result nil temp value-cell-header-widetag value-cell-size stack-allocate-p)
+        (result nil temp value-cell-widetag value-cell-size stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.

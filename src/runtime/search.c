@@ -57,7 +57,7 @@ boolean search_for_symbol(char *name, lispobj **start, int *count)
     struct vector *symbol_name;
     int namelen = strlen(name);
 
-    while (search_for_type(SYMBOL_HEADER_WIDETAG, start, count)) {
+    while (search_for_type(SYMBOL_WIDETAG, start, count)) {
         symbol = (struct symbol *)native_pointer((lispobj)*start);
         if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
             symbol_name = (struct vector *)native_pointer(symbol->name);

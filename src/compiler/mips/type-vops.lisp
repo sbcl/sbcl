@@ -179,7 +179,7 @@
 ;;; Because of our LOWTAG representation, SYMBOLP and CONSP are
 ;;; slightly more complex:
 ;;;
-;;; * SYMBOLP is true if the object has SYMBOL-HEADER-WIDETAG or is EQ
+;;; * SYMBOLP is true if the object has SYMBOL-WIDETAG or is EQ
 ;;; to NIL;
 ;;;
 ;;; * CONSP is true if the object has LIST-POINTER-LOWTAG and is not
@@ -191,7 +191,7 @@
   (:translate symbolp)
   (:generator 12
     (inst beq value null-tn (if not-p drop-thru target))
-    (test-type value target not-p (symbol-header-widetag) :temp temp)
+    (test-type value target not-p (symbol-widetag) :temp temp)
     DROP-THRU))
 
 (define-vop (consp type-predicate)

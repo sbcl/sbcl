@@ -193,8 +193,8 @@
   #!-(or x86 x86-64)
   return-pc-header-widetag                  ;  36   3D  36   3D
 
-  value-cell-header-widetag                 ;  3A   41  3A   41
-  symbol-header-widetag                     ;  3E   45  3E   45
+  value-cell-widetag                        ;  3A   41  3A   41
+  symbol-widetag                            ;  3E   45  3E   45
   character-widetag                         ;  42   49  42   49
   sap-widetag                               ;  46   4D  46   4D
   unbound-marker-widetag                    ;  4A   51  4A   51

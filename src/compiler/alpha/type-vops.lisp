@@ -174,7 +174,7 @@
   (:generator 12
     (inst cmpeq value null-tn temp)
     (inst bne temp (if not-p drop-thru target))
-    (test-type value target not-p (symbol-header-widetag) :temp temp)
+    (test-type value target not-p (symbol-widetag) :temp temp)
     DROP-THRU))
 
 (define-vop (consp type-predicate)

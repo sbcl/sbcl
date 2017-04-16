@@ -380,7 +380,7 @@
     (let ((is-symbol-label (if not-p DROP-THRU target)))
       (inst cmp value nil-value)
       (inst jmp :e is-symbol-label)
-      (test-type value target not-p (symbol-header-widetag)))
+      (test-type value target not-p (symbol-widetag)))
     DROP-THRU))
 
 (define-vop (consp type-predicate)

@@ -56,7 +56,7 @@
   (let ((code (fun-code-header (%fun-fun fun))))
     (loop for i from sb-vm:code-constants-offset below (code-header-words code)
           for c = (code-header-ref code i)
-          for value = (if (= (widetag-of c) sb-vm:value-cell-header-widetag)
+          for value = (if (= (widetag-of c) sb-vm:value-cell-widetag)
                           (value-cell-ref c)
                           c)
           when (typep value type)

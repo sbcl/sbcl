@@ -1677,7 +1677,7 @@ variable: an unreadable object representing the error is printed instead.")
         (#.sb!vm:other-pointer-lowtag
           (let ((widetag (widetag-of object)))
             (case widetag
-              (#.sb!vm:value-cell-header-widetag
+              (#.sb!vm:value-cell-widetag
                (write-string "value cell " stream)
                (output-object (value-cell-ref object) stream))
               (t

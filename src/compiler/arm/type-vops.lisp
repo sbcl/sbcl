@@ -327,7 +327,7 @@
            (is-symbol-label (if not-p drop-thru target)))
       (inst cmp value null-tn)
       (inst b :eq is-symbol-label)
-      (test-type value target not-p (symbol-header-widetag) :temp temp)
+      (test-type value target not-p (symbol-widetag) :temp temp)
       (emit-label drop-thru))))
 
 (define-vop (consp type-predicate)

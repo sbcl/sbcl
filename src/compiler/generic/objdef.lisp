@@ -256,7 +256,7 @@
   (info :rest-p t))
 
 (!define-primitive-object (value-cell :lowtag other-pointer-lowtag
-                                     :widetag value-cell-header-widetag
+                                     :widetag value-cell-widetag
                                      ;; FIXME: We also have an explicit VOP
                                      ;; for this. Is this needed as well?
                                      :alloc-trans make-value-cell)
@@ -306,7 +306,7 @@
 ;;;; symbols
 
 (!define-primitive-object (symbol :lowtag other-pointer-lowtag
-                                 :widetag symbol-header-widetag
+                                 :widetag symbol-widetag
                                  :alloc-trans %%make-symbol
                                  :type symbol)
 

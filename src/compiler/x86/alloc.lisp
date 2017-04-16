@@ -190,7 +190,7 @@
   (:node-var node)
   (:generator 10
     (with-fixed-allocation
-        (result value-cell-header-widetag value-cell-size node stack-allocate-p)
+        (result value-cell-widetag value-cell-size node stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; automatic allocators for primitive objects

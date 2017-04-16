@@ -167,7 +167,7 @@ print_entry_name (lispobj name)
         putchar(')');
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
         lispobj *object = native_pointer(name);
-        if (widetag_of(*object) == SYMBOL_HEADER_WIDETAG) {
+        if (widetag_of(*object) == SYMBOL_WIDETAG) {
             struct symbol *symbol = (struct symbol *) object;
             if (symbol->package != NIL) {
                 struct package *pkg

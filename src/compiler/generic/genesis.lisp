@@ -941,7 +941,7 @@ core and return a descriptor to it."
 (defun allocate-symbol (name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
   (let ((symbol (allocate-header+object gspace (1- sb!vm:symbol-size)
-                                        sb!vm:symbol-header-widetag)))
+                                        sb!vm:symbol-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
     (write-wordindexed symbol sb!vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-info-slot *nil-descriptor*)
@@ -1596,7 +1596,7 @@ core and return a descriptor to it."
                        1
                        (make-other-immediate-descriptor
                         0
-                        sb!vm:symbol-header-widetag))
+                        sb!vm:symbol-widetag))
     (write-wordindexed des
                        (+ 1 sb!vm:symbol-value-slot)
                        result)
@@ -2782,7 +2782,7 @@ core and return a descriptor to it."
                (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
               (#.sb!vm:other-pointer-lowtag
                (ecase (logand (descriptor-bits (read-memory x)) sb!vm:widetag-mask)
-                   (#.sb!vm:symbol-header-widetag
+                   (#.sb!vm:symbol-widetag
                     (if (cold-null (read-wordindexed x sb!vm:symbol-package-slot))
                         (get-or-make-uninterned-symbol
                          (base-string-from-core
@@ -3901,7 +3901,7 @@ initially undefined function references:~2%")
        (let ((widetag (logand (descriptor-bits (read-memory x))
                               sb!vm:widetag-mask)))
          (ecase widetag
-           (#.sb!vm:symbol-header-widetag
+           (#.sb!vm:symbol-widetag
             (if strictp
                 (warm-symbol x)
                 (or (gethash (descriptor-bits x) *cold-symbols*) ; first try

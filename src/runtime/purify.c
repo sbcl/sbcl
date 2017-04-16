@@ -420,11 +420,11 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case COMPLEX_ARRAY_WIDETAG:
         return ptrans_boxed(thing, header, constant);
 
-      case VALUE_CELL_HEADER_WIDETAG:
+      case VALUE_CELL_WIDETAG:
       case WEAK_POINTER_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
-      case SYMBOL_HEADER_WIDETAG:
+      case SYMBOL_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
 #include "genesis/specialized-vectors.inc"

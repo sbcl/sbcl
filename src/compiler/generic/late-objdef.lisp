@@ -53,8 +53,8 @@
     ;; These have a scav and trans function, but no size function.
     #!-(or x86 x86-64) (return-pc-header "return_pc_header" "return_pc_header" "lose")
 
-    (value-cell-header "boxed")
-    (symbol-header "tiny_boxed")
+    (value-cell "boxed")
+    (symbol "tiny_boxed")
     (character "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")

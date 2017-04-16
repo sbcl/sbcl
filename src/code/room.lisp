@@ -364,7 +364,7 @@
        ;; Static space starts with NIL, which requires special
        ;; handling, as the header and alignment are slightly off.
        (multiple-value-bind (start end) (space-bounds space)
-         (funcall fun nil symbol-header-widetag (* 8 n-word-bytes))
+         (funcall fun nil symbol-widetag (* 8 n-word-bytes))
          (map-objects-in-range fun
                                (%make-lisp-obj (+ (* 8 n-word-bytes)
                                                   (sap-int start)))
@@ -712,7 +712,7 @@
                               (if dinfo
                                   (sb!c::compiled-debug-info-name dinfo)
                                   "No debug info."))))
-                   (#.symbol-header-widetag
+                   (#.symbol-widetag
                     (format stream "~&~S~%" obj))
                    (#.list-pointer-lowtag
                     (unless (gethash obj printed-conses)

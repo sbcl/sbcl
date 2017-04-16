@@ -868,7 +868,7 @@ between the ~A definition and the ~A definition"
      (character :codes (#.sb!vm:character-widetag)
                 :translation (character-set)
                 :prototype-form (code-char 42))
-     (symbol :codes (#.sb!vm:symbol-header-widetag)
+     (symbol :codes (#.sb!vm:symbol-widetag)
              :prototype-form '#:mu)
 
      (system-area-pointer :codes (#.sb!vm:sap-widetag)

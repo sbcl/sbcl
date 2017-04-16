@@ -1506,7 +1506,7 @@ lispobj alloc_sym(lispobj name)
       alloc_immobile_obj(MAKE_ATTR(CEILING(SYMBOL_SIZE,2), // spacing
                                    CEILING(SYMBOL_SIZE,2), // size
                                    0),
-                         (SYMBOL_SIZE-1)<<8 | SYMBOL_HEADER_WIDETAG,
+                         (SYMBOL_SIZE-1)<<8 | SYMBOL_WIDETAG,
                          &symbol_page_hint);
     s->value = UNBOUND_MARKER_WIDETAG;
     s->hash = 0;
@@ -1782,8 +1782,8 @@ static void fixup_space(lispobj* where, size_t n_words)
         case COMPLEX_VECTOR_WIDETAG:
         case COMPLEX_ARRAY_WIDETAG:
         // And the other entirely boxed objects.
-        case SYMBOL_HEADER_WIDETAG:
-        case VALUE_CELL_HEADER_WIDETAG:
+        case SYMBOL_WIDETAG:
+        case VALUE_CELL_WIDETAG:
         case WEAK_POINTER_WIDETAG:
         case RATIO_WIDETAG:
         case COMPLEX_WIDETAG:
@@ -1894,7 +1894,7 @@ void defrag_immobile_space(int* components)
             for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
                 lispobj word = *obj;
                 if (!fixnump(word)) {
-                    if (widetag_of(word) == SYMBOL_HEADER_WIDETAG)
+                    if (widetag_of(word) == SYMBOL_WIDETAG)
                         ++sym_kind_histo[classify_symbol(obj)];
                     else
                         ++obj_type_histo[widetag_of(word)/4];
@@ -2008,7 +2008,7 @@ void defrag_immobile_space(int* components)
             case FDEFN_WIDETAG:
               alloc_ptr = &fdefn_alloc_ptr;
               break;
-            case SYMBOL_HEADER_WIDETAG:
+            case SYMBOL_WIDETAG:
               alloc_ptr = &symbol_alloc_ptr[classify_symbol(obj)];
               break;
             default:

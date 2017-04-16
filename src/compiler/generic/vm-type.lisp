@@ -335,13 +335,13 @@
                                       (list (sb!vm:saetp-typecode saetp)))))))))
                ((classoid-p x)
                 (case (classoid-name x)
-                  (symbol sb!vm:symbol-header-widetag) ; plus a hack for nil
+                  (symbol sb!vm:symbol-widetag) ; plus a hack for nil
                   (system-area-pointer sb!vm:sap-widetag))))))
         (cond ((not adjunct) (push x remainder))
               ((listp adjunct) (setq widetags (nconc adjunct widetags)))
               (t (push adjunct widetags)))))
     (let ((remainder (nreverse remainder)))
-      (when (member sb!vm:symbol-header-widetag widetags)
+      (when (member sb!vm:symbol-widetag widetags)
         ;; If symbol is the only widetag-testable type, it's better
         ;; to just use symbolp. e.g. (OR SYMBOL CHARACTER) should not
         ;; become (OR (%OTHER-POINTER-SUBTYPE-P ...)

@@ -547,7 +547,7 @@ static void brief_otherptr(lispobj obj)
     header = *ptr;
     type = widetag_of(header);
     switch (type) {
-        case SYMBOL_HEADER_WIDETAG:
+        case SYMBOL_WIDETAG:
             symbol = (struct symbol *)ptr;
             if (symbol->package == NIL)
                 printf("#:");
@@ -569,7 +569,7 @@ static void brief_otherptr(lispobj obj)
                 // FIXME: more address validity checks perhaps?
                 lispobj name = ((struct fdefn*)ptr)->name;
                 if (lowtag_of(name) == OTHER_POINTER_LOWTAG
-                    && widetag_of(*native_pointer(name)) == SYMBOL_HEADER_WIDETAG) {
+                    && widetag_of(*native_pointer(name)) == SYMBOL_WIDETAG) {
                   printf(" for ");
                   struct vector* str = symbol_name(native_pointer(name));
                   safely_show_lstring(str, 0, stdout);
@@ -698,7 +698,7 @@ static void print_otherptr(lispobj obj)
                 print_slots(complex_slots, count, ptr);
                 break;
 
-            case SYMBOL_HEADER_WIDETAG:
+            case SYMBOL_WIDETAG:
                 // Only 1 byte of a symbol header conveys its size.
                 // The other bytes may be freely used by the backend.
                 print_slots(symbol_slots, count & 0xFF, ptr);
@@ -825,7 +825,7 @@ static void print_otherptr(lispobj obj)
                             count & SHORT_HEADER_MAX_WORDS, ptr);
                 break;
 
-            case VALUE_CELL_HEADER_WIDETAG:
+            case VALUE_CELL_WIDETAG:
                 print_slots(value_cell_slots, 1, ptr);
                 break;
 

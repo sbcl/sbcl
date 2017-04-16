@@ -2448,7 +2448,7 @@ register."
 ;;; indirection cell.
 (defun indirect-value-cell-p (x)
   (and (%other-pointer-p x)
-       (eql (%other-pointer-widetag x) sb!vm:value-cell-header-widetag)))
+       (eql (%other-pointer-widetag x) sb!vm:value-cell-widetag)))
 
 ;;; Return three values reflecting the validity of DEBUG-VAR's value
 ;;; at BASIC-CODE-LOCATION:

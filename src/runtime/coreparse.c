@@ -579,7 +579,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
         for (i=2 ; i < fixnum_value(table->length) ; i += 2) {
           sym = table->data[i];
           if (lowtag_of(sym) == OTHER_POINTER_LOWTAG
-              && widetag_of(SYMBOL(sym)->header) == SYMBOL_HEADER_WIDETAG
+              && widetag_of(SYMBOL(sym)->header) == SYMBOL_WIDETAG
               && !strcmp(name,
                          (char*)((struct vector*)
                                  native_pointer(SYMBOL(sym)->name))->data))
