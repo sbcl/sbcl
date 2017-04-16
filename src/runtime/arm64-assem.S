@@ -171,7 +171,7 @@ no_args:
 
 	.align 4
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
-	.dword	RETURN_PC_HEADER_WIDETAG
+	.dword	RETURN_PC_WIDETAG
 
 	// Correct stack pointer for return processing.
         csel reg_CSP, reg_OCFP, reg_CSP, eq

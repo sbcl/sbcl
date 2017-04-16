@@ -109,7 +109,7 @@ call_into_lisp:
 	.globl	call_into_lisp_LRA
 call_into_lisp_LRA:	
 
-	.long	RETURN_PC_HEADER_WIDETAG
+	.long	RETURN_PC_WIDETAG
 
 	/* execution resumes here*/
 	mov	reg_OCFP,reg_CSP
@@ -270,7 +270,7 @@ end_of_tramps:
 	.set	noreorder
 	.globl	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.long	RETURN_PC_HEADER_WIDETAG + 0x600
+	.long	RETURN_PC_WIDETAG + 0x600
 	br	zero, fun_end_breakpoint_trap
 	nop
 	mov	reg_CSP, reg_OCFP

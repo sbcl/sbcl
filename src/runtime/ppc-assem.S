@@ -415,7 +415,7 @@ x:
 	
 	.align 3
 lra:
-	.long RETURN_PC_HEADER_WIDETAG 
+	.long RETURN_PC_WIDETAG 
 
 	/* Blow off any extra values. */
 	mr reg_CSP,reg_OCFP
@@ -640,7 +640,7 @@ lra:
 	This is header data for a widetag, so shift left eight bits
 	and add. */
         /* FIXME: the above is full of magic numbers. */
-	.long RETURN_PC_HEADER_WIDETAG + 0x600
+	.long RETURN_PC_WIDETAG + 0x600
 
 	/* We are receiving unknown multiple values, thus must deal
 	with the single-value and multiple-value cases separately. */
@@ -653,7 +653,7 @@ lra:
 	obtain a tagged pointer to the enclosing code component.  Both
 	values are tagged OTHER_POINTER_LOWTAG, so we just have to
 	account for the six words (see calculation for
-	RETURN_PC_HEADER_WIDETAG, above) between the two addresses.
+	RETURN_PC_WIDETAG, above) between the two addresses.
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
 	addi reg_CODE, reg_LRA, -24

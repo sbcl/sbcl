@@ -111,7 +111,7 @@ call_into_lisp:
 
 	.align 3
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
-	.word	RETURN_PC_HEADER_WIDETAG
+	.word	RETURN_PC_WIDETAG
 
 	@@ Correct stack pointer for return processing.
 	streq	reg_OCFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)

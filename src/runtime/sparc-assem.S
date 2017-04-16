@@ -87,7 +87,7 @@ call_into_lisp:
 
         .align  8
 lra:
-        .word   RETURN_PC_HEADER_WIDETAG
+        .word   RETURN_PC_WIDETAG
 
         /* Blow off any extra values. */
         mov     reg_OCFP, reg_CSP
@@ -214,7 +214,7 @@ call_into_c:
 	.align	8
 	.global	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_HEADER_WIDETAG + 0x600
+	.word	RETURN_PC_WIDETAG + 0x600
 	b	1f
 	nop
 	mov	reg_CSP, reg_OCFP
