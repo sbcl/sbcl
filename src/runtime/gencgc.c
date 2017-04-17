@@ -3186,8 +3186,8 @@ verify_range(lispobj *start, size_t words)
         }
     }
 }
-static uword_t verify_space(lispobj *start, lispobj *end) {
-    verify_range(start, end-start);
+static uword_t verify_space(lispobj start, lispobj end) {
+    verify_range((lispobj*)start, (end-start)>>WORD_SHIFT);
     return 0;
 }
 
@@ -3196,12 +3196,6 @@ static void verify_dynamic_space();
 static void
 verify_gc(void)
 {
-    /* FIXME: It would be nice to make names consistent so that
-     * foo_size meant size *in* *bytes* instead of size in some
-     * arbitrary units. (Yes, this caused a bug, how did you guess?:-)
-     * Some counts of lispobjs are called foo_count; it might be good
-     * to grep for all foo_size and rename the appropriate ones to
-     * foo_count. */
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
     // Try this verification if marknsweep was compiled with extra debugging.
@@ -3209,20 +3203,20 @@ verify_gc(void)
     extern void __attribute__((weak)) check_varyobj_pages();
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
-    verify_space((lispobj*)IMMOBILE_SPACE_START,
-                 (lispobj*)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0));
-    verify_space((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-                 (lispobj*)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+    verify_space(IMMOBILE_SPACE_START,
+                 SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0));
+    verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START,
+                 SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
 #endif
     struct thread *th;
     for_each_thread(th) {
-        verify_space(th->binding_stack_start,
-                     (lispobj*)get_binding_stack_pointer(th));
+        verify_space((lispobj)th->binding_stack_start,
+                     (lispobj)get_binding_stack_pointer(th));
     }
-    verify_space((lispobj*)READ_ONLY_SPACE_START,
-                 (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
-    verify_space((lispobj*)STATIC_SPACE_START,
-                 (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+    verify_space(READ_ONLY_SPACE_START,
+                 SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+    verify_space(STATIC_SPACE_START,
+                 SymbolValue(STATIC_SPACE_FREE_POINTER,0));
     verify_dynamic_space();
 }
 
@@ -3269,7 +3263,7 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*),
 }
 static void verify_generation(generation_index_t generation)
 {
-  walk_generation(verify_space, generation);
+  walk_generation((uword_t(*)(lispobj*,lispobj*))verify_space, generation);
 }
 
 /* Check that all the free space is zero filled. */
