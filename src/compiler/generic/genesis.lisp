@@ -953,7 +953,7 @@ core and return a descriptor to it."
     symbol))
 
 #!+sb-thread
-(defun assign-tls-index (symbol cold-symbol)
+(defun assign-tls-index-if-needed (symbol cold-symbol)
   (let ((index (info :variable :wired-tls symbol)))
     (cond ((integerp index) ; thread slot
            (cold-assign-tls-index cold-symbol index))
@@ -1545,7 +1545,6 @@ core and return a descriptor to it."
                     &key (access nil)
                          (gspace (symbol-value *cold-symbol-gspace*))
                     &aux (package (symbol-package-for-target-symbol symbol)))
-  (aver (package-ok-for-target-symbol-p package))
 
   ;; Anything on the cross-compilation host which refers to the target
   ;; machinery through the host SB-XC package should be translated to
@@ -1568,10 +1567,8 @@ core and return a descriptor to it."
           (record-accessibility
            (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
            pkg-info handle package symbol))
-        #!+sb-thread
-        (assign-tls-index symbol handle)
+        #!+sb-thread (assign-tls-index-if-needed symbol handle)
         (when (eq package *keyword-package*)
-          (setq access :external)
           (cold-set handle handle))
         handle)))
 

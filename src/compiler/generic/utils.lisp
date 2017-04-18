@@ -45,18 +45,6 @@
            (- list-pointer-lowtag)))
       0))
 
-;;; Given a byte offset, OFFSET, return the appropriate static symbol.
-(defun offset-static-symbol (offset)
-  (if (zerop offset)
-      nil
-      (multiple-value-bind (n rem)
-          (truncate (+ offset list-pointer-lowtag (- other-pointer-lowtag)
-                       (- (pad-data-block (1- symbol-size))))
-                    (pad-data-block symbol-size))
-        (unless (and (zerop rem) (<= 0 n (1- (length *static-symbols*))))
-          (error "The byte offset ~W is not valid." offset))
-        (elt *static-symbols* n))))
-
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
 (defun static-fdefn-offset (name)
