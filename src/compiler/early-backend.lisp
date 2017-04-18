@@ -16,5 +16,6 @@
 #!+sb-thread
 (progn
   (defglobal sb!vm::*free-tls-index* 0)
-  #!-64-bit ; on 64-bit, a single lisp word holds the index and lock flag
+  ;; Keep in sync with 'compiler/generic/parms.lisp'
+  #!+ppc ; only PPC uses a separate symbol for the TLS index lock
   (!defglobal sb!vm::*tls-index-lock* 0))

@@ -182,7 +182,9 @@
     ;; threading support
     #!+sb-thread *stop-for-gc-pending*
     #!+sb-thread *free-tls-index*
-    #!+sb-thread *tls-index-lock*
+    ;; Keep in sync with 'compiler/early-backend.lisp':
+    ;;  "only PPC uses a separate symbol for the TLS index lock"
+    #!+(and sb-thread ppc) *tls-index-lock*
 
     ;; dynamic runtime linking support
     #!+sb-dynamic-core *required-runtime-c-symbols*
