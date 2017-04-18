@@ -22,6 +22,7 @@
   (:temporary (:sc interior-reg) lip)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save))
 
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defun static-fun-template-name (num-args num-results)
   (intern (format nil "~:@(~R-arg-~R-result-static-fun~)"
@@ -108,6 +109,8 @@
              (when cur-nfp
                (load-stack-tn cur-nfp nfp-save))
              ,@(moves (result-names) (temp-names))))))))
+
+) ; EVAL-WHEN
 
 (macrolet ((frob (num-args num-res)
              (static-fun-template-vop (eval num-args) (eval num-res))))

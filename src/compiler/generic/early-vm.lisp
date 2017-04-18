@@ -119,7 +119,7 @@
 
 ;;; Helper macro for defining FIXUP-CODE-OBJECT so that its body
 ;;; can be the same between the host and target.
-;;; In the target, the byte offset supplied is relatove to CODE-INSTRUCTIONS.
+;;; In the target, the byte offset supplied is relative to CODE-INSTRUCTIONS.
 ;;; Genesis works differently - it adjusts the offset so that it is relative
 ;;; to the containing gspace since that's what bvref requires.
 (defmacro !with-bigvec-or-sap (&body body)
@@ -131,8 +131,10 @@
                 ;; Note that this shadows the uncallable stub function for SAP-INT
                 ;; that placates the host when compiling 'compiler/*/move.lisp'.
                 (declare (ignore sap))
-                `(sb!fasl::gspace-byte-address
-                  (sb!fasl::descriptor-gspace code))) ; use CODE, not SAP
+                `(locally
+                     (declare (notinline sb!fasl::descriptor-gspace)) ; fwd ref
+                   (sb!fasl::gspace-byte-address
+                    (sb!fasl::descriptor-gspace code)))) ; use CODE, not SAP
               (sap-ref-8 (sap offset) `(sb!fasl::bvref-8 ,sap ,offset))
               (sap-ref-32 (sap offset) `(sb!fasl::bvref-32 ,sap ,offset))
               (sap-ref-word (sap offset) `(sb!fasl::bvref-word ,sap ,offset)))
