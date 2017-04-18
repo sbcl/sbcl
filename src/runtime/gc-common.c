@@ -25,8 +25,6 @@
  *   <ftp://ftp.cs.utexas.edu/pub/garbage/bigsurv.ps>.
  */
 
-#define _GNU_SOURCE /* for ffsl(3) from string.h */
-
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
@@ -563,7 +561,13 @@ size_immediate(lispobj *where)
     return 1;
 }
 
-
+static inline boolean bignum_logbitp_inline(int index, struct bignum* bignum)
+{
+    int len = HeaderValue(bignum->header);
+    int word_index = index / N_WORD_BITS;
+    int bit_index = index % N_WORD_BITS;
+    return word_index < len ? (bignum->digits[word_index] >> bit_index) & 1 : 0;
+}
 boolean positive_bignum_logbitp(int index, struct bignum* bignum)
 {
   /* If the bignum in the layout has another pointer to it (besides the layout)
@@ -582,28 +586,7 @@ boolean positive_bignum_logbitp(int index, struct bignum* bignum)
 #endif
       bignum = (struct bignum*)native_pointer(forwarded);
   }
-
-  int len = HeaderValue(bignum->header);
-  int word_index = index / N_WORD_BITS;
-  int bit_index = index % N_WORD_BITS;
-  if (word_index >= len) {
-      // just return 0 since the marking logic does not allow negative bignums
-      return 0;
-  } else {
-      return (bignum->digits[word_index] >> bit_index) & 1;
-  }
-}
-
-struct instance_scanner {
-  lispobj* base;
-  void (*proc)(lispobj*, sword_t);
-};
-
-// Helper function for helper function below, since lambda isn't a thing
-static void instance_scan_range(void* arg, int offset, int nwords)
-{
-    struct instance_scanner *scanner = (struct instance_scanner*)arg;
-    scanner->proc(scanner->base + offset, nwords);
+  return bignum_logbitp_inline(index, bignum);
 }
 
 // Helper function for stepping through the tagged slots of an instance in
@@ -611,17 +594,14 @@ static void instance_scan_range(void* arg, int offset, int nwords)
 void
 instance_scan(void (*proc)(lispobj*, sword_t),
               lispobj *instance_slots,
-              sword_t n_words,
+              sword_t nslots, /* number of payload words */
               lispobj layout_bitmap)
 {
   sword_t index;
 
-  /* This code might be made more efficient by run-length-encoding the ranges
-     of words to scan, but probably not by much */
-
   if (fixnump(layout_bitmap)) {
       sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
-      for (index = 0; index < n_words ; index++, bitmap >>= 1)
+      for (index = 0; index < nslots ; index++, bitmap >>= 1)
           if (bitmap & 1)
               proc(instance_slots + index, 1);
   } else { /* huge bitmap */
@@ -630,77 +610,10 @@ instance_scan(void (*proc)(lispobj*, sword_t),
       if (forwarding_pointer_p((lispobj*)bitmap))
           bitmap = (struct bignum*)
             native_pointer(forwarding_pointer_value((lispobj*)bitmap));
-      struct instance_scanner scanner;
-      scanner.base = instance_slots;
-      scanner.proc = proc;
-      bitmap_scan((uword_t*)bitmap->digits, HeaderValue(bitmap->header), 0,
-                  instance_scan_range, &scanner);
+      for (index = 0; index < nslots ; index++)
+          if (bignum_logbitp_inline(index, bitmap))
+              proc(instance_slots + index, 1);
   }
-}
-
-void bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
-                 void (*proc)(void*, int, int), void* arg)
-{
-    uword_t sense = (flags & BIT_SCAN_INVERT) ? ~0L : 0;
-    int start_word_index = 0;
-    int shift = 0;
-    uword_t word;
-
-    flags = flags & BIT_SCAN_CLEAR;
-
-    // Rather than bzero'ing we can just clear each nonzero word as it's read,
-    // if so specified.
-#define BITMAP_REF(j) word = bitmap[j]; if(word && flags) bitmap[j] = 0; word ^= sense
-    BITMAP_REF(0);
-    while (1) {
-        int skip_bits, start_bit, start_position, run_length;
-        if (word == 0) {
-            if (++start_word_index >= n_bitmap_words) break;
-            BITMAP_REF(start_word_index);
-            shift = 0;
-            continue;
-        }
-        // On each loop iteration, the lowest 1 bit is a "relative"
-        // bit index, since the word was already shifted. This is 'skip_bits'.
-        // Adding back in the total shift amount gives 'start_bit',
-        // the true absolute index within the current word.
-        // 'start_position' is absolute within the entire bitmap.
-        skip_bits = ffsl(word) - 1;
-        start_bit = skip_bits + shift;
-        start_position = N_WORD_BITS * start_word_index + start_bit;
-        // Compute the number of consecutive 1s in the current word.
-        word >>= skip_bits;
-        run_length = ~word ? ffsl(~word) - 1 : N_WORD_BITS;
-        if (start_bit + run_length < N_WORD_BITS) { // Do not extend to additional words.
-            word >>= run_length;
-            shift += skip_bits + run_length;
-        } else {
-            int end_word_index = ++start_word_index;
-            while (1) {
-                if (end_word_index >= n_bitmap_words) {
-                    word = 0;
-                    run_length += (end_word_index - start_word_index) * N_WORD_BITS;
-                    break;
-                }
-                BITMAP_REF(end_word_index);
-                if (~word == 0)
-                    ++end_word_index;
-                else {
-                    // end_word_index is the exclusive bound on contiguous
-                    // words to include in the range. See if the low bits
-                    // from the next word can extend the range.
-                    shift = ffsl(~word) - 1;
-                    word >>= shift;
-                    run_length += (end_word_index - start_word_index) * N_WORD_BITS
-                                  + shift;
-                    break;
-                }
-            }
-            start_word_index = end_word_index;
-        }
-        proc(arg, start_position, run_length);
-    }
-#undef BITMAP_REF
 }
 
 static sword_t

@@ -234,13 +234,6 @@ instance_scan(void (*proc)(), lispobj *instance_ptr, sword_t n_words, lispobj bi
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);
 
-// Generalization of instance_scan
-#define BIT_SCAN_INVERT 1
-#define BIT_SCAN_CLEAR  2
-extern void
-bitmap_scan(uword_t* bitmap, int n_bitmap_words, int flags,
-            void (*proc)(void*, int, int), void* arg);
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 
 extern lispobj fdefn_raw_referent(struct fdefn *fdefn);
