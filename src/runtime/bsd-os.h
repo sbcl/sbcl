@@ -22,9 +22,7 @@
 #endif
 
 typedef caddr_t os_vm_address_t;
-#if defined __NetBSD__
-typedef vsize_t os_vm_size_t;
-#elif defined __OpenBSD__
+#if defined __NetBSD__ || defined __OpenBSD__
 typedef size_t os_vm_size_t;
 #else
 typedef vm_size_t os_vm_size_t;

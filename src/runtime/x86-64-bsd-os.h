@@ -9,7 +9,11 @@
 #include <machine/npx.h>
 #endif
 
+#ifdef LISP_FEATURE_NETBSD
+typedef unsigned long os_context_register_t;
+#else
 typedef register_t os_context_register_t;
+#endif
 
 static inline os_context_t *arch_os_get_context(void **void_context)
 {
