@@ -862,24 +862,6 @@
    (emit-bitfield segment +64-bit-size+ 1 +64-bit-size+
                   immr imms (tn-offset rn) (tn-offset rd))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun print-lsl-alias-name (value stream dstate)
-    (declare (ignore dstate))
-    (destructuring-bind (immr imms) value
-      (princ (if (and (/= imms 63)
-                      (= (1+ imms) immr))
-                 'lsl
-                 'ubfm)
-             stream)))
-
-  (defun print-lsl-alias (value stream dstate)
-    (declare (ignore dstate))
-    (destructuring-bind (immr imms) value
-      (if (and (/= imms 63)
-               (= (1+ imms) immr))
-          (format stream "#~d" (- 63 imms))
-          (format stream "#~d, #~d" immr imms)))))
-
 (define-instruction ubfm (segment rd rn immr imms)
   (:printer bitfield ((op #b10) (imms #b111111))
             '('lsr :tab rd  ", " rn ", " immr))
@@ -1905,14 +1887,6 @@
       (:osh . #b0011)
       (:oshst . #b0010)
       (:oshld . #b0001)))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun print-mem-bar-kind (value stream dstate)
-    (declare (ignore dstate))
-    (let ((kind (car (rassoc value **mem-bar-kinds**))))
-      (if kind
-          (princ kind stream)
-          (format stream "#~d" value)))))
 
 (defmacro def-mem-bar (name op)
   `(define-instruction ,name (segment &optional (kind :sy))
