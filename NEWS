@@ -3,6 +3,9 @@
 changes relative to sbcl-1.3.16:
   * enhancement: memory overhead from the garbage collector's metadata
     is reduced on 64-bit architectures; no change for 32-bit.
+  * enhancement: further garbage collector speedups affecting
+    pinned objects on conservative backends, and simple-vectors.
+  * bug fix: sb-cover does not lose source positions for AND/OR/COND.
 
 changes in sbcl-1.3.16 relative to sbcl-1.3.15:
   * optimization: various small tweaks give around 5% faster garbage
