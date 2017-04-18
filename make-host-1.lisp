@@ -39,7 +39,7 @@
                            (setq fail 'warning))))
                       ;; Prevent regressions on a couple platforms
                       ;; that are known to build cleanly.
-                      #!+(or x86 x86-64)
+                      #!+(or x86 x86-64 arm64)
                       (sb-int:simple-style-warning
                        (lambda (c)
                          (when (and in-summary
