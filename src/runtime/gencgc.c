@@ -824,7 +824,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
 {
     page_index_t first_page;
     page_index_t last_page;
-    os_vm_size_t bytes_found;
     page_index_t i;
     int ret;
 
@@ -842,8 +841,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     gc_assert(ret == 0);
     first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0);
     last_page=gc_find_freeish_pages(&first_page, nbytes, page_type_flag);
-    bytes_found=(GENCGC_CARD_BYTES - page_bytes_used(first_page))
-            + npage_bytes(last_page-first_page);
 
     /* Set up the alloc_region. */
     alloc_region->first_page = first_page;
@@ -851,23 +848,23 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     alloc_region->start_addr = page_bytes_used(first_page)
         + page_address(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
-    alloc_region->end_addr = alloc_region->start_addr + bytes_found;
+    alloc_region->end_addr = page_address(last_page+1);
 
     /* Set up the pages. */
 
     /* The first page may have already been in use. */
-    if (page_bytes_used(first_page) == 0) {
+    /* If so, just assert that it's consistent, otherwise, set it up. */
+    if (page_bytes_used(first_page)) {
+        gc_assert(page_table[first_page].allocated == page_type_flag);
+        gc_assert(page_table[first_page].gen == gc_alloc_generation);
+        gc_assert(page_table[first_page].large_object == 0);
+    } else {
         page_table[first_page].allocated = page_type_flag;
         page_table[first_page].gen = gc_alloc_generation;
         page_table[first_page].large_object = 0;
         set_page_scan_start_offset(first_page, 0);
     }
-
-    gc_assert(page_table[first_page].allocated == page_type_flag);
     page_table[first_page].allocated |= OPEN_REGION_PAGE_FLAG;
-
-    gc_assert(page_table[first_page].gen == gc_alloc_generation);
-    gc_assert(page_table[first_page].large_object == 0);
 
     for (i = first_page+1; i <= last_page; i++) {
         page_table[i].allocated = page_type_flag;
@@ -1171,18 +1168,13 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     /* Set up the pages. */
     orig_first_page_bytes_used = page_bytes_used(first_page);
 
-    /* If the first page was free then set up the gen, and
-     * scan_start_offset. */
-    if (page_bytes_used(first_page) == 0) {
-        page_table[first_page].allocated = page_type_flag;
-        page_table[first_page].gen = gc_alloc_generation;
-        set_page_scan_start_offset(first_page, 0);
-        page_table[first_page].large_object = 1;
-    }
+    /* Large objects don't share pages with other objects. */
+    gc_assert(orig_first_page_bytes_used == 0);
 
-    gc_assert(page_table[first_page].allocated == page_type_flag);
-    gc_assert(page_table[first_page].gen == gc_alloc_generation);
-    gc_assert(page_table[first_page].large_object == 1);
+    page_table[first_page].allocated = page_type_flag;
+    page_table[first_page].gen = gc_alloc_generation;
+    page_table[first_page].large_object = 1;
+    set_page_scan_start_offset(first_page, 0);
 
     byte_cnt = 0;
 
