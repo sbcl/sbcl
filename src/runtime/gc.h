@@ -21,13 +21,6 @@
 #include <stdint.h>
 
 typedef intptr_t page_index_t;
-#ifdef LISP_FEATURE_WIN32
-#define PAGE_INDEX_FMT "Id"
-#elif defined(LISP_FEATURE_64_BIT)
-#define PAGE_INDEX_FMT "ld"
-#else
-#define PAGE_INDEX_FMT "d"
-#endif
 
 // This decl should probably be be in gencgc-internal,
 // except it can't be: collect_garbage() receives a generation number.

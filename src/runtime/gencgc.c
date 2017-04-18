@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <inttypes.h>
 #include "sbcl.h"
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
 #include "pthreads_win32.h"
@@ -450,6 +451,8 @@ generation_average_age(generation_index_t gen)
 extern void fpu_save(void *);
 extern void fpu_restore(void *);
 #endif
+
+#define PAGE_INDEX_FMT PRIdPTR
 
 extern void
 write_generation_stats(FILE *file)
