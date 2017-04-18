@@ -406,6 +406,16 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * page fault on this OS.
  */
 static void
+fallback_sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
+{
+    // This calls corruption_warning_and_maybe_lose.
+    lisp_memory_fault_error(context, arch_get_bad_addr(signal, info, context));
+}
+
+void (*sbcl_fallback_sigsegv_handler)  // Settable by user.
+       (int, siginfo_t*, os_context_t*) = fallback_sigsegv_handler;
+
+static void
 sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
@@ -436,7 +446,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
     if (!cheneygc_handle_wp_violation(context, addr))
 #endif
         if (!handle_guard_page_triggered(context, addr))
-            lisp_memory_fault_error(context, addr);
+            sbcl_fallback_sigsegv_handler(signal, info, context);
 }
 
 void
