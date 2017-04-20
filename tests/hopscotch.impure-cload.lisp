@@ -21,7 +21,7 @@
         (alien-funcall (extern-alien "hopscotch_create"
                                      (function void system-area-pointer int int int int))
                        ht
-                       0 ; default hash function
+                       1 ; default hash function
                        bytes-per-value
                        32 ; size
                        8)) ; hop range

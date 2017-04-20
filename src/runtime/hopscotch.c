@@ -340,9 +340,8 @@ tableptr hopscotch_resize_up(tableptr ht)
         size *= 2;
         hopscotch_create(&copy, ht->hashfun, ht->value_size, size, 0);
         // Maybe change the hash function if it's the dumb one
-        if (ht->hop_range > 16 && ht->hash == 0)
-          ht->hash = hopscotch_hmix;
-        copy.hash = ht->hash; // in case DEFAULT was upgraded to MIX
+        if (copy.hop_range > 16 && copy.hash == 0)
+          copy.hash = hopscotch_hmix;
         copy.rehashing = 1; // Causes put() to return 0 on failure
         if (ht->values) {
             for(i=old_max_index ; i >= 0 ; --i)
