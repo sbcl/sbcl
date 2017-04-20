@@ -30,10 +30,11 @@ void hopscotch_integrity_check(tableptr,char*,int);
 #define table_size(table) (1+(table).mask)
 #define INTEGRITY_CHECK(when) {}
 
-/// XOR values based on the page number and the relative index into the page.
-/// Disregard lowtag bits.
+/// By default, XOR values based on the page number and the
+/// relative index into the page, disregarding lowtag bits.
+/// If a specific function has been set, then use that.
 static inline uint32_t hash(tableptr ht, lispobj x) {
-    return ht->hashfun ? ht->hashfun(x) :
+    return ht->hash ? ht->hash(x) :
       (x >> GENCGC_CARD_SHIFT) ^ (x >> (1+WORD_SHIFT));
 }
 
@@ -239,10 +240,18 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
 /* Initialize 'ht' for first use, which entails zeroing the counters
  * and allocating storage.
  */
-void hopscotch_create(tableptr ht, uint32_t (*hashfun)(uword_t),
+void hopscotch_create(tableptr ht, int hashfun,
                       int bytes_per_value, int size, char hop_range)
 {
     gc_assert((size & (size-1)) == 0); // ensure power-of-2
+    ht->hashfun = hashfun;
+    switch (hashfun) {
+    case HOPSCOTCH_HASH_FUN_DEFAULT:
+      ht->hash = 0; break;
+    case HOPSCOTCH_HASH_FUN_MIX:
+      ht->hash = hopscotch_hmix; break;
+    default: lose("Bad hash function");
+    }
     switch (bytes_per_value) {
     case 0: ht->get_value = 0; break; // no value getter
     case 1: ht->get_value = get_val1; break;
@@ -253,7 +262,6 @@ void hopscotch_create(tableptr ht, uint32_t (*hashfun)(uword_t),
 #endif
     default: lose("Bad value size");
     }
-    ht->hashfun = hashfun;
     ht->count = 0;
     ht->rehashing = 0;
     ht->resized = 0;
@@ -301,6 +309,9 @@ void hopscotch_reset(tableptr ht)
         hopscotch_realloc(ht, size >> 1, 0);
     ht->prev_size = size;
     ht->resized = 0;
+    // Possibly reset the hash function to the fast-but-dumb one
+    if (ht->hashfun == HOPSCOTCH_HASH_FUN_DEFAULT)
+        ht->hash = 0;
     INTEGRITY_CHECK("after reset");
 }
 
@@ -328,6 +339,10 @@ tableptr hopscotch_resize_up(tableptr ht)
     do {
         size *= 2;
         hopscotch_create(&copy, ht->hashfun, ht->value_size, size, 0);
+        // Maybe change the hash function if it's the dumb one
+        if (ht->hop_range > 16 && ht->hash == 0)
+          ht->hash = hopscotch_hmix;
+        copy.hash = ht->hash; // in case DEFAULT was upgraded to MIX
         copy.rehashing = 1; // Causes put() to return 0 on failure
         if (ht->values) {
             for(i=old_max_index ; i >= 0 ; --i)
@@ -354,6 +369,7 @@ tableptr hopscotch_resize_up(tableptr ht)
     // mem_size is passed to bzero() when resetting the table,
     // so definitely be sure to use the new, not the old.
     // And of course _don't_ hopscotch_delete() copy when done.
+    ht->hash      = copy.hash;
     ht->mem_size  = copy.mem_size;
     ht->mask      = copy.mask;
     ht->hop_range = copy.hop_range;

@@ -2167,11 +2167,6 @@ scavenge_pinned_ranges()
     }
 }
 
-static int addrcmp(const void* a, const void* b) {  // For qsort()
-    sword_t diff = *(uword_t*)a - *(uword_t*)b;
-    return diff < 0 ? -1 : (diff > 0 ? 1 : 0);
-}
-
 /* Zero out the byte ranges on small object pages marked dont_move,
  * carefully skipping over objects in the pin hashtable.
  * TODO: by recording an additional bit per page indicating whether
@@ -2180,6 +2175,7 @@ static int addrcmp(const void* a, const void* b) {  // For qsort()
 static void
 wipe_nonpinned_words()
 {
+    void gc_heapsort_uwords(uword_t*, int);
     // Loop over the keys in pinned_objects and pack them densely into
     // the same array - pinned_objects.keys[] - but skip any simple-funs.
     // Admittedly this is abstraction breakage.
@@ -2202,7 +2198,7 @@ wipe_nonpinned_words()
     // rendered unusable by stealing its key array for a different purpose.
     pinned_objects.keys[n_pins] = 0;
     // Order by ascending address, stopping short of the sentinel.
-    qsort(pinned_objects.keys, n_pins, sizeof (uword_t), addrcmp);
+    gc_heapsort_uwords(pinned_objects.keys, n_pins);
 #if 0
     printf("Sorted pin list:\n");
     for (i = 0; i < n_pins; ++i) {
@@ -2226,7 +2222,8 @@ wipe_nonpinned_words()
         uword_t this_page_base = page_base_address((uword_t)obj);
         /* printf("i=%d obj=%p base=%p\n", i, obj, (void*)this_page_base); */
         if (this_page_base > page_base_address(preceding_object)) {
-            bzero((void*)this_page_base, (uword_t)obj - this_page_base);
+            bzero((void*)this_page_base,
+                  void_diff((void*)obj, (void*)this_page_base));
             // Move the page to newspace
             page_index_t page = find_page_index(obj);
             int used = page_bytes_used(page);
@@ -2247,7 +2244,8 @@ wipe_nonpinned_words()
         if (page_base_address(pinned_objects.keys[i+1]) == this_page_base)
             range_end = pinned_objects.keys[i+1];
         /* printf("    Clearing %p .. %p\n", (void*)range_start, (void*)range_end); */
-        bzero((void*)range_start, range_end - range_start);
+        bzero((void*)range_start,
+              void_diff((void*)range_end, (void*)range_start));
         preceding_object = (uword_t)obj;
     }
 }
@@ -4043,8 +4041,7 @@ gc_init(void)
 #endif
 
     hopscotch_init();
-    hopscotch_create(&pinned_objects, 0 /* no values */,
-                     HOPSCOTCH_HASH_FUN_DEFAULT,
+    hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;

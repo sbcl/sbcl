@@ -17,7 +17,7 @@ struct hopscotch_table {
     unsigned*  hops;
     sword_t*   values;
     sword_t    (*get_value)(struct hopscotch_table*,int);
-    uint32_t   (*hashfun)(uword_t);
+    uint32_t   (*hash)(uword_t);
     unsigned   mask;
     int  hop_range;
     int  count;
@@ -27,12 +27,13 @@ struct hopscotch_table {
     // Statistics
     struct { int n_seeks, n_probes; } hit, miss;
     char value_size; // number of bytes in a value: 0,1,2,4,8
+    char hashfun;    // 1 or 2 to pick fast or slow
     char resized;    // set to 1 if sized up since last reset
     char rehashing;  // set to 1 during rehash
 };
 
 void hopscotch_init();
-void hopscotch_create(struct hopscotch_table*,uint32_t(*)(uword_t),int,int,char);
+void hopscotch_create(struct hopscotch_table*,int,int,int,char);
 void hopscotch_delete(struct hopscotch_table*);
 int hopscotch_insert(struct hopscotch_table*,uword_t,sword_t);
 int hopscotch_put(struct hopscotch_table*,uword_t,sword_t);
@@ -43,8 +44,8 @@ void hopscotch_log_stats(struct hopscotch_table*,char*);
 
 uint32_t hopscotch_hmix(uword_t);
 
-#define HOPSCOTCH_HASH_FUN_DEFAULT 0
-#define HOPSCOTCH_HASH_FUN_MIX hopscotch_hmix
+#define HOPSCOTCH_HASH_FUN_DEFAULT 1
+#define HOPSCOTCH_HASH_FUN_MIX 2
 
 /* This confuses me every time I look at it, so here's an example-
  * Suppose (unrealistically) that a table has a hop range of 4,
