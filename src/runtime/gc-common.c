@@ -1906,9 +1906,9 @@ int varint_unpack(struct varint_unpacker* unpacker, int* result)
 /* Our own implementation of heapsort, because some C libraries have a qsort()
  * that calls malloc() apparently, which we MUST NOT do. */
 
-typedef unsigned long* heap;
+typedef uword_t* heap;
 
-#define swap(a,i,j) { unsigned long temp=a[i];a[i]=a[j];a[j]=temp; }
+#define swap(a,i,j) { uword_t temp=a[i];a[i]=a[j];a[j]=temp; }
 static void sift_down(heap array, int start, int end)
 {
      int root = start;
