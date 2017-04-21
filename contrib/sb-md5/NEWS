@@ -1,0 +1,57 @@
+Release 2.0.4
+=============
+
+ * Clarified public domain status for code authored by Pierre R. Mai
+   through additional CC0 waiver.
+
+Release 2.0.3
+=============
+
+ * Add support for md5sum-string for other implementations through
+   through flexi-streams.  Patch supplied by Daniel Kochmanski.
+
+
+Release 2.0.2
+=============
+
+ * This release adds support for LispWorks 7.0, reworking the fixes
+   for 64-bit implementations of Lispworks in 2.0.1 and incorrect
+   use of the sys:simple-int32-vector type.  Patch supplied by
+   Martin Simmons from LispWorks.
+
+ * Minor fix to prevent style-warnings for implementations with no
+   support for md5sum-string.
+
+
+Release 2.0.1
+=============
+
+ * This release fixes problems on 64-bit implementations of Lispworks,
+   where sys:int32 arithmetic can overflow 32-bit values and hence
+   yield wrong results.
+
+
+Release 2.0.0
+=============
+
+ * This release consolidates the various versions of md5 that have
+   been floating around, including versions with Lispworks
+   optimizations, the version maintained by Kevin M. Rosenberg, the
+   SBCL-optimized version, and various patches and fixes.
+
+ * This release tries to separate out string-handling from actual
+   byte-based MD5 hash generation.  Hence users who want to generate
+   hashes from strings should use the new md5sum-string function,
+   which will go through your implementation's external-format
+   handling to generate the actual byte-array that is hashed.  Usage
+   of md5sum-sequence for strings and md5sum-stream for character
+   streams is deprecated, since it only ever worked correctly for 8bit
+   characters in most implementations.
+
+ * This release should work correctly on at least recentish versions
+   of CMUCL, SBCL, ECL, CCL, Lispworks, AllegroCL and ABCL and
+   generally most other conforming implementations.  It has been
+   optimized for CMUCL, SBCL and Lispworks, and should work with
+   adequate performance on most 64bit implementations.  Performance on
+   other 32bit implementations is still sub-optimal if they don't
+   support unboxed bit-operations on (unsigned-byte 32).
