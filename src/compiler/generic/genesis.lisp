@@ -3263,11 +3263,7 @@ core and return a descriptor to it."
        (list-sorted-tags (tail)
          (loop for symbol being the external-symbols of "SB!VM"
                when (and (constantp symbol)
-                         (tailwise-equal (string symbol) tail)
-                         ;; FIXME: these symbols are obsolete
-                         (not (member symbol
-                                      '(sb!vm:simple-fun-header-widetag
-                                        sb!vm:closure-header-widetag))))
+                         (tailwise-equal (string symbol) tail))
                collect symbol into tags
                finally (return (sort tags #'< :key #'symbol-value))))
        (write-tags (visibility kind limit ash-count)
