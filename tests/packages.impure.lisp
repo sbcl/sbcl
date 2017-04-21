@@ -910,3 +910,16 @@ if a restart was invoked."
             (when (sb-thread:join-thread thread) (incf count)))
           (unintern (sb-int:keywordicate "BLUB") "KEYWORD")
           (assert (= count n-threads)))))))
+
+(with-test (:name :name-conflict-non-pretty-message)
+  (make-package "SILLYPACKAGE1")
+  (export (intern "ASILLYSYM" 'sillypackage1) 'sillypackage1)
+  (make-package "SILLYPACKAGE2")
+  (export (intern "ASILLYSYM" 'sillypackage2) 'sillypackage2)
+  (use-package 'sillypackage1)
+  (handler-case (use-package 'sillypackage2)
+    (name-conflict (c) ; No silly string in the result
+      (assert (not (search "symbols:SILLY"
+                           (write-to-string c :pretty nil :escape nil)))))
+    (condition () (error "Should not get here"))
+    (:no-error () (error "Should not get here"))))

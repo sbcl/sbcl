@@ -1035,7 +1035,7 @@ implementation it is ~S." *!default-package-use-list*)
   (:report
    (lambda (c s)
      (format s "~@<~S ~S causes name-conflicts in ~S between the ~
-                following symbols:~2I~@:_~
+                following symbols: ~2I~@:_~
                 ~{~/sb-impl::print-symbol-with-prefix/~^, ~}~:@>"
              (name-conflict-function c)
              (name-conflict-datum c)
@@ -1064,7 +1064,7 @@ implementation it is ~S." *!default-package-use-list*)
                        (format s "Keep ~S accessible in ~A (shadowing ~S)."
                                (old-symbol) pname datum))
                       (use-package
-                       (format s "Keep symbols already accessible ~A (shadowing others)."
+                       (format s "Keep symbols already accessible in ~A (shadowing others)."
                                pname))))
           :test use-or-export-p
           (dolist (s (remove-duplicates symbols :test #'string=))
