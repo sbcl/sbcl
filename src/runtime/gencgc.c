@@ -165,6 +165,8 @@ page_index_t page_table_pages;
 struct page *page_table;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 struct hopscotch_table pinned_objects;
+lispobj gc_object_watcher;
+int gc_n_stack_pins;
 #endif
 
 /* In GC cards that have conservative pointers to them, should we wipe out
@@ -2197,6 +2199,9 @@ wipe_nonpinned_words()
     // are clobbered, which is irrelevant since the table has already been
     // rendered unusable by stealing its key array for a different purpose.
     pinned_objects.keys[n_pins] = 0;
+    // Don't touch pinned_objects.count in case the reset function uses it
+    // to decide how to resize for next use (which it doesn't, but could).
+    gc_n_stack_pins = n_pins;
     // Order by ascending address, stopping short of the sentinel.
     gc_heapsort_uwords(pinned_objects.keys, n_pins);
 #if 0
@@ -3676,6 +3681,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #endif
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
+#ifdef LISP_FEATURE_SB_TRACEROOT
+    scavenge(&gc_object_watcher, 1);
+#endif
     scavenge_pinned_ranges();
 
     /* Finally scavenge the new_space generation. Keep going until no
@@ -4007,6 +4015,15 @@ collect_garbage(generation_index_t last_gen)
 
     gc_active_p = 0;
     large_allocation = 0;
+
+#ifdef LISP_FEATURE_SB_TRACEROOT
+    if (gc_object_watcher) {
+        extern void gc_prove_liveness(void(*)(), lispobj, int, uword_t*);
+        gc_prove_liveness(preserve_context_registers,
+                          gc_object_watcher,
+                          gc_n_stack_pins, pinned_objects.keys);
+    }
+#endif
 
     log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");

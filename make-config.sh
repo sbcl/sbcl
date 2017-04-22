@@ -642,7 +642,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :inline-constants :precise-arg-count-error' >> $ltf
     printf ' :memory-barrier-vops :multiply-high-vops :ash-right-vops :symbol-info-vops' >> $ltf
-    printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
+    printf ' :fp-and-pc-standard-save :raw-signed-word :sb-traceroot' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
         printf ' :linkage-table' >> $ltf
@@ -665,7 +665,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops :sb-simd-pack :ash-right-vops :symbol-info-vops' >> $ltf
-    printf ' :undefined-fun-restarts' >> $ltf
+    printf ' :undefined-fun-restarts :sb-traceroot' >> $ltf
     case "$sbcl_os" in
     linux | darwin | *bsd)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf

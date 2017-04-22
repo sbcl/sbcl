@@ -137,7 +137,7 @@ extern int dynamic_values_bytes;
 #  define per_thread_value(sym, thread) sym->value
 #else
 #ifdef LISP_FEATURE_64_BIT
-static inline int
+static inline unsigned int
 tls_index_of(struct symbol *symbol) // untagged pointer
 {
   return symbol->header >> 32;

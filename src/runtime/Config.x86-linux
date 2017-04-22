@@ -48,7 +48,7 @@ ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   USE_LIBSBCL = sbcl.o
 endif
 
-GC_SRC = gencgc.c hopscotch.c
+GC_SRC = gencgc.c hopscotch.c traceroot.c
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

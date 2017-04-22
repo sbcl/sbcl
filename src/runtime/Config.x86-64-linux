@@ -45,9 +45,9 @@ endif
 CFLAGS += -fno-omit-frame-pointer
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
-  GC_SRC = gencgc.c hopscotch.c marknsweepgc.c
+  GC_SRC = gencgc.c hopscotch.c traceroot.c marknsweepgc.c
 else
-  GC_SRC = gencgc.c hopscotch.c
+  GC_SRC = gencgc.c hopscotch.c traceroot.c
 endif
 
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
