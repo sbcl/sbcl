@@ -827,7 +827,7 @@ Experimental: interface subject to change."
                                    :write-protected (logbitp 3 flags)
                                    :boxed (logbitp 0 allocated)
                                    :pinned (logbitp 5 flags)
-                                   :large (logbitp 6 flags)
+                                   :large (logbitp 7 flags)
                                    :page index))))
                        (list :space space))
                    #-gencgc
