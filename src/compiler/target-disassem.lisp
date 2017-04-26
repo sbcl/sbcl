@@ -1729,8 +1729,8 @@
                (slot-offset (words-to-bytes (car field)))
                (maybe-symbol-addr (- address slot-offset))
                (maybe-symbol
-                (make-lisp-obj
-                 (+ maybe-symbol-addr sb!vm:other-pointer-lowtag))))
+                (make-lisp-obj (+ maybe-symbol-addr sb!vm:other-pointer-lowtag)
+			       nil)))
           (when (symbolp maybe-symbol)
             (return (values maybe-symbol (cdr field))))))))
 
