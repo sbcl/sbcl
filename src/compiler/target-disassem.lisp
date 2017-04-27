@@ -1730,7 +1730,7 @@
                (maybe-symbol-addr (- address slot-offset))
                (maybe-symbol
                 (make-lisp-obj (+ maybe-symbol-addr sb!vm:other-pointer-lowtag)
-			       nil)))
+                               nil)))
           (when (symbolp maybe-symbol)
             (return (values maybe-symbol (cdr field))))))))
 
