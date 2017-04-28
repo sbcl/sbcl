@@ -2263,8 +2263,9 @@
         (defclass ,sup ()
           ())
         (handler-bind ((implicit-generic-function-warning #'muffle-warning))
-        (defmethod ,frob ((pnr ,pnr))
-          (slot-value pnr ',pax)))))))
+          (defmethod ,frob ((pnr ,pnr))
+            (slot-value pnr ',pax)))
+        (declaim (optimize (safety 1) (debug 1)))))))
 
 (defclass bug-1099708 () ((slot-1099708 :initarg :slot-1099708)))
 (defun make-1099708-1 ()
@@ -2546,3 +2547,12 @@
     (assert-error
      (funcall (checked-compile `(lambda ()
                                   (allocate-instance ',class)))))))
+
+(defclass unbound-slot-after-allocation=class ()
+  ((abc :allocation :class)
+   (d :accessor unbound-slot-after-allocation=class)))
+
+(with-test (:name :unbound-slot-after-allocation=class)
+  (assert-error (unbound-slot-after-allocation=class
+                 (make-instance 'unbound-slot-after-allocation=class))
+                unbound-slot))

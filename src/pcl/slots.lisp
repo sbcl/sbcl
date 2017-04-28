@@ -460,12 +460,9 @@
        ;; In the vast majority of cases location corresponds to the position
        ;; in list. The only exceptions are when there are non-local slots
        ;; before the one we want.
-       (let* ((slots (layout-slot-list (layout-of instance)))
-              (guess (nth position slots)))
-         (if (eql position (slot-definition-location guess))
-             (slot-definition-name guess)
-             (slot-definition-name
-              (car (member position (class-slots instance) :key #'slot-definition-location))))))
+       (slot-definition-name
+        (find position (layout-slot-list (layout-of instance))
+              :key #'slot-definition-location)))
       (cons
        (car position))))))
 
