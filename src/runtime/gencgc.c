@@ -1151,7 +1151,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
 {
     boolean more;
     page_index_t first_page, next_page, last_page;
-    page_bytes_t orig_first_page_bytes_used;
     os_vm_size_t byte_cnt;
     os_vm_size_t bytes_used;
     int ret;
@@ -1170,12 +1169,10 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
 
     set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1, last_page);
 
-    /* Set up the pages. */
-    orig_first_page_bytes_used = page_bytes_used(first_page);
-
     /* Large objects don't share pages with other objects. */
-    gc_assert(orig_first_page_bytes_used == 0);
+    gc_assert(page_bytes_used(first_page) == 0);
 
+    /* Set up the pages. */
     page_table[first_page].allocated = page_type_flag;
     page_table[first_page].gen = gc_alloc_generation;
     page_table[first_page].large_object = 1;
@@ -1186,7 +1183,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     /* Calc. the number of bytes used in this page. This is not
      * always the number of new bytes, unless it was free. */
     more = 0;
-    if ((bytes_used = nbytes+orig_first_page_bytes_used) > GENCGC_CARD_BYTES) {
+    if ((bytes_used = nbytes) > GENCGC_CARD_BYTES) {
         bytes_used = GENCGC_CARD_BYTES;
         more = 1;
     }
@@ -1205,12 +1202,11 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         page_table[next_page].gen = gc_alloc_generation;
         page_table[next_page].large_object = 1;
 
-        set_page_scan_start_offset(next_page,
-            npage_bytes(next_page-first_page) - orig_first_page_bytes_used);
+        set_page_scan_start_offset(next_page, npage_bytes(next_page-first_page));
 
         /* Calculate the number of bytes used in this page. */
         more = 0;
-        bytes_used=(nbytes+orig_first_page_bytes_used)-byte_cnt;
+        bytes_used = nbytes - byte_cnt;
         if (bytes_used > GENCGC_CARD_BYTES) {
             bytes_used = GENCGC_CARD_BYTES;
             more = 1;
@@ -1222,14 +1218,14 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         next_page++;
     }
 
-    gc_assert((byte_cnt-orig_first_page_bytes_used) == (size_t)nbytes);
+    gc_assert(byte_cnt == (size_t)nbytes);
 
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
     /* Add the region to the new_areas if requested. */
     if (BOXED_PAGE_FLAG & page_type_flag)
-        add_new_area(first_page,orig_first_page_bytes_used,nbytes);
+        add_new_area(first_page, 0, nbytes);
 
     /* Bump up last_free_page */
     if (last_page+1 > last_free_page) {
