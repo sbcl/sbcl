@@ -110,3 +110,14 @@
                  :name "get-foreground hang missing-broadcast test")))
     (sb-thread:release-foreground thread)
     (get-foreground-quietly)))
+
+;;; Releasing foreground to an already dead thread previously made the
+;;; dead thread the foreground thread. At that point, all succeeding
+;;; GET-FOREGROUND calls would just hang.
+(with-test (:name (sb-thread::get-foreground :hang :already-dead))
+  (let ((thread (sb-thread:make-thread
+                 (lambda ())
+                 :name "get-foreground hang already-dead test")))
+    (sb-thread:join-thread thread)
+    (sb-thread:release-foreground thread)
+    (get-foreground-quietly)))

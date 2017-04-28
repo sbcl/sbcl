@@ -1358,7 +1358,7 @@ have the foreground next."
           ((interactive-threads (session-interactive-threads session)))
         (setf interactive-threads
               (delete *current-thread* interactive-threads))
-        (when next
+        (when (and next (thread-alive-p next))
           (setf interactive-threads
                 (list* next (delete next interactive-threads))))
         (condition-broadcast (session-interactive-threads-queue session))))))
