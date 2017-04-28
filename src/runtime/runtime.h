@@ -217,9 +217,6 @@ typedef signed long s64;
 typedef unsigned int u32;
 typedef signed int s32;
 
-/* this is an integral type the same length as a machine pointer */
-typedef uintptr_t pointer_sized_uint_t;
-
 #ifdef _WIN64
 #define AMD64_SYSV_ABI __attribute__((sysv_abi))
 #else
@@ -246,7 +243,7 @@ typedef s32 sword_t;
 /* FIXME: we do things this way because of the alpha32 port.  once
    alpha64 has arrived, all this nastiness can go away */
 #if 64 == N_WORD_BITS
-#define LOW_WORD(c) ((pointer_sized_uint_t)c)
+#define LOW_WORD(c) ((uintptr_t)c)
 #define OBJ_FMTX "lx"
 typedef uintptr_t lispobj;
 #else
@@ -342,7 +339,7 @@ is_lisp_immediate(lispobj obj)
 static inline lispobj *
 native_pointer(lispobj obj)
 {
-    return (lispobj *) ((pointer_sized_uint_t) (obj & ~LOWTAG_MASK));
+    return (lispobj *) ((uintptr_t) (obj & ~LOWTAG_MASK));
 }
 
 /* inverse operation: create a suitably tagged lispobj from a native

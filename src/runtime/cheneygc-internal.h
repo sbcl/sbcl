@@ -52,12 +52,12 @@ new_space_p(lispobj object)
 #else
 
 #define from_space_p(ptr) \
-        ((from_space <= ((lispobj *) ((pointer_sized_uint_t) ptr))) && \
-         (((lispobj *) ((pointer_sized_uint_t) ptr))< from_space_free_pointer))
+        ((from_space <= ((lispobj *) ((uintptr_t) ptr))) && \
+         (((lispobj *) ((uintptr_t) ptr))< from_space_free_pointer))
 
 #define new_space_p(ptr) \
-        ((new_space <= ((lispobj *) ((pointer_sized_uint_t) ptr))) && \
-         (((lispobj *) ((pointer_sized_uint_t) ptr)) < new_space_free_pointer))
+        ((new_space <= ((lispobj *) ((uintptr_t) ptr))) && \
+         (((lispobj *) ((uintptr_t) ptr)) < new_space_free_pointer))
 
 #endif
 

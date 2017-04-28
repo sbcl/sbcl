@@ -250,8 +250,8 @@ static inline low_page_index_t find_immobile_page_index(void *addr)
       // Must use full register size here to avoid truncation of quotient
       // and bogus result!
       page_index_t index =
-          ((pointer_sized_uint_t)addr -
-           (pointer_sized_uint_t)IMMOBILE_SPACE_START) / IMMOBILE_CARD_BYTES;
+          ((uintptr_t)addr -
+           (uintptr_t)IMMOBILE_SPACE_START) / IMMOBILE_CARD_BYTES;
       if (index < (int)(IMMOBILE_SPACE_SIZE/IMMOBILE_CARD_BYTES))
           return index;
   }

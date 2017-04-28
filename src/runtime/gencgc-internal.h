@@ -231,8 +231,8 @@ static inline page_index_t
 find_page_index(void *addr)
 {
     if (addr >= (void*)DYNAMIC_SPACE_START) {
-        page_index_t index = ((pointer_sized_uint_t)addr -
-                              (pointer_sized_uint_t)DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
+        page_index_t index = ((uintptr_t)addr -
+                              (uintptr_t)DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
         if (index < page_table_pages)
             return (index);
     }

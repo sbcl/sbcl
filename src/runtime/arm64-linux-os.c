@@ -105,6 +105,6 @@ void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     os_vm_address_t end_address
-        = (os_vm_address_t)(((pointer_sized_uint_t) address) + length);
+        = (os_vm_address_t)(((uintptr_t) address) + length);
     __clear_cache(address, end_address);
 }

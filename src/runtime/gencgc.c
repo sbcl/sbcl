@@ -267,7 +267,7 @@ static inline os_vm_size_t
 void_diff(void *x, void *y)
 {
     gc_assert(x >= y);
-    return (pointer_sized_uint_t)x - (pointer_sized_uint_t)y;
+    return (uintptr_t)x - (uintptr_t)y;
 }
 
 /* a structure to hold the state of a generation
