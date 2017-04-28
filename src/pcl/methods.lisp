@@ -266,7 +266,7 @@
            'find-method-length-mismatch
            :format-control   "~@<The generic function ~S takes ~D ~
                               required argument~:P; was asked to ~
-                              find a method with specializers ~S~@:>"
+                              find a method with specializers ~:S~@:>"
            :format-arguments (list generic-function required-parameter-count
                                    (unparse-specializers generic-function specializers))))))
     (flet ((congruentp (other-method)
@@ -279,8 +279,8 @@
             ((null errorp) nil)
             (t
              (error "~@<There is no method on ~S with ~:[no ~
-                     qualifiers~;~:*qualifiers ~S~] and specializers ~
-                     ~S.~@:>"
+                     qualifiers~;~:*qualifiers ~:S~] and specializers ~
+                     ~:S.~@:>"
                     generic-function qualifiers specializers))))))
 
 (defmethod find-method ((generic-function standard-generic-function)
