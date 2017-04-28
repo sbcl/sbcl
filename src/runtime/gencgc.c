@@ -264,7 +264,7 @@ npage_bytes(page_index_t npages)
 /* Check that X is a higher address than Y and return offset from Y to
  * X in bytes. */
 static inline os_vm_size_t
-void_diff(void *x, void *y)
+addr_diff(void *x, void *y)
 {
     gc_assert(x >= y);
     return (uintptr_t)x - (uintptr_t)y;
@@ -876,7 +876,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         /* This may not be necessary for unboxed regions (think it was
          * broken before!) */
         set_page_scan_start_offset(i,
-            void_diff(page_address(i), alloc_region->start_addr));
+            addr_diff(page_address(i), alloc_region->start_addr));
         page_table[i].allocated |= OPEN_REGION_PAGE_FLAG ;
     }
     /* Bump up last_free_page. */
@@ -1065,7 +1065,7 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
         /* Calculate the number of bytes used in this page. This is not
          * always the number of new bytes, unless it was free. */
         more = 0;
-        if ((bytes_used = void_diff(alloc_region->free_pointer,
+        if ((bytes_used = addr_diff(alloc_region->free_pointer,
                                     page_address(first_page)))
             >GENCGC_CARD_BYTES) {
             bytes_used = GENCGC_CARD_BYTES;
@@ -1085,12 +1085,12 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
             gc_assert(page_table[next_page].gen == gc_alloc_generation);
             gc_assert(page_table[next_page].large_object == 0);
             gc_assert(page_scan_start_offset(next_page) ==
-                      void_diff(page_address(next_page),
+                      addr_diff(page_address(next_page),
                                 alloc_region->start_addr));
 
             /* Calculate the number of bytes used in this page. */
             more = 0;
-            if ((bytes_used = void_diff(alloc_region->free_pointer,
+            if ((bytes_used = addr_diff(alloc_region->free_pointer,
                                         page_address(next_page)))>GENCGC_CARD_BYTES) {
                 bytes_used = GENCGC_CARD_BYTES;
                 more = 1;
@@ -1101,7 +1101,7 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
             next_page++;
         }
 
-        region_size = void_diff(alloc_region->free_pointer,
+        region_size = addr_diff(alloc_region->free_pointer,
                                 alloc_region->start_addr);
         bytes_allocated += region_size;
         generations[gc_alloc_generation].bytes_allocated += region_size;
@@ -1408,7 +1408,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
         /* Unless a `quick' alloc was requested, check whether the
            alloc region is almost empty. */
         if (!quick_p &&
-            void_diff(my_region->end_addr,my_region->free_pointer) <= 32) {
+            addr_diff(my_region->end_addr,my_region->free_pointer) <= 32) {
             /* If so, finished with the current region. */
             gc_alloc_update_page_tables(page_type_flag, my_region);
             /* Set up a new region. */
@@ -2223,7 +2223,7 @@ wipe_nonpinned_words()
         /* printf("i=%d obj=%p base=%p\n", i, obj, (void*)this_page_base); */
         if (this_page_base > page_base_address(preceding_object)) {
             bzero((void*)this_page_base,
-                  void_diff((void*)obj, (void*)this_page_base));
+                  addr_diff((void*)obj, (void*)this_page_base));
             // Move the page to newspace
             page_index_t page = find_page_index(obj);
             int used = page_bytes_used(page);
@@ -2245,7 +2245,7 @@ wipe_nonpinned_words()
             range_end = pinned_objects.keys[i+1];
         /* printf("    Clearing %p .. %p\n", (void*)range_start, (void*)range_end); */
         bzero((void*)range_start,
-              void_diff((void*)range_end, (void*)range_start));
+              addr_diff((void*)range_end, (void*)range_start));
         preceding_object = (uword_t)obj;
     }
 }
