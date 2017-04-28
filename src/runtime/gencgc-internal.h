@@ -268,5 +268,5 @@ extern boolean gencgc_partial_pickup;
 #endif
 
 extern uword_t
-walk_generation(uword_t (*proc)(lispobj*,lispobj*),
-                generation_index_t generation);
+walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
+                generation_index_t generation, uword_t extra);

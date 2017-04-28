@@ -3217,8 +3217,8 @@ verify_gc(void)
  * specified generation.
  * Stop if any invocation returns non-zero, and return that value */
 uword_t
-walk_generation(uword_t (*proc)(lispobj*,lispobj*),
-                generation_index_t generation)
+walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
+                generation_index_t generation, uword_t extra)
 {
     page_index_t i;
     int genmask = generation >= 0 ? 1 << generation : ~0;
@@ -3246,7 +3246,8 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*),
             uword_t result =
                 proc(page_address(i),
                      (lispobj*)(page_bytes_used(last_page)
-                                + (char*)page_address(last_page)));
+                                + (char*)page_address(last_page)),
+                     extra);
             if (result) return result;
 
             i = last_page;
@@ -3256,7 +3257,8 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*),
 }
 static void verify_generation(generation_index_t generation)
 {
-  walk_generation((uword_t(*)(lispobj*,lispobj*))verify_space, generation);
+    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_space,
+                    generation, 0);
 }
 
 /* Check that all the free space is zero filled. */
