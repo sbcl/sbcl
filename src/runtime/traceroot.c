@@ -307,20 +307,23 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
     struct thread *th;
 
     for_each_thread(th) {
+        lispobj *where, *end;
+#ifdef LISP_FEATURE_SB_THREAD
         // Examine thread-local storage
         *root_kind = TLS;
-        lispobj* where = (lispobj*)(th+1);
-        lispobj* end   = (lispobj*)((char*)th + SymbolValue(FREE_TLS_INDEX,0));
+        where = (lispobj*)(th+1);
+        end   = (lispobj*)((char*)th + SymbolValue(FREE_TLS_INDEX,0));
         for( ; where < end ; ++where)
             if (interestingp(*where, targets)) {
                 *root_thread = th;
                 *tls_index = (char*)where - (char*)th;
                 return *where;
             }
+#endif
         // Examine the binding stack
         *root_kind = BINDING_STACK;
         where = (lispobj*)th->binding_stack_start;
-        end   = get_binding_stack_pointer(th);
+        end   = (lispobj*)get_binding_stack_pointer(th);
         for( ; where < end ; where += 2)
             if (interestingp(*where, targets)) {
                 *root_thread = th;
@@ -853,7 +856,7 @@ void prove_liveness(lispobj objects)
 #include "genesis/instance.h"
 #include "genesis/vector.h"
 
-static boolean sym_stringeq(lispobj sym, const char *string, int len)
+static boolean __attribute__((unused)) sym_stringeq(lispobj sym, const char *string, int len)
 {
     struct vector* name = (struct vector*)native_pointer(SYMBOL(sym)->name);
     return widetag_of(name->header) == SIMPLE_BASE_STRING_WIDETAG
@@ -864,9 +867,10 @@ static boolean sym_stringeq(lispobj sym, const char *string, int len)
 /* Return the value of SB-THREAD::*ALL-THREADS*
  * This does not need to be particularly efficient.
  */
-static const char all_threads_sym[] = "*ALL-THREADS*";
+static const char __attribute__((unused)) all_threads_sym[] = "*ALL-THREADS*";
 static lispobj all_lisp_threads()
 {
+#ifdef ENTER_FOREIGN_CALLBACK
     // Starting with a known static symbol in SB-THREAD::, get the SB-THREAD package
     // and find *ALL-THREADS* (which isn't static). Fewer static symbols is better.
     struct symbol*   sym = SYMBOL(ENTER_FOREIGN_CALLBACK);
@@ -886,6 +890,7 @@ static lispobj all_lisp_threads()
         index = (index + 1) % cells_length;
     } while (index != initial_index);
     lose("Can't find *ALL-THREADS*");
+#endif
     return NIL;
 }
 

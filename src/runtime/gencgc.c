@@ -3354,10 +3354,11 @@ write_protect_generation_pages(generation_index_t generation)
     }
 }
 
-#if defined(LISP_FEATURE_SB_THREAD) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 static void
 preserve_context_registers (void (*proc)(os_context_register_t), os_context_t *c)
 {
+#ifdef LISP_FEATURE_SB_THREAD
     void **ptr;
     /* On Darwin the signal context isn't a contiguous block of memory,
      * so just preserve_pointering its contents won't be sufficient.
@@ -3396,6 +3397,7 @@ preserve_context_registers (void (*proc)(os_context_register_t), os_context_t *c
         proc((os_context_register_t)*ptr);
     }
 #endif
+#endif // LISP_FEATURE_SB_THREAD
 }
 #endif
 

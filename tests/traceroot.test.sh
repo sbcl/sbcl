@@ -17,8 +17,8 @@
 
 use_test_subdirectory
 
-run_sbcl --eval "(sb-ext:exit :code (or #+sb-traceroot 0 7))"
-test $? = 7 && exit $EXIT_TEST_WIN # Pass if feature is absent
+run_sbcl --eval "(sb-ext:exit :code (or #+(and sb-thread sb-traceroot) 0 7))"
+test $? = 7 && exit $EXIT_TEST_WIN # Pass if feature is absent or not fully working
 
 tmpfilename="$TEST_FILESTEM.out"
 
