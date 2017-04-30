@@ -85,12 +85,6 @@ copy_object(lispobj object, sword_t nwords)
     return gc_general_copy_object(object, nwords, BOXED_PAGE_FLAG);
 }
 
-lispobj
-copy_code_object(lispobj object, sword_t nwords)
-{
-    return gc_general_copy_object(object, nwords, CODE_PAGE_FLAG);
-}
-
 static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 
 static inline void scav1(lispobj* object_ptr, lispobj object)
@@ -237,7 +231,7 @@ trans_code(struct code *code)
     sword_t nheader_words = code_header_words(code->header);
     sword_t ncode_words = code_instruction_words(code->code_size);
     sword_t nwords = nheader_words + ncode_words;
-    lispobj l_new_code = copy_code_object(l_code, nwords);
+    lispobj l_new_code = gc_general_copy_object(l_code, nwords, CODE_PAGE_FLAG);
     struct code *new_code = (struct code *) native_pointer(l_new_code);
 
 #if defined(DEBUG_CODE_GC)

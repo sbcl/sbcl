@@ -183,7 +183,6 @@ lispobj  copy_large_unboxed_object(lispobj object, sword_t nwords);
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
 lispobj  copy_large_object(lispobj object, sword_t nwords);
 lispobj  copy_object(lispobj object, sword_t nwords);
-lispobj  copy_code_object(lispobj object, sword_t nwords);
 struct simple_fun *code_fun_addr(struct code*, int);
 
 lispobj *search_read_only_space(void *pointer);
