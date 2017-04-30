@@ -1939,6 +1939,7 @@ search_dynamic_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
+#ifndef GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
 // were it allowed to be either discarded as garbage or moved.
@@ -1948,16 +1949,6 @@ search_dynamic_space(void *pointer)
 static lispobj*
 conservative_root_p(void *addr, page_index_t addr_page_index)
 {
-#ifdef GENCGC_IS_PRECISE
-    /* If we're in precise gencgc (non-x86oid as of this writing) then
-     * we are only called on valid object pointers in the first place,
-     * so we just have to do a bounds-check against the heap, a
-     * generation check, and the already-pinned check. */
-    if ((page_table[addr_page_index].gen != from_space)
-        || (page_table[addr_page_index].dont_move != 0))
-        return 0;
-    return (lispobj*)1;
-#else
     /* quick check 1: Address is quite likely to have been invalid. */
     if (page_free_p(addr_page_index)
         || (page_bytes_used(addr_page_index) == 0)
@@ -1997,8 +1988,8 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
         return 0;
 
     return object_start;
-#endif
 }
+#endif
 
 /* Adjust large bignum and vector objects. This will adjust the
  * allocated region if the size has shrunk, and move unboxed objects
@@ -2300,11 +2291,22 @@ preserve_pointer(void *addr)
     }
 #endif
     page_index_t addr_page_index = find_page_index(addr);
-    lispobj *object_start;
 
+#ifdef GENCGC_IS_PRECISE
+    /* If we're in precise gencgc (non-x86oid as of this writing) then
+     * we are only called on valid object pointers in the first place,
+     * so we just have to do a bounds-check against the heap, a
+     * generation check, and the already-pinned check. */
+    if (addr_page_index == -1
+        || (page_table[addr_page_index].gen != from_space)
+        || page_table[addr_page_index].dont_move)
+        return;
+#else
+    lispobj *object_start;
     if (addr_page_index == -1
         || (object_start = conservative_root_p(addr, addr_page_index)) == 0)
         return;
+#endif
 
     /* (Now that we know that addr_page_index is in range, it's
      * safe to index into page_table[] with it.) */
