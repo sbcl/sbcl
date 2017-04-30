@@ -58,11 +58,6 @@ ldso_stub__~A: ;                                \\
 /* This is an automatically generated file, please do not hand-edit it.
  * See the program tools-for-build/ldso-stubs.lisp. */
 
-#ifdef __ELF__
-// Mark the object as not requiring an executable stack.
-.section .note.GNU-stack,\"\",%progbits
-#endif
-
 #ifndef LANGUAGE_ASSEMBLY
 #define LANGUAGE_ASSEMBLY
 #endif
@@ -370,5 +365,9 @@ ldso_stub__ ## fct: ;                  \\
     (write-line pre f))
   (dolist (stub *stubs*)
     (check-type stub string)
-    (ldso-stubify stub f)))
-
+    (ldso-stubify stub f))
+  (format f "
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,\"\",%progbits
+#endif~%"))
