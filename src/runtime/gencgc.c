@@ -290,11 +290,6 @@ struct generation {
      * call. (Although it always allocates after the boxed_region.) */
     page_index_t alloc_large_start_page;
 
-    /* the first page that gc_alloc_large (unboxed) considers on its
-     * next call. (Although it always allocates after the
-     * current_unboxed_region.) */
-    page_index_t alloc_large_unboxed_start_page;
-
     /* the bytes allocated to this generation */
     os_vm_size_t bytes_allocated;
 
@@ -471,7 +466,7 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            " Gen StaPg UbSta LaSta LUbSt Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
+            " Gen  StaPg UbSta LaSta Boxed Unbox    LB   LUB !move    Alloc  Waste     Trig   WP GCs Mem-age\n");
 
     for (i = 0; i <= SCRATCH_GENERATION; i++) {
         page_index_t j;
@@ -506,12 +501,11 @@ write_generation_stats(FILE *file)
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
         fprintf(file,
-                "   %1d: %5ld %5ld %5ld %5ld",
+                "   %1d: %5ld %5ld %5ld",
                 i,
                 (long)generations[i].alloc_start_page,
                 (long)generations[i].alloc_unboxed_start_page,
-                (long)generations[i].alloc_large_start_page,
-                (long)generations[i].alloc_large_unboxed_start_page);
+                (long)generations[i].alloc_large_start_page);
         fprintf(file,
                 " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT
                 " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT,
@@ -519,7 +513,7 @@ write_generation_stats(FILE *file)
                 large_unboxed_cnt, pinned_cnt);
         fprintf(file,
                 " %8"OS_VM_SIZE_FMT
-                " %5"OS_VM_SIZE_FMT
+                " %6"OS_VM_SIZE_FMT
                 " %8"OS_VM_SIZE_FMT
                 " %4"PAGE_INDEX_FMT" %3d %7.4f\n",
                 generations[i].bytes_allocated,
@@ -755,50 +749,28 @@ static generation_index_t gc_alloc_generation;
 static inline page_index_t
 generation_alloc_start_page(generation_index_t generation, int page_type_flag, int large)
 {
-    if (large) {
-        if (UNBOXED_PAGE_FLAG == page_type_flag) {
-            return generations[generation].alloc_large_unboxed_start_page;
-        } else if (BOXED_PAGE_FLAG & page_type_flag) {
-            /* Both code and data. */
-            return generations[generation].alloc_large_start_page;
-        } else {
-            lose("bad page type flag: %d", page_type_flag);
-        }
-    } else {
-        if (UNBOXED_PAGE_FLAG == page_type_flag) {
-            return generations[generation].alloc_unboxed_start_page;
-        } else if (BOXED_PAGE_FLAG & page_type_flag) {
-            /* Both code and data. */
-            return generations[generation].alloc_start_page;
-        } else {
-            lose("bad page_type_flag: %d", page_type_flag);
-        }
-    }
+    if (!(page_type_flag >= 1 && page_type_flag <= 3))
+        lose("bad page_type_flag: %d", page_type_flag);
+    if (large)
+        return generations[generation].alloc_large_start_page;
+    if (UNBOXED_PAGE_FLAG == page_type_flag)
+        return generations[generation].alloc_unboxed_start_page;
+    /* Both code and data. */
+    return generations[generation].alloc_start_page;
 }
 
 static inline void
 set_generation_alloc_start_page(generation_index_t generation, int page_type_flag, int large,
                                 page_index_t page)
 {
-    if (large) {
-        if (UNBOXED_PAGE_FLAG == page_type_flag) {
-            generations[generation].alloc_large_unboxed_start_page = page;
-        } else if (BOXED_PAGE_FLAG & page_type_flag) {
-            /* Both code and data. */
-            generations[generation].alloc_large_start_page = page;
-        } else {
-            lose("bad page type flag: %d", page_type_flag);
-        }
-    } else {
-        if (UNBOXED_PAGE_FLAG == page_type_flag) {
-            generations[generation].alloc_unboxed_start_page = page;
-        } else if (BOXED_PAGE_FLAG & page_type_flag) {
-            /* Both code and data. */
-            generations[generation].alloc_start_page = page;
-        } else {
-            lose("bad page type flag: %d", page_type_flag);
-        }
-    }
+    if (!(page_type_flag >= 1 && page_type_flag <= 3))
+        lose("bad page_type_flag: %d", page_type_flag);
+    if (large)
+        generations[generation].alloc_large_start_page = page;
+    else if (UNBOXED_PAGE_FLAG == page_type_flag)
+        generations[generation].alloc_unboxed_start_page = page;
+    else /* Both code and data. */
+        generations[generation].alloc_start_page = page;
 }
 
 /* Find a new region with room for at least the given number of bytes.
@@ -1159,6 +1131,11 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     gc_assert(ret == 0);
 
     first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1);
+    // FIXME: really we want to try looking for space following the highest of
+    // the last page of all other small object regions. That's impossible - there's
+    // not enough information. At best we can skip some work in only the case where
+    // the supplied region was the one most recently created. To do this right
+    // would entail a malloc-like allocator at the page granularity.
     if (first_page <= alloc_region->last_page) {
         first_page = alloc_region->last_page+1;
     }
@@ -3467,7 +3444,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[new_space].alloc_start_page = 0;
     generations[new_space].alloc_unboxed_start_page = 0;
     generations[new_space].alloc_large_start_page = 0;
-    generations[new_space].alloc_large_unboxed_start_page = 0;
 
     hopscotch_reset(&pinned_objects);
     /* Before any pointers are preserved, the dont_move flags on the
@@ -3752,7 +3728,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[generation].alloc_start_page = 0;
     generations[generation].alloc_unboxed_start_page = 0;
     generations[generation].alloc_large_start_page = 0;
-    generations[generation].alloc_large_unboxed_start_page = 0;
 
     if (generation >= verify_gens) {
         if (gencgc_verbose) {
@@ -4105,7 +4080,6 @@ gc_init(void)
         generations[i].alloc_start_page = 0;
         generations[i].alloc_unboxed_start_page = 0;
         generations[i].alloc_large_start_page = 0;
-        generations[i].alloc_large_unboxed_start_page = 0;
         generations[i].bytes_allocated = 0;
         generations[i].gc_trigger = 2000000;
         generations[i].num_gc = 0;
