@@ -1950,17 +1950,12 @@ static lispobj*
 conservative_root_p(void *addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
-    if (page_free_p(addr_page_index)
-        || (page_bytes_used(addr_page_index) == 0)
-        || (page_table[addr_page_index].gen != from_space))
+    struct page* page = &page_table[addr_page_index];
+    if (page->gen != from_space ||
+        ((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
+        (page->large_object && page->dont_move))
         return 0;
-    gc_assert(!(page_table[addr_page_index].allocated&OPEN_REGION_PAGE_FLAG));
-
-    /* quick check 2: Check the offset within the page.
-     *
-     */
-    if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index))
-        return 0;
+    gc_assert(!(page->allocated & OPEN_REGION_PAGE_FLAG));
 
     /* Filter out anything which can't be a pointer to a Lisp object
      * (or, as a special case which also requires dont_move, a return
