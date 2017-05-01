@@ -202,7 +202,7 @@ void os_link_runtime()
         odxprint(runtime_link, "linking %s => %p", namechars, result);
 
         if (link_target == validated_end) {
-            validated_end += os_vm_page_size;
+            validated_end = (char*)validated_end + os_vm_page_size;
 #ifdef LISP_FEATURE_WIN32
             os_validate_recommit(link_target,os_vm_page_size);
 #endif

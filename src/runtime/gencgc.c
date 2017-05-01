@@ -213,7 +213,7 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
 }
 
 /* Calculate the start address for the given page number. */
-inline void *
+inline char *
 page_address(page_index_t page_num)
 {
     return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_CARD_BYTES));
@@ -822,8 +822,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     /* Set up the alloc_region. */
     alloc_region->first_page = first_page;
     alloc_region->last_page = last_page;
-    alloc_region->start_addr = page_bytes_used(first_page)
-        + page_address(first_page);
+    alloc_region->start_addr = page_address(first_page) + page_bytes_used(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
     alloc_region->end_addr = page_address(last_page+1);
 
@@ -1370,7 +1369,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
         return gc_alloc_large(nbytes, page_type_flag, my_region);
 
     /* Check whether there is room in the current alloc region. */
-    new_free_pointer = my_region->free_pointer + nbytes;
+    new_free_pointer = (char*)my_region->free_pointer + nbytes;
 
     /* fprintf(stderr, "alloc %d bytes from %p to %p\n", nbytes,
        my_region->free_pointer, new_free_pointer); */
@@ -2330,7 +2329,7 @@ preserve_pointer(void *addr)
     /* Adjust any large objects before promotion as they won't be
      * copied after promotion. */
     if (page_table[first_page].large_object) {
-        maybe_adjust_large_object(page_address(first_page));
+        maybe_adjust_large_object((lispobj*)page_address(first_page));
         /* It may have moved to unboxed pages. */
         region_allocation = page_table[first_page].allocated;
     }
@@ -2561,7 +2560,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                     update_page_write_prot(i);
                 }
                 for (last_page = i + 1; ; last_page++) {
-                    lispobj* start = page_address(last_page);
+                    lispobj* start = (lispobj*)page_address(last_page);
                     write_protected = page_table[last_page].write_protected;
                     if (page_ends_contiguous_block_p(last_page, generation)) {
                         if (!write_protected) {
@@ -2584,8 +2583,8 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                         break;
                 }
                 if (!write_protected) {
-                    heap_scavenge(page_address(i),
-                                  (lispobj*)((char*)page_address(last_page)
+                    heap_scavenge((lispobj*)page_address(i),
+                                  (lispobj*)(page_address(last_page)
                                              + page_bytes_used(last_page)));
 
                     /* Now scan the pages and write protect those that
@@ -2712,7 +2711,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
             if (!all_wp) {
                 new_areas_ignore_page = last_page;
                 heap_scavenge(page_scan_start(i),
-                              (lispobj*)((char*)page_address(last_page)
+                              (lispobj*)(page_address(last_page)
                                          + page_bytes_used(last_page)));
             }
             i = last_page;
@@ -2825,7 +2824,7 @@ scavenge_newspace_generation(generation_index_t generation)
                 size_t offset = (*previous_new_areas)[i].offset;
                 size_t size = (*previous_new_areas)[i].size;
                 gc_assert(size % N_WORD_BYTES == 0);
-                lispobj *start = (lispobj*)((char*)page_address(page) + offset);
+                lispobj *start = (lispobj*)(page_address(page) + offset);
                 heap_scavenge(start, (lispobj*)((char*)start + size));
             }
 
@@ -2873,8 +2872,8 @@ static void
 unprotect_oldspace(void)
 {
     page_index_t i;
-    void *region_addr = 0;
-    void *page_addr = 0;
+    char *region_addr = 0;
+    char *page_addr = 0;
     uword_t region_bytes = 0;
 
     for (i = 0; i < last_free_page; i++) {
@@ -3219,9 +3218,8 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
                     break;
 
             uword_t result =
-                proc(page_address(i),
-                     (lispobj*)(page_bytes_used(last_page)
-                                + (char*)page_address(last_page)),
+                proc((lispobj*)page_address(i),
+                     (lispobj*)(page_bytes_used(last_page) + page_address(last_page)),
                      extra);
             if (result) return result;
 
@@ -3255,8 +3253,8 @@ verify_zero_fill(void)
         } else {
             sword_t free_bytes = GENCGC_CARD_BYTES - page_bytes_used(page);
             if (free_bytes > 0) {
-                sword_t *start_addr = (sword_t *)((uword_t)page_address(page)
-                                                  + page_bytes_used(page));
+                sword_t *start_addr =
+                    (sword_t *)(page_address(page) + page_bytes_used(page));
                 sword_t size = free_bytes / N_WORD_BYTES;
                 sword_t i;
                 for (i = 0; i < size; i++) {
@@ -3309,7 +3307,7 @@ write_protect_generation_pages(generation_index_t generation)
                 page_table[last].write_protected = 1;
             }
 
-            page_start = (void *)page_address(start);
+            page_start = page_address(start);
 
             os_protect(page_start,
                        npage_bytes(last - start),
@@ -3953,7 +3951,7 @@ collect_garbage(generation_index_t last_gen)
 
     /* Set gc_alloc() back to generation 0. The current regions should
      * be flushed after the above GCs. */
-    gc_assert((boxed_region.free_pointer - boxed_region.start_addr) == 0);
+    gc_assert(boxed_region.free_pointer == boxed_region.start_addr);
     gc_alloc_generation = 0;
 
     /* Save the high-water mark before updating last_free_page */
@@ -4105,7 +4103,7 @@ static void
 gencgc_pickup_dynamic(void)
 {
     page_index_t page = 0;
-    void *alloc_ptr = (void *)get_alloc_pointer();
+    char *alloc_ptr = (char *)get_alloc_pointer();
     lispobj *prev=(lispobj *)page_address(page);
     generation_index_t gen = PSEUDO_STATIC_GENERATION;
 
@@ -4133,8 +4131,7 @@ gencgc_pickup_dynamic(void)
             first = gc_search_space3(ptr, prev, (ptr+2));
             if(ptr == first)
                 prev=ptr;
-            set_page_scan_start_offset(page,
-                page_address(page) - (void *)prev);
+            set_page_scan_start_offset(page, page_address(page) - (char*)prev);
         }
         page++;
     } while (page_address(page) < alloc_ptr);
@@ -4192,7 +4189,7 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
         large_allocation = nbytes;
 
     /* maybe we can do this quickly ... */
-    new_free_pointer = region->free_pointer + nbytes;
+    new_free_pointer = (char*)region->free_pointer + nbytes;
     if (new_free_pointer <= region->end_addr) {
         new_obj = (void*)(region->free_pointer);
         region->free_pointer = new_free_pointer;

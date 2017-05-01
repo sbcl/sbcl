@@ -626,7 +626,7 @@ create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
-    void *aligned_spaces=0;
+    char *aligned_spaces=0;
 #if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
     unsigned int i;
 #endif
@@ -647,7 +647,7 @@ create_thread_struct(lispobj initial_function) {
     aligned_spaces = (void *)((((uword_t)(char *)spaces)
                                + THREAD_ALIGNMENT_BYTES-1)
                               &~(uword_t)(THREAD_ALIGNMENT_BYTES-1));
-    void* csp_page=
+    char* csp_page=
         (aligned_spaces+
          thread_control_stack_size+
          BINDING_STACK_SIZE+
@@ -662,13 +662,13 @@ create_thread_struct(lispobj initial_function) {
 
     th=&per_thread->thread;
     th->os_address = spaces;
-    th->control_stack_start = aligned_spaces;
+    th->control_stack_start = (lispobj*)aligned_spaces;
     th->binding_stack_start=
-        (lispobj*)((void*)th->control_stack_start+thread_control_stack_size);
+        (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
     th->control_stack_guard_page_protected = T;
     th->alien_stack_start=
-        (lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
+        (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
     set_binding_stack_pointer(th,th->binding_stack_start);
     th->this=th;
     th->os_thread=0;
@@ -704,10 +704,10 @@ create_thread_struct(lispobj initial_function) {
 #endif
     th->state=STATE_RUNNING;
 #ifdef ALIEN_STACK_GROWS_DOWNWARD
-    th->alien_stack_pointer=((void *)th->alien_stack_start
-                             + ALIEN_STACK_SIZE-N_WORD_BYTES);
+    th->alien_stack_pointer=(lispobj*)((char*)th->alien_stack_start
+                                       + ALIEN_STACK_SIZE-N_WORD_BYTES);
 #else
-    th->alien_stack_pointer=((void *)th->alien_stack_start);
+    th->alien_stack_pointer=(lispobj*)((char*)th->alien_stack_start);
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
