@@ -50,7 +50,6 @@
                   *free-interrupt-context-index*
                   sb!vm::*allocation-pointer*
                   sb!vm::*binding-stack-pointer*
-                  sb!pcl::..slot-unbound..
                   sb!pcl::*cache-miss-values-stack*
                   sb!pcl::*dfun-miss-gfs-on-stack*))
 (!defvar sb!vm:*alloc-signal* nil)
