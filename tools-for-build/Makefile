@@ -10,7 +10,7 @@
 -include genesis/Makefile.features
 -include Config
 
-CPPFLAGS:=-I../src/runtime
+CPPFLAGS+=-I../src/runtime
 LDFLAGS:=$(LDFLAGS)
 LDLIBS:=$(OS_LIBS)
 

@@ -17,7 +17,7 @@ TARGET=sbcl
 # Defaults which might be overridden or modified by values in the
 # Config file. Most of them are same on most systems right now.
 # If you need to override one of these, do it in Config.
-LINKFLAGS = -g
+LINKFLAGS += -g
 NM = nm -gp
 DEPEND_FLAGS = -MM
 GREP = grep
@@ -30,9 +30,9 @@ __LDFLAGS__ =
 
 include ../../output/prefix.def
 
-CFLAGS = -g -Wall -Wsign-compare -Wpointer-arith -O3
-ASFLAGS = $(CFLAGS)
-CPPFLAGS = -I. -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
+CFLAGS += -g -Wall -Wsign-compare -Wpointer-arith -O3
+ASFLAGS += $(CFLAGS)
+CPPFLAGS += -I. -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
 
 # Give make access to the target Lisp features.
 include genesis/Makefile.features

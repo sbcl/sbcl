@@ -11,7 +11,7 @@ FASL=$(DEST)/$(SYSTEM).fasl
 ASD=$(DEST)/$(SYSTEM).asd
 
 ifeq (SunOS,$(UNAME))
-  EXTRA_CFLAGS=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+  EXTRA_CFLAGS+=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
   PATH:=/usr/xpg4/bin:${PATH}
 endif
 ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))
@@ -21,7 +21,7 @@ ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))
   CC:=$(shell cygpath -m $(shell readlink -fn $(shell which $(CC))))
 endif
 ifeq (Linux,$(UNAME))
-  EXTRA_CFLAGS=-D_GNU_SOURCE
+  EXTRA_CFLAGS+=-D_GNU_SOURCE
 endif
 
 export CC SBCL EXTRA_CFLAGS

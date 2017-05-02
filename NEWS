@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.3.17:
+  * minor incompatible change: existing values of CFLAGS, ASFLAGS,
+    CPPFLAGS, and LINKFLAGS will be incorporated into C compiler
+    invocations when building from source.
   * enhancement: x86[-64] backends contain an experimental feature
     which aids in demonstrating reachability of any object starting
     from a tenured object or a thread stack by producing a proof
