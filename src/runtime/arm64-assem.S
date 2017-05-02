@@ -1,8 +1,3 @@
-#ifdef __ELF__
-// Mark the object as not requiring an executable stack.
-.section .note.GNU-stack,"",%progbits
-#endif
-
 #define LANGUAGE_ASSEMBLY
 
 #include "globals.h"
@@ -473,3 +468,8 @@ do_pending_interrupt:
         brk trap_PendingInterrupt
 	ret
         #endif
+
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,"",%progbits
+#endif

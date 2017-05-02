@@ -1,8 +1,3 @@
-#ifdef __ELF__
-// Mark the object as not requiring an executable stack.
-.section .note.GNU-stack,"",%progbits
-#endif
-
 #define LANGUAGE_ASSEMBLY
 
 #include "lispregs.h"
@@ -377,4 +372,9 @@ do_pending_interrupt:
         .byte 0
         .byte 0
 	bx	lr
+#endif
+
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,"",%progbits
 #endif
