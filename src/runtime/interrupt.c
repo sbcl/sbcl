@@ -1598,7 +1598,7 @@ arrange_return_to_c_function(os_context_t *context,
 #endif
 #if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64)
     *os_context_register_addr(context,reg_CODE) =
-        (os_context_register_t)(fun + FUN_POINTER_LOWTAG);
+        (os_context_register_t)((char*)fun + FUN_POINTER_LOWTAG);
 #endif
     FSHOW((stderr, "/arranged return to Lisp function (0x%lx)\n",
            (long)function));
