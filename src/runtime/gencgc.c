@@ -850,7 +850,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
          * broken before!) */
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
-        page_table[i].allocated |= OPEN_REGION_PAGE_FLAG ;
+        page_table[i].allocated |= OPEN_REGION_PAGE_FLAG;
     }
     /* Bump up last_free_page. */
     if (last_page+1 > last_free_page) {
@@ -1993,32 +1993,28 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
  * if this is missed, just may delay the moving of objects to unboxed
  * pages, and the freeing of pages. */
 static void
-maybe_adjust_large_object(lispobj *where)
+maybe_adjust_large_object(page_index_t first_page)
 {
-    page_index_t first_page;
+    lispobj* where = (lispobj*)page_address(first_page);
     page_index_t next_page;
-    sword_t nwords;
 
     uword_t remaining_bytes;
     uword_t bytes_freed;
     uword_t old_bytes_used;
 
-    int boxed;
+    int page_type_flag;
 
     /* Check whether it's a vector or bignum object. */
     lispobj widetag = widetag_of(where[0]);
     if (widetag == SIMPLE_VECTOR_WIDETAG)
-        boxed = BOXED_PAGE_FLAG;
+        page_type_flag = BOXED_PAGE_FLAG;
     else if (specialized_vector_widetag_p(widetag) || widetag == BIGNUM_WIDETAG)
-        boxed = UNBOXED_PAGE_FLAG;
+        page_type_flag = UNBOXED_PAGE_FLAG;
     else
         return;
 
     /* Find its current size. */
-    nwords = sizetab[widetag](where);
-
-    first_page = find_page_index((void *)where);
-    gc_assert(first_page >= 0);
+    sword_t nwords = sizetab[widetag](where);
 
     /* Note: Any page write-protection must be removed, else a later
      * scavenge_newspace may incorrectly not scavenge these pages.
@@ -2032,13 +2028,16 @@ maybe_adjust_large_object(lispobj *where)
     remaining_bytes = nwords*N_WORD_BYTES;
     while (remaining_bytes > GENCGC_CARD_BYTES) {
         gc_assert(page_table[next_page].gen == from_space);
+        // We can't assert that page_table[next_page].allocated is correct,
+        // because unboxed objects are initially allocated on boxed pages.
         gc_assert(page_allocated_no_region_p(next_page));
         gc_assert(page_table[next_page].large_object);
         gc_assert(page_scan_start_offset(next_page) ==
                   npage_bytes(next_page-first_page));
         gc_assert(page_bytes_used(next_page) == GENCGC_CARD_BYTES);
 
-        page_table[next_page].allocated = boxed;
+        // This affects only one object, since large objects don't share pages.
+        page_table[next_page].allocated = page_type_flag;
 
         /* Shouldn't be write-protected at this stage. Essential that the
          * pages aren't. */
@@ -2053,9 +2052,7 @@ maybe_adjust_large_object(lispobj *where)
     /* Object may have shrunk but shouldn't have grown - check. */
     gc_assert(page_bytes_used(next_page) >= remaining_bytes);
 
-    page_table[next_page].allocated = boxed;
-    gc_assert(page_table[next_page].allocated ==
-              page_table[first_page].allocated);
+    page_table[next_page].allocated = page_type_flag;
 
     /* Adjust the bytes_used. */
     old_bytes_used = page_bytes_used(next_page);
@@ -2071,7 +2068,7 @@ maybe_adjust_large_object(lispobj *where)
            page_table[next_page].large_object &&
            (page_scan_start_offset(next_page) ==
             npage_bytes(next_page - first_page))) {
-        /* It checks out OK, free the page. We don't need to both zeroing
+        /* It checks out OK, free the page. We don't need to bother zeroing
          * pages as this should have been done before shrinking the
          * object. These pages shouldn't be write protected as they
          * should be zero filled. */
@@ -2329,7 +2326,7 @@ preserve_pointer(void *addr)
     /* Adjust any large objects before promotion as they won't be
      * copied after promotion. */
     if (page_table[first_page].large_object) {
-        maybe_adjust_large_object((lispobj*)page_address(first_page));
+        maybe_adjust_large_object(first_page);
         /* It may have moved to unboxed pages. */
         region_allocation = page_table[first_page].allocated;
     }
