@@ -127,10 +127,15 @@ static inline void *
 gc_general_alloc(sword_t nbytes, int page_type_flag, int quick_p)
 {
     struct alloc_region *my_region;
+#ifdef LISP_FEATURE_SEGREGATED_CODE
+    if (1 <= page_type_flag && page_type_flag <= 3) {
+        my_region = &gc_alloc_regions[page_type_flag-1];
+#else
     if (UNBOXED_PAGE_FLAG == page_type_flag) {
         my_region = &unboxed_region;
     } else if (BOXED_PAGE_FLAG & page_type_flag) {
         my_region = &boxed_region;
+#endif
     } else {
         lose("bad page type flag: %d", page_type_flag);
     }

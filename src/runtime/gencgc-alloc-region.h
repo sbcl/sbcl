@@ -21,8 +21,13 @@ struct alloc_region {
     void  *start_addr;
 };
 
+#ifdef LISP_FEATURE_SEGREGATED_CODE
+// One region for each of {BOXED,UNBOXED,CODE}_PAGE_FLAG
+extern struct alloc_region  gc_alloc_regions[3];
+#else
 extern struct alloc_region  boxed_region;
 extern struct alloc_region  unboxed_region;
+#endif
 extern generation_index_t from_space, new_space;
 extern struct weak_pointer *weak_pointers;
 

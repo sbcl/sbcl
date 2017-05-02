@@ -847,3 +847,45 @@
     (map-referencing-objects
      (lambda (obj) (res obj)) space object)
     (res)))
+
+
+#+nil ; for debugging
+(defun dump-dynamic-space-code (&optional (stream *standard-output*)
+                                &aux (n-pages 0) (n-code-bytes 0))
+  (flet ((dump-page (page-num)
+           (incf n-pages)
+           (format stream "~&Page ~D~%" page-num)
+           (let ((where (+ dynamic-space-start (* page-num gencgc-card-bytes)))
+                 (seen-filler nil))
+             (loop
+               (multiple-value-bind (obj type size)
+                   (reconstitute-object (ash where (- n-fixnum-tag-bits)))
+                 (when (= type code-header-widetag)
+                   (incf n-code-bytes size))
+                 (when (if (and (consp obj) (eq (car obj) 0) (eq (cdr obj) 0))
+                           (if seen-filler
+                               (progn (write-char #\. stream) nil)
+                               (setq seen-filler t))
+                           (progn (setq seen-filler nil) t))
+                   (let ((*print-pretty* nil))
+                     (format stream "~&  ~X ~4X ~S " where size obj)))
+                 (incf where size))
+               (let ((next-page (find-page-index where)))
+                 (cond ((= (logand where (1- gencgc-card-bytes)) 0)
+                        (format stream "~&-- END OF PAGE --~%")
+                        (return next-page))
+                       ((eq next-page page-num))
+                       (t
+                        (incf n-pages)
+                        (setq page-num next-page seen-filler nil))))))))
+    (let ((i 0))
+      (loop while (< i last-free-page)
+            do (let ((allocation (ldb (byte 2 0)
+                                      (slot (deref page-table i) 'flags))))
+                 (if (= allocation 3)
+                     (setq i (dump-page i))
+                     (incf i)))))
+    (let* ((tot (* n-pages gencgc-card-bytes))
+           (waste (- tot n-code-bytes)))
+      (format t "~&Used=~D Waste=~D (~F%)~%" n-code-bytes waste
+              (* 100 (/ waste tot))))))
