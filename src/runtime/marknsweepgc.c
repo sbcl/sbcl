@@ -184,7 +184,7 @@ static inline void set_visited(lispobj* obj)
 static inline void *
 low_page_address(low_page_index_t page_num)
 {
-    return ((void*)IMMOBILE_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
+    return ((char*)IMMOBILE_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
 }
 
 //// Variable-length utilities
