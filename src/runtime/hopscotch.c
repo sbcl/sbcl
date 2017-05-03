@@ -23,6 +23,7 @@
 #ifdef HOPSCOTCH_INSTRUMENT
 #include <stdio.h>
 #endif
+#include "genesis/vector.h"
 
 typedef struct hopscotch_table* tableptr;
 void hopscotch_integrity_check(tableptr,char*,int);
@@ -89,7 +90,9 @@ static sword_t get_val(tableptr ht, int index)
     case 2: return ((int16_t*)ht->values)[index];
     case 1: return ((int8_t *)ht->values)[index];
     }
-    return 1;
+    // For a hashset, return the found index + 1
+    // so that 0 can mean "not found"
+    return index + 1;
 }
 #ifdef LISP_FEATURE_64_BIT
 static sword_t get_val8(tableptr ht, int index) { return ht->values[index]; }
@@ -237,6 +240,42 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
     ht->values    = ht->value_size ? (sword_t*)(ht->hops + size) : 0;
 }
 
+/// Same as SB-KERNEL:%SXHASH-SIMPLE-STRING
+uword_t sxhash_simple_string(struct vector* string)
+{
+    unsigned int* char_string = (unsigned int*)(string->data);
+    unsigned char* base_string = (unsigned char*)(string->data);
+    sword_t len = fixnum_value(string->length);
+    uword_t result = 0;
+    sword_t i;
+    switch (widetag_of(string->header)) {
+#define MIX(ch) {result += ch; result += result<<10; result ^= (result>>6);}
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+    case SIMPLE_CHARACTER_STRING_WIDETAG:
+        for(i=0;i<len;++i) MIX(char_string[i])
+#endif
+    case SIMPLE_BASE_STRING_WIDETAG:
+        for(i=0;i<len;++i) MIX(base_string[i])
+        break;
+    }
+    result += result << 3;
+    result ^= result >> 11;
+    result ^= result << 15;
+    result &= (~(uword_t)0) >> (1+N_FIXNUM_TAG_BITS);
+    return result;
+}
+
+boolean hopscotch_stringeq(uword_t arg1, uword_t arg2)
+{
+    lispobj* str1 = (lispobj*)arg1;
+    lispobj* str2 = (lispobj*)arg2;
+    if (str1[0] == str2[0] && str1[1] == str2[1]) {
+        sword_t size = sizetab[widetag_of(*str1)](str1);
+        return !memcmp(str1 + 2, str2 + 2, (size-2) << WORD_SHIFT);
+    }
+    return 0;
+}
+
 /* Initialize 'ht' for first use, which entails zeroing the counters
  * and allocating storage.
  */
@@ -247,9 +286,13 @@ void hopscotch_create(tableptr ht, int hashfun,
     ht->hashfun = hashfun;
     switch (hashfun) {
     case HOPSCOTCH_HASH_FUN_DEFAULT:
-      ht->hash = 0; break;
+      ht->compare = 0; ht->hash = 0; break;
     case HOPSCOTCH_HASH_FUN_MIX:
-      ht->hash = hopscotch_hmix; break;
+      ht->compare = 0; ht->hash = hopscotch_hmix; break;
+    case HOPSCOTCH_STRING_HASH:
+      ht->compare = hopscotch_stringeq;
+      ht->hash = (uint32_t(*)(uword_t))sxhash_simple_string;
+      break;
     default: lose("Bad hash function");
     }
     switch (bytes_per_value) {
@@ -510,6 +553,13 @@ int hopscotch_containsp(tableptr ht, uword_t key)
     unsigned long index = hash(ht, key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
     int __attribute__((unused)) probes = 0;
+
+    if (ht->compare) { // Custom comparator
+        for ( ; bits ; bits >>= 1, ++index )
+            if ((bits & 1) && ht->compare(ht->keys[index], key))
+                return 1;
+        return 0;
+    }
     // *** Use care when modifying this code, and benchmark it thoroughly! ***
     // TODO: use XMM register to test 2 keys at once if properly aligned.
     if (bits & 0xff) {
@@ -552,16 +602,18 @@ sword_t hopscotch_get(tableptr ht, uword_t key, sword_t notfound)
     int __attribute__((unused)) probes = 0;
     // This is not as blazingly fast as the hand-unrolled loop
     // in containsp(), but the GC does not need it, so ...
-    while (bits) {
+    if (ht->compare) // Custom comparator
+        for ( ; bits ; bits >>= 1, ++index ) {
+            if ((bits & 1) && ht->compare(ht->keys[index], key))
+                goto found0;
+        }
+    else for ( ; bits ; bits >>= 4, index += 4)
         if (bits & 0xf) {
             probe(1, index+0, goto found0);
             probe(2, index+1, goto found1);
             probe(4, index+2, goto found2);
             probe(8, index+3, goto found3);
         }
-        index += 4;
-        bits >>= 4;
-    }
     tally_miss(ht, probes);
     return notfound;
 found3: ++index;
@@ -580,16 +632,18 @@ int hopscotch_put(tableptr ht, uword_t key, sword_t val)
     int __attribute__((unused)) probes = 0;
     // This is not as blazingly fast as the hand-unrolled loop
     // in containsp(), but the GC does not need it, so ...
-    while (bits) {
+    if (ht->compare) // Custom comparator
+        for ( ; bits ; bits >>= 1, ++index ) {
+            if ((bits & 1) && ht->compare(ht->keys[index], key))
+                goto found0;
+        }
+    else for ( ; bits ; bits >>= 4, index += 4 )
         if (bits & 0xf) {
             probe(1, index+0, goto found0);
             probe(2, index+1, goto found1);
             probe(4, index+2, goto found2);
             probe(8, index+3, goto found3);
         }
-        index += 4;
-        bits >>= 4;
-    }
     tally_miss(ht, probes);
     return hopscotch_insert(ht, key, val);
 found3: ++index;

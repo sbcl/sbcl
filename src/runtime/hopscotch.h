@@ -18,6 +18,7 @@ struct hopscotch_table {
     sword_t*   values;
     sword_t    (*get_value)(struct hopscotch_table*,int);
     uint32_t   (*hash)(uword_t);
+    int        (*compare)(uword_t,uword_t);
     unsigned   mask;
     int  hop_range;
     int  count;
@@ -46,6 +47,7 @@ uint32_t hopscotch_hmix(uword_t);
 
 #define HOPSCOTCH_HASH_FUN_DEFAULT 1
 #define HOPSCOTCH_HASH_FUN_MIX 2
+#define HOPSCOTCH_STRING_HASH 3
 
 /* This confuses me every time I look at it, so here's an example-
  * Suppose (unrealistically) that a table has a hop range of 4,
