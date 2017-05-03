@@ -1868,7 +1868,7 @@ static char* compute_defrag_start_address()
     return (char*)obj;
 }
 
-void defrag_immobile_space(int* components)
+void defrag_immobile_space(int* components, boolean verbose)
 {
     // Find the starting address of fixed-size objects that will undergo defrag.
     // Never move the first few pages of LAYOUTs or PACKAGEs created by genesis.
@@ -1952,12 +1952,13 @@ void defrag_immobile_space(int* components)
     }
     varyobj_tempspace.start = calloc(varyobj_tempspace.n_bytes, 1);
 
-    printf("%d+%d+%d+%d objects... ",
-           obj_type_histo[INSTANCE_WIDETAG/4],
-           obj_type_histo[FDEFN_WIDETAG/4],
-           (sym_kind_histo[0]+sym_kind_histo[1]+
-            sym_kind_histo[2]+sym_kind_histo[3]),
-           n_code_components);
+    if (verbose)
+        printf("%d+%d+%d+%d objects... ",
+               obj_type_histo[INSTANCE_WIDETAG/4],
+               obj_type_histo[FDEFN_WIDETAG/4],
+               (sym_kind_histo[0]+sym_kind_histo[1]+
+                sym_kind_histo[2]+sym_kind_histo[3]),
+               n_code_components);
 
     // Permute varyobj space into tempspace and deposit forwarding pointers.
     lispobj new_vaddr;

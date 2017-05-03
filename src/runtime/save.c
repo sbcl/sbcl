@@ -225,7 +225,7 @@ extern void prepare_immobile_space_for_save();
 #  define N_SPACES_TO_SAVE 5
 #  ifdef LISP_FEATURE_IMMOBILE_CODE
 lispobj code_component_order;
-extern void defrag_immobile_space(lispobj);
+extern void defrag_immobile_space(lispobj,boolean);
 #  endif
 #else
 #  define N_SPACES_TO_SAVE 3
@@ -269,7 +269,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
             printf("[defragmenting immobile space... ");
             fflush(stdout);
         }
-        defrag_immobile_space(code_component_order);
+        defrag_immobile_space(code_component_order, verbose);
         if (verbose) printf("done]\n");
     }
 #endif
