@@ -419,7 +419,7 @@
 
 ;;;; fops for loading arrays
 
-(!define-fop 100 (fop-base-string ((:operands length)))
+(!define-fop 100 :not-host (fop-base-string ((:operands length)))
   (logically-readonlyize
    (read-base-string-as-bytes (fasl-input-stream)
                               (make-string length :element-type 'base-char))))
