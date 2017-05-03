@@ -9,7 +9,13 @@ changes relative to sbcl-1.3.17:
     from a tenured object or a thread stack by producing a proof
     as a sequence of pointers to follow.
     The file "tests/traceroot.test.sh" contains an example usage.
-
+  * enhancement: if the alien symbol "gc_coalesce_string_literals" is
+    set to 1 prior to SAVE-LISP-AND-DIE, then similar string constants
+    loaded from different fasl files may be collapsed to one object.
+    For instance, two functions returning the literal string "HI"
+    might return EQ strings after collapsing, which may be undesired
+    in a particular use. The flag pertains to gencgc only.
+    
 changes in sbcl-1.3.17 relative to sbcl-1.3.16:
   * enhancement: memory overhead from the garbage collector's metadata
     is reduced on 64-bit architectures; no change for 32-bit.

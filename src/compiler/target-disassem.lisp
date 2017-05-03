@@ -800,7 +800,8 @@
       (awhen (get symbol 'instruction-flavors)
         (setf (get symbol 'instruction-flavors)
               (collect-inst-variants
-               (string-upcase symbol) package it cache))))
+               (logically-readonlyize (string-upcase symbol))
+               package it cache))))
     (apply 'format t
            "~&Disassembler: ~D printers, ~D prefilters, ~D labelers~%"
            (mapcar (lambda (x) (length (cdr x))) cache))))

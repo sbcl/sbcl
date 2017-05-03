@@ -559,7 +559,8 @@
 
 (defun set-header-data (object data)
   (write-header-word object data (ldb (byte sb!vm:n-widetag-bits 0)
-                                      (read-bits-wordindexed object 0))))
+                                      (read-bits-wordindexed object 0)))
+  object) ; return the object itself, like SB!KERNEL:SET-HEADER-DATA
 
 (defun get-header-data (object)
   (ash (read-bits-wordindexed object 0) (- sb!vm:n-widetag-bits)))
@@ -1352,6 +1353,8 @@ core and return a descriptor to it."
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
 
+(defun set-readonly (string) (set-header-data string 1))
+
 (defun initialize-packages ()
   (let ((package-data-list
          ;; docstrings are set in src/cold/warm. It would work to do it here,
@@ -1373,8 +1376,9 @@ core and return a descriptor to it."
                        (list* cold-package nil nil))
                  ;; Initialize string slots
                  (write-slots cold-package package-layout
-                              :%name (base-string-to-core
-                                      (target-package-name name))
+                              :%name (set-readonly
+                                      (base-string-to-core
+                                       (target-package-name name)))
                               :%nicknames (chill-nicknames name)
                               :doc-string (if docstring
                                               (base-string-to-core docstring)
@@ -1608,7 +1612,7 @@ core and return a descriptor to it."
                        ;; NIL's name is in dynamic space because any extra
                        ;; bytes allocated in static space would need to
                        ;; be accounted for by STATIC-SYMBOL-OFFSET.
-                       (base-string-to-core "NIL" *dynamic*))
+                       (set-readonly (base-string-to-core "NIL" *dynamic*)))
     (setf (gethash (descriptor-bits result) *cold-symbols*) nil
           (get nil 'cold-intern-info) result)))
 
@@ -2216,14 +2220,14 @@ core and return a descriptor to it."
     #!-sb-dynamic-core
     (dolist (symbol (sort (%hash-table-alist *cold-foreign-symbol-table*)
                           #'string< :key #'car))
-      (cold-push (cold-cons (base-string-to-core (car symbol))
+      (cold-push (cold-cons (set-readonly (base-string-to-core (car symbol)))
                             (number-to-core (cdr symbol)))
                  result))
     (cold-set '*!initial-foreign-symbols* result)
     #!+sb-dynamic-core
     (let ((runtime-linking-list *nil-descriptor*))
       (dolist (symbol *dyncore-linkage-keys*)
-        (cold-push (cold-cons (base-string-to-core (car symbol))
+        (cold-push (cold-cons (set-readonly (base-string-to-core (car symbol)))
                               (cdr symbol))
                    runtime-linking-list))
       (cold-set 'sb!vm::*required-runtime-c-symbols*
@@ -2461,7 +2465,7 @@ core and return a descriptor to it."
 (define-cold-fop (fop-base-string (len))
   (let ((string (make-string len)))
     (read-string-as-bytes (fasl-input-stream) string)
-    (base-string-to-core string)))
+    (set-readonly (base-string-to-core string))))
 
 #!+sb-unicode
 (define-cold-fop (fop-character-string (len))

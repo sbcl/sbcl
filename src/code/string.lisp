@@ -577,3 +577,6 @@ new string COUNT long filled with the fill character."
 
 (defun string-trim (char-bag string)
   (generic-string-trim char-bag string t t))
+
+(defun logically-readonlyize (string)
+  (set-header-data (the string string) 1))

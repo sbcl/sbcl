@@ -420,15 +420,17 @@
 ;;;; fops for loading arrays
 
 (!define-fop 100 (fop-base-string ((:operands length)))
-  (read-base-string-as-bytes (fasl-input-stream)
-                             (make-string length :element-type 'base-char)))
+  (logically-readonlyize
+   (read-base-string-as-bytes (fasl-input-stream)
+                              (make-string length :element-type 'base-char))))
 
 ;; FIXME: can save space by UTF-8 encoding, or use 1 bit to indicate pure ASCII
 ;; in the fasl even though the result will be a non-base string.
 #!+sb-unicode
 (!define-fop 160 :not-host (fop-character-string ((:operands length)))
-  (read-string-as-unsigned-byte-32 (fasl-input-stream)
-                                   (make-string length)))
+  (logically-readonlyize
+   (read-string-as-unsigned-byte-32 (fasl-input-stream)
+                                    (make-string length))))
 
 (!define-fop 92 (fop-vector ((:operands size)))
   (if (zerop size)

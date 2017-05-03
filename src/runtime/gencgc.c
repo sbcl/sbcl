@@ -4581,6 +4581,7 @@ prepare_for_final_gc ()
     }
 }
 
+char gc_coalesce_string_literals = 0;
 
 /* Do a non-conservative GC, and then save a core with the initial
  * function being set to the value of the static symbol
@@ -4612,6 +4613,19 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_for_final_gc();
     gencgc_alloc_start_page = last_free_page;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+
+    if (gc_coalesce_string_literals) {
+        extern struct lisp_startup_options lisp_startup_options;
+        extern void coalesce_strings();
+        boolean verbose = !lisp_startup_options.noinform;
+        if (verbose) {
+            printf("[coalescing similar strings... ");
+            fflush(stdout);
+        }
+        coalesce_strings();
+        if (verbose)
+            printf("done]\n");
+    }
 
     prepare_for_final_gc();
     gencgc_alloc_start_page = -1;

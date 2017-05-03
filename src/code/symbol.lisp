@@ -332,7 +332,8 @@ distinct from the global value. Can also be SETF."
 (defun make-symbol (string)
   "Make and return a new symbol with the STRING as its print name."
   (declare (type string string))
-  (%make-symbol 0 (if (simple-string-p string) string (subseq string 0))))
+  (%make-symbol 0 (logically-readonlyize
+                   (if (simple-string-p string) string (subseq string 0)))))
 
 ;;; All symbols go into immobile space if #!+immobile-symbols is enabled,
 ;;; but not if disabled. The win with immobile space that is that all symbols

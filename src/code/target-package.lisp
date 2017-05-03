@@ -964,8 +964,9 @@ implementation it is ~S." *!default-package-use-list*)
              (if where
                  (values symbol where)
                  (let ((symbol-name
-                        (replace (make-string length :element-type elt-type)
-                                 name)))
+                        (logically-readonlyize
+                         (replace (make-string length :element-type elt-type)
+                                  name))))
                    (with-single-package-locked-error
                        (:package package "interning ~A" symbol-name)
                      (let ((symbol ; Symbol kind: 1=keyword, 2=other interned
