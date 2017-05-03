@@ -303,10 +303,12 @@
   ;; - At least two produce an incorrect expansion that doesn't even work.
   (expand-rmw-macro 'cons (list obj) place '() nil env '(item)))
 
-(sb!xc:defmacro pushnew (obj place &rest keys &environment env)
+(sb!xc:defmacro pushnew (obj place &rest keys &key key test test-not
+                         &environment env)
   "Takes an object and a location holding a list. If the object is
   already in the list, does nothing; otherwise, conses the object onto
   the list. Keyword arguments are accepted as per the ADJOIN function."
+  (declare (ignore key test test-not))
   ;; Passing AFTER-ARGS-BINDP = NIL causes the forms subsequent to PLACE
   ;; to be inserted literally as-is, giving the (apparently) desired behavior
   ;; of *not* evaluating them before the Read/Modify/Write of PLACE, which
