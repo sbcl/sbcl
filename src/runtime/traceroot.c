@@ -121,16 +121,6 @@ static lispobj canonical_obj(lispobj obj)
     return obj;
 }
 
-/// Same as Lisp LOGBITP, except no negative bignums allowed.
-static inline boolean layout_bitmap_logbitp(int index, lispobj bitmap)
-{
-    if (fixnump(bitmap))
-      return (index < (N_WORD_BITS - N_FIXNUM_TAG_BITS))
-          ? (bitmap >> (index+N_FIXNUM_TAG_BITS)) & 1
-          : (sword_t)bitmap < 0;
-    return positive_bignum_logbitp(index, (struct bignum*)native_pointer(bitmap));
-}
-
 /* Return the word index of the pointer in 'source' which references 'target'.
  * Return -1 on failure. (This is an error if it happens)
  */
@@ -622,7 +612,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                           struct scan_state* ss)
 {
     lispobj layout, bitmap, fun;
-    int nwords, scan_limit, i, j;
+    sword_t nwords, scan_limit, i, j;
     uword_t n_objects = 0, n_scanned_words = 0,
             n_immediates = 0, n_pointers = 0;
 

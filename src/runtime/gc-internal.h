@@ -315,4 +315,14 @@ static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
             );
 }
 
+/// Same as Lisp LOGBITP, except no negative bignums allowed.
+static inline boolean layout_bitmap_logbitp(int index, lispobj bitmap)
+{
+    if (fixnump(bitmap))
+      return (index < (N_WORD_BITS - N_FIXNUM_TAG_BITS))
+          ? (bitmap >> (index+N_FIXNUM_TAG_BITS)) & 1
+          : (sword_t)bitmap < 0;
+    return positive_bignum_logbitp(index, (struct bignum*)native_pointer(bitmap));
+}
+
 #endif /* _GC_INTERNAL_H_ */
