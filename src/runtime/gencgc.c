@@ -2156,6 +2156,17 @@ scavenge_pinned_ranges()
     }
 }
 
+/* Create an array of fixnum to consume the space between 'from' and 'to' */
+static void deposit_filler(uword_t from, uword_t to)
+{
+    if (to > from) {
+        lispobj* where = (lispobj*)from;
+        sword_t nwords = (to - from) >> WORD_SHIFT;
+        where[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
+        where[1] = make_fixnum(nwords - 2);
+    }
+}
+
 /* Zero out the byte ranges on small object pages marked dont_move,
  * carefully skipping over objects in the pin hashtable.
  * TODO: by recording an additional bit per page indicating whether
@@ -2214,8 +2225,7 @@ wipe_nonpinned_words()
         uword_t this_page_base = page_base_address((uword_t)obj);
         /* printf("i=%d obj=%p base=%p\n", i, obj, (void*)this_page_base); */
         if (this_page_base > page_base_address(preceding_object)) {
-            bzero((void*)this_page_base,
-                  addr_diff((void*)obj, (void*)this_page_base));
+            deposit_filler(this_page_base, (lispobj)obj);
             // Move the page to newspace
             page_index_t page = find_page_index(obj);
             int used = page_bytes_used(page);
@@ -2236,8 +2246,7 @@ wipe_nonpinned_words()
         if (page_base_address(pinned_objects.keys[i+1]) == this_page_base)
             range_end = pinned_objects.keys[i+1];
         /* printf("    Clearing %p .. %p\n", (void*)range_start, (void*)range_end); */
-        bzero((void*)range_start,
-              addr_diff((void*)range_end, (void*)range_start));
+        deposit_filler(range_start, range_end);
         preceding_object = (uword_t)obj;
     }
 }
