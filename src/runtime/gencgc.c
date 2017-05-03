@@ -2162,7 +2162,7 @@ static void deposit_filler(uword_t from, uword_t to)
     if (to > from) {
         lispobj* where = (lispobj*)from;
         sword_t nwords = (to - from) >> WORD_SHIFT;
-        where[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
+        where[0] = SIMPLE_ARRAY_WORD_WIDETAG;
         where[1] = make_fixnum(nwords - 2);
     }
 }
