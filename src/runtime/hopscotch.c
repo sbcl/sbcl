@@ -243,7 +243,9 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
 /// Same as SB-KERNEL:%SXHASH-SIMPLE-STRING
 uword_t sxhash_simple_string(struct vector* string)
 {
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     unsigned int* char_string = (unsigned int*)(string->data);
+#endif
     unsigned char* base_string = (unsigned char*)(string->data);
     sword_t len = fixnum_value(string->length);
     uword_t result = 0;

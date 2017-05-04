@@ -163,7 +163,7 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#ifndef GENCGC_IS_PRECISE
 struct hopscotch_table pinned_objects;
 lispobj gc_object_watcher;
 int gc_n_stack_pins;
@@ -2126,12 +2126,8 @@ maybe_adjust_large_object(page_index_t first_page)
 }
 
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-#  define hopscotch_init()
-#  define hopscotch_reset(a)
 #  define scavenge_pinned_ranges()
 #  define wipe_nonpinned_words()
-#  define hopscotch_create(a,b,c,d,e)
-#  define hopscotch_log_stats(a,b)
 /* After scavenging of the roots is done, we go back to the pinned objects
  * and look within them for pointers. While heap_scavenge() could certainly
  * do this, it would potentially lead to extra work, since we can't know
@@ -3488,7 +3484,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[new_space].alloc_large_start_page = 0;
 #endif
 
+#ifndef GENCGC_IS_PRECISE
     hopscotch_reset(&pinned_objects);
+#endif
     /* Before any pointers are preserved, the dont_move flags on the
      * pages need to be cleared. */
     /* FIXME: consider moving this bitmap into its own range of words,
@@ -3749,7 +3747,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables(0);
+#ifndef GENCGC_IS_PRECISE
     hopscotch_log_stats(&pinned_objects, "pins");
+#endif
 
     /* Free the pages in oldspace, but not those marked dont_move. */
     free_oldspace();
@@ -4081,8 +4081,10 @@ gc_init(void)
 #endif
 
     hopscotch_init();
+#ifndef GENCGC_IS_PRECISE
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
+#endif
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
