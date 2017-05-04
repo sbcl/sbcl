@@ -579,4 +579,4 @@ new string COUNT long filled with the fill character."
   (generic-string-trim char-bag string t t))
 
 (defun logically-readonlyize (string)
-  (set-header-data (the string string) 1))
+  (set-header-data (the string string) +string-shareable+))

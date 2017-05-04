@@ -1950,7 +1950,7 @@ static void remap_string(lispobj* where, struct hopscotch_table* ht)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
          || widetag_of(s->header) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
-         ) && HeaderValue(s->header) == 1) { /* readonly string indicator */
+         ) && (HeaderValue(s->header) & 2) != 0) { /* shareable string */
         int index = hopscotch_get(ht, (uword_t)s, 0);
         if (!index) // Not found
             hopscotch_insert(ht, (uword_t)s, 1);

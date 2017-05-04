@@ -111,6 +111,9 @@
 ;; which can be expressed in 8 bits.
 (defconstant short-header-max-words #x7fff)
 
+(def!constant +string-downgradable+ 1)
+(def!constant +string-shareable+ 2)
+
 ;;; Is X a fixnum in the target Lisp?
 #+sb-xc-host
 (defun fixnump (x)

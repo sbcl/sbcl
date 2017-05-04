@@ -1702,7 +1702,10 @@ to :INTERPRET, an interpreter will be used.")
            ,@decls
            ,@forms
            (truly-the (simple-array character (*))
-                      (get-output-stream-string ,var))))))
+                      #+sb-xc-host (get-output-stream-string ,var)
+                      #-sb-xc-host
+                      (set-header-data (get-output-stream-string ,var)
+                                       +string-downgradable+))))))
 
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
