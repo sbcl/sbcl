@@ -14,7 +14,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/time.h>
+#ifndef LISP_FEATURE_WIN32
+#define HAVE_GETRUSAGE 1
+#endif
+#if HAVE_GETRUSAGE
 #include <sys/resource.h> // for getrusage()
+#endif
 
 int heap_trace_verbose = 0;
 
@@ -728,13 +733,16 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
     ss.scratchpad.free = ss.scratchpad.base + 2 * sizeof(uint32_t);
     ss.scratchpad.end  = ss.scratchpad.base + scratchpad_size;
     fprintf(stderr, "Scratchpad: %lu bytes\n", (long unsigned)scratchpad_size);
+#if HAVE_GETRUSAGE
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
+#endif
     ss.record_ptrs = 1;
     scan_spaces(&ss);
-    getrusage(RUSAGE_SELF, &after);
     *inverted_heap = ss.inverted_heap;
     *scratchpad = ss.scratchpad;
+#if HAVE_GETRUSAGE
+    getrusage(RUSAGE_SELF, &after);
     // We're done building the necessary structure. Show some memory stats.
 #define timediff(b,a,field) \
     ((a.field.tv_sec-b.field.tv_sec)*1000000+(a.field.tv_usec-b.field.tv_usec))
@@ -745,6 +753,7 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
             100*(float)inverted_heap->count / (1+hopscotch_max_key_index(*inverted_heap)),
             timediff(before, after, ru_stime),
             timediff(before, after, ru_utime));
+#endif
 };
 
 /* Find any shortest path from a thread or tenured object
