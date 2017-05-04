@@ -371,7 +371,7 @@
   t)
 
 
-#+(and gencgc x86-64)
+#+(and gencgc x86-64 (not win32))
 (progn
   (setq *print-array* nil)
   (defvar *large-array* (make-array (* sb-vm:gencgc-card-bytes 4)
