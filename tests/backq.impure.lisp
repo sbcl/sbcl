@@ -60,7 +60,8 @@
       *backquote-tests*)
 
 (let ((string "`(foobar a b ,c ,'(e f g) d ,@'(e f g) (h i j) ,@foo)"))
-  (assert (equalp (print (read-from-string string)) (read-from-string string))))
+  (assert (equalp (print (read-from-string string) (make-broadcast-stream))
+                  (read-from-string string))))
 
 (let ((a '`(1 ,@a ,@b ,.c ,.d)))
   (let ((*print-circle* t))
