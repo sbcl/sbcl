@@ -497,20 +497,29 @@ the operating system native pathname conventions."
                                          (member :wild :wild-inferiors)))
                   (pop results)
                   (push piece results)))
-             ((or simple-string pattern)
-              (push (maybe-diddle-case piece diddle-case) results))
-             (string
-              (push (maybe-diddle-case (coerce piece 'simple-string)
-                                       diddle-case) results))
-
+             ((or string pattern)
+              (when (typep piece '(and string (not simple-array)))
+                (setq piece (coerce piece 'simple-string)))
+              ;; Unix namestrings allow embedded "//" within them. Consecutive
+              ;; slashes are treated as one, which is weird but often convenient.
+              ;; However, preserving empty directory components:
+              ;; - is unaesthetic
+              ;; - makes (NAMESTRING (MAKE-PATHNAME :DIRECTORY '(:RELATIVE "" "d")))
+              ;;   visually indistinguishable from the absolute pathname "/d/"
+              ;; - can causes a pathname equality test to return NIL
+              ;;   on semantically equivalent pathnames. This can happen for
+              ;;   other reasons, but fewer false negatives is better.
+              (unless (and (stringp piece) (zerop (length piece)))
+                (push (maybe-diddle-case piece diddle-case) results)))
              (t
               (error "~S is not allowed as a directory component." piece)))))
        (nreverse results)))
-    (simple-string
-     `(:absolute ,(maybe-diddle-case directory diddle-case)))
     (string
-     `(:absolute
-       ,(maybe-diddle-case (coerce directory 'simple-string) diddle-case)))))
+     (cond ((zerop (length directory)) `(:absolute))
+           (t
+            (when (typep directory '(not simple-array))
+              (setq directory (coerce directory 'simple-string)))
+            `(:absolute ,(maybe-diddle-case directory diddle-case)))))))
 
 (defun make-pathname (&key host
                            (device nil devp)
