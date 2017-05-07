@@ -21,17 +21,17 @@
                         (lambda (host stream)
                           (print-unreadable-object
                            (host stream :type t :identity t)))))
-  (parse (missing-arg) :type function)
-  (parse-native (missing-arg) :type function)
-  (unparse (missing-arg) :type function)
-  (unparse-native (missing-arg) :type function)
-  (unparse-host (missing-arg) :type function)
-  (unparse-directory (missing-arg) :type function)
-  (unparse-file (missing-arg) :type function)
-  (unparse-enough (missing-arg) :type function)
-  (unparse-directory-separator (missing-arg) :type simple-string)
-  (simplify-namestring (missing-arg) :type function)
-  (customary-case (missing-arg) :type (member :upper :lower)))
+  (parse (missing-arg) :type function :read-only t)
+  (parse-native (missing-arg) :type function :read-only t)
+  (unparse (missing-arg) :type function :read-only t)
+  (unparse-native (missing-arg) :type function :read-only t)
+  (unparse-host (missing-arg) :type function :read-only t)
+  (unparse-directory (missing-arg) :type function :read-only t)
+  (unparse-file (missing-arg) :type function :read-only t)
+  (unparse-enough (missing-arg) :type function :read-only t)
+  (unparse-directory-separator (missing-arg) :type simple-string :read-only t)
+  (simplify-namestring (missing-arg) :type function :read-only t)
+  (customary-case (missing-arg) :type (member :upper :lower) :read-only t))
 
 (sb!xc:defstruct
             (logical-host
@@ -59,7 +59,7 @@
                        (unparse-directory-separator ";")
                        (simplify-namestring #'identity)
                        (customary-case :upper)))
-  (name "" :type simple-string)
+  (name "" :type simple-string :read-only t)
   (translations nil :type list)
   (canon-transls nil :type list))
 
@@ -72,7 +72,7 @@
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
 (def!struct (pattern (:constructor make-pattern (pieces)))
-  (pieces nil :type list))
+  (pieces nil :type list :read-only t))
 
 ;;;; PATHNAME structures
 
@@ -91,18 +91,19 @@
                                                          version))
                            (:predicate pathnamep))
   ;; the host (at present either a UNIX or logical host)
-  (host nil :type (or host null))
+  (host nil :type (or host null) :read-only t)
   ;; the name of a logical or physical device holding files
-  (device nil :type (or simple-string pathname-component-tokens))
+  (device nil :type (or simple-string pathname-component-tokens) :read-only t)
   ;; a list of strings that are the component subdirectory components
-  (directory nil :type list)
+  (directory nil :type list :read-only t)
   ;; the filename
-  (name nil :type (or simple-string pattern pathname-component-tokens))
+  (name nil :type (or simple-string pattern pathname-component-tokens) :read-only t)
   ;; the type extension of the file
-  (type nil :type (or simple-string pattern pathname-component-tokens))
+  (type nil :type (or simple-string pattern pathname-component-tokens) :read-only t)
   ;; the version number of the file, a positive integer (not supported
   ;; on standard Unix filesystems)
-  (version nil :type (or integer pathname-component-tokens (member :newest))))
+  (version nil :type (or integer pathname-component-tokens (member :newest))
+               :read-only t))
 
 ;;; Logical pathnames have the following format:
 ;;;
