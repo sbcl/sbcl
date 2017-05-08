@@ -1087,7 +1087,24 @@
                       (when whole `((,(car whole) ,ll-whole)))))
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
-             (parse (parse-ds-lambda-list new-ll)))
+             (parse (parse-ds-lambda-list new-ll))
+             ((declared-lambda-list decls)
+              (let ((ll
+                      (loop for (nil . declarations) in decls
+                            thereis
+                            (loop for x in declarations
+                                  when (and (consp x)
+                                            (eql (car x) 'lambda-list))
+                                  return x))))
+                (values
+                 (or ll
+                     ;; Normalize the lambda list by unparsing.
+                     `(lambda-list ,(unparse-ds-lambda-list parse)))
+                 (if ll
+                     (loop for (declare . declarations) in decls
+                           collect (list* declare
+                                          (remove 'lambda-list declarations :key #'car)))
+                     decls)))))
     ;; Signal a style warning for duplicate names, but disregard &AUX variables
     ;; because most folks agree that (LET* ((X (F)) (X (G X))) ..) makes sense
     ;; - some would even say that it is idiomatic - and &AUX bindings are just
@@ -1109,8 +1126,8 @@
               ;; MACROLET doesn't produce an object capable of reflection,
               ;; so don't bother inserting a different lambda-list.
               ,@(unless (eq kind 'macrolet)
-                  ;; Normalize the lambda list by unparsing.
-                  `((declare (lambda-list ,(unparse-ds-lambda-list parse)))))
+
+                  `((declare ,declared-lambda-list)))
               ,@(if outer-decls (list outer-decls))
               ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
               ,@(sb!c:macro-policy-decls)
