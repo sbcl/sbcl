@@ -498,12 +498,12 @@
             (oops)))
       (if end
           (let ((n (- end start)))
-            (declare (integer n))
             (when (minusp n)
               (oops))
             (when (plusp n)
               (let* ((head (list nil))
                      (tail head))
+                (declare (dynamic-extent head))
                 (macrolet ((pop-one ()
                              `(let ((tmp (list (pop pointer))))
                                 (setf (cdr tail) tmp
