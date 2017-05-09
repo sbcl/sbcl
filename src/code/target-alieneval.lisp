@@ -94,9 +94,10 @@ variable is undefined."
 (defmacro extern-alien (name type &environment env)
   "Access the alien variable named NAME, assuming it is of type TYPE.
 This is SETFable."
-  (let* ((alien-name (etypecase name
+  (let* ((alien-name (possibly-base-stringize
+                      (etypecase name
                        (symbol (guess-alien-name-from-lisp-name name))
-                       (string name)))
+                       (string name))))
          (alien-type (parse-alien-type type env))
          (datap (not (alien-fun-type-p alien-type))))
     `(%alien-value (foreign-symbol-sap ,alien-name ,datap) 0 ',alien-type)))

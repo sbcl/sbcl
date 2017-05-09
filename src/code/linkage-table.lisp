@@ -51,7 +51,8 @@
              (hash-table-count *linkage-info*)
              name))
     (write-linkage-table-entry table-address real-address datap)
-    (setf (gethash (cons name datap) *linkage-info*) table-address)))
+    (setf (gethash (cons (logically-readonlyize name) datap) *linkage-info*)
+          table-address)))
 
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
