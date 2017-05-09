@@ -9,6 +9,7 @@
 #include "genesis/constants.h"
 #include "genesis/gc-tables.h"
 #include "genesis/layout.h"
+#include "genesis/package.h"
 #include "pseudo-atomic.h" // for get_alloc_pointer()
 
 #include <stdlib.h>
@@ -97,7 +98,7 @@ static void add_to_layer(lispobj* obj, int wordindex,
     int lowtag = is_cons_half(word) ?
       LIST_POINTER_LOWTAG : lowtag_for_widetag[widetag_of(word)>>2];
     lispobj ptr = make_lispobj(obj, lowtag);
-    int staticp = ptr <= STATIC_SPACE_START;
+    int staticp = ptr <= STATIC_SPACE_END;
     int gen = staticp ? -1 : gen_of(ptr);
     if (heap_trace_verbose>2)
       // Show the containing object, its type and generation, and pointee
@@ -414,6 +415,23 @@ struct simple_fun* simple_fun_from_pc(char* pc)
     return prev_fun;
 }
 
+static void maybe_show_object_name(lispobj obj, FILE* stream)
+{
+    extern void safely_show_lstring(lispobj* string, int quotes, FILE *s);
+    lispobj package, package_name;
+    if (lowtag_of(obj)==OTHER_POINTER_LOWTAG)
+        switch(widetag_of(*native_pointer(obj))) {
+        case SYMBOL_WIDETAG:
+            package = SYMBOL(obj)->package;
+            package_name = ((struct package*)native_pointer(package))->_name;
+            putc(',', stream);
+            safely_show_lstring(native_pointer(package_name), 0, stream);
+            fputs("::", stream);
+            safely_show_lstring(native_pointer(SYMBOL(obj)->name), 0, stream);
+            break;
+      }
+}
+
 /// Find any shortest path to 'object' starting at a tenured object or a thread stack.
 static void trace1(lispobj object,
                    struct hopscotch_table* targets,
@@ -428,7 +446,7 @@ static void trace1(lispobj object,
     struct thread* root_thread;
     char* thread_pc;
     unsigned int tls_index;
-    lispobj target, root;
+    lispobj target;
     int i;
 
     struct layer* top_layer = 0;
@@ -449,7 +467,6 @@ static void trace1(lispobj object,
             printf("Next layer: Looking for %d object(s)\n", targets->count);
         for_each_hopscotch_key(i, target, (*targets)) {
             uint32_t list = hopscotch_get(inverted_heap, target, 0);
-            root = 0;
             if (heap_trace_verbose>1) {
                 uint32_t list1 = list;
                 fprintf(stderr, "target=%p srcs=", (void*)target);
@@ -461,7 +478,7 @@ static void trace1(lispobj object,
                 }
                 putc('\n',stderr);
             }
-            while (list && !root) {
+            while (list && !anchor) {
                 uint32_t* cell = (uint32_t*)(scratchpad->base + list);
                 lispobj ptr = decode_pointer(cell[0]);
                 list = cell[1];
@@ -477,15 +494,17 @@ static void trace1(lispobj object,
                 add_to_layer((lispobj*)ptr, wordindex,
                              top_layer, &layer_capacity);
                 // Stop if the object at 'ptr' is tenured.
-                if (ptr <= STATIC_SPACE_START || gen_of(ptr) >= 1+gencgc_oldest_gen_to_gc) {
+                if (ptr <= STATIC_SPACE_END || gen_of(ptr) >= 1+gencgc_oldest_gen_to_gc) {
                     fprintf(stderr, "Stopping at %p: tenured\n", (void*)ptr);
-                    root = ptr;
+                    anchor = &top_layer->nodes[top_layer->count-1];
                 }
             }
         }
         if (!top_layer->count) {
-            // Should print the graph we have so far.
-            fprintf(stderr, "NO OBJECTS!\n");
+            fprintf(stderr, "Failure tracing from %p. Current targets:\n", (void*)object);
+            for_each_hopscotch_key(i, target, (*targets))
+                fprintf(stderr, "%p ", (void*)target);
+            putc('\n', stderr);
             free_graph(top_layer);
             return;
         }
@@ -493,11 +512,8 @@ static void trace1(lispobj object,
             printf("Found %d object(s)\n", top_layer->count);
         // The top layer's last object if static or tenured
         // stops the scan. (And no more objects go in the top layer)
-        i = top_layer->count-1;
-        lispobj ptr = top_layer->nodes[i].object;
-        if (ptr <= STATIC_SPACE_START || gen_of(ptr) >= 1+gencgc_oldest_gen_to_gc)
-            anchor = &top_layer->nodes[i];
-        if (anchor) break;
+        if (anchor)
+            break;
         // Transfer the top layer objects into 'targets'
         hopscotch_reset(targets);
         struct node* nodes = top_layer->nodes;
@@ -555,7 +571,7 @@ static void trace1(lispobj object,
         }
         fprintf(file, "}->");
     } else { // Stopped at (pseudo)static object
-        fprintf(file, "Anchor object is @ %p. word[%d]\n",
+        fprintf(stderr, "Anchor object is @ %p. word[%d]\n",
                 native_pointer(anchor->object), anchor->wordindex);
     }
 
@@ -563,10 +579,22 @@ static void trace1(lispobj object,
     while (top_layer) {
         struct node next = *anchor;
         lispobj ptr = next.object;
-        fprintf(file, "(g%c,%s)%p[%d]->",
-                (ptr <= STATIC_SPACE_START ? 'S' : '0'+gen_of(ptr)),
-                classify_obj(ptr), (void*)ptr, next.wordindex);
+        fprintf(file, "(g%c,%s",
+                ptr <= STATIC_SPACE_END ? 'S' : '0'+gen_of(ptr),
+                classify_obj(ptr));
+        maybe_show_object_name(ptr, file);
+        fprintf(file, ")%p[%d]->", (void*)ptr, next.wordindex);
         target = native_pointer(ptr)[next.wordindex];
+        if (next.wordindex == 0 &&
+            (lowtag_of(ptr) == INSTANCE_POINTER_LOWTAG  ||
+             lowtag_of(ptr) == FUN_POINTER_LOWTAG)) {
+            target = instance_layout(native_pointer(ptr));
+        } else if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
+                   widetag_of(FDEFN(ptr)->header) == FDEFN_WIDETAG &&
+                   next.wordindex == 3) {
+            target = fdefn_raw_referent((struct fdefn*)native_pointer(ptr));
+        }
+        target = canonical_obj(target);
         struct layer* next_layer = top_layer->next;
         free(top_layer->nodes);
         free(top_layer);
