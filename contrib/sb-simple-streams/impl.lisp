@@ -9,6 +9,13 @@
 
 (in-package "SB-SIMPLE-STREAMS")
 
+(eval-when (:compile-toplevel)
+  (defun optional+key-style-warning-p (condition)
+    (and (typep condition '(and simple-condition style-warning))
+         (search "&OPTIONAL and &KEY found"
+                 (simple-condition-format-control condition))))
+  (proclaim '(sb-ext:muffle-conditions (satisfies optional+key-style-warning-p))))
+
 ;;;
 ;;; **********************************************************************
 ;;;

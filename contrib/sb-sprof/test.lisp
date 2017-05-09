@@ -51,4 +51,4 @@
 ;; the allocation sequence gets hit in the right places (i.e. not at all
 ;; in traditional builds, and everywhere if SB-SAFEPOINT-STRICTLY is
 ;; enabled.)
-(disassemble #'consalot)
+#+nil (disassemble #'consalot)

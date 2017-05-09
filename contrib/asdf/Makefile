@@ -6,12 +6,12 @@ FASL=$(UIOP_FASL) $(ASDF_FASL)
 fasl:: $(UIOP_FASL) $(ASDF_FASL)
 $(UIOP_FASL):: uiop.lisp ../../output/sbcl.core
 	mkdir -p $(DEST)
-	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;UIOP.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
+	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;UIOP.LISP" :print nil :output-file (parse-native-namestring "$@"))' </dev/null
 
 $(ASDF_FASL):: asdf.lisp ../../output/sbcl.core $(UIOP_FASL)
 	if [ -d asdf-upstream ] ; then rm -rf asdf-upstream ; fi
 	mkdir -p $(DEST)
-	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;ASDF.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
+	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;ASDF.LISP" :print nil :output-file (parse-native-namestring "$@"))' </dev/null
 
 install::
 	cp $(FASL) "$(BUILD_ROOT)$(INSTALL_DIR)"

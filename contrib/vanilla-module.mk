@@ -4,7 +4,7 @@ ASD=$(DEST)/$(MODULE).asd
 
 fasl:: $(FASL)
 $(FASL):: $(MODULE).lisp ../../output/sbcl.core
-	$(SBCL) --eval '(compile-file (format nil "SYS:CONTRIB;~:@(~A~);~:@(~A~).LISP" "$(MODULE)" "$(MODULE)") :output-file (parse-native-namestring "$@"))' </dev/null
+	$(SBCL) --eval '(compile-file (format nil "SYS:CONTRIB;~:@(~A~);~:@(~A~).LISP" "$(MODULE)" "$(MODULE)") :print nil :output-file (parse-native-namestring "$@"))' </dev/null
 
 $(ASD)::
 	echo "(defsystem :$(MODULE) :class require-system)" > $@

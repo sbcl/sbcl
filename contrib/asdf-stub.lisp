@@ -1,3 +1,5 @@
+(setq *compile-print* nil)
+sb-ext::(declaim (muffle-conditions compiler-note))
 (require :asdf)
 
 (in-package :asdf)

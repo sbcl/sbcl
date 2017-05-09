@@ -5,6 +5,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+;; Undo default contribs mufflage so that DECLARATION-INFORMATION tests pass.
+sb-ext::(declaim (unmuffle-conditions compiler-note))
+
 (defpackage :sb-cltl2-tests
   (:use :sb-cltl2 :cl :sb-rt :sb-ext :sb-kernel :sb-int))
 
