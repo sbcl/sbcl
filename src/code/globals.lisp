@@ -16,7 +16,7 @@
                   sb!debug:*stack-top-hint*
                   *handler-clusters*
                   *restart-clusters*
-                  *in-without-gcing* *gc-inhibit* *gc-pending*
+                  *gc-inhibit* *gc-pending*
                   #!+sb-thread *stop-for-gc-pending*
                   #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
                   *posix-argv*))
