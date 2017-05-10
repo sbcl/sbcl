@@ -432,13 +432,25 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
       }
 }
 
+static boolean root_p(lispobj ptr, int criterion)
+{
+    if (ptr <= STATIC_SPACE_END) return 1; // always a root
+    // 0 to 2 are in order of weakest to strongest condition for stopping,
+    // i.e. criterion 0 implies that that largest number of objects
+    // are considered roots.
+    return criterion < 2
+        && (gen_of(ptr) > (criterion ? HIGHEST_NORMAL_GENERATION
+                           : gencgc_oldest_gen_to_gc));
+}
+
 /// Find any shortest path to 'object' starting at a tenured object or a thread stack.
 static void trace1(lispobj object,
                    struct hopscotch_table* targets,
                    struct hopscotch_table* visited,
                    struct hopscotch_table* inverted_heap,
                    struct scratchpad* scratchpad,
-                   int n_pins, lispobj* pins, void (*context_scanner)())
+                   int n_pins, lispobj* pins, void (*context_scanner)(),
+                   int criterion)
 {
     struct node* anchor = 0;
     lispobj thread_ref;
@@ -494,7 +506,7 @@ static void trace1(lispobj object,
                 add_to_layer((lispobj*)ptr, wordindex,
                              top_layer, &layer_capacity);
                 // Stop if the object at 'ptr' is tenured.
-                if (ptr <= STATIC_SPACE_END || gen_of(ptr) >= 1+gencgc_oldest_gen_to_gc) {
+                if (root_p(ptr, criterion)) {
                     fprintf(stderr, "Stopping at %p: tenured\n", (void*)ptr);
                     anchor = &top_layer->nodes[top_layer->count-1];
                 }
@@ -579,9 +591,11 @@ static void trace1(lispobj object,
     while (top_layer) {
         struct node next = *anchor;
         lispobj ptr = next.object;
-        fprintf(file, "(g%c,%s",
-                ptr <= STATIC_SPACE_END ? 'S' : '0'+gen_of(ptr),
-                classify_obj(ptr));
+        if (ptr <= STATIC_SPACE_END)
+            fprintf(file, "(static,");
+        else
+            fprintf(file, "(g%d,", gen_of(ptr));
+        fputs(classify_obj(ptr), file);
         maybe_show_object_name(ptr, file);
         fprintf(file, ")%p[%d]->", (void*)ptr, next.wordindex);
         target = native_pointer(ptr)[next.wordindex];
@@ -791,7 +805,8 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
  * to each of the specified objects.
  */
 static void trace_paths(void (*context_scanner)(),
-                        lispobj weak_pointers, int n_pins, lispobj* pins)
+                        lispobj weak_pointers, int n_pins, lispobj* pins,
+                        int criterion)
 {
     int i;
     struct hopscotch_table inverted_heap;
@@ -821,7 +836,7 @@ static void trace_paths(void (*context_scanner)(),
             hopscotch_reset(&targets);
             trace1(value, &targets, &visited,
                    &inverted_heap, &scratchpad,
-                   n_pins, pins, context_scanner);
+                   n_pins, pins, context_scanner, criterion);
         }
     } while (weak_pointers != NIL);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
@@ -832,21 +847,22 @@ static void trace_paths(void (*context_scanner)(),
 
 void gc_prove_liveness(void(*context_scanner)(),
                        lispobj objects,
-                       int n_pins, uword_t* pins)
+                       int n_pins, uword_t* pins,
+                       int criterion)
 {
     int n_watched = 0, n_live = 0, n_bad = 0;
-    lispobj list = objects;
-    while (list != NIL && lowtag_of(list) == LIST_POINTER_LOWTAG) {
+    lispobj list;
+    for ( list = objects ;
+          list != NIL && lowtag_of(list) == LIST_POINTER_LOWTAG ;
+          list = CONS(list)->cdr ) {
         ++n_watched;
         lispobj car = CONS(list)->car;
-        if ((lowtag_of(car) == OTHER_POINTER_LOWTAG
-             && widetag_of(*native_pointer(car)) == WEAK_POINTER_WIDETAG)) {
-            n_live += ((struct weak_pointer*)native_pointer(car))
-                ->value != UNBOUND_MARKER_WIDETAG;
-            list = CONS(list)->cdr;
-        } else {
+        if ((lowtag_of(car) != OTHER_POINTER_LOWTAG ||
+             widetag_of(*native_pointer(car)) != WEAK_POINTER_WIDETAG))
             ++n_bad;
-        }
+        else
+            n_live += ((struct weak_pointer*)native_pointer(car))->value
+                != UNBOUND_MARKER_WIDETAG;
     }
     if (lowtag_of(list) != LIST_POINTER_LOWTAG || n_bad) {
         fprintf(stderr, "; Bad value in liveness tracker\n");
@@ -869,17 +885,17 @@ void gc_prove_liveness(void(*context_scanner)(),
             pins[i] = make_lispobj(obj, lowtag);
         }
     }
-    trace_paths(context_scanner, objects, n_pins, (lispobj*)pins);
+    trace_paths(context_scanner, objects, n_pins, (lispobj*)pins, criterion);
 }
 
 /* This should be called inside WITHOUT-GCING so that the set
  * of pins does not change out from underneath.
  */
-void prove_liveness(lispobj objects)
+void prove_liveness(lispobj objects, int criterion)
 {
     extern struct hopscotch_table pinned_objects;
     extern int gc_n_stack_pins;
-    gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys);
+    gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
 }
 
 #include "genesis/package.h"

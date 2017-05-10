@@ -166,6 +166,7 @@ struct page *page_table;
 #ifndef GENCGC_IS_PRECISE
 struct hopscotch_table pinned_objects;
 lispobj gc_object_watcher;
+int gc_traceroot_criterion;
 int gc_n_stack_pins;
 #endif
 
@@ -4039,10 +4040,11 @@ collect_garbage(generation_index_t last_gen)
 
 #ifdef LISP_FEATURE_SB_TRACEROOT
     if (gc_object_watcher) {
-        extern void gc_prove_liveness(void(*)(), lispobj, int, uword_t*);
+        extern void gc_prove_liveness(void(*)(), lispobj, int, uword_t*, int);
         gc_prove_liveness(preserve_context_registers,
                           gc_object_watcher,
-                          gc_n_stack_pins, pinned_objects.keys);
+                          gc_n_stack_pins, pinned_objects.keys,
+                          gc_traceroot_criterion);
     }
 #endif
 
