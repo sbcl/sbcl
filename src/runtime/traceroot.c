@@ -589,11 +589,14 @@ static void trace1(lispobj object,
             (lowtag_of(ptr) == INSTANCE_POINTER_LOWTAG  ||
              lowtag_of(ptr) == FUN_POINTER_LOWTAG)) {
             target = instance_layout(native_pointer(ptr));
-        } else if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
+        }
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+          else if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
                    widetag_of(FDEFN(ptr)->header) == FDEFN_WIDETAG &&
                    next.wordindex == 3) {
             target = fdefn_raw_referent((struct fdefn*)native_pointer(ptr));
         }
+#endif
         target = canonical_obj(target);
         struct layer* next_layer = top_layer->next;
         free(top_layer->nodes);
