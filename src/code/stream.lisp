@@ -817,6 +817,9 @@
 (declaim (freeze-type broadcast-stream))
 
 (defun make-broadcast-stream (&rest streams)
+  (unless streams
+    (return-from make-broadcast-stream
+      (load-time-value (%make-broadcast-stream nil) t)))
   (dolist (stream streams)
     (unless (output-stream-p stream)
       (error 'type-error
