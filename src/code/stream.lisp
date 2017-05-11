@@ -893,7 +893,8 @@
              (file-string-length (car last) arg1)
              1)))
       (:close
-       (set-closed-flame stream))
+       (when (broadcast-stream-streams stream)
+         (set-closed-flame stream)))
       (t
        (let ((res nil))
          (dolist (stream streams res)
