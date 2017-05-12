@@ -22,7 +22,7 @@
             (:constructor make-core-object ())
             #-no-ansi-print-object
             (:print-object (lambda (x s)
-                             (print-unreadable-object (x s :type t))))
+                             (print-unreadable-object (x s :type t :identity t))))
             (:copier nil))
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
