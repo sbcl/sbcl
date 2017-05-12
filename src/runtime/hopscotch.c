@@ -271,7 +271,7 @@ boolean hopscotch_stringeq(uword_t arg1, uword_t arg2)
 {
     lispobj* str1 = (lispobj*)arg1;
     lispobj* str2 = (lispobj*)arg2;
-    if (str1[0] == str2[0] && str1[1] == str2[1]) {
+    if (((str1[0] ^ str2[0]) & WIDETAG_MASK) == 0 && str1[1] == str2[1]) {
         sword_t size = sizetab[widetag_of(*str1)](str1);
         return !memcmp(str1 + 2, str2 + 2, (size-2) << WORD_SHIFT);
     }

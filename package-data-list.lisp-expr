@@ -1240,6 +1240,7 @@ possibly temporarily, because it might be used internally."
                "LOGICALLY-READONLYIZE"
                "+STRING-DOWNGRADABLE+"
                "+STRING-SHAREABLE+"
+               "+STRING-SHAREABLE-NONSTD+"
 
                ;; certainly doesn't belong in public extensions
                ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?

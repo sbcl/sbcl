@@ -1945,12 +1945,18 @@ static void remap_string(lispobj* where, struct hopscotch_table* ht)
 {
     lispobj obj = *where;
     struct vector* s = (struct vector*)native_pointer(obj);
+    extern char gc_coalesce_string_literals;
+    // gc_coalesce_string_literals represents the "aggressiveness" level.
+    // If 1, then we share strings tagged as +STRING-SHAREABLE+,
+    // but if >1, those and also +STRING-SHAREABLE-NONSTD+.
+    int mask = (gc_coalesce_string_literals>1 ? 6 : 2)<<N_WIDETAG_BITS;
+
     if (lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
         (widetag_of(s->header) == SIMPLE_BASE_STRING_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
          || widetag_of(s->header) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
-         ) && (HeaderValue(s->header) & 2) != 0) { /* shareable string */
+         ) && (s->header & mask) != 0) { /* shareable string */
         int index = hopscotch_get(ht, (uword_t)s, 0);
         if (!index) // Not found
             hopscotch_insert(ht, (uword_t)s, 1);

@@ -578,5 +578,13 @@ new string COUNT long filled with the fill character."
 (defun string-trim (char-bag string)
   (generic-string-trim char-bag string t t))
 
-(defun logically-readonlyize (string)
-  (set-header-data (the string string) +string-shareable+))
+(defun logically-readonlyize (string &optional (always-shareable t))
+  ;; "Always" means that regardless of whether the user want
+  ;; coalescing of strings used as literals in code compiled to memory,
+  ;; the string is shareable.
+  ;;  #b01_ ; symbol name, literal compiled to fasl, some other stuff
+  ;;  #b10_ ; literal compiled to core
+  (set-header-data (the string string)
+                   (if always-shareable
+                       +string-shareable+
+                       +string-shareable-nonstd+)))

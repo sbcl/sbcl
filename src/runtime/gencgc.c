@@ -4585,6 +4585,9 @@ prepare_for_final_gc ()
     }
 }
 
+/* Set this switch to 1 for coalescing of strings dumped to fasl,
+ * or 2 for coalescing of those,
+ * plus literal strings in code compiled to memory. */
 char gc_coalesce_string_literals = 0;
 
 /* Do a non-conservative GC, and then save a core with the initial

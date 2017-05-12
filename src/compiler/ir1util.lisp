@@ -2003,6 +2003,20 @@ is :ANY, the function name is not checked."
                                 (vector character))))))
              (coalescep (x)
                (if faslp (file-coalesce-p x) (core-coalesce-p x))))
+      ;; When compiling to core we don't coalesce strings, because
+      ;;  "The functions eval and compile are required to ensure that literal objects
+      ;;   referenced within the resulting interpreted or compiled code objects are
+      ;;   the _same_ as the corresponding objects in the source code."
+      ;; but in a dumped image, if gc_coalesce_string_literals is 1 then GC will
+      ;; coalesce similar immutable strings to save memory,
+      ;; even if not technically permitted. According to CLHS 3.7.1
+      ;;  "The consequences are undefined if literal objects are destructively modified
+      ;;   For this purpose, the following operations are considered destructive:
+      ;;   array - Storing a new value into some element of the array ..."
+      ;; so a string, once used as a literal in source, becomes logically immutable.
+      #-sb-xc-host
+      (when (and (not faslp) (simple-string-p object))
+        (logically-readonlyize object nil))
       (if (and (boundp '*constants*) (coalescep object))
           (or (gethash object *constants*)
               (setf (gethash object *constants*)
