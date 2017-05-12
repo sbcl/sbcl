@@ -819,7 +819,18 @@
 (defun make-broadcast-stream (&rest streams)
   (unless streams
     (return-from make-broadcast-stream
-      (load-time-value (%make-broadcast-stream nil) t)))
+      (load-time-value (let ((out (lambda (stream arg)
+                                    (declare (ignore stream arg)
+                                             (optimize speed (safety 0)))))
+                             (sout (lambda (stream string start end)
+                                     (declare (ignore stream string start end)
+                                              (optimize speed (safety 0)))))
+                             (stream (%make-broadcast-stream nil)))
+                         (setf (broadcast-stream-out stream) out
+                               (broadcast-stream-bout stream) out
+                               (broadcast-stream-sout stream) sout)
+                         stream)
+                       t)))
   (dolist (stream streams)
     (unless (output-stream-p stream)
       (error 'type-error
