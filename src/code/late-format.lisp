@@ -255,6 +255,9 @@
            (funcall expander directive more-directives)
            (format-error "Unknown directive ~@[(character: ~A)~]"
                          (char-name (format-directive-character directive))))))
+    ((simple-string 1)
+     (values `(write-char ,(schar directive 0) stream)
+             more-directives))
     (simple-string
      (values `(write-string ,directive stream)
              more-directives))))
