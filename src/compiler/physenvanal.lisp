@@ -264,26 +264,29 @@
           (setf (gethash functional table) nil)
           ;; Then compute the real value.
           (setf (gethash functional table)
-                (or
-                 ;; If the functional has a XEP, it's kind is :EXTERNAL --
-                 ;; which means it may escape. ...but if it
-                 ;; HAS-EXTERNAL-REFERENCES-P, then that XEP is actually a
-                 ;; TL-XEP, which means it's a toplevel function -- which in
-                 ;; turn means our search has bottomed out without an escape
-                 ;; path. AVER just to make sure, though.
-                 (and (eq :external (functional-kind functional))
-                      (if (functional-has-external-references-p functional)
-                          (aver (eq 'tl-xep (car (functional-debug-name functional))))
-                          t))
-                 ;; If it has an entry point that may escape, that just as bad.
-                 (and entry (functional-may-escape-p entry))
-                 ;; If it has references to it in functions that may escape, that's bad
-                 ;; too.
-                 (dolist (ref (functional-refs functional) nil)
-                   (binding* ((lvar (ref-lvar ref) :exit-if-null)
-                              (dest (lvar-dest lvar) :exit-if-null))
-                     (when (functional-may-escape-p (node-home-lambda dest))
-                       (return t))))))))))
+                (and
+                 ;; ESCAPE functionals would never escape from their target
+                 (neq (functional-kind functional) :escape)
+                 (or
+                  ;; If the functional has a XEP, it's kind is :EXTERNAL --
+                  ;; which means it may escape. ...but if it
+                  ;; HAS-EXTERNAL-REFERENCES-P, then that XEP is actually a
+                  ;; TL-XEP, which means it's a toplevel function -- which in
+                  ;; turn means our search has bottomed out without an escape
+                  ;; path. AVER just to make sure, though.
+                  (and (eq :external (functional-kind functional))
+                       (if (functional-has-external-references-p functional)
+                           (aver (eq 'tl-xep (car (functional-debug-name functional))))
+                           t))
+                  ;; If it has an entry point that may escape, that just as bad.
+                  (and entry (functional-may-escape-p entry))
+                  ;; If it has references to it in functions that may escape, that's bad
+                  ;; too.
+                  (dolist (ref (functional-refs functional) nil)
+                    (binding* ((lvar (ref-lvar ref) :exit-if-null)
+                               (dest (lvar-dest lvar) :exit-if-null))
+                      (when (functional-may-escape-p (node-home-lambda dest))
+                        (return t)))))))))))
 
 (defun exit-should-check-tag-p (exit)
   (declare (type exit exit))

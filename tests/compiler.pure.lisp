@@ -6402,3 +6402,15 @@
       (assert (equal string (string #\HIRAGANA_LETTER_SMALL_TU)))
       (assert-error (funcall fun base-string) type-error)
       (assert (equal base-string "a")))))
+
+(with-test (:name :can-escape-functionals-escape)
+  (checked-compile
+   `(lambda ()
+      (declare (optimize (speed 3)))
+      (lambda () (unwind-protect :x :z)))
+   :allow-notes nil)
+  (checked-compile
+   `(lambda ()
+      (declare (optimize (speed 3)))
+      (lambda () (catch :x)))
+   :allow-notes nil))
