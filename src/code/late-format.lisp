@@ -569,11 +569,14 @@
 (def-format-directive #\% (colonp atsignp params)
   (check-modifier "colon" colonp)
   (check-modifier "at-sign" atsignp)
-  (if params
-      (expand-bind-defaults ((count 1)) params
-        `(dotimes (i ,count)
-           (terpri stream)))
-      '(terpri stream)))
+  (cond ((not params)
+         '(terpri stream))
+        ((typep params '(cons (cons * (mod 65536)) null))
+         `(write-string ,(make-string (cdar params) :initial-element #\Newline) stream))
+        (t
+         (expand-bind-defaults ((count 1)) params
+           `(dotimes (i ,count)
+              (terpri stream))))))
 
 (def-format-directive #\& (colonp atsignp params)
   (check-modifier "colon" colonp)
