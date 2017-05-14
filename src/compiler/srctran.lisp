@@ -5005,3 +5005,6 @@
        `(setq ,symbol value))
       (t
        (give-up-ir1-transform)))))
+
+(deftransforms (prin1-to-string princ-to-string) ((object) (number))
+  `(stringify-object object))
