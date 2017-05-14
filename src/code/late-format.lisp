@@ -229,16 +229,36 @@
 
 (defun expand-directive-list (directives)
   (let ((results nil)
+        previous
         (remaining-directives directives))
     (loop
-      (unless remaining-directives
-        (return))
-      (multiple-value-bind (form new-directives)
-          (expand-directive (car remaining-directives)
-                            (cdr remaining-directives))
-        (push form results)
-        (setf remaining-directives new-directives)))
-    (reverse results)))
+     (unless remaining-directives
+       (return))
+     (multiple-value-bind (form new-directives)
+         (expand-directive (car remaining-directives)
+                           (cdr remaining-directives))
+       (flet ((merge-string (string)
+                (cond (previous
+                       (let ((concat (concatenate 'string
+                                                  (string previous)
+                                                  (string string))))
+                         (setf previous concat)
+                         (setf (car results)
+                               `(write-string ,concat stream))))
+                      (t
+                       (setf previous string)
+                       (push form results)))))
+         (cond ((not form))
+               ((typep form '(cons (member write-string write-char)
+                              (cons (or string character))))
+                (merge-string (second form)))
+               ((typep form '(cons (eql terpri)))
+                (merge-string #\Newline))
+               (t
+                (push form results)
+                (setf previous nil))))
+       (setf remaining-directives new-directives)))
+    (nreverse results)))
 
 (defun expand-directive (directive more-directives)
   (etypecase directive
@@ -258,6 +278,8 @@
     ((simple-string 1)
      (values `(write-char ,(schar directive 0) stream)
              more-directives))
+    ((simple-string 0)
+     (values nil more-directives))
     (simple-string
      (values `(write-string ,directive stream)
              more-directives))))
