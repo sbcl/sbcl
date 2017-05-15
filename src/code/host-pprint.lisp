@@ -15,6 +15,7 @@
 ;; This comes early so that fndb can use PPRINT-DISPATCH-TABLE as
 ;; a type-specifier.
 (sb!xc:defstruct (pprint-dispatch-table
+                  (:conc-name pp-dispatch-)
                   (:constructor make-pprint-dispatch-table (&optional entries))
                   (:copier nil) ; needs a deep copy
                   (:predicate nil))
@@ -24,7 +25,10 @@
   ;; A hash table mapping things to entries for type specifiers of the
   ;; form (CONS (MEMBER <thing>)). If the type specifier is of this form,
   ;; we put it in this hash table instead of the regular entries table.
-  (cons-entries (make-hash-table :test 'eql) :read-only t))
+  (cons-entries (make-hash-table :test 'eql) :read-only t)
+  ;; NIL if this this table can't match any numeric type.
+  ;; The conservative value is T.
+  (number-matchable-p nil))
 
 (declaim (freeze-type pprint-dispatch-table))
 

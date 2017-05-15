@@ -781,26 +781,28 @@ line break."
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
   (let* ((orig (or table *initial-pprint-dispatch-table*))
-         (new (make-pprint-dispatch-table
-               (copy-list (pprint-dispatch-table-entries orig)))))
-    (replace/eql-hash-table (pprint-dispatch-table-cons-entries new)
-                            (pprint-dispatch-table-cons-entries orig))
+         (new (make-pprint-dispatch-table (copy-list (pp-dispatch-entries orig)))))
+    (replace/eql-hash-table (pp-dispatch-cons-entries new)
+                            (pp-dispatch-cons-entries orig))
     new))
 
 (defun pprint-dispatch (object &optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
   (let* ((table (or table *initial-pprint-dispatch-table*))
-         (cons-entry
-          (and (consp object)
-               (gethash (car object)
-                        (pprint-dispatch-table-cons-entries table))))
          (entry
-          (dolist (entry (pprint-dispatch-table-entries table) cons-entry)
-            (when (and cons-entry
-                       (entry< entry cons-entry))
-              (return cons-entry))
-            (when (funcall (pprint-dispatch-entry-test-fn entry) object)
-              (return entry)))))
+          (when (or (not (numberp object)) (pp-dispatch-number-matchable-p table))
+            (let ((cons-entry
+                   (and (consp object)
+                        (gethash (car object) (pp-dispatch-cons-entries table)))))
+              (if (not cons-entry)
+                  (dolist (entry (pp-dispatch-entries table) nil)
+                    (when (funcall (pprint-dispatch-entry-test-fn entry) object)
+                      (return entry)))
+                  (dolist (entry (pp-dispatch-entries table) cons-entry)
+                    (when (entry< entry cons-entry)
+                      (return cons-entry))
+                    (when (funcall (pprint-dispatch-entry-test-fn entry) object)
+                      (return entry))))))))
     (if entry
         (values (pprint-dispatch-entry-fun entry) t)
         (values #'output-ugly-object nil))))
@@ -861,14 +863,16 @@ line break."
     (when (and function disabled-p)
       ;; a DISABLED-P test function has to close over the ENTRY
       (setf (pprint-dispatch-entry-test-fn entry) (defer-type-checker entry)))
+    (when (types-equal-or-intersect ctype (specifier-type 'number))
+      (setf (pp-dispatch-number-matchable-p table) t))
     (if consp
-        (let ((hashtable (pprint-dispatch-table-cons-entries table)))
+        (let ((hashtable (pp-dispatch-cons-entries table)))
           (dolist (key (member-type-members (cons-type-car-type ctype)))
             (if function
                 (setf (gethash key hashtable) entry)
                 (remhash key hashtable))))
-        (setf (pprint-dispatch-table-entries table)
-              (let ((list (delete type (pprint-dispatch-table-entries table)
+        (setf (pp-dispatch-entries table)
+              (let ((list (delete type (pp-dispatch-entries table)
                                   :key #'pprint-dispatch-entry-type
                                   :test #'equal)))
                 (if function

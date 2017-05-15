@@ -184,14 +184,20 @@ variable: an unreadable object representing the error is printed instead.")
 (defun stringify-object (object)
   (typecase object
     (integer
-     (let ((buffer-size (approx-chars-in-repr object)))
-       (let* ((string (make-string buffer-size :element-type 'base-char))
-              (stream (%make-finite-base-string-output-stream string)))
-         (declare (inline %make-finite-base-string-output-stream))
-         (declare (truly-dynamic-extent stream))
-         (output-integer object stream)
-         (%shrink-vector string
-                         (finite-base-string-output-stream-pointer stream)))))
+     (multiple-value-bind (fun pretty)
+         (and *print-pretty* (pprint-dispatch object))
+       (if pretty
+           (with-simple-output-to-string (stream)
+              (sb!pretty::with-pretty-stream (stream)
+                (funcall fun stream object)))
+           (let ((buffer-size (approx-chars-in-repr object)))
+             (let* ((string (make-string buffer-size :element-type 'base-char))
+                    (stream (%make-finite-base-string-output-stream string)))
+               (declare (inline %make-finite-base-string-output-stream))
+               (declare (truly-dynamic-extent stream))
+               (output-integer object stream)
+               (%shrink-vector string
+                               (finite-base-string-output-stream-pointer stream)))))))
     ;; Could do something for other numeric types, symbols, ...
     (t
      (with-simple-output-to-string (stream)

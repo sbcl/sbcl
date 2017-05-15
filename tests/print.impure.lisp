@@ -826,3 +826,14 @@
 (with-test (:name :print-random-standard-object) ; lp# 1654550
   (assert (search "#<FOO2 {" (write-to-string (make-instance 'foo2) :pretty nil)))
   (assert (search "#<FOO2 {" (write-to-string (make-instance 'foo2) :pretty t))))
+
+(set-pprint-dispatch 'fixnum
+                     (lambda (stream obj)
+                       (format stream "#{Fixnum ")
+                       (write obj :stream stream :pretty nil)
+                       (write-char #\} stream)))
+;; STRINGIFY-OBJECT failed to use the pretty-print dispatch table
+;; for integers.
+(with-test (:name :stringify-pretty-integer)
+  (assert (string= (write-to-string 92 :pretty t)
+                   "#{Fixnum 92}")))
