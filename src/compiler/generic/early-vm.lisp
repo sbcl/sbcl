@@ -111,15 +111,6 @@
 ;; which can be expressed in 8 bits.
 (defconstant short-header-max-words #x7fff)
 
-;; A string which is tagged +STRING-DOWNGRADABLE+ is created as
-;; an array of CHARACTER, but when there is no express requirement
-;; in the spec to use CHARACTER as opposed to BASE-CHAR.
-;; As such, certain operations on the string are permitted
-;; to return an array of BASE-CHAR in the interest of memory savings.
-;; Presently, use of strings so tagged is for INTERN on the string
-;; resulting from writing to a string stream.
-(def!constant +string-downgradable+ 1)
-
 ;; A string tagged as +STRING-SHAREABLE+ is logically readonly,
 ;; and permitted to be shared with another string per the CLHS standard
 ;; under the concept of similarity as constant. A string so tagged is

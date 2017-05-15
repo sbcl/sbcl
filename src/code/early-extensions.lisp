@@ -1698,14 +1698,14 @@ to :INTERPRET, an interpreter will be used.")
         `(let ((,var (sb!impl::make-fill-pointer-output-stream ,string)))
            ,@decls
            ,@forms)
-        `(let ((,var (make-string-output-stream)))
+        `(let ((,var #+sb-xc-host (make-string-output-stream)
+                     #-sb-xc-host (sb!impl::%make-string-output-stream
+                                   (or #!-sb-unicode 'character :default)
+                                   #'sb!impl::string-ouch)))
+
            ,@decls
            ,@forms
-           (truly-the (simple-array character (*))
-                      #+sb-xc-host (get-output-stream-string ,var)
-                      #-sb-xc-host
-                      (set-header-data (get-output-stream-string ,var)
-                                       +string-downgradable+))))))
+           (get-output-stream-string ,var)))))
 
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)

@@ -963,30 +963,7 @@ implementation it is ~S." *!default-package-use-list*)
              (setf (values symbol where) (%find-symbol name length package))
              (if where
                  (values symbol where)
-                 ;; The common idiom of (INTERN (FORMAT NIL "~A-~A"))
-                 ;; should use a base-string for the name if possible.
-                 ;; As far as I can tell, it would be permissible for a
-                 ;; string-output-stream to return a base-string regardless
-                 ;; of the stream's element type. Barring some nontrivial
-                 ;; changes to get string-streams to remember whether they
-                 ;; contain any non-base characters, it's straightforward
-                 ;; to hint to INTERN that its first argument might have a
-                 ;; different type from the resulting symbol's pname.
-                 ;; Users' expectations are misplaced if they believe
-                 ;; that INTERN uses the first argument as-is. However,
-                 ;; we'll still "meet expectations" when the user supplies a
-                 ;; non-base string that was not produced via string-stream.
-                 (let* ((elt-type
-                         #!-sb-unicode elt-type
-                         #!+sb-unicode
-                         (if (or (eq elt-type 'base-char)
-                                 (and (simple-character-string-p name) ; non-base string
-                                      (logtest +string-downgradable+   ; from a string-stream
-                                               (get-header-data name))
-                                      (every #'base-char-p name)))
-                             'base-char
-                             'character))
-                        (symbol-name
+                 (let* ((symbol-name
                          (logically-readonlyize
                           (replace (make-string length :element-type elt-type)
                                    name))))

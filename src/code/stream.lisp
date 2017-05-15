@@ -1360,10 +1360,9 @@
 
 (defstruct (string-output-stream
             (:include ansi-stream
-                      (out #'string-ouch)
                       (sout #'string-sout)
                       (misc #'string-out-misc))
-            (:constructor %make-string-output-stream (element-type))
+            (:constructor %make-string-output-stream (element-type out))
             (:copier nil)
             (:predicate nil))
   ;; The string we throw stuff in.
@@ -1382,10 +1381,12 @@
   ;; end of the stream.
   (index-cache 0 :type index)
   ;; Requested element type
-  ;; FIXME: there seems to be no way to skip the type-check in the ctor,
-  ;; which is redundant with the check in MAKE-STRING-OUTPUT-STREAM.
-  (element-type 'character :type type-specifier
-                           :read-only t))
+  (element-type nil
+                ;; It doesn't help anything to declare this slot's type.
+                ;; Readers don't really benefit, and the public constructor
+                ;; checks for validity.
+                #|:type (or #!+sb-unicode (eql :default) type-specifier)|#
+                :read-only t))
 
 (declaim (freeze-type string-output-stream))
 (defun make-string-output-stream (&key (element-type 'character))
@@ -1393,7 +1394,10 @@
 benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (explicit-check))
   (if (csubtypep (specifier-type element-type) (specifier-type 'character))
-      (%make-string-output-stream element-type)
+      (%make-string-output-stream
+       element-type (case element-type
+                      (base-char #'string-ouch/base-char)
+                      (t #'string-ouch)))
       (error "~S is not a subtype of CHARACTER" element-type)))
 
 (defstruct (finite-base-string-output-stream
@@ -1459,23 +1463,29 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (decf (string-output-stream-index stream) skipped)
            nil))))
 
-(defun string-ouch (stream character)
-  (/noshow0 "/string-ouch")
-  (let ((pointer (string-output-stream-pointer stream))
-        (buffer (string-output-stream-buffer stream))
-        (index (string-output-stream-index stream)))
-    (cond ((= pointer (length buffer))
-           (setf buffer (string-output-stream-new-buffer stream index)
-                 (aref buffer 0) character
-                 (string-output-stream-pointer stream) 1))
-          (t
-           (setf (aref buffer pointer) character
-                 (string-output-stream-pointer stream) (1+ pointer))))
-    (setf (string-output-stream-index stream) (1+ index))))
+(macrolet ((def (name char-type)
+  `(defun ,name (stream character)
+    (let ((pointer (string-output-stream-pointer stream))
+          (buffer (string-output-stream-buffer stream))
+          (index (string-output-stream-index stream)))
+      (when (= pointer (length buffer))
+        (setf buffer (string-output-stream-new-buffer stream index)
+              pointer 0))
+      (setf (aref buffer pointer) (the ,char-type character)
+            (string-output-stream-pointer stream) (1+ pointer))
+      (setf (string-output-stream-index stream) (1+ index))))))
+  (def string-ouch character)
+  (def string-ouch/base-char base-char))
 
 (defun string-sout (stream string start end)
   (declare (type simple-string string)
            (type index start end))
+  #!+sb-unicode
+  (when (and (typep string 'sb!kernel:simple-character-string)
+             (eq (string-output-stream-element-type stream) 'base-char))
+    (do ((i (1- end) (1- i))) ((< i start))
+      (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+      (the base-char (char string i))))
   (let* ((full-length (- end start))
          (length full-length)
          (buffer (string-output-stream-buffer stream))
@@ -1588,7 +1598,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (:close
      (/noshow0 "/string-out-misc close")
      (set-closed-flame stream))
-    (:element-type (string-output-stream-element-type stream))
+    (:element-type
+     (let ((et (string-output-stream-element-type stream)))
+       ;; Always return a valid type-specifier
+       (if (eq et :default) 'character et)))
     (:element-mode 'character)))
 
 ;;; Return a string of all the characters sent to a stream made by
@@ -1601,6 +1614,20 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (prev (nreverse (string-output-stream-prev stream)))
          (this (string-output-stream-buffer stream))
          (next (string-output-stream-next stream))
+         #!+sb-unicode
+         (element-type
+          (if (eq element-type :default)
+              (if (or next
+                      (dolist (buf prev)
+                         (unless (every #'base-char-p
+                                        (truly-the simple-character-string buf))
+                           (return t)))
+                      (dotimes (i (string-output-stream-pointer stream))
+                        (unless (base-char-p (char this i))
+                          (return t))))
+                  'character
+                  'base-char)
+              element-type))
          (result
           (case element-type
             ;; overwhelmingly common case: can be inlined

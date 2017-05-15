@@ -4,6 +4,8 @@ changes relative to sbcl-1.3.17:
   * minor incompatible change: existing values of CFLAGS, ASFLAGS,
     CPPFLAGS, and LINKFLAGS will be incorporated into C compiler
     invocations when building from source.
+  * minor incompatible change: the result of WRITE-TO-STRING may be
+    a BASE-STRING if all characters written are of type BASE-CHAR.
   * minor incompatible change: the broadcast stream with no output
     streams is a singleton object. That object satisfies OPEN-STREAM-P
     regardless of how many times CLOSE is invoked on it.

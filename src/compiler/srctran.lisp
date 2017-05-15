@@ -4512,7 +4512,7 @@
   (declare (ignore control args))
   (when (and (constant-lvar-p dest)
              (null (lvar-value dest)))
-    (specifier-type '(simple-array character (*)))))
+    (specifier-type 'simple-string)))
 
 ;;; We disable this transform in the cross-compiler to save memory in
 ;;; the target image; most of the uses of FORMAT in the compiler are for
@@ -4995,7 +4995,11 @@
                                (and (csubtypep specifier (specifier-type 'character))
                                     (type-specifier specifier)))))))
    (if element-type
-       `(sb!impl::%make-string-output-stream ',element-type)
+       `(sb!impl::%make-string-output-stream
+         ',element-type
+         (function ,(case element-type
+                      (base-char 'sb!impl::string-ouch/base-char)
+                      (t 'sb!impl::string-ouch))))
        (give-up-ir1-transform))))
 
 (deftransform set ((symbol value) ((constant-arg symbol) *))
