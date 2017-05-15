@@ -30,7 +30,8 @@ all: $(FASL) $(ASD)
 
 $(FASL)::
 	$(MAKE) -C ../asdf
-	$(SBCL) --load ../asdf-stub.lisp \
+	$(SBCL) --eval '(setf (sb-ext:readtable-base-char-preference *readtable*) :both)' \
+		--load ../asdf-stub.lisp \
 		--eval '(asdf::build-asdf-contrib "$(SYSTEM)")'
 
 $(ASD)::
