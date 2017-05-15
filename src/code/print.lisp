@@ -1334,13 +1334,14 @@ variable: an unreadable object representing the error is printed instead.")
                      (cond ((>= e 0)
                             (let ((be (expt float-radix e)))
                               (if (/= f (expt float-radix (1- float-digits)))
-                                  (setf r (* f be 2)
+                                  ;; multiply F by 2 first, avoding consing two bignums
+                                  (setf r (* f 2 be)
                                         s 2
                                         m+ be
                                         m- be)
                                   (setf m- be
                                         m+ (* be float-radix)
-                                        r (* f m+ 2)
+                                        r (* f 2 m+)
                                         s (* float-radix 2)))))
                            ((or (= e min-e)
                                 (/= f (expt float-radix (1- float-digits))))

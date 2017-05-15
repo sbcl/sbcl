@@ -25,6 +25,7 @@ changes relative to sbcl-1.3.17:
   * bug fix: MAKE-PATHNAME removes empty strings as components of a
     directory, as is permitted: "Whenever a pathname is constructed
     the components may be canonicalized if appropriate."
+  * optimization: various printer and FORMAT performance enhancements.
 
 changes in sbcl-1.3.17 relative to sbcl-1.3.16:
   * enhancement: memory overhead from the garbage collector's metadata
