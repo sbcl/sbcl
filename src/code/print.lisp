@@ -1264,113 +1264,163 @@ variable: an unreadable object representing the error is printed instead.")
 (defconstant long-float-min-e
   (nth-value 1 (decode-float least-positive-long-float)))
 
-(defun flonum-to-digits (v &optional position relativep)
+;;; Call CHAR-FUN with the digits of FLOAT
+;;; PROLOGUE-FUN and EPILOGUE-FUN are called with the exponent before
+;;; and after printing to set up the state.
+(declaim (inline %flonum-to-digits))
+(defun %flonum-to-digits (char-fun
+                          prologue-fun
+                          epilogue-fun
+                          float &optional position relativep)
   (let ((print-base 10)                 ; B
         (float-radix 2)                 ; b
-        (float-digits (float-digits v)) ; p
-        (digit-characters "0123456789")
+        (float-digits (float-digits float)) ; p
         (min-e
-          (etypecase v
+          (etypecase float
             (single-float single-float-min-e)
             (double-float double-float-min-e)
             #!+long-float
             (long-float long-float-min-e))))
     (multiple-value-bind (f e)
-        (integer-decode-float v)
+        (integer-decode-float float)
       (let ( ;; FIXME: these even tests assume normal IEEE rounding
             ;; mode.  I wonder if we should cater for non-normal?
             (high-ok (evenp f))
             (low-ok (evenp f)))
-        (with-push-char (:element-type base-char)
-          (labels ((scale (r s m+ m-)
-                     (do ((r+m+ (+ r m+))
-                          (k 0 (1+ k))
-                          (s s (* s print-base)))
-                         ((not (or (> r+m+ s)
-                                   (and high-ok (= r+m+ s))))
-                          (do ((k k (1- k))
-                               (r r (* r print-base))
-                               (m+ m+ (* m+ print-base))
-                               (m- m- (* m- print-base)))
-                              ((not (and (> r m-) ; Extension to handle zero
-                                         (let ((x (* (+ r m+) print-base)))
-                                           (or (< x s)
-                                               (and (not high-ok)
-                                                    (= x s))))))
-                               (values k (generate r s m+ m-)))))))
-                   (generate (r s m+ m-)
-                     (let (d tc1 tc2)
-                       (tagbody
-                        loop
-                          (setf (values d r) (truncate (* r print-base) s))
-                          (setf m+ (* m+ print-base))
-                          (setf m- (* m- print-base))
-                          (setf tc1 (or (< r m-) (and low-ok (= r m-))))
-                          (setf tc2 (let ((r+m+ (+ r m+)))
-                                      (or (> r+m+ s)
-                                          (and high-ok (= r+m+ s)))))
-                          (when (or tc1 tc2)
-                            (go end))
-                          (push-char (char digit-characters d))
-                          (go loop)
-                        end
-                          (let ((d (cond
-                                     ((and (not tc1) tc2) (1+ d))
-                                     ((and tc1 (not tc2)) d)
-                                     ((< (* r 2) s)
-                                      d)
-                                     (t
-                                      (1+ d)))))
-                            (push-char (char digit-characters d))
-                            (return-from generate (get-pushed-string))))))
-                   (initialize ()
-                     (let (r s m+ m-)
-                       (cond ((>= e 0)
-                              (let ((be (expt float-radix e)))
-                                (if (/= f (expt float-radix (1- float-digits)))
-                                    (setf r (* f be 2)
-                                          s 2
-                                          m+ be
-                                          m- be)
-                                    (setf m- be
-                                          m+ (* be float-radix)
-                                          r (* f m+ 2)
-                                          s (* float-radix 2)))))
-                             ((or (= e min-e)
-                                  (/= f (expt float-radix (1- float-digits))))
-                              (setf r (* f 2)
-                                    s (expt float-radix (- 1 e))
-                                    m+ 1
-                                    m- 1))
-                             (t
-                              (setf r (* f float-radix 2)
-                                    s (expt float-radix (- 2 e))
-                                    m+ float-radix
-                                    m- 1)))
-                       (when position
-                         (when relativep
-                           (aver (> position 0))
-                           (do ((k 0 (1+ k))
-                                ;; running out of letters here
-                                (l 1 (* l print-base)))
-                               ((>= (* s l) (+ r m+))
-                                ;; k is now \hat{k}
-                                (if (< (+ r (* s (/ (expt print-base (- k position)) 2)))
-                                       (* s l))
-                                    (setf position (- k position))
-                                    (setf position (- k position 1))))))
-                         (let* ((x (/ (* s (expt print-base position)) 2))
-                                (low (max m- x))
-                                (high (max m+ x)))
-                           (when (<= m- low)
-                             (setf m- low)
-                             (setf low-ok t))
-                           (when (<= m+ high)
-                             (setf m+ high)
-                             (setf high-ok t))))
-                       (values r s m+ m-))))
-            (multiple-value-bind (r s m+ m-) (initialize)
-              (scale r s m+ m-))))))))
+        (labels ((scale (r s m+ m-)
+                   (do ((r+m+ (+ r m+))
+                        (k 0 (1+ k))
+                        (s s (* s print-base)))
+                       ((not (or (> r+m+ s)
+                                 (and high-ok (= r+m+ s))))
+                        (do ((k k (1- k))
+                             (r r (* r print-base))
+                             (m+ m+ (* m+ print-base))
+                             (m- m- (* m- print-base)))
+                            ((not (and (> r m-) ; Extension to handle zero
+                                       (let ((x (* (+ r m+) print-base)))
+                                         (or (< x s)
+                                             (and (not high-ok)
+                                                  (= x s))))))
+                             (funcall prologue-fun k)
+                             (generate r s m+ m-)
+                             (funcall epilogue-fun k))))))
+                 (generate (r s m+ m-)
+                   (let (d tc1 tc2)
+                     (tagbody
+                      loop
+                        (setf (values d r) (truncate (* r print-base) s))
+                        (setf m+ (* m+ print-base))
+                        (setf m- (* m- print-base))
+                        (setf tc1 (or (< r m-) (and low-ok (= r m-))))
+                        (setf tc2 (let ((r+m+ (+ r m+)))
+                                    (or (> r+m+ s)
+                                        (and high-ok (= r+m+ s)))))
+                        (when (or tc1 tc2)
+                          (go end))
+                        (funcall char-fun d)
+                        (go loop)
+                      end
+                        (let ((d (cond
+                                   ((and (not tc1) tc2) (1+ d))
+                                   ((and tc1 (not tc2)) d)
+                                   ((< (* r 2) s)
+                                    d)
+                                   (t
+                                    (1+ d)))))
+                          (funcall char-fun d)))))
+                 (initialize ()
+                   (let (r s m+ m-)
+                     (cond ((>= e 0)
+                            (let ((be (expt float-radix e)))
+                              (if (/= f (expt float-radix (1- float-digits)))
+                                  (setf r (* f be 2)
+                                        s 2
+                                        m+ be
+                                        m- be)
+                                  (setf m- be
+                                        m+ (* be float-radix)
+                                        r (* f m+ 2)
+                                        s (* float-radix 2)))))
+                           ((or (= e min-e)
+                                (/= f (expt float-radix (1- float-digits))))
+                            (setf r (* f 2)
+                                  s (expt float-radix (- 1 e))
+                                  m+ 1
+                                  m- 1))
+                           (t
+                            (setf r (* f float-radix 2)
+                                  s (expt float-radix (- 2 e))
+                                  m+ float-radix
+                                  m- 1)))
+                     (when position
+                       (when relativep
+                         (aver (> position 0))
+                         (do ((k 0 (1+ k))
+                              ;; running out of letters here
+                              (l 1 (* l print-base)))
+                             ((>= (* s l) (+ r m+))
+                              ;; k is now \hat{k}
+                              (if (< (+ r (* s (/ (expt print-base (- k position)) 2)))
+                                     (* s l))
+                                  (setf position (- k position))
+                                  (setf position (- k position 1))))))
+                       (let* ((x (/ (* s (expt print-base position)) 2))
+                              (low (max m- x))
+                              (high (max m+ x)))
+                         (when (<= m- low)
+                           (setf m- low)
+                           (setf low-ok t))
+                         (when (<= m+ high)
+                           (setf m+ high)
+                           (setf high-ok t))))
+                     (values r s m+ m-))))
+          (multiple-value-bind (r s m+ m-) (initialize)
+            (scale r s m+ m-)))))))
+
+(defun flonum-to-digits (float &optional position relativep)
+  (let ((digit-characters "0123456789"))
+    (with-push-char (:element-type base-char)
+      (%flonum-to-digits
+       (lambda (d)
+         (push-char (char digit-characters d)))
+       (lambda (k) k)
+       (lambda (k) (values k (get-pushed-string)))
+       float position relativep))))
+
+(defun print-float (float stream)
+  (let ((position 0)
+        (dot-position 0)
+        (digit-characters "0123456789")
+        (e-min -3)
+        (e-max 8))
+    (%flonum-to-digits
+     (lambda (d)
+       (when (= position dot-position)
+         (write-char #\. stream))
+       (write-char (char digit-characters d) stream)
+       (incf position))
+     (lambda (k)
+       (cond ((not (< e-min k e-max))
+              (setf dot-position 1))
+             ((plusp k)
+              (setf dot-position k))
+             (t
+              (setf dot-position -1)
+              (write-char #\0 stream)
+              (write-char #\. stream)
+              (loop for i below (- k)
+                    do (write-char #\0 stream)))))
+     (lambda (k)
+       (when (<= position dot-position)
+         (loop for i below (- dot-position position)
+               do (write-char #\0 stream))
+         (write-char #\. stream)
+         (write-char #\0 stream))
+       (if (< e-min k e-max)
+           (print-float-exponent float 0 stream)
+           (print-float-exponent float (1- k) stream)))
+     float)))
 
 ;;; Given a non-negative floating point number, SCALE-EXPONENT returns
 ;;; a new floating point number Z in the range (0.1, 1.0] and an
@@ -1503,51 +1553,33 @@ variable: an unreadable object representing the error is printed instead.")
     (write-string (if (float-trapping-nan-p x) " trapping" " quiet") stream)
     (write-string " NaN" stream)))
 
-;;; the function called by OUTPUT-OBJECT to handle floats
-(defmethod print-object ((x float) stream)
+(declaim (inline output-float))
+(defun output-float (x stream)
   (cond
-   ((float-infinity-p x)
-    (output-float-infinity x stream))
-   ((float-nan-p x)
-    (output-float-nan x stream))
-   (t
-    (let ((x (cond ((minusp (float-sign x))
-                    (write-char #\- stream)
-                    (- x))
-                   (t
-                    x))))
-      (cond
-       ((zerop x)
-        (write-string "0.0" stream)
-        (print-float-exponent x 0 stream))
-       (t
-        (output-float-aux x stream -3 8)))))))
+    ((float-infinity-p x)
+     (output-float-infinity x stream))
+    ((float-nan-p x)
+     (output-float-nan x stream))
+    (t
+     (let ((x (cond ((minusp (float-sign x))
+                     (write-char #\- stream)
+                     (- x))
+                    (t
+                     x))))
+       (cond
+         ((zerop x)
+          (write-string "0.0" stream)
+          (print-float-exponent x 0 stream))
+         (t
+          (print-float x stream)))))))
 
-(defun output-float-aux (x stream e-min e-max)
-  (multiple-value-bind (e string)
-      (flonum-to-digits x)
-    (cond
-      ((< e-min e e-max)
-       (if (plusp e)
-           (progn
-             (write-string string stream :end (min (length string) e))
-             (dotimes (i (- e (length string)))
-               (write-char #\0 stream))
-             (write-char #\. stream)
-             (write-string string stream :start (min (length string) e))
-             (when (<= (length string) e)
-               (write-char #\0 stream))
-             (print-float-exponent x 0 stream))
-           (progn
-             (write-string "0." stream)
-             (dotimes (i (- e))
-               (write-char #\0 stream))
-             (write-string string stream)
-             (print-float-exponent x 0 stream))))
-      (t (write-string string stream :end 1)
-         (write-char #\. stream)
-         (write-string string stream :start 1)
-         (print-float-exponent x (1- e) stream)))))
+;;; the function called by OUTPUT-OBJECT to handle floats
+(defmethod print-object ((x single-float) stream)
+  (output-float x stream))
+
+(defmethod print-object ((x double-float) stream)
+  (output-float x stream))
+
 
 ;;;; other leaf objects
 
