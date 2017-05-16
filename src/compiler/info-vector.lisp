@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB!IMPL")
 
 ;;;; This file implements abstract types which map globaldb Info-Number/Name
 ;;;; pairs to data values. The database itself is defined in 'globaldb'.
@@ -1188,7 +1188,7 @@ This is interpreted as
   (when (and (consp name)
              (memq (car name) '(sb!pcl::slow-method sb!pcl::fast-method))
              (some #'consp (car (last name))))
-    (let ((i (aref sb!c::*info-types* info-number)))
+    (let ((i (aref *info-types* info-number)))
       (warn "Globaldb storing info for ~S~% ~S ~S~% -> ~S"
             name (meta-info-category i) (meta-info-kind i) new-value)))
 

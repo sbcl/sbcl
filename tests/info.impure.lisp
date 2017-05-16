@@ -54,7 +54,7 @@
   (assert-error (funcall (compile nil `(lambda (x) (fdefinition x))) 0)
                  type-error))
 
-(in-package "SB-C")
+(in-package "SB-IMPL")
 
 (test-util:with-test (:name :globaldb-sxhashoid-discrimination)
   (assert (not (eql (globaldb-sxhashoid '(a b c d e))
@@ -62,14 +62,14 @@
 
 (test-util:with-test (:name :bug-458015)
   ;; Make sure layouts have sane source-locations
-  (sb-c::call-with-each-globaldb-name
+  (sb-int:call-with-each-globaldb-name
    (lambda (info-name)
      (when (and (symbolp info-name) (info :type :kind info-name))
         (let* ((classoid (find-classoid info-name nil))
                (layout (and classoid (classoid-layout classoid)))
                (srcloc (and layout (sb-kernel::layout-source-location layout))))
           (when (and layout)
-            (assert (or (definition-source-location-p srcloc)
+            (assert (or (sb-c::definition-source-location-p srcloc)
                         (null srcloc)))))))))
 
 (test-util:with-test (:name :find-classoid-signal-error)
@@ -481,7 +481,7 @@
         (random-result (make-array (length names) :initial-element nil))
         (n-created 0)
         (highest-type-num
-         (position-if #'identity sb-c::*info-types*
+         (position-if #'identity *info-types*
                       :end sb-int:+fdefn-info-num+ :from-end t)))
     (loop for name across names
           for i from 0
@@ -499,8 +499,8 @@
                      (random-value (random most-positive-fixnum)))
                  (push (cons random-type random-value)
                        (aref random-result random-name-index))
-                 (sb-c::set-info-value (aref names random-name-index)
-                                       random-type random-value))))
+                 (sb-int:set-info-value (aref names random-name-index)
+                                        random-type random-value))))
     (values n-created fdefn-result random-result)))
 
 (test-util:with-test (:name :get-info-value-initializing
@@ -551,8 +551,7 @@
         (when (some (lambda (output)
                       (assoc type-num (aref output name-index)))
                     random-results)
-          (let ((actual (sb-c::get-info-value (aref work name-index)
-                                              type-num)))
+          (let ((actual (get-info-value (aref work name-index) type-num)))
             (unless (some (lambda (output)
                             (some (lambda (cell)
                                     (and (eq (car cell) type-num)
@@ -588,8 +587,7 @@
                           (let* ((index (random n))
                                  (name (aref names index)))
                             (atomic-incf (aref counts index))
-                            ;; should probably be SB-INT:
-                            (sb-c::atomic-set-info-value
+                            (sb-int:atomic-set-info-value
                              :variable :macro-expansion name
                              (lambda (old old-p)
                                (if old-p (1+ old) 1))))

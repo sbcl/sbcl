@@ -527,7 +527,7 @@
 ;;; More work here equates to less work in the global hashtable.
 ;;; To wit: (eq (sxhash '(foo a b c bar)) (sxhash '(foo a b c d))) => T
 ;;; but the corresponding globaldb-sxhashoids differ.
-(defun sb!c::globaldb-sxhashoid (name)
+(defun globaldb-sxhashoid (name)
   (locally
       (declare (optimize (safety 0))) ; after the argc check
     ;; TRAVERSE will walk across more cons cells than RECURSE will descend.

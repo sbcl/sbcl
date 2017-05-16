@@ -1956,7 +1956,7 @@ core and return a descriptor to it."
                (setf (gethash symbol hashtable)
                      (packed-info-insert
                       (gethash symbol hashtable +nil-packed-infos+)
-                      sb!c::+no-auxilliary-key+ num cold-classoid-cell)))
+                      sb!impl::+no-auxilliary-key+ num cold-classoid-cell)))
              *classoid-cells*))
   hashtable)
 

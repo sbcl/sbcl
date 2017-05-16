@@ -1546,7 +1546,7 @@
          (return nil))
         (t t)))))
 (test-util:with-test (:name :identify-suspect-vops)
-  (sb-c::call-with-each-globaldb-name
+  (sb-int:call-with-each-globaldb-name
    (lambda (name)
      ;; LEGAL-FUN-NAME-P test is necessary, since (INFO :FUNCTION :TYPE)
      ;; has a defaulting expression that involves calling FDEFINITION.

@@ -10,10 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; Given the presence of docstrings and source locations,
-;;; this logic arguably belongs to the runtime kernel, not the compiler,
-;;; but such nuance isn't hugely important.
-(in-package "SB!C")
+(in-package "SB!IMPL")
 
 ;;; Similar to FUNCTION, but the result type is "exactly" specified:
 ;;; if it is an object type, then the function returns exactly one
@@ -255,6 +252,7 @@
 ;;;; functions and VOPs. To save space and allow for quick set
 ;;;; operations, we represent the attributes as bits in a fixnum.
 
+(in-package "SB!C")
 (deftype attributes () 'fixnum)
 
 ;;; Given a list of attribute names and an alist that translates them

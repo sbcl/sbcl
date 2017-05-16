@@ -114,7 +114,7 @@
   sb-int::
   (let ((ht (make-hash-table :test 'equalp))
         (old-count 0))
-    (sb-c::call-with-each-globaldb-name
+    (sb-int:call-with-each-globaldb-name
      (lambda (name)
        (binding* ((info (info :function :info name) :exit-if-null)
                   (shared-info (gethash info ht info)))

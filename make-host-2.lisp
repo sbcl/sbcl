@@ -119,7 +119,7 @@
 
 (when sb!c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)
-    (sb!c::call-with-each-globaldb-name
+    (sb!int:call-with-each-globaldb-name
      (lambda (name)
        (let* ((cell (sb!int:info :function :emitted-full-calls name))
               (inlinep (eq (sb!int:info :function :inlinep name) :inline))

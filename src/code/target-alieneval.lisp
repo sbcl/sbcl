@@ -672,7 +672,7 @@ null byte."
 ;;; so it would be a more invasive change.
 ;;;
 (defun-cached (coerce-to-interpreted-function
-               :hash-bits 8 :hash-function #'sb!c::globaldb-sxhashoid)
+               :hash-bits 8 :hash-function #'globaldb-sxhashoid)
     ((lambda-form equal))
   (let (#!+(or sb-eval sb-fasteval)
         (*evaluator-mode* :interpret))

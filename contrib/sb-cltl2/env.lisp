@@ -499,7 +499,7 @@ the condition types that have been muffled."
          (sb-int:awhen (car (rassoc 'muffle-warning handled-conditions))
            (sb-kernel:type-specifier it))))
       (declaration
-       (copy-list sb-c::*recognized-declarations*))
+       (copy-list sb-int:*recognized-declarations*))
       (t (if (info :declaration :handler declaration-name)
              (extra-decl-info
               declaration-name
