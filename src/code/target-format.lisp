@@ -36,7 +36,8 @@
 
   FORMAT has many additional capabilities not described here. Consult the
   manual for details."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (dynamic-extent format-arguments))
   (etypecase destination
     (null
      (with-simple-output-to-string (stream)
