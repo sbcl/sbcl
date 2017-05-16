@@ -396,9 +396,10 @@ Note: currently changes to this value are lost when saving core."
 #!+gencgc
 (define-alien-type generation
     (struct generation
+            (alloc-large-start-page page-index-t)
             (alloc-start-page page-index-t)
             (alloc-unboxed-start-page page-index-t)
-            (alloc-large-start-page page-index-t)
+            #!+segregated-code (alloc-code-start-page page-index-t)
             (bytes-allocated os-vm-size-t)
             (gc-trigger os-vm-size-t)
             (bytes-consed-between-gcs os-vm-size-t)

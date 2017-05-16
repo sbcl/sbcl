@@ -289,15 +289,15 @@ struct generation {
 #define alloc_start_page alloc_start_page_[BOXED_PAGE_FLAG]
 #define alloc_unboxed_start_page alloc_start_page_[UNBOXED_PAGE_FLAG]
 #else
+    /* the first page that gc_alloc_large (boxed) considers on its next
+     * call. (Although it always allocates after the boxed_region.) */
+    page_index_t alloc_large_start_page;
+
     /* the first page that gc_alloc() checks on its next call */
     page_index_t alloc_start_page;
 
     /* the first page that gc_alloc_unboxed() checks on its next call */
     page_index_t alloc_unboxed_start_page;
-
-    /* the first page that gc_alloc_large (boxed) considers on its next
-     * call. (Although it always allocates after the boxed_region.) */
-    page_index_t alloc_large_start_page;
 #endif
 
     /* the bytes allocated to this generation */
