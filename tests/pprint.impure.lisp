@@ -22,7 +22,7 @@
       (set-pprint-dispatch 'foo1 #'pprint-fill 5 tbl)
       (set-pprint-dispatch 'fool #'pprint-fill 0 tbl)
       (set-pprint-dispatch 'foo2 #'pprint-fill 5 tbl))
-    (let ((entries (sb-pretty::pprint-dispatch-table-entries tbl)))
+    (let ((entries (sb-pretty::pp-dispatch-entries tbl)))
       (assert (equal (mapcar #'sb-pretty::pprint-dispatch-entry-type entries)
                      '(foo1 foo2 fool))))))
 
@@ -294,6 +294,7 @@
 (with-test (:name :pprint-logical-block-multiple-per-line-prefix-eval)
   (funcall (compile nil
                     `(lambda ()
+                       (declare (muffle-conditions compiler-note))
                        (let ((n 0))
                          (with-output-to-string (s)
                            (pprint-logical-block (s nil :per-line-prefix (if (eql 1 (incf n))
@@ -343,11 +344,12 @@
 
 (defvar *a* (make-array 3 :fill-pointer 0))
 (with-test (:name :pprint-logical-block-eval-order)
-  (flet ((vp (x) (vector-push x *a*)))
-    (pprint-logical-block (nil (progn (vp 1) '(foo))
+  (let ((s (make-broadcast-stream)))
+    (flet ((vp (x) (vector-push x *a*)))
+      (pprint-logical-block (s (progn (vp 1) '(foo))
                                :suffix (progn (vp 2) "}")
                                :prefix (progn (vp 3) "{"))
-      (write (pprint-pop))))
+      (write (pprint-pop) :stream s))))
   (assert (equalp *a* #(1 2 3))))
 
 ;; these warn, but "work" in as much as they don't kill the machinery
@@ -399,8 +401,7 @@
   (flet ((pprint-known-cons (stream obj)
            (format stream "#<KNOWN-CONS ~S>" (cdr obj))))
     (set-pprint-dispatch 'known-cons #'pprint-known-cons))
-  (let ((hashtable (sb-pretty::pprint-dispatch-table-cons-entries
-                    *print-pprint-dispatch*)))
+  (let ((hashtable (sb-pretty::pp-dispatch-cons-entries *print-pprint-dispatch*)))
     ;; First ensure that the CONS table was used
     (assert (gethash 'known-cons hashtable))
     ;; Check that dispatch entries are shared. In practice it is not "useful"
