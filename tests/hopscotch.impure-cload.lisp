@@ -15,9 +15,6 @@
 ;;; exclusive use of the "cached" memory allocator.
 ;;; Were it not for that, these tests would have nothing to do with GC.
 
-#-(or x86 x86-64)
-(exit :code 104)
-
 (defun new-hh-table (bytes-per-value)
   (let ((ht (sb-alien::%make-alien 100))) ; overestimate the C structure size
     (sb-sys:without-gcing

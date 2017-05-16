@@ -49,7 +49,7 @@ if [ "$1" != --load ]; then
 fi
 echo //doing warm init - load and dump phase
 echo '(load "loader.lisp") (load-sbcl-file "make-target-2-load.lisp" nil)
-(setf (extern-alien "gc_coalesce_string_literals" char) 2)
+#+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2)
 (sb-ext:save-lisp-and-die "output/sbcl.core")' | \
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \

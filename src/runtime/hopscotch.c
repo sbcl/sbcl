@@ -36,7 +36,11 @@ void hopscotch_integrity_check(tableptr,char*,int);
 /// If a specific function has been set, then use that.
 static inline uint32_t hash(tableptr ht, lispobj x) {
     return ht->hash ? ht->hash(x) :
+#ifdef LISP_FEATURE_GENCGC
       (x >> GENCGC_CARD_SHIFT) ^ (x >> (1+WORD_SHIFT));
+#else
+      (x >> (1+WORD_SHIFT));
+#endif
 }
 
 /// From https://github.com/google/cityhash/blob/master/src/city.cc
@@ -117,8 +121,8 @@ static int hh_allocation_granularity = 4096;
 char* cached_alloc[N_CACHED_ALLOCS];
 void hopscotch_init() // Called once on runtime startup, from gc_init().
 {
-    // Get 16KB from the OS and evenly divide it into two pieces.
-    int n_bytes_per_slice = 8 * 1024;
+    // Prefill the cache with 2 entries, each the size of a kernel page.
+    int n_bytes_per_slice = getpagesize();
     int n_bytes_total = N_CACHED_ALLOCS * n_bytes_per_slice;
     char* mem = (char*)os_validate(0, n_bytes_total);
     gc_assert(mem);

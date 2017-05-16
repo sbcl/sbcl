@@ -38,6 +38,7 @@
 #include "lispregs.h"
 #include "arch.h"
 #include "gc.h"
+#include "hopscotch.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
@@ -2023,6 +2024,10 @@ void coalesce_strings()
                   (lispobj*)SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value,
                   (uword_t)&ht);
 #endif
+#ifdef LISP_FEATURE_GENCGC
     walk_generation(remap_strings, -1, (uword_t)&ht);
+#else
+    // FIXME: implement
+#endif
     hopscotch_delete(&ht);
 }
