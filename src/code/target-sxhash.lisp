@@ -294,9 +294,8 @@
                    ;; we hash all of the components of a pathname together.
                    (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
                      (mixf hash (sxhash-recurse (pathname-device x) depthoid))
-                     (mixf hash (sxhash-recurse (pathname-directory x) depthoid))
-                     (mixf hash (sxhash-recurse (pathname-name x) depthoid))
-                     (mixf hash (sxhash-recurse (pathname-type x) depthoid))
+                     (mixf hash (%pathname-dir-hash x))
+                     (mixf hash (%pathname-stem-hash x))
                      ;; Hash :NEWEST the same as NIL because EQUAL for
                      ;; pathnames assumes that :newest and nil are equal.
                      (let ((version (%pathname-version x)))

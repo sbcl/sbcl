@@ -71,25 +71,27 @@
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
-(def!struct (pattern (:constructor make-pattern (pieces)))
-  (pieces nil :type list :read-only t))
+(sb!xc:defstruct (pattern (:constructor make-pattern (pieces)))
+  (pieces nil :type list))
 
 ;;;; PATHNAME structures
 
 ;;; the various magic tokens that are allowed to appear in pretty much
 ;;; all pathname components
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (def!type pathname-component-tokens ()
+  (sb!xc:deftype pathname-component-tokens ()
     '(member nil :unspecific :wild :unc)))
 
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
-                           (:constructor %make-pathname (host
-                                                         device
-                                                         directory
-                                                         name
-                                                         type
-                                                         version))
+                           (:constructor %%make-pathname
+                               (host device directory name type version
+                                &aux (dir-hash (pathname-dir-hash directory))
+                                     (stem-hash (mix (sxhash name) (sxhash type)))))
                            (:predicate pathnamep))
+  (namestring nil) ; computed on demand
+  ;; support for pathname interning and hashing.
+  (dir-hash nil :type fixnum :read-only t)
+  (stem-hash nil :type fixnum :read-only t) ; name hash and type hash mixed
   ;; the host (at present either a UNIX or logical host)
   (host nil :type (or host null) :read-only t)
   ;; the name of a logical or physical device holding files
@@ -126,12 +128,9 @@
 (sb!xc:defstruct (logical-pathname (:conc-name %logical-pathname-)
                                    (:include pathname)
                                    (:constructor %make-logical-pathname
-                                                 (host
-                                                  device
-                                                  directory
-                                                  name
-                                                  type
-                                                  version))))
+                                    (host device directory name type version
+                                     &aux (dir-hash (pathname-dir-hash directory))
+                                          (stem-hash (mix (sxhash name) (sxhash type)))))))
 
 ;;; This is used both for Unix and Windows: while we accept both
 ;;; \ and / as directory separators on Windows, we print our

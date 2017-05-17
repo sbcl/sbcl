@@ -20,9 +20,18 @@
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
 ;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
 (defun make-trivial-default-pathname ()
-  (%make-pathname *physical-host* nil nil nil nil :newest))
+  (%%make-pathname *physical-host* nil nil nil nil :newest))
 
 ;;; pathname methods
+
+;;; SXHASH does a really poor job on pathname directory, especially if in your
+;;; environment, the directories of interest are all many levels down from the
+;;; filesystem root- every directory in your work space might hash to the same
+;;; value under SXHASH. Mixing in all pieces of the directory path solves that.
+(defun pathname-dir-hash (directory)
+  (let ((hash (sxhash (car directory))))
+    (dolist (piece (cdr directory) hash)
+      (mixf hash (sxhash piece)))))
 
 (defmethod print-object ((pathname pathname) stream)
   (let ((namestring (handler-case (namestring pathname)
@@ -229,6 +238,8 @@
   (or (eq pathname1 pathname2)
       (and (eq (%pathname-host pathname1)
                (%pathname-host pathname2))
+           (= (%pathname-dir-hash pathname1) (%pathname-dir-hash pathname2))
+           (= (%pathname-stem-hash pathname1) (%pathname-stem-hash pathname2))
            (compare-component (%pathname-device pathname1)
                               (%pathname-device pathname2))
            (compare-component (%pathname-directory pathname1)
@@ -240,6 +251,86 @@
            (or (eq (%pathname-host pathname1) *physical-host*)
                (compare-component (%pathname-version pathname1)
                                   (%pathname-version pathname2))))))
+
+;;; This is conceptually like (DEFUN-CACHED (%MAKE-PATHNAME ...))
+;;; except that we try hard never to evict entries until SAVE-LISP-AND-DIE.
+;;; Entries can still be kicked out randomly though.
+;;; A two-level lookup is used- it works better than mixing all
+;;; pathname components into a hash key.
+(define-load-time-global *pathnames* (make-array 211 :initial-element nil))
+(defglobal *pathnames-lock* (sb!thread:make-mutex :name "Pathnames"))
+
+(defun %make-pathname (host device directory name type version)
+  (if (or device (neq host *physical-host*))
+      (%%make-pathname host device directory name type version)
+      (let* ((table *pathnames*)
+             (index (rem (pathname-dir-hash directory) (length table)))
+             (dir-holder
+              ;; Candidates is a list of ((dir . contents) ...)
+              (loop named outer
+                    with candidates = (svref table index) and new = nil
+                    do
+                    (let ((n-candidates 0))
+                      (dolist (candidate candidates)
+                        (incf n-candidates)
+                        (when (compare-component (car candidate) directory)
+                          (return-from outer candidate)))
+                      (unless new
+                        (setq new (cons directory (make-array 3 :initial-element nil))))
+                      (cond ((< n-candidates 10)
+                             (let* ((cell (cons new candidates))
+                                    (actual-old (cas (svref table index) candidates cell)))
+                               (when (eq actual-old candidates)
+                                 (return-from outer new))
+                               (setq candidates actual-old)))
+                            (t
+                             ;; Clobber this cache entry, losing all directories in it.
+                             ;; Hopefully this doesn't happen often.
+                             #+nil (format t "~&*** Pathname cache overflow: ~D ~S~%"
+                                           index (mapcar 'car candidates))
+                             (setf (svref table index) (list new))
+                             (return-from outer new)))))))
+        (flet ((matchp (stem-hash candidates)
+                 (let ((n-candidates 0))
+                   (dolist (pathname candidates (values nil n-candidates))
+                     (when (and (= (%pathname-stem-hash pathname) stem-hash)
+                                (compare-component (%pathname-version pathname) version)
+                                (compare-component (%pathname-name pathname) name)
+                                (compare-component (%pathname-type pathname) type))
+                       (return (values pathname 0)))
+                     (incf n-candidates)))))
+          ;; We have tests asserting that the distinction between :NEWEST
+          ;; and NIL is preserved, though there is no effective difference.
+          (binding* ((stem-hash (mix (sxhash name) (sxhash type)))
+                     (vector (the simple-vector (cdr dir-holder)))
+                     (index (rem stem-hash (length vector)))
+                     (candidates (svref vector index))
+                     ((found n-candidates) (matchp stem-hash candidates)))
+            (when found
+              (return-from %make-pathname found))
+            ;; Optimistically assuming that the pathname won't be found
+            ;; on the double-check, allocate it now
+            (let ((pathname (%%make-pathname *physical-host* nil (car dir-holder)
+                                             name type version)))
+              (sb!thread::with-system-mutex (*pathnames-lock*)
+                (when (>= n-candidates 10)
+                  ;; Rehash into a larger vector
+                  (let* ((old-len (length vector))
+                         (new-len (+ old-len 4))
+                         (new-vector (make-array new-len :initial-element nil)))
+                    (dovector (list vector)
+                      (dolist (p list)
+                        (push p (svref new-vector (rem (%pathname-stem-hash p)
+                                                       new-len)))))
+                    (rplacd dir-holder new-vector)
+                    (setq vector new-vector
+                          index (rem stem-hash new-len)
+                          candidates (svref vector index))))
+                (let ((found (matchp stem-hash candidates)))
+                  (if found
+                      (setq pathname found)
+                      (push pathname (svref vector index)))))
+              pathname))))))
 
 ;;; Convert PATHNAME-DESIGNATOR (a pathname, or string, or
 ;;; stream), into a pathname in pathname.
@@ -926,19 +1017,21 @@ directory."
                     thing))
            (values name nil)))))))
 
-(defun-cached (namestring :hash-bits 5 :hash-function #'sxhash
-                          :memoizer memoize)
-    ((pathname pathname=))
+(defun namestring (pathname)
   "Construct the full (name)string form of the pathname."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (when pathname
-      (let ((host (%pathname-host pathname)))
-        (unless host
-          (error "can't determine the namestring for pathnames with no ~
-                  host:~%  ~S" pathname))
-        (memoize (possibly-base-stringize
-                  (funcall (host-unparse host) pathname)))))))
+      (or (%pathname-namestring pathname)
+          (let ((host (%pathname-host pathname)))
+            (if (not host)
+                (error
+                 "can't determine the namestring for pathnames with no host:~%  ~S"
+                 pathname)
+                (setf (%pathname-namestring pathname)
+                      (logically-readonlyize
+                       (possibly-base-stringize
+                        (funcall (host-unparse host) pathname))))))))))
 
 (defun native-namestring (pathname &key as-file)
   "Construct the full native (name)string form of PATHNAME.  For

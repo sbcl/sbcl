@@ -264,6 +264,7 @@ sufficiently motivated to do lengthy fixes."
   (profile-deinit)
   (foreign-deinit)
   (deinit-finalizers)
+  (fill *pathnames* nil)
   (drop-all-hash-caches)
   (os-deinit)
   ;; Do this last, to have some hope of printing if we need to.
