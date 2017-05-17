@@ -1647,11 +1647,12 @@ register."
 (defun debug-fun-debug-vars (debug-fun)
   (let ((vars (debug-fun-%debug-vars debug-fun)))
     (if (eq vars :unparsed)
-        (setf (debug-fun-%debug-vars debug-fun)
-              (etypecase debug-fun
-                (compiled-debug-fun
-                 (parse-compiled-debug-vars debug-fun))
-                (bogus-debug-fun nil)))
+        (let* ((new (etypecase debug-fun
+                      (compiled-debug-fun
+                       (parse-compiled-debug-vars debug-fun))
+                      (bogus-debug-fun nil)))
+               (old (cas (debug-fun-%debug-vars debug-fun) :unparsed new)))
+          (if (eq old :unparsed) new old))
         vars)))
 
 ;;; VARS is the parsed variables for a minimal debug function. We need
