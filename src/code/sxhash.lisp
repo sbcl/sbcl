@@ -98,6 +98,12 @@
   (cond #-sb-xc-host ((constant-lvar-p x) (sxhash (lvar-value x)))
         ((csubtypep (lvar-type x) (specifier-type 'null))
          (ash sb!vm::nil-value (- sb!vm:n-fixnum-tag-bits)))
+        ((csubtypep (lvar-type x) (specifier-type 'keyword))
+         ;; All interned symbols have a precomputed hash.
+         ;; There's no way to ask the type system whether a symbol is known to
+         ;; be interned, but we *can* test for the specific case of keywords.
+         ;; Even if it gets uninterned, this shortcut remains valid.
+         `(symbol-hash x)) ; Never need to lazily compute and memoize
         (t
           ;; Cache the value of the symbol's sxhash in the symbol-hash
           ;; slot.
