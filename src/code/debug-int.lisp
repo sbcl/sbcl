@@ -1551,17 +1551,12 @@ register."
 ;;; return the blocks.
 (defun debug-fun-debug-blocks (debug-fun)
   (let ((blocks (debug-fun-blocks debug-fun)))
-    (cond ((eq blocks :unparsed)
-           (setf (debug-fun-blocks debug-fun)
-                 (parse-debug-blocks debug-fun))
-           (unless (debug-fun-blocks debug-fun)
-             (debug-signal 'no-debug-blocks
-                           :debug-fun debug-fun))
-           (debug-fun-blocks debug-fun))
-          (blocks)
-          (t
-           (debug-signal 'no-debug-blocks
-                         :debug-fun debug-fun)))))
+    (when (eq blocks :unparsed)
+      (let* ((new (parse-debug-blocks debug-fun))
+             (old (cas (debug-fun-blocks debug-fun) :unparsed new)))
+        (setq blocks (if (eq old :unparsed) new old))))
+    (or blocks
+        (debug-signal 'no-debug-blocks :debug-fun debug-fun))))
 
 ;;; Return a SIMPLE-VECTOR of DEBUG-BLOCKs or NIL. NIL indicates there
 ;;; was no basic block information.
