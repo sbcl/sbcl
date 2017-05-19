@@ -2321,6 +2321,7 @@
 
 (defclass bug-1099708b-pathname ()
   ((slot-1099708b-pathname :initarg :slot-1099708b-pathname)))
+#+nil ; after change 58602640ed, I don't see how to make this assert something useful
 (with-test (:name :bug-1099708b-pathname)
   (defun make-1099708b-pathname-1 ()
     (make-instance 'bug-1099708b-pathname :slot-1099708b-pathname #p"pn"))
