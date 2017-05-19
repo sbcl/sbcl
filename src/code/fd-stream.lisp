@@ -2687,28 +2687,26 @@
     (t ; call next method
      (fd-stream-misc-routine stream operation arg1 arg2))))
 
-;; Using (get-std-handle-or-null +std-error-handle+) instead of the file
-;; descriptor might make this work on win32, but I don't know.
-#!+win32
-(defun !make-cold-stderr-stream () (make-broadcast-stream))
-#!-win32
-(macrolet ((stderr () 2))
- (!defglobal *!cold-stderr-buf* " ")
- (defun !make-cold-stderr-stream ()
-   (%make-fd-stream
-    :out (lambda (stream ch)
-           (declare (ignore stream))
-           (let ((b (truly-the (simple-base-string 1) *!cold-stderr-buf*)))
-             (setf (char b 0) ch)
-             (sb!unix:unix-write (stderr) b 0 1)))
-    :sout (lambda (stream string start end)
+(!defglobal *!cold-stderr-buf* " ")
+
+(defun !make-cold-stderr-stream ()
+  (let ((stderr
+          #!-win32 2
+          #!+win32 (sb!win32::get-std-handle-or-null sb!win32::+std-error-handle+)))
+    (%make-fd-stream
+     :out (lambda (stream ch)
             (declare (ignore stream))
-            (flet ((out (s start len)
-                     (sb!unix:unix-write (stderr) s start len)))
-              (if (typep string 'simple-base-string)
-                  (out string start (- end start))
-                  (let ((n (- end start)))
-                    ;; will croak if there is any non-BASE-CHAR in the string
-                    (out (replace (make-array n :element-type 'base-char)
-                                  string :start2 start) 0 n)))))
-    :misc (constantly nil))))
+            (let ((b (truly-the (simple-base-string 1) *!cold-stderr-buf*)))
+              (setf (char b 0) ch)
+              (sb!unix:unix-write stderr b 0 1)))
+     :sout (lambda (stream string start end)
+             (declare (ignore stream))
+             (flet ((out (s start len)
+                      (sb!unix:unix-write stderr s start len)))
+               (if (typep string 'simple-base-string)
+                   (out string start (- end start))
+                   (let ((n (- end start)))
+                     ;; will croak if there is any non-BASE-CHAR in the string
+                     (out (replace (make-array n :element-type 'base-char)
+                                   string :start2 start) 0 n)))))
+     :misc (constantly nil))))
