@@ -2495,7 +2495,7 @@
    (defclass class-with-superclass-cycle2 (class-with-superclass-cycle1) ())))
 
 (with-test (:name (sb-mop:ensure-class :self-metaclass))
-  ;; These have a superclass cycle from the beginning.
+  ;; These have a metaclass cycle from the beginning.
   (assert-error
    (defclass class-with-self-as-metaclass () ()
      (:metaclass class-with-self-as-metaclass))))
@@ -2519,7 +2519,7 @@
    (defclass class-with-eventual-superclass-cycle1
        (class-with-eventual-superclass-cycle2) ())))
 
-(with-test (:name (sb-pcl::update-class :becomses-own-metaclass))
+(with-test (:name (sb-pcl::update-class :becomes-self-metaclass))
   (defclass class-with-eventual-self-as-metaclass () ())
   ;; Try to update metaclass to self.
   (assert-error
