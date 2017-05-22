@@ -1984,10 +1984,37 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
     if (page->gen != from_space ||
+#ifdef LISP_FEATURE_SEGREGATED_CODE
+        (!is_lisp_pointer((lispobj)addr) && page->allocated != CODE_PAGE_FLAG) ||
+#endif
         ((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
         (page->large_object && page->dont_move))
         return 0;
     gc_assert(!(page->allocated & OPEN_REGION_PAGE_FLAG));
+
+#ifdef LISP_FEATURE_SEGREGATED_CODE
+    /* quick check 2: Unless the page can hold code, the pointer's lowtag must
+     * correspond to the widetag of the object. The object header can safely
+     * be read even if it turns out that the pointer is not valid,
+     * because the pointer was in bounds for the page.
+     * Note that this can falsely pass if looking at the interior of an unboxed
+     * array that masquerades as a Lisp object header by pure luck.
+     * But if this doesn't pass, there's no point in proceeding to the
+     * definitive test which involves searching for the containing object. */
+
+    if (page->allocated != CODE_PAGE_FLAG) {
+        lispobj* obj = native_pointer((lispobj)addr);
+        if (lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) {
+            if (!is_cons_half(obj[0]) || !is_cons_half(obj[1]))
+                return 0;
+        } else {
+            unsigned char widetag = widetag_of(*obj);
+            if (!other_immediate_lowtag_p(widetag) ||
+                lowtag_of((lispobj)addr) != lowtag_for_widetag[widetag>>2])
+                return 0;
+        }
+    }
+#endif
 
     /* Filter out anything which can't be a pointer to a Lisp object
      * (or, as a special case which also requires dont_move, a return
