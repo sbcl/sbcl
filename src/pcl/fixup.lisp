@@ -65,3 +65,6 @@
     (find-class (classoid-name k))))
 (setq **boot-state** 'complete)
 
+;;; CLASS-PROTOTYPE for FUNCTION should not use ALLOCATE-INSTANCE.
+(let ((class (find-class 'function)))
+  (setf (slot-value class 'prototype) #'identity))
