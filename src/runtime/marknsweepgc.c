@@ -2098,8 +2098,9 @@ void defrag_immobile_space(int* components, boolean verbose)
                 lispobj *obj = target_addr < IMMOBILE_VARYOBJ_SUBSPACE_START
                   ? search_immobile_space((void*)(uword_t)target_addr)
                   : defrag_search_varyobj_subspace(target_addr);
-                target_adjust = (int)((char*)native_pointer(forwarding_pointer_value(obj))
-                                      - (char*)obj);
+                if (forwarding_pointer_p(obj))
+                    target_adjust = (int)((char*)native_pointer(forwarding_pointer_value(obj))
+                                          - (char*)obj);
             }
             // If the instruction to fix has moved, then adjust for
             // its new address, and perform the fixup in tempspace.
