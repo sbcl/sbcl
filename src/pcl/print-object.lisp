@@ -153,10 +153,10 @@
     (format stream "~D" (cpd-count obj))))
 
 (defmethod print-object ((self specializer-with-object) stream)
-  (let ((have-obj (slot-boundp self 'object)))
-    (print-unreadable-object (self stream :type t :identity (not have-obj))
-      (when have-obj
-        (write (slot-value self 'object) :stream stream)))))
+  (if (and (slot-exists-p self 'object) (slot-boundp self 'object))
+      (print-unreadable-object (self stream :type t)
+        (write (slot-value self 'object) :stream stream))
+      (print-unreadable-object (self stream :type t :identity t))))
 
 sb-c::
 (defmethod print-object ((self policy) stream)
