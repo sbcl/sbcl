@@ -871,8 +871,8 @@ void scan_weak_pointers(void)
                 LOW_WORD(forwarding_pointer_value(objaddr)) : UNBOUND_MARKER_WIDETAG;
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-          else if (immobile_space_p(pointee) &&
-                   immobile_obj_gen_bits(objaddr) == from_space) {
+          else if (immobile_space_p(pointee)) {
+            if (immobile_obj_gen_bits(objaddr) == from_space)
                 wp->value = UNBOUND_MARKER_WIDETAG;
         }
 #endif
