@@ -127,6 +127,17 @@
         (tricky-sequences #("/../" "../" "/.." "." "/." "./" "/./"
                             "[]" "*" "**" "/**" "**/" "/**/" "?"
                             "\\*" "\\[]" "\\?" "\\*\\*" "*\\*")))
+   (labels ((canon (s)
+              #+win32
+              ;; We canonicalize to \ as the directory separator
+              ;; on windows -- though both \ and / are legal.
+              (substitute #\\ #\/ s)
+              #+unix
+              ;; Consecutive separators become a single separator
+              (let ((p (search "//" s)))
+                (if p
+                    (canon (concatenate 'string (subseq s 0 p) (subseq s (1+ p))))
+                    s))))
     (loop repeat 1000
           for length = (random 32)
           for native-namestring = (coerce
@@ -137,10 +148,7 @@
                                    'simple-base-string)
           for pathname = (native-pathname native-namestring)
           for nnn = (native-namestring pathname)
-          do #+win32
-             ;; We canonicalize to \ as the directory separator
-             ;; on windows -- though both \ and / are legal.
-             (setf native-namestring (substitute #\\ #\/ native-namestring))
+          do (setf native-namestring (canon native-namestring))
              (unless (string= nnn native-namestring)
                (error "1: wanted ~S, got ~S" native-namestring nnn)))
     (loop repeat 1000
@@ -162,12 +170,9 @@
                                               s))))))
           for pathname = (native-pathname native-namestring)
           for tricky-nnn = (native-namestring pathname)
-          do #+win32
-             ;; We canonicalize to \ as the directory separator
-             ;; on windows -- though both \ and / are legal.
-             (setf native-namestring (substitute #\\ #\/ native-namestring))
+          do (setf native-namestring (canon native-namestring))
              (unless (string= tricky-nnn native-namestring)
-               (error "2: wanted ~S, got ~S" native-namestring tricky-nnn)))))
+               (error "2: wanted ~S, got ~S" native-namestring tricky-nnn))))))
 
 ;;; USER-HOMEDIR-PATHNAME and the extension SBCL-HOMEDIR-PATHNAME both
 ;;; used to call PARSE-NATIVE-NAMESTRING without supplying a HOST
@@ -272,3 +277,7 @@
     (assert (equal (simple-condition-format-control error)
                    "OPEN :IF-EXISTS :NEW-VERSION is not supported ~
                             when a new version must be created."))))
+
+(with-test (:name :parse-native-namestring-canon :skipped-on '(not :unix))
+  (let ((pathname (parse-native-namestring "foo/bar//baz")))
+    (assert (string= (car (last (pathname-directory pathname))) "bar"))))

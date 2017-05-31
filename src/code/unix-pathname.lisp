@@ -131,10 +131,12 @@
                              collect (if (and (string= piece "..") rest)
                                          :up
                                          piece)))
-           (directory (if (and as-directory
-                               (string/= "" (car (last components))))
-                          components
-                          (butlast components)))
+           (directory (remove ""
+                              (if (and as-directory
+                                       (string/= "" (car (last components))))
+                                  components
+                                  (butlast components))
+                              :test #'equal))
            (name-and-type
             (unless as-directory
               (let* ((end (first (last components)))
