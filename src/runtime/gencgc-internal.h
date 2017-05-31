@@ -212,7 +212,6 @@ extern page_index_t page_table_pages;
 
 /* forward declarations */
 #ifdef LISP_FEATURE_X86
-void sniff_code_object(struct code *code, os_vm_size_t displacement);
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #endif
 
