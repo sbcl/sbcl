@@ -101,10 +101,10 @@
       (loadw temp thing 0 fun-pointer-lowtag)
       (inst shr temp n-widetag-bits)
       (inst jmp :z bogus)
-      (inst shl temp word-shift)
-      (inst add temp (- fun-pointer-lowtag other-pointer-lowtag))
-      (move code thing)
-      (inst sub code temp)
+      (inst neg temp)
+      (inst lea code
+            (make-ea :dword :base thing :index temp :scale n-word-bytes
+                            :disp (- other-pointer-lowtag fun-pointer-lowtag)))
       (emit-label done)
       (assemble (*elsewhere*)
         (emit-label bogus)
