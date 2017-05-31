@@ -491,7 +491,7 @@
 (defun stack-ref (s n) (stack-ref s n))
 (defun %set-stack-ref (s n value) (%set-stack-ref s n value))
 (defun fun-code-header (fun) (fun-code-header fun))
-(defun lra-code-header (lra) (lra-code-header lra))
+#!-(or x86 x86-64) (defun lra-code-header (lra) (lra-code-header lra))
 (defun %make-lisp-obj (value) (%make-lisp-obj value))
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 (defun fun-word-offset (fun) (fun-word-offset fun))
