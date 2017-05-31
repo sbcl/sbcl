@@ -878,14 +878,8 @@ a host-structure or string."
                          host
                          (defaults *default-pathname-defaults*)
                          &key (start 0) end junk-allowed)
-  (declare (type pathname-designator thing defaults)
-           (type (or list host string (member :unspecific)) host)
-           (type index start)
-           (type (or index null) end)
-           (type (or t null) junk-allowed)
-           (values (or null pathname) (or null index)))
   (declare (ftype (function * (values (or null pathname) (or null index)))
-                  %parse-native-namestring))
+                  %parse-namestring))
   (with-host (found-host host)
     (let (;; According to ANSI defaults may be any valid pathname designator
           (defaults (etypecase defaults
@@ -898,11 +892,10 @@ a host-structure or string."
                        (truename defaults)))))
       (declare (type pathname defaults))
       (etypecase thing
-        (simple-string
-         (%parse-namestring thing found-host defaults start end junk-allowed))
         (string
-         (%parse-namestring (coerce thing 'simple-string)
-                            found-host defaults start end junk-allowed))
+         (with-array-data ((thing thing) (start start) (end end)
+                           :check-fill-pointer t)
+           (%parse-namestring thing found-host defaults start end junk-allowed)))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))
@@ -994,13 +987,12 @@ directory."
                        (truename defaults)))))
       (declare (type pathname defaults))
       (etypecase thing
-        (simple-string
-         (%parse-native-namestring
-          thing found-host defaults start end junk-allowed as-directory))
         (string
-         (%parse-native-namestring (coerce thing 'simple-string)
-                                   found-host defaults start end junk-allowed
-                                   as-directory))
+         (with-array-data ((thing thing) (start start) (end end)
+                           :check-fill-pointer t)
+           (%parse-native-namestring thing
+                                     found-host defaults start end junk-allowed
+                                     as-directory)))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))
