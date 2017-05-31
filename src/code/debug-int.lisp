@@ -516,28 +516,75 @@
          (or (not aligned) (zerop (logand (sap-int x)
                                           (1- (ash 1 sb!vm:word-shift))))))))
 
-(declaim (inline component-ptr-from-pc))
-(sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
-  (pc system-area-pointer))
-
 (declaim (inline valid-lisp-pointer-p))
 (sb!alien:define-alien-routine valid-lisp-pointer-p sb!alien:int
   (pointer system-area-pointer))
 
-(declaim (inline component-from-component-ptr))
-(defun component-from-component-ptr (component-ptr)
-  (declare (type system-area-pointer component-ptr))
-  (make-lisp-obj (logior (sap-int component-ptr)
-                         sb!vm:other-pointer-lowtag)))
+;;; There are many opportunities for things to go wrong when searching
+;;; the heap for a code component. One possible problem occurs when
+;;; component_ptr_from_pc() searches for a code component on a page which
+;;; gets partially evacuated on x86[-64]. Suppose it contains pinned code
+;;; preceded by some objects that got forwarded. The scan performed by
+;;; gc_search_space could be interrupted in the middle, and resume execution
+;;; looking at a forwarding pointer, which gets the fatal "no size function".
+;;; Morover, excess delay between finding an object and creating a Lisp
+;;; descriptor introduces additional potential for error.
+;;; So we do two things to mitigate that problem:
+;;; (1) use unsafe %MAKE-LISP-OBJ, since we've already determined
+;;;     where the code object starts with certainty, and we don't need
+;;;     yet another search to test validity of the address.
+;;; (2) wrap the calls in WITHOUT-GCING.
+;;;
+;;; Here's a concrete example, assuming the following objects exists:
+;;;       0x8000: vector header     |
+;;;       0x8008: vector length     | object 1
+;;;       0x8010: vector contents   |
+;;;             : ...               v
+;;;       0x8100: code object       | object 2
+;;;             : ...
+;;; thread A is backtracing, and currently in component_ptr_to_pc(),
+;;; looking at 0x8000. Suppose the code is pinned, and that a garbage collection
+;;; will partially evacuate the page, and that partial evacuation zero-fills
+;;; the unused ranges (which it no longer does). Consider these schedules:
+;;;
+;;;  Thread A                      Thread B
+;;;  --------                      --------
+;;;  read header @ 0x8000
+;;;                                 GC happens. zero-fill from 0x8000:0x8100
+;;;  read length @ 0x8008 => 0
+;;;   (skip to next object)
+;;;  read header @ 0x8010 => junk
+;;;
+;;; In this schedule, thread A reads a word which is not a valid object header.
+;;;
+;;; But partial evacution no longer zeros the freed subranges - instead it writes
+;;; an unboxed array header so that only two words are touched per unused subrange.
+;;; This causes a different problem: The array may appear to contain forwarding
+;;; pointers to live objects that were moved off the page, and those pointers
+;;; appear to be embedded in the unboxed array.
+;;;
+;;; Use of WITHOUT-GCING is unfortunate - it's always preferable to
+;;; try to pin individual objects - but to do better we would have to
+;;; implement page-wide hazard pointers informing GC not to do anything
+;;; to any object on a specified page.
+;;;
+(defun code-header-from-pc (pc)
+  (without-gcing
+   (let ((component-ptr
+          (sb!alien:alien-funcall (sb!alien:extern-alien
+                                   "component_ptr_from_pc"
+                                   (function system-area-pointer system-area-pointer))
+                                  pc)))
+     (unless (sap= component-ptr (int-sap #x0))
+       (%make-lisp-obj (logior (sap-int component-ptr) sb!vm:other-pointer-lowtag))))))
 
 ;;;; (OR X86 X86-64) support
 
 (defun compute-lra-data-from-pc (pc)
   (declare (type system-area-pointer pc))
-  (let ((component-ptr (component-ptr-from-pc pc)))
-    (unless (sap= component-ptr (int-sap #x0))
-       (let* ((code (component-from-component-ptr component-ptr))
-              (code-header-len (* (code-header-words code) sb!vm:n-word-bytes))
+  (let ((code (code-header-from-pc pc)))
+    (when code
+       (let* ((code-header-len (* (code-header-words code) sb!vm:n-word-bytes))
               (pc-offset (- (sap-int pc)
                             (- (get-lisp-obj-address code)
                                sb!vm:other-pointer-lowtag)
@@ -856,9 +903,7 @@
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
           (let* ((pc (context-pc context))
-                 (component-ptr (component-ptr-from-pc pc))
-                 (code (unless (sap= component-ptr (int-sap #x0))
-                         (component-from-component-ptr component-ptr))))
+                 (code (code-header-from-pc pc)))
             (/noshow0 "got CODE")
             (when (null code)
               ;; KLUDGE: Detect undefined functions by a range-check
@@ -1096,8 +1141,7 @@ register."
                    (component
                     (stack-ref catch sb!vm:catch-block-code-slot))
                    #!+(or x86 x86-64)
-                   (component (component-from-component-ptr
-                               (component-ptr-from-pc ra)))
+                   (component (code-header-from-pc ra))
                    (offset
                     #!-(or x86 x86-64)
                     (* (- (1+ (get-header-data lra))
@@ -2240,9 +2284,7 @@ register."
       (#.constant-sc-number
        (if escaped
            (code-header-ref
-            (component-from-component-ptr
-             (component-ptr-from-pc
-              (sb!vm:context-pc escaped)))
+            (code-header-from-pc (sb!vm:context-pc escaped))
             (sb!c:sc-offset-offset sc-offset))
            :invalid-value-for-unescaped-register-storage)))))
 

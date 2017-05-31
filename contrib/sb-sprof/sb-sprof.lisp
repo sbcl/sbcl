@@ -415,16 +415,15 @@ profiling, and :TIME for wallclock profiling.")
 (defun debug-info (pc)
   (declare (type system-area-pointer pc)
            (muffle-conditions compiler-note))
-  (let ((ptr (sb-di::component-ptr-from-pc pc)))
-    (cond ((sap= ptr (int-sap 0))
+  (let ((code (sb-di::code-header-from-pc pc)))
+    (cond ((not code)
            (let ((name (sap-foreign-symbol pc)))
              (if name
                  (values (format nil "foreign function ~a" name)
                          (sap-int pc))
                  (values nil (sap-int pc)))))
           (t
-           (let* ((code (sb-di::component-from-component-ptr ptr))
-                  (code-header-len (* (sb-kernel:code-header-words code)
+           (let* ((code-header-len (* (sb-kernel:code-header-words code)
                                       sb-vm:n-word-bytes))
                   ;; Give up if we land in the 2 or 3 instructions of a
                   ;; code component sans simple-fun that is not an asm routine.
