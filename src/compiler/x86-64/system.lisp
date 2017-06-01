@@ -97,9 +97,10 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (inst shr res n-widetag-bits)
-    (inst and res short-header-max-words)))
+    (let ((res (reg-in-size res :dword)))
+      (inst mov res (make-ea-for-object-slot-half x 0 fun-pointer-lowtag))
+      (inst shr res n-widetag-bits)
+      (inst and res short-header-max-words))))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

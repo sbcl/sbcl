@@ -2594,9 +2594,19 @@
                                               (- n-widetag-bits
                                                  word-shift)))))))
 
+#!+immobile-space
+(progn
+  (defconstant sb!vm:function-layout ; kludge
+    (logior (+ immobile-space-start (* 3 256)) instance-pointer-lowtag))
+  #-sb-xc-host
+  (aver (eql sb!vm:function-layout
+             (get-lisp-obj-address (find-layout 'function)))))
+
 (define-instruction simple-fun-header-word (segment)
   (:emitter
-   (emit-header-data segment simple-fun-widetag)))
+   (emit-header-data segment
+                     (logior #!+immobile-space (ash sb!vm:function-layout 32)
+                             simple-fun-widetag))))
 
 ;;;; Instructions required to do floating point operations using SSE
 

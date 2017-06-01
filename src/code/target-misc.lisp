@@ -99,7 +99,9 @@
                         by sb!vm:n-word-bytes
               do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
         (setf (closure-header-word copy) ; Update the header
-              (logior (closure-header-word copy) +closure-header-namedp+)))
+              (logior #!+immobile-space (ash sb!vm:function-layout 32)
+                      +closure-header-namedp+
+                      (closure-header-word copy))))
       copy))
 
   ;; Rename a closure. Doing so changes its identity unless it was already named.

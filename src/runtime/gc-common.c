@@ -385,7 +385,8 @@ static lispobj
 trans_fun_header(lispobj object)
 {
     struct simple_fun *fheader = (struct simple_fun *) native_pointer(object);
-    uword_t offset = HeaderValue(fheader->header) * N_WORD_BYTES;
+    uword_t offset =
+        (HeaderValue(fheader->header) & FUN_HEADER_NWORDS_MASK) * N_WORD_BYTES;
 
     /* Transport the whole code object */
     struct code *code = (struct code *) ((uword_t) fheader - offset);

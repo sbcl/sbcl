@@ -1311,6 +1311,7 @@ core and return a descriptor to it."
       (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
       (dolist (layout (list t-layout s-o-layout *layout-layout*))
         (set-instance-layout layout *layout-layout*))
+      (chill-layout 'function t-layout)
       (chill-layout 'package t-layout s-o-layout))))
 
 ;;;; interning symbols in the cold image

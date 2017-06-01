@@ -293,6 +293,9 @@
                   fun-pointer-lowtag)
       (storew* (logior (ash (1- size) n-widetag-bits) closure-widetag)
                result 0 fun-pointer-lowtag (not stack-allocate-p)))
+    #!+immobile-space ; store layout in header word
+    (inst mov (make-ea-for-object-slot-half result 1/2 fun-pointer-lowtag)
+          function-layout)
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
     (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
