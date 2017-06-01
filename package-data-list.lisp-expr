@@ -1248,9 +1248,6 @@ possibly temporarily, because it might be used internally."
                "GENSYMIFY" "GENSYMIFY*" "KEYWORDICATE" "SYMBOLICATE"
                "INTERNED-SYMBOL-P" "PACKAGE-SYMBOLICATE"
                "LOGICALLY-READONLYIZE"
-               "+STRING-DOWNGRADABLE+"
-               "+STRING-SHAREABLE+"
-               "+STRING-SHAREABLE-NONSTD+"
 
                ;; certainly doesn't belong in public extensions
                ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
@@ -2946,6 +2943,8 @@ structure representations"
                "*PRIMITIVE-OBJECTS*"
                "+HIGHEST-NORMAL-GENERATION+"
                "+PSEUDO-STATIC-GENERATION+"
+               "+VECTOR-SHAREABLE+"
+               "+VECTOR-SHAREABLE-NONSTD+"
                "%COMPILER-BARRIER" "%DATA-DEPENDENCY-BARRIER"
                "%MEMORY-BARRIER" "%READ-BARRIER" "%WRITE-BARRIER"
                "AFTER-BREAKPOINT-TRAP"

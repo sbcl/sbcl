@@ -111,22 +111,6 @@
 ;; which can be expressed in 8 bits.
 (defconstant short-header-max-words #x7fff)
 
-;; A string tagged as +STRING-SHAREABLE+ is logically readonly,
-;; and permitted to be shared with another string per the CLHS standard
-;; under the concept of similarity as constant. A string so tagged is
-;; often the print-name of a symbol, or was loaded from a fasl,
-;; or used in a few others situations that warrant sharing.
-(def!constant +string-shareable+ 2)
-
-;; A string tagged as +STRING-SHAREABLE-NONSTD+ is logically readonly,
-;; and *not* technically permitted by the standard to be shared.
-;; If, despite the apparent prohibition, the user opts to make these
-;; shareable, we'll do it. This typically occurs with compilation
-;; into memory, where the requirement is that the machine code
-;; reference "the same" object as appeared in source, but where,
-;; nonetheless, opportunities for sharing abound.
-(def!constant +string-shareable-nonstd+ 4)
-
 ;;; Is X a fixnum in the target Lisp?
 #+sb-xc-host
 (defun fixnump (x)

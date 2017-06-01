@@ -1352,7 +1352,7 @@ core and return a descriptor to it."
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
 
-(defun set-readonly (string) (set-header-data string +string-shareable+))
+(defun set-readonly (string) (set-header-data string sb!vm:+vector-shareable+))
 
 (defun initialize-packages ()
   (let ((package-data-list
@@ -3132,6 +3132,7 @@ core and return a descriptor to it."
               (maybe-record-with-munged-name "-FLAG" "flag_" 2)
               (maybe-record-with-munged-name "-TRAP" "trap_" 3)
               (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
+              (maybe-record-with-translated-name '("SHAREABLE+" "SHAREABLE-NONSTD+") 4)
               (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
               (maybe-record-with-translated-name '("-SIZE" "-INTERRUPTS") 6)
               (maybe-record-with-translated-name '("-START" "-END" "-PAGE-BYTES"

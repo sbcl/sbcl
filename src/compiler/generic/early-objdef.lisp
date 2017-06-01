@@ -283,6 +283,26 @@
   vector-unused-subtype
   vector-valid-hashing-subtype)
 
+;;; These next two constants must not occupy the same byte of a
+;;; vector header word as the values in the preceding defenum.
+
+;; A vector tagged as +VECTOR-SHAREABLE+ is logically readonly,
+;; and permitted to be shared with another vector per the CLHS standard
+;; under the concept of similarity as constant. A vector so tagged is
+;; often the print-name of a symbol, or was a literal in source code
+;; and loaded from a fasl, or used in a few others situations
+;; which warrant sharing.
+(def!constant +vector-shareable+ #x100)
+
+;; A vector tagged as +VECTOR-SHAREABLE-NONSTD+ is logically readonly,
+;; and *not* technically permitted by the standard to be shared.
+;; If, despite the apparent prohibition, the user opts to make these
+;; shareable, we'll do it. This typically occurs with compilation
+;; into memory, where the requirement is that the machine code
+;; reference "the same" object as appeared in source, but where,
+;; nonetheless, opportunities for sharing abound.
+(defconstant +vector-shareable-nonstd+ #x200)
+
 #|
 ;; Run this in the SB-VM or SB!VM package once for each target feature combo.
 (defun rewrite-widetag-comments ()

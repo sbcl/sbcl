@@ -37,7 +37,7 @@
 (define-source-transform %make-symbol (kind string)
   (declare (ignore kind))
   ;; Set "logically read-only" bit in pname.
-  `(sb!vm::%%make-symbol (set-header-data ,string +string-shareable+)))
+  `(sb!vm::%%make-symbol (set-header-data ,string sb!vm:+vector-shareable+)))
 
 ;;; We don't want to clutter the bignum code.
 #!+(or x86 x86-64)

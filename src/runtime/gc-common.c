@@ -1941,33 +1941,35 @@ void gc_heapsort_uwords(heap array, int length)
     }
 }
 
-//// Coalescing of constant strings for SAVE-LISP-AND-DIE
+//// Coalescing of constant vectors for SAVE-LISP-AND-DIE
 
-static void remap_string(lispobj* where, struct hopscotch_table* ht)
+static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 {
     lispobj obj = *where;
-    struct vector* s = (struct vector*)native_pointer(obj);
+    struct vector* v = (struct vector*)native_pointer(obj);
     extern char gc_coalesce_string_literals;
     // gc_coalesce_string_literals represents the "aggressiveness" level.
-    // If 1, then we share strings tagged as +STRING-SHAREABLE+,
-    // but if >1, those and also +STRING-SHAREABLE-NONSTD+.
-    int mask = (gc_coalesce_string_literals>1 ? 6 : 2)<<N_WIDETAG_BITS;
+    // If 1, then we share vectors tagged as +VECTOR-SHAREABLE+,
+    // but if >1, those and also +VECTOR-SHAREABLE-NONSTD+.
+    int mask = gc_coalesce_string_literals > 1
+      ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<N_WIDETAG_BITS
+      : (VECTOR_SHAREABLE                        )<<N_WIDETAG_BITS;
 
     if (lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
-        (widetag_of(s->header) == SIMPLE_BASE_STRING_WIDETAG
+        (widetag_of(v->header) == SIMPLE_BASE_STRING_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-         || widetag_of(s->header) == SIMPLE_CHARACTER_STRING_WIDETAG
+         || widetag_of(v->header) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
-         ) && (s->header & mask) != 0) { /* shareable string */
-        int index = hopscotch_get(ht, (uword_t)s, 0);
+         ) && (v->header & mask) != 0) { /* shareable vector */
+        int index = hopscotch_get(ht, (uword_t)v, 0);
         if (!index) // Not found
-            hopscotch_insert(ht, (uword_t)s, 1);
+            hopscotch_insert(ht, (uword_t)v, 1);
         else
             *where = make_lispobj((void*)ht->keys[index-1], OTHER_POINTER_LOWTAG);
     }
 }
 
-static uword_t remap_strings(lispobj* where, lispobj* limit, uword_t arg)
+static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct hopscotch_table* ht = (struct hopscotch_table*)arg;
     lispobj layout, bitmap, *next;
@@ -1976,8 +1978,8 @@ static uword_t remap_strings(lispobj* where, lispobj* limit, uword_t arg)
     for ( ; where < limit ; where = next ) {
         lispobj header = *where;
         if (is_cons_half(header)) {
-            remap_string(where+0, ht);
-            remap_string(where+1, ht);
+            coalesce_obj(where+0, ht);
+            coalesce_obj(where+1, ht);
             next = where + 2;
         } else {
             int widetag = widetag_of(header);
@@ -1992,13 +1994,13 @@ static uword_t remap_strings(lispobj* where, lispobj* limit, uword_t arg)
                 bitmap = ((struct layout*)native_pointer(layout))->bitmap;
                 for(i=1; i<nwords; ++i)
                     if (layout_bitmap_logbitp(i-1, bitmap))
-                        remap_string(where+i, ht);
+                        coalesce_obj(where+i, ht);
                 continue;
             case CODE_HEADER_WIDETAG:
                 for_each_simple_fun(i, fun, (struct code*)where, 0, {
                     lispobj* fun_slots = SIMPLE_FUN_SCAV_START(fun);
                     for (j=0; j<SIMPLE_FUN_SCAV_NWORDS(fun); ++j)
-                        remap_string(fun_slots+j, ht);
+                        coalesce_obj(fun_slots+j, ht);
                 })
                 nwords = code_header_words(header);
                 break;
@@ -2007,7 +2009,7 @@ static uword_t remap_strings(lispobj* where, lispobj* limit, uword_t arg)
                     continue; // Ignore this object.
             }
             for(i=1; i<nwords; ++i)
-                remap_string(where+i, ht);
+                coalesce_obj(where+i, ht);
         }
     }
     return 0;
@@ -2018,15 +2020,15 @@ void coalesce_strings()
     struct hopscotch_table ht;
     hopscotch_create(&ht, HOPSCOTCH_STRING_HASH, 0, 1<<17, 0);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    remap_strings((lispobj*)IMMOBILE_SPACE_START,
-                  (lispobj*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value,
-                  (uword_t)&ht);
-    remap_strings((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-                  (lispobj*)SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value,
-                  (uword_t)&ht);
+    coalesce_range((lispobj*)IMMOBILE_SPACE_START,
+                   (lispobj*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value,
+                   (uword_t)&ht);
+    coalesce_range((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
+                   (lispobj*)SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value,
+                   (uword_t)&ht);
 #endif
 #ifdef LISP_FEATURE_GENCGC
-    walk_generation(remap_strings, -1, (uword_t)&ht);
+    walk_generation(coalesce_range, -1, (uword_t)&ht);
 #else
     // FIXME: implement
 #endif
