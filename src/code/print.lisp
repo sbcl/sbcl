@@ -823,62 +823,37 @@ variable: an unreadable object representing the error is printed instead.")
         (incf length)))
     (write-char #\) stream)))
 
-(defun output-unreadable-vector-readably (vector stream)
-  (declare (vector vector))
-  (write-string "#." stream)
-  (write `(coerce ,(coerce vector '(vector t))
-                  '(simple-array ,(array-element-type vector) (*)))
-         :stream stream))
-
 (defmethod print-object ((vector vector) stream)
- (let ((readably *print-readably*))
-  (cond ((stringp vector)
-         (let ((coerce-p
-                (and readably (not (typep vector '(vector character))))))
-           (cond ((and coerce-p (not *read-eval*))
-                  (print-not-readable-error vector stream))
+  (let ((readably *print-readably*))
+    (cond ((stringp vector)
+           (cond ((and readably (not (typep vector '(vector character))))
+                  (output-unreadable-array-readably vector stream))
                  ((or *print-escape* readably)
-                  (when coerce-p
-                    ;; OUTPUT-UNREADABLE-VECTOR-READABLY would output each char
-                    ;; in #\c syntax. In addition to wasting time coercing to a
-                    ;; general vector, it's not nice looking.
-                    (write-string "#.(" stream)
-                    (write 'coerce :stream stream) ; package-qualify / casify as needed
-                    (write-char #\Space stream))
                   (write-char #\" stream)
                   (quote-string vector stream)
-                  (write-char #\" stream)
-                  (when coerce-p
-                    (write-char #\Space stream)
-                    (write (cond #!+sb-unicode
-                                 ((base-string-p vector)
-                                  ''base-string)
-                                 (t
-                                  `'(vector ,(array-element-type vector)))) :stream stream)
-                    (write-char #\) stream)))
+                  (write-char #\" stream))
                  (t
-                  (write-string vector stream)))))
-        ((not (or *print-array* readably))
-         (output-terse-array vector stream))
-        ((bit-vector-p vector)
-         (write-string "#*" stream)
-         (dovector (bit vector)
-           ;; (Don't use OUTPUT-OBJECT here, since this code
-           ;; has to work for all possible *PRINT-BASE* values.)
-           (write-char (if (zerop bit) #\0 #\1) stream)))
-        ((or (not readably) (array-readably-printable-p vector))
-         (descend-into (stream)
-                       (write-string "#(" stream)
-                       (dotimes (i (length vector))
-                         (unless (zerop i)
-                           (write-char #\space stream))
-                         (punt-print-if-too-long i stream)
-                         (output-object (aref vector i) stream))
-                       (write-string ")" stream)))
-        (*read-eval*
-         (output-unreadable-vector-readably vector stream))
-        (t
-         (print-not-readable-error vector stream)))))
+                  (write-string vector stream))))
+          ((not (or *print-array* readably))
+           (output-terse-array vector stream))
+          ((bit-vector-p vector)
+           (write-string "#*" stream)
+           (dovector (bit vector)
+             ;; (Don't use OUTPUT-OBJECT here, since this code
+             ;; has to work for all possible *PRINT-BASE* values.)
+             (write-char (if (zerop bit) #\0 #\1) stream)))
+          ((or (not readably) (array-readably-printable-p vector))
+           (descend-into (stream)
+             (write-string "#(" stream)
+             (dotimes (i (length vector))
+               (unless (zerop i)
+                 (write-char #\space stream))
+               (punt-print-if-too-long i stream)
+               (output-object (aref vector i) stream))
+             (write-string ")" stream)))
+
+          (t
+           (output-unreadable-array-readably vector stream)))))
 
 ;;; This function outputs a string quoting characters sufficiently
 ;;; so that someone can read it in again. Basically, put a slash in
@@ -921,25 +896,43 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Convert an array into a list that can be used with MAKE-ARRAY's
 ;;; :INITIAL-CONTENTS keyword argument.
 (defun listify-array (array)
-  (with-array-data ((data array) (start) (end))
-    (declare (ignore end))
-    (labels ((listify (dimensions index)
-               (if (null dimensions)
-                   (aref data index)
-                   (let* ((dimension (car dimensions))
-                          (dimensions (cdr dimensions))
-                          (count (reduce #'* dimensions)))
-                     (loop for i below dimension
-                           collect (listify dimensions index)
-                           do (incf index count))))))
-      (listify (array-dimensions array) start))))
+  (flet ((compact (seq)
+           (typecase array
+             (string
+              (coerce seq '(simple-array character (*))))
+             ((array bit)
+              (coerce seq 'bit-vector))
+             (t
+              seq))))
+    (if (typep array '(or string bit-vector))
+        (compact array)
+        (with-array-data ((data array) (start) (end))
+          (declare (ignore end))
+          (labels ((listify (dimensions index)
+                     (if (null dimensions)
+                         (aref data index)
+                         (let* ((dimension (car dimensions))
+                                (dimensions (cdr dimensions))
+                                (count (reduce #'* dimensions)))
+                           (loop for i below dimension
+                                 for list = (listify dimensions index)
+                                 collect (if (and dimensions
+                                                  (null (cdr dimensions)))
+                                             (compact list)
+                                             list)
+                                 do (incf index count))))))
+            (listify (array-dimensions array) start))))))
 
+;;; Use nonstandard #A(dimensions element-type contents)
+;;; to avoid using #.
 (defun output-unreadable-array-readably (array stream)
-  (write-string "#." stream)
-  (write `(make-array ',(array-dimensions array)
-                      :element-type ',(array-element-type array)
-                      :initial-contents ',(listify-array array))
-         :stream stream))
+  (let ((array (list* (array-dimensions array)
+                      (array-element-type array)
+                      (listify-array array))))
+    (declare (dynamic-extent array))
+    (write-string "#A" stream)
+    (write array :stream stream)
+    nil))
 
 ;;; Output the readable #A form of an array.
 (defun output-array-guts (array stream)
@@ -953,10 +946,8 @@ variable: an unreadable object representing the error is printed instead.")
          (with-array-data ((data array) (start) (end))
            (declare (ignore end))
            (sub-output-array-guts data (array-dimensions array) stream start)))
-        (*read-eval*
-         (output-unreadable-array-readably array stream))
         (t
-         (print-not-readable-error array stream))))
+         (output-unreadable-array-readably array stream))))
 
 (defun sub-output-array-guts (array dimensions stream index)
   (declare (type (simple-array * (*)) array) (fixnum index))

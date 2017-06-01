@@ -164,10 +164,8 @@
                        (make-array 1 :element-type 'base-char)
                        (make-array 1 :element-type 'character)))
     (assert (multiple-value-bind (result error)
-                (ignore-errors (read-from-string
-                                (with-output-to-string (s)
-                                  (let ((*print-readably* t))
-                                    (print array s)))))
+                (read-from-string
+                 (write-to-string array :readably t))
               ;; it might not be readably-printable
               (or (typep error 'print-not-readable)
                   (and
@@ -664,10 +662,10 @@
   (assert (equal "ab" (format nil "a~0&b"))))
 
 (with-test (:name :print-unreadably-function)
-  (assert (equal "\"foo\""
-                 (handler-bind ((print-not-readable #'sb-ext:print-unreadably))
-                   (let ((*read-eval* nil))
-                     (write-to-string (coerce "foo" 'base-string) :readably t))))))
+  (assert (search "#<HASH-TABLE"
+                  (handler-bind ((print-not-readable #'sb-ext:print-unreadably))
+                    (let ((*read-eval* nil))
+                      (write-to-string (make-hash-table) :readably t))))))
 
 (with-test (:name :printing-specialized-arrays-readably)
   (let ((*read-eval* t)
