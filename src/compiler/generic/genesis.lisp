@@ -1312,6 +1312,10 @@ core and return a descriptor to it."
       (dolist (layout (list t-layout s-o-layout *layout-layout*))
         (set-instance-layout layout *layout-layout*))
       (chill-layout 'function t-layout)
+      (let* ((sequence (chill-layout 'sequence t-layout))
+             (list     (chill-layout 'list t-layout sequence))
+             (symbol   (chill-layout 'symbol t-layout)))
+        (chill-layout 'null t-layout sequence list symbol))
       (chill-layout 'package t-layout s-o-layout))))
 
 ;;;; interning symbols in the cold image
