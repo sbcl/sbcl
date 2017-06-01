@@ -967,7 +967,7 @@ between the ~A definition and the ~A definition"
      (sequence
       :translation (or cons (member nil) vector extended-sequence)
       :state :read-only
-      :depth 2)
+      :depth 1)
      (vector
       :translation vector :codes (#.sb!vm:complex-vector-widetag)
       :direct-superclasses (array sequence)
@@ -1194,6 +1194,11 @@ between the ~A definition and the ~A definition"
       :inherits (symbol list sequence)
       :direct-superclasses (symbol list)
       :prototype-form 'nil)
+     ;; These last few are strange. STREAM has only T as an ancestor,
+     ;; so you'd think it would be at depth 1. FILE- and STRING-STREAM
+     ;; each have STREAM and T as ancestors, so you'd think they'd be at depth
+     ;; 1 greater than STREAM, instead of 2 greater. But changing any of
+     ;; these to the "obvious" value makes various type checks go wrong.
      (stream
       :state :read-only
       :depth 2)
