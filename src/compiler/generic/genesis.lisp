@@ -2828,21 +2828,16 @@ core and return a descriptor to it."
          (offset-from-code-start (calc-offset code-object offset-from-insns-start)))
     (unless (zerop (logand offset-from-code-start sb!vm:lowtag-mask))
       (error "unaligned function entry ~S ~S" code-object fun-index))
-    (values (ash offset-from-code-start (- sb!vm:word-shift))
-            (make-descriptor
-             (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
-                        offset-from-code-start)
-                     sb!vm:fun-pointer-lowtag)))))
+    (make-descriptor (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
+                                offset-from-code-start)
+                             sb!vm:fun-pointer-lowtag))))
 
 (defun cold-fop-fun-entry (fasl-input fun-index)
   (binding* (((info type arglist name code-object)
               (macrolet ((pop-stack ()
                            '(pop-fop-stack (%fasl-input-stack fasl-input))))
                 (values (pop-stack) (pop-stack) (pop-stack) (pop-stack) (pop-stack))))
-             ((word-offset fn)
-              (compute-fun code-object fun-index)))
-    (write-memory fn (make-other-immediate-descriptor
-                      word-offset sb!vm:simple-fun-widetag))
+             (fn (compute-fun code-object fun-index)))
     #!+(or x86 x86-64) ; store a machine-native pointer to the function entry
     ;; note that the bit pattern looks like fixnum due to alignment
     (write-wordindexed/raw fn sb!vm:simple-fun-self-slot
