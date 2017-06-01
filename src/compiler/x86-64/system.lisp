@@ -68,7 +68,7 @@
     (logior (+ immobile-space-start (* 7 256)) instance-pointer-lowtag))
   #-sb-xc-host
   (aver (eql null-layout (get-lisp-obj-address (find-layout 'null))))
-  ;; ~19 instructions vs. 35
+  ;; ~20 instructions vs. 35
   (define-vop (layout-of) ; no translation
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg))
@@ -96,9 +96,8 @@
       (inst movzx (reg-in-size rax :dword) (make-ea :byte :base rax))
       (inst jmp  load-from-vector)
       IMM-OR-LIST
-      (inst mov  result null-layout)
       (inst cmp  object nil-value)
-      (inst jmp  :eq done)
+      (inst jmp  :eq NULL)
       (inst xor  (reg-in-size rax :dword) #b1111) ; restore it
       (inst and  (reg-in-size rax :dword) #xff)
       LOAD-FROM-VECTOR
@@ -107,6 +106,9 @@
                                  :index rax :scale 8
                                  :disp (+ (ash vector-data-offset word-shift)
                                           (- other-pointer-lowtag))))
+      (inst jmp  done)
+      NULL
+      (inst mov  result null-layout)
       DONE)))
 
 (define-vop (%other-pointer-widetag)

@@ -2557,3 +2557,6 @@
   (assert-error (unbound-slot-after-allocation=class
                  (make-instance 'unbound-slot-after-allocation=class))
                 unbound-slot))
+
+(with-test (:name :layouf-of-nil)
+  (assert (eq (sb-kernel:layout-of nil) (sb-kernel:find-layout 'null))))
