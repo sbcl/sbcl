@@ -174,9 +174,11 @@
 ;;; a stunted stack can result from the tail call variant.)
 (flet ((optimized ()
          (declare (optimize (speed 2) (debug 1))) ; tail call elimination
+         (declare (muffle-conditions style-warning))
          (#:undefined-function 42))
        (not-optimized ()
          (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
+         (declare (muffle-conditions style-warning))
          (#:undefined-function 42))
        (test (fun)
          (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
@@ -232,9 +234,11 @@
 ;;; Enabling it might catch other problems, so do it anyway.
 (flet ((optimized ()
          (declare (optimize (speed 2) (debug 1))) ; tail call elimination
+         (declare (muffle-conditions style-warning))
          (/ 42 0))
        (not-optimized ()
          (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
+         (declare (muffle-conditions style-warning))
          (/ 42 0))
        (test (fun)
          (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
@@ -439,7 +443,7 @@
   (assert-backtrace #'bt.5.2 '((bt.5.2)))
   (assert-backtrace #'bt.5.3 `((bt.5.3))))
 
-(with-test (:name (:backtrace :unused-optinoal-with-supplied-p :bug-1498644))
+(with-test (:name (:backtrace :unused-optional-with-supplied-p :bug-1498644))
   (assert-backtrace (lambda () (bt.6.1 :opt))
                     `(((bt.6.1 ,*unused-argument*) ()))
                     :details t)
@@ -534,6 +538,7 @@
   (:method (x y)
     (+ x y)))
 (defun gf-dispatch-test/f (z)
+  (declare (muffle-conditions style-warning))
   (gf-dispatch-test/gf z))
 (with-test (:name (:backtrace :gf-dispatch))
   ;; Fill the cache
