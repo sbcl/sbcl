@@ -62,6 +62,53 @@
     DONE
     (move result rax)))
 
+#!+immobile-space
+(progn
+  (defconstant null-layout ; kludge
+    (logior (+ immobile-space-start (* 7 256)) instance-pointer-lowtag))
+  #-sb-xc-host
+  (aver (eql null-layout (get-lisp-obj-address (find-layout 'null))))
+  ;; ~19 instructions vs. 35
+  (define-vop (layout-of) ; no translation
+    (:policy :fast-safe)
+    (:args (object :scs (descriptor-reg))
+           (layouts :scs (constant)))
+    (:temporary (:sc unsigned-reg :offset rax-offset :target result) rax)
+    (:results (result :scs (descriptor-reg)))
+    (:generator 6
+      ;; Lowtag: #b0011 instance
+      ;;         #b0111 list
+      ;;         #b1011 fun
+      ;;         #b1111 other
+      (inst mov  rax object)
+      (inst xor  (reg-in-size rax :byte) #b0011)
+      (inst test (reg-in-size rax :byte) #b0111)
+      (inst jmp  :ne try-other)
+      ;; It's an instance or function. Both have the layout in the header.
+      (inst and  (reg-in-size rax :byte) #b11110111)
+      (inst mov  (reg-in-size result :dword) (make-ea :dword :base rax :disp 4))
+      (inst jmp  done)
+      TRY-OTHER
+      (inst xor  (reg-in-size rax :byte) #b1100)
+      (inst test (reg-in-size rax :byte) #b1111)
+      (inst jmp  :ne imm-or-list)
+      ;; It's an other-pointer. Read the widetag.
+      (inst movzx (reg-in-size rax :dword) (make-ea :byte :base rax))
+      (inst jmp  load-from-vector)
+      IMM-OR-LIST
+      (inst mov  result null-layout)
+      (inst cmp  object nil-value)
+      (inst jmp  :eq done)
+      (inst xor  (reg-in-size rax :dword) #b1111) ; restore it
+      (inst and  (reg-in-size rax :dword) #xff)
+      LOAD-FROM-VECTOR
+      (inst mov  result layouts)
+      (inst mov  result (make-ea :qword :base result
+                                 :index rax :scale 8
+                                 :disp (+ (ash vector-data-offset word-shift)
+                                          (- other-pointer-lowtag))))
+      DONE)))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)

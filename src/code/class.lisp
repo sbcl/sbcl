@@ -1344,6 +1344,14 @@ between the ~A definition and the ~A definition"
               (let ((layout (classoid-layout (find-classoid name))))
                 (dolist (code codes)
                   (setf (svref res code) layout)))))))
+  #!+immobile-space
+  (let ((table **built-in-class-codes**))
+    (loop with layout = (aref table sb!vm:list-pointer-lowtag)
+          for i from sb!vm:list-pointer-lowtag by 16 below 256
+          do (setf (aref table i) layout))
+    (loop with layout = (aref table sb!vm:even-fixnum-lowtag)
+          for i from sb!vm:even-fixnum-lowtag by (ash 1 sb!vm:n-fixnum-tag-bits) below 256
+          do (setf (aref table i) layout)))
   #-sb-xc-host (/show0 "done setting *BUILT-IN-CLASS-CODES*"))
 
 (!defun-from-collected-cold-init-forms !classes-cold-init)
