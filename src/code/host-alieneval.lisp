@@ -275,11 +275,10 @@
 ;;;
 (defmethod print-object ((info heap-alien-info) stream)
   (print-unreadable-object (info stream :type t)
-    (funcall (formatter "~S ~S~@[ (data)~]")
-             stream
-             (heap-alien-info-alien-name info)
-             (unparse-alien-type (heap-alien-info-type info))
-             (heap-alien-info-datap info))))
+    (format stream "~S ~S~@[ (data)~]"
+            (heap-alien-info-alien-name info)
+            (unparse-alien-type (heap-alien-info-type info))
+            (heap-alien-info-datap info))))
 
 ;;; The form to evaluate to produce the SAP pointing to where in the heap
 ;;; it is.
