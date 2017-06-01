@@ -153,7 +153,10 @@
                    (list end nil)))))))
       (values nil
               nil
-              (cons (if absolute :absolute :relative) directory)
+              (cond (absolute
+                     (cons :absolute directory))
+                    (directory
+                     (cons :relative directory)))
               (first name-and-type)
               (second name-and-type)
               nil))))
