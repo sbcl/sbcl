@@ -650,3 +650,11 @@
         (sb-ext:parse-native-namestring disp)
       (assert (equal path #P""))
       (assert (zerop pos)))))
+
+(with-test (:name (:parse-logical-pathname :displaced))
+  (let* ((string "XSYS:ABC.LISP")
+         (disp (make-array (1- (length string))
+                           :element-type (array-element-type string)
+                           :displaced-to string
+                           :displaced-index-offset 1)))
+    (assert (equal (parse-namestring disp) #p"SYS:ABC.LISP"))))

@@ -1462,7 +1462,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
 (defun logical-chunkify (namestr start end)
   (collect ((chunks))
     (do ((i start (1+ i))
-         (prev 0))
+         (prev start))
         ((= i end)
          (when (> end prev)
             (chunks (cons (nstring-upcase (subseq namestr prev end)) prev))))
