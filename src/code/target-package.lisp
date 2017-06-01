@@ -541,6 +541,12 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                               (when (boundp '*package*)
                                 *package*)))
 
+;;; Perform (GETHASH NAME TABLE) and then unwrap the value if it is a list.
+;;; List vs nonlist disambiguates a nickname from the primary name.
+(defun %get-package (name table)
+  (let ((found (gethash name table)))
+    (if (listp found) (car found) found)))
+
 ;;; This is undocumented and unexported for now, but the idea is that by
 ;;; making this a generic function then packages with custom package classes
 ;;; could hook into this to provide their own resolution.
@@ -556,7 +562,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                                (package-%local-nicknames base)))
                   (nicknamed (when nicknames
                                (cdr (assoc string nicknames :test #'string=))))
-                  (packageoid (or nicknamed (gethash string *package-names*))))
+                  (packageoid (or nicknamed (%get-package string *package-names*))))
              (if (and (null packageoid)
                       ;; FIXME: should never need 'debootstrap' hack
                       (let ((mismatch (mismatch "SB!" string)))
@@ -697,13 +703,13 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*. If there is a
 ;;; conflict then give the user a chance to do something about it. Caller is
 ;;; responsible for having acquired the mutex via WITH-PACKAGES.
-(defun %enter-new-nicknames (package nicknames)
+(defun %enter-new-nicknames (package nicknames &aux (val (list package)))
   (declare (type list nicknames))
   (dolist (n nicknames)
     (let ((found (with-package-names (names)
-                    (or (gethash (the simple-string n) names)
+                    (or (%get-package (the simple-string n) names)
                         (progn
-                          (setf (gethash n names) package)
+                          (setf (gethash n names) val)
                           (push n (package-%nicknames package))
                           package)))))
       (cond ((eq found package))
@@ -897,7 +903,8 @@ implementation it is ~S." *!default-package-use-list*)
     (with-package-names (names)
       (maphash (lambda (k v)
                  (declare (ignore k))
-                 (pushnew v res :test #'eq))
+                 (unless (listp v)
+                   (push v res)))
                names))
     res))
 
@@ -1555,7 +1562,7 @@ PACKAGE."
               (package-source-location pkg) nil
               (gethash (package-%name pkg) names) pkg)
         (dolist (nick (package-%nicknames pkg))
-          (setf (gethash nick names) pkg))
+          (setf (gethash nick names) (list pkg)))
         #!+sb-package-locks
         (setf (package-lock pkg) nil
               (package-%implementation-packages pkg) nil))))
