@@ -586,3 +586,23 @@
                                                         (sb-debug:list-backtrace))))))
                        (funcall fun)))
                    'simple-error))))
+
+(defun mega-string-replace-fail (x)
+  (let ((string (make-string 10000 :initial-element #\z))
+        (stream (make-string-output-stream)))
+    (block nil
+      (handler-bind
+          ((condition (lambda (c)
+                        (declare (ignore c))
+                        (sb-debug:print-backtrace :stream stream)
+                        (return-from nil))))
+        (replace string x)))
+    (get-output-stream-string stream)))
+
+(with-test (:name :long-string-abbreviation)
+  (let ((backtrace (mega-string-replace-fail '(#\- 1))))
+    (assert (search (concatenate 'string
+                                 "\"-"
+                                 (make-string 49 :initial-element #\z)
+                                 "...\"")
+                    backtrace))))

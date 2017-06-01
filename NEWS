@@ -4,7 +4,8 @@ changes relative to sbcl-1.3.18:
   * enhancement: specialized arrays can be printed readably without using
     *read-eval*
   * bug fix: backtracing from several threads at once could fail
-
+  * enhancement: SB-DEBUG:PRINT-BACKTRACE truncates huge string arguments.
+    The full string remains available for inspection via (SB-DEBUG:ARG).
 
 changes in sbcl-1.3.18 relative to sbcl-1.3.17:
   * minor incompatible change: existing values of CFLAGS, ASFLAGS,

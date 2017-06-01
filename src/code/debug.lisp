@@ -731,9 +731,25 @@ the current thread are replaced with dummy objects which can safely escape."
         (let ((args (if emergency-best-effort
                         (ensure-printable-object args)
                         args)))
-          (if (listp args)
-              (format stream "~{ ~_~S~}" args)
-              (format stream " ~S" args)))))
+          (cond ((not (listp args))
+                 (format stream " ~S" args))
+                (t
+                 (dolist (arg args)
+                   (write-char #\space stream)
+                   (pprint-newline :linear stream)
+                   (cond ((and (stringp arg) (>= (length arg) 100))
+                          (print-unreadable-object (arg stream :type nil :identity t)
+                            (format stream "~A \"~A...\" (len=~D)"
+                                    (typecase arg
+                                      (simple-base-string 'simple-base-string)
+                                      (base-string 'base-string)
+                                      (simple-string 'simple-string)
+                                      (t 'string))
+                                    (make-array 50 :element-type (array-element-type arg)
+                                                   :displaced-to arg)
+                                    (length arg))))
+                         (t
+                          (write arg :stream stream :escape t)))))))))
     (when info
       (format stream " [~{~(~A~)~^,~}]" info)))
   (when print-frame-source
