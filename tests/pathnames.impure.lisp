@@ -631,4 +631,12 @@
 (with-test (:name :back-and-truename)
   (probe-file (make-pathname :directory '(:absolute "a" "b" :back))))
 
-;;;; success
+(with-test (:name (:parse-namestring :displaced))
+  (let* ((string "abc")
+         (disp (make-array 0 :element-type (array-element-type string)
+                             :displaced-to string
+                             :displaced-index-offset 1)))
+    (multiple-value-bind (path pos)
+        (parse-namestring disp)
+      (assert (equal path #P""))
+      (assert (zerop pos)))))

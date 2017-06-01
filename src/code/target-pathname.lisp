@@ -895,7 +895,9 @@ a host-structure or string."
         (string
          (with-array-data ((thing thing) (start start) (end end)
                            :check-fill-pointer t)
-           (%parse-namestring thing found-host defaults start end junk-allowed)))
+           (multiple-value-bind (pathname position)
+               (%parse-namestring thing found-host defaults start end junk-allowed)
+             (values pathname (- position start)))))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))
