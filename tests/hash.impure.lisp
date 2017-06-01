@@ -332,14 +332,14 @@
 
 (with-test (:name (:hash-table :weakness :removal) :skipped-on '(and :c-stack-is-control-stack (not :sb-thread)))
   (loop for test in '(eq eql equal equalp) do
-        (format t "test: ~A~%" test)
+        ; (format t "test: ~A~%" test)
         (loop for weakness in '(:key :value :key-and-value :key-or-value)
               do
-              (format t "weakness: ~A~%" weakness)
+              ; (format t "weakness: ~A~%" weakness)
               (let ((ht (make-hash-table :test 'equal :weakness weakness)))
                 (alloc (add-removable-stuff ht :n 117 :size 1))
                 (loop for i upfrom 0
-                      do (format t "~A. count: ~A~%" i (hash-table-count ht))
+                      do ; (format t "~A. count: ~A~%" i (hash-table-count ht))
                       (force-output)
                       until (zerop (hash-table-count ht))
                       do
