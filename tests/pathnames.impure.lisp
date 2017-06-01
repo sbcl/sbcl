@@ -640,3 +640,13 @@
         (parse-namestring disp)
       (assert (equal path #P""))
       (assert (zerop pos)))))
+
+(with-test (:name (:parse-native-namestring :displaced))
+  (let* ((string "abc")
+         (disp (make-array 0 :element-type (array-element-type string)
+                             :displaced-to string
+                             :displaced-index-offset 1)))
+    (multiple-value-bind (path pos)
+        (sb-ext:parse-native-namestring disp)
+      (assert (equal path #P""))
+      (assert (zerop pos)))))

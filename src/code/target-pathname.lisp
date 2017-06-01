@@ -992,9 +992,11 @@ directory."
         (string
          (with-array-data ((thing thing) (start start) (end end)
                            :check-fill-pointer t)
-           (%parse-native-namestring thing
-                                     found-host defaults start end junk-allowed
-                                     as-directory)))
+           (multiple-value-bind (pathname position)
+               (%parse-native-namestring thing
+                                         found-host defaults start end junk-allowed
+                                         as-directory)
+             (values pathname (- position start)))))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))
