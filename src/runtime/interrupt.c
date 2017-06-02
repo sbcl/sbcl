@@ -1194,7 +1194,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         lose("there is a pending handler already (PA)\n");
     if (data->gc_blocked_deferrables)
         lose("maybe_defer_handler: gc_blocked_deferrables true\n");
-    check_interrupt_context_or_lose(context);
+
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
      * atomic section inside a WITHOUT-INTERRUPTS.
@@ -1226,6 +1226,9 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         check_interrupt_context_or_lose(context);
         return 1;
     }
+
+    check_interrupt_context_or_lose(context);
+
     FSHOW_SIGNAL((stderr,
                   "/maybe_defer_handler(%x,%d): not deferred\n",
                   (unsigned int)handler,signal));
