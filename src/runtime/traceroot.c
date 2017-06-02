@@ -405,6 +405,7 @@ static inline lispobj decode_pointer(uint32_t encoding)
 struct simple_fun* simple_fun_from_pc(char* pc)
 {
     struct code* code = (struct code*)component_ptr_from_pc((lispobj*)pc);
+    if (!code) return 0;
     struct simple_fun* prev_fun = (struct simple_fun*)
         ((char*)code + (code_header_words(code->header)<<WORD_SHIFT)
          + FIRST_SIMPLE_FUN_OFFSET(code));
@@ -456,7 +457,7 @@ static void trace1(lispobj object,
     lispobj thread_ref;
     enum ref_kind root_kind;
     struct thread* root_thread;
-    char* thread_pc;
+    char* thread_pc = 0;
     unsigned int tls_index;
     lispobj target;
     int i;
@@ -484,8 +485,14 @@ static void trace1(lispobj object,
                 fprintf(stderr, "target=%p srcs=", (void*)target);
                 while (list1) {
                     uint32_t* cell = (uint32_t*)(scratchpad->base + list1);
-                    lispobj ptr = decode_pointer(cell[0]);
-                    fprintf(stderr, "%p ", (void*)ptr);
+                    lispobj* ptr = (lispobj*)decode_pointer(cell[0]);
+                    if (hopscotch_containsp(visited, (lispobj)ptr))
+                        fprintf(stderr, "%p ", ptr);
+                    else {
+                        lispobj word = *ptr;
+                        int nwords = is_cons_half(word) ? 2 : sizetab[widetag_of(word)](ptr);
+                        fprintf(stderr, "%p+%d ", ptr, nwords);
+                    }
                     list1 = cell[1];
                 }
                 putc('\n',stderr);
@@ -603,6 +610,10 @@ static void trace1(lispobj object,
             (lowtag_of(ptr) == INSTANCE_POINTER_LOWTAG  ||
              lowtag_of(ptr) == FUN_POINTER_LOWTAG)) {
             target = instance_layout(native_pointer(ptr));
+        } else if (next.wordindex == 1 &&
+                   lowtag_of(ptr) == FUN_POINTER_LOWTAG &&
+                   widetag_of(*native_pointer(ptr)) == CLOSURE_WIDETAG) {
+            target -= FUN_RAW_ADDR_OFFSET;
         }
 #ifdef LISP_FEATURE_IMMOBILE_CODE
           else if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
