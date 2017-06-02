@@ -944,10 +944,13 @@
   (loop-depth 0 :type fixnum))
 (declaim (freeze-type tn))
 (defmethod print-object ((tn tn) stream)
-  (print-unreadable-object (tn stream :type t)
+  (cond ((not (boundp 'sb!c::*compiler-ir-obj-map*))
+         (print-unreadable-object (tn stream :type t :identity t)))
+        (t
+         (print-unreadable-object (tn stream :type t)
     ;; KLUDGE: The distinction between PRINT-TN and PRINT-OBJECT on TN is
     ;; not very mnemonic. -- WHN 20000124
-    (print-tn-guts tn stream)))
+           (print-tn-guts tn stream)))))
 
 ;;; The GLOBAL-CONFLICTS structure represents the conflicts for global
 ;;; TNs. Each global TN has a list of these structures, one for each

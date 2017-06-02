@@ -64,7 +64,8 @@
 
 (defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (format stream "~D" (cont-num x))))
+    (when (boundp '*compiler-ir-obj-map*)
+      (format stream "~D" (cont-num x)))))
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
 ;;; temporal storage.
@@ -93,7 +94,8 @@
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (format stream "~D" (cont-num x))))
+    (when (boundp '*compiler-ir-obj-map*)
+      (format stream "~D" (cont-num x)))))
 
 #!-sb-fluid (declaim (inline lvar-has-single-use-p))
 (defun lvar-has-single-use-p (lvar)
@@ -343,10 +345,12 @@
   ;; no cached value has been stored yet.
   (physenv-cache :none :type (or null physenv (member :none))))
 (defmethod print-object ((cblock cblock) stream)
-  (print-unreadable-object (cblock stream :type t :identity t)
-    (format stream "~W :START c~W"
+  (if (boundp '*compiler-ir-obj-map*)
+      (print-unreadable-object (cblock stream :type t :identity t)
+        (format stream "~W :START c~W"
             (block-number cblock)
-            (cont-num (block-start cblock)))))
+            (cont-num (block-start cblock))))
+      (print-unreadable-object (cblock stream :type t :identity t))))
 
 ;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
 ;;; different BLOCK-INFO annotation structures so that code

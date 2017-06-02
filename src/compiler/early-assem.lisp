@@ -65,10 +65,13 @@
   ;; annotation structure)
   )
 (defmethod print-object ((label label) stream)
-  (if (or *print-escape* *print-readably*)
-      (print-unreadable-object (label stream :type t)
-        (prin1 (sb!c:label-id label) stream))
-      (format stream "L~D" (sb!c:label-id label))))
+  (cond ((not (boundp 'sb!c::*compiler-ir-obj-map*))
+         (print-unreadable-object (label stream :type t :identity t)))
+        ((or *print-escape* *print-readably*)
+         (print-unreadable-object (label stream :type t)
+           (prin1 (sb!c:label-id label) stream)))
+        (t
+         (format stream "L~D" (sb!c:label-id label)))))
 
 ;;; Not only can DEFINE-ASSEMBLY-ROUTINE not work in the target,
 ;;; the cross-compiler never sees a DEFUN for any of the helper functions
