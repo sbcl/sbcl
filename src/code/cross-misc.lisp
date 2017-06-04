@@ -210,3 +210,5 @@
 (defun sap-int (x) (error "can't take SAP-INT ~S" x))
 ;;; Needed for FIXUP-CODE-OBJECT
 (defmacro without-gcing (&body body) `(progn ,@body))
+
+(defun logically-readonlyize (x) x)

@@ -4353,13 +4353,13 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
     if (gc_coalesce_string_literals) {
         extern struct lisp_startup_options lisp_startup_options;
-        extern void coalesce_strings();
+        extern void coalesce_similar_vectors();
         boolean verbose = !lisp_startup_options.noinform;
         if (verbose) {
-            printf("[coalescing similar strings... ");
+            printf("[coalescing similar vectors... ");
             fflush(stdout);
         }
-        coalesce_strings();
+        coalesce_similar_vectors();
         if (verbose)
             printf("done]\n");
     }

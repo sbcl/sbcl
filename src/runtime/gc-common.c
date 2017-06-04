@@ -1943,10 +1943,30 @@ void gc_heapsort_uwords(heap array, int length)
 
 //// Coalescing of constant vectors for SAVE-LISP-AND-DIE
 
+static boolean symbol_or_fixnum_p(lispobj obj)
+{
+    return fixnump(obj)
+        || (lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
+            widetag_of(*native_pointer(obj)) == SYMBOL_WIDETAG)
+        || obj == NIL;
+}
+
+static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
+{
+    int i;
+    for (i = fixnum_value(v->length)-1; i >= 0; --i)
+        if (!pred(v->data[i])) return 0;
+    return 1;
+}
+
 static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 {
     lispobj obj = *where;
+    if (lowtag_of(obj) != OTHER_POINTER_LOWTAG)
+        return;
     struct vector* v = (struct vector*)native_pointer(obj);
+    int widetag = widetag_of(v->header);
+
     extern char gc_coalesce_string_literals;
     // gc_coalesce_string_literals represents the "aggressiveness" level.
     // If 1, then we share vectors tagged as +VECTOR-SHAREABLE+,
@@ -1955,12 +1975,9 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
       ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<N_WIDETAG_BITS
       : (VECTOR_SHAREABLE                        )<<N_WIDETAG_BITS;
 
-    if (lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
-        (widetag_of(v->header) == SIMPLE_BASE_STRING_WIDETAG
-#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-         || widetag_of(v->header) == SIMPLE_CHARACTER_STRING_WIDETAG
-#endif
-         ) && (v->header & mask) != 0) { /* shareable vector */
+    if ((specialized_vector_widetag_p(widetag) ||
+         (widetag == SIMPLE_VECTOR_WIDETAG && vector_isevery(symbol_or_fixnum_p, v)))
+        && (v->header & mask) != 0) { /* shareable vector */
         int index = hopscotch_get(ht, (uword_t)v, 0);
         if (!index) // Not found
             hopscotch_insert(ht, (uword_t)v, 1);
@@ -2015,10 +2032,10 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
     return 0;
 }
 
-void coalesce_strings()
+void coalesce_similar_vectors()
 {
     struct hopscotch_table ht;
-    hopscotch_create(&ht, HOPSCOTCH_STRING_HASH, 0, 1<<17, 0);
+    hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)IMMOBILE_SPACE_START,
                    (lispobj*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value,

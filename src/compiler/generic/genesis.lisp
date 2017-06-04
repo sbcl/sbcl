@@ -2483,7 +2483,7 @@ core and return a descriptor to it."
           (write-wordindexed result
                              (+ index sb!vm:vector-data-offset)
                              (pop-stack)))
-        result)))
+        (set-readonly result))))
 
 (define-cold-fop (fop-spec-vector)
   (let* ((len (read-word-arg (fasl-input-stream)))
@@ -2500,7 +2500,7 @@ core and return a descriptor to it."
                                     (fasl-input-stream)
                                     :start start
                                     :end end)
-    result))
+    (set-readonly result)))
 
 (not-cold-fop fop-array)
 #+nil

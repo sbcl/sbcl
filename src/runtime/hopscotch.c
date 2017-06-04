@@ -24,6 +24,7 @@
 #include <stdio.h>
 #endif
 #include "genesis/vector.h"
+#include "murmur_hash.h"
 
 typedef struct hopscotch_table* tableptr;
 void hopscotch_integrity_check(tableptr,char*,int);
@@ -271,13 +272,32 @@ uword_t sxhash_simple_string(struct vector* string)
     return result;
 }
 
-boolean hopscotch_stringeq(uword_t arg1, uword_t arg2)
+static uword_t vector_sxhash(struct vector* vector)
 {
+    int widetag = widetag_of(vector->header);
+    sword_t nwords = sizetab[widetag]((lispobj*)vector);
+    // Mix words. At present this works correctly only for specialized vectors
+    // or general vectors with eq-comparable elements.
+    return gpr_murmur_hash3(&vector->length,
+                            (nwords-1) * N_WORD_BYTES, /* exclude header */
+                            hopscotch_hmix(widetag));
+}
+
+/* Compare vectors elementwise for EQLness.
+ * This is unlike EQUAL because it works on any specialized vector,
+ * and unlike EQUALP because it compares strings case-sensitively.
+ */
+static boolean vector_eql(uword_t arg1, uword_t arg2)
+{
+    if (arg1 == arg2) return 1;
     lispobj* str1 = (lispobj*)arg1;
     lispobj* str2 = (lispobj*)arg2;
+    // FIXME: should really compare elementwise for SIMPLE-VECTOR
+    // so that copyable numbers (bignums, double-floats) compare properly.
+    // Otherwise we'll only coalesce when such numbers are EQ.
     if (((str1[0] ^ str2[0]) & WIDETAG_MASK) == 0 && str1[1] == str2[1]) {
-        sword_t size = sizetab[widetag_of(*str1)](str1);
-        return !memcmp(str1 + 2, str2 + 2, (size-2) << WORD_SHIFT);
+        sword_t nwords = sizetab[widetag_of(*str1)](str1);
+        return !memcmp(str1 + 2, str2 + 2, (nwords-2) << WORD_SHIFT);
     }
     return 0;
 }
@@ -296,9 +316,14 @@ void hopscotch_create(tableptr ht, int hashfun,
     case HOPSCOTCH_HASH_FUN_MIX:
       ht->compare = 0; ht->hash = hopscotch_hmix; break;
     case HOPSCOTCH_STRING_HASH:
-      ht->compare = hopscotch_stringeq;
+      ht->compare = vector_eql;
       ht->hash = (uint32_t(*)(uword_t))sxhash_simple_string;
       break;
+    case HOPSCOTCH_VECTOR_HASH:
+      ht->compare = vector_eql;
+      ht->hash = (uint32_t(*)(uword_t))vector_sxhash;
+      break;
+
     default: lose("Bad hash function");
     }
     switch (bytes_per_value) {
@@ -712,16 +737,16 @@ void hopscotch_integrity_check(tableptr ht, char*when, int verbose)
       }
       if (verbose) {
           if (claimed==i || (claimed==-1 && !key))
-            fprintf(s, "      ");
+            fprintf(s, "        ");
           else if (claimed!=-1) {
-            fprintf(s, "[%4d]", claimed);
+            fprintf(s, "[%6d]", claimed);
             if ((int)(ht->mask & hash(ht, key)) != claimed)
               lose("key hashes to wrong logical cell?");
           } else { // should have been claimed
             fprintf(s, " **** ");
             fail = 1;
           }
-          fprintf(s, " %4d: %04x", i, i <= ht->mask ? get_hop_mask(ht,i) : 0);
+          fprintf(s, " %6d: %04x", i, i <= ht->mask ? get_hop_mask(ht,i) : 0);
           if (key) {
             fprintf(s, " %lx -> %d", key, (int)(ht->mask & hash(ht, key)));
             if (ht->values)

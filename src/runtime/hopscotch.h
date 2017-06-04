@@ -48,6 +48,7 @@ uint32_t hopscotch_hmix(uword_t);
 #define HOPSCOTCH_HASH_FUN_DEFAULT 1
 #define HOPSCOTCH_HASH_FUN_MIX 2
 #define HOPSCOTCH_STRING_HASH 3
+#define HOPSCOTCH_VECTOR_HASH 4
 
 /* This confuses me every time I look at it, so here's an example-
  * Suppose (unrealistically) that a table has a hop range of 4,

@@ -312,7 +312,8 @@
                     (setf max-negative abs))))
                (t
                 (return-from coerce-to-smallest-eltype
-                  (coerce seq 'simple-vector))))))
+                  (logically-readonlyize
+                   (coerce seq 'simple-vector)))))))
       (if (listp seq)
           (dolist (i seq)
             (incf length)     ; so not to traverse again to compute it
@@ -321,11 +322,12 @@
             (frob i)))
       (if (zerop length)
           #()
-          (!make-specialized-array length
-                                   (smallest-element-type (max max-positive
-                                                               (1- max-negative))
-                                                          (plusp max-negative))
-                                   seq)))))
+          (logically-readonlyize
+           (!make-specialized-array length
+                                    (smallest-element-type (max max-positive
+                                                                (1- max-negative))
+                                                           (plusp max-negative))
+                                    seq))))))
 
 ;;;; variables
 
@@ -479,7 +481,10 @@
           (dump-1-var fun var (cdr x) id minimal buffer)
           (setf (gethash var var-locs) i)
           (incf i)))
-      (coerce buffer 'simple-vector))))
+      ;; The vector can be marked as readonly so that compilation into memory
+      ;; is permitted to coalesce when saving the image.
+      ;; Otherwise only COMPILE-FILE would coalesce these.
+      (logically-readonlyize (coerce buffer 'simple-vector)))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of
 ;;; FUN, representing the arguments to FUN in minimal variable format.
@@ -488,7 +493,8 @@
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
       (dump-1-var fun var (leaf-info var) 0 t buffer))
-    (coerce buffer 'simple-vector)))
+    ;; See remark in COMPUTE-VARS about LOGICALLY-READONLYIZE here.
+    (logically-readonlyize (coerce buffer 'simple-vector))))
 
 ;;; Return VAR's relative position in the function's variables (determined
 ;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DEBUG-INFO-VAR-DELETED.

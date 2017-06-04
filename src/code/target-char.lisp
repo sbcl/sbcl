@@ -195,7 +195,7 @@
                                           (incf index))
                                         (setf (gethash
                                                (apply #'pack-3-codepoints codepoints)
-                                               table) key)))
+                                               table) (logically-readonlyize key))))
                                 table))))
 
                     ,(with-open-file

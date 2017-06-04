@@ -440,7 +440,7 @@
         (declare (fixnum size))
         (let ((ptr (fop-stack-pop-n stack size)))
           (replace res stack :start2 ptr))
-        res)))
+        (logically-readonlyize res))))
 
 ;; No MAKE-ARRAY-HEADER on host
 (!define-fop 89 :not-host (fop-array (vec))
@@ -479,7 +479,8 @@
          (vector (if (and (= widetag sb!vm:simple-vector-widetag)
                           (= words 0))
                      #()
-                     (allocate-vector widetag length words))))
+                     (logically-readonlyize
+                      (allocate-vector widetag length words)))))
     (declare (type index length bytes words)
              (type word bits))
     (read-n-bytes (fasl-input-stream) vector 0 bytes)
