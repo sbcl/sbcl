@@ -61,7 +61,7 @@
                      (t
                       (try (make-condition 'retry-undefined-function
                                            :name name
-                                           :format-control "Bad value when resarting ~s: ~s"
+                                           :format-control "Bad value when restarting ~s: ~s"
                                            :format-arguments (list name value))
                            t)))
                    (try (make-condition 'retry-undefined-function
