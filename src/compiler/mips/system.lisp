@@ -122,7 +122,12 @@
        (inst sll t2 data (- n-widetag-bits n-fixnum-tag-bits))
        (inst or t1 t2))
       (immediate
-       (inst or t1 (ash (tn-value data) n-widetag-bits)))
+       (let ((val (ash (tn-value data) n-widetag-bits)))
+         (cond ((typep val '(unsigned-byte 16))
+                (inst or t1 val))
+               (t
+                (inst li t2 val)
+                (inst or t1 t2)))))
       (zero))
     (storew t1 x 0 other-pointer-lowtag)
     (move res x)))
