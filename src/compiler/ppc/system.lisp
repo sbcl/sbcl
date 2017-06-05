@@ -113,7 +113,12 @@
        (inst slwi t2 data (- n-widetag-bits n-fixnum-tag-bits))
        (inst or t1 t1 t2))
       (immediate
-       (inst ori t1 t1 (ash (tn-value data) n-widetag-bits)))
+       (let ((val (ash (tn-value data) n-widetag-bits)))
+         (cond ((typep val '(unsigned-byte 16))
+                (inst ori t1 t1 val))
+               (t
+                (inst lr t2 val)
+                (inst or t1 t1 t2)))))
       (zero))
     (storew t1 x 0 other-pointer-lowtag)
     (move res x)))

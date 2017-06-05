@@ -188,8 +188,6 @@
   (:result-types signed-num)
   (:note "inline (signed-byte 32) logical op"))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
 (defmacro !define-var-binop (translate untagged-penalty op
                              &optional arg-swap restore-fixnum-mask)
   `(progn
@@ -395,8 +393,6 @@
                   (inst ,shifted-op temp x high-half)
                   (inst ,op r temp low-half))))
              `(inst ,op r x y))))))
-
-); eval-when
 
 (!define-var-binop + 4 add)
 (!define-var-binop - 4 sub)

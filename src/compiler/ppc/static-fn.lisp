@@ -27,13 +27,11 @@
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save))
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defun static-fun-template-name (num-args num-results)
   (intern (format nil "~:@(~R-arg-~R-result-static-fun~)"
                   num-args num-results)))
-
 
 (defun moves (dst src)
   (collect ((moves))
@@ -112,7 +110,6 @@
              (when cur-nfp
                (load-stack-tn cur-nfp nfp-save))
              ,@(moves (result-names) (temp-names))))))))
-
 
 ) ; EVAL-WHEN
 

@@ -125,7 +125,7 @@
 (define-compiler-macro valid-bo-encoding (&whole form enc)
   (declare (notinline valid-bo-encoding))
   (if (keywordp enc) (valid-bo-encoding enc) form))
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun valid-bo-encoding (enc)
   (or (if (integerp enc)
         (and (= enc (logand #x1f enc))
