@@ -416,11 +416,11 @@
                    (t
                     ;; Could not write -- buffer or error.
                     #!+win32
-                    (simple-stream-perror "couldn't write to ~s" stream errno)
+                    (simple-stream-perror "Couldn't write to ~s" stream errno)
                     #!-win32
                     (if (= errno sb!unix:ewouldblock)
                         (buffer-output stream thing start end)
-                        (simple-stream-perror "couldn't write to ~s" stream errno)))))))))
+                        (simple-stream-perror "Couldn't write to ~s" stream errno)))))))))
 
 ;;; Deprecated -- can go away after 1.1 or so. Deprecated because
 ;;; this is not something we want to export. Nikodemus thinks the

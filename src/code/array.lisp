@@ -442,7 +442,7 @@
     (declare (type array-rank array-rank))
     (declare (type index dimension-0))
     (cond ((and displaced-index-offset (null displaced-to))
-           (error "can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
+           (error "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
           ((and simple (= array-rank 1))
            (let ((vector ; a (SIMPLE-ARRAY * (*))
                   (allocate-vector-with-widetag widetag dimension-0 n-bits)))
@@ -835,7 +835,7 @@ of specialized arrays is supported."
     (cond ((array-header-p array)
            (let ((rank (%array-rank array)))
              (unless (= rank length)
-               (error "wrong number of subscripts, ~W, for array of rank ~W."
+               (error "Wrong number of subscripts, ~W, for array of rank ~W."
                       length rank))
              (do ((axis (1- rank) (1- axis))
                   (chunk-size 1)

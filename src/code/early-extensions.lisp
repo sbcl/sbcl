@@ -887,7 +887,7 @@ NOTE: This interface is experimental and subject to change."
     (error 'simple-type-error
            :datum name
            :expected-type 'function-name
-           :format-control "invalid function name: ~S"
+           :format-control "Invalid function name: ~S"
            :format-arguments (list name))))
 
 ;;; Given a function name, return the symbol embedded in it.

@@ -957,7 +957,7 @@
               (nthcdr (1+ posn) directives)))))
 
 (def-complex-format-directive #\} ()
-  (format-error "no corresponding open brace"))
+  (format-error "No corresponding open brace"))
 
 ;;;; format directives and support functions for justification
 
@@ -1011,7 +1011,7 @@
      remaining)))
 
 (def-complex-format-directive #\> ()
-  (format-error "no corresponding open bracket"))
+  (format-error "No corresponding open bracket"))
 
 (defun parse-format-logical-block
        (segments colonp first-semi close params string end)

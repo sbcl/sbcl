@@ -1775,7 +1775,7 @@ code to be loaded.
                                        &key (which (sb!int:missing-arg)))
   (declare (type (member :hash-key :hash-value) which))
   (cond ((or (cdr prep-phrases) (not (member (caar prep-phrases) '(:in :of))))
-         (loop-error "too many prepositions!"))
+         (loop-error "Too many prepositions!"))
         ((null prep-phrases)
          (loop-error "missing OF or IN in ~S iteration path")))
   (let ((ht-var (gensym "LOOP-HASHTAB-"))

@@ -43,7 +43,7 @@
                   (values arg-p
                           (+ n
                              (or (position-in #'tn-ref-across ref refs)
-                                 (error "couldn't find REF?"))
+                                 (error "Couldn't find REF?"))
                              1)
                           t
                           more-cost

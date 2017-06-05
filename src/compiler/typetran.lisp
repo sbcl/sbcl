@@ -131,7 +131,7 @@
   (let* ((name (lvar-value name))
          (cell (find-classoid-cell name :create t)))
     `(or (classoid-cell-classoid ',cell)
-         (error "class not yet defined: ~S" name))))
+         (error "Class not yet defined: ~S" name))))
 
 (defoptimizer (%typep-wrapper constraint-propagate-if)
     ((test-value variable type) node gen)
