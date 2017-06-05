@@ -33,7 +33,7 @@
            (let ((segment (sb-assem:make-segment :type :regular)))
              (dolist (instruction (subst n :ARGC c-prog)
                       (sb-assem::segment-buffer segment))
-               (apply (sb-assem::inst-emitter-symbol (car instruction))
+               (apply (sb-assem::op-encoder-name (car instruction))
                       segment nil (cdr instruction))))))
     (dotimes (n-args 4)
       (let ((the-code (assemble-it n-args)))

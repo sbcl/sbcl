@@ -1221,15 +1221,27 @@
                              form))
                        body)))))))
 
-(defun inst-emitter-symbol (symbol &optional create)
-  (values (funcall (if create 'intern 'find-symbol)
-                   (string-downcase symbol)
-                   *backend-instruction-set-package*)))
+(defun op-encoder-name (string-designator &optional create)
+  (let ((conflictp
+         ;; This kludge avoids interning instruction encoder names in lowercase
+         ;; most of the time, which was a hack to avoid overlap with Lisp macros
+         ;; of the same name.
+         (member string-designator
+                 '("ASR" "LSR" "LSL" "ROR"                     ; ARM
+                   "T"                                         ; Sparc "trap"
+                   "AND" "OR" "NOT" "PUSH" "POP" "SET" "LOOP"  ; x86
+                   "BREAK" "BYTE" "MOVE")                      ; generic
+                 :test #'string=)))
+    (values (funcall (if create 'intern 'find-symbol)
+                     (if conflictp
+                         (string-downcase string-designator)
+                         (string string-designator))
+                     *backend-instruction-set-package*))))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
   "Emit the specified instruction to the current segment."
   (let* ((stringablep (typep instruction '(or symbol string character)))
-         (sym (and stringablep (inst-emitter-symbol instruction))))
+         (sym (and stringablep (op-encoder-name instruction))))
     (cond ((and stringablep
                 (null sym))
            (warn "Undefined instruction: ~s in~% ~s" instruction whole)
@@ -1237,7 +1249,7 @@
           ((#-sb-xc macro-function #+sb-xc sb!xc:macro-function sym env)
            `(,sym ,@args))
           (t
-           `(,@(if stringablep `(,sym) `(funcall (inst-emitter-symbol ,instruction)))
+           `(,@(if stringablep `(,sym) `(funcall (op-encoder-name ,instruction)))
              (%%current-segment%%) (%%current-vop%%) ,@args)))))
 
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
@@ -1466,7 +1478,7 @@
 
 (defmacro define-instruction (name lambda-list &rest options)
   (binding* ((sym-name (symbol-name name))
-             (defun-name (inst-emitter-symbol sym-name t))
+             (defun-name (op-encoder-name sym-name t))
              (segment-name (car lambda-list))
              (vop-name nil)
              (postits (gensym "POSTITS-"))
@@ -1594,4 +1606,4 @@
            (values))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
-  `(defmacro ,(inst-emitter-symbol (symbol-name name) t) ,lambda-list ,@body))
+  `(defmacro ,(op-encoder-name name t) ,lambda-list ,@body))
