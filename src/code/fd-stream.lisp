@@ -262,6 +262,8 @@
          (when (> end start)
            (go :flush-and-fill))))))
 
+(define-symbol-macro +write-failed+ "Couldn't write to ~S")
+
 ;;; Flush the current output buffer of the stream, ensuring that the
 ;;; new buffer is empty. Returns (for convenience) the new output
 ;;; buffer -- which may or may not be EQ to the old one. If the is no
@@ -317,7 +319,7 @@
                               ;; if interrupted on win32, just try again
                               #!+win32 ((eql errno sb!unix:eintr))
                               (t
-                               (simple-stream-perror "Couldn't write to ~s"
+                               (simple-stream-perror +write-failed+
                                                      stream errno)))))))))))))
 
 ;;; Helper for FLUSH-OUTPUT-BUFFER -- returns the new buffer.
@@ -385,11 +387,11 @@
                  (t
                   ;; Could not write on the first try at all!
                   #!+win32
-                  (simple-stream-perror "Couldn't write to ~S." stream errno)
+                  (simple-stream-perror +write-failed+ stream errno)
                   #!-win32
                   (if (= errno sb!unix:ewouldblock)
                       (bug "Unexpected blocking in WRITE-OUTPUT-FROM-QUEUE.")
-                      (simple-stream-perror "Couldn't write to ~S"
+                      (simple-stream-perror +write-failed+
                                             stream errno))))))))
   nil)
 
@@ -416,11 +418,11 @@
                    (t
                     ;; Could not write -- buffer or error.
                     #!+win32
-                    (simple-stream-perror "Couldn't write to ~s" stream errno)
+                    (simple-stream-perror +write-failed+ stream errno)
                     #!-win32
                     (if (= errno sb!unix:ewouldblock)
                         (buffer-output stream thing start end)
-                        (simple-stream-perror "Couldn't write to ~s" stream errno)))))))))
+                        (simple-stream-perror +write-failed+ stream errno)))))))))
 
 ;;; Deprecated -- can go away after 1.1 or so. Deprecated because
 ;;; this is not something we want to export. Nikodemus thinks the
