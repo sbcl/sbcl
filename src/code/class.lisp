@@ -987,151 +987,6 @@ between the ~A definition and the ~A definition"
       :inherits (bit-vector vector simple-array
                  array sequence)
       :prototype-form (make-array 0 :element-type 'bit))
-     (simple-array-unsigned-byte-2
-      :translation (simple-array (unsigned-byte 2) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-2-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 2)))
-     (simple-array-unsigned-byte-4
-      :translation (simple-array (unsigned-byte 4) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-4-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 4)))
-     (simple-array-unsigned-byte-7
-      :translation (simple-array (unsigned-byte 7) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-7-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 7)))
-     (simple-array-unsigned-byte-8
-      :translation (simple-array (unsigned-byte 8) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-8-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 8)))
-     (simple-array-unsigned-byte-15
-      :translation (simple-array (unsigned-byte 15) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-15-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 15)))
-     (simple-array-unsigned-byte-16
-      :translation (simple-array (unsigned-byte 16) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-16-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 16)))
-
-     (simple-array-unsigned-fixnum
-      :translation (simple-array (unsigned-byte #.sb!vm:n-positive-fixnum-bits) (*))
-      :codes (#.sb!vm:simple-array-unsigned-fixnum-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0
-                       :element-type '(unsigned-byte #.sb!vm:n-positive-fixnum-bits)))
-
-     (simple-array-unsigned-byte-31
-      :translation (simple-array (unsigned-byte 31) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-31-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 31)))
-     (simple-array-unsigned-byte-32
-      :translation (simple-array (unsigned-byte 32) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-32-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 32)))
-     #!+64-bit
-     (simple-array-unsigned-byte-63
-      :translation (simple-array (unsigned-byte 63) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-63-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 63)))
-     #!+64-bit
-     (simple-array-unsigned-byte-64
-      :translation (simple-array (unsigned-byte 64) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-64-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(unsigned-byte 64)))
-     (simple-array-signed-byte-8
-      :translation (simple-array (signed-byte 8) (*))
-      :codes (#.sb!vm:simple-array-signed-byte-8-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(signed-byte 8)))
-     (simple-array-signed-byte-16
-      :translation (simple-array (signed-byte 16) (*))
-      :codes (#.sb!vm:simple-array-signed-byte-16-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(signed-byte 16)))
-
-     (simple-array-fixnum
-      :translation (simple-array (signed-byte #.sb!vm:n-fixnum-bits)
-                    (*))
-      :codes (#.sb!vm:simple-array-fixnum-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0
-                       :element-type
-                       '(signed-byte #.sb!vm:n-fixnum-bits)))
-
-     (simple-array-signed-byte-32
-      :translation (simple-array (signed-byte 32) (*))
-      :codes (#.sb!vm:simple-array-signed-byte-32-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(signed-byte 32)))
-     #!+64-bit
-     (simple-array-signed-byte-64
-      :translation (simple-array (signed-byte 64) (*))
-      :codes (#.sb!vm:simple-array-signed-byte-64-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(signed-byte 64)))
-     (simple-array-single-float
-      :translation (simple-array single-float (*))
-      :codes (#.sb!vm:simple-array-single-float-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type 'single-float))
-     (simple-array-double-float
-      :translation (simple-array double-float (*))
-      :codes (#.sb!vm:simple-array-double-float-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type 'double-float))
-     #!+long-float
-     (simple-array-long-float
-      :translation (simple-array long-float (*))
-      :codes (#.sb!vm:simple-array-long-float-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type 'long-float))
-     (simple-array-complex-single-float
-      :translation (simple-array (complex single-float) (*))
-      :codes (#.sb!vm:simple-array-complex-single-float-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(complex single-float)))
-     (simple-array-complex-double-float
-      :translation (simple-array (complex double-float) (*))
-      :codes (#.sb!vm:simple-array-complex-double-float-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(complex double-float)))
-     #!+long-float
-     (simple-array-complex-long-float
-      :translation (simple-array (complex long-float) (*))
-      :codes (#.sb!vm:simple-array-complex-long-float-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0 :element-type '(complex long-float)))
      (string
       :translation string
       :direct-superclasses (vector)
@@ -1209,7 +1064,21 @@ between the ~A definition and the ~A definition"
      (string-stream
       :state :read-only
       :depth 4
-      :inherits (stream))))
+      :inherits (stream))
+     .
+     #.(loop for x across sb!vm:*specialized-array-element-type-properties*
+             unless (member (sb!vm::saetp-specifier x) '(t character base-char nil bit))
+             collect
+             ;; I'm not sure if it's an accident that there are distinct SB!KERNEL
+             ;; versus SB!VM symbols for the specialized arrays. The former are types
+             ;; in the language, and the latter are primitive object types,
+             ;; but istm they should be designated by the same symbols.
+             `(,(intern (string (sb!vm::saetp-primitive-type-name x)) *package*)
+               :translation (simple-array ,(sb!vm::saetp-specifier x) (*))
+               :codes (,(sb!vm::saetp-typecode x))
+               :direct-superclasses (vector simple-array)
+               :inherits (vector simple-array array sequence)
+               :prototype-form (make-array 0 :element-type ',(sb!vm::saetp-specifier x))))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
