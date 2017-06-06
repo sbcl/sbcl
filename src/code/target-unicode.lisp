@@ -99,7 +99,10 @@
                                                        (< x sb!xc:char-code-limit))
                                                    item)) set))
                          do (dolist (i items)
-                              (setf (gethash i hash) (first items))))
+                              (setf (gethash (logically-readonlyize (possibly-base-stringize i))
+                                             hash)
+                                    (logically-readonlyize
+                                     (possibly-base-stringize (first items))))))
                       (setf **confusables** hash))
                     (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
                       (loop for (k v) in list do
