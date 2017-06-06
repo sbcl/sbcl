@@ -230,7 +230,7 @@
   `(let ((compile-name (compile-file-pathname ,file)))
      (unwind-protect
           (progn
-            (compile-file ,file)
+            (compile-file ,file :print nil)
             (load compile-name))
        (ignore-errors
          (delete-file compile-name)))))
