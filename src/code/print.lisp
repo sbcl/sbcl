@@ -442,9 +442,9 @@ variable: an unreadable object representing the error is printed instead.")
               (let ((prefix (or (car (rassoc package (package-%local-nicknames current)))
                                 (package-name package))))
                 (output-token prefix))
-              (if (nth-value 1 (find-external-symbol name package))
-                  (write-char #\: stream)
-                  (write-string "::" stream))))))
+              (write-char #\: stream)
+              (when (eql (find-external-symbol name package) 0)
+                (write-char #\: stream))))))
         (output-token name)))))
 
 ;;;; escaping symbols

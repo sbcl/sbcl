@@ -1021,7 +1021,7 @@ implementation it is ~S." *!default-package-use-list*)
   (values nil nil))
 
 ;;; Similar to FIND-SYMBOL, but only looks for an external symbol.
-;;; Return the symbol and T if found, otherwise two NILs.
+;;; Return the symbol if found, otherwise 0.
 ;;; This is used for fast name-conflict checking in this file and symbol
 ;;; printing in the printer.
 ;;; An optimization is possible here: by accepting either a string or symbol,
@@ -1032,8 +1032,8 @@ implementation it is ~S." *!default-package-use-list*)
          (hash (compute-symbol-hash string length)))
     (declare (type index length) (type hash hash))
     (with-symbol ((symbol) (package-external-symbols package) string length hash)
-      (return-from find-external-symbol (values symbol t))))
-  (values nil nil))
+      (return-from find-external-symbol symbol)))
+  0)
 
 (define-condition name-conflict (reference-condition package-error)
   ((function :initarg :function :reader name-conflict-function)
@@ -1174,10 +1174,8 @@ uninterned."
         (when (member symbol shadowing-symbols)
           (let ((cset ()))
             (dolist (p (package-%use-list package))
-              (multiple-value-bind (s w) (find-external-symbol name p)
-                ;; S should be derived as SYMBOL so that PUSHNEW can assume #'EQ
-                ;; as the test, but it's not happening, so restate the obvious.
-                (when w (pushnew s cset :test #'eq))))
+              (let ((s (find-external-symbol name p)))
+                (unless (eql s 0) (pushnew s cset :test #'eq))))
             (when (cdr cset)
               (apply #'name-conflict package 'unintern symbol cset)
               (return-from unintern t)))
@@ -1221,10 +1219,9 @@ uninterned."
           (syms ()))
       ;; Punt any symbols that are already external.
       (dolist (sym symbols)
-        (multiple-value-bind (s found)
-            (find-external-symbol (symbol-name sym) package)
-          (unless (or (and found (eq s sym)) (member sym syms))
-            (push sym syms))))
+        (let ((s (find-external-symbol (symbol-name sym) package)))
+          (unless (eq s sym)
+            (pushnew sym syms :test #'eq))))
       (with-single-package-locked-error ()
         (when syms
           (assert-package-unlocked package "exporting symbol~P ~{~A~^, ~}"
@@ -1419,17 +1416,15 @@ PACKAGE."
                            (incf res (package-external-symbol-count p)))))
                     (package-external-symbol-count pkg))
                  (do-symbols (sym package)
-                   (multiple-value-bind (s w)
-                       (find-external-symbol (symbol-name sym) pkg)
-                     (when (and w
+                   (let ((s (find-external-symbol (symbol-name sym) pkg)))
+                     (when (and (not (eql s 0))
                                 (not (eq s sym))
                                 (not (member sym shadowing-symbols)))
                        (name-conflict package 'use-package pkg sym s))))
                  (dolist (p use-list)
                    (do-external-symbols (sym p)
-                     (multiple-value-bind (s w)
-                         (find-external-symbol (symbol-name sym) pkg)
-                       (when (and w
+                     (let ((s (find-external-symbol (symbol-name sym) pkg)))
+                       (when (and (not (eql s 0))
                                   (not (eq s sym))
                                   (not (member
                                         (find-symbol (symbol-name sym) package)
