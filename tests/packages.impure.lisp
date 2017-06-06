@@ -923,3 +923,7 @@ if a restart was invoked."
                            (write-to-string c :pretty nil :escape nil)))))
     (condition () (error "Should not get here"))
     (:no-error () (error "Should not get here"))))
+
+;; git revision f7d1550c0e16262f28213c9e3c048f42e3f0b476 broke find-all-symbols
+(with-test (:name :find-all-symbols)
+  (find-all-symbols "FIXNUM"))

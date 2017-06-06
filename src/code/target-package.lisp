@@ -1479,8 +1479,9 @@ PACKAGE."
     (with-package-names (names)
       (maphash (lambda (k v)
                  (declare (ignore k))
-                 (multiple-value-bind (s w) (find-symbol string v)
-                   (when w (pushnew s res))))
+                 (unless (listp v) ; ignore nickname entries
+                   (multiple-value-bind (s w) (find-symbol string v)
+                     (when w (pushnew s res)))))
                names))
     res))
 
