@@ -344,7 +344,6 @@
 ;; so happens to be a function in SBCL, but which must not be
 ;; bound to a function-name by way of (SETF FEDFINITION).
 (defun err-if-unacceptable-function (object setter)
-  (declare (notinline macro/special-guard-fun-p)) ; not performance-critical
   (when (macro/special-guard-fun-p object)
     (error 'simple-reference-error
            :references (list '(:ansi-cl :function fdefinition))
