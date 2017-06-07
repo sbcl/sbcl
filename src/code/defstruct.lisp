@@ -144,6 +144,19 @@
   (accessor-name nil :type symbol)
   default                       ; default value expression
   (type t)                      ; declared type specifier
+
+  ;; FIXME: there are two (actually three) different ways a slot can be unsafe.
+  ;; (1) a structure subtype can constrains the slot type more highly than the
+  ;;     parent type constraints it. This case requires that each read via
+  ;;     the subtype's accessor be type-checked.
+  ;; (2) a BOA constructor does not initialize the slot.
+  ;;     This case admits a more efficient solution - instead of type-checking
+  ;;     each slot read, initialize the slot with UNBOUND-MARKER, and do
+  ;;     a simple EQ test. This is easier than an arbitrary type-check.
+  ;; (3) MAKE-LOAD-FORM methods can do damage to the type invariants
+  ;;     without any way of detection.
+  ;;     It's as simple as using MAKE-LOAD-FORM-SAVING-SLOTS without
+  ;;     specifying all the slots. This has no remedy whatsoever.
   (safe-p t :type boolean)      ; whether the slot is known to be
                                 ; always of the specified type
   ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
@@ -635,27 +648,6 @@ unless :NAMED is also specified.")))
           (setf (dd-copier-name dd) (symbolicate "COPY-" name))))))
   dd)
 
-;;; BOA constructors is (&aux x), i.e. without the default value, the
-;;; value of the slot is unspecified, but it should signal a type
-;;; error only when it's accessed. safe-p slot in dsd determines
-;;; whether to check the type after accessing the slot.
-;;;
-;;; This was performed during boa constructor creating, but the
-;;; constructors are created after this information is used to inform
-;;; the compiler how to treat such slots.
-(defun determine-unsafe-slots (dd)
-  (dolist (ctor (dd-constructors dd))
-    (let ((ll-parts (cdr ctor))) ; = (llks req opt rest key aux)
-      (dolist (var (if (listp ll-parts) (sixth ll-parts)))
-        (let* ((name (if (listp var) (car var) var))
-               (dsd (find name (dd-slots dd)
-                          :key #'dsd-name
-                          ;; FIXME: Not sure why this is #'EQ.
-                          ;; Everywhere else we use STRING=.
-                          :test #'eq)))
-          (when dsd
-            (setf (dsd-safe-p dsd) nil)))))))
-
 ;;; Given name and options and slot descriptions (and possibly doc
 ;;; string at the head of slot descriptions) return a DD holding that
 ;;; info.
@@ -703,7 +695,6 @@ unless :NAMED is also specified.")))
               (let ((*pending-defstruct-type* proto-classoid))
                 (parse-slots)))
             (parse-slots)))
-      (determine-unsafe-slots dd)
       (values dd proto-classoid inherits))))
 
 ;;;; stuff to parse slot descriptions
@@ -810,6 +801,21 @@ unless :NAMED is also specified.")))
             (error "~@<The slot ~S is :READ-ONLY in superclass, and so must ~
                        be :READ-ONLY in subclass.~:@>"
                    (dsd-name slot)))))
+    ;; Check for existence of any BOA constructor that leaves the
+    ;; slot with an unspecified value, as when it's initialized
+    ;; by an &AUX binding with no value (CLHS 3.4.6)
+    (when (some (lambda (ctor &aux (ll-parts (cdr ctor)))
+                  ;; Keyword constructors store :DEFAULT in the cdr of the cell.
+                  ;; BOA constructors store the parsed lambda list.
+                  (and (listp ll-parts) ; = (llks req opt rest key aux)
+                       (some (lambda (binding)
+                               (and (or (atom binding) (not (cdr binding)))
+                                    (string= (if (atom binding) binding (car binding))
+                                             name)))
+                             (sixth ll-parts))))
+                (dd-constructors defstruct))
+      (setf (dsd-safe-p slot) nil))
+
     slot))
 
 ;;; When a value of type TYPE is stored in a structure, should it be

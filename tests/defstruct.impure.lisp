@@ -31,11 +31,18 @@
 (declaim (notinline opaque-identity))
 (defun opaque-identity (x) x)
 
+(defstruct (boa-saux (:constructor make-boa-saux (&aux a (b 3) (c))))
+  (a #\! :type (integer 1 2))
+  (b #\? :type (integer 3 4))
+  (c #\# :type (integer 5 6)))
 (with-test (:name :defstruct-boa-typecheck)
-  (defstruct (boa-saux (:constructor make-boa-saux (&aux a (b 3) (c))))
-    (a #\! :type (integer 1 2))
-    (b #\? :type (integer 3 4))
-    (c #\# :type (integer 5 6)))
+  (dolist (dsd (sb-kernel:dd-slots
+                (sb-kernel:find-defstruct-description 'boa-saux)))
+    (let ((name (sb-kernel:dsd-name dsd))
+          (safe-p (sb-kernel::dsd-safe-p dsd)))
+      (ecase name
+        ((a c) (assert (not safe-p)))
+        (b (assert safe-p)))))
   (let ((s (make-boa-saux)))
     (locally (declare (optimize (safety 3))
                       (inline boa-saux-a))
