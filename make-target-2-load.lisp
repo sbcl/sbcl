@@ -177,10 +177,10 @@
 (dolist (rt (list sb-impl::*standard-readtable* *debug-readtable*))
   (setf (readtable-base-char-preference rt) :symbols))
 ;;; Change the internal constructor's default too.
-sb-kernel::(setf (dsd-default
-                  (find 'sb-impl::%readtable-string-preference
-                        (dd-slots (find-defstruct-description 'readtable))
-                        :key #'dsd-name)) 'character)
+(let ((dsd sb-kernel::(find 'sb-impl::%readtable-string-preference
+                            (dd-slots (find-defstruct-description 'readtable))
+                            :key #'dsd-name)))
+  (funcall #'(setf slot-value) 'character dsd 'sb-kernel::default))
 
 ;;; Lock internal packages
 #+sb-package-locks

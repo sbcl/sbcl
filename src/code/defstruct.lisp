@@ -126,25 +126,44 @@
 ;;;; DEFSTRUCT-SLOT-DESCRIPTION
 
 ;;; A DEFSTRUCT-SLOT-DESCRIPTION holds compile-time information about
-;;; a structure slot.
+;;; a structure slot. These objects are immutable.
 (def!struct (defstruct-slot-description
+             (:constructor make-dsd (name type accessor-name bits default))
              (:conc-name dsd-)
              (:copier nil)
              #-sb-xc-host (:pure t))
-  ;; name of slot
-  name
-  ;; its position in the implementation sequence
-  (index (missing-arg) :type fixnum)
-  ;; the name of the accessor function
-  ;;
-  ;; (CMU CL had extra complexity here ("..or NIL if this accessor has
-  ;; the same name as an inherited accessor (which we don't want to
-  ;; shadow)") but that behavior doesn't seem to be specified by (or
-  ;; even particularly consistent with) ANSI, so it's gone in SBCL.)
-  (accessor-name nil :type symbol)
-  default                       ; default value expression
-  (type t)                      ; declared type specifier
+  (name nil :read-only t)                       ; name of slot
+  (type t :read-only t)                         ; declared type specifier
+  (accessor-name nil :type symbol :read-only t) ; name of the accessor function
+  ;; Packed integer with 4 subfields.
+  ;; FIXNUM is ok for the host - it's guaranteed to be at least 16 signed bits
+  ;; and we don't have structures whose slot indices run into the thousands.
+  (bits 0 :type fixnum :read-only t)
+  (default nil :read-only t))                    ; default value expression
+#!-sb-fluid (declaim (freeze-type defstruct-slot-description))
 
+(eval-when (:compile-toplevel)
+  ;; Ensure that %raw-type is representable in 3 bits. (Can easily be changed)
+  (assert (<= (1+ (length *raw-slot-data*)) 8)))
+
+;; genesis needs to know how many bits are to the right of the 'index' field
+;; in the packed BITS slot of a DSD.
+(defconstant +dsd-index-shift+ 5)
+(defun pack-dsd-bits (index read-only safe-p %raw-type)
+  (logior (ash index +dsd-index-shift+)
+          (if read-only (ash 1 4) 0)
+          (if safe-p (ash 1 3) 0)
+          (the (unsigned-byte 3) (1+ %raw-type))))
+
+(declaim (inline dsd-%raw-type
+                 dsd-safe-p
+                 ; dsd-read-only ; compilation order problem
+                 ; dsd-index
+                 ))
+;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
+;; The index is -1 if this slot is not raw.
+(defun dsd-%raw-type (dsd) (1- (ldb (byte 3 0) (dsd-bits dsd))))
+;; whether the slot is known to be always of the specified type
   ;; FIXME: there are two (actually three) different ways a slot can be unsafe.
   ;; (1) a structure subtype can constrains the slot type more highly than the
   ;;     parent type constraints it. This case requires that each read via
@@ -157,13 +176,11 @@
   ;;     without any way of detection.
   ;;     It's as simple as using MAKE-LOAD-FORM-SAVING-SLOTS without
   ;;     specifying all the slots. This has no remedy whatsoever.
-  (safe-p t :type boolean)      ; whether the slot is known to be
-                                ; always of the specified type
-  ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
-  ;; The index is -1 if this slot is not raw.
-  (%raw-type -1 :type (integer -1 (#.(length *raw-slot-data*))))
-  (read-only nil :type (member t nil)))
-#!-sb-fluid (declaim (freeze-type defstruct-slot-description))
+(defun dsd-safe-p (dsd) (logbitp 3 (dsd-bits dsd)))
+(defun dsd-read-only (dsd) (logbitp 4 (dsd-bits dsd)))
+;; its position in the implementation sequence
+(defun dsd-index (dsd) (ash (dsd-bits dsd) (- +dsd-index-shift+)))
+
 (!set-load-form-method defstruct-slot-description (:host :xc :target))
 (defmethod print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
@@ -685,7 +702,7 @@ unless :NAMED is also specified.")))
       ;; on slots whose :TYPE option allows an instance of itself
       (flet ((parse-slots ()
                (dolist (slot-description slot-descriptions)
-                 (allocate-1-slot dd (parse-1-dsd dd slot-description)))))
+                 (parse-1-dsd dd slot-description))))
         (if (dd-class-p dd)
             (progn
               (when (info :type :kind name)
@@ -700,13 +717,10 @@ unless :NAMED is also specified.")))
 ;;;; stuff to parse slot descriptions
 
 ;;; Parse a slot description for DEFSTRUCT, add it to the description
-;;; and return it. If supplied, SLOT is a pre-initialized DSD
-;;; that we modify to get the new slot. This is supplied when handling
-;;; included slots.
-(defun parse-1-dsd (defstruct spec &optional
-                    (slot (make-defstruct-slot-description :name ""
-                                                           :index 0
-                                                           :type t)))
+;;; and return it. If supplied, INCLUDED-SLOT is used to get the default,
+;;; type, and read-only flag for the new slot.
+(defun parse-1-dsd (defstruct spec &optional included-slot
+                    &aux accessor-name (safe-p t) %raw-type index)
   #-sb-xc-host (declare (muffle-conditions style-warning))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
       (typecase spec
@@ -741,23 +755,17 @@ unless :NAMED is also specified.")))
                                    description."
                   :format-arguments (list spec))))
 
-    (when (find name (dd-slots defstruct)
-                :test #'string=
-                :key (lambda (x) (symbol-name (dsd-name x))))
+    (when (find name (dd-slots defstruct) :test #'string= :key #'dsd-name)
       (error 'simple-program-error
              ;; Todo: indicate whether name is a duplicate in the directly
              ;; specified slots vs. exists in the ancestor and so should
              ;; be in the (:include ...) clause instead of where it is.
              :format-control "duplicate slot name ~S"
              :format-arguments (list name)))
-    (setf (dsd-name slot) name)
-    (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list slot)))
-
-    (let ((accessor-name (if (dd-conc-name defstruct)
-                             (symbolicate (dd-conc-name defstruct) name)
-                             name))
-          (predicate-name (dd-predicate-name defstruct)))
-      (setf (dsd-accessor-name slot) accessor-name)
+    (setf accessor-name (if (dd-conc-name defstruct)
+                            (symbolicate (dd-conc-name defstruct) name)
+                            name))
+    (let ((predicate-name (dd-predicate-name defstruct)))
       (when (eql accessor-name predicate-name)
         ;; Some adventurous soul has named a slot so that its accessor
         ;; collides with the structure type predicate. ANSI doesn't
@@ -787,20 +795,20 @@ unless :NAMED is also specified.")))
       ;; is actually compiled or loaded.
       )
 
-    (when default-p
-      (setf (dsd-default slot) default))
-    (when type-p
-      (setf (dsd-type slot)
-            (if (eq (dsd-type slot) t)
-                type
-                `(and ,(dsd-type slot) ,type))))
-    (when ro-p
-      (if read-only
-          (setf (dsd-read-only slot) t)
-          (when (dsd-read-only slot)
+    (when (and (not default-p) included-slot)
+      (setf default (dsd-default included-slot)))
+
+    (let ((inherited-type (if included-slot (dsd-type included-slot) t)))
+      (setf type (cond ((not type-p) inherited-type)
+                       ((eq inherited-type t) type)
+                       (t `(and ,inherited-type ,type)))))
+    (when included-slot
+     (cond ((not ro-p)
+            (setq read-only (dsd-read-only included-slot)))
+           ((and ro-p (not read-only) (dsd-read-only included-slot))
             (error "~@<The slot ~S is :READ-ONLY in superclass, and so must ~
                        be :READ-ONLY in subclass.~:@>"
-                   (dsd-name slot)))))
+                  name))))
     ;; Check for existence of any BOA constructor that leaves the
     ;; slot with an unspecified value, as when it's initialized
     ;; by an &AUX binding with no value (CLHS 3.4.6)
@@ -814,9 +822,36 @@ unless :NAMED is also specified.")))
                                              name)))
                              (sixth ll-parts))))
                 (dd-constructors defstruct))
-      (setf (dsd-safe-p slot) nil))
+      (setf safe-p nil)) ; this is "unsafe case (2)"
 
-    slot))
+    (cond (included-slot
+           (setf %raw-type (dsd-%raw-type included-slot)
+                 index (dsd-index included-slot))
+           (when (and (neq type (dsd-type included-slot))
+                      (dsd-safe-p included-slot)
+                      (not (sb!xc:subtypep (dsd-type included-slot) type)))
+             (setf safe-p nil))) ; this is "unsafe case (1)"
+          (t
+           ;; Compute the index of this DSD. First decide whether the slot is raw.
+           (setf %raw-type (and (eq (dd-type defstruct) 'structure)
+                                (structure-raw-slot-data-index type)))
+           (let ((n-words
+                  (if %raw-type
+                      (let* ((rsd (svref *raw-slot-data* %raw-type))
+                             (alignment (raw-slot-data-alignment rsd))
+                             (len (dd-length defstruct)))
+                        (setf (dd-length defstruct) ; Pad for alignment as needed
+                              ;; this formula works but can it be made less unclear?
+                              (- len (nth-value 1 (ceiling (1- len) alignment))))
+                        (raw-slot-data-n-words rsd))
+                      1)))
+             (setf index (dd-length defstruct))
+             (incf (dd-length defstruct) n-words))))
+    (let ((dsd (make-dsd name type accessor-name
+                         (pack-dsd-bits index read-only safe-p (or %raw-type -1))
+                         default)))
+      (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
+      dsd)))
 
 ;;; When a value of type TYPE is stored in a structure, should it be
 ;;; stored in a raw slot?  Return the index of the matching RAW-SLOT-DATA
@@ -835,28 +870,6 @@ unless :NAMED is also specified.")))
           (let ((data (svref *raw-slot-data* i)))
             (when (sb!xc:subtypep type (raw-slot-data-raw-type data))
               (return i)))))))
-
-;;; Allocate storage for a DSD in DD. This is where we decide whether
-;;; a slot is raw or not. Raw objects are aligned on the unit of their size.
-(defun allocate-1-slot (dd dsd)
-  (let ((rsd-index (if (eq (dd-type dd) 'structure)
-                       (structure-raw-slot-data-index (dsd-type dsd))
-                       nil)))
-    (cond ((null rsd-index)
-           (setf (dsd-index dsd) (dd-length dd))
-           (incf (dd-length dd)))
-          (t
-           (setf (dsd-%raw-type dsd) rsd-index)
-           (let* ((rsd (svref *raw-slot-data* rsd-index))
-                  (words (raw-slot-data-n-words rsd))
-                  (alignment (raw-slot-data-alignment rsd)))
-             (let ((len (dd-length dd)))
-               (setf (dd-length dd)
-                     ;; this formula works but can it be made less unclear?
-                     (- len (nth-value 1 (ceiling (1- len) alignment))))
-               (setf (dsd-index dsd) (dd-length dd))
-               (incf (dd-length dd) words))))))
-  (values))
 
 (defun typed-structure-info-or-lose (name)
   (or (info :typed-structure :info name)
@@ -931,14 +944,8 @@ unless :NAMED is also specified.")))
                            (dsd-index included-slot))
                      (dd-inherited-accessor-alist dd)
                      :test #'eq :key #'car))
-          (let ((new-slot (parse-1-dsd dd
-                                       modified
-                                       (copy-structure included-slot))))
-            (when (and (neq (dsd-type new-slot) (dsd-type included-slot))
-                       (not (sb!xc:subtypep (dsd-type included-slot)
-                                            (dsd-type new-slot)))
-                       (dsd-safe-p included-slot))
-              (setf (dsd-safe-p new-slot) nil)
+          (let ((new-slot (parse-1-dsd dd modified included-slot)))
+            (when (and (dsd-safe-p included-slot) (not (dsd-safe-p new-slot)))
               ;; XXX: notify?
               )))))))
 
@@ -1772,10 +1779,10 @@ or they must be declared locally notinline at each call site.~@:>"
                                             metaclass-constructor)
           (dd-slots dd)
           (mapcar (lambda (slot-name)
-                    (make-defstruct-slot-description
-                     :name slot-name
-                     :index (prog1 slot-index (incf slot-index))
-                     :accessor-name (symbolicate conc-name slot-name)))
+                    (make-dsd slot-name t (symbolicate conc-name slot-name)
+                              (pack-dsd-bits (prog1 slot-index (incf slot-index))
+                                             nil t -1)
+                              nil))
                   slot-names)
           (dd-length dd) slot-index
           (dd-type dd) dd-type)

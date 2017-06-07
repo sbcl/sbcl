@@ -1051,21 +1051,29 @@ core and return a descriptor to it."
 (defun dsd-accessor-from-cold-slots (cold-dd-slots desired-index)
   (let* ((dsd-slots (dd-slots
                      (find-defstruct-description 'defstruct-slot-description)))
-         (index-slot
-          (dsd-index (find 'sb!kernel::index dsd-slots :key #'dsd-name)))
+         (bits-slot
+          (dsd-index (find 'sb!kernel::bits dsd-slots :key #'dsd-name)))
          (accessor-fun-name-slot
           (dsd-index (find 'sb!kernel::accessor-name dsd-slots :key #'dsd-name))))
     (do ((list cold-dd-slots (cold-cdr list)))
         ((cold-null list))
-      (when (= (descriptor-fixnum
-                (read-wordindexed (cold-car list)
-                                  (+ sb!vm:instance-slots-offset index-slot)))
+      (when (= (ash (descriptor-fixnum
+                     (read-wordindexed (cold-car list)
+                                       (+ sb!vm:instance-slots-offset bits-slot)))
+                    (- sb!kernel::+dsd-index-shift+))
                desired-index)
         (return
          (warm-symbol
           (read-wordindexed (cold-car list)
                             (+ sb!vm:instance-slots-offset
                                accessor-fun-name-slot))))))))
+
+(defun cold-dsd-index (cold-dsd dsd-layout)
+  (ash (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits))
+       (- sb!kernel::+dsd-index-shift+)))
+
+(defun cold-dsd-raw-type (cold-dsd dsd-layout)
+  (1- (ldb (byte 3 0) (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits)))))
 
 (flet ((get-slots (host-layout-or-type)
          (etypecase host-layout-or-type
@@ -1081,10 +1089,8 @@ core and return a descriptor to it."
                          (slot-name (read-slot dsd dsd-layout :name)))
                     (when (eq (keywordicate (warm-symbol slot-name)) initarg)
                       ;; Untagged slots are not accessible during cold-load
-                      (aver (eql (descriptor-fixnum
-                                  (read-slot dsd dsd-layout :%raw-type)) -1))
-                      (return (descriptor-fixnum
-                               (read-slot dsd dsd-layout :index))))))
+                      (aver (eql (cold-dsd-raw-type dsd dsd-layout) -1))
+                      (return (cold-dsd-index dsd dsd-layout)))))
                 (let ((dsd (find initarg slots
                                  :test (lambda (x y)
                                          (eq x (keywordicate (dsd-name y)))))))
