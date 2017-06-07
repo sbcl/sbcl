@@ -257,8 +257,9 @@
       (dolist (loc (nreverse elsewhere-locations))
         (push loc locations)
         (dump-location-from-info loc var-locs)))
-    (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
-                             byte-buffer)))
+    (logically-readonlyize
+     (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
+                              byte-buffer))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
