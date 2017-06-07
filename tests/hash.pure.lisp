@@ -115,3 +115,18 @@
             (maphash
              (constantly nil)
              (make-hash-table))))))
+
+(with-test (:name :equalp-hash-float-infinity)
+  (let ((table (make-hash-table :test 'equalp)))
+    (setf (gethash sb-ext:double-float-positive-infinity table) 1
+          (gethash sb-ext:double-float-negative-infinity table) -1)
+    (dolist (v (list sb-ext:single-float-positive-infinity
+                     sb-ext:double-float-positive-infinity
+                     (complex sb-ext:single-float-positive-infinity 0)
+                     (complex sb-ext:double-float-positive-infinity 0)))
+      (assert (eql (gethash v table) 1)))
+    (dolist (v (list sb-ext:single-float-negative-infinity
+                     sb-ext:double-float-negative-infinity
+                     (complex sb-ext:single-float-negative-infinity 0)
+                     (complex sb-ext:double-float-negative-infinity 0)))
+      (assert (eql (gethash v table) -1)))))
