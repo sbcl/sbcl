@@ -20,9 +20,7 @@
 #include "gc-internal.h" // for os_validate()
 #include "hopscotch.h"
 #include <stdint.h>
-#ifdef HOPSCOTCH_INSTRUMENT
 #include <stdio.h>
-#endif
 #include "genesis/vector.h"
 #include "murmur_hash.h"
 
@@ -272,34 +270,50 @@ uword_t sxhash_simple_string(struct vector* string)
     return result;
 }
 
-static uword_t vector_sxhash(struct vector* vector)
+// This works on vector-like objects, which includes most numerics.
+static uword_t vector_sxhash(lispobj* object)
 {
-    int widetag = widetag_of(vector->header);
-    sword_t nwords = sizetab[widetag]((lispobj*)vector);
-    // Mix words. At present this works correctly only for specialized vectors
-    // or general vectors with eq-comparable elements.
-    return gpr_murmur_hash3(&vector->length,
-                            (nwords-1) * N_WORD_BYTES, /* exclude header */
-                            hopscotch_hmix(widetag));
+    lispobj header = *object;
+    int widetag = widetag_of(header);
+    sword_t nwords = sizetab[widetag](object);
+    // Mix words. At present this works correctly only for specialized vectors,
+    // general vectors with eq-comparable elements,
+    // and numbers that do not contain pointers.
+    return gpr_murmur_hash3(object+1,
+                            (nwords-1) * N_WORD_BYTES,  // exclude header word
+                            // Ignore vector header data bits except for the widetag
+                            widetag >= SIMPLE_ARRAY_WIDETAG
+                              ? hopscotch_hmix(widetag)
+                              : hopscotch_hmix(header & 0xFFFFFFFF));
 }
 
 /* Compare vectors elementwise for EQLness.
  * This is unlike EQUAL because it works on any specialized vector,
  * and unlike EQUALP because it compares strings case-sensitively.
+ * Note: this works on most numbers too, not just vectors.
  */
 static boolean vector_eql(uword_t arg1, uword_t arg2)
 {
     if (arg1 == arg2) return 1;
-    lispobj* str1 = (lispobj*)arg1;
-    lispobj* str2 = (lispobj*)arg2;
-    // FIXME: should really compare elementwise for SIMPLE-VECTOR
-    // so that copyable numbers (bignums, double-floats) compare properly.
-    // Otherwise we'll only coalesce when such numbers are EQ.
-    if (((str1[0] ^ str2[0]) & WIDETAG_MASK) == 0 && str1[1] == str2[1]) {
-        sword_t nwords = sizetab[widetag_of(*str1)](str1);
-        return !memcmp(str1 + 2, str2 + 2, (nwords-2) << WORD_SHIFT);
-    }
-    return 0;
+    lispobj* obj1 = (lispobj*)arg1;
+    lispobj* obj2 = (lispobj*)arg2;
+    lispobj header1 = *obj1;
+    if (((header1 ^ *obj2) & WIDETAG_MASK) != 0)
+        return 0; // not eql - different type objects
+
+    int widetag1 = widetag_of(header1);
+    sword_t nwords = sizetab[widetag1](obj1);
+    if (widetag1 < SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG)
+        // All words must match exactly. Start by comparing the length
+        // (as encoded in the header) since we don't yet know that obj2
+        // occupies the correct number of words.
+        return header1 == *obj2
+            && !memcmp(obj1 + 1, obj2 + 1, (nwords-1) << WORD_SHIFT);
+
+    // FIXME: coalescing of copyable numbers within a simple-vector should be
+    // done first, so that subseqent byte-for-byte comparison works.
+    return (obj1[1] == obj2[1]) // same length vectors
+        && !memcmp(obj1 + 2, obj2 + 2, (nwords-2) << WORD_SHIFT);
 }
 
 /* Initialize 'ht' for first use, which entails zeroing the counters

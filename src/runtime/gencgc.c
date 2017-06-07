@@ -4331,6 +4331,9 @@ gc_and_save(char *filename, boolean prepend_runtime,
     FILE *file;
     void *runtime_bytes = NULL;
     size_t runtime_size;
+    extern void coalesce_similar_objects();
+    extern struct lisp_startup_options lisp_startup_options;
+    boolean verbose = !lisp_startup_options.noinform;
 
     file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
                            &runtime_size);
@@ -4351,18 +4354,15 @@ gc_and_save(char *filename, boolean prepend_runtime,
     gencgc_alloc_start_page = last_free_page;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
-    if (gc_coalesce_string_literals) {
-        extern struct lisp_startup_options lisp_startup_options;
-        extern void coalesce_similar_vectors();
-        boolean verbose = !lisp_startup_options.noinform;
-        if (verbose) {
-            printf("[coalescing similar vectors... ");
-            fflush(stdout);
-        }
-        coalesce_similar_vectors();
-        if (verbose)
-            printf("done]\n");
+    // We always coalesce copyable numbers. Addional coalescing is done
+    // only on request, in which case a message is shown (unless verbose=0).
+    if (gc_coalesce_string_literals && verbose) {
+        printf("[coalescing similar vectors... ");
+        fflush(stdout);
     }
+    coalesce_similar_objects();
+    if (verbose)
+        printf("done]\n");
 
     prepare_for_final_gc();
     gencgc_alloc_start_page = -1;

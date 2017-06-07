@@ -1943,6 +1943,21 @@ void gc_heapsort_uwords(heap array, int length)
 
 //// Coalescing of constant vectors for SAVE-LISP-AND-DIE
 
+static boolean coalescible_number_p(lispobj* where)
+{
+    int widetag = widetag_of(*where);
+    return widetag == BIGNUM_WIDETAG
+        // Ratios and complex integers containing pointers to bignums don't work.
+        || ((widetag == RATIO_WIDETAG || widetag == COMPLEX_WIDETAG)
+            && fixnump(where[1]) && fixnump(where[2]))
+#ifndef LISP_FEATURE_64_BIT
+        || widetag == SINGLE_FLOAT_WIDETAG
+#endif
+        || widetag == DOUBLE_FLOAT_WIDETAG
+        || widetag == COMPLEX_SINGLE_FLOAT_WIDETAG
+        || widetag == COMPLEX_DOUBLE_FLOAT_WIDETAG;
+}
+
 static boolean symbol_or_fixnum_p(lispobj obj)
 {
     return fixnump(obj)
@@ -1961,11 +1976,9 @@ static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
 
 static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 {
-    lispobj obj = *where;
-    if (lowtag_of(obj) != OTHER_POINTER_LOWTAG)
+    lispobj ptr = *where;
+    if (lowtag_of(ptr) != OTHER_POINTER_LOWTAG)
         return;
-    struct vector* v = (struct vector*)native_pointer(obj);
-    int widetag = widetag_of(v->header);
 
     extern char gc_coalesce_string_literals;
     // gc_coalesce_string_literals represents the "aggressiveness" level.
@@ -1975,12 +1988,18 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
       ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<N_WIDETAG_BITS
       : (VECTOR_SHAREABLE                        )<<N_WIDETAG_BITS;
 
-    if ((specialized_vector_widetag_p(widetag) ||
-         (widetag == SIMPLE_VECTOR_WIDETAG && vector_isevery(symbol_or_fixnum_p, v)))
-        && (v->header & mask) != 0) { /* shareable vector */
-        int index = hopscotch_get(ht, (uword_t)v, 0);
+    lispobj* obj = native_pointer(ptr);
+    lispobj header = *obj;
+    int widetag = widetag_of(header);
+
+    if ((((header & mask) != 0) // optimistically assume it's a vector
+         && ((widetag == SIMPLE_VECTOR_WIDETAG
+              && vector_isevery(symbol_or_fixnum_p, (struct vector*)obj))
+             || specialized_vector_widetag_p(widetag)))
+        || coalescible_number_p(obj)) {
+        int index = hopscotch_get(ht, (uword_t)obj, 0);
         if (!index) // Not found
-            hopscotch_insert(ht, (uword_t)v, 1);
+            hopscotch_insert(ht, (uword_t)obj, 1);
         else
             *where = make_lispobj((void*)ht->keys[index-1], OTHER_POINTER_LOWTAG);
     }
@@ -2032,7 +2051,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
     return 0;
 }
 
-void coalesce_similar_vectors()
+void coalesce_similar_objects()
 {
     struct hopscotch_table ht;
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
