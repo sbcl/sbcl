@@ -21,7 +21,7 @@
   ;; Namestring of the source file that the definition was compiled from.
   ;; This is null if the definition was not compiled from a file.
   (namestring nil :type (or string null) :read-only t)
-  (indices 0 :type unsigned-byte :read-only t))
+  (indices 0 :type integer :read-only t))
 (!set-load-form-method definition-source-location  (:xc :target))
 (def!struct (definition-source-location+plist
              (:include definition-source-location)
@@ -35,13 +35,12 @@
                  definition-source-location-plist))
 ;;; Toplevel form index
 (defun definition-source-location-toplevel-form-number (source-loc)
-  (let ((val (ash (definition-source-location-indices source-loc)
-                  (- (floor sb!vm:n-fixnum-bits 2)))))
-    (if (plusp val) (1- val))))
+  (let ((val (ash (definition-source-location-indices source-loc) -15)))
+    (cond ((plusp val) (1- val))
+          ((minusp val) val))))
 ;; DFO form number within the top-level form
 (defun definition-source-location-form-number (source-loc)
-  (let ((val (ldb (byte (floor sb!vm:n-fixnum-bits 2) 0)
-                  (definition-source-location-indices source-loc))))
+  (let ((val (ldb (byte 15 0) (definition-source-location-indices source-loc))))
     (if (plusp val) (1- val))))
 ;; plist from WITH-COMPILATION-UNIT
 (defun definition-source-location-plist (source-loc)
@@ -50,14 +49,20 @@
     (definition-source-location+plist-plist source-loc)))
 
 (defun %make-definition-source-location (namestring tlf-num subform-num)
+  (declare (type (or null (integer -1 *)) tlf-num)
+           (type (or null unsigned-byte) subform-num))
   (let* ((plist *source-plist*)
+         ;; Use 15 bits for subform#, and all other bits (including sign) for TLF#.
+         ;; Map 0 to NIL, 1 to 0, 2 to 1, etc; but -1 remains itself.
          (indices
-          (flet ((pack (val)
-                   (declare (type (or null unsigned-byte) val))
-                   (if val (1+ val) 0)))
-            (declare (inline pack))
-            (logior (ash (pack tlf-num) (floor sb!vm:n-fixnum-bits 2))
-                    (pack subform-num))))
+          (logior (ash (cond ((eql tlf-num -1) -1)
+                             (tlf-num (1+ tlf-num))
+                             (t 0))
+                       15)
+                  ;; If subform-num exceeds 32766 just drop it.
+                  (if (and subform-num (< subform-num 32767))
+                      (1+ subform-num)
+                      0)))
          (source-info (and (boundp '*source-info*) *source-info*))
          (last (and source-info
                     (source-info-last-defn-source-loc source-info))))
