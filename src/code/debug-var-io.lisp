@@ -127,6 +127,13 @@
 ;;; x86-64 does not care about speed here, because GC is unaffected
 ;;; except when saving a core.
 
+(defun integer-from-octets (octets)
+  (declare (type (array (unsigned-byte 8) (*)) octets))
+  (let ((result 0) (shift 0))
+    (dovector (byte octets result)
+      (setf result (logior result (ash byte shift))
+            shift (+ shift 8)))))
+
 ;;; XXX: Maybe rename this if we use it to pack debug-fun-ish things.
 (defun pack-code-fixup-locs (list)
   ;; Estimate the length
@@ -138,10 +145,7 @@
       (write-var-integer (- x prev) bytes)
       (setq prev x))
     ;; Pack into a single integer
-    (let ((result 0) (shift 0))
-      (dovector (byte bytes)
-        (setf result (logior result (ash byte shift))
-              shift (+ shift 8)))
+    (let ((result (integer-from-octets bytes)))
       (aver (equal (unpack-code-fixup-locs result) list))
       result)))
 

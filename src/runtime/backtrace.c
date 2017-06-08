@@ -33,6 +33,7 @@
 #include "genesis/primitive-objects.h"
 #include "thread.h"
 #include "gc-internal.h"
+#include "var-io.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
 # include <dlfcn.h>
@@ -50,6 +51,15 @@ sbcl_putwc(wchar_t c, FILE *file)
         fputc('?', file);
     }
 #endif
+}
+
+unsigned int decode_elsewhere_pc(lispobj packed_integer)
+{
+    struct varint_unpacker unpacker;
+    int value;
+    varint_unpacker_init(&unpacker, packed_integer);
+    varint_unpack(&unpacker, &value);
+    return value;
 }
 
 struct compiled_debug_fun *
@@ -89,10 +99,10 @@ debug_function_from_pc (struct code* code, void *pc)
         if (i == len)
             return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
 
-        if (offset >= (uword_t)fixnum_value(df->elsewhere_pc)) {
+        if (offset >= (uword_t)decode_elsewhere_pc(df->encoded_locs)) {
             struct compiled_debug_fun *p
                 = ((struct compiled_debug_fun *) native_pointer(v->data[i + 1]));
-            next_pc = fixnum_value(p->elsewhere_pc);
+            next_pc = decode_elsewhere_pc(p->encoded_locs);
         } else
             next_pc = fixnum_value(v->data[i]);
 

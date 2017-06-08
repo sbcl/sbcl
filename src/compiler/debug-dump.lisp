@@ -597,15 +597,15 @@
              #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
              #!-fp-and-pc-standard-save :old-fp
              #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-old-fp 2env))
-             :start-pc (label-position (ir2-physenv-environment-start 2env))
-             :elsewhere-pc (label-position (ir2-physenv-elsewhere-start 2env))
-             :closure-save (when (ir2-physenv-closure-save-tn 2env)
-                             (tn-sc-offset (ir2-physenv-closure-save-tn 2env)))
-             #!+unwind-to-frame-and-call-vop
-             :bsp-save
-             #!+unwind-to-frame-and-call-vop
-             (when (ir2-physenv-bsp-save-tn 2env)
-               (tn-sc-offset (ir2-physenv-bsp-save-tn 2env))))))
+             :encoded-locs
+             (cdf-encode-locs
+              (label-position (ir2-physenv-environment-start 2env))
+              (label-position (ir2-physenv-elsewhere-start 2env))
+              (when (ir2-physenv-closure-save-tn 2env)
+                (tn-sc-offset (ir2-physenv-closure-save-tn 2env)))
+              #!+unwind-to-frame-and-call-vop
+              (when (ir2-physenv-bsp-save-tn 2env)
+                (tn-sc-offset (ir2-physenv-bsp-save-tn 2env)))))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as

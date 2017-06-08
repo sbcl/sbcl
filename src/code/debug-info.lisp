@@ -180,14 +180,59 @@
   (return-pc (missing-arg) :type sc-offset)
   #!-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc-offset)
+  ;; An integer which contains between 2 and 4 varint-encoded fields:
+  ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
-  (start-pc (missing-arg) :type index :read-only t)
+  ;; ELSEWHERE-PC -
   ;; The start of elsewhere code for this function (if any.)
-  (elsewhere-pc (missing-arg) :type index :read-only t)
-  (closure-save nil :type (or sc-offset null)  :read-only t)
-  #!+unwind-to-frame-and-call-vop
-  (bsp-save nil :type (or sc-offset null)  :read-only t))
+  ;; CLOSURE-SAVE, and BSP-SAVE.
+  (encoded-locs (missing-arg) :type unsigned-byte :read-only t))
+
+(defun cdf-encode-locs (start-pc elsewhere-pc closure-save
+                        #!+unwind-to-frame-and-call-vop bsp-save)
+  (dx-let ((storage (make-array (* 5 4) :element-type '(unsigned-byte 8))))
+    (let ((bytes (make-array (* 5 4) :fill-pointer 0 :displaced-to storage
+                             :element-type '(unsigned-byte 8))))
+      ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
+      ;; which does not need access to any of the subsequent fields.
+      (write-var-integer elsewhere-pc bytes)
+      (write-var-integer start-pc bytes)
+      #!+unwind-to-frame-and-call-vop
+      (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
+      ;; More often the BSP-SAVE is non-null than CLOSURE-SAVE is non-null,
+      ;; so the encoding is potentially smaller with CLOSURE-SAVE being last.
+      (when closure-save
+        (write-var-integer (1+ closure-save) bytes))
+      (integer-from-octets bytes))))
+
+(defun cdf-decode-locs (cdf)
+  (let ((encoding (compiled-debug-fun-encoded-locs cdf))
+        (input-pointer 0))
+    (flet ((decode-varint (&aux (accumulator 0) (shift 0))
+             (loop
+              (let ((byte (ldb (byte 8 input-pointer) encoding)))
+                (incf input-pointer 8)
+                (setf accumulator (logior accumulator (ash (logand byte #x7f) shift)))
+                (incf shift 7)
+                (unless (logtest byte #x80) (return accumulator))))))
+      (let ((elsewhere-pc (decode-varint))
+            (start-pc (decode-varint))
+            #!+unwind-to-frame-and-call-vop
+            ;; 0 -> NULL, 1 -> 0, ...
+            (bsp-save (let ((i (decode-varint))) (unless (zerop i) (1- i))))
+            (closure-save (let ((i (decode-varint))) (unless (zerop i) (1- i)))))
+        (values start-pc elsewhere-pc closure-save
+                #!+unwind-to-frame-and-call-vop bsp-save)))))
+
+(macrolet ((def (index name)
+             `(defun ,name (cdf)
+                (nth-value ,index (cdf-decode-locs cdf)))))
+  (def 0 compiled-debug-fun-start-pc)
+  (def 1 compiled-debug-fun-elsewhere-pc)
+  ;; Most compiled-debug-funs don't need these
+  (def 2 compiled-debug-fun-closure-save)
+  #!+unwind-to-frame-and-call-vop (def 3 compiled-debug-fun-bsp-save))
 
 (def!struct (compiled-debug-fun-optional (:include compiled-debug-fun)
                                          #-sb-xc-host (:pure t)
