@@ -2055,9 +2055,13 @@ void coalesce_similar_objects()
 {
     struct hopscotch_table ht;
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
+#ifndef LISP_FEATURE_WIN32
+    // Apparently this triggers the "Unable to recommit" lossage message
+    // in handle_access_violation() in src/runtime/win32-os.c
     coalesce_range((lispobj*)STATIC_SPACE_START,
                    (lispobj*)STATIC_SPACE_END,
                    (uword_t)&ht);
+#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)IMMOBILE_SPACE_START,
                    (lispobj*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value,
