@@ -172,10 +172,27 @@
   ;;     This case admits a more efficient solution - instead of type-checking
   ;;     each slot read, initialize the slot with UNBOUND-MARKER, and do
   ;;     a simple EQ test. This is easier than an arbitrary type-check.
+  ;;     *** There is a pernicious subcase (2a) - if a BOA constructor does not
+  ;;     initialize the slot, and the structure inherits from a parent type,
+  ;;     then the parent accessor can be unsafe, and there is almost nothing
+  ;;     that can be done to make it safe. That is, regardless of what strategy
+  ;;     we choose to optimize the accessor for the child, the parent accessor
+  ;;     has already decided whether to emit safe or unsafe code.
+  ;;     It could be argued that we should/must destructively alter the
+  ;;     parent's slot info to indicate that it has become unsafe.
+  ;;     We should emit a style-warning if this happens, and/or if any code
+  ;;     was compiled under the assumption that the slot was safe.
+  ;;     Or it could be argued that nobody should do this in the first place.
   ;; (3) MAKE-LOAD-FORM methods can do damage to the type invariants
-  ;;     without any way of detection.
+  ;;     without any efficient means of detection.
   ;;     It's as simple as using MAKE-LOAD-FORM-SAVING-SLOTS without
   ;;     specifying all the slots. This has no remedy whatsoever.
+  ;;     In this case, it should be as if the omitted initializations caused
+  ;;     the slot to receive the unbound marker. However, no code would
+  ;;     check for that. At best, downstream use would signal an error in
+  ;;     safe code due to receiving the unbound marker.
+  ;;     However, raw slots would pose a problem in that they can't
+  ;;     store an unbound marker.
 (defun dsd-safe-p (dsd) (logbitp 3 (dsd-bits dsd)))
 (defun dsd-read-only (dsd) (logbitp 4 (dsd-bits dsd)))
 ;; its position in the implementation sequence

@@ -286,7 +286,7 @@
         (setq *or-method-combination* method-combination)))))
 
 ;;; I have no idea why we care so much about being able to create an instance
-;;; of STRUCTURE-OBJECT, when (almost) no other struucture class in the system
+;;; of STRUCTURE-OBJECT, when (almost) no other structure class in the system
 ;;; begins life such that MAKE-INSTANCE works on it.
 ;;; And ALLOCATE-INSTANCE seems to work fine anyway. e.g. you can call
 ;;; (ALLOCATE-INSTANCE (FIND-CLASS 'HASH-TABLE)).
