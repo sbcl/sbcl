@@ -285,6 +285,18 @@
         (funcall set-slot 'options '(:most-specific-first))
         (setq *or-method-combination* method-combination)))))
 
+;;; I have no idea why we care so much about being able to create an instance
+;;; of STRUCTURE-OBJECT, when (almost) no other struucture class in the system
+;;; begins life such that MAKE-INSTANCE works on it.
+;;; And ALLOCATE-INSTANCE seems to work fine anyway. e.g. you can call
+;;; (ALLOCATE-INSTANCE (FIND-CLASS 'HASH-TABLE)).
+;;; Anyway, see below in !BOOTSTRAP-INITIALIZE-CLASS where we refer to
+;;; the name of this seemingly useless constructor function.
+(defun |STRUCTURE-OBJECT class constructor| ()
+  (sb-kernel:%make-structure-instance
+   #.(sb-kernel:find-defstruct-description 'structure-object)
+   nil))
+
 ;;; Initialize a class metaobject.
 (defun !bootstrap-initialize-class
        (metaclass-name class name

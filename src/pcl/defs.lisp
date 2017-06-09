@@ -294,10 +294,6 @@
 (defclass structure-object (slot-object) ()
   (:metaclass structure-class))
 
-(defstruct (dead-beef-structure-object
-            (:constructor |STRUCTURE-OBJECT class constructor|)
-            (:copier nil)))
-
 (defclass standard-object (slot-object) ())
 
 (defclass funcallable-standard-object (function standard-object)
