@@ -98,7 +98,7 @@
 
 (defun boxed-combination-ref-p (combination lvar)
   (let ((args (combination-args combination)))
-    (flet ((struct-slot-raw-p (dd index)
+    (flet ((struct-slot-tagged-p (dd index)
              (let ((slot (and dd
                               (find index (dd-slots dd) :key #'dsd-index))))
                (and slot
@@ -120,16 +120,15 @@
                 (slot (position lvar (cddr args)))
                 (slot (and slot
                            (nth slot slot-specs))))
-           (struct-slot-raw-p dd
-                              (cddr slot))))
+           (struct-slot-tagged-p dd (cddr slot))))
         (%instance-set
          (let* ((instance (lvar-type (car args)))
                 (layout (and (structure-classoid-p instance)
                              (classoid-layout instance))))
            (and (eq lvar (car (last args)))
-                (struct-slot-raw-p (and layout
-                                        (layout-info layout))
-                                   (constant (cadr args))))))
+                (struct-slot-tagged-p (and layout
+                                           (layout-info layout))
+                                      (constant (cadr args))))))
         ((%special-bind %set-sap-ref-lispobj
           %rplaca %rplacd cons list list*
           values)
