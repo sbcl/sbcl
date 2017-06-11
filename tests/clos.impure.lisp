@@ -2560,3 +2560,13 @@
 
 (with-test (:name :layouf-of-nil)
   (assert (eq (sb-kernel:layout-of nil) (sb-kernel:find-layout 'null))))
+
+(with-test (:name :defmethod-on-classless-type)
+  (handler-bind ((timeout (lambda (condition)
+                            (declare (ignore condition))
+                            (error "Timeout"))))
+    (sb-ext:with-timeout 0.1
+      (assert-error (funcall (checked-compile `(lambda ()
+                                                 (defmethod foo ((bar keyword))))
+                                              :allow-warnings t))
+                    sb-pcl:class-not-found-error))))

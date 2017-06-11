@@ -1029,11 +1029,15 @@ generic function lambda list ~S~:>"
                  (list name 'specializer-type-specifier
                        (class-name (class-of proto-method))
                        (class-name (class-of proto-generic-function)))))
-         (class-name-type-specifier (name proto-generic-function proto-method)
+         (class-name-type-specifier (name proto-generic-function proto-method
+                                     &optional (class t))
            (let ((kind (info :type :kind name)))
              (case kind
                (:primitive
-                name)
+                (if class
+                    name
+                    (warn-find 'simple-warning
+                               name proto-generic-function proto-method)))
                (:defined
                 ;; This can happen if NAME is a DEFTYPE.
                 (warn-find 'simple-warning
@@ -1070,7 +1074,7 @@ generic function lambda list ~S~:>"
                ;; CLASS-NAME-TYPE-SPECIFIER will emit the warning and
                ;; return nil if not.
                (class-name-type-specifier
-                specializer proto-generic-function proto-method))
+                specializer proto-generic-function proto-method nil))
              (error (condition)
                ;; This can only happen if there is an EQL-specialized
                ;; method on PARSE-SPECIALIZER-USING-CLASS matching
