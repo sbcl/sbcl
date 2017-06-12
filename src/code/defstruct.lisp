@@ -143,26 +143,27 @@
 #!-sb-fluid (declaim (freeze-type defstruct-slot-description))
 
 (eval-when (:compile-toplevel)
-  ;; Ensure that %raw-type is representable in 3 bits. (Can easily be changed)
+  ;; Ensure that rsd-index is representable in 3 bits. (Can easily be changed)
   (assert (<= (1+ (length *raw-slot-data*)) 8)))
 
 ;; genesis needs to know how many bits are to the right of the 'index' field
 ;; in the packed BITS slot of a DSD.
 (defconstant +dsd-index-shift+ 5)
-(defun pack-dsd-bits (index read-only safe-p %raw-type)
+(defun pack-dsd-bits (index read-only safe-p rsd-index)
   (logior (ash index +dsd-index-shift+)
           (if read-only (ash 1 4) 0)
           (if safe-p (ash 1 3) 0)
-          (the (unsigned-byte 3) (1+ %raw-type))))
+          (the (unsigned-byte 3) (if rsd-index (1+ rsd-index) 0))))
 
-(declaim (inline dsd-%raw-type
-                 dsd-safe-p
+(declaim (inline dsd-safe-p
                  ; dsd-read-only ; compilation order problem
                  ; dsd-index
                  ))
 ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
 ;; The index is -1 if this slot is not raw.
-(defun dsd-%raw-type (dsd) (1- (ldb (byte 3 0) (dsd-bits dsd))))
+(defun dsd-rsd-index (dsd)
+  (let ((val (ldb (byte 3 0) (dsd-bits dsd))))
+    (if (plusp val) (1- val))))
 ;; whether the slot is known to be always of the specified type
   ;; FIXME: there are two (actually three) different ways a slot can be unsafe.
   ;; (1) a structure subtype can constrains the slot type more highly than the
@@ -203,9 +204,9 @@
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))
 (defun dsd-raw-slot-data (dsd)
-  (let ((type-index (dsd-%raw-type dsd)))
-    (and (>= type-index 0)
-         (svref *raw-slot-data* type-index))))
+  (let ((rsd-index (dsd-rsd-index dsd)))
+    (and rsd-index
+         (svref *raw-slot-data* rsd-index))))
 (defun dsd-raw-type (dsd)
   (acond ((dsd-raw-slot-data dsd) (raw-slot-data-raw-type it))
          (t)))
@@ -737,7 +738,7 @@ unless :NAMED is also specified.")))
 ;;; and return it. If supplied, INCLUDED-SLOT is used to get the default,
 ;;; type, and read-only flag for the new slot.
 (defun parse-1-dsd (defstruct spec &optional included-slot
-                    &aux accessor-name (safe-p t) %raw-type index)
+                    &aux accessor-name (safe-p t) rsd-index index)
   #-sb-xc-host (declare (muffle-conditions style-warning))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
       (typecase spec
@@ -842,7 +843,7 @@ unless :NAMED is also specified.")))
       (setf safe-p nil)) ; this is "unsafe case (2)"
 
     (cond (included-slot
-           (setf %raw-type (dsd-%raw-type included-slot)
+           (setf rsd-index (dsd-rsd-index included-slot)
                  safe-p (dsd-safe-p included-slot)
                  index (dsd-index included-slot))
            (when (and (neq type (dsd-type included-slot))
@@ -851,11 +852,11 @@ unless :NAMED is also specified.")))
              (setf safe-p nil))) ; this is "unsafe case (1)"
           (t
            ;; Compute the index of this DSD. First decide whether the slot is raw.
-           (setf %raw-type (and (eq (dd-type defstruct) 'structure)
+           (setf rsd-index (and (eq (dd-type defstruct) 'structure)
                                 (structure-raw-slot-data-index type)))
            (let ((n-words
-                  (if %raw-type
-                      (let* ((rsd (svref *raw-slot-data* %raw-type))
+                  (if rsd-index
+                      (let* ((rsd (svref *raw-slot-data* rsd-index))
                              (alignment (raw-slot-data-alignment rsd))
                              (len (dd-length defstruct)))
                         (setf (dd-length defstruct) ; Pad for alignment as needed
@@ -866,7 +867,7 @@ unless :NAMED is also specified.")))
              (setf index (dd-length defstruct))
              (incf (dd-length defstruct) n-words))))
     (let ((dsd (make-dsd name type accessor-name
-                         (pack-dsd-bits index read-only safe-p (or %raw-type -1))
+                         (pack-dsd-bits index read-only safe-p rsd-index)
                          default)))
       (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
       dsd)))
@@ -1799,7 +1800,7 @@ or they must be declared locally notinline at each call site.~@:>"
           (mapcar (lambda (slot-name)
                     (make-dsd slot-name t (symbolicate conc-name slot-name)
                               (pack-dsd-bits (prog1 slot-index (incf slot-index))
-                                             nil t -1)
+                                             nil t nil)
                               nil))
                   slot-names)
           (dd-length dd) slot-index

@@ -102,7 +102,7 @@
              (let ((slot (and dd
                               (find index (dd-slots dd) :key #'dsd-index))))
                (and slot
-                    (= (sb!kernel::dsd-%raw-type slot) -1))))
+                    (eq (dsd-raw-type slot) t))))
            (constant (lvar)
              (and (constant-lvar-p lvar)
                   (lvar-value lvar))))
@@ -117,9 +117,9 @@
         (%make-structure-instance
          (let* ((dd (constant (car args)))
                 (slot-specs (constant (cadr args)))
-                (slot (position lvar (cddr args)))
-                (slot (and slot
-                           (nth slot slot-specs))))
+                (pos (position lvar (cddr args)))
+                (slot (and pos
+                           (nth pos slot-specs))))
            (struct-slot-tagged-p dd (cddr slot))))
         (%instance-set
          (let* ((instance (lvar-type (car args)))

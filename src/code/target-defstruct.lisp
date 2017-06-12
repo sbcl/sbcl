@@ -35,10 +35,12 @@
 ;;; constructors only.
 #!+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
-  (let ((instance (%make-instance (dd-length dd)))) ; length = sans header word
+  (let ((instance (%make-instance (dd-length dd))) ; length = sans header word
+        (value-index 0))
+    (declare (index value-index))
     (setf (%instance-layout instance) (dd-layout-or-lose dd))
-    (mapc (lambda (spec value)
-            (destructuring-bind (raw-type . index) (cdr spec)
+    (dolist (spec slot-specs instance)
+      (destructuring-bind (raw-type . index) (cdr spec)
               (macrolet ((make-case ()
                            `(ecase raw-type
                               ((t)
@@ -50,9 +52,9 @@
                                               instance index)
                                             value)))
                                  *raw-slot-data*))))
-                (make-case))))
-          slot-specs slot-values)
-    instance))
+                (let ((value (fast-&rest-nth value-index slot-values)))
+                  (incf value-index)
+                  (make-case)))))))
 
 (defun %instance-layout (instance)
   (%instance-layout instance))
