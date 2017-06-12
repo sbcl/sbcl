@@ -36,7 +36,7 @@
   (b #\? :type (integer 3 4))
   (c #\# :type (integer 5 6)))
 (defstruct (boa-kid (:include boa-saux)))
-(defstruct (boa-grandkid (:include boa-saux)))
+(defstruct (boa-grandkid (:include boa-kid)))
 (with-test (:name :defstruct-boa-typecheck)
   (dolist (dsd (sb-kernel:dd-slots
                 (sb-kernel:find-defstruct-description 'boa-saux)))
