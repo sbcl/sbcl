@@ -1068,9 +1068,18 @@ unless :NAMED is also specified.")))
            (type-spec (dsd-type dsd)))
       (if (eq function :read)
           (when (singleton-p args)
-            (if (eq type-spec t)
-                place
-                `(,(if (dsd-safe-p dsd) 'truly-the 'the) ,type-spec ,place)))
+            ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
+            ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
+            ;; check the type on each read. Assuming that type-checks reject
+            ;; the unbound-marker, then we needn't separately check for it.
+            (cond ((not (dsd-safe-p dsd))
+                   `(the ,type-spec ,place))
+                  (t
+                   (unless (dsd-always-boundp dsd)
+                     (setf place `(the* ((not (satisfies sb!vm::unbound-marker-p))
+                                         :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
+                                         ,place)))
+                   (if (eq type-spec t) place `(truly-the ,type-spec ,place)))))
           (when (singleton-p (cdr args))
             (let ((inverse (info :setf :expander (car place))))
               (flet ((check (newval)
@@ -1503,24 +1512,32 @@ or they must be declared locally notinline at each call site.~@:>"
     (aver (= (length dd-slots) (length values)))
     #!+raw-instance-init-vops
     (collect ((slot-specs) (slot-values))
-      (mapc (lambda (dsd value)
-              (unless (eq value '.do-not-initialize-slot.)
-                (slot-specs (list* :slot (dsd-raw-type dsd) (dsd-index dsd)))
-                (slot-values value)))
+      (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
+                                    (spec (list* :slot raw-type (dsd-index dsd))))
+              (cond ((eq value '.do-not-initialize-slot.)
+                     (when (eq raw-type t)
+                       (rplaca spec :unbound)
+                       (slot-specs spec)))
+                    (t
+                     (slot-specs spec)
+                     (slot-values value))))
             dd-slots values)
       `(%make-structure-instance-macro ,dd ',(slot-specs) ,@(slot-values)))
     #!-raw-instance-init-vops
     (collect ((slot-specs) (slot-values) (raw-slots) (raw-values))
       ;; Partition into non-raw and raw
-      (mapc (lambda (dsd value)
-              (unless (eq value '.do-not-initialize-slot.)
-                (let ((raw-type (dsd-raw-type dsd)))
-                  (cond ((eq t raw-type)
-                         (slot-specs (list* :slot raw-type (dsd-index dsd)))
-                         (slot-values value))
-                        (t
-                         (raw-slots dsd)
-                         (raw-values value))))))
+      (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
+                                    (spec (list* :slot raw-type (dsd-index dsd))))
+              (cond ((eq value '.do-not-initialize-slot.)
+                     (when (eq raw-type t)
+                       (rplaca spec :unbound)
+                       (slot-specs spec)))
+                    ((eq raw-type t)
+                     (slot-specs spec)
+                     (slot-values value))
+                    (t
+                     (raw-slots dsd)
+                     (raw-values value))))
             dd-slots values)
       (let ((instance-form
              `(%make-structure-instance-macro ,dd
@@ -1537,7 +1554,7 @@ or they must be declared locally notinline at each call site.~@:>"
                  ,temp))
             instance-form)))))
 
-;;; A "typed" constructors prefers to use a single call to LIST or VECTOR
+;;; A "typed" constructor prefers to use a single call to LIST or VECTOR
 ;;; if possible, but can't always do that for VECTOR because it might not
 ;;; be a (VECTOR T). If not, we fallback to MAKE-ARRAY and (SETF AREF).
 (defun typed-constructor-form (dd values)

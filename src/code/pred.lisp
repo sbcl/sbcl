@@ -142,6 +142,9 @@
   (def-type-predicate-wrapper symbolp)
   (def-type-predicate-wrapper %other-pointer-p)
   (def-type-predicate-wrapper system-area-pointer-p)
+  ;; The error message for this "type" in interpreted code
+  ;; is not very informative, but it'll have to do for now.
+  (def-type-predicate-wrapper sb!vm::unbound-marker-p)
   (def-type-predicate-wrapper weak-pointer-p)
   #!-64-bit
   (progn

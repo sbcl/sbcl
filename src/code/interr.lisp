@@ -307,13 +307,19 @@
                                                      sb!vm::cfp-offset))))
             (if (and (>= error-number (length **internal-error-handlers**))
                      (< error-number (length sb!c:+backend-internal-errors+)))
-                (error 'type-error
-                       :datum (sb!di::sub-access-debug-var-slot
-                               fp (first arguments) alien-context)
-                       :expected-type
-                       (car (svref sb!c:+backend-internal-errors+
-                                   error-number))
-                       :context (sb!di:error-context))
+                (let ((context (sb!di:error-context)))
+                  (if (typep context '(cons (eql :struct-read)))
+                      ;; This was shoehorned into being a "type error"
+                      ;; but it isn't the best way to explain the problem.
+                      (error "Accessed uninitialized slot ~s of structure ~s"
+                             (cddr context) (cadr context))
+                      (error 'type-error
+                             :datum (sb!di::sub-access-debug-var-slot
+                                     fp (first arguments) alien-context)
+                             :expected-type
+                             (car (svref sb!c:+backend-internal-errors+
+                                         error-number))
+                             :context context)))
                 (let ((handler
                         (and (typep error-number
                                     '#.`(mod ,(length **internal-error-handlers**)))
