@@ -35,6 +35,8 @@
   (a #\! :type (integer 1 2))
   (b #\? :type (integer 3 4))
   (c #\# :type (integer 5 6)))
+(defstruct (boa-kid (:include boa-saux)))
+(defstruct (boa-grandkid (:include boa-saux)))
 (with-test (:name :defstruct-boa-typecheck)
   (dolist (dsd (sb-kernel:dd-slots
                 (sb-kernel:find-defstruct-description 'boa-saux)))
@@ -43,6 +45,8 @@
       (ecase name
         ((a c) (assert (not safe-p)))
         (b (assert safe-p)))))
+  (let ((dd (sb-kernel:find-defstruct-description 'boa-grandkid)))
+    (assert (not (sb-kernel::dsd-safe-p (car (sb-kernel:dd-slots dd))))))
   (let ((s (make-boa-saux)))
     (locally (declare (optimize (safety 3))
                       (inline boa-saux-a))

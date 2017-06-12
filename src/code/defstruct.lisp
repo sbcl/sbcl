@@ -843,6 +843,7 @@ unless :NAMED is also specified.")))
 
     (cond (included-slot
            (setf %raw-type (dsd-%raw-type included-slot)
+                 safe-p (dsd-safe-p included-slot)
                  index (dsd-index included-slot))
            (when (and (neq type (dsd-type included-slot))
                       (dsd-safe-p included-slot)
