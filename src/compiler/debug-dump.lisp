@@ -411,7 +411,13 @@
     (vector-push-extend flags buffer)
     (unless (or minimal
                 more) ;; &more vars need no name
-      (vector-push-extend name buffer)
+      ;; Dumping uninterned symbols as debug var names is kinda silly.
+      ;; Reconstruction of the name on fasl load produces a new gensym anyway.
+      ;; So rather than waste symbol space, just dump such symbols as strings,
+      ;; and PARSE-COMPILED-DEBUG-VARS can create the interned symbol.
+      ;; This reduces core size by omitting zillions of symbols whose names
+      ;; are spelled the same.
+      (vector-push-extend (if (symbol-package name) name (string name)) buffer)
       (unless (zerop id)
         (vector-push-extend id buffer)))
 

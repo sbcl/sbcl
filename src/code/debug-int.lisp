@@ -1756,14 +1756,15 @@ register."
                  (indirect-sc-offset (and indirect-p
                                           (geti))))
             (aver (not (and args-minimal (not minimal))))
-            (vector-push-extend (make-compiled-debug-var symbol
-                                                         id
-                                                         live
-                                                         sc-offset
-                                                         save-sc-offset
-                                                         indirect-sc-offset
-                                                         (cond (more-context-p :more-context)
-                                                               (more-count-p :more-count)))
+            (vector-push-extend (make-compiled-debug-var
+                                 (if (stringp symbol) (make-symbol symbol) symbol)
+                                 id
+                                 live
+                                 sc-offset
+                                 save-sc-offset
+                                 indirect-sc-offset
+                                 (cond (more-context-p :more-context)
+                                       (more-count-p :more-count)))
                                 buffer)))))))
 
 ;;;; CODE-LOCATIONs
