@@ -216,6 +216,7 @@
 (defun args-exhausted (control-string offset)
   (format-error-at control-string offset "No more arguments"))
 
+(defvar *format-gensym-counter*)
 (defun expand-control-string (string)
   (let* ((string (etypecase string
                    (simple-string
@@ -223,6 +224,7 @@
                    (string
                     (coerce string 'simple-string))))
          (*default-format-error-control-string* string)
+         (*format-gensym-counter* 0)
          (directives (tokenize-control-string string)))
     `(block nil
        ,@(expand-directive-list directives))))
@@ -294,7 +296,12 @@
       `(,*expander-next-arg-macro*
         ,*default-format-error-control-string*
         ,(or offset *default-format-error-offset*))
-      (let ((symbol (sb!xc:gensym "FORMAT-ARG")))
+      (let ((symbol
+             (without-package-locks
+                 (package-symbolicate
+                  (load-time-value (find-package "SB!FORMAT") t)
+                  "FORMAT-ARG"
+                  (write-to-string (incf *format-gensym-counter*))))))
         (push (cons symbol (or offset *default-format-error-offset*))
               *simple-args*)
         symbol)))
