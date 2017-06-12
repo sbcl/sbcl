@@ -158,15 +158,6 @@
   base-char
   ((and vector (not simple-array)) object-not-complex-vector)
 
-  ;; This "type" is used for checking that a structure slot has a value,
-  ;; which it may not if a BOA constructor failed to initialize it.
-  ;; The compiler knows to translate the SATISFIES test with a vop,
-  ;; and knows to emit the specific error number for this type
-  ;; rather than using the strange type name. The INTERNAL-ERROR function
-  ;; receives the trap number as if it were a type error,
-  ;; but prints a better message than "is not a (not satisfies)"
-  ((not (satisfies sb!vm::unbound-marker-p)) slot-not-initialized)
-
   ;; Now, in approximate order of descending popularity.
   ;; If we exceed 255 error numbers, trailing ones can be deleted arbitrarily.
   (sb!c:sc object-not-storage-class) ; the single most popular type

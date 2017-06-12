@@ -5,9 +5,6 @@ changes relative to sbcl-1.3.18:
     *read-eval*
   * enhancement: SB-DEBUG:PRINT-BACKTRACE truncates huge string arguments.
     The full string remains available for inspection via (SB-DEBUG:ARG).
-  * optimization: BOA constructors which create uninitialized structure slots
-    through &AUX bindings do not necessarily cause reads of the slot in safe
-    code to incur the cost of a full type-check.
   * bug fix: backtracing from several threads at once could fail
   * bug fix: floating-point infinities could not be used as keys
     in EQUALP hash tables. (lp#1696274)
