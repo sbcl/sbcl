@@ -301,7 +301,8 @@
                  (package-symbolicate
                   (load-time-value (find-package "SB!FORMAT") t)
                   "FORMAT-ARG"
-                  (write-to-string (incf *format-gensym-counter*))))))
+                  (write-to-string (incf *format-gensym-counter*)
+                                   :pretty nil :base 10 :radix nil)))))
         (push (cons symbol (or offset *default-format-error-offset*))
               *simple-args*)
         symbol)))

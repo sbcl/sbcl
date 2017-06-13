@@ -984,8 +984,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                        'input-error-in-compile-file)
     (with-source-paths
       (find-source-paths form current-index)
-      (process-toplevel-form
-       form `(original-source-start 0 ,current-index) nil)))
+      (let ((sb!xc:*gensym-counter* 0))
+        (process-toplevel-form
+         form `(original-source-start 0 ,current-index) nil))))
   ;; It's easy to get into a situation where cold-init crashes and the only
   ;; backtrace you get from ldb is TOP-LEVEL-FORM, which means you're anywhere
   ;; within the 23000 or so blobs of code deferred until cold-init.

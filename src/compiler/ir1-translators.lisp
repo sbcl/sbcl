@@ -818,7 +818,10 @@ lexically apparent function definition in the enclosing environment."
                               d :source-name n
                                 :maybe-add-debug-catch t
                                 :debug-name
-                                (debug-name 'flet n t)))
+                                (let ((n (if (and (symbolp n) (not (symbol-package n)))
+                                             (string n)
+                                             n)))
+                                  (debug-name 'flet n t))))
                            names defs)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
