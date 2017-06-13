@@ -297,7 +297,7 @@
                        #+(or x86 x86-64)
                        ,@(and predicate
                               `((,(find-symbol (format nil "GENERIC-~A" fun) "SB-VM"))))
-                       ((flet ,test-name :in ,*p*) 42 t)))))))
+                       ((flet ,(string test-name) :in ,*p*) 42 t)))))))
            (test-predicates (&rest functions)
              `(progn ,@(mapcar (lambda (function)
                                  `(test t ,@(sb-int:ensure-list function)))
