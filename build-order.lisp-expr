@@ -137,9 +137,6 @@
  ("src/code/ansi-stream" :not-host)
  ("src/code/early-fasl")
 
- ;; mostly needed by stuff from comcom, but also used by "x86-vm"
- ("src/code/debug-var-io")
-
  ("src/code/defbangstruct")
  ("src/code/early-thread")
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -198,6 +195,7 @@
  ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/pred" :not-host)
+ ("src/code/debug-var-io")
 
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)

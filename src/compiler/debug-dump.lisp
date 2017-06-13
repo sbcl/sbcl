@@ -257,9 +257,12 @@
       (dolist (loc (nreverse elsewhere-locations))
         (push loc locations)
         (dump-location-from-info loc var-locs)))
-    (logically-readonlyize
-     (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
-                              byte-buffer))))
+    (let ((compressed
+           (lz-compress (coerce byte-buffer
+                                '(simple-array (unsigned-byte 8) (*))))))
+      (logically-readonlyize
+       (!make-specialized-array (length compressed) '(unsigned-byte 8)
+                                compressed)))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.

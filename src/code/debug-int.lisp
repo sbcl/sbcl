@@ -1617,8 +1617,10 @@ register."
     (let* ((var-count (length (debug-fun-debug-vars debug-fun)))
            (compiler-debug-fun (compiled-debug-fun-compiler-debug-fun
                                 debug-fun))
-           (blocks (or (sb!c::compiled-debug-fun-blocks compiler-debug-fun)
-                       (return-from parse-compiled-debug-blocks nil)))
+           (compressed-data
+            (or (sb!c::compiled-debug-fun-blocks compiler-debug-fun)
+                (return-from parse-compiled-debug-blocks nil)))
+           (blocks (sb!c::lz-decompress compressed-data))
            ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
            ;; element size of the packed binary representation of the
            ;; blocks data.
