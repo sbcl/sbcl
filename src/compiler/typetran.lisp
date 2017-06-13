@@ -527,9 +527,9 @@
              ;; If we know OBJ is an array header, and that the array is
              ;; simple, we also know there is exactly one indirection to
              ;; follow.
-             `((eq (%other-pointer-widetag (%array-data-vector ,obj)) ,typecode))
-             `((do ((,data ,(if headerp `(%array-data-vector ,obj) obj)
-                           (%array-data-vector ,data)))
+             `((eq (%other-pointer-widetag (%array-data ,obj)) ,typecode))
+             `((do ((,data ,(if headerp `(%array-data ,obj) obj)
+                           (%array-data ,data)))
                    ((not (array-header-p ,data))
                     (eq (%other-pointer-widetag ,data) ,typecode))))))))))
 

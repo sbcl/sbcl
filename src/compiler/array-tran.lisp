@@ -717,7 +717,7 @@
                                ,(and fill-pointer
                                      `(and fill-pointer t)))
                          (setf (%array-available-elements header) length)
-                         (setf (%array-data-vector header) data)
+                         (setf (%array-data header) data)
                          (setf (%array-displaced-p header) nil)
                          (setf (%array-displaced-from header) nil)
                          (setf (%array-dimension header 0) length)
@@ -1025,7 +1025,7 @@
                   (setf (%array-fill-pointer header) ,total-size)
                   (setf (%array-fill-pointer-p header) nil)
                   (setf (%array-available-elements header) ,total-size)
-                  (setf (%array-data-vector header) data)
+                  (setf (%array-data header) data)
                   (setf (%array-displaced-p header) nil)
                   (setf (%array-displaced-from header) nil)
                   ,@(let ((axis -1))
@@ -1389,9 +1389,9 @@
                      `(sequence-bounding-indices-bad-error ,array ,start ,end)
                      `(array-bounding-indices-bad-error ,array ,start ,end)))))
        (do ((,data ,(if array-header-p
-                        `(%array-data-vector ,array)
+                        `(%array-data ,array)
                         array)
-                   (%array-data-vector ,data))
+                   (%array-data ,data))
             (,cumulative-offset ,(if array-header-p
                                      `(%array-displacement ,array)
                                      0)
@@ -1421,14 +1421,14 @@
         ;; similar.
         (if check-bounds
             `(let* ((data (truly-the (simple-array ,element-type (*))
-                                     (%array-data-vector array)))
+                                     (%array-data array)))
                     (len (length data))
                     (real-end (or end len)))
                (unless (<= 0 start data-end lend)
                  (sequence-bounding-indices-bad-error array start end))
                (values data 0 real-end 0))
             `(let ((data (truly-the (simple-array ,element-type (*))
-                                    (%array-data-vector array))))
+                                    (%array-data array))))
                (values data 0 (or end (length data)) 0)))
         `(%with-array-data-macro array start end
                                  :check-fill-pointer ,check-fill-pointer

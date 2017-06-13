@@ -159,7 +159,7 @@
                             (reduce #'* dims))))
         `(data-vector-ref (truly-the (simple-array ,(type-specifier el-type)
                                                    (,total-size))
-                                     (%array-data-vector array))
+                                     (%array-data array))
                           index)))))
 
 ;;; Transform data vector access to a form that opens up optimization
@@ -249,7 +249,7 @@
                             (reduce #'* dims))))
         `(data-vector-set (truly-the (simple-array ,(type-specifier el-type)
                                                    (,total-size))
-                                     (%array-data-vector array))
+                                     (%array-data array))
                           index
                           new-value)))))
 
@@ -302,7 +302,7 @@
 (deftransform array-storage-vector ((array) ((simple-array * (*))))
   'array)
 
-(defoptimizer (%array-data-vector derive-type) ((array))
+(defoptimizer (%array-data derive-type) ((array))
   (let ((atype (lvar-type array)))
     (when (array-type-p atype)
       (specifier-type (or
@@ -346,7 +346,7 @@
   (upgraded-element-type-specifier-or-give-up %array)
 
   '(if (array-header-p %array)
-       (values (%array-data-vector %array) %index)
+       (values (%array-data %array) %index)
        (values %array %index)))
 
 ;;;; BIT-VECTOR hackery

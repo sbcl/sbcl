@@ -622,7 +622,7 @@ standard Lisp readtable when NIL."
   (named-let free ((buffer chain))
     ;; If 'adjustable-string' was displaced to 'string',
     ;; adjust it back down to allow GC of the abnormally large string.
-    (unless (eq (%array-data-vector (token-buf-adjustable-string buffer))
+    (unless (eq (%array-data (token-buf-adjustable-string buffer))
                 (token-buf-initial-string buffer))
       (adjust-array (token-buf-adjustable-string buffer) '(0)
                     :displaced-to (token-buf-initial-string buffer)))

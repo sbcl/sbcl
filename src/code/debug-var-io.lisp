@@ -231,7 +231,7 @@
            #+sb-xc-host
            (coerce output '(simple-array (unsigned-byte 8) (*)))
            #-sb-xc-host
-           (%shrink-vector (%array-data-vector output) (fill-pointer output))))
+           (%shrink-vector (%array-data output) (fill-pointer output))))
       (aver (equalp input (lz-decompress result)))
       result)))
 
@@ -273,4 +273,4 @@
     #+sb-xc-host
     (coerce output '(simple-array (unsigned-byte 8) (*)))
     #-sb-xc-host
-    (%shrink-vector (%array-data-vector output) (fill-pointer output))))
+    (%shrink-vector (%array-data output) (fill-pointer output))))

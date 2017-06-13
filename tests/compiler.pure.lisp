@@ -3802,7 +3802,7 @@
                    (f #'always-one))))))
     (assert (= 1.0d0 (funcall fun)))))
 
-(with-test (:name :%array-data-vector-type-derivation)
+(with-test (:name :%array-data-type-derivation)
   (let* ((f (checked-compile
              `(lambda (ary)
                 (declare (type (simple-array (unsigned-byte 32) (3 3)) ary))
@@ -6024,10 +6024,10 @@
           (assert (search "NUNION"
                           (princ-to-string c))))))
 
-(with-test (:name :%array-data-vector-complex-type-derivation)
+(with-test (:name :%array-data-complex-type-derivation)
   (let ((type (funcall (checked-compile
                         `(lambda (x)
-                           (ctu:compiler-derived-type (sb-kernel:%array-data-vector (the array x)))))
+                           (ctu:compiler-derived-type (sb-kernel:%array-data (the array x)))))
                        #2A())))
     (assert (eq type 'array))))
 

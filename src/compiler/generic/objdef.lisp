@@ -118,9 +118,9 @@
         ;; FIXME: terrible name for the accessor.
         ;; It is in general just an ARRAY,
         ;; and should be named %ARRAY-DATA.
-        :ref-trans %array-data-vector
+        :ref-trans %array-data
         :ref-known (flushable foldable)
-        :set-trans (setf %array-data-vector)
+        :set-trans (setf %array-data)
         :set-known ())
   (displacement :type (or index null)
                 :ref-trans %array-displacement

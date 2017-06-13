@@ -2989,7 +2989,7 @@ many elements are copied."
   (defun fill-array (initial-contents array)
     (declare (explicit-check))
     (let ((rank (array-rank array))
-          (vector (%array-data-vector array)))
+          (vector (%array-data array)))
       (symbol-macrolet ((dimensions (array-dimensions array))
                         (this-dimension (%array-dimension array axis)))
         (body (axis contents) (= axis rank)

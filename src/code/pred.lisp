@@ -26,7 +26,7 @@
                   collect `(defun ,name (x)
                              (or (typep x '(simple-array ,spec (*)))
                                  (and (complex-vector-p x)
-                                      (do ((data (%array-data-vector x) (%array-data-vector data)))
+                                      (do ((data (%array-data x) (%array-data data)))
                                           ((not (array-header-p data)) (typep data '(simple-array ,spec (*))))))))))))
   (def))
 

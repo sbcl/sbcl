@@ -938,7 +938,7 @@ Experimental: interface subject to change."
              (dotimes (i (length object))
                (call (aref object i)))
              (when (sb-kernel:array-header-p object)
-               (call (sb-kernel::%array-data-vector object))
+               (call (sb-kernel:%array-data object))
                (call (sb-kernel::%array-displaced-p object))
                (unless simple
                  (call (sb-kernel::%array-displaced-from object))))))

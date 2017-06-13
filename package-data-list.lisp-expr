@@ -1421,7 +1421,7 @@ possibly temporarily, because it might be used internally."
    ;;     other sequence function implementation grot into SB-SEQ.
    ;;   * Pull all the math stuff (%ACOS, %COSH, WORD-LOGICAL-AND...)
    ;;     into SB-MATH.
-   ;;   * Pull all the array stuff (%ARRAY-DATA-VECTOR,
+   ;;   * Pull all the array stuff (%ARRAY-DATA,
    ;;     WITH-ARRAY-DATA, ALLOCATE-VECTOR, HAIRY-DATA-VECTOR-REF...)
    ;;     into SB-ARRAY.
    ;;   * Pull all the streams stuff out into SB-STREAM.
@@ -1460,7 +1460,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%ADJOIN-KEY-TEST-NOT"
                "%ADJOIN-TEST"
                "%ADJOIN-TEST-NOT"
-               "%ARRAY-AVAILABLE-ELEMENTS" "%ARRAY-DATA-VECTOR"
+               "%ARRAY-AVAILABLE-ELEMENTS"
+               "%ARRAY-DATA"
+               "%ARRAY-DATA-VECTOR" ; DO NOT USE !!!
                "%ARRAY-DIMENSION" "%ARRAY-DISPLACED-P"
                "%ARRAY-DISPLACED-FROM"
                "%ARRAY-DISPLACEMENT" "%ARRAY-FILL-POINTER"

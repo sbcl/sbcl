@@ -28,10 +28,13 @@
   (def %array-fill-pointer)
   (def %array-fill-pointer-p)
   (def %array-available-elements)
-  (def %array-data-vector)
+  (def %array-data)
   (def %array-displacement)
   (def %array-displaced-p)
   (def %array-displaced-from))
+
+;;; For compatibility: DO NOT USE IN NEW CODE.
+(defun %array-data-vector (array) (%array-data array))
 
 (defun %array-rank (array)
   (%array-rank array))
@@ -412,7 +415,7 @@
             (cons (make-weak-pointer array)
                   (purge (%array-displaced-from data)))))
     ;; Remove old backpointer, if any.
-    (let ((old-data (%array-data-vector array)))
+    (let ((old-data (%array-data array)))
       (when (and (neq data old-data) (array-header-p old-data))
         (setf (%array-displaced-from old-data)
               (purge (%array-displaced-from old-data)))))))
@@ -495,7 +498,7 @@
              ;; Terrible name for this slot - we displace to the
              ;; target array's header, if any, not the "ultimate"
              ;; vector in the chain of displacements.
-             (setf (%array-data-vector array) data)
+             (setf (%array-data array) data)
              (setf (%array-displaced-from array) nil)
              (cond (displaced-to
                     (let ((offset (or displaced-index-offset 0)))
@@ -679,7 +682,7 @@ of specialized arrays is supported."
                   (if (not (%array-displaced-p array))
                       ;; The reasonably quick path of non-displaced complex
                       ;; arrays.
-                      (let ((array (%array-data-vector array)))
+                      (let ((array (%array-data array)))
                         (%ref ,accessor-getter ,extra-params))
                       ;; The real slow path.
                       (with-array-data
@@ -1028,7 +1031,7 @@ of specialized arrays is supported."
   (declare (type array array))
   (if (and (array-header-p array) ; if unsimple and
            (%array-displaced-p array)) ; displaced
-      (values (%array-data-vector array) (%array-displacement array))
+      (values (%array-data array) (%array-displacement array))
       (values nil 0)))
 
 (defun adjustable-array-p (array)
@@ -1152,7 +1155,7 @@ of specialized arrays is supported."
              (new-data
                (allocate-vector-with-widetag widetag new-length n-bits-shift)))
         (copy-vector-data old-data new-data old-start old-end n-bits-shift)
-        (setf (%array-data-vector vector) new-data
+        (setf (%array-data vector) new-data
               (%array-available-elements vector) new-length
               (%array-fill-pointer vector) fill-pointer
               (%array-displacement vector) 0
@@ -1435,7 +1438,7 @@ of specialized arrays is supported."
   (labels ((%walk-displaced-array-backpointers (array new-length)
              (dolist (p (%array-displaced-from array))
                (let ((from (weak-pointer-value p)))
-                 (when (and from (eq array (%array-data-vector from)))
+                 (when (and from (eq array (%array-data from)))
                    (let ((requires (+ (%array-available-elements from)
                                       (%array-displacement from))))
                      (unless (>= new-length requires)
@@ -1462,7 +1465,7 @@ of specialized arrays is supported."
         (%walk-displaced-array-backpointers array length))
     (when displacedp
       (%save-displaced-array-backpointer array data))
-    (setf (%array-data-vector array) data)
+    (setf (%array-data array) data)
     (setf (%array-available-elements array) length)
     (cond (fill-pointer
            (setf (%array-fill-pointer array) fill-pointer)
@@ -1501,7 +1504,7 @@ function to be removed without further warning."
                     (error "~S cannot be used with displaced arrays. Use ~S instead."
                            'array-storage-vector 'array-displacement))
                    (t
-                    (%array-data-vector array)))))
+                    (%array-data array)))))
 
 
 ;;;; ZAP-ARRAY-DATA for ADJUST-ARRAY
@@ -1623,7 +1626,7 @@ function to be removed without further warning."
                      :element-type 'bit
                      :initial-element 0)
          (let ((header (copy-array-header bit-array-1)))
-           (setf (%array-data-vector header)
+           (setf (%array-data header)
                  (make-array (%array-available-elements bit-array-1)
                              :element-type 'bit
                              :initial-element 0))
@@ -1789,7 +1792,7 @@ function to be removed without further warning."
             (unless (eql (array-dimension array i) (pop dimensions))
               (return t))))
     (error "malformed :INITIAL-CONTENTS: ~S should have dimensions ~S"
-           (make-array dimensions :displaced-to (%array-data-vector array)
+           (make-array dimensions :displaced-to (%array-data array)
                                   :element-type (array-element-type array))
            (array-dimensions array)))
   array)
