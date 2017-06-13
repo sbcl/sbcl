@@ -766,18 +766,19 @@
 (defmacro nsublis-macro ()
   (let ((key-tmp (gensym)))
     `(let ((,key-tmp (apply-key key subtree)))
-      (if notp
-          (assoc ,key-tmp alist :test-not test-not)
-          (assoc ,key-tmp alist :test test)))))
+       (if notp
+           (assoc ,key-tmp alist :test-not test-not)
+           (assoc ,key-tmp alist :test test)))))
 
 (defun nsublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
-  "Substitute from ALIST into TRUE destructively."
+  "Substitute from ALIST into TREE destructively."
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
         (test (if testp (%coerce-callable-to-fun test) test))
         (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
-    (declare (inline assoc))
+    (declare (type function test test-not)
+             (inline assoc))
     (let (temp)
       (labels ((s (subtree)
                  (cond ((setq temp (nsublis-macro))
