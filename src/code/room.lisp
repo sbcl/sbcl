@@ -670,7 +670,7 @@
            (pages-so-far 0)
            (count-so-far 0)
            (last-page 0))
-      (declare (type (unsigned-byte 32) last-page start)
+      (declare (type word last-page start)
                (fixnum pages-so-far count-so-far pagesize))
       (labels ((note-conses (x)
                  (unless (or (atom x) (gethash x printed-conses))
@@ -687,10 +687,10 @@
                  (return-from print-allocated-objects (values)))
 
                (unless count
-                 (let ((this-page (* (the (values (unsigned-byte 32) t)
+                 (let ((this-page (* (the (values word t)
                                        (truncate addr pagesize))
                                      pagesize)))
-                   (declare (type (unsigned-byte 32) this-page))
+                   (declare (type word this-page))
                    (when (/= this-page last-page)
                      (when (< pages-so-far pages)
                        ;; FIXME: What is this? (ERROR "Argh..")? or
