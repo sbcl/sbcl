@@ -1958,12 +1958,20 @@ static boolean coalescible_number_p(lispobj* where)
         || widetag == COMPLEX_DOUBLE_FLOAT_WIDETAG;
 }
 
-static boolean symbol_or_fixnum_p(lispobj obj)
+/// Return true of fixnums, bignums, strings, symbols.
+/// Strings are considered eql-comparable,
+/// because they're coalesced before comparing.
+static boolean eql_comparable_p(lispobj obj)
 {
-    return fixnump(obj)
-        || (lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
-            widetag_of(*native_pointer(obj)) == SYMBOL_WIDETAG)
-        || obj == NIL;
+    if (fixnump(obj) || obj == NIL) return 1;
+    if (lowtag_of(obj) != OTHER_POINTER_LOWTAG) return 0;
+    int widetag = widetag_of(*native_pointer(obj));
+    return widetag == BIGNUM_WIDETAG
+        || widetag == SYMBOL_WIDETAG
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+        || widetag == SIMPLE_CHARACTER_STRING_WIDETAG
+#endif
+        || widetag == SIMPLE_BASE_STRING_WIDETAG;
 }
 
 static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
@@ -1994,9 +2002,14 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 
     if ((((header & mask) != 0) // optimistically assume it's a vector
          && ((widetag == SIMPLE_VECTOR_WIDETAG
-              && vector_isevery(symbol_or_fixnum_p, (struct vector*)obj))
+              && vector_isevery(eql_comparable_p, (struct vector*)obj))
              || specialized_vector_widetag_p(widetag)))
         || coalescible_number_p(obj)) {
+        if (widetag == SIMPLE_VECTOR_WIDETAG) {
+            sword_t n_elts = fixnum_value(obj[1]), i;
+            for (i = 2 ; i < n_elts+2 ; ++i)
+                coalesce_obj(obj + i, ht);
+        }
         int index = hopscotch_get(ht, (uword_t)obj, 0);
         if (!index) // Not found
             hopscotch_insert(ht, (uword_t)obj, 1);

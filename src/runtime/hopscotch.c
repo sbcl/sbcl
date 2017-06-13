@@ -310,8 +310,8 @@ static boolean vector_eql(uword_t arg1, uword_t arg2)
         return header1 == *obj2
             && !memcmp(obj1 + 1, obj2 + 1, (nwords-1) << WORD_SHIFT);
 
-    // FIXME: coalescing of copyable numbers within a simple-vector should be
-    // done first, so that subseqent byte-for-byte comparison works.
+    // Vector elements must have already been coalesced
+    // when comparing simple-vectors for similarity.
     return (obj1[1] == obj2[1]) // same length vectors
         && !memcmp(obj1 + 2, obj2 + 2, (nwords-2) << WORD_SHIFT);
 }
