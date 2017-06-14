@@ -198,7 +198,10 @@
             do
         (let ((match-start 0)
               (match-len 2))
-          (dotimes (start pos)
+          ;; limit the lookback amount to make the running time n^2 in input
+          ;; length instead of n^3.
+          (loop for start from (max 0 (- pos 4000)) below pos
+                do
             (let ((this-len (compare start pos (length input))))
               (when (> this-len match-len)
                 (setq match-start start match-len this-len))))
