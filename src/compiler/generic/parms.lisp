@@ -202,13 +202,7 @@
 
     ;; for looking up assembler routine by name
     ;; and patching them on runtime startup
-    sb!fasl::*assembler-routines*
-
-    ;; hash table weaknesses
-    :key
-    :value
-    :key-and-value
-    :key-or-value))
+    sb!fasl::*assembler-routines*))
 
 ;;; Number of entries in the thread local storage. Limits the number
 ;;; of symbols with thread local bindings.

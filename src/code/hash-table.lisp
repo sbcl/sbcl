@@ -12,6 +12,12 @@
 
 (in-package "SB!IMPL")
 
+;;; ** weak_hash_entry_alivep_fun[] in gc-common must
+;;;    coincide with this ordering of table kinds
+(defconstant-eqx weak-hash-table-kinds
+    #(nil :key :value :key-and-value :key-or-value)
+  #'equalp)
+
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb!xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
@@ -22,7 +28,7 @@
                                 rehash-threshold
                                 rehash-trigger
                                 table
-                                weakness
+                                %weakness
                                 index-vector
                                 next-vector
                                 hash-vector
@@ -57,8 +63,7 @@
   (next-weak-hash-table nil :type null)
   ;; Non-NIL if this is some kind of weak hash table. For details see
   ;; the docstring of MAKE-HASH-TABLE.
-  (weakness nil :type (member nil :key :value :key-or-value :key-and-value)
-            :read-only t)
+  (%weakness nil :type (integer 0 4) :read-only t)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   (next-free-kv 0 :type index)
@@ -96,6 +101,15 @@
   (reading-thread nil)
   #!+sb-hash-table-debug
   (writing-thread nil))
+
+(defun hash-table-weakness (ht)
+  "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
+:VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE."
+  (aref weak-hash-table-kinds (hash-table-%weakness ht)))
+
+(declaim (inline hash-table-weak-p))
+(defun hash-table-weak-p (ht)
+  (not (zerop (hash-table-%weakness ht))))
 
 ;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
 ;; is bigger than any possible nonEQ hash value, and thus indicates an

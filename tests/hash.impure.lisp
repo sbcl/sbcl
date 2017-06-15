@@ -323,7 +323,7 @@
     (values)))
 
 (defun print-ht (ht &optional (stream t))
-  (format stream "Weakness: ~S~%" (sb-impl::hash-table-weakness ht))
+  (format stream "Weakness: ~S~%" (hash-table-weakness ht))
   (format stream "Table: ~S~%" (sb-impl::hash-table-table ht))
   (format stream "Next: ~S~%" (sb-impl::hash-table-next-vector ht))
   (format stream "Index: ~S~%" (sb-impl::hash-table-index-vector ht))

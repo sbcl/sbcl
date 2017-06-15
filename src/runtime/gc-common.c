@@ -959,17 +959,13 @@ static int survived_gc_yet_OR(lispobj key, lispobj value) {
     return pointer_survived_gc_yet(key) || pointer_survived_gc_yet(value);
 }
 
-static int (*weak_hash_entry_alivep_fun(lispobj weakness))(lispobj,lispobj)
-{
-    switch (weakness) {
-    case KEY: return survived_gc_yet_KEY;
-    case VALUE: return survived_gc_yet_VALUE;
-    case KEY_OR_VALUE: return survived_gc_yet_OR;
-    case KEY_AND_VALUE: return survived_gc_yet_AND;
-    case NIL: return NULL;
-    default: lose("Bad hash table weakness");
-    }
-}
+static int (*weak_hash_entry_alivep_fun[5])(lispobj,lispobj) = {
+    NULL,
+    survived_gc_yet_KEY,
+    survived_gc_yet_VALUE,
+    survived_gc_yet_AND,
+    survived_gc_yet_OR
+};
 
 /* Return the beginning of data in ARRAY (skipping the header and the
  * length) or NULL if it isn't an array of the specified widetag after
@@ -1003,7 +999,6 @@ scav_hash_table_entries (struct hash_table *hash_table)
     lispobj *hash_vector;
     uword_t hash_vector_length;
     lispobj empty_symbol;
-    lispobj weakness = hash_table->weakness;
     uword_t i;
 
     kv_vector = get_array_data(hash_table->table,
@@ -1041,7 +1036,8 @@ scav_hash_table_entries (struct hash_table *hash_table)
     }
 
     /* Work through the KV vector. */
-    int (*alivep_test)(lispobj,lispobj) = weak_hash_entry_alivep_fun(weakness);
+    int (*alivep_test)(lispobj,lispobj)
+        = weak_hash_entry_alivep_fun[fixnum_value(hash_table->_weakness)];
 #define SCAV_ENTRIES(aliveness_predicate) \
     for (i = 1; i < next_vector_length; i++) {                                 \
         lispobj old_key = kv_vector[2*i];                                      \
@@ -1115,7 +1111,7 @@ scav_vector (lispobj *where, lispobj object)
         lose("hash_table table!=this table %x\n", hash_table->table);
     }
 
-    if (hash_table->weakness == NIL) {
+    if (!hash_table->_weakness) {
         scav_hash_table_entries(hash_table);
     } else {
         /* Delay scavenging of this table by pushing it onto
@@ -1185,7 +1181,8 @@ scan_weak_hash_table (struct hash_table *hash_table)
     uword_t next_vector_length = 0; /* prevent warning */
     lispobj *hash_vector;
     lispobj empty_symbol;
-    lispobj weakness = hash_table->weakness;
+    int (*alivep_test)(lispobj,lispobj) =
+        weak_hash_entry_alivep_fun[fixnum_value(hash_table->_weakness)];
     uword_t i;
 
     kv_vector = get_array_data(hash_table->table,
@@ -1202,8 +1199,7 @@ scan_weak_hash_table (struct hash_table *hash_table)
     for (i = 0; i < length; i++) {
         scan_weak_hash_table_chain(hash_table, &index_vector[i],
                                    kv_vector, index_vector, next_vector,
-                                   hash_vector, empty_symbol,
-                                   weak_hash_entry_alivep_fun(weakness));
+                                   hash_vector, empty_symbol, alivep_test);
     }
 }
 
