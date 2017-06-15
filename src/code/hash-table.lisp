@@ -102,15 +102,6 @@
   #!+sb-hash-table-debug
   (writing-thread nil))
 
-(defun hash-table-weakness (ht)
-  "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
-:VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE."
-  (aref weak-hash-table-kinds (hash-table-%weakness ht)))
-
-(declaim (inline hash-table-weak-p))
-(defun hash-table-weak-p (ht)
-  (not (zerop (hash-table-%weakness ht))))
-
 ;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
 ;; is bigger than any possible nonEQ hash value, and thus indicates an
 ;; empty slot; and EQ hash tables don't use HASH-TABLE-HASH-VECTOR.

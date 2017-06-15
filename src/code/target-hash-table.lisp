@@ -14,6 +14,15 @@
 
 ;;;; utilities
 
+(defun hash-table-weakness (ht)
+  "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
+:VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE."
+  (aref weak-hash-table-kinds (hash-table-%weakness ht)))
+
+(declaim (inline hash-table-weak-p))
+(defun hash-table-weak-p (ht)
+  (not (zerop (hash-table-%weakness ht))))
+
 ;;; Code for detecting concurrent accesses to the same table from
 ;;; multiple threads. Only compiled in when the :SB-HASH-TABLE-DEBUG
 ;;; feature is enabled. The main reason for the existence of this code
