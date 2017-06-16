@@ -138,10 +138,6 @@
 
 (defparameter *common-static-symbols*
   '(t
-
-    ;; filled in by the C code to propagate to Lisp
-    *posix-argv* *core-string*
-
     ;; free pointers.  Note that these are FIXNUM word counts, not (as
     ;; one might expect) byte counts or SAPs. The reason seems to be
     ;; that by representing them this way, we can avoid consing
