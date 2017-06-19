@@ -181,15 +181,13 @@
      nil)
     (t
      (write-char #\# stream)
-     (let ((*print-base* 10) (*print-radix* nil))
-       (cond ((minusp marker)
-              (output-integer (- marker) stream)
-              (write-char #\# stream)
-              nil)
-             (t
-              (output-integer marker stream)
-              (write-char #\= stream)
-              t))))))
+     (output-integer (abs marker) stream 10 nil)
+     (cond ((minusp marker)
+            (write-char #\# stream)
+            nil)
+           (t
+            (write-char #\= stream)
+            t)))))
 
 (defmacro with-circularity-detection ((object stream) &body body)
   (with-unique-names (marker body-name)

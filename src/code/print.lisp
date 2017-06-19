@@ -195,7 +195,7 @@ variable: an unreadable object representing the error is printed instead.")
                     (stream (%make-finite-base-string-output-stream string)))
                (declare (inline %make-finite-base-string-output-stream))
                (declare (truly-dynamic-extent stream))
-               (output-integer object stream)
+               (output-integer object stream *print-base* *print-radix*)
                (%shrink-vector string
                                (finite-base-string-output-stream-pointer stream)))))))
     ;; Could do something for other numeric types, symbols, ...
@@ -939,9 +939,7 @@ variable: an unreadable object representing the error is printed instead.")
   (cond ((or (not *print-readably*)
              (array-readably-printable-p array))
          (write-char #\# stream)
-         (let ((*print-base* 10)
-               (*print-radix* nil))
-           (output-integer (array-rank array) stream))
+         (output-integer (array-rank array) stream 10 nil)
          (write-char #\A stream)
          (with-array-data ((data array) (start) (end))
            (declare (ignore end))
@@ -1089,15 +1087,15 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; This gets both a method and a specifically named function
 ;;; since the latter is called from a few places.
-(defmethod print-object ((object integer) stream) (output-integer object stream))
-(defun output-integer (integer stream)
-  (let ((base *print-base*))
-    (cond (*print-radix*
-           (unless (= base 10) (%output-radix base stream))
-           (%output-integer-in-base integer base stream)
-           (when (= base 10) (write-char #\. stream)))
-          (t
-           (%output-integer-in-base integer base stream)))))
+(defmethod print-object ((object integer) stream)
+  (output-integer object stream *print-base* *print-radix*))
+(defun output-integer (integer stream base radixp)
+  (cond (radixp
+         (unless (= base 10) (%output-radix base stream))
+         (%output-integer-in-base integer base stream)
+         (when (= base 10) (write-char #\. stream)))
+        (t
+         (%output-integer-in-base integer base stream))))
 
 (defmethod print-object ((ratio ratio) stream)
   (let ((base *print-base*))
@@ -1712,25 +1710,21 @@ variable: an unreadable object representing the error is printed instead.")
                        (output-object (value-cell-ref object) stream))
                       (t
                        (write-string "unknown pointer object, widetag=" stream)
-                       (let ((*print-base* 16) (*print-radix* t))
-                         (output-integer widetag stream))))))
+                       (output-integer widetag stream 16 t)))))
                  ((#.sb!vm:fun-pointer-lowtag
                    #.sb!vm:instance-pointer-lowtag
                    #.sb!vm:list-pointer-lowtag)
                   (write-string "unknown pointer object, lowtag=" stream)
-                  (let ((*print-base* 16) (*print-radix* t))
-                    (output-integer lowtag stream)))
+                  (output-integer lowtag stream 16 t))
                 (t
                  (case (widetag-of object)
                    (#.sb!vm:unbound-marker-widetag
                     (write-string "unbound marker" stream))
                    (t
                     (write-string "unknown immediate object, lowtag=" stream)
-                    (let ((*print-base* 2) (*print-radix* t))
-                      (output-integer lowtag stream))
+                    (output-integer lowtag stream 2 t)
                     (write-string ", widetag=" stream)
-                    (let ((*print-base* 16) (*print-radix* t))
-                      (output-integer (widetag-of object) stream))))))))))
+                    (output-integer (widetag-of object) stream 16 t)))))))))
     (if *print-pretty*
       ;; This block might not be necessary. Not sure, probably can't hurt.
         (pprint-logical-block (stream nil) (output-it stream))
