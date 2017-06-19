@@ -246,10 +246,12 @@
   (let ((f (%code-entry-point code-obj 0)))
     (or (and f
              (let ((from (code-header-words code-obj))
-                   (to (ash (with-pinned-objects (f)
+                   ;; Ignore the layout pointer (if present) in the upper bits
+                   ;; of the function header.
+                   (to (ldb (byte 24 sb!vm:n-widetag-bits)
+                            (with-pinned-objects (f)
                               (sap-ref-word (int-sap (get-lisp-obj-address f))
-                                            (- sb!vm:fun-pointer-lowtag)))
-                            (- sb!vm:n-widetag-bits))))
+                                            (- sb!vm:fun-pointer-lowtag))))))
                (and (< from to) (- to from))))
         0)))
 

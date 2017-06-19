@@ -186,6 +186,13 @@
                     (the (complex single-float) y)))
                :stream (make-broadcast-stream)))
 
+;;; Data in the high bits of a fun header caused CODE-N-UNBOXED-DATA-WORDS
+;;; to return a ridiculously huge value.
+(with-test (:name (disassemble :unboxed-data))
+  (assert (< (sb-kernel:code-n-unboxed-data-words
+              (sb-kernel:fun-code-header #'expt))
+             100))) ; The exact value is irrelevant.
+
 #+x86-64
 ;; The labeler for LEA would choke on an illegal encoding
 ;; instead of showing what it illegally encodes, such as LEA RAX, RSP
