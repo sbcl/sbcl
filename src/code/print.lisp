@@ -1700,38 +1700,38 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;; catch-all for unknown things
 
 (defmethod print-object ((object t) stream)
- (flet ((output-it (stream)
-  (print-unreadable-object (object stream :identity t)
-    (let ((lowtag (lowtag-of object)))
-      (case lowtag
-        (#.sb!vm:other-pointer-lowtag
-          (let ((widetag (widetag-of object)))
-            (case widetag
-              (#.sb!vm:value-cell-widetag
-               (write-string "value cell " stream)
-               (output-object (value-cell-ref object) stream))
-              (t
-               (write-string "unknown pointer object, widetag=" stream)
-               (let ((*print-base* 16) (*print-radix* t))
-                 (output-integer widetag stream))))))
-        ((#.sb!vm:fun-pointer-lowtag
-          #.sb!vm:instance-pointer-lowtag
-          #.sb!vm:list-pointer-lowtag)
-         (write-string "unknown pointer object, lowtag=" stream)
-         (let ((*print-base* 16) (*print-radix* t))
-           (output-integer lowtag stream)))
-        (t
-         (case (widetag-of object)
-           (#.sb!vm:unbound-marker-widetag
-            (write-string "unbound marker" stream))
-           (t
-            (write-string "unknown immediate object, lowtag=" stream)
-            (let ((*print-base* 2) (*print-radix* t))
-              (output-integer lowtag stream))
-            (write-string ", widetag=" stream)
-            (let ((*print-base* 16) (*print-radix* t))
-              (output-integer (widetag-of object) stream))))))))))
-  (if *print-pretty*
+  (flet ((output-it (stream)
+           (print-unreadable-object (object stream :identity t)
+             (let ((lowtag (lowtag-of object)))
+               (case lowtag
+                 (#.sb!vm:other-pointer-lowtag
+                  (let ((widetag (widetag-of object)))
+                    (case widetag
+                      (#.sb!vm:value-cell-widetag
+                       (write-string "value cell " stream)
+                       (output-object (value-cell-ref object) stream))
+                      (t
+                       (write-string "unknown pointer object, widetag=" stream)
+                       (let ((*print-base* 16) (*print-radix* t))
+                         (output-integer widetag stream))))))
+                 ((#.sb!vm:fun-pointer-lowtag
+                   #.sb!vm:instance-pointer-lowtag
+                   #.sb!vm:list-pointer-lowtag)
+                  (write-string "unknown pointer object, lowtag=" stream)
+                  (let ((*print-base* 16) (*print-radix* t))
+                    (output-integer lowtag stream)))
+                (t
+                 (case (widetag-of object)
+                   (#.sb!vm:unbound-marker-widetag
+                    (write-string "unbound marker" stream))
+                   (t
+                    (write-string "unknown immediate object, lowtag=" stream)
+                    (let ((*print-base* 2) (*print-radix* t))
+                      (output-integer lowtag stream))
+                    (write-string ", widetag=" stream)
+                    (let ((*print-base* 16) (*print-radix* t))
+                      (output-integer (widetag-of object) stream))))))))))
+    (if *print-pretty*
       ;; This block might not be necessary. Not sure, probably can't hurt.
-      (pprint-logical-block (stream nil) (output-it stream))
-      (output-it stream))))
+        (pprint-logical-block (stream nil) (output-it stream))
+        (output-it stream))))
