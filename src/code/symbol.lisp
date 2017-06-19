@@ -82,7 +82,7 @@ distinct from the global value. Can also be SETF."
 
 (declaim (inline %makunbound))
 (defun %makunbound (symbol)
-  (%set-symbol-value symbol (%primitive sb!c:make-unbound-marker)))
+  (%set-symbol-value symbol (make-unbound-marker)))
 
 (defun makunbound (symbol)
   "Make SYMBOL unbound, removing any value it may currently have."

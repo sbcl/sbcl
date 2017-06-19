@@ -157,7 +157,7 @@
   x)
 
 (!define-fop 66 :not-host (fop-misc-trap)
-  (%primitive sb!c:make-unbound-marker))
+  (make-unbound-marker))
 
 (!define-fop 76 (fop-character ((:operands char-code)))
   (code-char char-code))
@@ -204,7 +204,7 @@
       (dotimes (i n-slots)
         (let ((val (svref stack (+ ptr i)))
               (slot-name (pop slot-names)))
-          (if (sb!pcl::unbound-marker-p val)
+          (if (unbound-marker-p val)
               ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
               (slot-makunbound obj slot-name)
               (setf (slot-value obj slot-name) val))))))

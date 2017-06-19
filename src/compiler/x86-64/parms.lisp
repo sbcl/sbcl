@@ -165,16 +165,7 @@
 
      ;; hash table empty cell marker
      sb!impl::%empty-ht-slot%
-
-     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
-     ;; common slot unbound check.
-     ;;
-     ;; FIXME: In SBCL, the CLOS code has become sufficiently tightly
-     ;; integrated into the system that it'd probably make sense to
-     ;; use the ordinary unbound marker for this.
-     ;;
-     ;; FIXME II: if it doesn't make sense, why is this X86-ish only?
-     sb!pcl::..slot-unbound..)))
+     )))
 
 ;;; FIXME: with #!+immobile-space, this should be the empty list,
 ;;; because *all* fdefns are permanently placed.

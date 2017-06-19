@@ -17,17 +17,13 @@
   (let ((*evaluator-mode* :interpret))
     (eval form)))
 
-(defun unbound-marker ()
-  (sb-c::%primitive sb-c:make-unbound-marker))
-(compile 'unbound-marker)
-
 (defun assert-foo-not-checked (fun)
-  (let* ((marker (unbound-marker))
+  (let* ((marker (sb-kernel:make-unbound-marker))
          (*foo* marker))
     (assert (eq marker (funcall fun)))))
 
 (defun assert-foo-checked (fun)
-  (let* ((marker (unbound-marker))
+  (let* ((marker (sb-kernel:make-unbound-marker))
          (*foo* marker))
     (assert (eq :error
                 (handler-case

@@ -776,3 +776,15 @@
 (deftransform sb!vm::get-lisp-obj-address ((obj) ((constant-arg character)))
   (logior sb!vm::character-widetag
           (ash (char-code (lvar-value obj)) sb!vm::n-widetag-bits)))
+
+;; So that the PCL code walker doesn't observe any use of %PRIMITIVE,
+;; MAKE-UNBOUND-MARKER is an ordinary function, not a macro.
+#-sb-xc-host
+(defun make-unbound-marker () ; for interpreters
+  (sb!sys:%primitive make-unbound-marker))
+;; Get the main compiler to transform MAKE-UNBOUND-MARKER
+;; without the fopcompiler seeing it - the fopcompiler does
+;; expand compiler-macros, but not source-transforms -
+;; because %PRIMITIVE is not generally fopcompilable.
+(sb!c:define-source-transform make-unbound-marker ()
+  `(sb!sys:%primitive make-unbound-marker))

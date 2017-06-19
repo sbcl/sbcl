@@ -260,10 +260,7 @@
      ;; Needed for callbacks to work across saving cores. see
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
-     sb!alien::*enter-alien-callback*
-
-     ;; see comments in ../x86-64/parms.lisp
-     sb!pcl::..slot-unbound..)))
+     sb!alien::*enter-alien-callback*)))
 
 (defparameter *static-funs*
   '(length
