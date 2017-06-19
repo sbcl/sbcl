@@ -60,3 +60,6 @@ assigning this to it using (SETF STANDARD-INSTANCE-ACCESS).
 Value of +SLOT-UNBOUND+ is unspecified, and should not be relied to be
 of any particular type, but it is guaranteed to be suitable for EQ
 comparison.")
+
+;;; This is not at all the same as SB-VM::UNBOUND-MARKER-P !
+(defmacro unbound-marker-p (x) `(eq ,x +slot-unbound+))

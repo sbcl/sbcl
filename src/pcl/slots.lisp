@@ -141,7 +141,7 @@
                  (cdr location))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
-    (if (eq +slot-unbound+ value)
+    (if (unbound-marker-p value)
         (slot-unbound (wrapper-class* wrapper) object slot-name)
         value)))
 
@@ -200,8 +200,7 @@
                       (cas (cdr location) old-value new-value))
                      (t
                       (bug "Bogus slot-cell in (CAS SLOT-VALUE): ~S" cell)))))
-      (if (and (eq +slot-unbound+ old)
-               (neq old old-value))
+      (if (and (unbound-marker-p old) (neq old old-value))
           (slot-unbound (wrapper-class* wrapper) object slot-name)
           old))))
 
@@ -225,7 +224,7 @@
                  (cdr location))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
-    (not (eq +slot-unbound+ value))))
+    (not (unbound-marker-p value))))
 
 (defun slot-makunbound (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
@@ -283,7 +282,7 @@
             (t
              (instance-structure-protocol-error slotd
                                                 'slot-value-using-class)))))
-    (if (eq value +slot-unbound+)
+    (if (unbound-marker-p value)
         (values (slot-unbound class object (slot-definition-name slotd)))
         value)))
 
@@ -340,7 +339,7 @@
             (t
              (instance-structure-protocol-error slotd
                                                 'slot-boundp-using-class)))))
-    (not (eq value +slot-unbound+))))
+    (not (unbound-marker-p value))))
 
 (defmethod slot-makunbound-using-class
            ((class std-class)
@@ -400,7 +399,7 @@
     (declare (type function function))
     ;; FIXME: Is this really necessary? Structure slots should surely
     ;; never be unbound!
-    (if (eq value +slot-unbound+)
+    (if (unbound-marker-p value)
         (values (slot-unbound class object (slot-definition-name slotd)))
         value)))
 
@@ -500,7 +499,7 @@
 
 (defun %set-slots (object names &rest values)
   (mapc (lambda (name value)
-          (if (eq value +slot-unbound+)
+          (if (unbound-marker-p value)
               ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
               (slot-makunbound object name)
               (setf (slot-value object name) value)))

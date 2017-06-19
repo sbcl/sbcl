@@ -204,7 +204,7 @@
       (dotimes (i n-slots)
         (let ((val (svref stack (+ ptr i)))
               (slot-name (pop slot-names)))
-          (if (eq val sb!pcl:+slot-unbound+)
+          (if (sb!pcl::unbound-marker-p val)
               ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
               (slot-makunbound obj slot-name)
               (setf (slot-value obj slot-name) val))))))

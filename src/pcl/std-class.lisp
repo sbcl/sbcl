@@ -1185,7 +1185,7 @@
                                   (push c (class-slot-cells from-class))
                                   c))))
                  (aver (consp cell))
-                 (if (eq +slot-unbound+ (cdr cell))
+                 (if (unbound-marker-p (cdr cell))
                      ;; We may have inherited an initfunction FIXME: Is this
                      ;; really right? Is the initialization in
                      ;; SHARED-INITIALIZE (STD-CLASS) not enough?
@@ -1506,7 +1506,7 @@
 (defun %set-slot-value-checking-type (context slots slot value
                                       safe old-class new-class)
   (setf (clos-slots-ref slots (slot-definition-location slot))
-        (if (and safe (neq value +slot-unbound+))
+        (if (and safe (not (unbound-marker-p value)))
             (let ((name (slot-definition-name slot))
                   (type (slot-definition-type slot)))
               (%ensure-slot-value-type context name type value
@@ -1567,7 +1567,7 @@
          (dolist (old old-instance-slots)
            (let* ((name (slot-definition-name old))
                   (value (clos-slots-ref oslots (slot-definition-location old))))
-             (unless (eq value +slot-unbound+)
+             (unless (unbound-marker-p value)
                (let ((new (assq name layout)))
                  (cond (new
                         (set-value value new))
@@ -1628,9 +1628,8 @@
                      return slot))
              (initarg-for-slot-p (slot)
                (dolist (slot-initarg (slot-definition-initargs slot))
-                 ;; Abuse +slot-unbound+
-                 (unless (eq +slot-unbound+
-                             (getf initargs slot-initarg +slot-unbound+))
+                 (unless (unbound-marker-p
+                          (getf initargs slot-initarg +slot-unbound+))
                    (return t))))
              (set-value (value slotd)
                (%set-slot-value-checking-type

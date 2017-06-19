@@ -1433,7 +1433,7 @@ generic function lambda list ~S~:>"
                 (let* ((.slots. (get-slots-or-nil
                                  ,(car required-args)))
                        (value (when .slots. (clos-slots-ref .slots. ,emf))))
-                  (if (eq value +slot-unbound+)
+                  (if (unbound-marker-p value)
                       (slot-unbound-internal ,(car required-args)
                                              ,emf)
                       value)))))
@@ -1536,7 +1536,7 @@ generic function lambda list ~S~:>"
            ((null (cdr args))
             (let* ((slots (get-slots (car args)))
                    (value (clos-slots-ref slots emf)))
-              (if (eq value +slot-unbound+)
+              (if (unbound-marker-p value)
                   (slot-unbound-internal (car args) emf)
                   value)))
            ((null (cddr args))
@@ -1551,8 +1551,8 @@ generic function lambda list ~S~:>"
                 :format-control "invalid number of arguments"
                 :format-arguments nil)
          (let ((slots (get-slots (car args))))
-           (not (eq (clos-slots-ref slots (fast-instance-boundp-index emf))
-                    +slot-unbound+)))))
+           (not (unbound-marker-p
+                 (clos-slots-ref slots (fast-instance-boundp-index emf)))))))
     (function
      (apply emf args))))
 
@@ -1995,8 +1995,7 @@ generic function lambda list ~S~:>"
 
 (defun early-gf-p (x)
   (and (fsc-instance-p x)
-       (eq (clos-slots-ref (get-slots x) +sgf-method-class-index+)
-           +slot-unbound+)))
+       (unbound-marker-p (clos-slots-ref (get-slots x) +sgf-method-class-index+))))
 
 (defconstant +sgf-methods-index+
   (!bootstrap-slot-index 'standard-generic-function 'methods))

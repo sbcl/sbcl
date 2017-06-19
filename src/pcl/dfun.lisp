@@ -213,7 +213,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         (let ((value (if (funcallable-instance-p object)
                          (funcallable-standard-instance-access object location)
                          (standard-instance-access object location))))
-          (when (eq +slot-unbound+ value)
+          (when (unbound-marker-p value)
             (error "~@<slot ~S of class ~S is unbound in object ~S~@:>"
                    slot-name class object))
           value)
@@ -767,7 +767,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (boundp #'(lambda (instance)
                   (let* ((class (class-of instance))
                          (class-name (!bootstrap-get-slot 'class class 'name)))
-                    (not (eq +slot-unbound+
+                    (not (unbound-marker-p
                              (!bootstrap-get-slot class-name
                                                   instance slot-name))))))
       (writer #'(lambda (new-value instance)

@@ -147,7 +147,7 @@
 
 (defun condition-slot-value (condition name)
   (let ((val (getf (condition-assigned-slots condition) name sb!pcl:+slot-unbound+)))
-    (if (eq val sb!pcl:+slot-unbound+)
+    (if (sb!pcl::unbound-marker-p val)
         (let ((class (layout-classoid (%instance-layout condition))))
           (dolist (cslot
                    (condition-classoid-class-slots class)
@@ -222,14 +222,14 @@
     (dolist (cslot (condition-classoid-class-slots classoid))
       (dolist (initarg (condition-slot-initargs cslot))
         (let ((val (getf initargs initarg sb!pcl:+slot-unbound+)))
-          (unless (eq val sb!pcl:+slot-unbound+)
+          (unless (sb!pcl::unbound-marker-p val)
             (setf (car (condition-slot-cell cslot)) val)))))
 
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots classoid))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
-              (unless (eq (getf initargs initarg sb!pcl:+slot-unbound+)
-                          sb!pcl:+slot-unbound+)
+              (unless (sb!pcl::unbound-marker-p
+                       (getf initargs initarg sb!pcl:+slot-unbound+))
                 (return nil)))
         (setf (getf (condition-assigned-slots condition)
                     (condition-slot-name hslot))

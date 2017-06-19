@@ -359,7 +359,7 @@
       (let* ((super (find-class super))
              (subclasses (!bootstrap-get-slot metaclass-name super
                                               'direct-subclasses)))
-        (cond ((eq +slot-unbound+ subclasses)
+        (cond ((unbound-marker-p subclasses)
                (!bootstrap-set-slot metaclass-name super 'direct-subclasses
                                     (list class)))
               ((not (memq class subclasses))

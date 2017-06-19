@@ -402,7 +402,7 @@
                                 `((cons (cdr ,index))))
                         (t
                          +slot-unbound+)))
-         (if (eq ,value +slot-unbound+)
+         (if (unbound-marker-p ,value)
              ,default
              ,value)))))
 
@@ -492,10 +492,10 @@
          (typecase ,index
            ,@(when (or (null kind) (eq kind :instance))
                    `((fixnum (not (and ,slots
-                                       (eq (clos-slots-ref ,slots ,index)
-                                           +slot-unbound+))))))
+                                       (unbound-marker-p
+                                        (clos-slots-ref ,slots ,index)))))))
            ,@(when (or (null kind) (eq kind :class))
-                   `((cons (not (eq (cdr ,index) +slot-unbound+)))))
+                   `((cons (not (unbound-marker-p (cdr ,index))))))
            (t ,default))))))
 
 (defmacro instance-boundp-custom (pv pv-offset parameter)

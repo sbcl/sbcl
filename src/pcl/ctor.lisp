@@ -1011,8 +1011,7 @@
                                (if (member slotd sbuc-slots :test #'eq)
                                    `(not (slot-boundp-using-class
                                           ,class .instance. ,slotd))
-                                   `(eq (clos-slots-ref .slots. ,i)
-                                        +slot-unbound+))))
+                                   `(unbound-marker-p (clos-slots-ref .slots. ,i)))))
                         (ecase kind
                           ((nil)
                            (unless early-unbound-markers-p

@@ -234,11 +234,11 @@
             ,@(ecase reader/writer
                 (:reader
                  `((let ((value ,read-form))
-                     (unless (eq value +slot-unbound+)
+                     (unless (unbound-marker-p value)
                        (return-from access value)))))
                 (:boundp
                  `((let ((value ,read-form))
-                     (return-from access (not (eq value +slot-unbound+))))))
+                     (return-from access (not (unbound-marker-p value))))))
                 (:writer
                  `((return-from access (setf ,read-form ,(car arglist)))))))
           (funcall miss-fn ,@arglist))))))
@@ -250,7 +250,7 @@
 
 (defun emit-boundp-check (value-form miss-fn arglist)
   `(let ((value ,value-form))
-     (if (eq value +slot-unbound+)
+     (if (unbound-marker-p value)
          (funcall ,miss-fn ,@arglist)
          value)))
 
@@ -259,7 +259,7 @@
   (let ((read-form (emit-slot-read-form class-slot-p index slots)))
     (ecase reader/writer
       (:reader (emit-boundp-check read-form miss-fn arglist))
-      (:boundp `(not (eq ,read-form +slot-unbound+)))
+      (:boundp `(not (unbound-marker-p ,read-form)))
       (:writer `(setf ,read-form ,(car arglist))))))
 
 (defmacro emit-reader/writer-macro (reader/writer 1-or-2-class class-slot-p)
