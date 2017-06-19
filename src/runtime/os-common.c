@@ -147,27 +147,6 @@ void* os_dlopen(char* name, int flags) {
  * table entry for each element of REQUIRED_RUNTIME_C_SYMBOLS.
  */
 
-/* We start with a little greenspunning to make car, cdr and base-string data
- * accessible. */
-
-/* Object tagged? (dereference (cast (untag (obj)))) */
-#define FOLLOW(obj,lowtagtype,ctype)            \
-    (*(struct ctype*)(obj - lowtagtype##_LOWTAG))
-
-/* For all types sharing OTHER_POINTER_LOWTAG: */
-#define FOTHERPTR(obj,ctype)                    \
-    FOLLOW(obj,OTHER_POINTER,ctype)
-
-static inline lispobj car(lispobj conscell)
-{
-    return FOLLOW(conscell,LIST_POINTER,cons).car;
-}
-
-static inline lispobj cdr(lispobj conscell)
-{
-    return FOLLOW(conscell,LIST_POINTER,cons).cdr;
-}
-
 #ifndef LISP_FEATURE_WIN32
 void *
 os_dlsym_default(char *name)
@@ -192,12 +171,13 @@ void os_link_runtime()
     int n = 0, m = 0;
 
     for (head = SymbolValue(REQUIRED_RUNTIME_C_SYMBOLS,0);
-         head!=NIL; head = cdr(head), n++)
+         head!=NIL; head = CONS(head)->cdr, n++)
     {
-        lispobj item = car(head);
-        symbol_name = car(item);
-        datap = (NIL!=(cdr(item)));
-        namechars = (void*)(intptr_t)FOTHERPTR(symbol_name,vector).data;
+        lispobj item = CONS(head)->car;
+        symbol_name = CONS(item)->car;
+        datap = CONS(item)->cdr != NIL;
+        namechars = (void*)(intptr_t)
+            ((struct vector*)(symbol_name-OTHER_POINTER_LOWTAG))->data;
         result = os_dlsym_default(namechars);
         odxprint(runtime_link, "linking %s => %p", namechars, result);
 
