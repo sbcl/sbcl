@@ -1699,6 +1699,12 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defmethod print-object ((object t) stream)
   (flet ((output-it (stream)
+          (when (eq object sb!pcl:+slot-unbound+)
+            (print-unreadable-object (object stream)
+              ;; If specifically the unbound marker with 0 data,
+              ;; as opposed to any other unbound marker.
+              (write-string "unbound" stream))
+            (return-from output-it))
            (print-unreadable-object (object stream :identity t)
              (let ((lowtag (lowtag-of object)))
                (case lowtag
