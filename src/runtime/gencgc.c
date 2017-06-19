@@ -3332,10 +3332,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     for_each_thread(th) {
         lispobj pin_list = SymbolTlValue(PINNED_OBJECTS,th);
         while (pin_list != NIL) {
-            struct cons *list_entry =
-                (struct cons *)native_pointer(pin_list);
-            preserve_pointer((void*)list_entry->car);
-            pin_list = list_entry->cdr;
+            preserve_pointer((void*)(CONS(pin_list)->car));
+            pin_list = CONS(pin_list)->cdr;
         }
     }
 #endif

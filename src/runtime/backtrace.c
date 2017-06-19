@@ -168,9 +168,8 @@ print_entry_name (lispobj name)
                        (void*)name);
                 return;
             }
-            struct cons *cons = (struct cons *) native_pointer(name);
-            print_entry_name(cons->car);
-            name = cons->cdr;
+            print_entry_name(CONS(name)->car);
+            name = CONS(name)->cdr;
             if (name != NIL)
                 putchar(' ');
         }

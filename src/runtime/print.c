@@ -387,8 +387,6 @@ static void brief_list(lispobj obj)
     else {
         putchar('(');
         while (lowtag_of(obj) == LIST_POINTER_LOWTAG) {
-            struct cons *cons = (struct cons *)native_pointer(obj);
-
             if (space)
                 putchar(' ');
             if (++length >= max_length) {
@@ -396,8 +394,8 @@ static void brief_list(lispobj obj)
                 obj = NIL;
                 break;
             }
-            print_obj("", cons->car);
-            obj = cons->cdr;
+            print_obj("", CONS(obj)->car);
+            obj = CONS(obj)->cdr;
             space = 1;
             if (obj == NIL)
                 break;
@@ -417,10 +415,8 @@ static void print_list(lispobj obj)
     } else if (obj == NIL) {
         printf(" (NIL)");
     } else {
-        struct cons *cons = (struct cons *)native_pointer(obj);
-
-        print_obj("car: ", cons->car);
-        print_obj("cdr: ", cons->cdr);
+        print_obj("car: ", CONS(obj)->car);
+        print_obj("cdr: ", CONS(obj)->cdr);
     }
 }
 
