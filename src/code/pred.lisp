@@ -142,6 +142,7 @@
   (def-type-predicate-wrapper symbolp)
   (def-type-predicate-wrapper %other-pointer-p)
   (def-type-predicate-wrapper system-area-pointer-p)
+  (def-type-predicate-wrapper unbound-marker-p)
   (def-type-predicate-wrapper weak-pointer-p)
   #!-64-bit
   (progn
