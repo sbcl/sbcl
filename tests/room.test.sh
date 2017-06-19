@@ -18,7 +18,7 @@
 run_sbcl <<EOF
   (dotimes (i 10)
     (dotimes (j 10)
-      (room))
+      (let ((*standard-output* (make-string-output-stream))) (room)))
     #+nil (gc))
   (sb-ext:quit :unix-status $EXIT_LISP_WIN)
 EOF
