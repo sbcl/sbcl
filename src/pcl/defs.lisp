@@ -181,7 +181,6 @@
                          (convert-to-system-type type2))))))))
 
 (defvar *built-in-class-symbols* ())
-(defvar *built-in-wrapper-symbols* ())
 
 (defun get-built-in-class-symbol (class-name)
   (or (cadr (assq class-name *built-in-class-symbols*))
