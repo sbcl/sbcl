@@ -3017,7 +3017,7 @@ verify_zero_fill(void)
             sword_t i;
             for (i = 0; i < (sword_t)GENCGC_CARD_BYTES/N_WORD_BYTES; i++) {
                 if (start_addr[i] != 0) {
-                    lose("free page not zero at %x\n", start_addr + i);
+                    lose("free page not zero at %p\n", start_addr + i);
                 }
             }
         } else {
@@ -3029,7 +3029,7 @@ verify_zero_fill(void)
                 sword_t i;
                 for (i = 0; i < size; i++) {
                     if (start_addr[i] != 0) {
-                        lose("free region not zero at %x\n", start_addr + i);
+                        lose("free region not zero at %p\n", start_addr + i);
                     }
                 }
             }
