@@ -162,12 +162,12 @@ if the symbol isn't found."
 #-sb-xc-host
 (defun !foreign-cold-init ()
   #!-sb-dynamic-core
-  (dolist (symbol *!initial-foreign-symbols*)
+  (dovector (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
   #!+sb-dynamic-core
   (loop for table-address from sb!vm::linkage-table-space-start
           by sb!vm::linkage-table-entry-size
-          and reference in sb!vm::*required-runtime-c-symbols*
+          and reference across sb!vm::*required-runtime-c-symbols*
         do (setf (gethash reference *linkage-info*) table-address))
   #!+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))

@@ -2221,28 +2221,26 @@ core and return a descriptor to it."
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
 ;;; target-load.lisp refers to.
 (defun foreign-symbols-to-core ()
-  (let ((result *nil-descriptor*))
+  (flet ((to-core (list transducer target-symbol)
+           (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
     #!-sb-dynamic-core
-    (dolist (symbol (sort (%hash-table-alist *cold-foreign-symbol-table*)
-                          #'string< :key #'car))
-      (cold-push (cold-cons (set-readonly (base-string-to-core (car symbol)))
-                            (number-to-core (cdr symbol)))
-                 result))
-    (cold-set '*!initial-foreign-symbols* result)
+    (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'string< :key #'car)
+             (lambda (symbol)
+               (cold-cons (set-readonly (base-string-to-core (car symbol)))
+                          (number-to-core (cdr symbol))))
+             '*!initial-foreign-symbols*)
     #!+sb-dynamic-core
-    (let ((runtime-linking-list *nil-descriptor*))
-      (dolist (symbol *dyncore-linkage-keys*)
-        (cold-push (cold-cons (set-readonly (base-string-to-core (car symbol)))
-                              (cdr symbol))
-                   runtime-linking-list))
-      (cold-set 'sb!vm::*required-runtime-c-symbols*
-                runtime-linking-list)))
-  (let ((result *nil-descriptor*))
-    (dolist (rtn (sort (copy-list *cold-assembler-routines*) #'string< :key #'car))
-      (cold-push (cold-cons (cold-intern (car rtn))
-                            (number-to-core (cdr rtn)))
-                 result))
-    (cold-set '*!initial-assembler-routines* result)))
+    ;; Linkage table is recomputed by Lisp, so foreign symbols have to be listed
+    ;; in the proper order, which is the reverse of the currently stored order.
+    (to-core (nreverse *dyncore-linkage-keys*)
+             (lambda (symbol)
+               (cold-cons (set-readonly (base-string-to-core (car symbol)))
+                          (cdr symbol)))
+             'sb!vm::*required-runtime-c-symbols*)
+    (to-core (sort (copy-list *cold-assembler-routines*) #'string< :key #'car)
+             (lambda (rtn)
+               (cold-cons (cold-intern (car rtn)) (number-to-core (cdr rtn))))
+             '*!initial-assembler-routines*)))
 
 
 ;;;; general machinery for cold-loading FASL files

@@ -264,5 +264,5 @@
 
 (defun !loader-cold-init ()
   (/show0 "/!loader-cold-init")
-  (dolist (routine *!initial-assembler-routines*)
+  (dovector (routine *!initial-assembler-routines*)
     (setf (gethash (car routine) *assembler-routines*) (cdr routine))))

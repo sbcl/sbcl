@@ -159,7 +159,6 @@ os_dlsym_default(char *name)
 
 void os_link_runtime()
 {
-    lispobj head;
     void *link_target = (void*)(intptr_t)LINKAGE_TABLE_SPACE_START;
     void *validated_end = link_target;
     lispobj symbol_name;
@@ -168,12 +167,13 @@ void os_link_runtime()
     void* result;
     int strict /* If in a cold core, fail early and often. */
       = (SymbolValue(GC_INHIBIT, 0) & WIDETAG_MASK) == UNBOUND_MARKER_WIDETAG;
-    int n = 0, m = 0;
+    int n = 0, m = 0, j;
 
-    for (head = SymbolValue(REQUIRED_RUNTIME_C_SYMBOLS,0);
-         head!=NIL; head = CONS(head)->cdr, n++)
+    struct vector* symbols = VECTOR(SymbolValue(REQUIRED_RUNTIME_C_SYMBOLS,0));
+    n = fixnum_value(symbols->length);
+    for (j = 0 ; j < n ; ++j)
     {
-        lispobj item = CONS(head)->car;
+        lispobj item = symbols->data[j];
         symbol_name = CONS(item)->car;
         datap = CONS(item)->cdr != NIL;
         namechars = (void*)(intptr_t)

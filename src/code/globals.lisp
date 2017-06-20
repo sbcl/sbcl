@@ -18,5 +18,10 @@
                   *restart-clusters*
                   *gc-inhibit* *gc-pending*
                   #!+sb-thread *stop-for-gc-pending*
-                  #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
                   *posix-argv*))
+;;; This constant is assigned by Genesis and never read by Lisp code.
+;;; (To prove that it isn't used, it's not a toplevel form)
+#!+(and sb-dynamic-core (host-feature sb-xc))
+(let ()
+  (defconstant sb!vm::*required-runtime-c-symbols*
+    (symbol-value 'sb!vm::*required-runtime-c-symbols*)))
