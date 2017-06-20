@@ -312,6 +312,10 @@ corresponds to NAME, or NIL if there is none."
 ;;; associated with fd from the buffer starting at offset. It returns
 ;;; the actual number of bytes written.
 (defun unix-write (fd buf offset len)
+  ;; KLUDGE: change 60fa88b187e438cc made this function unusable in cold-init
+  ;; if compiled with #!+sb-show (which increases DEBUG to 2) because of
+  ;; full calls to SB-ALIEN-INTERNALS:DEPORT-ALLOC and DEPORT.
+  (declare (optimize (debug 1)))
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) offset len))
   (flet ((%write (sap)
