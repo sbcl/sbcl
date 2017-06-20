@@ -755,8 +755,7 @@ trans_vector(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
-    sword_t length =
-        fixnum_value(((struct vector*)native_pointer(object))->length);
+    sword_t length = fixnum_value(VECTOR(object)->length);
     return copy_large_object(object, CEILING(length + 2, 2));
 }
 
@@ -793,7 +792,7 @@ NWORDS(uword_t x, uword_t n_bits)
   } \
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
-    sword_t length = fixnum_value(((struct vector*)(object-OTHER_POINTER_LOWTAG))->length); \
+    sword_t length = fixnum_value(VECTOR(object)->length); \
     return copy_large_unboxed_object(object, CEILING(nwords + 2, 2)); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \

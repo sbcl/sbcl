@@ -582,8 +582,7 @@ static void trace1(lispobj object,
                 if (is_lisp_pointer(fun->name) &&
                     widetag_of(*native_pointer(fun->name)) == SYMBOL_WIDETAG) {
                     fprintf(file, "=");
-                    show_lstring((struct vector*)native_pointer(SYMBOL(fun->name)->name),
-                                 0, file);
+                    show_lstring(VECTOR(SYMBOL(fun->name)->name), 0, file);
                 }
             } else if (thread_pc)
                 fprintf(file, "pc=%p", thread_pc);
@@ -968,8 +967,7 @@ struct vector* lisp_thread_name(os_thread_t os_thread)
         list = CONS(list)->cdr;
         if ((os_thread_t)lisp_thread->slots[LISP_THREAD_OS_THREAD_SLOT]
             == os_thread)
-            return (struct vector*)
-                native_pointer(lisp_thread->slots[LISP_THREAD_NAME_SLOT]);
+            return VECTOR(lisp_thread->slots[LISP_THREAD_NAME_SLOT]);
     }
     return 0;
 }

@@ -547,8 +547,7 @@ static void brief_otherptr(lispobj obj)
             symbol = (struct symbol *)ptr;
             if (symbol->package == NIL)
                 printf("#:");
-            show_lstring((struct vector *)native_pointer(symbol->name),
-                         0, stdout);
+            show_lstring(VECTOR(symbol->name), 0, stdout);
             break;
 
         case SIMPLE_BASE_STRING_WIDETAG:
@@ -620,7 +619,7 @@ static lispobj symbol_function(lispobj* symbol)
     if (lowtag_of(info) == LIST_POINTER_LOWTAG)
         info = CONS(info)->cdr;
     if (lowtag_of(info) == OTHER_POINTER_LOWTAG) {
-        struct vector* v = (struct vector*)native_pointer(info);
+        struct vector* v = VECTOR(info);
         int len = fixnum_value(v->length);
         if (len != 0) {
             lispobj elt = v->data[0];  // Just like INFO-VECTOR-FDEFN

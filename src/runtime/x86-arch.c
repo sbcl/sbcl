@@ -546,7 +546,6 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     os_vm_address_t old_addr = (os_vm_address_t)old_code;
     os_vm_size_t displacement = code_addr - old_addr;
     lispobj fixups = NIL;
-    struct vector *fixups_vector;
 
     ncode_words = code_instruction_words(new_code->code_size);
     nheader_words = code_header_words(*(lispobj *)new_code);
@@ -577,7 +576,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
         return;
     }
 
-    fixups_vector = (struct vector *)native_pointer(fixups);
+    struct vector *fixups_vector = VECTOR(fixups);
 
     /* Could be pointing to a forwarding pointer. */
     /* This is extremely unlikely, because the only referent of the fixups
@@ -590,8 +589,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
         forwarding_pointer_p((lispobj*)fixups_vector))  {
         /* If so, then follow it. */
         /*SHOW("following pointer to a forwarding pointer");*/
-        fixups_vector = (struct vector *)
-          native_pointer(forwarding_pointer_value((lispobj*)fixups_vector));
+        fixups_vector = VECTOR(forwarding_pointer_value((lispobj*)fixups_vector));
     }
 
     /*SHOW("got fixups");*/

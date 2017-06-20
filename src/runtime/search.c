@@ -54,13 +54,12 @@ static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, char* b)
 boolean search_for_symbol(char *name, lispobj **start, int *count)
 {
     struct symbol *symbol;
-    struct vector *symbol_name;
     int namelen = strlen(name);
 
     while (search_for_type(SYMBOL_WIDETAG, start, count)) {
         symbol = (struct symbol *)native_pointer((lispobj)*start);
         if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
-            symbol_name = (struct vector *)native_pointer(symbol->name);
+            struct vector *symbol_name = VECTOR(symbol->name);
             if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
                 /* FIXME: Broken with more than one type of string
                    (i.e. even broken given (VECTOR NIL) */

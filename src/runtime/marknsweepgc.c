@@ -1469,7 +1469,7 @@ lispobj* find_preceding_object(lispobj* obj)
 #include "genesis/instance.h"
 lispobj alloc_layout(lispobj slots)
 {
-    struct vector* v = (struct vector*)native_pointer(slots);
+    struct vector* v = VECTOR(slots);
     // If INSTANCE_DATA_START is 0, subtract 1 word for the header.
     // If 1, subtract 2 words: 1 for the header and 1 for the layout.
     if (fixnum_value(v->length) != (LAYOUT_SIZE - INSTANCE_DATA_START - 1))
@@ -1842,7 +1842,7 @@ static int classify_symbol(lispobj* obj)
   if (widetag_of(package_name->header) == SIMPLE_BASE_STRING_WIDETAG
       && !strcmp((char*)package_name->data, "KEYWORD"))
       return 1;
-  struct vector* symbol_name = (struct vector*)native_pointer(symbol->name);
+  struct vector* symbol_name = VECTOR(symbol->name);
   if (symbol_name->length >= make_fixnum(2) &&
       schar(symbol_name, 0) == '*' &&
       schar(symbol_name, fixnum_value(symbol_name->length)-1) == '*')

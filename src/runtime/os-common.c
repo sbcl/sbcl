@@ -177,7 +177,7 @@ void os_link_runtime()
         symbol_name = CONS(item)->car;
         datap = CONS(item)->cdr != NIL;
         namechars = (void*)(intptr_t)
-            ((struct vector*)(symbol_name-OTHER_POINTER_LOWTAG))->data;
+            (VECTOR(symbol_name)->data);
         result = os_dlsym_default(namechars);
         odxprint(runtime_link, "linking %s => %p", namechars, result);
 

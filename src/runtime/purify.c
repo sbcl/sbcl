@@ -227,7 +227,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
 static lispobj
 ptrans_vector(lispobj thing, boolean boxed, boolean constant)
 {
-    struct vector *vector = (struct vector *)native_pointer(thing);
+    struct vector *vector = VECTOR(thing);
     long nwords = sizetab[widetag_of(vector->header)]((lispobj*)vector);
 
     lispobj *new = newspace_alloc(nwords, (constant || !boxed));

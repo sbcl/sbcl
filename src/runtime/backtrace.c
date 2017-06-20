@@ -81,7 +81,7 @@ debug_function_from_pc (struct code* code, void *pc)
     if (lowtag_of(di->fun_map) != INSTANCE_POINTER_LOWTAG)
         return NULL;
 
-    v = (struct vector *) native_pointer(di->fun_map);
+    v = VECTOR(di->fun_map);
 
     len = fixnum_value(v->length);
 

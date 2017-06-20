@@ -295,6 +295,12 @@ CONS(lispobj obj)
   return (struct cons *)(obj - LIST_POINTER_LOWTAG);
 }
 
+static inline struct vector *
+VECTOR(lispobj obj)
+{
+  return (struct vector *)(obj - OTHER_POINTER_LOWTAG);
+}
+
 static inline struct symbol *
 SYMBOL(lispobj obj)
 {

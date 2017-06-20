@@ -284,7 +284,7 @@ lispobj debug_print(lispobj string)
        here */
     char untouched[32];
     fprintf(stderr, "%s\n",
-            (char *)(((struct vector *)native_pointer(string))->data));
+            (char *)(VECTOR(string)->data));
     /* shut GCC up about not using this, because that's the point.. */
     (void)untouched;
     return NIL;
