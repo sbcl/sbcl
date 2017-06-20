@@ -111,7 +111,7 @@
 ;;;; into account.
 
 (eval-when (:compile-toplevel :execute)
-(defparameter *special-form-constantp-defs* (make-array 20 :fill-pointer 0)))
+(defparameter *!special-form-constantp-defs* (make-array 20 :fill-pointer 0)))
 
 (defmacro !defconstantp (operator lambda-list &key test eval)
   (let ((args (make-symbol "ARGS")))
@@ -152,7 +152,7 @@
       `(eval-when (:compile-toplevel :execute)
          (vector-push-extend ',(list* operator test eval
                                       (binding-maker 'args '(go fail)))
-                             *special-form-constantp-defs*)))))
+                             *!special-form-constantp-defs*)))))
 
 ;;; NOTE: special forms are tested in the order as written,
 ;;; so there is some benefit to listing important ones earliest.
@@ -252,7 +252,7 @@
                          (let* ,bindings
                            (declare (ignorable ,@(mapcar #'car bindings)))
                            ,(nth expr-selector spec))))
-                     *special-form-constantp-defs*)
+                     *!special-form-constantp-defs*)
               (t
                ,default-clause))))))
 
