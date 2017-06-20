@@ -946,8 +946,8 @@
 ;;; otherwise return :COMPILE.
 ;;; A lexical environment which contains only macros and decls is ok.
 ;;; Locally [not]inline declarations about global functions are ok.
-(defun env-from-lexenv (lexenv &aux (compiler-funs (sb-c::lexenv-vars lexenv))
-                                    (compiler-vars (sb-c::lexenv-funs lexenv)))
+(defun env-from-lexenv (lexenv &aux (compiler-funs (sb-c::lexenv-funs lexenv))
+                                    (compiler-vars (sb-c::lexenv-vars lexenv)))
   (flet ((harmless-defined-fun-p (thing)
            (and (typep thing 'sb-c::defined-fun)
                 (eq (sb-c::defined-fun-kind thing) :global-function)))

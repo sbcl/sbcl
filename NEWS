@@ -8,6 +8,7 @@ changes relative to sbcl-1.3.18:
   * bug fix: backtracing from several threads at once could fail
   * bug fix: floating-point infinities could not be used as keys
     in EQUALP hash tables. (lp#1696274)
+  * bug fix: random sb-fasteval failures. (lp#1642708)
 
 changes in sbcl-1.3.18 relative to sbcl-1.3.17:
   * minor incompatible change: existing values of CFLAGS, ASFLAGS,
