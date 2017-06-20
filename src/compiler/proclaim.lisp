@@ -276,7 +276,11 @@
                (if location
                    (setf (getf (info :source-location :declaration name) key)
                          location)
-                   (remf (info :source-location :declaration name) key)))
+                   ;; Without this WHEN, globaldb would accumulate
+                   ;; a bunch of explicitly stored empty lists because
+                   ;; it does not know that there's no need to store NIL.
+                   (when (info :source-location :declaration name)
+                     (remf (info :source-location :declaration name) key))))
              (map-names (names function &rest extra-args)
                (mapc (lambda (name)
                        (store-location name)
