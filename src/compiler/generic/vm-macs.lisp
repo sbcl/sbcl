@@ -33,10 +33,9 @@
                 (remove-keywords (cddr options) keywords)))))
 
 (def!struct (prim-object-slot
-             (:constructor make-slot (name docs rest-p offset special options))
+             (:constructor make-slot (name rest-p offset special options))
              (:conc-name slot-))
   (name nil :type symbol :read-only t)
-  (docs nil :type (or null simple-string) :read-only t)
   (rest-p nil :type (member t nil) :read-only t)
   (offset 0 :type fixnum :read-only t)
   (options nil :type list :read-only t)
@@ -80,7 +79,7 @@
           (error "No more slots can follow a :rest-p slot."))
         (destructuring-bind
             (slot-name &rest options
-                       &key docs rest-p (length (if rest-p 0 1))
+                       &key rest-p (length (if rest-p 0 1))
                        ((:type slot-type) t) init
                        (ref-known nil ref-known-p) ref-trans
                        (set-known nil set-known-p) set-trans
@@ -103,13 +102,11 @@
               (setf length 2))
             (when (oddp offset)
               (incf offset)))
-          (slots (make-slot slot-name docs rest-p offset special
-                            (remove-keywords options
-                                             '(:docs :rest-p :length))))
+          (slots (make-slot slot-name rest-p offset special
+                            (remove-keywords options '(:rest-p :length))))
           (let ((offset-sym (symbolicate name "-" slot-name
                                          (if rest-p "-OFFSET" "-SLOT"))))
-            (constants `(def!constant ,offset-sym ,offset
-                          ,@(when docs (list docs))))
+            (constants `(def!constant ,offset-sym ,offset))
             (when special
               (specials `(defvar ,special))))
           (when ref-trans
