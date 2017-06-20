@@ -1422,7 +1422,7 @@
 ;;; Parse an inline/notinline declaration. If it's a local function we're
 ;;; defining, set its INLINEP. If a global function, add a new FENV entry.
 (defun process-inline-decl (spec res fvars)
-  (let ((sense (cdr (assoc (first spec) *inlinep-translations* :test #'eq)))
+  (let ((sense (cdr (assoc (first spec) +inlinep-translations+ :test #'eq)))
         (new-fenv ()))
     (dolist (name (rest spec))
       (let ((fvar (find name fvars

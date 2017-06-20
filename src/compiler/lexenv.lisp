@@ -78,7 +78,7 @@
                    (unless (defined-fun-p what)
                      (return-from reconstruct-lexenv))
                    (push `(,(car (rassoc (defined-fun-inlinep what)
-                                         *inlinep-translations*))
+                                         +inlinep-translations+))
                            ,name)
                          declarations))
                   (t

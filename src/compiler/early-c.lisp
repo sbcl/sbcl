@@ -63,10 +63,11 @@
 ;;;             references (even under #'without FUNCALL)."
 (deftype inlinep ()
   '(member :inline :maybe-inline :notinline nil))
-(defparameter *inlinep-translations*
+(defconstant-eqx +inlinep-translations+
   '((inline . :inline)
     (notinline . :notinline)
-    (maybe-inline . :maybe-inline)))
+    (maybe-inline . :maybe-inline))
+  #'equal)
 
 ;;; *FREE-VARS* translates from the names of variables referenced
 ;;; globally to the LEAF structures for them. *FREE-FUNS* is like
