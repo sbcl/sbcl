@@ -825,13 +825,22 @@
   (assert (search "#<FOO2 {" (write-to-string (make-instance 'foo2) :pretty nil)))
   (assert (search "#<FOO2 {" (write-to-string (make-instance 'foo2) :pretty t))))
 
-(set-pprint-dispatch 'fixnum
-                     (lambda (stream obj)
-                       (format stream "#{Fixnum ")
-                       (write obj :stream stream :pretty nil)
-                       (write-char #\} stream)))
 ;; STRINGIFY-OBJECT failed to use the pretty-print dispatch table
 ;; for integers.
 (with-test (:name :stringify-pretty-integer)
-  (assert (string= (write-to-string 92 :pretty t)
-                   "#{Fixnum 92}")))
+  (unwind-protect
+       (progn
+         (set-pprint-dispatch 'fixnum
+                              (lambda (stream obj)
+                                (format stream "#{Fixnum ")
+                                (write obj :stream stream :pretty nil)
+                                (write-char #\} stream)))
+         (assert (string= (write-to-string 92 :pretty t)
+                          "#{Fixnum 92}")))
+    (set-pprint-dispatch 'fixnum nil)))
+
+(with-test (:name :readable-vector-circularity)
+  (let ((x (make-array 1 :element-type 'base-char :initial-contents "x"))
+        (y (make-array 1 :element-type 'base-char :initial-contents "y")))
+    (assert (equal (read-from-string (write-to-string (list x y) :readably t :circle t))
+                   '("x" "y")))))
