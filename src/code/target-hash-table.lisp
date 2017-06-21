@@ -508,8 +508,7 @@ multiple threads accessing the same hash-table without locking."
       (declare (type index/2 i))
       (let ((key (aref new-kv-vector (* 2 i)))
             (value (aref new-kv-vector (1+ (* 2 i)))))
-        (cond ((and (eq key +empty-ht-slot+)
-                    (eq value +empty-ht-slot+))
+        (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
                ;; Slot is empty, push it onto the free list.
                (setf (aref new-next-vector i)
                      (hash-table-next-free-kv table))
@@ -580,8 +579,7 @@ multiple threads accessing the same hash-table without locking."
       (declare (type index/2 i))
       (let ((key (aref kv-vector (* 2 i)))
             (value (aref kv-vector (1+ (* 2 i)))))
-        (cond ((and (eq key +empty-ht-slot+)
-                    (eq value +empty-ht-slot+))
+        (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
                ;; Slot is empty, push it onto free list.
                (setf (aref next-vector i) (hash-table-next-free-kv table))
                (setf (hash-table-next-free-kv table) i))

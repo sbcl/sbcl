@@ -930,29 +930,22 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 #endif
 }
 
-#ifdef EMPTY_HT_SLOT /* only if it's a static symbol */
-// "ish" because EMPTY_HT_SLOT is of course a pointer.
-#  define ht_cell_nonpointerish(x) (!is_lisp_pointer(x) || x==EMPTY_HT_SLOT)
-#else
-#  define ht_cell_nonpointerish(x) !is_lisp_pointer(x)
-#endif
-
 static int survived_gc_yet_KEY(lispobj key, lispobj value) {
-    return ht_cell_nonpointerish(key) || pointer_survived_gc_yet(key);
+    return !is_lisp_pointer(key) || pointer_survived_gc_yet(key);
 }
 static int survived_gc_yet_VALUE(lispobj key, lispobj value) {
-    return ht_cell_nonpointerish(value) || pointer_survived_gc_yet(value);
+    return !is_lisp_pointer(value) || pointer_survived_gc_yet(value);
 }
 static int survived_gc_yet_AND(lispobj key, lispobj value) {
-    int key_nonpointer = ht_cell_nonpointerish(key);
-    int val_nonpointer = ht_cell_nonpointerish(value);
+    int key_nonpointer = !is_lisp_pointer(key);
+    int val_nonpointer = !is_lisp_pointer(value);
     if (key_nonpointer && val_nonpointer) return 1;
     return (key_nonpointer || pointer_survived_gc_yet(key))
         && (val_nonpointer || pointer_survived_gc_yet(value));
 }
 static int survived_gc_yet_OR(lispobj key, lispobj value) {
-    int key_nonpointer = ht_cell_nonpointerish(key);
-    int val_nonpointer = ht_cell_nonpointerish(value);
+    int key_nonpointer = !is_lisp_pointer(key);
+    int val_nonpointer = !is_lisp_pointer(value);
     if (key_nonpointer || val_nonpointer) return 1;
     // Both MUST be pointers
     return pointer_survived_gc_yet(key) || pointer_survived_gc_yet(value);
@@ -1027,12 +1020,8 @@ scav_hash_table_entries (struct hash_table *hash_table)
       * help reduce collisions. */
      gc_assert(next_vector_length*2 == kv_length);
 
-    empty_symbol = kv_vector[1];
-    /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
-    if (widetag_of(*native_pointer(empty_symbol)) != SYMBOL_WIDETAG) {
-        lose("not a symbol where empty-hash-table-slot symbol expected: %x\n",
-             *native_pointer(empty_symbol));
-    }
+     if ((empty_symbol = kv_vector[1]) != UNBOUND_MARKER_WIDETAG)
+        lose("unexpected empty-hash-table-slot marker: %p\n", empty_symbol);
 
     /* Work through the KV vector. */
     int (*alivep_test)(lispobj,lispobj)
@@ -1094,12 +1083,10 @@ scav_vector (lispobj *where, lispobj object)
              hash_table);
     }
 
-    /* Scavenge element 1, which should be some internal symbol that
-     * the hash table code reserves for marking empty slots. */
-    scavenge(where+3, 1);
-    if (!is_lisp_pointer(where[3])) {
-        lose("not empty-hash-table-slot symbol pointer: %x\n", where[3]);
-    }
+    /* Verify that vector element 1 is as expected.
+       Don't bother scavenging it, since we lose() if it's not an immediate. */
+    if (where[3] != UNBOUND_MARKER_WIDETAG)
+        lose("unexpected empty-hash-table-slot marker: %p\n", where[3]);
 
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
