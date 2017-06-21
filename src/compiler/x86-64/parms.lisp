@@ -143,11 +143,10 @@
 (defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
-(defparameter *static-symbols*
-  (append
-   *common-static-symbols*
-   *c-callable-static-symbols*
-   '(*alien-stack-pointer*
+(defconstant-eqx +static-symbols+
+  `(,@+common-static-symbols+
+    ,@+c-callable-static-symbols+
+    *alien-stack-pointer*
 
      ;; interrupt handling
      *pseudo-atomic-bits*
@@ -165,11 +164,12 @@
 
      ;; hash table empty cell marker
      sb!impl::%empty-ht-slot%
-     )))
+     )
+  #'equal)
 
 ;;; FIXME: with #!+immobile-space, this should be the empty list,
 ;;; because *all* fdefns are permanently placed.
-(defparameter *static-funs*
+(defconstant-eqx +static-fdefns+
   '(length
     two-arg-+
     two-arg--
@@ -185,7 +185,8 @@
     two-arg-xor
     two-arg-gcd
     two-arg-lcm
-    %coerce-callable-to-fun))
+    %coerce-callable-to-fun)
+  #'equal)
 
 #!+sb-simd-pack
 (defvar *simd-pack-element-types* '(integer single-float double-float))

@@ -119,13 +119,12 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
-(defparameter *static-symbols*
-  (append
-   #!-sb-thread
-   '(*binding-stack-pointer*
-     *pseudo-atomic-atomic*
-     *pseudo-atomic-interrupted*)
-   '(*allocation-pointer*
+(defconstant-eqx +static-symbols+
+  `(#!-sb-thread
+    ,@'(*binding-stack-pointer*
+        *pseudo-atomic-atomic*
+        *pseudo-atomic-interrupted*)
+    *allocation-pointer*
      ;; interrupt handling
 
 
@@ -133,18 +132,20 @@
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
      sb!alien::*enter-alien-callback*
-     #!+gencgc *restart-lisp-function*)
-   *common-static-symbols*
-   *c-callable-static-symbols*))
+     #!+gencgc *restart-lisp-function*
+     ,@+common-static-symbols+
+     ,@+c-callable-static-symbols+)
+  #'equal)
 
-(defparameter *static-funs*
+(defconstant-eqx +static-fdefns+
   '(two-arg-gcd two-arg-lcm
     two-arg-+ two-arg-- two-arg-* two-arg-/
     two-arg-< two-arg-> two-arg-=
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
 
     eql
-    sb!kernel:%negate))
+    sb!kernel:%negate)
+  #'equal)
 
 
 ;;;; Assembler parameters:

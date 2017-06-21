@@ -228,11 +228,10 @@
 (defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
-(defparameter *static-symbols*
-  (append
-   *common-static-symbols*
-   *c-callable-static-symbols*
-   '(*alien-stack-pointer*
+(defconstant-eqx +static-symbols+
+  `(,@+common-static-symbols+
+    ,@+c-callable-static-symbols+
+    *alien-stack-pointer*
 
      ;; interrupt handling
      *pseudo-atomic-bits*
@@ -260,9 +259,10 @@
      ;; Needed for callbacks to work across saving cores. see
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
-     sb!alien::*enter-alien-callback*)))
+     sb!alien::*enter-alien-callback*)
+  #'equal)
 
-(defparameter *static-funs*
+(defconstant-eqx +static-fdefns+
   '(length
     two-arg-+
     two-arg--
@@ -278,7 +278,8 @@
     two-arg-xor
     two-arg-gcd
     two-arg-lcm
-    %coerce-callable-to-fun))
+    %coerce-callable-to-fun)
+  #'equal)
 
 #!+win32
 (defconstant +win32-tib-arbitrary-field-offset+ #.(+ #xE10 (* 4 63)))

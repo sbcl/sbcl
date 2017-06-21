@@ -115,7 +115,7 @@
        (defconstant dynamic-space-end (!configure-dynamic-space-end
                                        ,@optional-dynamic-space-end)))))
 
-(defparameter *c-callable-static-symbols*
+(defconstant-eqx +c-callable-static-symbols+
   '(sub-gc
     sb!kernel::post-gc
     internal-error
@@ -134,9 +134,10 @@
     #!+sb-thruption sb!thread::run-interruption
     #!+sb-thread sb!thread::enter-foreign-callback
     #!+(and sb-safepoint-strictly (not win32))
-    sb!unix::signal-handler-callback))
+    sb!unix::signal-handler-callback)
+  #'equal)
 
-(defparameter *common-static-symbols*
+(defconstant-eqx +common-static-symbols+
   '(t
     ;; free pointers.  Note that these are FIXNUM word counts, not (as
     ;; one might expect) byte counts or SAPs. The reason seems to be
@@ -198,7 +199,8 @@
 
     ;; for looking up assembler routine by name
     ;; and patching them on runtime startup
-    sb!fasl::*assembler-routines*))
+    sb!fasl::*assembler-routines*)
+  #'equal)
 
 ;;; Number of entries in the thread local storage. Limits the number
 ;;; of symbols with thread local bindings.

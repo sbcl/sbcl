@@ -201,18 +201,19 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
-(defparameter *static-symbols*
-  (append
-   *common-static-symbols*
-   *c-callable-static-symbols*
-   '(#!+gencgc *restart-lisp-function*)))
+(defconstant-eqx +static-symbols+
+  `(,@+common-static-symbols+
+   ,@+c-callable-static-symbols+
+   #!+gencgc *restart-lisp-function*)
+  #'equal)
 
-(defparameter *static-funs*
+(defconstant-eqx +static-fdefns+
   '(length
     two-arg-+ two-arg-- two-arg-* two-arg-/ two-arg-< two-arg-> two-arg-=
     two-arg-<= two-arg->= two-arg-/= eql %negate
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-    two-arg-gcd two-arg-lcm))
+    two-arg-gcd two-arg-lcm)
+  #'equal)
 
 ;;;; Pseudo-atomic trap number
 

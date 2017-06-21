@@ -108,13 +108,12 @@
 ;;; The fdefn objects for the static functions are loaded into static
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
-(defparameter *static-symbols*
-  (append
-   *common-static-symbols*
-   *c-callable-static-symbols*
-   '()))
+(defconstant-eqx +static-symbols+
+  `(,@+common-static-symbols+
+    ,@+c-callable-static-symbols+)
+  #'equal)
 
-(defparameter *static-funs*
+(defconstant-eqx +static-fdefns+
   '(length
     two-arg-+
     two-arg--
@@ -132,5 +131,6 @@
     two-arg-ior
     two-arg-xor
     two-arg-gcd
-    two-arg-lcm))
+    two-arg-lcm)
+  #'equal)
 

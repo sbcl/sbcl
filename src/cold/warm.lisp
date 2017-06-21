@@ -31,7 +31,7 @@
 
 (load "src/cold/muffler.lisp")
 
-(unless (member sb-int:+empty-ht-slot+ sb-vm::*static-symbols*)
+(unless (member sb-int:+empty-ht-slot+ sb-vm::+static-symbols+)
   ;; It doesn't "just work" to unintern the marker symbol, because then
   ;; then compiler thinks that equivalence-as-constant for such symbol permits
   ;; creation of new uninterned symbol at load-time, never mind that it was

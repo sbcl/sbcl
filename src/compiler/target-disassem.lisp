@@ -1804,7 +1804,7 @@
     (setf *assembler-routines-by-addr*
           (invert-address-hash *static-foreign-symbols*
                                *assembler-routines-by-addr*))
-    (loop for name in sb!vm:*static-funs*
+    (loop for name in sb!vm:+static-fdefns+
           for address =
           #!+immobile-code (sb!vm::function-raw-address name)
           #!-immobile-code (+ sb!vm::nil-value (sb!vm::static-fun-offset name))
@@ -1997,7 +1997,7 @@
       t)))
 
 (defun maybe-note-static-symbol (address dstate)
-  (dolist (symbol sb!vm:*static-symbols*)
+  (dolist (symbol sb!vm:+static-symbols+)
     (when (= (get-lisp-obj-address symbol) address)
       (return (note (lambda (s) (prin1 symbol s)) dstate))))
   ;; Guess whether 'address' is an immobile-space symbol by looking at

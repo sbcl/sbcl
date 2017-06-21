@@ -114,7 +114,7 @@
                (t
                 ;; While we could use CALL-INDIRECT here,
                 ;; the fixup allows calling _any_ Lisp function,
-                ;; not just those in *static-funs*.
+                ;; not just those in +static-fdefns+.
                 (inst mov temp-reg-tn (make-fixup function :static-call))
                 (inst call temp-reg-tn)))
          #!-immobile-code

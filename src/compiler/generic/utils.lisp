@@ -32,12 +32,12 @@
 
 (defun static-symbol-p (symbol)
   (or (null symbol)
-      (and (member symbol *static-symbols*) t)))
+      (and (member symbol +static-symbols+) t)))
 
 ;;; the byte offset of the static symbol SYMBOL
 (defun static-symbol-offset (symbol)
   (if symbol
-      (let ((posn (position symbol *static-symbols*)))
+      (let ((posn (position symbol +static-symbols+)))
         (unless posn (error "~S is not a static symbol." symbol))
         (+ (* posn (pad-data-block symbol-size))
            (pad-data-block (1- symbol-size))
@@ -48,8 +48,8 @@
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
 (defun static-fdefn-offset (name)
-  (let ((static-syms (length *static-symbols*))
-        (static-fun-index (position name *static-funs*)))
+  (let ((static-syms (length +static-symbols+))
+        (static-fun-index (position name +static-fdefns+)))
     (unless static-fun-index
       (error "~S isn't a static function." name))
     (+ (* static-syms (pad-data-block symbol-size))
