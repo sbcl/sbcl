@@ -183,7 +183,7 @@
     #!+(and sb-thread ppc) *tls-index-lock*
 
     ;; dynamic runtime linking support
-    #!+sb-dynamic-core *required-runtime-c-symbols*
+    #!+sb-dynamic-core +required-runtime-c-symbols+
     sb!kernel::*gc-epoch*
 
     ;; Dispatch tables for generic array access

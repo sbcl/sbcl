@@ -167,7 +167,7 @@ if the symbol isn't found."
   #!+sb-dynamic-core
   (loop for table-address from sb!vm::linkage-table-space-start
           by sb!vm::linkage-table-entry-size
-          and reference across sb!vm::*required-runtime-c-symbols*
+          and reference across (symbol-value 'sb!vm::+required-runtime-c-symbols+)
         do (setf (gethash reference *linkage-info*) table-address))
   #!+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))

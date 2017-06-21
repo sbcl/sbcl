@@ -2236,7 +2236,7 @@ core and return a descriptor to it."
              (lambda (symbol)
                (cold-cons (set-readonly (base-string-to-core (car symbol)))
                           (cdr symbol)))
-             'sb!vm::*required-runtime-c-symbols*)
+             'sb!vm::+required-runtime-c-symbols+)
     (to-core (sort (copy-list *cold-assembler-routines*) #'string< :key #'car)
              (lambda (rtn)
                (cold-cons (cold-intern (car rtn)) (number-to-core (cdr rtn))))
