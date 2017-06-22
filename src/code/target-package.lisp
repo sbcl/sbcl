@@ -1551,8 +1551,8 @@ PACKAGE."
                                (length (the simple-vector input)))))
                    (dovector (symbol input table)
                      (add-symbol table symbol)))))
-          (setf (package-external-symbols pkg) (!make-table (car symbols))
-                (package-internal-symbols pkg) (!make-table (cdr symbols))))
+          (setf (package-external-symbols pkg) (!make-table (first symbols))
+                (package-internal-symbols pkg) (!make-table (second symbols))))
         (setf (package-%local-nicknames pkg) nil
               (package-%locally-nicknamed-by pkg) nil
               (package-source-location pkg) nil

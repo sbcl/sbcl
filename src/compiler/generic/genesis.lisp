@@ -473,11 +473,6 @@
 
 ;;;; miscellaneous stuff to read and write the core memory
 
-;;; FIXME: should be DEFINE-MODIFY-MACRO
-(defmacro cold-push (thing list) ; for making a target list held in a host symbol
-  "Push THING onto the given cold-load LIST."
-  `(setq ,list (cold-cons ,thing ,list)))
-
 ;; Like above, but the list is held in the target's image of the host symbol,
 ;; not the host's value of the symbol.
 (defun cold-target-push (cold-thing host-symbol)
@@ -1327,13 +1322,13 @@ core and return a descriptor to it."
 ;;;; interning symbols in the cold image
 
 ;;; a map from package name as a host string to
-;;; (cold-package-descriptor . (external-symbols . internal-symbols))
+;;; ((external-symbols . internal-symbols) . cold-package-descriptor)
 (defvar *cold-package-symbols*)
 (declaim (type hash-table *cold-package-symbols*))
 
 (setf (get 'find-package :sb-cold-funcall-handler/for-value)
       (lambda (descriptor &aux (name (base-string-from-core descriptor)))
-        (or (car (gethash name *cold-package-symbols*))
+        (or (cdr (gethash name *cold-package-symbols*))
             (error "Genesis could not find a target package named ~S" name))))
 
 (defvar *classoid-cells*)
@@ -1378,7 +1373,7 @@ core and return a descriptor to it."
                (let ((cold-package (allocate-struct (symbol-value *cold-layout-gspace*)
                                                     (gethash 'package *cold-layouts*))))
                  (setf (gethash name *cold-package-symbols*)
-                       (list* cold-package nil nil))
+                       (cons (cons nil nil) cold-package))
                  ;; Initialize string slots
                  (write-slots cold-package package-layout
                               :%name (set-readonly
@@ -1396,14 +1391,14 @@ core and return a descriptor to it."
                    (concatenate 'string "SB-" (subseq string 3))
                    string))
              (chill-nicknames (pkg-name)
-               (let ((result *nil-descriptor*))
                  ;; Make the package nickname lists for the standard packages
                  ;; be the minimum specified by ANSI, regardless of what value
                  ;; the cross-compilation host happens to use.
                  ;; For packages other than the standard packages, the nickname
                  ;; list was specified by our package setup code, and we can just
                  ;; propagate the current state into the target.
-                 (dolist (nickname
+               (list-to-core
+                  (mapcar #'base-string-to-core
                           (cond ((string= pkg-name "COMMON-LISP") '("CL"))
                                 ((string= pkg-name "COMMON-LISP-USER")
                                  '("CL-USER"))
@@ -1413,9 +1408,7 @@ core and return a descriptor to it."
                                  ;; (See comment in 'set-up-cold-packages')
                                  (aver (null (package-nicknames
                                               (find-package pkg-name))))
-                                 nil))
-                          result)
-                   (cold-push (base-string-to-core nickname) result))))
+                                 nil)))))
              (find-cold-package (name)
                (cadr (find-package-cell name)))
              (find-package-cell (name)
@@ -1572,7 +1565,7 @@ core and return a descriptor to it."
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
         (let ((pkg-info (or (gethash (package-name package) *cold-package-symbols*)
                             (error "No target package descriptor for ~S" package))))
-          (write-wordindexed handle sb!vm:symbol-package-slot (car pkg-info))
+          (write-wordindexed handle sb!vm:symbol-package-slot (cdr pkg-info))
           (record-accessibility
            (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
            pkg-info handle package symbol))
@@ -1583,7 +1576,7 @@ core and return a descriptor to it."
 
 (defun record-accessibility (accessibility target-pkg-info symbol-descriptor
                              &optional host-package host-symbol)
-  (let ((access-lists (cdr target-pkg-info)))
+  (let ((access-lists (car target-pkg-info)))
     (case accessibility
       (:external (push symbol-descriptor (car access-lists)))
       (:internal (push symbol-descriptor (cdr access-lists)))
@@ -1629,7 +1622,7 @@ core and return a descriptor to it."
   (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
     ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
     (write-wordindexed *nil-descriptor* (- sb!vm:symbol-package-slot 1)
-                       (car target-cl-pkg-info))
+                       (cdr target-cl-pkg-info))
     (record-accessibility :external target-cl-pkg-info *nil-descriptor*))
   ;; Intern the others.
   (dolist (symbol sb!vm:+static-symbols+)
@@ -1658,14 +1651,6 @@ core and return a descriptor to it."
 (defun sort-cold-layouts ()
   (sort (%hash-table-alist *cold-layouts*) #'<
         :key (lambda (x) (descriptor-bits (cdr x)))))
-
-;;; a helper function for FINISH-SYMBOLS: Return a cold alist suitable
-;;; to be stored in *!INITIAL-LAYOUTS*.
-(defun cold-list-all-layouts ()
-  (let ((result *nil-descriptor*))
-    (dolist (layout (sort-cold-layouts) result)
-      (cold-push (cold-cons (cold-intern (car layout)) (cdr layout))
-                 result))))
 
 ;;; Establish initial values for magic symbols.
 ;;;
@@ -1704,7 +1689,11 @@ core and return a descriptor to it."
 
   (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
 
-  (cold-set '*!initial-layouts* (cold-list-all-layouts))
+  (cold-set '*!initial-layouts*
+            (vector-in-core
+             (mapcar (lambda (layout)
+                       (cold-cons (cold-intern (car layout)) (cdr layout)))
+                     (sort-cold-layouts))))
 
   #!+sb-thread
   (cold-set 'sb!vm::*free-tls-index*
@@ -1732,14 +1721,11 @@ core and return a descriptor to it."
     (dolist (sym syms)
       (cold-intern sym)))
 
-  (let ((cold-pkg-inits *nil-descriptor*)
-        cold-package-symbols-list)
-    (maphash (lambda (name info)
-               (push (cons name info) cold-package-symbols-list))
-             *cold-package-symbols*)
-    (setf cold-package-symbols-list
-          (sort cold-package-symbols-list #'string< :key #'car))
-    (dolist (pkgcons cold-package-symbols-list)
+  (cold-set
+   'sb!impl::*!initial-symbols*
+   (list-to-core
+    (mapcar
+     (lambda (pkgcons)
       (destructuring-bind (pkg-name . pkg-info) pkgcons
         (let ((shadow
                ;; Record shadowing symbols (except from SB-XC) in SB! packages.
@@ -1748,7 +1734,7 @@ core and return a descriptor to it."
                  (sort (remove (find-package "SB-XC")
                                (package-shadowing-symbols (find-package pkg-name))
                                :key #'symbol-package) #'string<))))
-          (write-slots (car (gethash pkg-name *cold-package-symbols*)) ; package
+          (write-slots (cdr pkg-info) ; package
                        (find-layout 'package)
                        :%shadowing-symbols (list-to-core
                                             (mapcar 'cold-intern shadow))))
@@ -1769,11 +1755,11 @@ core and return a descriptor to it."
               (destructuring-bind (sym . accessibility) symcons
                 (record-accessibility accessibility pkg-info (cold-intern sym)
                                       host-pkg sym)))))
-        (cold-push (cold-cons (car pkg-info)
-                              (cold-cons (vector-in-core (cadr pkg-info))
-                                         (vector-in-core (cddr pkg-info))))
-                   cold-pkg-inits)))
-    (cold-set 'sb!impl::*!initial-symbols* cold-pkg-inits))
+        (cold-list (cdr pkg-info)
+                   (vector-in-core (caar pkg-info))
+                   (vector-in-core (cdar pkg-info)))))
+     (sort (%hash-table-alist *cold-package-symbols*)
+           #'string< :key #'car)))) ; Sort by package-name
 
   (dump-symbol-info-vectors
    (attach-fdefinitions-to-symbols

@@ -31,7 +31,7 @@
 
 ;;;; basic LAYOUT stuff
 
-;;; a list of conses, initialized by genesis
+;;; a vector of conses, initialized by genesis
 ;;;
 ;;; In each cons, the car is the symbol naming the layout, and the
 ;;; cdr is the layout itself.
@@ -47,7 +47,7 @@
   (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
-                 (dolist (x *!initial-layouts*)
+                 (dovector (x *!initial-layouts*)
                    (setf (layout-clos-hash (cdr x)) (random-layout-clos-hash))
                    (setf (gethash (car x) *forward-referenced-layouts*)
                          (cdr x)))
