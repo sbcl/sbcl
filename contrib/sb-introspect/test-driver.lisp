@@ -666,3 +666,9 @@
 (deftest condition-slot-writer
   (matchp-name :method 'cl-user::condition-slot-writer 33)
   t)
+
+(deftest function-with-a-local-function
+    (sb-introspect:definition-source-form-number
+     (car (sb-introspect:find-definition-sources-by-name
+           'cl-user::with-a-local-function :function)))
+  0)

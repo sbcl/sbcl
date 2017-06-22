@@ -88,3 +88,8 @@
 (define-condition test-condition (error)
   ((a :reader condition-slot-reader
       :writer condition-slot-writer)))
+
+(defun with-a-local-function ()
+  (flet ((x ()))
+    (declare (notinline x))
+    (x)))

@@ -494,7 +494,15 @@
 #!-(or x86 x86-64) (defun lra-code-header (lra) (lra-code-header lra))
 (defun %make-lisp-obj (value) (%make-lisp-obj value))
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
-(defun fun-word-offset (fun) (fun-word-offset fun))
+
+(defun fun-word-offset (fun)
+  (ldb (byte (- sb!vm:n-word-bits
+                sb!vm:n-widetag-bits
+                ;; Chop off the layout
+                #!+immobile-space 32)
+             sb!vm:n-widetag-bits)
+       (sap-ref-word (int-sap (get-lisp-obj-address fun))
+                     (- sb!vm:fun-pointer-lowtag))))
 
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))

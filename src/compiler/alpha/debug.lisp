@@ -128,16 +128,6 @@
   (:generator 1
     (move thing result)))
 
-(define-vop (fun-word-offset)
-  (:policy :fast-safe)
-  (:translate fun-word-offset)
-  (:args (fun :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 5
-    (loadw res fun 0 fun-pointer-lowtag)
-    (inst srl res n-widetag-bits res)))
-
 (defknown make-number-stack-pointer ((unsigned-byte 32)) system-area-pointer
   (movable foldable flushable))
 

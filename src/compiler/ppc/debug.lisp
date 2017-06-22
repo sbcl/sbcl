@@ -99,14 +99,3 @@
   (:result-types unsigned-num)
   (:generator 1
     (move result thing)))
-
-
-(define-vop (fun-word-offset)
-  (:policy :fast-safe)
-  (:translate sb!di::fun-word-offset)
-  (:args (fun :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 5
-    (loadw res fun 0 fun-pointer-lowtag)
-    (inst srwi res res n-widetag-bits)))
