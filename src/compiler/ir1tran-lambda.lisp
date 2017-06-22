@@ -519,10 +519,12 @@
                                  :where-from (leaf-where-from var))))
 
     (let* ((n-context (sb!xc:gensym "N-CONTEXT-"))
-           (context-temp (make-lambda-var :%source-name n-context))
+           (context-temp (make-lambda-var :%source-name n-context
+                                          :arg-info (make-arg-info :kind :more-context)))
            (n-count (sb!xc:gensym "N-COUNT-"))
            (count-temp (make-lambda-var :%source-name n-count
-                                        :type (specifier-type 'index))))
+                                        :type (specifier-type 'index)
+                                        :arg-info (make-arg-info :kind :more-count))))
 
       (arg-vars context-temp count-temp)
 
