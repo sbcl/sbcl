@@ -589,7 +589,10 @@
     (when (eq (vop-info-save-p (vop-info vop)) t)
       (do-live-tns (tn (vop-save-set vop) block)
         (when (and (sc-save-p (tn-sc tn))
-                   (not (eq (tn-kind tn) :component)))
+                   (not (eq (tn-kind tn) :component))
+                   ;; Ignore closed over but not read values (due to
+                   ;; type propagation)
+                   (tn-offset tn))
           (basic-save-tn tn vop)))))
 
   (values))

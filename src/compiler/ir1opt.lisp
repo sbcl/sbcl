@@ -28,13 +28,6 @@
            ;; check for EQL types and singleton numeric types
            (values (type-singleton-p (lvar-type thing))))))
 
-;;; Same as above except it doesn't consider EQL types
-(defun strictly-constant-lvar-p (thing)
-  (declare (type (or lvar null) thing))
-  (and (lvar-p thing)
-       (let ((use (principal-lvar-use thing)))
-         (and (ref-p use) (constant-p (ref-leaf use))))))
-
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.
 (declaim (ftype (function (lvar) t) lvar-value))

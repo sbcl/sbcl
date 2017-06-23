@@ -485,7 +485,7 @@
                 ;; And the value is already loaded into a register,
                 ;; which is usually cheaper/more compactly encoded
                 ;; than a constant.
-                (and (strictly-constant-lvar-p lvar)
+                (and (constant-lvar-p lvar)
                      (funcall (second restr) (lvar-value lvar))))
                (tn
                 (and (eq (tn-kind tn) :constant)

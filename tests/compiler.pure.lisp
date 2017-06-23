@@ -5833,6 +5833,17 @@
               3)
              -5)))
 
+(with-test (:name :vop-on-eql-type.2)
+  (assert (integerp
+           (funcall
+            (funcall (checked-compile
+                      `(lambda (b)
+                         (declare ((eql -7) b)
+                                  (optimize debug))
+                         (lambda ()
+                           (+ (random 10) b))))
+                     -7)))))
+
 (flet ((test (form)
          (multiple-value-bind (fun failurep)
              (checked-compile `(lambda () ,form)
@@ -6414,3 +6425,10 @@
       (declare (optimize (speed 3)))
       (lambda () (catch :x)))
    :allow-notes nil))
+
+(with-test (:name (:combination-implementation-style :constants))
+  (assert (funcall (checked-compile
+                    `(lambda (p1 p2)
+                       (declare (optimize (speed 2) (safety 0)))
+                       (logbitp (the (eql 1) p1)
+                                (the fixnum p2)))) 1 2)))
