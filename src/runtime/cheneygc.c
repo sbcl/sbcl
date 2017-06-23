@@ -47,6 +47,9 @@ lispobj *from_space_free_pointer;
 lispobj *new_space;
 lispobj *new_space_free_pointer;
 
+/* This does nothing. It's only to satisfy a reference from gc-common. */
+char gc_coalesce_string_literals = 0;
+
 static void scavenge_newspace(void);
 
 
@@ -463,7 +466,7 @@ gc_trigger_hit(void *addr)
         return 0;
     else{
         return (addr >= (void *)current_auto_gc_trigger &&
-                addr <((void *)current_dynamic_space + dynamic_space_size));
+                (char*)addr <((char *)current_dynamic_space + dynamic_space_size));
     }
 }
 
