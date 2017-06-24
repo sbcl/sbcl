@@ -461,7 +461,9 @@
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
           (inst mov rdx rsp)
           ;; add room on stack for return value
-          (inst sub rsp 8)
+          (inst sub rsp (if (evenp arg-count)
+                            (* n-word-bytes 2)
+                            n-word-bytes))
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
           (inst mov rcx rsp)
 
@@ -484,7 +486,9 @@
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
           (inst mov #!-win32 rsi #!+win32 rdx rsp)
           ;; add room on stack for return value
-          (inst sub rsp 8)
+          (inst sub rsp (if (evenp arg-count)
+                            (* n-word-bytes 2)
+                            n-word-bytes))
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
           (inst mov #!-win32 rdx #!+win32 r8 rsp)
           ;; Make new frame
@@ -515,7 +519,13 @@
 
         ;; Pop the arguments and the return value from the stack to get
         ;; the return address at top of stack.
-        (inst add rsp (* (1+ (length argument-types)) n-word-bytes))
+
+        (inst add rsp (* (+ arg-count
+                            ;; Plus the return value and make sure it's aligned
+                            (if (evenp arg-count)
+                                2
+                                1))
+                         n-word-bytes))
         ;; Return
         (inst ret))
       (finalize-segment segment)
