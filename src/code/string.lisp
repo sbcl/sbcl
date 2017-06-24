@@ -546,28 +546,40 @@ new string COUNT long filled with the fill character."
                       (start)
                       (end)
                       :check-fill-pointer t)
-      (let* ((left-end (if left-p
-                           (do ((index start (1+ index)))
-                               ((or (= index (the fixnum end))
-                                    (not (find (schar string index)
-                                               char-bag
-                                               :test #'char=)))
-                                index)
-                             (declare (fixnum index)))
-                           start))
-             (right-end (if right-p
-                            (do ((index (1- (the fixnum end)) (1- index)))
-                                ((or (< index left-end)
-                                     (not (find (schar string index)
-                                                char-bag
-                                                :test #'char=)))
-                                 (1+ index))
-                              (declare (fixnum index)))
-                            end)))
-        (if (and (eql left-end start)
-                 (eql right-end end))
-            header
-            (subseq (the simple-string string) left-end right-end))))))
+      (flet ((trim-char-p (char)
+               (typecase char-bag
+                 (list
+                  (loop for bag-char in char-bag
+                        thereis (char= bag-char char)))
+                 (simple-string
+                  (loop for bag-char across char-bag
+                        thereis (char= bag-char char)))
+                 (simple-vector
+                  (loop for bag-char across char-bag
+                        thereis (char= bag-char char)))
+                 (vector
+                  (loop for bag-char across char-bag
+                        thereis (char= bag-char char)))
+                 (t
+                  (find char char-bag :test #'char=)))))
+        (let* ((left-end (if left-p
+                             (do ((index start (1+ index)))
+                                 ((or (= index (the fixnum end))
+                                      (not (trim-char-p (schar string index))))
+                                  index)
+                               (declare (fixnum index)))
+                             start))
+               (right-end (if right-p
+                              (do ((index (1- (the fixnum end)) (1- index)))
+                                  ((or (< index left-end)
+                                       (not (trim-char-p (schar string index))))
+                                   (1+ index))
+                                (declare (fixnum index)))
+                              end)))
+          (if (and (eql left-end start)
+                   (eql right-end end))
+              header
+              (subseq (the simple-string string) left-end right-end)))))))
 
 (defun string-left-trim (char-bag string)
   (generic-string-trim char-bag string t nil))
