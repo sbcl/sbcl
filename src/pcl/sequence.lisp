@@ -158,6 +158,10 @@
 ;;; The general protocol
 
 (defgeneric sequence:make-sequence-iterator (sequence &key from-end start end)
+  (:method ((s vector) &key from-end (start 0) end)
+    (make-vector-iterator s from-end start end))
+  (:method ((s list) &key from-end (start 0) end)
+    (make-list-iterator s from-end start end))
   (:method ((s sequence) &key from-end (start 0) end)
     (multiple-value-bind (iterator limit from-end)
         (sequence:make-simple-sequence-iterator
@@ -190,12 +194,83 @@
    elements in the order in which they appear in SEQUENCE. Otherwise,
    the elements are visited in the opposite order."))
 
-;;; the simple protocol: the simple iterator returns three values,
-;;; STATE, LIMIT and FROM-END.
-
 ;;; magic termination value for list :from-end t
 (defvar *exhausted* (cons nil nil))
 
+(defun make-list-iterator (list from-end start end)
+  (multiple-value-bind (iterator limit from-end)
+      (if from-end
+          (let* ((termination (if (= start 0) *exhausted* (nthcdr (1- start) list)))
+                 (init (if (<= (or end (length list)) start)
+                           termination
+                           (if end (last list (- (length list) (1- end))) (last list)))))
+            (values init termination t))
+          (cond
+            ((not end) (values (nthcdr start list) nil nil))
+            (t (let ((st (nthcdr start list)))
+                 (values st (nthcdr (- end start) st) nil)))))
+    (values iterator limit from-end
+            (if from-end
+                (lambda (list iterator from-end)
+                  (declare (ignore from-end))
+                  (if (eq iterator list)
+                      *exhausted*
+                      (do* ((cdr list (cdr cdr)))
+                           ((eq (cdr cdr) iterator) cdr)))
+                  (1+ iterator))
+                (lambda (list iterator from-end)
+                  (declare (ignore list from-end))
+                  (cdr iterator)))
+            (lambda (list iterator limit from-end)
+              (declare (ignore list from-end))
+              (eq iterator limit))
+            (lambda (list iterator)
+              (declare (ignore list))
+              (car iterator))
+            (lambda (new-value list iterator)
+              (declare (ignore list))
+              (setf (car iterator) new-value))
+            (lambda (list iterator)
+              (loop for cdr on list
+                    for i from 0
+                    when (eq cdr iterator)
+                    return i))
+            (lambda (list iterator)
+              (declare (ignore list))
+              iterator))))
+
+(defun make-vector-iterator (vector from-end start end)
+  (let* ((end (or end (length vector)))
+         (iterator (if from-end
+                       (1- end)
+                       start))
+         (limit (if from-end
+                    (1- start)
+                    end)))
+    (values iterator limit from-end
+            (if from-end
+                (lambda (sequence iterator from-end)
+                  (declare (ignore sequence from-end))
+                  (1- iterator))
+                (lambda (sequence iterator from-end)
+                  (declare (ignore sequence from-end))
+                  (1+ iterator)))
+            (lambda (sequence iterator limit from-end)
+              (declare (ignore sequence from-end))
+              (= iterator limit))
+            (lambda (sequence iterator)
+              (aref sequence iterator))
+            (lambda (new-value sequence iterator)
+              (setf (aref sequence iterator) new-value))
+            (lambda (sequence iterator)
+              (declare (ignore sequence))
+              iterator)
+            (lambda (sequence iterator)
+              (declare (ignore sequence))
+              iterator))))
+
+;;; the simple protocol: the simple iterator returns three values,
+;;; STATE, LIMIT and FROM-END.
 (defgeneric sequence:make-simple-sequence-iterator
     (sequence &key from-end start end)
   (:method ((s list) &key from-end (start 0) end)
@@ -303,23 +378,38 @@
    "Returns a copy of ITERATOR which also traverses SEQUENCE but can
    be mutated independently of ITERATOR."))
 
+(defun %make-sequence-iterator (sequence from-end start end)
+  (typecase sequence
+    (vector
+     (make-vector-iterator sequence from-end start end))
+    (list
+     (make-list-iterator sequence from-end start end))
+    (t
+     (sequence:make-sequence-iterator sequence :end end :start start
+                                               :from-end from-end))))
+
 (defmacro sequence:with-sequence-iterator
-    ((&rest vars) (sequence &rest args &key from-end start end) &body body)
+    ((&whole vars
+      &optional iterator limit from-end-p
+                step endp element set-element index copy)
+     (sequence &key from-end (start 0) end) &body body)
   "Executes BODY with the elements of VARS bound to the iteration
   state returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE and
   ARGS. Elements of VARS may be NIL in which case the corresponding
   value returned by MAKE-SEQUENCE-ITERATOR is ignored."
-  (declare (ignore from-end start end))
+  (declare (ignore iterator limit from-end-p
+                   step endp element set-element index copy))
   (let* ((ignored '())
          (vars (mapcar (lambda (x)
                          (or x (let ((name (gensym)))
                                  (push name ignored)
                                  name)))
                        vars)))
-   `(multiple-value-bind (,@vars) (sequence:make-sequence-iterator ,sequence ,@args)
-      (declare (type function ,@(nthcdr 3 vars))
-               (ignore ,@ignored))
-      ,@body)))
+    `(multiple-value-bind (,@vars)
+         (%make-sequence-iterator ,sequence ,from-end ,start ,end)
+       (declare (type function ,@(nthcdr 3 vars))
+                (ignore ,@ignored))
+       ,@body)))
 
 (defmacro sequence:with-sequence-iterator-functions
     ((step endp elt setf index copy)
@@ -369,13 +459,18 @@
             ((:of :in) (if of-phrase
                            (sb-loop::loop-error "Too many prepositions")
                            (setq of-phrase rest)))))
-    (destructuring-bind (it lim f-e step endp elt seq)
-        (loop repeat 7 collect (gensym))
+    (let ((it (gensym "ITER"))
+          (lim (gensym "LIMIT"))
+          (f-e (gensym "FROM-END"))
+          (step (gensym "STEP"))
+          (endp (gensym "ENDP"))
+          (elt (gensym "ELT"))
+          (seq (gensym "SEQ")))
       (push `(let ((,seq ,(car of-phrase)))) sb-loop::*loop-wrappers*)
       (push `(sequence:with-sequence-iterator (,it ,lim ,f-e ,step ,endp ,elt) (,seq))
             sb-loop::*loop-wrappers*)
-    `(((,variable nil ,data-type)) () () nil (funcall ,endp ,seq ,it ,lim ,f-e)
-      (,variable (funcall ,elt ,seq ,it) ,it (funcall ,step ,seq ,it ,f-e))))))
+      `(((,variable nil ,data-type)) () () nil (funcall ,endp ,seq ,it ,lim ,f-e)
+        (,variable (funcall ,elt ,seq ,it) ,it (funcall ,step ,seq ,it ,f-e))))))
 (sb-loop::add-loop-path
  '(element elements) 'loop-elements-iteration-path sb-loop::*loop-ansi-universe*
  :preposition-groups '((:of :in)) :inclusive-permitted nil)
@@ -830,16 +925,18 @@
     ;; Create an iteration state for SEQUENCE1 for the interesting
     ;;range within SEQUENCE1. To compare this range against ranges in
     ;;SEQUENCE2, we copy START-STATE1 and then mutate the copy.
-    (sequence:with-sequence-iterator (start-state1 nil from-end1 step1 nil elt1)
+    (sequence:with-sequence-iterator (start-state1 nil from-end1
+                                      step1 nil elt1 nil nil copy1)
         (sequence1 :start start1 :end end1 :from-end from-end)
       ;; Create an iteration state for the interesting range within
       ;; SEQUENCE2.
-      (sequence:with-sequence-iterator (start-state2 nil from-end2 step2 nil elt2 nil index2)
+      (sequence:with-sequence-iterator (start-state2 nil from-end2
+                                        step2 nil elt2 nil index2 copy2)
           (sequence2 :start start2 :end end2 :from-end from-end)
         ;; Copy both iterators at all COUNT possible match positions.
         (dotimes (i count)
-          (let ((state1 (sequence:iterator-copy sequence1 start-state1))
-                (state2 (sequence:iterator-copy sequence2 start-state2)))
+          (let ((state1 (funcall copy1 sequence1 start-state1))
+                (state2 (funcall copy2 sequence2 start-state2)))
             ;; Determine whether there is a match at the current
             ;; position. Return immediately, if there is a match.
             (dotimes
