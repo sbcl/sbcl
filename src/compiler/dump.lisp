@@ -879,12 +879,16 @@
                (ecase bits
                  (8  sb!vm:simple-array-signed-byte-8-widetag)
                  (16 sb!vm:simple-array-signed-byte-16-widetag)
-                 (32 sb!vm:simple-array-signed-byte-32-widetag)))
+                 (32 sb!vm:simple-array-signed-byte-32-widetag)
+                 #!+64-bit
+                 (64 sb!vm:simple-array-signed-byte-64-widetag)))
               (unsigned-byte
                (ecase bits
                  (8  sb!vm:simple-array-unsigned-byte-8-widetag)
                  (16 sb!vm:simple-array-unsigned-byte-16-widetag)
-                 (32 sb!vm:simple-array-unsigned-byte-32-widetag))))
+                 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
+                 #!+64-bit
+                 (64 sb!vm:simple-array-unsigned-byte-64-widetag))))
             (/ bits sb!vm:n-byte-bits)
             bits)))
         ((typep vector '(simple-bit-vector 0))

@@ -491,10 +491,7 @@
           (dump-1-var fun var (cdr x) id minimal buffer)
           (setf (gethash var var-locs) i)
           (incf i)))
-      ;; The vector can be marked as readonly so that compilation into memory
-      ;; is permitted to coalesce when saving the image.
-      ;; Otherwise only COMPILE-FILE would coalesce these.
-      (logically-readonlyize (coerce buffer 'simple-vector)))))
+      (coerce-to-smallest-eltype buffer))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of
 ;;; FUN, representing the arguments to FUN in minimal variable format.
@@ -503,8 +500,7 @@
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
       (dump-1-var fun var (leaf-info var) 0 t buffer))
-    ;; See remark in COMPUTE-VARS about LOGICALLY-READONLYIZE here.
-    (logically-readonlyize (coerce buffer 'simple-vector))))
+    (coerce-to-smallest-eltype buffer)))
 
 ;;; Return VAR's relative position in the function's variables (determined
 ;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DEBUG-INFO-VAR-DELETED.

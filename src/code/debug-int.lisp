@@ -1252,7 +1252,7 @@ register."
        (declare (type (or null simple-vector) ,vars))
        (if ,vars
            (dotimes (,i (length ,vars) ,result)
-             (let ((,var (svref ,vars ,i)))
+             (let ((,var (aref ,vars ,i)))
                ,@body))
            ,result))))
 

@@ -113,7 +113,7 @@
   ;;   * the variable ID, when it has one
   ;;   * SC-offset of primary location, if it has one
   ;;   * SC-offset of save location, if it has one
-  (vars nil :type (or simple-vector null))
+  (vars nil :type (or (simple-array * (*)) null))
   ;; a vector of the packed binary representation of the
   ;; COMPILED-DEBUG-BLOCKs in this function, in the order that the
   ;; blocks were emitted. The first block is the start of the
