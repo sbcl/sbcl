@@ -9,6 +9,10 @@ changes relative to sbcl-1.3.18:
   * bug fix: floating-point infinities could not be used as keys
     in EQUALP hash tables. (lp#1696274)
   * bug fix: random sb-fasteval failures. (lp#1642708)
+  * bug fix: align the stack in callback wrappers to defend against C
+    compiler over-aggressive use of SIMD.  (lp#1697528)
+  * bug fix: don't try to find the class when reporting that a class does
+    not exist for a primitive type.  (lp#1697226) 
 
 changes in sbcl-1.3.18 relative to sbcl-1.3.17:
   * minor incompatible change: existing values of CFLAGS, ASFLAGS,
