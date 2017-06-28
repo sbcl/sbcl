@@ -1231,8 +1231,7 @@
   (declare (type sb!di:debug-fun debug-fun))
   (let ((sc-vec sb!c::*backend-sc-numbers*)
         (groups nil)
-        (debug-vars (sb!di::debug-fun-debug-vars
-                     debug-fun)))
+        (debug-vars (sb!di::debug-fun-debug-vars debug-fun)))
     (and debug-vars
          (dotimes (debug-var-offset
                    (length debug-vars)

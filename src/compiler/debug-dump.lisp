@@ -255,7 +255,6 @@
 
     (when elsewhere-locations
       (dolist (loc (nreverse elsewhere-locations))
-        (push loc locations)
         (dump-location-from-info loc var-locs)))
     (let ((compressed
            (lz-compress (coerce byte-buffer
@@ -360,8 +359,8 @@
 ;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
-(defun dump-1-var (fun var tn id minimal buffer)
-  (declare (type lambda-var var) (type (or tn null) tn) (type index id)
+(defun dump-1-var (fun var tn minimal buffer &optional same-name-p)
+  (declare (type lambda-var var) (type (or tn null) tn)
            (type clambda fun))
   (let* ((name (leaf-debug-name var))
          (save-tn (and tn (tn-save-tn tn)))
@@ -397,9 +396,9 @@
         (:more-count
          (setq flags (logior flags compiled-debug-var-more-count-p)
                more t))))
-    (unless (or more (zerop id) minimal)
-      (setq flags (logior flags compiled-debug-var-id-p)))
-
+    (when (and same-name-p
+               (not (or more minimal)))
+      (setf flags (logior flags compiled-debug-var-same-name-p)))
     #!+64-bit
     (cond (indirect
            (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
@@ -413,6 +412,7 @@
              (setf (ldb (byte 27 35) flags) (tn-sc-offset save-tn)))))
     (vector-push-extend flags buffer)
     (unless (or minimal
+                same-name-p
                 more) ;; &more vars need no name
       ;; Dumping uninterned symbols as debug var names is kinda silly.
       ;; Reconstruction of the name on fasl load produces a new gensym anyway.
@@ -420,9 +420,7 @@
       ;; and PARSE-COMPILED-DEBUG-VARS can create the interned symbol.
       ;; This reduces core size by omitting zillions of symbols whose names
       ;; are spelled the same.
-      (vector-push-extend (if (symbol-package name) name (string name)) buffer)
-      (unless (zerop id)
-        (vector-push-extend id buffer)))
+      (vector-push-extend (if (symbol-package name) name (string name)) buffer))
 
     (cond (indirect
            ;; Indirect variables live in the parent frame, and are
@@ -474,21 +472,17 @@
                         :key (lambda (x)
                                (symbol-name (leaf-debug-name (car x))))))
           (prev-name nil)
-          (id 0)
           (i 0)
           (buffer (make-array 0 :fill-pointer 0 :adjustable t))
           ;; XEPs don't have any useful variables
           (minimal (eq (functional-kind fun) :external)))
-      (declare (type (or simple-string null) prev-name)
-               (type index id i))
+      (declare (type index i))
       (dolist (x sorted)
         (let* ((var (car x))
-               (name (symbol-name (leaf-debug-name var))))
-          (cond ((and prev-name (string= prev-name name))
-                 (incf id))
-                (t
-                 (setq id 0  prev-name name)))
-          (dump-1-var fun var (cdr x) id minimal buffer)
+               (name (leaf-debug-name var)))
+          (dump-1-var fun var (cdr x) minimal buffer
+                      (and prev-name (eq prev-name name)))
+          (setf prev-name name)
           (setf (gethash var var-locs) i)
           (incf i)))
       (coerce-to-smallest-eltype buffer))))
@@ -499,7 +493,7 @@
   (declare (type clambda fun))
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
-      (dump-1-var fun var (leaf-info var) 0 t buffer))
+      (dump-1-var fun var (leaf-info var) t buffer))
     (coerce-to-smallest-eltype buffer)))
 
 ;;; Return VAR's relative position in the function's variables (determined

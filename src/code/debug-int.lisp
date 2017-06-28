@@ -1734,6 +1734,8 @@ register."
                            :minimal)))
     (when packed-vars
       (do ((i 0)
+           (id 0)
+           prev-name
            (buffer (make-array 0 :fill-pointer 0 :adjustable t)))
           ((>= i (length packed-vars))
            (let ((result (coerce buffer 'simple-vector)))
@@ -1750,13 +1752,13 @@ register."
                  (live (logtest sb!c::compiled-debug-var-environment-live
                                 flags))
                  (save (logtest sb!c::compiled-debug-var-save-loc-p flags))
-                 (symbol (if (or more-count-p
-                                 more-context-p
-                                 minimal)
-                             nil (geti)))
-                 (id (if (logtest sb!c::compiled-debug-var-id-p flags)
-                         (geti)
-                         0))
+                 (symbol (cond ((or more-count-p
+                                    more-context-p
+                                    minimal)
+                                nil)
+                               ((logtest sb!c::compiled-debug-var-same-name-p flags)
+                                prev-name)
+                               (t (geti))))
                  (sc-offset (if deleted 0
                                 #!-64-bit (geti)
                                 #!+64-bit (ldb (byte 27 8) flags)))
@@ -1766,6 +1768,11 @@ register."
                  (indirect-sc-offset (and indirect-p
                                           (geti))))
             (aver (not (and args-minimal (not minimal))))
+            (cond ((and prev-name (string= prev-name symbol))
+                   (incf id))
+                  (t
+                   (setf id 0
+                         prev-name symbol)))
             (vector-push-extend (make-compiled-debug-var
                                  (if (stringp symbol) (make-symbol symbol) symbol)
                                  id
