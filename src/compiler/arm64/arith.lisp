@@ -629,7 +629,7 @@
 (defun %%ldb (integer size posn)
   (%ldb size posn integer))
 
-(defun %%dpb (newbyte integer size posn)
+(defun %%dpb (newbyte size posn integer)
   (%dpb newbyte size posn integer))
 
 (define-vop (ldb-c/fixnum)
