@@ -5844,6 +5844,17 @@
                            (+ (random 10) b))))
                      -7)))))
 
+(with-test (:name :vop-on-eql-type.3)
+  (assert (integerp
+           (funcall
+            (funcall (checked-compile
+                      `(lambda (b)
+                         (declare ((eql -7) b)
+                                  (optimize (compilation-speed 0) debug))
+                         (lambda ()
+                           (+ (random 10) b))))
+                     -7)))))
+
 (flet ((test (form)
          (multiple-value-bind (fun failurep)
              (checked-compile `(lambda () ,form)
