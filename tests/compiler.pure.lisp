@@ -6443,3 +6443,17 @@
                        (declare (optimize (speed 2) (safety 0)))
                        (logbitp (the (eql 1) p1)
                                 (the fixnum p2)))) 1 2)))
+
+(with-test (:name :reducing-constants)
+  (assert (eql (funcall (checked-compile
+                       `(lambda (x)
+                          (* 4.457268f31 4 x
+                             -46253801283659)))
+                      5.0f-9)
+             -4.123312f37))
+  (assert (eql (funcall (checked-compile
+                       `(lambda (x)
+                          (* #C(4.457268f31 0.0) 4 x
+                             -46253801283659)))
+                      5.0f-9)
+             #C(-4.123312f37 -0.0))))

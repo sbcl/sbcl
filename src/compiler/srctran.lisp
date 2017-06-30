@@ -4209,9 +4209,25 @@
                          arg)))
           (cond ((not (funcall one-arg-constant-p value))
                  (not-constants arg))
-                (reduced-value
-                 (setf reduced-value (funcall fun reduced-value value)
-                       reduced-p t))
+                 (reduced-value
+                  (handler-case (funcall fun reduced-value value)
+                    (arithmetic-error ()
+                      (not-constants arg))
+                    (:no-error (value)
+                      ;; Some backends have no float traps
+                      (cond #!+(or arm arm64)
+                            ((or (and (floatp value)
+                                      (or (float-infinity-p value)
+                                          (float-nan-p value)))
+                                 (and (complex-float-p value)
+                                      (or (float-infinity-p (imagpart value))
+                                          (float-nan-p (imagpart value))
+                                          (float-infinity-p (realpart value))
+                                          (float-nan-p (realpart value)))))
+                             (not-constants arg))
+                            (t
+                             (setf reduced-value value
+                                   reduced-p t))))))
                 (t
                  (setf reduced-value value)))))
       ;; It is tempting to drop constants reduced to identity here,
