@@ -4215,7 +4215,8 @@
                       (not-constants arg))
                     (:no-error (value)
                       ;; Some backends have no float traps
-                      (cond #!+(or arm arm64)
+                      (cond #!+(or arm arm64
+                                   (not (host-feature sb-xc-host)))
                             ((or (and (floatp value)
                                       (or (float-infinity-p value)
                                           (float-nan-p value)))
