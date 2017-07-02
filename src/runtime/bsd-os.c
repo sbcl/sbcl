@@ -187,38 +187,6 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     }
 }
 
-static boolean
-in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
-{
-    char* beg = (char*) sbeg;
-    char* end = (char*) sbeg + slen;
-    char* adr = (char*) a;
-    return (adr >= beg && adr < end);
-}
-
-boolean
-is_valid_lisp_addr(os_vm_address_t addr)
-{
-    struct thread *th;
-
-    if (in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
-        in_range_p(addr, STATIC_SPACE_START, STATIC_SPACE_SIZE) ||
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        in_range_p(addr, IMMOBILE_SPACE_START, IMMOBILE_SPACE_SIZE) ||
-#endif
-        in_range_p(addr, DYNAMIC_SPACE_START, dynamic_space_size))
-        return 1;
-    for_each_thread(th) {
-        if (((os_vm_address_t)th->control_stack_start <= addr) &&
-            (addr < (os_vm_address_t)th->control_stack_end))
-            return 1;
-        if (in_range_p(addr, (lispobj) th->binding_stack_start,
-                       BINDING_STACK_SIZE))
-            return 1;
-    }
-    return 0;
-}
-
 /*
  * any OS-dependent special low-level handling for signals
  */

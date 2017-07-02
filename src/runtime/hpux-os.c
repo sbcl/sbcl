@@ -72,29 +72,6 @@ os_protect(os_vm_address_t addr, os_vm_size_t len, os_vm_prot_t prot)
         perror("mprotect");
     }
 }
-
-boolean
-is_valid_lisp_addr(os_vm_address_t addr)
-{
-    struct thread *th;
-    size_t ad = (size_t) addr;
-
-    if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
-        || (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
-        || (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_0_SPACE_END)
-        || (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_1_SPACE_END)
-        )
-        return 1;
-    for_each_thread(th) {
-        if((size_t)(th->control_stack_start) <= ad
-           && ad < (size_t)(th->control_stack_end))
-            return 1;
-        if((size_t)(th->binding_stack_start) <= ad
-           && ad < (size_t)(th->binding_stack_start + BINDING_STACK_SIZE))
-            return 1;
-    }
-    return 0;
-}
 
 /*
  * any OS-dependent special low-level handling for signals

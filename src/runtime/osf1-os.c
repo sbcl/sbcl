@@ -86,19 +86,6 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
         perror("mprotect");
     }
 }
-
-boolean
-is_valid_lisp_addr(os_vm_address_t addr)
-{
-    int ret;
-    os_vm_address_t newaddr;
-    newaddr=os_trunc_to_page(addr);
-    if((ret=mvalid(newaddr,newaddr-addr+4,OS_VM_PROT_ALL)) == 0)
-        return TRUE;
-    else if(errno==EINVAL)
-        perror("mvalid");
-    return FALSE;
-}
 
 /*
  * any OS-dependent special low-level handling for signals

@@ -226,4 +226,35 @@ void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
         lose("unexpected mmap(%d, %d, ...) failure\n", addr, len);
     }
 }
+
+boolean
+is_valid_lisp_addr(os_vm_address_t addr)
+{
+    struct thread *th;
+    size_t ad = (size_t) addr;
+
+    if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
+        || (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
+#if defined LISP_FEATURE_IMMOBILE_SPACE
+        || (IMMOBILE_SPACE_START <= ad && ad < IMMOBILE_SPACE_END)
+#endif
+#if defined LISP_FEATURE_GENCGC
+        || (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+#else
+        || (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_0_SPACE_END)
+        || (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_1_SPACE_END)
+#endif
+        )
+        return 1;
+    for_each_thread(th) {
+        if((size_t)(th->control_stack_start) <= ad
+           && ad < (size_t)(th->control_stack_end))
+            return 1;
+        if((size_t)(th->binding_stack_start) <= ad
+           && ad < (size_t)(th->binding_stack_start + BINDING_STACK_SIZE))
+            return 1;
+    }
+    return 0;
+}
+
 #endif

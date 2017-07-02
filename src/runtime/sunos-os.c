@@ -84,47 +84,6 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     }
 }
 
-static boolean in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
-{
-    char* beg = (char*) sbeg;
-    char* end = (char*) sbeg + slen;
-    char* adr = (char*) a;
-    return (adr >= beg && adr < end);
-}
-
-boolean is_valid_lisp_addr(os_vm_address_t addr)
-{
-    /* Old CMUCL comment:
-
-       Just assume address is valid if it lies within one of the known
-       spaces.  (Unlike sunos-os which keeps track of every valid page.) */
-
-    /* FIXME: this looks like a valid definition for all targets with
-       cheney-gc; it may not be impressively smart (witness the
-       comment above) but maybe associating these functions with the
-       GC rather than the OS would be a maintainability win.  -- CSR,
-       2003-04-04 */
-    struct thread *th;
-    if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
-       in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
-#ifdef LISP_FEATURE_GENCGC
-       in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size)
-#else
-       in_range_p(addr, DYNAMIC_0_SPACE_START, dynamic_space_size) ||
-       in_range_p(addr, DYNAMIC_1_SPACE_START, dynamic_space_size)
-#endif
-       )
-        return 1;
-    for_each_thread(th) {
-        if((th->control_stack_start <= addr) && (addr < th->control_stack_end))
-            return 1;
-        if(in_range_p(addr, th->binding_stack_start, BINDING_STACK_SIZE))
-            return 1;
-    }
-    return 0;
-}
-
-
 #if defined LISP_FEATURE_GENCGC
 
 void
