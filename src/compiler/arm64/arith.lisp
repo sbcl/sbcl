@@ -912,21 +912,22 @@
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
   (:translate %logbitp)
   (:conditional :ne)
-  (:arg-types tagged-num (:constant (integer 0 63)))
+  (:arg-types tagged-num (:constant (mod #.n-word-bits)))
   (:generator 4
-    (inst tst x (ash 1 (+ y n-fixnum-tag-bits)))))
+    (inst tst x (ash 1 (min (+ y n-fixnum-tag-bits)
+                            (1- n-word-bits))))))
 
 (define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
   (:translate %logbitp)
   (:conditional :ne)
-  (:arg-types signed-num (:constant (integer 0 63)))
+  (:arg-types signed-num (:constant (mod #.n-word-bits)))
   (:generator 5
     (inst tst x (ash 1 y))))
 
 (define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
   (:translate %logbitp)
   (:conditional :ne)
-  (:arg-types unsigned-num (:constant (integer 0 63)))
+  (:arg-types unsigned-num (:constant (mod #.n-word-bits)))
   (:generator 5
     (inst tst x (ash 1 y))))
 

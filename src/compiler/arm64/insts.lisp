@@ -250,7 +250,10 @@
   (operand 0 :type (integer 0 63)))
 
 (define-condition cannot-encode-immediate-operand (error)
-  ((value :initarg :value)))
+  ((value :initarg :value))
+  (:report
+   (lambda (condition stream)
+     (format stream "Cannot encode ~S" (slot-value condition 'value)))))
 
 (defun encode-shifted-register (operand)
   (etypecase operand

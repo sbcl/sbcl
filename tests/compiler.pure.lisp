@@ -6457,3 +6457,10 @@
                              -46253801283659)))
                       5.0f-9)
              #C(-4.123312f37 -0.0))))
+
+(with-test (:name :logbitp-past-fixnum)
+  (let ((fun (checked-compile `(lambda (x)
+                                 (logbitp sb-vm:n-fixnum-bits
+                                          (the fixnum x))))))
+    (assert (not (funcall fun 1)))
+    (assert (funcall fun -1))))
