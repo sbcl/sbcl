@@ -213,8 +213,7 @@
 
 (define-vop (test-fixnum-mod-power-of-two)
   (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+                              unsigned-reg signed-reg)))
   (:arg-types *
               (:constant (satisfies power-of-two-limit-p)))
   (:translate fixnum-mod-p)
@@ -223,17 +222,14 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 2
-     (aver (not (sc-is value immediate)))
      (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                            hi
                            (fixnumize hi))))
        (inst tst value (lognot fixnum-hi)))))
 
-(define-vop (test-fixnum-mod-tagged-unsigned-imm)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
-  (:arg-types (:or tagged-num unsigned-num signed-num)
+(define-vop (test-fixnum-mod-signed-unsigned-imm)
+  (:args (value :scs (unsigned-reg signed-reg)))
+  (:arg-types (:or unsigned-num signed-num)
               (:constant (satisfies add-sub-immediate-p)))
   (:translate fixnum-mod-p)
   (:conditional :ls)
@@ -241,39 +237,23 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
-     (aver (not (sc-is value immediate)))
-     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                          hi
-                          (fixnumize hi))))
-       (inst cmp value fixnum-hi))))
+     (inst cmp value hi)))
 
-(defun add-sub-immediate+1-p (x)
-  (add-sub-immediate-p (1+ (fixnumize x))))
-
-;;; Adding 1 and changing the codntions from <= to < allows to encode
-;;; more immediates.
-(define-vop (test-fixnum-mod-tagged-unsigned-imm+1)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
-  (:arg-types (:or tagged-num unsigned-num signed-num)
-              (:constant (satisfies add-sub-immediate+1-p)))
+(define-vop (test-fixnum-mod-tagged-imm)
+  (:args (value :scs (any-reg)))
+  (:arg-types tagged-num
+              (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:translate fixnum-mod-p)
-  (:conditional :cc)
+  (:conditional :ls)
   (:info hi)
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
-     (aver (not (sc-is value immediate)))
-     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                          (1+ hi)
-                          (fixnumize (1+ hi)))))
-       (inst cmp value fixnum-hi))))
+    (inst cmp value (fixnumize hi))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned)
   (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+                              unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
               (:constant fixnum))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -283,31 +263,22 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
-     (aver (not (sc-is value immediate)))
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                           hi
                           (fixnumize hi))))
        (load-immediate-word temp fixnum-hi)
        (inst cmp value temp))))
 
-(defun add-sub-immediate/+1-p (x)
-  (let ((x (fixnumize x)))
-    (or (add-sub-immediate-p x)
-        (add-sub-immediate-p (1+ x)))))
-
 (define-vop (test-fixnum-mod-*-imm)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (satisfies add-sub-immediate/+1-p)))
+  (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:translate fixnum-mod-p)
   (:conditional)
   (:info target not-p hi)
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 5
-    (let* ((1+ (not (add-sub-immediate-p (fixnumize hi))))
-           (fixnum-hi (fixnumize (if 1+
-                                     (1+ hi)
-                                     hi))))
+    (let ((fixnum-hi (fixnumize hi)))
       #.(assert (= fixnum-tag-mask 1))
       (cond (not-p
              (inst tst value fixnum-tag-mask)
@@ -317,8 +288,8 @@
              (inst tbnz value 0 skip)))
       (inst cmp value fixnum-hi)
       (inst b (if not-p
-                  (if 1+ :cs :hi)
-                  (if 1+ :cc :ls))
+                  :hi
+                  :ls)
             target))
     skip))
 

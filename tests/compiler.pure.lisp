@@ -6464,3 +6464,21 @@
                                           (the fixnum x))))))
     (assert (not (funcall fun 1)))
     (assert (funcall fun -1))))
+
+(with-test (:name :dpb-implementation-style)
+  (assert (= (funcall (checked-compile
+                       `(lambda ()
+                          (let ((res 126))
+                            (declare (type sb-vm:signed-word res))
+                            (setf res (dpb res (byte 1 2) res))
+                            res))))
+             122)))
+
+(with-test (:name :fixnum-mod-p-immediate)
+  (let ((fun (checked-compile `(lambda (x)
+                                 (declare (type fixnum x))
+                                 (typep x '(integer 0 2049))))))
+    (assert (not (funcall fun 2050)))
+    (assert (not (funcall fun -1)))
+    (assert (funcall fun 1))
+    (assert (funcall fun 0))))

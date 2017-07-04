@@ -2766,12 +2766,3 @@
                                           :allow-warnings t
                                           :allow-failure t))
                 type-error))
-
-(with-test (:name :dpb-implementation-style)
-  (assert (= (funcall (checked-compile
-                       `(lambda ()
-                          (let ((res 126))
-                            (declare (type sb-vm:signed-word res))
-                            (setf res (dpb res (byte 1 2) res))
-                            res))))
-             122)))
