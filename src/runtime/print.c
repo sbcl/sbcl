@@ -360,18 +360,18 @@ static void print_otherimm(lispobj obj)
     printf(", %s", widetag_names[widetag_of(obj) >> 2]);
 
     switch (widetag_of(obj)) {
-        case CHARACTER_WIDETAG:
-            printf(": ");
-            brief_otherimm(obj);
-            break;
+    case CHARACTER_WIDETAG:
+        printf(": ");
+        brief_otherimm(obj);
+        break;
 
-        case SAP_WIDETAG:
-        case UNBOUND_MARKER_WIDETAG:
-            break;
+    case SAP_WIDETAG:
+    case UNBOUND_MARKER_WIDETAG:
+        break;
 
-        default:
-            printf(": data=%"OBJ_FMTX, (obj>>8));
-            break;
+    default:
+        printf(": data=%"OBJ_FMTX, (obj>>8));
+        break;
     }
 }
 
@@ -434,20 +434,18 @@ char * simple_base_stringize(struct vector * string)
 static void brief_struct(lispobj obj)
 {
     struct instance *instance = (struct instance *)native_pointer(obj);
-    {
-        extern struct vector * instance_classoid_name(lispobj*);
-        struct vector * classoid_name;
-        classoid_name = instance_classoid_name((lispobj*)instance);
-        if ( classoid_name ) {
-          char * namestring = simple_base_stringize(classoid_name);
-          printf("#<ptr to %p %s instance>",
-                 (void*)instance_layout((lispobj*)instance), namestring);
-          if ( namestring != (char*)classoid_name->data )
-              free(namestring);
-        } else {
-          printf("#<ptr to %p instance>",
-                 (void*)instance_layout((lispobj*)instance));
-        }
+    extern struct vector * instance_classoid_name(lispobj*);
+    struct vector * classoid_name;
+    classoid_name = instance_classoid_name((lispobj*)instance);
+    if ( classoid_name ) {
+        char * namestring = simple_base_stringize(classoid_name);
+        printf("#<ptr to %p %s instance>",
+               (void*)instance_layout((lispobj*)instance), namestring);
+        if ( namestring != (char*)classoid_name->data )
+            free(namestring);
+    } else {
+        printf("#<ptr to %p instance>",
+               (void*)instance_layout((lispobj*)instance));
     }
 }
 
@@ -469,18 +467,16 @@ static void print_struct(lispobj obj)
     struct instance *instance = (struct instance *)native_pointer(obj);
     unsigned int i;
     char buffer[16];
-    {
-        lispobj layout_obj =  instance_layout(native_pointer(obj));
-        print_obj("type: ", layout_obj);
-        struct layout * layout = (struct layout*)native_pointer(layout_obj);
-        for (i=INSTANCE_DATA_START; i<instance_length(instance->header); i++) {
-            sprintf(buffer, "slot %d: ", i);
-            if (layout != NULL && tagged_slot_p(layout, i)) {
-                print_obj(buffer, instance->slots[i]);
-            } else {
-                newline(NULL);
-                printf("\n\t    %s0x%"OBJ_FMTX" [raw]", buffer, instance->slots[i]);
-            }
+    lispobj layout_obj =  instance_layout(native_pointer(obj));
+    print_obj("type: ", layout_obj);
+    struct layout * layout = (struct layout*)native_pointer(layout_obj);
+    for (i=INSTANCE_DATA_START; i<instance_length(instance->header); i++) {
+        sprintf(buffer, "slot %d: ", i);
+        if (layout != NULL && tagged_slot_p(layout, i)) {
+            print_obj(buffer, instance->slots[i]);
+        } else {
+            newline(NULL);
+            printf("\n\t    %s0x%"OBJ_FMTX" [raw]", buffer, instance->slots[i]);
         }
     }
 }
@@ -621,226 +617,224 @@ static lispobj symbol_function(lispobj* symbol)
 
 static void print_otherptr(lispobj obj)
 {
-    {
 #ifndef LISP_FEATURE_ALPHA
-        lispobj *ptr;
-        unsigned long header;
-        unsigned long length;
+    lispobj *ptr;
+    unsigned long header;
+    unsigned long length;
 #else
-        u32 *ptr;
-        u32 header;
-        u32 length;
+    u32 *ptr;
+    u32 header;
+    u32 length;
 #endif
-        int count, type, index;
-        char buffer[16];
+    int count, type, index;
+    char buffer[16];
 
-        ptr = native_pointer(obj);
-        if (ptr == NULL) {
-                printf(" (NULL Pointer)");
-                return;
-        }
+    ptr = native_pointer(obj);
+    if (ptr == NULL) {
+        printf(" (NULL Pointer)");
+        return;
+    }
 
-        header = *ptr++;
-        length = fixnum_value(*ptr);
-        count = HeaderValue(header);
-        type = widetag_of(header);
+    header = *ptr++;
+    length = fixnum_value(*ptr);
+    count = HeaderValue(header);
+    type = widetag_of(header);
 
-        print_obj("header: ", header);
-        if (!other_immediate_lowtag_p(header)) {
-            NEWLINE_OR_RETURN;
-            printf("(invalid header object)");
-            return;
-        }
+    print_obj("header: ", header);
+    if (!other_immediate_lowtag_p(header)) {
+        NEWLINE_OR_RETURN;
+        printf("(invalid header object)");
+        return;
+    }
 
-        if (unprintable_array_types[type/8] & (1<<(type % 8)))
-            return;
-        switch (type) {
-            case BIGNUM_WIDETAG:
-                ptr += count;
-                NEWLINE_OR_RETURN;
-                printf("0x");
-                while (count-- > 0)
-                    printf(
+    if (unprintable_array_types[type/8] & (1<<(type % 8)))
+        return;
+    switch (type) {
+    case BIGNUM_WIDETAG:
+        ptr += count;
+        NEWLINE_OR_RETURN;
+        printf("0x");
+        while (count-- > 0)
+            printf(
 #if N_WORD_BITS == 32
-                           "%08lx%s",
+                   "%08lx%s",
 #else
-                           "%016lx%s",
+                   "%016lx%s",
 #endif
-                           (unsigned long) *--ptr, (count?"_":""));
-                break;
+                   (unsigned long) *--ptr, (count?"_":""));
+        break;
 
-            case RATIO_WIDETAG:
-                print_slots(ratio_slots, count, ptr);
-                break;
+    case RATIO_WIDETAG:
+        print_slots(ratio_slots, count, ptr);
+        break;
 
-            case COMPLEX_WIDETAG:
-                print_slots(complex_slots, count, ptr);
-                break;
+    case COMPLEX_WIDETAG:
+        print_slots(complex_slots, count, ptr);
+        break;
 
-            case SYMBOL_WIDETAG:
-                // Only 1 byte of a symbol header conveys its size.
-                // The other bytes may be freely used by the backend.
-                print_slots(symbol_slots, count & 0xFF, ptr);
-                if (symbol_function(ptr-1) != NIL)
-                    print_obj("fun: ", symbol_function(ptr-1));
-                break;
+    case SYMBOL_WIDETAG:
+        // Only 1 byte of a symbol header conveys its size.
+        // The other bytes may be freely used by the backend.
+        print_slots(symbol_slots, count & 0xFF, ptr);
+        if (symbol_function(ptr-1) != NIL)
+            print_obj("fun: ", symbol_function(ptr-1));
+        break;
 
 #if N_WORD_BITS == 32
-            case SINGLE_FLOAT_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("%g", ((struct single_float *)native_pointer(obj))->value);
-                break;
+    case SINGLE_FLOAT_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("%g", ((struct single_float *)native_pointer(obj))->value);
+        break;
 #endif
-            case DOUBLE_FLOAT_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("%g", ((struct double_float *)native_pointer(obj))->value);
-                break;
+    case DOUBLE_FLOAT_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("%g", ((struct double_float *)native_pointer(obj))->value);
+        break;
 
 #ifdef LONG_FLOAT_WIDETAG
-            case LONG_FLOAT_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("%Lg", ((struct long_float *)native_pointer(obj))->value);
-                break;
+    case LONG_FLOAT_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("%Lg", ((struct long_float *)native_pointer(obj))->value);
+        break;
 #endif
 
 #ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
-            case COMPLEX_SINGLE_FLOAT_WIDETAG:
-                NEWLINE_OR_RETURN;
+    case COMPLEX_SINGLE_FLOAT_WIDETAG:
+        NEWLINE_OR_RETURN;
 #ifdef LISP_FEATURE_64_BIT
-                printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[0]);
+        printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[0]);
 #else
-                printf("%g", ((struct complex_single_float *)native_pointer(obj))->real);
+        printf("%g", ((struct complex_single_float *)native_pointer(obj))->real);
 #endif
-                NEWLINE_OR_RETURN;
+        NEWLINE_OR_RETURN;
 #ifdef LISP_FEATURE_64_BIT
-                printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[1]);
+        printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[1]);
 #else
-                printf("%g", ((struct complex_single_float *)native_pointer(obj))->imag);
+        printf("%g", ((struct complex_single_float *)native_pointer(obj))->imag);
 #endif
-                break;
+        break;
 #endif
 
 #ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
-            case COMPLEX_DOUBLE_FLOAT_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("%g", ((struct complex_double_float *)native_pointer(obj))->real);
-                NEWLINE_OR_RETURN;
-                printf("%g", ((struct complex_double_float *)native_pointer(obj))->imag);
-                break;
+    case COMPLEX_DOUBLE_FLOAT_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("%g", ((struct complex_double_float *)native_pointer(obj))->real);
+        NEWLINE_OR_RETURN;
+        printf("%g", ((struct complex_double_float *)native_pointer(obj))->imag);
+        break;
 #endif
 
 #ifdef COMPLEX_LONG_FLOAT_WIDETAG
-            case COMPLEX_LONG_FLOAT_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->real);
-                NEWLINE_OR_RETURN;
-                printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->imag);
-                break;
+    case COMPLEX_LONG_FLOAT_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->real);
+        NEWLINE_OR_RETURN;
+        printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->imag);
+        break;
 #endif
 
-            case SIMPLE_BASE_STRING_WIDETAG:
+    case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-            case SIMPLE_CHARACTER_STRING_WIDETAG:
+    case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
-                NEWLINE_OR_RETURN;
-                show_lstring((struct vector*)native_pointer(obj), 1, stdout);
-                break;
+        NEWLINE_OR_RETURN;
+        show_lstring((struct vector*)native_pointer(obj), 1, stdout);
+        break;
 
-            case SIMPLE_VECTOR_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("length = %ld", length);
-                ptr++;
-                index = 0;
-                while (length-- > 0) {
-                    sprintf(buffer, "%d: ", index++);
-                    print_obj(buffer, *ptr++);
-                }
-                break;
+    case SIMPLE_VECTOR_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("length = %ld", length);
+        ptr++;
+        index = 0;
+        while (length-- > 0) {
+            sprintf(buffer, "%d: ", index++);
+            print_obj(buffer, *ptr++);
+        }
+        break;
 
-            // FIXME: This case looks unreachable. print_struct() does it
-            case INSTANCE_WIDETAG:
-                NEWLINE_OR_RETURN;
-                count &= SHORT_HEADER_MAX_WORDS;
-                printf("length = %ld", (long) count);
-                index = 0;
-                while (count-- > 0) {
-                    sprintf(buffer, "%d: ", index++);
-                    print_obj(buffer, *ptr++);
-                }
-                break;
+    // FIXME: This case looks unreachable. print_struct() does it
+    case INSTANCE_WIDETAG:
+        NEWLINE_OR_RETURN;
+        count &= SHORT_HEADER_MAX_WORDS;
+        printf("length = %ld", (long) count);
+        index = 0;
+        while (count-- > 0) {
+            sprintf(buffer, "%d: ", index++);
+            print_obj(buffer, *ptr++);
+        }
+        break;
 
-            case CODE_HEADER_WIDETAG:
-                count &= SHORT_HEADER_MAX_WORDS;
-                // ptr was already bumped up
-                for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
-                    sprintf(buffer, "f[%d]: ", fun_index);
-                    print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG));
-                });
-                print_slots(code_slots, count-1, ptr);
-                break;
+    case CODE_HEADER_WIDETAG:
+        count &= SHORT_HEADER_MAX_WORDS;
+        // ptr was already bumped up
+        for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
+            sprintf(buffer, "f[%d]: ", fun_index);
+            print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG));
+        });
+        print_slots(code_slots, count-1, ptr);
+        break;
 
-            case SIMPLE_FUN_WIDETAG:
-                print_obj("code: ",
-                          make_lispobj(native_pointer((lispobj)(ptr-1))
-                                       -(HeaderValue(header)&0xFFFF),
-                                       OTHER_POINTER_LOWTAG));
-                print_slots(simple_fun_slots,
-                            sizeof simple_fun_slots/sizeof(char*)-1, ptr);
-                break;
+    case SIMPLE_FUN_WIDETAG:
+        print_obj("code: ",
+                  make_lispobj(native_pointer((lispobj)(ptr-1))
+                               -(HeaderValue(header)&0xFFFF),
+                               OTHER_POINTER_LOWTAG));
+        print_slots(simple_fun_slots,
+                    sizeof simple_fun_slots/sizeof(char*)-1, ptr);
+        break;
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-            case RETURN_PC_WIDETAG:
-                print_obj("code: ", obj - (count * 4));
-                break;
+    case RETURN_PC_WIDETAG:
+        print_obj("code: ", obj - (count * 4));
+        break;
 #endif
 
-            case CLOSURE_WIDETAG:
-                print_slots(closure_slots,
-                            count & SHORT_HEADER_MAX_WORDS, ptr);
-                break;
+    case CLOSURE_WIDETAG:
+        print_slots(closure_slots,
+                    count & SHORT_HEADER_MAX_WORDS, ptr);
+        break;
 
-            case FUNCALLABLE_INSTANCE_WIDETAG:
-                print_slots(funcallable_instance_slots,
-                            count & SHORT_HEADER_MAX_WORDS, ptr);
-                break;
+    case FUNCALLABLE_INSTANCE_WIDETAG:
+        print_slots(funcallable_instance_slots,
+                    count & SHORT_HEADER_MAX_WORDS, ptr);
+        break;
 
-            case VALUE_CELL_WIDETAG:
-                print_slots(value_cell_slots, 1, ptr);
-                break;
+    case VALUE_CELL_WIDETAG:
+        print_slots(value_cell_slots, 1, ptr);
+        break;
 
-            case SAP_WIDETAG:
-                NEWLINE_OR_RETURN;
+    case SAP_WIDETAG:
+        NEWLINE_OR_RETURN;
 #ifndef LISP_FEATURE_ALPHA
-                printf("0x%08lx", (unsigned long) *ptr);
+        printf("0x%08lx", (unsigned long) *ptr);
 #else
-                printf("0x%016lx", *(lispobj*)(ptr+1));
+        printf("0x%016lx", *(lispobj*)(ptr+1));
 #endif
-                break;
+        break;
 
-            case WEAK_POINTER_WIDETAG:
-                print_slots(weak_pointer_slots, 1, ptr);
-                break;
+    case WEAK_POINTER_WIDETAG:
+        print_slots(weak_pointer_slots, 1, ptr);
+        break;
 
-            case CHARACTER_WIDETAG:
-            case UNBOUND_MARKER_WIDETAG:
-                NEWLINE_OR_RETURN;
-                printf("pointer to an immediate?");
-                break;
+    case CHARACTER_WIDETAG:
+    case UNBOUND_MARKER_WIDETAG:
+        NEWLINE_OR_RETURN;
+        printf("pointer to an immediate?");
+        break;
 
-            case FDEFN_WIDETAG:
+    case FDEFN_WIDETAG:
 #ifdef LISP_FEATURE_IMMOBILE_CODE
-                print_slots(fdefn_slots, 2, ptr);
-                print_obj("entry: ", fdefn_raw_referent((struct fdefn*)(ptr-1)));
+        print_slots(fdefn_slots, 2, ptr);
+        print_obj("entry: ", fdefn_raw_referent((struct fdefn*)(ptr-1)));
 #else
-                print_slots(fdefn_slots, count & SHORT_HEADER_MAX_WORDS, ptr);
+        print_slots(fdefn_slots, count & SHORT_HEADER_MAX_WORDS, ptr);
 #endif
-                break;
+        break;
 
-            default:
-                NEWLINE_OR_RETURN;
-                printf("Unknown header object?");
-                break;
-        }
+    default:
+        NEWLINE_OR_RETURN;
+        printf("Unknown header object?");
+        break;
     }
 }
 
