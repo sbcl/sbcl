@@ -317,14 +317,14 @@
            (values :default nil)))
       (logbitp
        (cond
-         ((or (valid-funtype '((constant-arg (integer 0 #.(1- n-word-bits))) signed-word) '*)
-              (valid-funtype '((constant-arg (integer 0 #.(1- n-word-bits))) word) '*))
+         ((or (valid-funtype '((constant-arg (mod #.n-word-bits)) signed-word) '*)
+              (valid-funtype '((constant-arg (mod #.n-word-bits)) word) '*))
           (values :transform '(lambda (index integer)
                                (%logbitp integer index))))
          (t (values :default nil))))
       (%ldb
        (flet ((validp (type width)
-                (and (valid-funtype `((constant-arg (mod ,width))
+                (and (valid-funtype `((constant-arg (integer 1 ,(1- width)))
                                       (constant-arg (mod ,width))
                                       ,type)
                                     'unsigned-byte)
@@ -343,7 +343,7 @@
       (%dpb
        (flet ((validp (type result-type)
                 (valid-funtype `(,type
-                                 (constant-arg (mod ,n-word-bits))
+                                 (constant-arg (integer 1 ,(1- n-word-bits)))
                                  (constant-arg (mod ,n-word-bits))
                                  ,type)
                                result-type)))

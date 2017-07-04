@@ -6474,6 +6474,14 @@
                             res))))
              122)))
 
+(with-test (:name :dpb-implementation-style.2)
+  (let ((fun (checked-compile
+              `(lambda (x i)
+                 (declare (fixnum x i))
+                 (dpb x (byte 0 0) i)))))
+    (assert (= (funcall fun 0 1) 1))
+    (assert (= (funcall fun -1 1) 1))))
+
 (with-test (:name :fixnum-mod-p-immediate)
   (let ((fun (checked-compile `(lambda (x)
                                  (declare (type fixnum x))
