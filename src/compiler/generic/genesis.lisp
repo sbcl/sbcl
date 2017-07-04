@@ -3288,6 +3288,16 @@ core and return a descriptor to it."
     (format out
             "~%static unsigned char unprintable_array_types[32] =~% {~{~d~^,~}};~%"
             (coerce array-type-bits 'list)))
+  (dolist (prim-obj '(symbol ratio complex sb!vm::code simple-fun
+                      closure funcallable-instance
+                      weak-pointer fdefn sb!vm::value-cell))
+    (format out "static char *~A_slots[] = {~%~{ \"~A: \",~} NULL~%};~%"
+            (c-name (string-downcase prim-obj))
+            (mapcar (lambda (x) (c-name (string-downcase (sb!vm:slot-name x))))
+                    (remove-if 'sb!vm:slot-rest-p
+                               (sb!vm::primitive-object-slots
+                                (find prim-obj sb!vm:*primitive-objects*
+                                      :key 'sb!vm:primitive-object-name))))))
   (values))
 
 (defun write-primitive-object (obj *standard-output*)

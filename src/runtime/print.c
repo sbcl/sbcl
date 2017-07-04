@@ -13,8 +13,7 @@
 
 /*
  * FIXME:
- *   Some of the code in here (the various
- *   foo_slots[], at least) is deeply broken, depending on guessing
+ *   Some of the code in here is deeply broken, depending on guessing
  *   already out-of-date values instead of getting them from sbcl.h.
  */
 
@@ -567,34 +566,6 @@ static void print_slots(char **slots, int count, lispobj *ptr)
     }
 }
 
-/* FIXME: Yikes! This needs to depend on the values in sbcl.h (or
- * perhaps be generated automatically by GENESIS as part of
- * sbcl.h). */
-static char *symbol_slots[] = {"value: ", "hash: ",
-    "info: ", "name: ", "package: ",
-#if defined (LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_X86_64)
-    "tls-index: " ,
-#endif
-    NULL};
-static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
-static char *complex_slots[] = {"real: ", "imag: ", NULL};
-static char *code_slots[] = {"bytes: ", "debug: ",
-#ifndef LISP_FEATURE_64_BIT
-                             "n_entries: ",
-#endif
-                             NULL};
-static char *simple_fun_slots[] = {
-    "self: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
-static char *closure_slots[] = {"fn: ", NULL};
-static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ",
-#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                                             "layout: ",
-#endif
-                                             NULL};
-static char *weak_pointer_slots[] = {"value: ", NULL};
-static char *fdefn_slots[] = {"name: ", "function: ", "raw_addr: ", NULL};
-static char *value_cell_slots[] = {"value: ", NULL};
-
 static lispobj symbol_function(lispobj* symbol)
 {
     lispobj info = ((struct symbol*)symbol)->info;
@@ -783,7 +754,7 @@ static void print_otherptr(lispobj obj)
                     sizeof simple_fun_slots/sizeof(char*)-1, ptr);
         break;
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef RETURN_PC_WIDETAG
     case RETURN_PC_WIDETAG:
         print_obj("code: ", obj - (count * 4));
         break;
