@@ -380,9 +380,7 @@ static void brief_list(lispobj obj)
     int space = 0;
     int length = 0;
 
-    if (!is_valid_lisp_addr((os_vm_address_t)native_pointer(obj)))
-        printf("(invalid Lisp-level address)");
-    else if (obj == NIL)
+    if (obj == NIL)
         printf("NIL");
     else {
         putchar('(');
@@ -410,9 +408,7 @@ static void brief_list(lispobj obj)
 
 static void print_list(lispobj obj)
 {
-    if (!is_valid_lisp_addr((os_vm_address_t)native_pointer(obj))) {
-        printf("(invalid address)");
-    } else if (obj == NIL) {
+    if (obj == NIL) {
         printf(" (NIL)");
     } else {
         print_obj("car: ", CONS(obj)->car);
@@ -438,9 +434,7 @@ char * simple_base_stringize(struct vector * string)
 static void brief_struct(lispobj obj)
 {
     struct instance *instance = (struct instance *)native_pointer(obj);
-    if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
-        printf("(invalid address)");
-    } else {
+    {
         extern struct vector * instance_classoid_name(lispobj*);
         struct vector * classoid_name;
         classoid_name = instance_classoid_name((lispobj*)instance);
@@ -475,9 +469,7 @@ static void print_struct(lispobj obj)
     struct instance *instance = (struct instance *)native_pointer(obj);
     unsigned int i;
     char buffer[16];
-    if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
-        printf("(invalid address)");
-    } else {
+    {
         lispobj layout_obj =  instance_layout(native_pointer(obj));
         print_obj("type: ", layout_obj);
         struct layout * layout = (struct layout*)native_pointer(layout_obj);
@@ -534,12 +526,6 @@ static void brief_otherptr(lispobj obj)
     struct symbol *symbol;
 
     ptr = native_pointer(obj);
-
-    if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
-            printf("(invalid address)");
-            return;
-    }
-
     header = *ptr;
     type = widetag_of(header);
     switch (type) {
@@ -635,9 +621,7 @@ static lispobj symbol_function(lispobj* symbol)
 
 static void print_otherptr(lispobj obj)
 {
-    if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
-        printf("(invalid address)");
-    } else {
+    {
 #ifndef LISP_FEATURE_ALPHA
         lispobj *ptr;
         unsigned long header;
@@ -898,6 +882,7 @@ static void print_obj(char *prefix, lispobj obj)
     if (var != NULL)
         var_setclock(var, cur_clock);
 
+    void (**fns)(lispobj) = NULL;
     cur_depth++;
     if (verbose) {
         if (var != NULL) {
@@ -909,10 +894,10 @@ static void print_obj(char *prefix, lispobj obj)
         printf("%s0x%08lx: ", prefix, (unsigned long) obj);
         if (cur_depth < brief_depth) {
             fputs(lowtag_names[type], stdout);
-            (*verbose_fns[type])(obj);
+            fns = verbose_fns;
         }
         else
-            (*brief_fns[type])(obj);
+            fns = brief_fns;
     }
     else {
         if (dont_descend)
@@ -920,9 +905,16 @@ static void print_obj(char *prefix, lispobj obj)
         else {
             if (var != NULL)
                 printf("$%s=", var_name(var));
-            (*brief_fns[type])(obj);
+            fns = brief_fns;
         }
     }
+    if (!fns)
+        ;
+    else if (is_lisp_pointer(obj)
+             && !is_valid_lisp_addr((os_vm_address_t)obj))
+        printf("(bad-address)");
+    else
+        (*fns[type])(obj);
     cur_depth--;
     dont_descend = 0;
 }
