@@ -201,7 +201,7 @@ static lispobj* find_sym_by_tls_index(unsigned int tls_index)
             if (widetag == SYMBOL_WIDETAG &&
                 tls_index_of(((struct symbol*)where)) == tls_index)
                 return where;
-            where += is_cons_half(header) ? 2 : sizetab[widetag](where);
+            where += OBJECT_SIZE(header, where);
         }
         if (where >= (lispobj*)DYNAMIC_SPACE_START)
             break;
@@ -490,7 +490,7 @@ static void trace1(lispobj object,
                         fprintf(stderr, "%p ", ptr);
                     else {
                         lispobj word = *ptr;
-                        int nwords = is_cons_half(word) ? 2 : sizetab[widetag_of(word)](ptr);
+                        int nwords = OBJECT_SIZE(word, ptr);
                         fprintf(stderr, "%p+%d ", ptr, nwords);
                     }
                     list1 = cell[1];

@@ -79,7 +79,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
                  ))
                 return where;
         }
-        where += is_cons_half(word) ? 2 : sizetab[widetag_of(word)](where);
+        where += OBJECT_SIZE(word, where);
     }
     return 0;
 }

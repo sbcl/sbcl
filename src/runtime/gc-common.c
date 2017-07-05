@@ -1289,14 +1289,14 @@ gc_search_space3(void *pointer, lispobj *start, void *limit)
         else
             forwarded_start = start;
         lispobj thing = *forwarded_start;
-        count = is_cons_half(thing) ? 2 : sizetab[widetag_of(thing)](forwarded_start);
+        count = OBJECT_SIZE(thing, forwarded_start);
         /* Check whether the pointer is within this object. */
         if (pointer < (void*)(start+count)) return start;
     }
 #else
     for ( ; (void*)start < limit ; start += count) {
         lispobj thing = *start;
-        count = is_cons_half(thing) ? 2 : sizetab[widetag_of(thing)](start);
+        count = OBJECT_SIZE(thing, start);
         /* Check whether the pointer is within this object. */
         if (pointer < (void*)(start+count)) return start;
     }
