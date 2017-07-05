@@ -37,6 +37,7 @@
  * instead. See hpux-os.c for some useful restrictions on actual
  * usage. */
 
+#ifdef LISP_FEATURE_CHENEYGC
 void
 os_zero(os_vm_address_t addr, os_vm_size_t length)
 {
@@ -70,6 +71,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
                  addr);
     }
 }
+#endif
 
 os_vm_address_t
 os_allocate(os_vm_size_t len)
