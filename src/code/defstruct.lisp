@@ -846,8 +846,8 @@ unless :NAMED is also specified.")))
            (setf rsd-index (dsd-rsd-index included-slot)
                  safe-p (dsd-safe-p included-slot)
                  index (dsd-index included-slot))
-           (when (and (neq type (dsd-type included-slot))
-                      (dsd-safe-p included-slot)
+           (when (and safe-p
+                      (not (equal type (dsd-type included-slot)))
                       (not (sb!xc:subtypep (dsd-type included-slot) type)))
              (setf safe-p nil))) ; this is "unsafe case (1)"
           (t
@@ -856,12 +856,12 @@ unless :NAMED is also specified.")))
                                 (structure-raw-slot-data-index type)))
            (let ((n-words
                   (if rsd-index
-                      (let* ((rsd (svref *raw-slot-data* rsd-index))
-                             (alignment (raw-slot-data-alignment rsd))
-                             (len (dd-length defstruct)))
-                        (setf (dd-length defstruct) ; Pad for alignment as needed
-                              ;; this formula works but can it be made less unclear?
-                              (- len (nth-value 1 (ceiling (1- len) alignment))))
+                      (let ((rsd (svref *raw-slot-data* rsd-index)))
+                        ;; If slot requires alignment of 2, then ensure that
+                        ;; it has an odd (i.e. doubleword aligned) index.
+                        (when (and (eql (raw-slot-data-alignment rsd) 2)
+                                   (evenp (dd-length defstruct)))
+                          (incf (dd-length defstruct)))
                         (raw-slot-data-n-words rsd))
                       1)))
              (setf index (dd-length defstruct))
@@ -1362,8 +1362,9 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; If both the + and - values are fixnums, and raw slots are present,
 ;;; we'll choose the positive value.
 (defun dd-bitmap (dd)
-  ;; Without compact instances, the 0th bit is always 1.
-  ;; LAYOUT is tagged but not reflected in DD-SLOTS
+  ;; With compact instances, LAYOUT is not reflected in the bitmap.
+  ;; Without compact instances, the 0th bitmap bit (for the LAYOUT) is always 1.
+  ;; In neither case is the place for the layout represented in in DD-SLOTS.
   (let ((bitmap sb!vm:instance-data-start))
     (dolist (slot (dd-slots dd))
       (when (eql t (dsd-raw-type slot))
@@ -1537,7 +1538,7 @@ or they must be declared locally notinline at each call site.~@:>"
                  ,temp))
             instance-form)))))
 
-;;; A "typed" constructors prefers to use a single call to LIST or VECTOR
+;;; A "typed" constructor prefers to use a single call to LIST or VECTOR
 ;;; if possible, but can't always do that for VECTOR because it might not
 ;;; be a (VECTOR T). If not, we fallback to MAKE-ARRAY and (SETF AREF).
 (defun typed-constructor-form (dd values)
