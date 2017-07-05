@@ -13,6 +13,6 @@
 #define _SEARCH_H_
 
 extern boolean search_for_type(int type, lispobj **start, int *count);
-extern boolean search_for_symbol(char *name, lispobj **start, int *count);
+extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end);
 
 #endif

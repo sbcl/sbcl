@@ -206,34 +206,31 @@ char *parse_addr(char **ptr, boolean safely)
 
 static lispobj lookup_symbol(char *name)
 {
-    int count;
     lispobj *headerptr;
 
     /* Search static space. */
-    headerptr = (lispobj *)STATIC_SPACE_START;
-    count =
-        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
-        (lispobj *)STATIC_SPACE_START;
-    if (search_for_symbol(name, &headerptr, &count))
+    if ((headerptr = search_for_symbol(name,
+                                       STATIC_SPACE_START,
+                                       SymbolValue(STATIC_SPACE_FREE_POINTER,0))))
         return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Search immobile space. */
-    headerptr = (lispobj *)IMMOBILE_SPACE_START;
-    count = IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE / N_WORD_BYTES;
-    if (search_for_symbol(name, &headerptr, &count))
+    if ((headerptr = search_for_symbol(name,
+                                       IMMOBILE_SPACE_START,
+                                       SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0))))
         return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 #endif
 
     /* Search dynamic space. */
 #if defined(LISP_FEATURE_GENCGC)
-    headerptr = (lispobj *)DYNAMIC_SPACE_START;
-    count = (lispobj *)get_alloc_pointer() - headerptr;
+    uword_t start = DYNAMIC_SPACE_START;
+    uword_t end   = (uword_t)get_alloc_pointer();
 #else
-    headerptr = (lispobj *)current_dynamic_space;
-    count = dynamic_space_free_pointer - headerptr;
+    uword_t start = (uword_t)current_dynamic_space;
+    uword_t end   = (uword_t)dynamic_space_free_pointer;
 #endif
-    if (search_for_symbol(name, &headerptr, &count))
+    if ((headerptr = search_for_symbol(name, start, end)))
         return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 
     return 0;

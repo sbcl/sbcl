@@ -16,6 +16,7 @@
 #include "os.h"
 #include "search.h"
 #include "thread.h"
+#include "gc-internal.h"
 #include "genesis/primitive-objects.h"
 
 boolean search_for_type(int type, lispobj **start, int *count)
@@ -51,14 +52,18 @@ static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, char* b)
   return a[i] - b[i]; // same return convention as strcmp()
 }
 
-boolean search_for_symbol(char *name, lispobj **start, int *count)
+lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
 {
+    lispobj* where = (lispobj*)start;
+    lispobj* limit = (lispobj*)end;
     struct symbol *symbol;
     int namelen = strlen(name);
 
-    while (search_for_type(SYMBOL_WIDETAG, start, count)) {
-        symbol = (struct symbol *)native_pointer((lispobj)*start);
-        if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
+    while (where < limit) {
+        lispobj word = *where;
+        if (widetag_of(word) == SYMBOL_WIDETAG &&
+            lowtag_of((symbol = (struct symbol *)where)->name)
+            == OTHER_POINTER_LOWTAG) {
             struct vector *symbol_name = VECTOR(symbol->name);
             if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
                 /* FIXME: Broken with more than one type of string
@@ -72,9 +77,9 @@ boolean search_for_symbol(char *name, lispobj **start, int *count)
                      && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data, name))
 #endif
                  ))
-                return 1;
+                return where;
         }
-        (*start) += 2;
+        where += is_cons_half(word) ? 2 : sizetab[widetag_of(word)](where);
     }
     return 0;
 }
