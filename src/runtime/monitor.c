@@ -147,7 +147,7 @@ dump_cmd(char **ptr)
 #else
         printf("0x%08X: ", (u32) addr);
 #endif
-        if (force || is_valid_lisp_addr((os_vm_address_t)addr)) {
+        if (force || gc_managed_addr_p((lispobj)addr)) {
 #ifndef LISP_FEATURE_ALPHA
             unsigned long *lptr = (unsigned long *)addr;
 #else

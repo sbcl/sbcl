@@ -196,7 +196,7 @@ char *parse_addr(char **ptr, boolean safely)
         result = (value & ~3);
     }
 
-    if (safely && !is_valid_lisp_addr((os_vm_address_t)result)) {
+    if (safely && !gc_managed_addr_p(result)) {
         printf("invalid Lisp-level address: %p\n", (void *)result);
         throw_to_monitor();
     }
@@ -305,7 +305,7 @@ lispobj parse_lispobj(char **ptr)
     } else if (token[0] == '@') {
         if (string_to_long(token+1, &pointer)) {
             pointer &= ~3;
-            if (is_valid_lisp_addr((os_vm_address_t)pointer))
+            if (gc_managed_addr_p(pointer))
                 result = *(lispobj *)pointer;
             else {
                 printf("invalid Lisp-level address: ``%s''\n", token+1);

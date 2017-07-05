@@ -230,10 +230,9 @@ void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 }
 
 boolean
-is_valid_lisp_addr(os_vm_address_t addr)
+gc_managed_addr_p(lispobj ad)
 {
     struct thread *th;
-    size_t ad = (size_t) addr;
 
     if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
         || (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
@@ -249,11 +248,11 @@ is_valid_lisp_addr(os_vm_address_t addr)
         )
         return 1;
     for_each_thread(th) {
-        if((size_t)(th->control_stack_start) <= ad
-           && ad < (size_t)(th->control_stack_end))
+        if(th->control_stack_start <= (lispobj*)ad
+           && (lispobj*)ad < th->control_stack_end)
             return 1;
-        if((size_t)(th->binding_stack_start) <= ad
-           && ad < (size_t)(th->binding_stack_start + BINDING_STACK_SIZE))
+        if(th->binding_stack_start <= (lispobj*)ad
+           && (lispobj*)ad < th->binding_stack_start + BINDING_STACK_SIZE)
             return 1;
     }
     return 0;

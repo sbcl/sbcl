@@ -995,7 +995,7 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
  * description of a space, we could probably punt this and just do
  * (FOO_START <= x && x < FOO_END) everywhere it's called. */
 static boolean
-in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
+in_range_p(lispobj a, lispobj sbeg, size_t slen)
 {
     char* beg = (char*)((uword_t)sbeg);
     char* end = (char*)((uword_t)sbeg) + slen;
@@ -1006,18 +1006,18 @@ in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 boolean
 is_linkage_table_addr(os_vm_address_t addr)
 {
-    return in_range_p(addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
+    return in_range_p((lispobj)addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
 }
 
 static boolean is_some_thread_local_addr(os_vm_address_t addr);
 
 boolean
-is_valid_lisp_addr(os_vm_address_t addr)
+gc_managed_addr_p(lispobj addr)
 {
     if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
        in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
        in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size) ||
-       is_some_thread_local_addr(addr))
+       is_some_thread_local_addr((os_vm_address_t)addr))
         return 1;
     return 0;
 }
@@ -1239,7 +1239,7 @@ handle_access_violation(os_context_t *ctx,
 
     /* linkage table or a "valid_lisp_addr" outside of dynamic space (?) */
     if (is_linkage_table_addr(fault_address)
-        || is_valid_lisp_addr(fault_address))
+        || gc_managed_addr_p((lispobj)fault_address))
         goto try_recommit;
 
     return -1;

@@ -102,8 +102,9 @@ extern void os_protect(os_vm_address_t addr,
                        os_vm_size_t len,
                        os_vm_prot_t protection);
 
-/* This returns true for an address which makes sense at the Lisp level. */
-extern boolean is_valid_lisp_addr(os_vm_address_t test);
+/* Return true for an address (with or without lowtag bits) within
+ * any range of memory understood by the garbage collector. */
+extern boolean gc_managed_addr_p(lispobj test);
 
 /* Given a signal context, return the address for storage of the
  * register, of the specified offset, for that context. The offset is

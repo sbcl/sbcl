@@ -875,8 +875,7 @@ static void print_obj(char *prefix, lispobj obj)
     }
     if (!fns)
         ;
-    else if (is_lisp_pointer(obj)
-             && !is_valid_lisp_addr((os_vm_address_t)obj))
+    else if (is_lisp_pointer(obj) && !gc_managed_addr_p(obj))
         printf("(bad-address)");
     else
         (*fns[type])(obj);

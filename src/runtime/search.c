@@ -24,7 +24,7 @@ boolean search_for_type(int type, lispobj **start, int *count)
     lispobj obj;
 
     while ((*count == -1 || (*count > 0)) &&
-           is_valid_lisp_addr((os_vm_address_t)*start)) {
+           gc_managed_addr_p((lispobj)*start)) {
         obj = **start;
         if (*count != -1)
             *count -= 2;
@@ -65,7 +65,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
             lowtag_of((symbol = (struct symbol *)where)->name)
             == OTHER_POINTER_LOWTAG) {
             struct vector *symbol_name = VECTOR(symbol->name);
-            if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
+            if (gc_managed_addr_p((lispobj)symbol_name) &&
                 /* FIXME: Broken with more than one type of string
                    (i.e. even broken given (VECTOR NIL) */
                 ((widetag_of(symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG
