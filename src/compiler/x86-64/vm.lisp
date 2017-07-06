@@ -452,6 +452,8 @@
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
+  (declare (notinline sb!c::core-object-p) ; forward ref
+           (special sb!c::*compile-object*))
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
