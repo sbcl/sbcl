@@ -348,7 +348,7 @@ code to be loaded.
                        ;; Special case is for handling an expanded POP.
                        (mapcan (lambda (x)
                                  (and (consp x)
-                                      (or (not (eq (car x) 'car))
+                                      (or (neq (car x) 'car)
                                           (not (symbolp (cadr x)))
                                           (not (symbolp (setq x (sb!int:%macroexpand x env)))))
                                       (cons x nil)))
@@ -535,7 +535,7 @@ code to be loaded.
       ((eq l (cdr *loop-source-code*)) (nreverse new))))
 
 (defun loop-error (format-string &rest format-args)
-  #-sb-xc-host(declare (optimize sb!kernel:allow-non-returning-tail-call))
+  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
   (error 'sb!int:simple-program-error
          :format-control "~?~%current LOOP context:~{ ~S~}."
          :format-arguments (list format-string format-args (loop-context))))
@@ -735,10 +735,10 @@ code to be loaded.
 (defun loop-typed-init (data-type &optional step-var-p)
   ;; FIXME: can't tell if unsupplied or NIL, but it has to be rare.
   (when data-type
-   (let ((ctype (sb!kernel:specifier-type data-type)))
+   (let ((ctype (specifier-type data-type)))
      ;; FIXME: use the ctype for the rest of the type operations, now
      ;; that it's parsed.
-     (cond ((eql ctype sb!kernel:*empty-type*)
+     (cond ((eql ctype *empty-type*)
             (values nil t))
            ((sb!xc:subtypep data-type 'number)
             (let ((init (if step-var-p 1 0)))
@@ -758,10 +758,10 @@ code to be loaded.
                       (t
                        init)))))
            ((sb!xc:subtypep data-type 'vector)
-            (when (sb!kernel:array-type-p ctype)
-              (let ((etype (sb!kernel:type-*-to-t
-                            (sb!kernel:array-type-specialized-element-type ctype))))
-                (make-array 0 :element-type (sb!kernel:type-specifier etype)))))
+            (when (array-type-p ctype)
+              (let ((etype (type-*-to-t
+                            (array-type-specialized-element-type ctype))))
+                (make-array 0 :element-type (type-specifier etype)))))
            #!+sb-unicode
            ((sb!xc:subtypep data-type 'extended-char)
             (code-char sb!int:base-char-code-limit))
@@ -1109,10 +1109,10 @@ code to be loaded.
                       ;; likely, SUM and COUNT which have number and
                       ;; fixnum respectively.
                       (setf (loop-collector-dtype cruft)
-                            (sb!kernel:type-specifier
-                             (sb!kernel:type-union
-                              (sb!kernel:specifier-type dtype)
-                              (sb!kernel:specifier-type (loop-collector-dtype cruft))))))
+                            (type-specifier
+                             (type-union
+                              (specifier-type dtype)
+                              (specifier-type (loop-collector-dtype cruft))))))
                      (t
                       (loop-warn
                        "unequal datatypes specified in different LOOP value accumulations~@
@@ -1380,7 +1380,7 @@ code to be loaded.
           (when (<= length 1)
             (setq other-test t)))
         `(,other-test ,step () ,pstep
-          ,@(and (not (eq first-test other-test))
+          ,@(and (neq first-test other-test)
                  `(,first-test ,step () ,pstep)))))))
 
 ;;;; list iteration
@@ -1432,7 +1432,7 @@ code to be loaded.
                 (t (let ((step `(,var ,listvar))
                          (pseudo `(,listvar ,list-step)))
                      `(,other-endtest ,step () ,pseudo
-                       ,@(and (not (eq first-endtest other-endtest))
+                       ,@(and (neq first-endtest other-endtest)
                               `(,first-endtest ,step () ,pseudo)))))))))))
 
 (defun loop-for-in (var val data-type)
@@ -1449,7 +1449,7 @@ code to be loaded.
           (when (and constantp (listp list-value))
             (setq first-endtest (null list-value)))
           `(,other-endtest ,step () ,pseudo-step
-            ,@(and (not (eq first-endtest other-endtest))
+            ,@(and (neq first-endtest other-endtest)
                    `(,first-endtest ,step () ,pseudo-step))))))))
 
 ;;;; iteration paths
@@ -1660,7 +1660,7 @@ code to be loaded.
                  "~S invalid preposition in sequencing or sequence path;~@
               maybe invalid prepositions were specified in iteration path descriptor?"
                  prep)))
-         (when (and odir dir (not (eq dir odir)))
+         (when (and odir dir (neq dir odir))
            (loop-error
              "conflicting stepping directions in LOOP sequencing path"))
          (setq odir dir))

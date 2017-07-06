@@ -2308,7 +2308,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
    #s(sb-cold:package-data
       :name "SB!LOOP"
       :doc "private: implementation details of LOOP"
-      :use ("CL")
+      :use ("CL" "SB!INT" "SB!KERNEL")
       :export ())
 
    #s(sb-cold:package-data
