@@ -224,7 +224,7 @@
          ;; Objects of type SYMBOL can be immediate but they still go in the constants
          ;; because liveness depends on pointer tracing without looking at code-fixups.
          (when (or (not use-immed-p)
-                   #!+immobile-symbols
+                   #!+immobile-space
                    (let ((val (constant-value constant)))
                      (and (symbolp val) (not (sb!vm:static-symbol-p val)))))
            (let ((constants (ir2-component-constants component)))

@@ -85,8 +85,9 @@
     ;; If target is a register, we can just mov it there directly
     ((and (tn-p target)
           (sc-is target signed-reg unsigned-reg descriptor-reg any-reg))
-     ;; val can be a fixup for an immobile symbol
-     (cond ((and #!+immobile-symbols (numberp val) (zerop val)) (zeroize target))
+     ;; val can be a fixup for an immobile-space symbol, i.e. not a number,
+     ;; hence not acceptable to ZEROP.
+     (cond ((and (numberp val) (zerop val)) (zeroize target))
            (t (inst mov target val))))
     ;; Likewise if the value is small enough.
     ((typep val '(or (signed-byte 32) #!+immobile-space fixup))

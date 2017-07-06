@@ -29,7 +29,7 @@
               (make-ea :qword :disp
                        (let* ((symbol (tn-value object))
                               (offset (- (* offset n-word-bytes) lowtag)))
-                         (if (and #!+immobile-symbols (static-symbol-p symbol))
+                         (if (static-symbol-p symbol)
                              (+ nil-value (static-symbol-offset symbol) offset)
                              (make-fixup symbol :immobile-object offset)))))
         (loadw value object offset lowtag))))

@@ -457,8 +457,16 @@
          character)
      (sc-number-or-lose 'immediate))
     (symbol
-     ;; immobile-symbols implies that ALL symbols are static in placement.
-     (when (and #!-immobile-symbols (static-symbol-p value))
+     ;; If #!+immobile-symbols, then ALL symbols are static in placement
+     ;; and in the sub-2GB space, therefore immediate constants.
+     ;; Otherwise, if #!+immobile-space, and either compilation is to memory
+     ;; and the symbol is in immobile-space, or if in the cross-compiler which
+     ;; dumps all symbols as immobile if possible, then it's immediate.
+     (when (or #!+(or immobile-symbols (and immobile-space (host-feature sb-xc-host))) t
+               #!+(and immobile-space (not (host-feature sb-xc-host)))
+               (and (sb!c::core-object-p sb!c::*compile-object*)
+                    (typep (get-lisp-obj-address value) '(signed-byte 32)))
+               (static-symbol-p value))
        (sc-number-or-lose 'immediate)))
     (single-float
        (sc-number-or-lose
@@ -491,7 +499,7 @@
       (let ((val (tn-value tn)))
         (etypecase val
           (integer  (if tag (fixnumize val) val))
-          (symbol   (if (and #!+immobile-symbols (static-symbol-p val))
+          (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
                         (make-fixup val :immobile-object)))
           (character (if tag
