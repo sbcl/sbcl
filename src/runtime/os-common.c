@@ -167,8 +167,6 @@ void os_link_runtime()
     char *namechars;
     boolean datap;
     void* result;
-    int strict /* If in a cold core, fail early and often. */
-      = (SymbolValue(GC_INHIBIT, 0) & WIDETAG_MASK) == UNBOUND_MARKER_WIDETAG;
     int n = 0, m = 0, j;
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_RUNTIME_C_SYMBOLS,0));
@@ -196,21 +194,12 @@ void os_link_runtime()
                 arch_write_linkage_table_jmp(link_target,result);
         } else {
             m++;
-            if (strict)
-                fprintf(stderr,
-                        "undefined foreign symbol in cold init: %s\n",
-                        namechars);
         }
 
         link_target = (void*)(((uintptr_t)link_target)+LINKAGE_TABLE_ENTRY_SIZE);
     }
     odxprint(runtime_link, "%d total symbols linked, %d undefined",
              n, m);
-    if (strict && m)
-        /* We could proceed, but rather than run into improperly
-         * displayed internal errors, let's make ourselves heard right
-         * here and now. */
-        lose("Undefined aliens in cold init.");
 }
 #endif  /* sb-dynamic-core */
 
