@@ -185,13 +185,6 @@
 
     ;; dynamic runtime linking support
     #!+sb-dynamic-core +required-runtime-c-symbols+
-    sb!kernel::*gc-epoch*
-
-    ;; Dispatch tables for generic array access
-    sb!impl::%%data-vector-reffers%%
-    sb!impl::%%data-vector-reffers/check-bounds%%
-    sb!impl::%%data-vector-setters%%
-    sb!impl::%%data-vector-setters/check-bounds%%
 
     ;; non-x86oid gencgc object pinning
     #!+(and gencgc (not (or x86 x86-64)))
@@ -199,7 +192,22 @@
 
     ;; for looking up assembler routine by name
     ;; and patching them on runtime startup
-    sb!fasl::*assembler-routines*)
+    sb!fasl::*assembler-routines*
+
+    ;;; The following symbols aren't strictly required to be static
+    ;;; - they are not accessed from C - but we make them static in order
+    ;;; to (perhaps) micro-optimize access in Lisp.
+    ;;; However there is no efficiency gain if we have #!+immobile-space.
+    .
+    #!+immobile-space ()
+    #!-immobile-space
+    (;; arbitrary object that changes after each GC
+     sb!kernel::*gc-epoch*
+     ;; Dispatch tables for generic array access
+     sb!impl::%%data-vector-reffers%%
+     sb!impl::%%data-vector-reffers/check-bounds%%
+     sb!impl::%%data-vector-setters%%
+     sb!impl::%%data-vector-setters/check-bounds%%))
   #'equal)
 
 ;;; Number of entries in the thread local storage. Limits the number
