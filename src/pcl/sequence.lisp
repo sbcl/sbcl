@@ -452,7 +452,7 @@
 
 ;;;; LOOP support.  (DOSEQUENCE support is present in the core SBCL
 ;;;; code).
-(defun loop-elements-iteration-path (variable data-type prep-phrases)
+(defun sb-loop::loop-elements-iteration-path (variable data-type prep-phrases)
   (let (of-phrase)
     (loop for (prep . rest) in prep-phrases do
           (ecase prep
@@ -471,9 +471,6 @@
             sb-loop::*loop-wrappers*)
       `(((,variable nil ,data-type)) () () nil (funcall ,endp ,seq ,it ,lim ,f-e)
         (,variable (funcall ,elt ,seq ,it) ,it (funcall ,step ,seq ,it ,f-e))))))
-(sb-loop::add-loop-path
- '(element elements) 'loop-elements-iteration-path sb-loop::*loop-ansi-universe*
- :preposition-groups '((:of :in)) :inclusive-permitted nil)
 
 ;;;; generic implementations for sequence functions.
 

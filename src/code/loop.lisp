@@ -267,6 +267,19 @@ code to be loaded.
 (sb!xc:defmacro loop-store-table-data (symbol table datum)
   `(setf (gethash (symbol-name ,symbol) ,table) ,datum))
 
+;;; "4.2.3 Type Specifiers" lists the standardized atomic type specifiers.
+;;; While in theory we might want to include all of them,
+;;; in practice it seems silly to allow "for x arithmetic-error in ..."
+(defun std-atom-type-specifier-p (symbol)
+  (and (eq (symbol-package symbol) *cl-package*)
+       ;; Check for primitiveness of the type, since some symbols in the CL
+       ;; package are private-use typedefs (e.g. ARRAY-RANK, CHAR-CODE).
+       (or (eq (info :type :kind symbol) :primitive)
+           ;; allow certain :instance types, but not all of them
+           (member symbol '(hash-table package pathname random-state readtable)))
+       (neq symbol '*)
+       symbol))
+
 (defstruct (loop-universe
              (:constructor !make-loop-universe)
              (:copier nil)
@@ -274,11 +287,7 @@ code to be loaded.
   keywords             ; hash table, value = (fn-name . extra-data)
   iteration-keywords   ; hash table, value = (fn-name . extra-data)
   for-keywords         ; hash table, value = (fn-name . extra-data)
-  path-keywords        ; hash table, value = (fn-name . extra-data)
-  type-symbols         ; hash table of type SYMBOLS, test EQ,
-                       ; value = CL type specifier
-  type-keywords)       ; hash table of type STRINGS, test EQUAL,
-                       ; value = CL type spec
+  path-keywords)       ; hash table, value = (fn-name . extra-data)
 (defmethod print-object ((u loop-universe) stream)
   (print-unreadable-object (u stream :type t :identity t)))
 
@@ -287,12 +296,10 @@ code to be loaded.
 (defvar *loop-universe*)
 
 (defun !make-standard-loop-universe (&key keywords for-keywords
-                                          iteration-keywords path-keywords
-                                          type-keywords type-symbols)
+                                          iteration-keywords path-keywords)
   (flet ((maketable (entries)
-           (let* ((size (length entries))
-                  (ht (make-hash-table :size (if (< size 10) 10 size)
-                                       :test 'equal)))
+           (let ((ht (make-hash-table :size (max 10 (length entries))
+                                      :test 'equal)))
              (dolist (x entries)
                (setf (gethash (symbol-name (car x)) ht) (cadr x)))
              ht)))
@@ -300,16 +307,7 @@ code to be loaded.
       :keywords (maketable keywords)
       :for-keywords (maketable for-keywords)
       :iteration-keywords (maketable iteration-keywords)
-      :path-keywords (maketable path-keywords)
-      :type-keywords (maketable type-keywords)
-      :type-symbols (let* ((size (length type-symbols))
-                           (ht (make-hash-table :size (if (< size 10) 10 size)
-                                                :test 'eq)))
-                      (dolist (x type-symbols)
-                        (if (atom x)
-                            (setf (gethash x ht) x)
-                            (setf (gethash (car x) ht) (cadr x))))
-                      ht))))
+      :path-keywords (maketable path-keywords))))
 
 ;;;; SETQ hackery, including destructuring ("DESETQ")
 
@@ -787,12 +785,7 @@ code to be loaded.
                ((symbolp z)
                 ;; This is the (sort of) "old" syntax, even though we
                 ;; didn't used to support all of these type symbols.
-                (let ((type-spec (or (gethash z
-                                              (loop-universe-type-symbols
-                                               *loop-universe*))
-                                     (gethash (symbol-name z)
-                                              (loop-universe-type-keywords
-                                               *loop-universe*)))))
+                (let ((type-spec (std-atom-type-specifier-p z)))
                   (when type-spec
                     (loop-pop-source)
                     type-spec)))
@@ -815,12 +808,7 @@ code to be loaded.
                            (cond ((null k) nil)
                                  ((atom k)
                                   (replicate
-                                    (or (gethash k
-                                                 (loop-universe-type-symbols
-                                                  *loop-universe*))
-                                        (gethash (symbol-name k)
-                                                 (loop-universe-type-keywords
-                                                  *loop-universe*))
+                                    (or (std-atom-type-specifier-p k)
                                         (loop-error
                                           "The destructuring type pattern ~S contains the unrecognized type keyword ~S."
                                           z k))
@@ -1902,9 +1890,7 @@ code to be loaded.
                              (by (loop-for-arithmetic :by))
                              (being (loop-for-being)))
              :iteration-keywords '((for (loop-do-for))
-                                   (as (loop-do-for)))
-             :type-symbols sb!kernel::*!standard-type-names*
-             :type-keywords nil)))
+                                   (as (loop-do-for))))))
     (add-loop-path '(hash-key hash-keys) 'loop-hash-table-iteration-path w
                    :preposition-groups '((:of :in))
                    :inclusive-permitted nil
@@ -1930,10 +1916,11 @@ code to be loaded.
                    :inclusive-permitted nil
                    :user-data '(:symbol-types (:internal
                                                :external)))
+    (add-loop-path '(element elements)
+                   'loop-elements-iteration-path w
+                   :preposition-groups '((:of :in))
+                   :inclusive-permitted nil)
     w))
-
-(defparameter *loop-ansi-universe*
-  (!make-ansi-loop-universe))
 
 (defun loop-standard-expansion (keywords-and-forms environment universe)
   (if (and keywords-and-forms (symbolp (car keywords-and-forms)))
@@ -1942,7 +1929,9 @@ code to be loaded.
         `(block nil (tagbody ,tag (progn ,@keywords-and-forms) (go ,tag))))))
 
 (sb!xc:defmacro loop (&environment env &rest keywords-and-forms)
-  (loop-standard-expansion keywords-and-forms env *loop-ansi-universe*))
+  (loop-standard-expansion keywords-and-forms
+                           env
+                           (load-time-value (!make-ansi-loop-universe) t)))
 
 (sb!xc:defmacro loop-finish ()
   "Cause the iteration to terminate \"normally\", the same as implicit
@@ -1950,3 +1939,6 @@ termination by an iteration driving clause, or by use of WHILE or
 UNTIL -- the epilogue code (if any) will be run, and any implicitly
 collected result will be returned as the value of the LOOP."
   '(go end-loop))
+
+(defun !unintern-symbols ()
+  `("SB-LOOP" add-loop-path))
