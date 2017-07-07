@@ -21,20 +21,6 @@
 (declaim (type index *current-form-number*))
 (defvar *current-form-number*)
 
-;;; *SOURCE-PATHS* is a hashtable from source code forms to the path
-;;; taken through the source to reach the form. This provides a way to
-;;; keep track of the location of original source forms, even when
-;;; macroexpansions and other arbitary permutations of the code
-;;; happen. This table is initialized by calling FIND-SOURCE-PATHS on
-;;; the original source.
-;;;
-;;; It is fairly useless to store symbols, characters, or fixnums in
-;;; this table, as 42 is EQ to 42 no matter where in the source it
-;;; appears. GET-SOURCE-PATH and NOTE-SOURCE-PATH functions should be
-;;; always used to access this table.
-(declaim (hash-table *source-paths*))
-(defvar *source-paths*)
-
 (declaim (inline source-form-has-path-p))
 (defun source-form-has-path-p (form)
   (not (typep form '(or symbol fixnum character))))
@@ -98,8 +84,6 @@
   to optimize code which uses those definitions? Setting this true
   gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
   the efficiency of stable code.")
-
-(defvar *fun-names-in-this-file* nil)
 
 (defvar *post-binding-variable-lexenv* nil)
 

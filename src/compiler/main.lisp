@@ -13,18 +13,6 @@
 
 (in-package "SB!C")
 
-;;; FIXME: Doesn't this belong somewhere else, like early-c.lisp?
-(declaim (special *constants* *free-vars* *component-being-compiled*
-                  *free-funs* *source-paths*
-                  *undefined-warnings* *compiler-error-count*
-                  *compiler-warning-count* *compiler-style-warning-count*
-                  *compiler-note-count*
-                  *compiler-error-bailout*
-                  *last-format-string* *last-format-args*
-                  *last-message-count* *last-error-context*
-                  *lexenv* *fun-names-in-this-file*
-                  *allow-instrumenting*))
-
 ;;; Whether reference to a thing which cannot be defined causes a full
 ;;; warning.
 (defvar *flame-on-necessarily-undefined-thing* nil)
@@ -1697,6 +1685,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (let ((ctype (rassoc 'muffle-warning
                          (lexenv-handled-conditions *lexenv*))))
       (and ctype (handle-p condition (car ctype))))))
+
+(defvar *fun-names-in-this-file* nil)
 
 ;;; Read all forms from INFO and compile them, with output to
 ;;; *COMPILE-OBJECT*. Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
