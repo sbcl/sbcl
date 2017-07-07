@@ -98,9 +98,8 @@
     (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
        (apply #'compiler-mumble foo))))
 
-(deftype object () '(or fasl-output core-object null))
 
-(defvar *compile-object* nil)
+(deftype object () '(or fasl-output core-object null))
 (declaim (type object *compile-object*))
 (defvar *compile-toplevel-object* nil)
 
@@ -1288,6 +1287,8 @@ necessary, since type inference may take arbitrarily long to converge.")
               ;; EVAL strategy of compiling everything inside (LAMBDA ()
               ;; ...).  -- CSR, 2002-11-02
               (when (core-object-p *compile-object*)
+                #+sb-xc-host (error "Can't compile to core")
+                #-sb-xc-host
                 (fix-core-source-info *source-info* *compile-object*
                                       (and (policy (lambda-bind fun)
                                                (> eval-store-source-form 0))

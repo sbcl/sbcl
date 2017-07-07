@@ -335,6 +335,9 @@
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
  ("src/compiler/meta-vmdef")
 
+ ("src/compiler/fixup") ; for DEFSTRUCT FIXUP, needed by generic/core
+ ("src/compiler/generic/core") ; for CORE-OBJECT-P, needed by x86-64/vm
+
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/target/vm")
 
@@ -447,8 +450,6 @@
 
  ("src/compiler/bit-util")
 
- ("src/compiler/fixup") ; for DEFSTRUCT FIXUP
- ("src/compiler/generic/core")
  ("src/code/thread")
  ("src/code/load")
 

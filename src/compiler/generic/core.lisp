@@ -113,19 +113,6 @@
                         (core-object-entry-table object))
                (error "Unresolved forward reference."))))
 
-;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
-;;; SOURCE-INFO list. We also check that there are no outstanding
-;;; forward references to functions.
-(defun fix-core-source-info (info object &optional function)
-  (declare (type core-object object)
-           (type (or null function) function))
-  (aver (zerop (hash-table-count (core-object-patch-table object))))
-  (let ((source (debug-source-for-info info :function function)))
-    (dolist (info (core-object-debug-info object))
-      (setf (debug-info-source info) source)))
-  (setf (core-object-debug-info object) nil)
-  (values))
-
 #!+(and immobile-code (host-feature sb-xc))
 (progn
   ;; Use FDEFINITION because it strips encapsulations - whether that's
