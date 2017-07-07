@@ -115,14 +115,11 @@
             :set-trans (setf %array-available-elements)
             :set-known ())
   (data :type array
-        ;; FIXME: terrible name for the accessor.
-        ;; It is in general just an ARRAY,
-        ;; and should be named %ARRAY-DATA.
-        :ref-trans %array-data
+        :ref-trans %array-data ; might be a vector, might not be
         :ref-known (flushable foldable)
         :set-trans (setf %array-data)
         :set-known ())
-  (displacement :type (or index null)
+  (displacement :type index
                 :ref-trans %array-displacement
                 :ref-known (flushable foldable)
                 :set-trans (setf %array-displacement)
