@@ -14,6 +14,7 @@
 
 ;;; Stream and single-file functions
 
+(progn
 (defun whitespace-p (character)
   (member character '(#\Space #\Tab) :test #'char=))
 
@@ -82,7 +83,8 @@
   (with-open-file (stream *stamp-file*
                           :direction :output
                           :if-exists :supersede)
-    (declare (ignorable stream))))
+    (declare (ignorable stream))
+    (values)))
 
 ;;; Repository-level functions
 
@@ -109,6 +111,7 @@
                (files (remove-if #'skip-p (directory pattern))))
           (mapc #'canonicalize-whitespace/file files))))
     (write-stamp-file)))
+) ; end PROGN
 
 ;;; Entry point
 
