@@ -159,34 +159,40 @@
 ;;; common cases (we don't want to allocate a hash-table), and not
 ;;; falling down to exponential behaviour for large trees (so we set
 ;;; an arbitrady depth limit beyond which we punt).
-(defun maybe-cyclic-p (x &optional (depth-limit 12))
-  (and (listp x)
-       (labels ((safe-cddr (cons)
-                  (let ((cdr (cdr cons)))
-                    (when (consp cdr)
-                      (cdr cdr))))
-                (check-cycle (object seen depth)
-                  (when (and (consp object)
-                             (or (> depth depth-limit)
-                                 (member object seen)
-                                 (circularp object seen depth)))
-                    (return-from maybe-cyclic-p t)))
-                (circularp (list seen depth)
-                  ;; Almost regular circular list detection, with a twist:
-                  ;; we also check each element of the list for upward
-                  ;; references using CHECK-CYCLE.
-                  (do ((fast (cons (car list) (cdr list)) (safe-cddr fast))
-                       (slow list (cdr slow)))
-                      ((not (consp fast))
-                       ;; Not CDR-circular, need to check remaining CARs yet
-                       (do ((tail slow (and (cdr tail))))
-                           ((not (consp tail))
-                            nil)
-                         (check-cycle (car tail) (cons tail seen) (1+ depth))))
-                    (check-cycle (car slow) (cons slow seen) (1+ depth))
-                    (when (eq fast slow)
-                      (return t)))))
-         (circularp x (list x) 0))))
+(defun maybe-cyclic-p (x)
+  (let ((depth-limit 12))
+    (and (consp x)
+         (labels ((safe-cddr (cons)
+                    (let ((cdr (cdr cons)))
+                      (when (consp cdr)
+                        (cdr cdr))))
+                  (check-cycle (cdr seen depth)
+                    (let ((object (car cdr)))
+                      (when (and (consp object)
+                                 (or (= depth depth-limit)
+                                     (memq object seen)
+                                     (let ((seen (cons cdr seen)))
+                                       (declare (dynamic-extent seen))
+                                       (circularp object seen
+                                                  (truly-the fixnum (1+ depth))))))
+                        (return-from maybe-cyclic-p t))))
+                  (circularp (list seen depth)
+                    ;; Almost regular circular list detection, with a twist:
+                    ;; we also check each element of the list for upward
+                    ;; references using CHECK-CYCLE.
+                    (do ((fast (cdr list) (safe-cddr fast))
+                         (slow list (cdr slow)))
+                        ((not (consp fast))
+                         ;; Not CDR-circular, need to check remaining CARs yet
+                         (do ((tail slow (cdr tail)))
+                             ((not (consp tail))
+                              nil)
+                           (check-cycle tail seen depth)))
+                      (check-cycle slow seen depth)
+                      (when (eq fast slow)
+                        (return t)))))
+           (declare (inline check-cycle))
+           (circularp x (list x) 0)))))
 
 ;;; Is X a (possibly-improper) list of at least N elements?
 (declaim (ftype (function (t index)) list-of-length-at-least-p))
