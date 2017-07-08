@@ -571,7 +571,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                      (signal 'bootstrap-package-not-found :name string)
                    (debootstrap-package ()
                      (if (string= string "SB!XC")
-                         (find-package "COMMON-LISP")
+                         *cl-package*
                          (find-package
                           (substitute #\- #\! string :count 1)))))
                  packageoid))))

@@ -1226,13 +1226,14 @@
                                 (subseq foo (1+ slash) (1- end)))))
          (first-colon (position #\: name))
          (second-colon (if first-colon (position #\: name :start (1+ first-colon))))
-         (package-name (if first-colon
-                           (subseq name 0 first-colon)
-                           "COMMON-LISP-USER"))
-         (package (or (find-package package-name)
+         (package
+            (if (not first-colon)
+                (load-time-value (find-package "COMMON-LISP-USER") t)
+                (let ((package-name (subseq name 0 first-colon)))
+                  (or (find-package package-name)
                       ;; FIXME: should be PACKAGE-ERROR? Could we just
                       ;; use FIND-UNDELETED-PACKAGE-OR-LOSE?
-                      (format-error "No package named ~S" package-name))))
+                      (format-error "No package named ~S" package-name))))))
     (intern (cond
               ((and second-colon (= second-colon (1+ first-colon)))
                (subseq name (1+ second-colon)))

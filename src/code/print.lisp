@@ -61,7 +61,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
-  (let ((*package* (find-package "COMMON-LISP-USER"))
+  (let ((*package* (load-time-value (find-package "COMMON-LISP-USER") t))
         (*print-array* t)
         (*print-base* 10)
         (*print-case* :upcase)
