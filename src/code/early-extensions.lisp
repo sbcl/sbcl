@@ -154,13 +154,12 @@
 
 ;;;; type-ish predicates
 
-;;; X may contain cycles -- a conservative approximation. This
-;;; occupies a somewhat uncomfortable niche between being fast for
-;;; common cases (we don't want to allocate a hash-table), and not
-;;; falling down to exponential behaviour for large trees (so we set
-;;; an arbitrady depth limit beyond which we punt).
-(defun maybe-cyclic-p (x)
-  (let ((depth-limit 12))
+;;; This is used for coalescing constants, check that the tree doesn't
+;;; have cycles and isn't too large.
+(defun coalesce-tree-p (x)
+  (let ((depth-limit 12)
+        (size-limit (expt 2 25)))
+    (declare (fixnum size-limit))
     (and (consp x)
          (labels ((safe-cddr (cons)
                     (let ((cdr (cdr cons)))
@@ -173,10 +172,10 @@
                                      (memq object seen)
                                      (let ((seen (cons cdr seen)))
                                        (declare (dynamic-extent seen))
-                                       (circularp object seen
-                                                  (truly-the fixnum (1+ depth))))))
-                        (return-from maybe-cyclic-p t))))
-                  (circularp (list seen depth)
+                                       (recurse object seen
+                                                (truly-the fixnum (1+ depth))))))
+                        (return-from coalesce-tree-p))))
+                  (recurse (list seen depth)
                     ;; Almost regular circular list detection, with a twist:
                     ;; we also check each element of the list for upward
                     ;; references using CHECK-CYCLE.
@@ -185,14 +184,17 @@
                         ((not (consp fast))
                          ;; Not CDR-circular, need to check remaining CARs yet
                          (do ((tail slow (cdr tail)))
-                             ((not (consp tail))
-                              nil)
+                             ((not (consp tail)))
                            (check-cycle tail seen depth)))
                       (check-cycle slow seen depth)
-                      (when (eq fast slow)
-                        (return t)))))
+                      (when (or (eq fast slow)
+                                (zerop (setf size-limit
+                                             (truly-the fixnum
+                                                        (1- size-limit)))))
+                        (return-from coalesce-tree-p)))))
            (declare (inline check-cycle))
-           (circularp x (list x) 0)))))
+           (recurse x (list x) 0)
+           t))))
 
 ;;; Is X a (possibly-improper) list of at least N elements?
 (declaim (ftype (function (t index)) list-of-length-at-least-p))

@@ -1967,40 +1967,51 @@ is :ANY, the function name is not checked."
                    ;; No point in stuffing them in the hash-table.
                    (and (typep x 'instance)
                         (not (or (leaf-p x) (node-p x))))))
+             (cons-coalesce-p (x)
+               (if (eq +code-coverage-unmarked+ (cdr x))
+                   ;; These are already coalesced, and the CAR should
+                   ;; always be OK, so no need to check.
+                   t
+                   (when (coalesce-tree-p x)
+                     (labels ((descend (x)
+                                (do ((y x (cdr y)))
+                                    ((atom y) (atom-colesce-p y))
+                                  ;; Don't just call file-coalesce-p, because it'll
+                                  ;; invoke COALESCE-TREE-P repeatedly
+                                  (let ((car (car y)))
+                                    (unless (if (consp car)
+                                                (descend car)
+                                                (atom-colesce-p car))
+                                      (return nil))))))
+                       (descend x)))))
+             (atom-colesce-p (x)
+               (or (core-coalesce-p x)
+                   ;; We *could* coalesce base-strings as well,
+                   ;; but we'd need a separate hash-table for
+                   ;; that, since we are not allowed to coalesce
+                   ;; base-strings with non-base-strings.
+                   (typep x
+                          '(or bit-vector
+                            ;; in the cross-compiler, we coalesce
+                            ;; all strings with the same contents,
+                            ;; because we will end up dumping them
+                            ;; as base-strings anyway.  In the
+                            ;; real compiler, we're not allowed to
+                            ;; coalesce regardless of string
+                            ;; specialized element type, so we
+                            ;; KLUDGE by coalescing only character
+                            ;; strings (the common case) and
+                            ;; punting on the other types.
+                            #+sb-xc-host
+                            string
+                            #-sb-xc-host
+                            (vector character)))))
              (file-coalesce-p (x)
                ;; CLHS 3.2.4.2.2: We are also allowed to coalesce various
                ;; other things when file-compiling.
-               (or (core-coalesce-p x)
-                   (if (consp x)
-                       (if (eq +code-coverage-unmarked+ (cdr x))
-                           ;; These are already coalesced, and the CAR should
-                           ;; always be OK, so no need to check.
-                           t
-                           (unless (maybe-cyclic-p x) ; safe for EQUAL?
-                             (do ((y x (cdr y)))
-                                 ((atom y) (file-coalesce-p y))
-                               (unless (file-coalesce-p (car y))
-                                 (return nil)))))
-                       ;; We *could* coalesce base-strings as well,
-                       ;; but we'd need a separate hash-table for
-                       ;; that, since we are not allowed to coalesce
-                       ;; base-strings with non-base-strings.
-                       (typep x
-                              '(or bit-vector
-                                ;; in the cross-compiler, we coalesce
-                                ;; all strings with the same contents,
-                                ;; because we will end up dumping them
-                                ;; as base-strings anyway.  In the
-                                ;; real compiler, we're not allowed to
-                                ;; coalesce regardless of string
-                                ;; specialized element type, so we
-                                ;; KLUDGE by coalescing only character
-                                ;; strings (the common case) and
-                                ;; punting on the other types.
-                                #+sb-xc-host
-                                string
-                                #-sb-xc-host
-                                (vector character))))))
+               (if (consp x)
+                   (cons-coalesce-p x)
+                   (atom-colesce-p x)))
              (coalescep (x)
                (if faslp (file-coalesce-p x) (core-coalesce-p x))))
       ;; When compiling to core we don't coalesce strings, because

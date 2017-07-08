@@ -374,25 +374,12 @@
            (typecase x
              (symbol (dump-symbol x file))
              (list
-              ;; KLUDGE: The code in this case has been hacked
-              ;; to match Douglas Crosher's quick fix to CMU CL
-              ;; (on cmucl-imp 1999-12-27), applied in sbcl-0.6.8.11
-              ;; with help from Martin Atzmueller. This is not an
-              ;; ideal solution; to quote DTC,
-              ;;   The compiler locks up trying to coalesce the
-              ;;   constant lists. The hack below will disable the
-              ;;   coalescing of lists while dumping and allows
-              ;;   the code to compile. The real fix would be to
-              ;;   take a little more care while dumping these.
-              ;; So if better list coalescing is needed, start here.
-              ;; -- WHN 2000-11-07
-              (if (maybe-cyclic-p x)
-                  (progn
-                    (dump-list x file)
-                    (eq-save-object x file))
-                  (unless (equal-check-table x file)
-                    (dump-list x file)
-                    (equal-save-object x file))))
+              (cond ((not (coalesce-tree-p x))
+                     (dump-list x file)
+                     (eq-save-object x file))
+                    ((not (equal-check-table x file))
+                     (dump-list x file)
+                     (equal-save-object x file))))
              (layout
               (dump-layout x file)
               (eq-save-object x file))
