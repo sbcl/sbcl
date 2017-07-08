@@ -378,7 +378,7 @@
                      (dump-list x file)
                      (eq-save-object x file))
                     ((not (equal-check-table x file))
-                     (dump-list x file)
+                     (dump-list x file t)
                      (equal-save-object x file))))
              (layout
               (dump-layout x file)
@@ -656,49 +656,63 @@
 ;;;
 ;;; Otherwise, we recursively call the dumper to dump the current
 ;;; element.
-(defun dump-list (list file)
+(defun dump-list (list file &optional coalesce)
   (aver (and list
              (not (gethash list (fasl-output-circularity-table file)))))
   (let ((circ (fasl-output-circularity-table file)))
-   (flet ((cdr-circularity (obj n)
-            (let ((ref (gethash obj circ)))
-              (when ref
-                (push (make-circularity :type :rplacd
-                                        :object list
-                                        :index (1- n)
-                                        :value obj
-                                        :enclosing-object ref)
-                      *circularities-detected*)
-                (terminate-undotted-list n file)
-                t))))
-     (do* ((l list (cdr l))
-           (n 0 (1+ n)))
-          ((atom l)
-           (cond ((null l)
-                  (terminate-undotted-list n file))
-                 (t
-                  (cond ((cdr-circularity l n))
-                        (t
-                         (sub-dump-object l file)
-                         (terminate-dotted-list n file))))))
-       (declare (type index n))
-       (when (cdr-circularity l n)
-         (return))
+    (flet ((cdr-circularity (obj n)
+             ;; COALESCE means there's no cycles
+             (let ((ref (gethash obj circ)))
+               (when ref
+                 (push (make-circularity :type :rplacd
+                                         :object list
+                                         :index (1- n)
+                                         :value obj
+                                         :enclosing-object ref)
+                       *circularities-detected*)
+                 (terminate-undotted-list n file)
+                 t))))
+      (do* ((l list (cdr l))
+            (n 0 (1+ n)))
+           ((atom l)
+            (cond ((null l)
+                   (terminate-undotted-list n file))
+                  (t
+                   (cond ((cdr-circularity l n))
+                         (t
+                          (sub-dump-object l file)
+                          (terminate-dotted-list n file))))))
+        (declare (type index n))
+        (when (cdr-circularity l n)
+          (return))
 
-       (setf (gethash l circ) list)
+        (setf (gethash l circ) list)
 
-       (let* ((obj (car l))
-              (ref (gethash obj circ)))
-         (cond (ref
-                (push (make-circularity :type :rplaca
-                                        :object list
-                                        :index n
-                                        :value obj
-                                        :enclosing-object ref)
-                      *circularities-detected*)
-                (sub-dump-object nil file))
-               (t
-                (sub-dump-object obj file))))))))
+        (let* ((obj (car l))
+               (ref (gethash obj circ)))
+          (cond (ref
+                 (push (make-circularity :type :rplaca
+                                         :object list
+                                         :index n
+                                         :value obj
+                                         :enclosing-object ref)
+                       *circularities-detected*)
+                 (sub-dump-object nil file))
+                ;; Avoid coalescing if COALESCE-TREE-P decided not to
+                ((consp obj)
+                 ;; This is the same as DUMP-NON-IMMEDIATE-OBJECT but
+                 ;; without calling COALESCE-TREE-P again.
+                 (let ((index (gethash obj (fasl-output-eq-table file))))
+                   (cond (index
+                          (dump-push index file))
+                         ((not coalesce)
+                          (dump-list obj file)
+                          (eq-save-object obj file))
+                         ((not (equal-check-table obj file))
+                          (dump-list obj file t)
+                          (equal-save-object obj file)))))
+                (t
+                 (sub-dump-object obj file))))))))
 
 (defun terminate-dotted-list (n file)
   (declare (type index n) (type fasl-output file))
