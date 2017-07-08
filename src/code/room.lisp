@@ -804,43 +804,79 @@
   (declare (type (or (eql :all) spaces) space))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
-  (flet ((maybe-call (fun obj)
-           (when (valid-obj space obj)
-             (funcall fun obj))))
-    (map-allocated-objects
-     (lambda (obj obj-type size)
-       (declare (ignore obj-type size))
-       (typecase obj
-         (cons
-          (when (or (eq (car obj) object)
-                    (eq (cdr obj) object))
-            (maybe-call fun obj)))
-         (instance
-          (when (or (eq (%instance-layout obj) object)
-                    (do-instance-tagged-slot (i obj)
-                      (when (eq (%instance-ref obj i) object)
-                        (return t))))
-            (maybe-call fun obj)))
-         (code-component
-          (let ((length (code-header-words obj)))
-            (do ((i code-constants-offset (1+ i)))
-                ((= i length))
-              (when (eq (code-header-ref obj i) object)
-                (maybe-call fun obj)
-                (return)))))
-         (simple-vector
-          (dotimes (i (length obj))
-            (when (eq (svref obj i) object)
-              (maybe-call fun obj)
-              (return))))
-         (symbol
-          (when (or (eq (symbol-name obj) object)
-                    (eq (symbol-package obj) object)
-                    (eq (symbol-info obj) object)
-                    (and (boundp obj)
-                         (eq (symbol-value obj) object)))
-            (maybe-call fun obj)))))
-     space)))
+  (flet ((ref-p (this widetag nwords) ; return T if 'this' references object
+           (when (listp this)
+             (return-from ref-p
+               (or (eq (car this) object) (eq (cdr this) object))))
+           (case widetag
+             ;; purely boxed objects
+             ((#.ratio-widetag #.complex-widetag #.value-cell-widetag
+               #.symbol-widetag #.weak-pointer-widetag
+               #.simple-array-widetag #.simple-vector-widetag
+               #.complex-array-widetag #.complex-vector-widetag
+               #.complex-bit-vector-widetag #.complex-vector-nil-widetag
+               #.complex-base-string-widetag
+               #!+sb-unicode #.complex-character-string-widetag))
+             ;; mixed boxed/unboxed objects
+             (#.code-header-widetag
+              (dotimes (i (code-n-entries this))
+                (let ((f (%code-entry-point this i)))
+                  (when (or (eq f object)
+                            (eq (%simple-fun-name f) object)
+                            (eq (%simple-fun-arglist f) object)
+                            (eq (%simple-fun-type f) object)
+                            (eq (%simple-fun-info f) object))
+                    (return-from ref-p t))))
+              (setq nwords (code-header-words this)))
+             (#.instance-widetag
+              (return-from ref-p
+                (or (eq (%instance-layout this) object)
+                    (do-instance-tagged-slot (i this)
+                      (when (eq (%instance-ref this i) object)
+                        (return t))))))
+             (#.funcallable-instance-widetag
+              (let ((l (%funcallable-instance-layout this)))
+                (when (eq l object)
+                  (return-from ref-p t))
+                (let ((bitmap (layout-bitmap l)))
+                  (unless (eql bitmap -1)
+                    ;; tagged slots precede untagged slots,
+                    ;; so integer-length is the count of tagged slots.
+                    (setq nwords (1+ (integer-length bitmap)))))))
+             (#.closure-widetag
+              (when (eq (%closure-fun this) object)
+                (return-from ref-p t)))
+             (#.fdefn-widetag
+              #!+immobile-code
+              (when (eq (make-lisp-obj
+                         (alien-funcall
+                          (extern-alien "fdefn_raw_referent" (function unsigned unsigned))
+                          (logandc2 (get-lisp-obj-address this) lowtag-mask)))
+                        object)
+                (return-from ref-p t))
+              ;; Without immobile-code the 'raw-addr' slot either holds the same thing
+              ;; as the 'fun' slot, or holds a trampoline address. We'll overlook the
+              ;; minor issue that due to concurrent writes, two representations of the
+              ;; allegedly same referent may diverge; thus the last slot is skipped
+              ;; even if it refers to a different simple-fun.
+              (decf nwords))
+             (t
+              (return-from ref-p nil)))
+           ;; gencgc has WITHOUT-GCING in map-allocated-objects over dynamic space,
+           ;; so we don't have to pin each object inside REF-P.
+           (#!+cheneygc with-pinned-objects #!+cheneygc (this)
+            #!-cheneygc progn
+            (do ((sap (int-sap (logandc2 (get-lisp-obj-address this) lowtag-mask)))
+                 (i (* (1- nwords) n-word-bytes) (- i n-word-bytes)))
+                ((<= i 0) nil)
+              (when (eq (sap-ref-lispobj sap i) object)
+                (return t))))))
+    (let ((fun (%coerce-callable-to-fun fun)))
+      (dx-flet ((mapfun (obj widetag size)
+                  (when (and (ref-p obj widetag (/ size n-word-bytes))
+                             (valid-obj space obj))
+                    (funcall fun obj))))
+        (map-allocated-objects #'mapfun space)))))
 
 (defun list-referencing-objects (space object)
   (collect ((res))

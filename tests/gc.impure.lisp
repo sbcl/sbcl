@@ -96,18 +96,16 @@
 
 (with-test (:name :bug-936304)
   (gc :full t)
-  (time
-   (assert (eq :ok (handler-case
+  (assert (eq :ok (handler-case
                        (progn
                          (loop repeat 50 do (stress-gc))
                          :ok)
                      (storage-condition ()
-                       :oom))))))
+                       :oom)))))
 
 (with-test (:name :bug-981106)
   (gc :full t)
-  (time
-   (assert (eq :ok
+  (assert (eq :ok
                (handler-case
                    (dotimes (runs 100 :ok)
                      (let* ((n (truncate (dynamic-space-size) 1200))
@@ -117,7 +115,7 @@
                                       (write-sequence "hi there!" string))))))
                        (assert (eql len (* n (length "hi there!"))))))
                  (storage-condition ()
-                   :oom))))))
+                   :oom)))))
 
 (with-test (:name :gc-logfile :skipped-on '(not :gencgc))
   (assert (not (gc-logfile)))
