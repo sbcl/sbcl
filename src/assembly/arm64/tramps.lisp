@@ -16,13 +16,18 @@
   HEADER
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'undefined-tramp-tagged
-                         :assembly-routine))
+                          :assembly-routine))
   (dotimes (i (- simple-fun-code-offset 2))
     (inst dword nil-value))
 
   UNDEFINED-TRAMP
   (inst adr code-tn header fun-pointer-lowtag)
-  (error-call nil 'undefined-fun-error lexenv-tn))
+  (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error)
+                    (list lexenv-tn))
+  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst add lr-tn code-tn (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+
+  (inst br lr-tn))
 
 (define-assembly-routine
     (xundefined-alien-tramp (:return-style :none)

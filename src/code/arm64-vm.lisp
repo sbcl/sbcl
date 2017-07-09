@@ -75,10 +75,12 @@
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
          (instruction (sap-ref-32 pc 0))
-         (error-number (ldb (byte 8 13) instruction)))
+         (error-number (ldb (byte 8 13) instruction))
+         (trap-number (ldb (byte 8 5) instruction)))
     (declare (type system-area-pointer pc))
     (values error-number
-            (if (= (ldb (byte 8 5) instruction) invalid-arg-count-trap)
+            (if (= trap-number invalid-arg-count-trap)
                 '(#.arg-count-sc)
-                (sb!kernel::decode-internal-error-args (sap+ pc 4) error-number)))))
+                (sb!kernel::decode-internal-error-args (sap+ pc 4) error-number))
+            trap-number)))
 ) ; end PROGN
