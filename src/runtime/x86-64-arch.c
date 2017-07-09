@@ -161,9 +161,7 @@ void arch_skip_instruction(os_context_t *context)
      * past it. Skip the code; after that, if the code is an
      * error-trap or cerror-trap then skip the data bytes that follow. */
 
-    int vlen;
     long code;
-
 
     /* Get and skip the Lisp interrupt code. */
     code = *(char*)(*os_context_pc_addr(context))++;
@@ -171,12 +169,8 @@ void arch_skip_instruction(os_context_t *context)
         {
         case trap_Error:
         case trap_Cerror:
-            /* Lisp error arg vector length */
-            vlen = *(char*)(*os_context_pc_addr(context))++;
-            /* Skip Lisp error arg data bytes. */
-            while (vlen-- > 0) {
-                ++*os_context_pc_addr(context);
-            }
+            skip_internal_error(context);
+
             break;
 
         case trap_Breakpoint:           /* not tested */

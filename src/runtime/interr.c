@@ -175,6 +175,25 @@ void print_constant(os_context_t *context, int offset) {
 #include "genesis/errnames.h"
 char *internal_error_descriptions[] = {INTERNAL_ERROR_NAMES};
 char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
+
+void skip_internal_error (os_context_t *context) {
+    unsigned char *ptr = (unsigned char *)*os_context_pc_addr(context);
+#ifdef LISP_FEATURE_ARM64
+    u32 trap_instruction = *(u32 *)ptr;
+    unsigned char code = trap_instruction >> 13 & 0xFF;
+    ptr += 4;
+#else
+    unsigned char code = *ptr;
+    ptr++;
+#endif
+    if (code > sizeof(internal_error_nargs)) {
+        printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
+    }
+    printf("%d\n", code);
+    ptr += internal_error_nargs[code];
+    *((unsigned char **)os_context_pc_addr(context)) = ptr; 
+}
+
 /* internal error handler for when the Lisp error system doesn't exist
  *
  * FIXME: Shouldn't error output go to stderr instead of stdout? (Alas,
