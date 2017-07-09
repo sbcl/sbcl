@@ -242,7 +242,10 @@
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
     (inst cmp value null-tn)
-    (inst b :eq (generate-error-code vop 'undefined-fun-error object))))
+    (inst b :eq
+          (let ((*location-context* (make-restart-location RETRY value)))
+            (generate-error-code vop 'undefined-fun-error object)))
+    RETRY))
 
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
