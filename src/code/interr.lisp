@@ -83,19 +83,20 @@
                       ;; The #'abc case from SAFE-FDEFN-FUN, CONTEXT
                       ;; specifies the offset from the error location
                       ;; where it can retry checking the FDEFN
-                      (restart-case (error condition)
-                        (continue ()
-                          :report (lambda (stream)
-                                    (format stream "Retry using ~s." name))
-                          (set-value fdefn-or-symbol retrying))
-                        (use-value (value)
-                          :report (lambda (stream)
-                                    (format stream "Use specified function."))
-                          :interactive read-evaluated-form
-                          (set-value value retrying)))
-                      (unless retrying
-                        (sb!vm::incf-context-pc *current-internal-error-context*
-                                                pc-offset)))
+                      (prog1
+                          (restart-case (error condition)
+                            (continue ()
+                              :report (lambda (stream)
+                                        (format stream "Retry using ~s." name))
+                              (set-value fdefn-or-symbol retrying))
+                            (use-value (value)
+                              :report (lambda (stream)
+                                        (format stream "Use specified function."))
+                              :interactive read-evaluated-form
+                              (set-value value retrying)))
+                        (unless retrying
+                          (sb!vm::incf-context-pc *current-internal-error-context*
+                                                  pc-offset))))
                      (t
                       (restart-case (error condition)
                         (continue ()
