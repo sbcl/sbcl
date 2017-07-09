@@ -229,7 +229,7 @@
 (defvar *binding-stack-pointer*)
 
 (defconstant-eqx +static-symbols+
-  `(,@+common-static-symbols+
+ `#(,@+common-static-symbols+
     ,@+c-callable-static-symbols+
     *alien-stack-pointer*
 
@@ -260,10 +260,10 @@
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
      sb!alien::*enter-alien-callback*)
-  #'equal)
+  #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  '(length
+  #(length
     two-arg-+
     two-arg--
     two-arg-*
@@ -279,7 +279,7 @@
     two-arg-gcd
     two-arg-lcm
     %coerce-callable-to-fun)
-  #'equal)
+  #'equalp)
 
 #!+win32
 (defconstant +win32-tib-arbitrary-field-offset+ #.(+ #xE10 (* 4 63)))

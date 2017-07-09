@@ -32,7 +32,7 @@
 
 (defun static-symbol-p (symbol)
   (or (null symbol)
-      (and (member symbol +static-symbols+) t)))
+      (and (find symbol +static-symbols+) t)))
 
 ;;; the byte offset of the static symbol SYMBOL
 (defun static-symbol-offset (symbol)

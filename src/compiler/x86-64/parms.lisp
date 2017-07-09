@@ -144,7 +144,7 @@
 (defvar *binding-stack-pointer*)
 
 (defconstant-eqx +static-symbols+
-  `(,@+common-static-symbols+
+ `#(,@+common-static-symbols+
     ,@+c-callable-static-symbols+
     *alien-stack-pointer*
 
@@ -162,12 +162,12 @@
      ;; details.
      sb!alien::*enter-alien-callback*
      )
-  #'equal)
+  #'equalp)
 
 ;;; FIXME: with #!+immobile-space, this should be the empty list,
 ;;; because *all* fdefns are permanently placed.
 (defconstant-eqx +static-fdefns+
-  '(length
+  #(length
     two-arg-+
     two-arg--
     two-arg-*
@@ -183,7 +183,7 @@
     two-arg-gcd
     two-arg-lcm
     %coerce-callable-to-fun)
-  #'equal)
+  #'equalp)
 
 #!+sb-simd-pack
 (defvar *simd-pack-element-types* '(integer single-float double-float))

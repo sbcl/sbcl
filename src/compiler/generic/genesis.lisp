@@ -1625,7 +1625,7 @@ core and return a descriptor to it."
                        (cdr target-cl-pkg-info))
     (record-accessibility :external target-cl-pkg-info *nil-descriptor*))
   ;; Intern the others.
-  (dolist (symbol sb!vm:+static-symbols+)
+  (dovector (symbol sb!vm:+static-symbols+)
     (let* ((des (cold-intern symbol :gspace *static*))
            (offset-wanted (sb!vm:static-symbol-offset symbol))
            (offset-found (- (descriptor-bits des)
@@ -1658,7 +1658,7 @@ core and return a descriptor to it."
 
   ;; Everything between this preserved-for-posterity comment down to
   ;; the assignment of *CURRENT-CATCH-BLOCK* could be entirely deleted,
-  ;; including the list of *C-CALLABLE-STATIC-SYMBOLS* itself,
+  ;; including the list of C-CALLABLE-STATIC-SYMBOLS itself,
   ;; if it is GC-safe for the C runtime to have its own implementation
   ;; of the INFO-VECTOR-FDEFN function in a multi-threaded build.
   ;;
@@ -1924,7 +1924,7 @@ core and return a descriptor to it."
 
 (defun initialize-static-fns ()
   (let ((*cold-fdefn-gspace* *static*))
-    (dolist (sym sb!vm:+static-fdefns+)
+    (dovector (sym sb!vm:+static-fdefns+)
       (let* ((fdefn (cold-fdefinition-object (cold-intern sym)))
              (offset (- (+ (- (descriptor-bits fdefn)
                               sb!vm:other-pointer-lowtag)
@@ -3353,7 +3353,7 @@ core and return a descriptor to it."
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
 
 (defun write-static-symbols (stream)
-  (dolist (symbol (cons nil sb!vm:+static-symbols+))
+  (dolist (symbol (cons nil (coerce sb!vm:+static-symbols+ 'list)))
     ;; FIXME: It would be nice to use longer names than NIL and
     ;; (particularly) T in #define statements.
     (format stream "#define ~A LISPOBJ(0x~X)~%"

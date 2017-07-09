@@ -174,7 +174,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
-  `(,@+common-static-symbols+
+ `#(,@+common-static-symbols+
     ,@+c-callable-static-symbols+
      #!+gencgc *restart-lisp-function*
 
@@ -183,10 +183,10 @@
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
      sb!alien::*enter-alien-callback*)
-  #'equal)
+  #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  '(length
+  #(length
     two-arg-+
     two-arg--
     two-arg-*
@@ -205,4 +205,4 @@
     two-arg-eqv
     two-arg-gcd
     two-arg-lcm)
-  #'equal)
+  #'equalp)

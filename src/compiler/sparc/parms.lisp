@@ -202,18 +202,18 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
-  `(,@+common-static-symbols+
-   ,@+c-callable-static-symbols+
-   #!+gencgc *restart-lisp-function*)
-  #'equal)
+  `#(,@+common-static-symbols+
+     ,@+c-callable-static-symbols+
+     #!+gencgc *restart-lisp-function*)
+  #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  '(length
+  #(length
     two-arg-+ two-arg-- two-arg-* two-arg-/ two-arg-< two-arg-> two-arg-=
     two-arg-<= two-arg->= two-arg-/= eql %negate
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
     two-arg-gcd two-arg-lcm)
-  #'equal)
+  #'equalp)
 
 ;;;; Pseudo-atomic trap number
 

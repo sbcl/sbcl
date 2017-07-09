@@ -138,7 +138,7 @@
   #'equal)
 
 (defconstant-eqx +common-static-symbols+
-  '(t
+  `(t
     ;; free pointers.  Note that these are FIXNUM word counts, not (as
     ;; one might expect) byte counts or SAPs. The reason seems to be
     ;; that by representing them this way, we can avoid consing
@@ -198,17 +198,15 @@
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.
     ;;; However there is no efficiency gain if we have #!+immobile-space.
-    .
-    #!+immobile-space ()
-    #!-immobile-space
-    (;; arbitrary object that changes after each GC
+    #!-immobile-space ,@'(
+     ;; arbitrary object that changes after each GC
      sb!kernel::*gc-epoch*
      ;; Dispatch tables for generic array access
      sb!impl::%%data-vector-reffers%%
      sb!impl::%%data-vector-reffers/check-bounds%%
      sb!impl::%%data-vector-setters%%
      sb!impl::%%data-vector-setters/check-bounds%%))
-  #'equal)
+  #'equalp)
 
 ;;; Number of entries in the thread local storage. Limits the number
 ;;; of symbols with thread local bindings.
@@ -222,3 +220,8 @@
 (progn
   (defconstant +highest-normal-generation+ 5)
   (defconstant +pseudo-static-generation+ 6))
+
+(defun !unintern-symbols ()
+  '("SB-VM"
+    +c-callable-static-symbols+
+    +common-static-symbols+))

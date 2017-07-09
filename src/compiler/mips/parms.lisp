@@ -134,12 +134,12 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 (defconstant-eqx +static-symbols+
-  `(,@+common-static-symbols+
-    ,@+c-callable-static-symbols+)
-  #'equal)
+  `#(,@+common-static-symbols+
+     ,@+c-callable-static-symbols+)
+  #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  '(two-arg-+
+  #(two-arg-+
     two-arg--
     two-arg-*
     two-arg-/
@@ -157,4 +157,4 @@
     length
     two-arg-gcd
     two-arg-lcm)
-  #'equal)
+  #'equalp)

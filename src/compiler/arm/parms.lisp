@@ -138,7 +138,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
-  `(,@+common-static-symbols+
+ `#(,@+common-static-symbols+
     ,@+c-callable-static-symbols+
     *allocation-pointer*
 
@@ -155,17 +155,17 @@
      ;; details.
      sb!alien::*enter-alien-callback*
      #!+gencgc *restart-lisp-function*)
-  #'equal)
+  #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  '(two-arg-gcd two-arg-lcm
+  #(two-arg-gcd two-arg-lcm
     two-arg-+ two-arg-- two-arg-* two-arg-/
     two-arg-< two-arg-> two-arg-=
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
 
     eql
     sb!kernel:%negate)
-  #'equal)
+  #'equalp)
 
 
 ;;;; Assembler parameters:

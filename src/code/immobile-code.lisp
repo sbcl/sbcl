@@ -83,7 +83,7 @@
     ;; immobile space functions - the x86 call sequence requires two
     ;; instructions, and the fixupper does not understand that.
     ;; (It's not too hard to enhance it, but not worth the trouble)
-    (dolist (fun-name sb-vm:+static-fdefns+)
+    (dovector (fun-name sb-vm:+static-fdefns+)
       (let ((code (fun-code-header (symbol-function fun-name))))
         (setf (gethash code hashset) t)
         (vector-push-extend code ordering)))
