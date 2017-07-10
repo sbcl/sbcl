@@ -2999,7 +2999,9 @@ core and return a descriptor to it."
       (check sb!vm:read-only-space-start sb!vm:read-only-space-end :read-only)
       (check sb!vm:static-space-start sb!vm:static-space-end :static)
       #!+gencgc
-      (check sb!vm:dynamic-space-start sb!vm:dynamic-space-end :dynamic)
+      (check sb!vm:dynamic-space-start
+             (+ sb!vm:dynamic-space-start sb!vm:default-dynamic-space-size)
+             :dynamic)
       #!+immobile-space
       ;; Must be a multiple of 32 because it makes the math a nicer
       ;; when computing word and bit index into the 'touched' bitmap.

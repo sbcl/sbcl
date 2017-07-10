@@ -167,6 +167,9 @@ statistics are appended to it."
 (defun dynamic-space-size ()
   "Size of the dynamic space in bytes."
   (extern-alien "dynamic_space_size" os-vm-size-t))
+#!+gencgc
+(define-symbol-macro sb!vm:dynamic-space-end
+  (+ (dynamic-space-size) sb!vm:dynamic-space-start))
 
 ;;;; SUB-GC
 

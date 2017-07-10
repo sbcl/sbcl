@@ -12,12 +12,12 @@
 
 (in-package "SB!VM")
 
-(defmacro !configure-dynamic-space-end (&optional default)
+(defun !read-dynamic-space-size ()
   (with-open-file (f "output/dynamic-space-size.txt")
     (let ((line (read-line f)))
       (multiple-value-bind (number end)
           (parse-integer line :junk-allowed t)
-        (if number
+        (when number
             (let* ((ext (subseq line end))
                    (mult (cond ((or (zerop (length ext))
                                     (member ext '("MB" "MIB") :test #'equalp))
@@ -26,12 +26,7 @@
                                 (expt 2 30))
                                (t
                                 (error "Invalid --dynamic-space-size=~A" line)))))
-              `(+ dynamic-space-start ,(* number mult)))
-            (or default
-                `(+ dynamic-space-start
-                    (ecase n-word-bits
-                      (32 (expt 2 29))
-                      (64 (expt 2 30))))))))))
+              (* number mult)))))))
 
 #!+gencgc
 ;; Define START/END constants for GENCGC spaces.
@@ -62,7 +57,7 @@
 (defmacro !gencgc-space-setup
     (small-spaces-start
           &key ((:dynamic-space-start dynamic-space-start*))
-               default-dynamic-space-size
+               ((:default-dynamic-space-size default-dynamic-space-size*))
                #!+immobile-space (immobile-space-size (* 128 1024 1024))
                ;; Smallest os_validate()able alignment; used as safepoint
                ;; page size.  Default suitable for POSIX platforms.
@@ -101,19 +96,20 @@
          (safepoint-page-forms
           (list #!+sb-safepoint
                 `(defconstant gc-safepoint-page-addr ,safepoint-address)))
-         (dynamic-space-start* (or dynamic-space-start* ptr))
-         (optional-dynamic-space-end
-          (when default-dynamic-space-size
-            (list (+ dynamic-space-start* default-dynamic-space-size)))))
+         )
     #+ccl safepoint-address ; workaround for incorrect "Unused" warning
     `(progn
        ,@safepoint-page-forms
        ,@small-space-forms
        #!+immobile-space
        (defconstant immobile-fixedobj-subspace-size (* 24 1024 1024))
-       (defconstant dynamic-space-start ,dynamic-space-start*)
-       (defconstant dynamic-space-end (!configure-dynamic-space-end
-                                       ,@optional-dynamic-space-end)))))
+       (defconstant dynamic-space-start ,(or dynamic-space-start* ptr))
+       (defconstant default-dynamic-space-size
+         (or ,(!read-dynamic-space-size)
+             ,default-dynamic-space-size*
+             (ecase n-word-bits
+               (32 (expt 2 29))
+               (64 (expt 2 30))))))))
 
 (defconstant-eqx +c-callable-static-symbols+
   '(sub-gc

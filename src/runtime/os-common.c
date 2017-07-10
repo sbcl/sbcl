@@ -229,7 +229,8 @@ gc_managed_addr_p(lispobj ad)
         || (IMMOBILE_SPACE_START <= ad && ad < IMMOBILE_SPACE_END)
 #endif
 #if defined LISP_FEATURE_GENCGC
-        || (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+        || (DYNAMIC_SPACE_START <= ad &&
+            ad < (DYNAMIC_SPACE_START + dynamic_space_size))
 #else
         || (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_0_SPACE_END)
         || (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_1_SPACE_END)

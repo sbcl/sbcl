@@ -102,7 +102,8 @@
   (defconstant static-space-end          #x097fff00)
 
   (defconstant dynamic-space-start       #x4f000000)
-  (defconstant dynamic-space-end         (!configure-dynamic-space-end)))
+  (defconstant default-dynamic-space-size
+    (or (!read-dynamic-space-size) (expt 2 29))))
 
 (defconstant linkage-table-entry-size 16)
 
