@@ -3571,12 +3571,9 @@ remap_page_range (page_index_t from, page_index_t to)
 }
 
 static void
-remap_free_pages (page_index_t from, page_index_t to, int forcibly)
+remap_free_pages (page_index_t from, page_index_t to)
 {
     page_index_t first_page, last_page;
-
-    if (forcibly)
-        return remap_page_range(from, to);
 
     for (first_page = from; first_page <= to; first_page++) {
         if (!page_free_p(first_page) || !page_need_to_zero(first_page))
@@ -3759,7 +3756,7 @@ collect_garbage(generation_index_t last_gen)
     if (gen > small_generation_limit) {
         if (last_free_page > high_water_mark)
             high_water_mark = last_free_page;
-        remap_free_pages(0, high_water_mark, 0);
+        remap_free_pages(0, high_water_mark);
         high_water_mark = 0;
     }
 
