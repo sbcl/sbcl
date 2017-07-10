@@ -96,7 +96,6 @@ collect_garbage(generation_index_t ignore)
 #endif
     unsigned long size_retained;
     lispobj *current_static_space_free_pointer;
-    unsigned long binding_stack_size;
     sigset_t old;
     struct thread *th=arch_os_get_current_thread();
 
@@ -156,16 +155,8 @@ collect_garbage(generation_index_t ignore)
 #endif
     scavenge_control_stack(th);
 
-
-    binding_stack_size =
-        (lispobj *)get_binding_stack_pointer(th) -
-        (lispobj *)th->binding_stack_start;
-#ifdef PRINTNOISE
-    printf("Scavenging the binding stack %p - %p (%d words) ...\n",
-           th->binding_stack_start, get_binding_stack_pointer(th),
-           (int)(binding_stack_size));
-#endif
-    scavenge(((lispobj *)th->binding_stack_start), binding_stack_size);
+    scav_binding_stack((lispobj*)th->binding_stack_start,
+                       (lispobj*)get_binding_stack_pointer(th));
 
 #ifdef PRINTNOISE
     printf("Scavenging static space %p - %p (%d words) ...\n",

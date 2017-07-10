@@ -3396,11 +3396,11 @@ garbage_collect_generation(generation_index_t generation, int raise)
     {
         struct thread *th;
         for_each_thread(th) {
-            sword_t len= (lispobj *)get_binding_stack_pointer(th) -
-                th->binding_stack_start;
-            scavenge((lispobj *) th->binding_stack_start,len);
+            scav_binding_stack((lispobj*)th->binding_stack_start,
+                               (lispobj*)get_binding_stack_pointer(th));
 #ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
+            sword_t len;
             len=(SymbolValue(FREE_TLS_INDEX,0) >> WORD_SHIFT) -
                 (sizeof (struct thread))/(sizeof (lispobj));
             scavenge((lispobj *) (th+1),len);

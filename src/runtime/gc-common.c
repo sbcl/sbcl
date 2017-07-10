@@ -185,6 +185,23 @@ sword_t scavenge(lispobj *start, sword_t n_words)
     return n_words;
 }
 
+void scav_binding_stack(lispobj* where, lispobj* end)
+{
+#ifdef LISP_FEATURE_SB_THREAD
+    // The binding stack stores TLS indices where symbols would be,
+    // and there's no reason to scavenge those words since they're fixnums.
+    // This means a symbol can not be enlivened if it exists *solely* on
+    // the binding stack - which is, practically speaking, impossible.
+    lispobj *object_ptr;
+    for (object_ptr = where; object_ptr < end; object_ptr += 2) {
+        lispobj object = *object_ptr;
+        if (is_lisp_pointer(object)) scav1(object_ptr, object);
+    }
+#else
+    scavenge(where, end - where);
+#endif
+}
+
 static lispobj trans_fun_header(lispobj object); /* forward decls */
 static lispobj trans_short_boxed(lispobj object);
 
