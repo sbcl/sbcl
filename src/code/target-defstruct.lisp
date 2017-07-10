@@ -40,8 +40,11 @@
     (declare (index value-index))
     (setf (%instance-layout instance) (dd-layout-or-lose dd))
     (dolist (spec slot-specs instance)
-      (destructuring-bind (raw-type . index) (cdr spec)
-              (macrolet ((make-case ()
+      (destructuring-bind (kind raw-type . index) spec
+        (if (eq kind :unbound)
+            (setf (%instance-ref instance index)
+                  (sb!sys:%primitive make-unbound-marker))
+            (macrolet ((make-case ()
                            `(ecase raw-type
                               ((t)
                                (setf (%instance-ref instance index) value))
@@ -54,7 +57,7 @@
                                  *raw-slot-data*))))
                 (let ((value (fast-&rest-nth value-index slot-values)))
                   (incf value-index)
-                  (make-case)))))))
+                  (make-case))))))))
 
 (defun %instance-layout (instance)
   (%instance-layout instance))

@@ -148,54 +148,56 @@
 
 ;; genesis needs to know how many bits are to the right of the 'index' field
 ;; in the packed BITS slot of a DSD.
-(defconstant +dsd-index-shift+ 5)
-(defun pack-dsd-bits (index read-only safe-p rsd-index)
+(defconstant +dsd-index-shift+ 6)
+(defun pack-dsd-bits (index read-only safe-p always-boundp rsd-index)
   (logior (ash index +dsd-index-shift+)
-          (if read-only (ash 1 4) 0)
-          (if safe-p (ash 1 3) 0)
+          (if read-only (ash 1 5) 0)
+          (if safe-p (ash 1 4) 0)
+          (if always-boundp (ash 1 3) 0)
           (the (unsigned-byte 3) (if rsd-index (1+ rsd-index) 0))))
 
-(declaim (inline dsd-safe-p
+(declaim (inline dsd-always-boundp
+                 dsd-safe-p
                  ; dsd-read-only ; compilation order problem
                  ; dsd-index
                  ))
+
+;;; In general we type-check a slot when it is written, not when read.
+;;; There are cases where we must check each read though:
+
+;;; (1) a structure subtype can constrain a slot type more highly than the
+;;; parent type constrains it. This requires that each read via the subtype's
+;;; accessor be type-checked, because a write via the parent writer may
+;;; store a value that does not satisfy the more restrictive constraint.
+;;; These slots have SAFE-P = 0 in the dsd.
+;;; (2) If a BOA constructor leaves an ordinary (non-raw) slot uninitialized,
+;;; then the slot contains the unbound-marker which can be tested with just
+;;; an EQ comparison. Such slots have ALWAYS-BOUNDP = 0 in the dsd.
+;;; This does not apply to raw slots, which can not hold an unbound marker.
+
+;;; Note that inheritance in the presence of a BOA constructor can cause
+;;; the parent structure's notion of ALWAYS-BOUNDP to be wrong.
+;;; We don't try to deal with that.
+;;; FIXME: We could emit a style-warning if this happens, and/or if any code
+;;; was compiled under the assumption that the slot was safe.
+
+;;; Further note that MAKE-LOAD-FORM methods can do damage to type invariants
+;;; without any efficient means of detection, if MAKE-LOAD-FORM-SAVING-SLOTS
+;;; is used without specifying all slots.
+
 ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
 ;; The index is -1 if this slot is not raw.
 (defun dsd-rsd-index (dsd)
   (let ((val (ldb (byte 3 0) (dsd-bits dsd))))
     (if (plusp val) (1- val))))
-;; whether the slot is known to be always of the specified type
-  ;; FIXME: there are two (actually three) different ways a slot can be unsafe.
-  ;; (1) a structure subtype can constrains the slot type more highly than the
-  ;;     parent type constraints it. This case requires that each read via
-  ;;     the subtype's accessor be type-checked.
-  ;; (2) a BOA constructor does not initialize the slot.
-  ;;     This case admits a more efficient solution - instead of type-checking
-  ;;     each slot read, initialize the slot with UNBOUND-MARKER, and do
-  ;;     a simple EQ test. This is easier than an arbitrary type-check.
-  ;;     *** There is a pernicious subcase (2a) - if a BOA constructor does not
-  ;;     initialize the slot, and the structure inherits from a parent type,
-  ;;     then the parent accessor can be unsafe, and there is almost nothing
-  ;;     that can be done to make it safe. That is, regardless of what strategy
-  ;;     we choose to optimize the accessor for the child, the parent accessor
-  ;;     has already decided whether to emit safe or unsafe code.
-  ;;     It could be argued that we should/must destructively alter the
-  ;;     parent's slot info to indicate that it has become unsafe.
-  ;;     We should emit a style-warning if this happens, and/or if any code
-  ;;     was compiled under the assumption that the slot was safe.
-  ;;     Or it could be argued that nobody should do this in the first place.
-  ;; (3) MAKE-LOAD-FORM methods can do damage to the type invariants
-  ;;     without any efficient means of detection.
-  ;;     It's as simple as using MAKE-LOAD-FORM-SAVING-SLOTS without
-  ;;     specifying all the slots. This has no remedy whatsoever.
-  ;;     In this case, it should be as if the omitted initializations caused
-  ;;     the slot to receive the unbound marker. However, no code would
-  ;;     check for that. At best, downstream use would signal an error in
-  ;;     safe code due to receiving the unbound marker.
-  ;;     However, raw slots would pose a problem in that they can't
-  ;;     store an unbound marker.
-(defun dsd-safe-p (dsd) (logbitp 3 (dsd-bits dsd)))
-(defun dsd-read-only (dsd) (logbitp 4 (dsd-bits dsd)))
+;; Whether the slot is always bound. Slots are almost always bound,
+;; the exception being those which appear as an &AUX var with no value
+;; in a BOA constructor.
+(defun dsd-always-boundp (dsd) (logbitp 3 (dsd-bits dsd)))
+;; Whether the slot is known to be always of the specified type
+;; A slot may be SAFE-P even if not always-boundp.
+(defun dsd-safe-p (dsd) (logbitp 4 (dsd-bits dsd)))
+(defun dsd-read-only (dsd) (logbitp 5 (dsd-bits dsd)))
 ;; its position in the implementation sequence
 (defun dsd-index (dsd) (ash (dsd-bits dsd) (- +dsd-index-shift+)))
 
@@ -738,7 +740,8 @@ unless :NAMED is also specified.")))
 ;;; and return it. If supplied, INCLUDED-SLOT is used to get the default,
 ;;; type, and read-only flag for the new slot.
 (defun parse-1-dsd (defstruct spec &optional included-slot
-                    &aux accessor-name (safe-p t) rsd-index index)
+                    &aux accessor-name (always-boundp t) (safe-p t)
+                         rsd-index index)
   #-sb-xc-host (declare (muffle-conditions style-warning))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
       (typecase spec
@@ -820,36 +823,21 @@ unless :NAMED is also specified.")))
       (setf type (cond ((not type-p) inherited-type)
                        ((eq inherited-type t) type)
                        (t `(and ,inherited-type ,type)))))
-    (when included-slot
-     (cond ((not ro-p)
-            (setq read-only (dsd-read-only included-slot)))
-           ((and ro-p (not read-only) (dsd-read-only included-slot))
-            (error "~@<The slot ~S is :READ-ONLY in superclass, and so must ~
-                       be :READ-ONLY in subclass.~:@>"
-                  name))))
-    ;; Check for existence of any BOA constructor that leaves the
-    ;; slot with an unspecified value, as when it's initialized
-    ;; by an &AUX binding with no value (CLHS 3.4.6)
-    (when (some (lambda (ctor &aux (ll-parts (cdr ctor)))
-                  ;; Keyword constructors store :DEFAULT in the cdr of the cell.
-                  ;; BOA constructors store the parsed lambda list.
-                  (and (listp ll-parts) ; = (llks req opt rest key aux)
-                       (some (lambda (binding)
-                               (and (or (atom binding) (not (cdr binding)))
-                                    (string= (if (atom binding) binding (car binding))
-                                             name)))
-                             (sixth ll-parts))))
-                (dd-constructors defstruct))
-      (setf safe-p nil)) ; this is "unsafe case (2)"
-
     (cond (included-slot
+           (cond ((not ro-p)
+                  (setq read-only (dsd-read-only included-slot)))
+                 ((and ro-p (not read-only) (dsd-read-only included-slot))
+                  (error "~@<The slot ~S is :READ-ONLY in superclass, and so must ~
+                          be :READ-ONLY in subclass.~:@>"
+                         name)))
            (setf rsd-index (dsd-rsd-index included-slot)
                  safe-p (dsd-safe-p included-slot)
+                 always-boundp (dsd-always-boundp included-slot)
                  index (dsd-index included-slot))
            (when (and safe-p
                       (not (equal type (dsd-type included-slot)))
                       (not (sb!xc:subtypep (dsd-type included-slot) type)))
-             (setf safe-p nil))) ; this is "unsafe case (1)"
+             (setf safe-p nil)))
           (t
            ;; Compute the index of this DSD. First decide whether the slot is raw.
            (setf rsd-index (and (eq (dd-type defstruct) 'structure)
@@ -866,8 +854,31 @@ unless :NAMED is also specified.")))
                       1)))
              (setf index (dd-length defstruct))
              (incf (dd-length defstruct) n-words))))
+
+    ;; Check for existence of any BOA constructor that leaves the
+    ;; slot with an unspecified value, as when it's initialized
+    ;; by an &AUX binding with no value (CLHS 3.4.6)
+    (when (and always-boundp
+               (some (lambda (ctor &aux (ll-parts (cdr ctor)))
+                       ;; Keyword constructors store :DEFAULT in the cdr of the cell.
+                       ;; BOA constructors store the parsed lambda list.
+                       (and (listp ll-parts) ; = (llks req opt rest key aux)
+                            (some (lambda (binding)
+                                    (and (or (atom binding) (not (cdr binding)))
+                                         (string= (if (atom binding) binding (car binding))
+                                                  name)))
+                                  (sixth ll-parts))))
+                     (dd-constructors defstruct)))
+      (setf always-boundp nil))
+    (unless always-boundp
+      ;; FIXME: the :TYPE option should not preclude storing #<unbound>
+      ;; unless the storage is a specialized numeric vector.
+      (when (or rsd-index (neq (dd-type defstruct) 'structure))
+        (setf always-boundp t safe-p nil))) ; "demote" to unsafe.
+
     (let ((dsd (make-dsd name type accessor-name
-                         (pack-dsd-bits index read-only safe-p rsd-index)
+                         (pack-dsd-bits index read-only safe-p
+                                        always-boundp rsd-index)
                          default)))
       (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
       dsd)))
@@ -1068,9 +1079,18 @@ unless :NAMED is also specified.")))
            (type-spec (dsd-type dsd)))
       (if (eq function :read)
           (when (singleton-p args)
-            (if (eq type-spec t)
-                place
-                `(,(if (dsd-safe-p dsd) 'truly-the 'the) ,type-spec ,place)))
+            ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
+            ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
+            ;; check the type on each read. Assuming that type-checks reject
+            ;; the unbound-marker, then we needn't separately check for it.
+            (cond ((not (dsd-safe-p dsd))
+                   `(the ,type-spec ,place))
+                  (t
+                   (unless (dsd-always-boundp dsd)
+                     (setf place `(the* ((not (satisfies sb!vm::unbound-marker-p))
+                                         :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
+                                         ,place)))
+                   (if (eq type-spec t) place `(truly-the ,type-spec ,place)))))
           (when (singleton-p (cdr args))
             (let ((inverse (info :setf :expander (car place))))
               (flet ((check (newval)
@@ -1504,24 +1524,32 @@ or they must be declared locally notinline at each call site.~@:>"
     (aver (= (length dd-slots) (length values)))
     #!+raw-instance-init-vops
     (collect ((slot-specs) (slot-values))
-      (mapc (lambda (dsd value)
-              (unless (eq value '.do-not-initialize-slot.)
-                (slot-specs (list* :slot (dsd-raw-type dsd) (dsd-index dsd)))
-                (slot-values value)))
+      (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
+                                    (spec (list* :slot raw-type (dsd-index dsd))))
+              (cond ((eq value '.do-not-initialize-slot.)
+                     (when (eq raw-type t)
+                       (rplaca spec :unbound)
+                       (slot-specs spec)))
+                    (t
+                     (slot-specs spec)
+                     (slot-values value))))
             dd-slots values)
       `(%make-structure-instance-macro ,dd ',(slot-specs) ,@(slot-values)))
     #!-raw-instance-init-vops
     (collect ((slot-specs) (slot-values) (raw-slots) (raw-values))
       ;; Partition into non-raw and raw
-      (mapc (lambda (dsd value)
-              (unless (eq value '.do-not-initialize-slot.)
-                (let ((raw-type (dsd-raw-type dsd)))
-                  (cond ((eq t raw-type)
-                         (slot-specs (list* :slot raw-type (dsd-index dsd)))
-                         (slot-values value))
-                        (t
-                         (raw-slots dsd)
-                         (raw-values value))))))
+      (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
+                                    (spec (list* :slot raw-type (dsd-index dsd))))
+              (cond ((eq value '.do-not-initialize-slot.)
+                     (when (eq raw-type t)
+                       (rplaca spec :unbound)
+                       (slot-specs spec)))
+                    ((eq raw-type t)
+                     (slot-specs spec)
+                     (slot-values value))
+                    (t
+                     (raw-slots dsd)
+                     (raw-values value))))
             dd-slots values)
       (let ((instance-form
              `(%make-structure-instance-macro ,dd
@@ -1801,7 +1829,7 @@ or they must be declared locally notinline at each call site.~@:>"
           (mapcar (lambda (slot-name)
                     (make-dsd slot-name t (symbolicate conc-name slot-name)
                               (pack-dsd-bits (prog1 slot-index (incf slot-index))
-                                             nil t nil)
+                                             nil t t nil)
                               nil))
                   slot-names)
           (dd-length dd) slot-index

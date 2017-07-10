@@ -125,6 +125,12 @@
                         (aver args)
                         (lvar-tn node block (pop args)))
                        (:unbound
+                        ;; SLOT should be the word index to alter, but with structure
+                        ;; instances, SLOT is a cons whose car is the raw-slot-type
+                        ;; since BOXED-COMBINATION-REF-P expects that #'cddr is the
+                        ;; slot index.
+                        (when (listp slot)
+                          (setq slot (+ (cdr slot) sb!vm:instance-slots-offset)))
                         (or unbound-marker-tn
                             (setf unbound-marker-tn
                                   (let ((tn (make-restricted-tn

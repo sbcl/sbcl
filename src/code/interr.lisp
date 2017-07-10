@@ -308,13 +308,31 @@
                                                      sb!vm::cfp-offset))))
             (if (and (>= error-number (length **internal-error-handlers**))
                      (< error-number (length sb!c:+backend-internal-errors+)))
-                (error 'type-error
-                       :datum (sb!di::sub-access-debug-var-slot
-                               fp (first arguments) alien-context)
-                       :expected-type
-                       (car (svref sb!c:+backend-internal-errors+
-                                   error-number))
-                       :context (sb!di:error-context))
+                (let ((context (sb!di:error-context)))
+                  (if (typep context '(cons (eql :struct-read)))
+                      ;; This was shoehorned into being a "type error"
+                      ;; which isn't the best way to explain it to the user.
+                      ;; However, from an API stance, it makes some sense to signal
+                      ;; a TYPE-ERROR since there may be existing code that catches
+                      ;; unbound slots errors as type-errors. Our tests certainly do,
+                      ;; but perhaps only as an artifact of the implementation.
+                      (destructuring-bind (struct-name . slot-name) (cdr context)
+                        ;; Infer the slot type, but fail safely. The message is enough,
+                        ;; and the required type is pretty much irrelevant.
+                        (let* ((dd (find-defstruct-description struct-name))
+                               (dsd (and dd (find slot-name (dd-slots dd) :key #'dsd-name))))
+                          (error 'simple-type-error
+                                 :format-control "Accessed uninitialized slot ~S of structure ~S"
+                                 :format-arguments (list slot-name struct-name)
+                                 :datum (make-unbound-marker)
+                                 :expected-type (if dsd (dsd-type dsd) 't))))
+                      (error 'type-error
+                             :datum (sb!di::sub-access-debug-var-slot
+                                     fp (first arguments) alien-context)
+                             :expected-type
+                             (car (svref sb!c:+backend-internal-errors+
+                                         error-number))
+                             :context context)))
                 (let ((handler
                         (and (typep error-number
                                     '#.`(mod ,(length **internal-error-handlers**)))

@@ -41,12 +41,12 @@
   (dolist (dsd (sb-kernel:dd-slots
                 (sb-kernel:find-defstruct-description 'boa-saux)))
     (let ((name (sb-kernel:dsd-name dsd))
-          (safe-p (sb-kernel::dsd-safe-p dsd)))
+          (always-boundp (sb-kernel::dsd-always-boundp dsd)))
       (ecase name
-        ((a c) (assert (not safe-p)))
-        (b (assert safe-p)))))
+        ((a c) (assert (not always-boundp)))
+        (b (assert always-boundp)))))
   (let ((dd (sb-kernel:find-defstruct-description 'boa-grandkid)))
-    (assert (not (sb-kernel::dsd-safe-p (car (sb-kernel:dd-slots dd))))))
+    (assert (not (sb-kernel::dsd-always-boundp (car (sb-kernel:dd-slots dd))))))
   (let ((s (make-boa-saux)))
     (locally (declare (optimize (safety 3))
                       (inline boa-saux-a))
@@ -56,6 +56,13 @@
     (assert (eql (boa-saux-a s) 1))
     (assert (eql (boa-saux-b s) 3))
     (assert (eql (boa-saux-c s) 5))))
+
+(with-test (:name :defstruct-boa-nice-error :skipped-on :interpreter)
+  (let ((err (nth-value 1 (ignore-errors (boa-saux-a (make-boa-saux))))))
+    (assert (and (typep err 'simple-type-error)
+                 (search "Accessed uninitialized slot"
+                         (simple-condition-format-control err))))))
+
                                         ; these two checks should be
                                         ; kept separated
 
@@ -63,7 +70,7 @@
  (let ((s (make-boa-saux)))
    (locally (declare (optimize (safety 0))
                      (inline boa-saux-a))
-     (assert (eql (opaque-identity (boa-saux-a s)) 0)))
+     (assert (sb-int:unbound-marker-p (opaque-identity (boa-saux-a s)))))
    (setf (boa-saux-a s) 1)
    (setf (boa-saux-c s) 5)
    (assert (eql (boa-saux-a s) 1))
@@ -1163,7 +1170,7 @@ redefinition."
         (error "fail"))
     (type-error (e)
       (assert (eq 'string (type-error-expected-type e)))
-      (assert (zerop (type-error-datum e))))))
+      (assert (sb-int:unbound-marker-p (type-error-datum e))))))
 
 (with-test (:name :defstruct-copier-typechecks-argument)
   (copy-person (make-astronaut :name "Neil"))
