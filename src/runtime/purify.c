@@ -30,6 +30,7 @@
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
+#include "genesis/gc-tables.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
@@ -388,7 +389,8 @@ ptrans_list(lispobj thing, boolean constant)
 static lispobj
 ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 {
-    switch (widetag_of(header)) {
+    int widetag = widetag_of(header);
+    switch (widetag) {
         /* FIXME: this needs a reindent */
       case BIGNUM_WIDETAG:
       case SINGLE_FLOAT_WIDETAG:
@@ -427,9 +429,6 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case SYMBOL_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
-#include "genesis/specialized-vectors.inc"
-        return ptrans_vector(thing, 0, constant);
-
       case SIMPLE_VECTOR_WIDETAG:
         return ptrans_vector(thing, 1, constant);
 
@@ -443,6 +442,9 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
         return ptrans_fdefn(thing, header);
 
       default:
+        if (other_immediate_lowtag_p(widetag) &&
+            specialized_vector_widetag_p(widetag))
+            return ptrans_vector(thing, 0, constant);
         fprintf(stderr, "Invalid widetag: %d\n", widetag_of(header));
         /* Should only come across other pointers to the above stuff. */
         gc_abort();
@@ -471,6 +473,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
     while (nwords > 0) {
         thing = *addr;
+        int widetag = widetag_of(thing);
         if (is_lisp_pointer(thing)) {
             /* It's a pointer. Is it something we might have to move? */
             if (dynamic_pointer_p(thing)) {
@@ -509,14 +512,14 @@ pscav(lispobj *addr, long nwords, boolean constant)
             count = 1;
         }
 #if N_WORD_BITS == 64
-        else if (widetag_of(thing) == SINGLE_FLOAT_WIDETAG) {
+        else if (widetag == SINGLE_FLOAT_WIDETAG) {
             count = 1;
         }
 #endif
         else if (thing & FIXNUM_TAG_MASK) {
             /* It's an other immediate. Maybe the header for an unboxed */
             /* object. */
-            switch (widetag_of(thing)) {
+            switch (widetag) {
               case BIGNUM_WIDETAG:
               case SINGLE_FLOAT_WIDETAG:
               case DOUBLE_FLOAT_WIDETAG:
@@ -535,10 +538,6 @@ pscav(lispobj *addr, long nwords, boolean constant)
                     hash_table->needs_rehash_p = T;
                   }
                 count = 2;
-                break;
-
-#include "genesis/specialized-vectors.inc"
-                count = sizetab[widetag_of(thing)](addr);
                 break;
 
               case CODE_HEADER_WIDETAG:
@@ -589,7 +588,11 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 break;
 
               default:
-                count = 1;
+                if (other_immediate_lowtag_p(widetag) &&
+                    specialized_vector_widetag_p(widetag))
+                    count = sizetab[widetag_of(thing)](addr);
+                else
+                    count = 1;
                 break;
             }
         }
