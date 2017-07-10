@@ -191,7 +191,7 @@ void skip_internal_error (os_context_t *context) {
     }
     printf("%d\n", code);
     ptr += internal_error_nargs[code];
-    *((unsigned char **)os_context_pc_addr(context)) = ptr; 
+    *((unsigned char **)os_context_pc_addr(context)) = ptr;
 }
 
 /* internal error handler for when the Lisp error system doesn't exist
