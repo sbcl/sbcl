@@ -99,6 +99,7 @@
   (name (missing-arg) :type (or simple-string cons symbol) :read-only t)
   ;; a description of variable locations for this function, in alphabetical
   ;; order by name; or NIL if no information is available
+  ;; If only one variable is encoded then it's stored as is without a vector.
   ;;
   ;; The variable entries are alphabetically ordered. This ordering is
   ;; used in lifetime info to refer to variables: the first entry is
@@ -113,7 +114,8 @@
   ;;   * the variable ID, when it has one
   ;;   * SC-offset of primary location, if it has one
   ;;   * SC-offset of save location, if it has one
-  (vars nil :type (or (simple-array * (*)) null))
+  ;; Can either be a single value or a vector for multiple values.
+  (vars nil)
   ;; a vector of the packed binary representation of the
   ;; COMPILED-DEBUG-BLOCKs in this function, in the order that the
   ;; blocks were emitted. The first block is the start of the
@@ -161,7 +163,9 @@
   ;; VARIABLES are all required arguments, and are in the order they
   ;; appear in the VARIABLES vector. In other words, :MINIMAL stands
   ;; in for a vector where every element holds its index.
-  (arguments nil :type (or (simple-array * (*)) (member :minimal nil)))
+  ;;
+  ;; Can either be a single value or a vector for multiple values.
+  (arguments nil)
   ;; There are three alternatives for this slot:
   ;;
   ;; a VECTOR
@@ -383,7 +387,8 @@
   ;; WHN 20000120
   (fun-map (missing-arg) :type simple-vector :read-only t)
   ;; Location contexts
-  (contexts nil :type (or simple-vector null) :read-only t)
+  ;; Either a simple-vector or a context if there's only one context.
+  (contexts nil :type t :read-only t)
   (tlf-number nil :type (or index null))
   (char-offset nil :type (or index null)))
 

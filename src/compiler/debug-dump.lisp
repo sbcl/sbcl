@@ -331,6 +331,13 @@
                                                                 (1- max-negative))
                                                            (plusp max-negative))
                                     seq))))))
+
+(defun compact-vector (sequence)
+  (cond ((and (= (length sequence) 1)
+              (not (vectorp (elt sequence 0))))
+         (elt sequence 0))
+        (t
+         (coerce-to-smallest-eltype sequence))))
 
 ;;;; variables
 
@@ -485,7 +492,7 @@
           (setf prev-name name)
           (setf (gethash var var-locs) i)
           (incf i)))
-      (coerce-to-smallest-eltype buffer))))
+      (compact-vector buffer))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of
 ;;; FUN, representing the arguments to FUN in minimal variable format.
@@ -494,7 +501,7 @@
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
       (dump-1-var fun var (leaf-info var) t buffer))
-    (coerce-to-smallest-eltype buffer)))
+    (compact-vector buffer)))
 
 ;;; Return VAR's relative position in the function's variables (determined
 ;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DEBUG-INFO-VAR-DELETED.
@@ -556,7 +563,7 @@
           (dolist (var (lambda-vars fun))
             (res (debug-location-for var var-locs)))))
 
-    (coerce-to-smallest-eltype (res))))
+    (compact-vector (res))))
 
 ;;; Return a vector of SC offsets describing FUN's return locations.
 ;;; (Must be known values return...)
@@ -699,9 +706,7 @@
             (aref (file-info-positions
                    (source-info-file-info *source-info*))
                   component-tlf-num))
-       :contexts
-       (and (plusp (length *contexts*))
-            (coerce *contexts* 'simple-vector))))))
+       :contexts (compact-vector *contexts*)))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.

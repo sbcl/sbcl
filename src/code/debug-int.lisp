@@ -1249,10 +1249,9 @@ register."
   (let ((vars (gensym))
         (i (gensym)))
     `(let ((,vars (debug-fun-debug-vars ,debug-fun)))
-       (declare (type (or null simple-vector) ,vars))
        (if ,vars
-           (dotimes (,i (length ,vars) ,result)
-             (let ((,var (aref ,vars ,i)))
+           (dotimes (,i (compact-vector-length ,vars) ,result)
+             (let ((,var (compact-vector-ref ,vars ,i)))
                ,@body))
            ,result))))
 
@@ -1415,29 +1414,26 @@ register."
 ;;; about its arguments.
 (defun ambiguous-debug-vars (debug-fun name-prefix-string)
   (declare (simple-string name-prefix-string))
-  (let ((variables (debug-fun-debug-vars debug-fun)))
-    (declare (type (or null simple-vector) variables))
-    (if variables
-        (let* ((len (length variables))
-               (prefix-len (length name-prefix-string))
-               (pos (find-var name-prefix-string variables len))
-               (res nil))
-          (when pos
-            ;; Find names from pos to variable's len that contain prefix.
-            (do ((i pos (1+ i)))
-                ((= i len))
-              (let* ((var (svref variables i))
-                     (name (debug-var-symbol-name var))
-                     (name-len (length name)))
-                (declare (simple-string name))
-                (when (/= (or (string/= name-prefix-string name
-                                        :end1 prefix-len :end2 name-len)
-                              prefix-len)
-                          prefix-len)
-                  (return))
-                (push var res)))
-            (setq res (nreverse res)))
-          res))))
+  (let* ((variables (debug-fun-debug-vars debug-fun))
+         (len (compact-vector-length variables))
+         (prefix-len (length name-prefix-string))
+         (pos (find-var name-prefix-string variables len))
+         (res nil))
+    (when pos
+      ;; Find names from pos to variable's len that contain prefix.
+      (do ((i pos (1+ i)))
+          ((= i len))
+        (let* ((var (compact-vector-ref variables i))
+               (name (debug-var-symbol-name var))
+               (name-len (length name)))
+          (declare (simple-string name))
+          (when (/= (or (string/= name-prefix-string name
+                                  :end1 prefix-len :end2 name-len)
+                        prefix-len)
+                    prefix-len)
+            (return))
+          (push var res)))
+      (nreverse res))))
 
 ;;; This returns a position in VARIABLES for one containing NAME as an
 ;;; initial substring. END is the length of VARIABLES if supplied.
@@ -1521,10 +1517,28 @@ register."
                 (debug-fun-debug-vars debug-fun) args)
                t)))))
 
+;;; A compact "vector" is either the element itself or a vector
+(defun compact-vector-ref (vector index)
+  (declare (index index))
+  (typecase vector
+    (simple-vector
+     (svref vector index))
+    (vector
+     (aref vector index))
+    (t
+     (aver (zerop index))
+     vector)))
+
+(defun compact-vector-length (vector)
+  (typecase vector
+    (vector
+     (length vector))
+    (t
+     1)))
+
 (defun parse-compiled-debug-fun-lambda-list/args-available (vars args)
-  (declare (type (or null simple-vector) vars))
   (let ((i 0)
-        (len (length args))
+        (len (compact-vector-length args))
         (optionalp nil)
         (keyword nil)
         (result '()))
@@ -1532,17 +1546,17 @@ register."
              (push (if var-count
                        (append tag-and-info
                                (loop :repeat var-count :collect
-                                  (compiled-debug-fun-lambda-list-var
-                                   args (incf i) vars)))
+                                     (compiled-debug-fun-lambda-list-var
+                                      args (incf i) vars)))
                        tag-and-info)
                    result))
            (var-or-deleted (index-or-deleted)
              (if (eq index-or-deleted sb!c::debug-info-var-deleted)
                  :deleted
-                 (svref vars index-or-deleted))))
+                 (compact-vector-ref vars index-or-deleted))))
       (loop
          :while (< i len)
-         :for ele = (aref args i) :do
+         :for ele = (compact-vector-ref args i) :do
          (cond
            ((eq ele sb!c::debug-info-var-optional)
             (setf optionalp t))
@@ -1579,16 +1593,14 @@ register."
             (push-var :deleted))
            ;; Required arg at beginning of args array.
            (t
-            (push-var (svref vars ele))))
+            (push-var (compact-vector-ref vars ele))))
          (incf i)
          :finally (return (nreverse result))))))
 
 ;;; This is used in COMPILED-DEBUG-FUN-LAMBDA-LIST.
 (defun compiled-debug-fun-lambda-list-var (args i vars)
-  (declare (type (simple-array * (*)) args)
-           (simple-vector vars))
-  (let ((ele (aref args i)))
-    (cond ((typep ele 'index) (svref vars ele))
+  (let ((ele (compact-vector-ref args i)))
+    (cond ((typep ele 'index) (compact-vector-ref vars ele))
           ((eq ele sb!c::debug-info-var-deleted) :deleted)
           (t (error "malformed arguments description")))))
 
@@ -1673,9 +1685,9 @@ register."
                       ""))
                 (context
                   (and (logtest sb!c::compiled-code-location-context flags)
-                       (svref (sb!c::compiled-debug-info-contexts
-                               (%code-debug-info (compiled-debug-fun-component debug-fun)))
-                              (sb!c:read-var-integerf blocks i)))))
+                       (compact-vector-ref (sb!c::compiled-debug-info-contexts
+                                            (%code-debug-info (compiled-debug-fun-component debug-fun)))
+                                           (sb!c:read-var-integerf blocks i)))))
            (when (or (memq kind '(:block-start :non-local-entry))
                      (and (not elsewhere-p)
                           (> pc elsewhere-pc)
@@ -1730,6 +1742,9 @@ register."
   (let* ((cdebug-fun (compiled-debug-fun-compiler-debug-fun
                       debug-fun))
          (packed-vars (sb!c::compiled-debug-fun-vars cdebug-fun))
+         (length (if (vectorp packed-vars)
+                     (length packed-vars)
+                     1))
          (args-minimal (eq (sb!c::compiled-debug-fun-arguments cdebug-fun)
                            :minimal)))
     (when packed-vars
@@ -1737,12 +1752,12 @@ register."
            (id 0)
            prev-name
            (buffer (make-array 0 :fill-pointer 0 :adjustable t)))
-          ((>= i (length packed-vars))
+          ((>= i length)
            (let ((result (coerce buffer 'simple-vector)))
              (when args-minimal
                (assign-minimal-var-names result))
              result))
-        (flet ((geti () (prog1 (aref packed-vars i) (incf i))))
+        (flet ((geti () (prog1 (compact-vector-ref packed-vars i) (incf i))))
           (let* ((flags (geti))
                  (minimal (logtest sb!c::compiled-debug-var-minimal-p flags))
                  (deleted (logtest sb!c::compiled-debug-var-deleted-p flags))
