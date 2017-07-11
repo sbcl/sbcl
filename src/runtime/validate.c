@@ -42,7 +42,7 @@ os_vm_address_t undefined_alien_address = 0;
 
 static void
 ensure_undefined_alien(void) {
-    os_vm_address_t start = os_validate(NULL, os_vm_page_size);
+    os_vm_address_t start = os_allocate(os_vm_page_size);
     if (start) {
         os_protect(start, os_vm_page_size, OS_VM_PROT_NONE);
         undefined_alien_address = start;

@@ -17,7 +17,7 @@
  */
 
 #include "os.h"
-#include "gc-internal.h" // for os_validate()
+#include "gc-internal.h" // for os_allocate()
 #include "hopscotch.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -123,7 +123,7 @@ void hopscotch_init() // Called once on runtime startup, from gc_init().
     // Prefill the cache with 2 entries, each the size of a kernel page.
     int n_bytes_per_slice = getpagesize();
     int n_bytes_total = N_CACHED_ALLOCS * n_bytes_per_slice;
-    char* mem = (char*)os_validate(0, n_bytes_total);
+    char* mem = os_allocate(n_bytes_total);
     gc_assert(mem);
     cached_alloc[0] = mem + ALLOCATION_OVERHEAD;
     cached_alloc[1] = cached_alloc[0] + n_bytes_per_slice;
@@ -158,7 +158,7 @@ static char* cached_allocate(os_vm_size_t nbytes)
     // not a multiple of the mmap granularity, which we'll assume is 4K.
     // (It doesn't actually matter.)
     nbytes = CEILING(nbytes, hh_allocation_granularity);
-    char* result = os_validate(0, nbytes);
+    char* result = os_allocate(nbytes);
     gc_assert(result);
     result += ALLOCATION_OVERHEAD;
     usable_size(result) = nbytes - ALLOCATION_OVERHEAD;

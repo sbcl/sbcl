@@ -787,7 +787,7 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
     uword_t scratchpad_min_size = (1 + ss.n_pointers) * 2 * sizeof (uint32_t);
     int pagesize = getpagesize();
     uword_t scratchpad_size = CEILING(scratchpad_min_size, pagesize);
-    ss.scratchpad.base = os_validate(0, scratchpad_size);
+    ss.scratchpad.base = os_allocate(scratchpad_size);
     gc_assert(ss.scratchpad.base);
     ss.scratchpad.free = ss.scratchpad.base + 2 * sizeof(uint32_t);
     ss.scratchpad.end  = ss.scratchpad.base + scratchpad_size;

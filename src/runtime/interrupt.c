@@ -1476,7 +1476,7 @@ arrange_return_to_c_function(os_context_t *context,
 #endif
 
 #if defined(LISP_FEATURE_DARWIN)
-    u32 *register_save_area = (u32 *)os_validate(0, 0x40);
+    u32 *register_save_area = (u32 *)os_allocate(0x40);
 
     FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function,
                   *os_context_register_addr(context,reg_ESP)));
