@@ -165,12 +165,6 @@ int gc_traceroot_criterion;
 int gc_n_stack_pins;
 #endif
 
-/* In GC cards that have conservative pointers to them, should we wipe out
- * dwords in there that are not used, so that they do not act as false
- * root to other things in the heap from then on? This is a new feature
- * but in testing it is both reliable and no noticeable slowdown. */
-int do_wipe_p = 1;
-
 /// Constants defined in gc-internal:
 ///   #define BOXED_PAGE_FLAG 1
 ///   #define UNBOXED_PAGE_FLAG 2
@@ -2119,11 +2113,10 @@ preserve_pointer(void *addr)
             break;
     }
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#ifndef GENCGC_IS_PRECISE
     /* Do not do this for multi-page objects.  Those pages do not need
-     * object wipeout anyway.
-     */
-    if (do_wipe_p && i == first_page) { // single-page object
+     * object wipeout anyway. */
+    if (i == first_page) { // single-page object
        lispobj word = *object_start;
        int lowtag = is_cons_half(word) ?
            LIST_POINTER_LOWTAG : lowtag_for_widetag[widetag_of(word)>>2];
@@ -3154,9 +3147,9 @@ move_pinned_pages_to_newspace()
 
     for (i = 0; i < last_free_page; i++) {
         if (page_table[i].dont_move &&
-            /* dont_move is cleared lazily, so validate the space as well. */
+            /* dont_move is cleared lazily, so test the 'gen' field as well. */
             page_table[i].gen == from_space) {
-            if (do_wipe_p && page_table[i].has_pins) {
+            if (page_table[i].has_pins) {
                 // do not move to newspace after all, this will be word-wiped
                 continue;
             }
@@ -4298,7 +4291,6 @@ prepare_for_final_gc ()
     extern void prepare_immobile_space_for_final_gc();
     prepare_immobile_space_for_final_gc ();
 #endif
-    do_wipe_p = 0;
     for (i = 0; i < last_free_page; i++) {
         page_table[i].large_object = 0;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
