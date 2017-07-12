@@ -1836,6 +1836,8 @@ code to be loaded.
 
 ;;;; ANSI LOOP
 
+;;; Due to what looks like a CMUCL bug, :compile-toplevel is necessary
+(eval-when (:load-toplevel :execute #+(and cmu sb-xc-host) :compile-toplevel)
 (defun !make-ansi-loop-universe ()
   (let ((w (!make-standard-loop-universe
              :keywords '((named (loop-do-named))
@@ -1920,7 +1922,7 @@ code to be loaded.
                    'loop-elements-iteration-path w
                    :preposition-groups '((:of :in))
                    :inclusive-permitted nil)
-    w))
+    w)))
 
 (defun loop-standard-expansion (keywords-and-forms environment universe)
   (if (and keywords-and-forms (symbolp (car keywords-and-forms)))
