@@ -434,4 +434,5 @@
                          (dpb byte2 (byte 6 12)
                               (dpb byte3 (byte 6 6) byte4)))))))
   utf8->string-aref
-  string->utf8)
+  string->utf8
+  #!+sb-unicode :base-string-direct-mapping #!+sb-unicode t)

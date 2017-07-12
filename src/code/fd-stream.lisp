@@ -1429,7 +1429,8 @@
 (defmacro define-external-format/variable-width
     (external-format output-restart replacement-character
      out-size-expr out-expr in-size-expr in-expr
-     octets-to-string-sym string-to-octets-sym)
+     octets-to-string-sym string-to-octets-sym
+     &key base-string-direct-mapping)
   (let* ((name (first external-format))
          (out-function (symbolicate "OUTPUT-BYTES/" name))
          (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
@@ -1649,44 +1650,48 @@
 
       (defun ,output-c-string-function (string)
         (declare (type simple-string string))
-        (locally
-            (declare (optimize (speed 3) (safety 0)))
-          (let* ((length (length string))
-                 (char-length (make-array (1+ length) :element-type 'index))
-                 (buffer-length
-                  (+ (loop for i of-type index below length
-                        for byte of-type character = (aref string i)
-                        for bits = (char-code byte)
-                        sum (setf (aref char-length i)
-                                  (the index ,out-size-expr)) of-type index)
-                     (let* ((byte (code-char 0))
-                            (bits (char-code byte)))
-                       (declare (ignorable byte bits))
-                       (setf (aref char-length length)
-                             (the index ,out-size-expr)))))
-                 (tail 0)
-                 (,n-buffer (make-array buffer-length
-                                        :element-type '(unsigned-byte 8)))
-                 stream)
-            (declare (type index length buffer-length tail)
-                     (type null stream)
-                     (ignorable stream))
-            (with-pinned-objects (,n-buffer)
-              (let ((sap (vector-sap ,n-buffer)))
-                (declare (system-area-pointer sap))
-                (loop for i of-type index below length
-                      for byte of-type character = (aref string i)
-                      for bits = (char-code byte)
-                      for size of-type index = (aref char-length i)
-                      do (prog1
-                             ,out-expr
-                           (incf tail size)))
-                (let* ((bits 0)
-                       (byte (code-char bits))
-                       (size (aref char-length length)))
-                  (declare (ignorable bits byte size))
-                  ,out-expr)))
-            ,n-buffer)))
+        (cond ,@(and base-string-direct-mapping
+                     `(((simple-base-string-p string)
+                        string)))
+              (t
+               (locally
+                   (declare (optimize (speed 3) (safety 0)))
+                 (let* ((length (length string))
+                        (char-length (make-array (1+ length) :element-type 'index))
+                        (buffer-length
+                          (+ (loop for i of-type index below length
+                                   for byte of-type character = (aref string i)
+                                   for bits = (char-code byte)
+                                   sum (setf (aref char-length i)
+                                             (the index ,out-size-expr)) of-type index)
+                             (let* ((byte (code-char 0))
+                                    (bits (char-code byte)))
+                               (declare (ignorable byte bits))
+                               (setf (aref char-length length)
+                                     (the index ,out-size-expr)))))
+                        (tail 0)
+                        (,n-buffer (make-array buffer-length
+                                               :element-type '(unsigned-byte 8)))
+                        stream)
+                   (declare (type index length buffer-length tail)
+                            (type null stream)
+                            (ignorable stream))
+                   (with-pinned-objects (,n-buffer)
+                     (let ((sap (vector-sap ,n-buffer)))
+                       (declare (system-area-pointer sap))
+                       (loop for i of-type index below length
+                             for byte of-type character = (aref string i)
+                             for bits = (char-code byte)
+                             for size of-type index = (aref char-length i)
+                             do (prog1
+                                    ,out-expr
+                                  (incf tail size)))
+                       (let* ((bits 0)
+                              (byte (code-char bits))
+                              (size (aref char-length length)))
+                         (declare (ignorable bits byte size))
+                         ,out-expr)))
+                   ,n-buffer)))))
 
       (let ((entry (%make-external-format
                     :names ',external-format
