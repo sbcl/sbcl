@@ -40,20 +40,20 @@
 (declaim (type sc-vector *backend-sc-numbers*))
 
 ;;; a list of all the SBs defined, so that we can easily iterate over them
-(defvar *backend-sb-list* ())
+(defglobal *backend-sb-list* ())
 (declaim (type list *backend-sb-list*))
 
 ;;; translation from template names to template structures
-(defvar *backend-template-names* (make-hash-table :test 'eq))
+(defglobal *backend-template-names* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-template-names*))
 
 ;;; hashtables mapping from SC and SB names to the corresponding structures
-(defvar *backend-sc-names* (make-hash-table :test 'eq))
+(defglobal *backend-sc-names* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-sc-names*))
 
 ;;; translations from primitive type names to the corresponding
 ;;; primitive-type structure.
-(defvar *backend-primitive-type-names*
+(defglobal *backend-primitive-type-names*
   (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-primitive-type-names*))
 
@@ -79,14 +79,14 @@
 
 ;;; a hashtable translating from VOP names to the corresponding VOP-PARSE
 ;;; structures. This information is only used at meta-compile time.
-(defvar *backend-parsed-vops* (make-hash-table :test 'eq))
+(defglobal *backend-parsed-vops* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-parsed-vops*))
 
 ;;; mappings between CTYPE structures and the corresponding predicate.
 ;;; The type->predicate mapping is implemented as an alist because
 ;;; there is no such thing as a TYPE= hash table.
-(defvar *backend-predicate-types* (make-hash-table :test 'eq))
-(defvar *backend-type-predicates* nil)
+(defglobal *backend-predicate-types* (make-hash-table :test 'eq))
+(defglobal *backend-type-predicates* nil)
 (declaim (type hash-table *backend-predicate-types*))
 (declaim (type list *backend-type-predicates*))
 

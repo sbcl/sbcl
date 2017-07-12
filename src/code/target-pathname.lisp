@@ -79,7 +79,8 @@
 
 ;;; Hash table searching maps a logical pathname's host to its
 ;;; physical pathname translation.
-(defvar *logical-hosts* (make-hash-table :test 'equal :synchronized t))
+(define-load-time-global *logical-hosts*
+    (make-hash-table :test 'equal :synchronized t))
 
 ;;;; patterns
 

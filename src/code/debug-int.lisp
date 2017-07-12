@@ -339,7 +339,8 @@
 ;;; This maps SB!C::COMPILED-DEBUG-FUNs to
 ;;; COMPILED-DEBUG-FUNs, so we can get at cached stuff and not
 ;;; duplicate COMPILED-DEBUG-FUN structures.
-(defvar *compiled-debug-funs* (make-hash-table :test 'eq :weakness :key))
+(define-load-time-global *compiled-debug-funs*
+    (make-hash-table :test 'eq :weakness :key))
 
 ;;; Make a COMPILED-DEBUG-FUN for a SB!C::COMPILER-DEBUG-FUN and its
 ;;; component. This maps the latter to the former in

@@ -749,7 +749,6 @@ line break."
 ;; This used to involve rewriting into a sexpr if CONS was involved,
 ;; since it was not an official specifier. But now it is.
 (defun compute-test-fn (ctype type-spec function)
-  (declare (special sb!c::*backend-type-predicates*))
   ;; Avoid compiling code for an existing structure predicate
   (or (and (eq (info :type :kind type-spec) :instance)
            (let ((layout (info :type :compiler-layout type-spec)))

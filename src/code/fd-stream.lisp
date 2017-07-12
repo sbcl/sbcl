@@ -839,7 +839,7 @@
       (frob ef-string-to-octets-fun))
     result))
 
-(defvar *external-formats* (make-hash-table)
+(define-load-time-global *external-formats* (make-hash-table)
   "Hashtable of all available external formats. The table maps from
   external-format names to EXTERNAL-FORMAT structures.")
 

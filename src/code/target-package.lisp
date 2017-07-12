@@ -58,7 +58,7 @@
     (funcall function)))
 
 ;;; a map from package names to packages
-(defvar *package-names*)
+(define-load-time-global *package-names* nil)
 (declaim (type hash-table *package-names*))
 
 (defmacro with-package-names ((names &key) &body body)

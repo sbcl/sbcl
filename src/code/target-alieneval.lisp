@@ -880,16 +880,17 @@ changing the lisp-side function they point to, invalidation, etc.")
 (defun alien-callback-info (alien)
   (cdr (assoc (alien-sap alien) *alien-callback-info* :test #'sap=)))
 
-(defvar *alien-callbacks* (make-hash-table :test #'equal)
+(define-load-time-global *alien-callbacks* (make-hash-table :test #'equal)
   "Cache of existing callback SAPs, indexed with (SPECIFER . FUNCTION). Used for
 memoization: we don't create new callbacks if one pointing to the correct
 function with the same specifier already exists.")
 
-(defvar *alien-callback-wrappers* (make-hash-table :test #'equal)
+(define-load-time-global *alien-callback-wrappers* (make-hash-table :test #'equal)
   "Cache of existing lisp wrappers, indexed with SPECIFER. Used for memoization:
 we don't create new wrappers if one for the same specifier already exists.")
 
-(defvar *alien-callback-trampolines* (make-array 32 :fill-pointer 0 :adjustable t)
+(define-load-time-global *alien-callback-trampolines*
+    (make-array 32 :fill-pointer 0 :adjustable t)
   "Lisp trampoline store: assembler wrappers contain indexes to this, and
 ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 

@@ -27,7 +27,8 @@
   (table-address system-area-pointer)
   (real-address system-area-pointer))
 
-(defvar *linkage-info* (make-hash-table :test 'equal :synchronized t))
+(define-load-time-global *linkage-info*
+    (make-hash-table :test 'equal :synchronized t))
 
 (defun write-linkage-table-entry (table-address real-address datap)
   (/show0 "write-linkage-table-entry")

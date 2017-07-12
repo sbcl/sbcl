@@ -9,7 +9,7 @@
 
 (in-package "SB!ALIEN")
 
-(defvar *alien-type-classes* (make-hash-table :test 'eq))
+(defglobal *alien-type-classes* (make-hash-table :test 'eq))
 
 (defvar *new-auxiliary-types* nil)
 
