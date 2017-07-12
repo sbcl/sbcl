@@ -1777,8 +1777,6 @@ core and return a descriptor to it."
 ;;; hash table, not the default 'EQL.
 (defvar *cold-fdefn-objects*)
 
-(defvar *cold-fdefn-gspace* nil)
-
 ;;; Given a cold representation of a symbol, return a warm
 ;;; representation.
 (defun warm-symbol (des)
@@ -1839,16 +1837,14 @@ core and return a descriptor to it."
                     5))))
     (logior (ash (ldb (byte 32 0) (the (signed-byte 32) disp)) 8) opcode)))
 
-(defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
+(defun cold-fdefinition-object (cold-name &optional leave-fn-raw
+                                          (gspace #!+immobile-space *immobile-fixedobj*
+                                                  #!-immobile-space *dynamic*))
   (declare (type (or symbol descriptor) cold-name))
   (declare (special core-file-name))
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
-        (let ((fdefn (allocate-header+object (or *cold-fdefn-gspace*
-                                                 #!+immobile-space *immobile-fixedobj*
-                                                 #!-immobile-space *dynamic*)
-                                             (1- sb!vm:fdefn-size)
-                                             sb!vm:fdefn-widetag)))
+        (let ((fdefn (allocate-header+object gspace (1- sb!vm:fdefn-size) sb!vm:fdefn-widetag)))
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
           (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
           (unless leave-fn-raw
@@ -1916,17 +1912,15 @@ core and return a descriptor to it."
     (push stuff (cdr gf))))
 
 (defun initialize-static-fns ()
-  (let ((*cold-fdefn-gspace* *static*))
-    (dovector (sym sb!vm:+static-fdefns+)
-      (let* ((fdefn (cold-fdefinition-object (cold-intern sym)))
-             (offset (- (+ (- (descriptor-bits fdefn)
-                              sb!vm:other-pointer-lowtag)
-                           (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
-                        (descriptor-bits *nil-descriptor*)))
-             (desired (sb!vm:static-fun-offset sym)))
-        (unless (= offset desired)
-          (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
-                 sym nil offset desired))))))
+  (dovector (sym sb!vm:+static-fdefns+)
+    (let* ((fdefn (cold-fdefinition-object (cold-intern sym) nil *static*))
+           (offset (- (+ (- (descriptor-bits fdefn) sb!vm:other-pointer-lowtag)
+                         (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
+                      (descriptor-bits *nil-descriptor*)))
+           (desired (sb!vm:static-fun-offset sym)))
+      (unless (= offset desired)
+        (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
+               sym nil offset desired)))))
 
 (defun attach-classoid-cells-to-symbols (hashtable)
   (let ((num (sb!c::meta-info-number (sb!c::meta-info :type :classoid-cell)))
