@@ -199,11 +199,11 @@ SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
     per_thread_value(sym, thread) = val;
 }
 
-/* This only works for static symbols. */
-static inline lispobj
-StaticSymbolFunction(lispobj sym)
+#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
+/* Return 'fun' given a tagged pointer to an fdefn. */
+static inline lispobj FdefnFun(lispobj fdefn)
 {
-    return ((struct fdefn *)native_pointer(SymbolValue(sym, 0)))->fun;
+    return FDEFN(fdefn)->fun;
 }
 
 /* These are for use during GC, on the current thread, or on prenatal

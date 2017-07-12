@@ -175,7 +175,6 @@
 ;;;
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    ,@+c-callable-static-symbols+
      #!+gencgc *restart-lisp-function*
 
      ;; CLH: 20060210 Taken from x86-64/parms.lisp per JES' suggestion

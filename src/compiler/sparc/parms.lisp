@@ -205,7 +205,6 @@
 ;;;
 (defconstant-eqx +static-symbols+
   `#(,@+common-static-symbols+
-     ,@+c-callable-static-symbols+
      #!+gencgc *restart-lisp-function*)
   #'equalp)
 

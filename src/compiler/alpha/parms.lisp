@@ -164,8 +164,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
-  `#(,@+common-static-symbols+
-     ,@+c-callable-static-symbols+)
+  `#(,@+common-static-symbols+)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

@@ -53,6 +53,7 @@
     (unless static-fun-index
       (error "~S isn't a static function." name))
     (+ (* static-syms (pad-data-block symbol-size))
+       (* (length sb!vm::+c-callable-fdefns+) (pad-data-block fdefn-size))
        (pad-data-block (1- symbol-size))
        (- list-pointer-lowtag)
        (* static-fun-index (pad-data-block fdefn-size))

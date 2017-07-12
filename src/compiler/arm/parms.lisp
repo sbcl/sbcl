@@ -140,7 +140,6 @@
 ;;;
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    ,@+c-callable-static-symbols+
     *allocation-pointer*
 
      *control-stack-pointer*

@@ -111,7 +111,7 @@
                (32 (expt 2 29))
                (64 (expt 2 30))))))))
 
-(defconstant-eqx +c-callable-static-symbols+
+(defconstant-eqx +c-callable-fdefns+
   '(sub-gc
     sb!kernel::post-gc
     internal-error
@@ -219,5 +219,5 @@
 
 (defun !unintern-symbols ()
   '("SB-VM"
-    +c-callable-static-symbols+
+    +c-callable-fdefns+
     +common-static-symbols+))

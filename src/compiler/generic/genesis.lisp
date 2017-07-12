@@ -1616,7 +1616,7 @@ core and return a descriptor to it."
 
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
-(defun initialize-static-symbols ()
+(defun initialize-static-space ()
   "Initialize the cold load symbol-hacking data structures."
   ;; NIL did not have its package assigned. Do that now.
   (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
@@ -1638,7 +1638,19 @@ core and return a descriptor to it."
               offset-wanted))))
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
-    (cold-set t-symbol t-symbol)))
+    (cold-set t-symbol t-symbol))
+  (dolist (sym sb!vm::+c-callable-fdefns+)
+    (cold-fdefinition-object (cold-intern sym) nil *static*))
+  (dovector (sym sb!vm:+static-fdefns+)
+    (let* ((fdefn (cold-fdefinition-object (cold-intern sym) nil *static*))
+           (offset (- (+ (- (descriptor-bits fdefn)
+                            sb!vm:other-pointer-lowtag)
+                         (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
+                      (descriptor-bits *nil-descriptor*)))
+           (desired (sb!vm:static-fun-offset sym)))
+      (unless (= offset desired)
+        (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
+               sym nil offset desired)))))
 
 ;;; Sort *COLD-LAYOUTS* to return them in a deterministic order.
 (defun sort-cold-layouts ()
@@ -1648,35 +1660,6 @@ core and return a descriptor to it."
 ;;; Establish initial values for magic symbols.
 ;;;
 (defun finish-symbols ()
-
-  ;; Everything between this preserved-for-posterity comment down to
-  ;; the assignment of *CURRENT-CATCH-BLOCK* could be entirely deleted,
-  ;; including the list of C-CALLABLE-STATIC-SYMBOLS itself,
-  ;; if it is GC-safe for the C runtime to have its own implementation
-  ;; of the INFO-VECTOR-FDEFN function in a multi-threaded build.
-  ;;
-  ;;   "I think the point of setting these functions into SYMBOL-VALUEs
-  ;;    here, instead of using SYMBOL-FUNCTION, is that in CMU CL
-  ;;    SYMBOL-FUNCTION reduces to FDEFINITION, which is a pretty
-  ;;    hairy operation (involving globaldb.lisp etc.) which we don't
-  ;;    want to invoke early in cold init. -- WHN 2001-12-05"
-  ;;
-  ;; So... that's no longer true. We _do_ associate symbol -> fdefn in genesis.
-  ;; Additionally, the INFO-VECTOR-FDEFN function is extremely simple and could
-  ;; easily be implemented in C. However, info-vectors are inevitably
-  ;; reallocated when new info is attached to a symbol, so the vectors can't be
-  ;; in static space; they'd gradually become permanent garbage if they did.
-  ;; That's the real reason for preserving the approach of storing an #<fdefn>
-  ;; in a symbol's value cell - that location is static, the symbol-info is not.
-
-  ;; FIXME: So OK, that's a reasonable reason to do something weird like
-  ;; this, but this is still a weird thing to do, and we should change
-  ;; the names to highlight that something weird is going on. Perhaps
-  ;; *MAYBE-GC-FUN*, *INTERNAL-ERROR-FUN*, *HANDLE-BREAKPOINT-FUN*,
-  ;; and *HANDLE-FUN-END-BREAKPOINT-FUN*...
-  (dolist (symbol sb!vm::+c-callable-static-symbols+)
-    (cold-set symbol (cold-fdefinition-object (cold-intern symbol))))
-
   (cold-set 'sb!vm::*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set 'sb!vm::*current-unwind-protect-block* (make-fixnum-descriptor 0))
 
@@ -1910,17 +1893,6 @@ core and return a descriptor to it."
       (setq gf (cons name nil))
       (push gf *cold-methods*))
     (push stuff (cdr gf))))
-
-(defun initialize-static-fns ()
-  (dovector (sym sb!vm:+static-fdefns+)
-    (let* ((fdefn (cold-fdefinition-object (cold-intern sym) nil *static*))
-           (offset (- (+ (- (descriptor-bits fdefn) sb!vm:other-pointer-lowtag)
-                         (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
-                      (descriptor-bits *nil-descriptor*)))
-           (desired (sb!vm:static-fun-offset sym)))
-      (unless (= offset desired)
-        (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
-               sym nil offset desired)))))
 
 (defun attach-classoid-cells-to-symbols (hashtable)
   (let ((num (sb!c::meta-info-number (sb!c::meta-info :type :classoid-cell)))
@@ -3356,7 +3328,22 @@ core and return a descriptor to it."
               (+ sb!vm:static-space-start
                  sb!vm:n-word-bytes
                  sb!vm:other-pointer-lowtag
-                 (if symbol (sb!vm:static-symbol-offset symbol) 0))))))
+                 (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
+  (loop for symbol in sb!vm::+c-callable-fdefns+
+        for index from 0
+        do
+    (format stream "#define ~A_FDEFN LISPOBJ(0x~X)~%"
+            (c-symbol-name symbol)
+            (if *static*                ; if we ran GENESIS
+              ;; We actually ran GENESIS, use the real value.
+              (descriptor-bits (cold-fdefinition-object symbol))
+              ;; We didn't run GENESIS, so guess at the address.
+              (+ sb!vm:static-space-start
+                 sb!vm:n-word-bytes
+                 sb!vm:other-pointer-lowtag
+                 (* (length sb!vm:+static-symbols+)
+                    (sb!vm:pad-data-block sb!vm:symbol-size))
+                 (* index (sb!vm:pad-data-block sb!vm:fdefn-size)))))))
 
 (defun write-sc-offset-coding (stream)
   (flet ((write-array (name bytes)
@@ -3689,15 +3676,14 @@ initially undefined function references:~2%")
       ;; that must be loaded before we create any FDEFNs.  It can in
       ;; theory be loaded any time between binding
       ;; *COLD-ASSEMBLER-ROUTINES* above and calling
-      ;; INITIALIZE-STATIC-FNS below.
+      ;; INITIALIZE-STATIC-SPACE below.
       (when preload-file
         (cold-load preload-file))
 
       ;; Prepare for cold load.
       (initialize-layouts)
       (initialize-packages)
-      (initialize-static-symbols)
-      (initialize-static-fns)
+      (initialize-static-space)
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
       ;; from common-lisp-exports.lisp-expr.

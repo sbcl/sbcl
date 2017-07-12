@@ -133,8 +133,7 @@
      ;; details.
      sb!alien::*enter-alien-callback*
      #!+gencgc *restart-lisp-function*
-     ,@+common-static-symbols+
-     ,@+c-callable-static-symbols+)
+     ,@+common-static-symbols+)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

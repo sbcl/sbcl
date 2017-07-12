@@ -145,7 +145,6 @@
 
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    ,@+c-callable-static-symbols+
     *alien-stack-pointer*
 
      ;; interrupt handling
