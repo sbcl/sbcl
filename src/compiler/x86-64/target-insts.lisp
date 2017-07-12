@@ -169,6 +169,11 @@
             ((= r/m #b101) (make-machine-ea :rip (read-signed-suffix 32 dstate)))
             (t (make-machine-ea full-reg))))))
 
+(defun static-symbol-from-tls-index (index)
+  (dovector (sym +static-symbols+)
+    (when (= (symbol-tls-index sym) index)
+      (return sym))))
+
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
 ;;; missing or nil to indicate that it's not used or has the obvious
@@ -254,13 +259,19 @@
       ;; Try to reverse-engineer which thread-local binding this is
       (let* ((code (seg-code (dstate-segment dstate)))
              (header-n-words (code-header-words code))
-             (tls-index (ash disp (- n-fixnum-tag-bits))))
-        (loop for word-num from code-constants-offset below header-n-words
-              for obj = (code-header-ref code word-num)
-              when (and (symbolp obj) (= (symbol-tls-index obj) tls-index))
-              do (return-from print-mem-ref
-                   (note (lambda (stream) (format stream "tls: ~S" obj))
-                         dstate))))
+             (tls-index (ash disp (- n-fixnum-tag-bits)))
+             (symbol
+              (or (loop for word-num from code-constants-offset below header-n-words
+                        for obj = (code-header-ref code word-num)
+                        when (and (symbolp obj) (= (symbol-tls-index obj) tls-index))
+                        do (return obj))
+                  ;; static symbols with known TLS index don't go in the code header,
+                  ;; but it'd be nice to guess at the symbol.
+                  (static-symbol-from-tls-index tls-index))))
+        (when symbol
+          (return-from print-mem-ref
+            (note (lambda (stream) (format stream "tls: ~S" symbol))
+                  dstate))))
       ;; Or maybe we're looking at the 'struct thread' itself
       (when (< disp max-interrupts)
         (let* ((thread-slots
