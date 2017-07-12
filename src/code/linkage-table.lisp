@@ -57,7 +57,6 @@
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
-  (/show0 "ensure-foreign-symbol-linkage")
   (with-locked-system-table (*linkage-info*)
     (or (gethash (cons name datap) *linkage-info*)
         (link-foreign-symbol name datap))))
