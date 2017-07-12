@@ -169,6 +169,7 @@
             ((= r/m #b101) (make-machine-ea :rip (read-signed-suffix 32 dstate)))
             (t (make-machine-ea full-reg))))))
 
+#!+sb-thread
 (defun static-symbol-from-tls-index (index)
   (dovector (sym +static-symbols+)
     (when (= (symbol-tls-index sym) index)
