@@ -1638,14 +1638,7 @@ core and return a descriptor to it."
               offset-wanted))))
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
-    (cold-set t-symbol t-symbol))
-  ;; Establish the value of *PSEUDO-ATOMIC-BITS* so that the
-  ;; allocation sequences that expect it to be zero upon entrance
-  ;; actually find it to be so.
-  #!+(or x86-64 x86)
-  (let ((p-a-a-symbol (cold-intern '*pseudo-atomic-bits*
-                                   :gspace *static*)))
-    (cold-set p-a-a-symbol (make-fixnum-descriptor 0))))
+    (cold-set t-symbol t-symbol)))
 
 ;;; Sort *COLD-LAYOUTS* to return them in a deterministic order.
 (defun sort-cold-layouts ()
