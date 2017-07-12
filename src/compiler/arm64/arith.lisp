@@ -381,8 +381,10 @@
            (if (plusp amount)
                (inst lsl result number amount)
                (inst asr result number (- amount))))
+          ((= amount 64)
+           (inst mov result 0))
           (t
-           (inst mov result 0)))))
+           (inst asr result number 63)))))
 
 (define-vop (fast-ash/signed/unsigned)
   (:note "inline ASH")

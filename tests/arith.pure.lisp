@@ -799,3 +799,11 @@
                                           (/ #c(1.0 2.0) b)))
                       1.0)
              #c(1.0 2.0))))
+
+(with-test (:name :unsigned-ash)
+  (let ((fun (checked-compile
+              `(lambda (x)
+                 (declare (sb-vm:signed-word x))
+                 (ash x -64)))))
+    (assert (zerop (funcall fun 123)))
+    (assert (= (funcall fun -321) -1))))
