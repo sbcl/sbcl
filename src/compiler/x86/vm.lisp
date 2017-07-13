@@ -445,7 +445,6 @@
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
       (noise (symbol-name (sc-name sc))))))
-;;; FIXME: Could this, and everything that uses it, be made #!+SB-SHOW?
 
 (defun combination-implementation-style (node)
   (declare (type sb!c::combination node))

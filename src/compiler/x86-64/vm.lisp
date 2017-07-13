@@ -564,17 +564,6 @@
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
       (noise (symbol-name (sc-name sc))))))
-;;; FIXME: Could this, and everything that uses it, be made #!+SB-SHOW?
-
-(defun dwords-for-quad (value)
-  (let* ((lo (logand value (1- (ash 1 32))))
-         (hi (ash value -32)))
-    (values lo hi)))
-
-(defun words-for-dword (value)
-  (let* ((lo (logand value (1- (ash 1 16))))
-         (hi (ash value -16)))
-    (values lo hi)))
 
 (defconstant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
