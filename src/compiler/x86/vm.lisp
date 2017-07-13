@@ -13,23 +13,23 @@
 
 ;;;; register specs
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *byte-register-names* (make-array 8 :initial-element nil))
-  (defvar *word-register-names* (make-array 16 :initial-element nil))
-  (defvar *dword-register-names* (make-array 16 :initial-element nil))
-  (defvar *float-register-names* (make-array 8 :initial-element nil)))
+(defconstant-eqx +byte-register-names+
+    #("AL" "AH" "CL" "CH" "DL" "DH" "BL" "BH")
+  #'equalp)
+(defconstant-eqx +word-register-names+
+    #("AX" NIL "CX" NIL "DX" NIL "BX" NIL "SP" NIL "BP" NIL "SI" NIL "DI" NIL)
+  #'equalp)
+(defconstant-eqx +dword-register-names+
+    #("EAX" NIL "ECX" NIL "EDX" NIL "EBX" NIL "ESP" NIL "EBP" NIL "ESI" NIL "EDI" NIL)
+  #'equalp)
 
 (macrolet ((defreg (name offset size)
-             (let ((offset-sym (symbolicate name "-OFFSET"))
-                   (names-vector (symbolicate "*" size "-REGISTER-NAMES*")))
-               `(progn
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
+             (declare (ignore size))
+             `(eval-when (:compile-toplevel :load-toplevel :execute)
                     ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
-                    (defconstant ,offset-sym ,offset))
-                  (setf (svref ,names-vector ,offset-sym)
-                        ,(symbol-name name)))))
+                (defconstant ,(symbolicate name "-OFFSET") ,offset)))
            ;; FIXME: It looks to me as though DEFREGSET should also
            ;; define the related *FOO-REGISTER-NAMES* variable.
            (defregset (name &rest regs)
@@ -430,11 +430,11 @@
       (registers
        (let* ((sc-name (sc-name sc))
               (name-vec (cond ((member sc-name *byte-sc-names*)
-                               *byte-register-names*)
+                               +byte-register-names+)
                               ((member sc-name *word-sc-names*)
-                               *word-register-names*)
+                               +word-register-names+)
                               ((member sc-name *dword-sc-names*)
-                               *dword-register-names*))))
+                               +dword-register-names+))))
          (or (and name-vec
                   (< -1 offset (length name-vec))
                   (svref name-vec offset))

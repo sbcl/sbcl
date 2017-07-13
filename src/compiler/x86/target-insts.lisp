@@ -18,10 +18,12 @@
 (defun print-reg-with-width (value width stream dstate)
   (declare (ignore dstate))
   (princ (aref (ecase width
-                 (:byte *byte-reg-names*)
-                 (:word *word-reg-names*)
-                 (:dword *dword-reg-names*))
-               value)
+                 ;; Notice that the this array is not the same
+                 ;; as SB!VM::+BYTE-REGISTER-NAMES+
+                 (:byte #(al cl dl bl ah ch dh bh))
+                 (:word sb!vm::+word-register-names+)
+                 (:dword sb!vm::+dword-register-names+))
+               (if (eq width :byte) value (ash value 1)))
          stream)
   ;; XXX plus should do some source-var notes
   )

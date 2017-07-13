@@ -72,7 +72,7 @@
                         `(progn ,@routines))
                  (push (frob-allocation-assembly-routine 'cons
                                                          list-pointer-lowtag
-                                                         (intern (aref *dword-register-names* tn-offset)))
+                                                         (intern (aref +dword-register-names+ tn-offset)))
                        routines)))))
   (frob-cons-routines))
 

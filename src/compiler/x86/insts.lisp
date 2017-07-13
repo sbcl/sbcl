@@ -32,13 +32,6 @@
   ;; Actually, :DWORD is the only one really supported.
   :dword)
 
-(defparameter *byte-reg-names*
-  #(al cl dl bl ah ch dh bh))
-(defparameter *word-reg-names*
-  #(ax cx dx bx sp bp si di))
-(defparameter *dword-reg-names*
-  #(eax ecx edx ebx esp ebp esi edi))
-
 ;;; Disassembling x86 code needs to take into account little things
 ;;; like instructions that have a byte/word length bit in their
 ;;; encoding, prefixes to change the default word length for a single

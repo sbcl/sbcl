@@ -228,7 +228,7 @@
                #.(loop for offset in *dword-regs*
                     collect `(,offset
                               ',(intern (format nil "ALLOCATE-CONS-TO-~A"
-                                                (svref *dword-register-names*
+                                                (svref +dword-register-names+
                                                        offset)))) into cases
                     finally (return `(case (tn-offset result)
                                        ,@cases)))))
