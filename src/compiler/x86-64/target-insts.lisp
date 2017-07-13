@@ -32,12 +32,12 @@
   (princ (if (and (eq width :byte)
                   (<= 4 value 7)
                   (not (dstate-get-inst-prop dstate +rex+)))
-             (aref *high-byte-reg-names* (- value 4))
+             (aref #("AH" "CH" "DH" "BH") (- value 4))
              (aref (ecase width
-                     (:byte *byte-reg-names*)
-                     (:word *word-reg-names*)
-                     (:dword *dword-reg-names*)
-                     (:qword *qword-reg-names*))
+                     (:byte sb!vm::+byte-register-names+)
+                     (:word sb!vm::+word-register-names+)
+                     (:dword sb!vm::+dword-register-names+)
+                     (:qword sb!vm::+qword-register-names+))
                    value))
          stream)
   ;; XXX plus should do some source-var notes

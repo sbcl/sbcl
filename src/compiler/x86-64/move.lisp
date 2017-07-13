@@ -245,7 +245,7 @@
                     ;; but let's be future-proof and allow for it.
                     (unless (member x '(rsp rbp) :test 'string=)
                       (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x)))
-                  sb!x86-64-asm::*qword-reg-names*)
+                  +qword-register-names+)
            (ash (tn-offset ,tn) -1))))
 
 ;;; Convert an untagged signed word to a lispobj -- fixnum or bignum

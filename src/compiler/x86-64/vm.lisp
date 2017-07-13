@@ -13,24 +13,30 @@
 
 ;;;; register specs
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *byte-register-names* (make-array 32 :initial-element nil))
-  (defvar *word-register-names* (make-array 32 :initial-element nil))
-  (defvar *dword-register-names* (make-array 32 :initial-element nil))
-  (defvar *qword-register-names* (make-array 32 :initial-element nil))
-  (defvar *float-register-names* (make-array 16 :initial-element nil)))
+(defconstant-eqx +byte-register-names+
+    #("AL"  "CL"  "DL"   "BL"   "SPL"  "BPL"  "SIL"  "DIL"
+      "R8B" "R9B" "R10B" "R11B" "R12B" "R13B" "R14B" "R15B")
+  #'equalp)
+(defconstant-eqx +word-register-names+
+    #("AX"  "CX"  "DX"   "BX"   "SP"   "BP"   "SI"   "DI"
+      "R8W" "R9W" "R10W" "R11W" "R12W" "R13W" "R14W" "R15W")
+  #'equalp)
+(defconstant-eqx +dword-register-names+
+    #("EAX" "ECX" "EDX"  "EBX"  "ESP"  "EBP"  "ESI"  "EDI"
+      "R8D" "R9D" "R10D" "R11D" "R12D" "R13D" "R14D" "R15D")
+  #'equalp)
+(defconstant-eqx +qword-register-names+
+    #("RAX" "RCX" "RDX" "RBX" "RSP" "RBP" "RSI" "RDI"
+      "R8"  "R9"  "R10" "R11" "R12" "R13" "R14" "R15")
+  #'equalp)
 
 (macrolet ((defreg (name offset size)
-             (let ((offset-sym (symbolicate name "-OFFSET"))
-                   (names-vector (symbolicate "*" size "-REGISTER-NAMES*")))
-               `(progn
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
+             (declare (ignore size))
+             `(eval-when (:compile-toplevel :load-toplevel :execute)
                     ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
-                    (defconstant ,offset-sym ,offset))
-                  (setf (svref ,names-vector ,offset-sym)
-                        ,(symbol-name name)))))
+                (defconstant ,(symbolicate name "-OFFSET") ,offset)))
            ;; FIXME: It looks to me as though DEFREGSET should also
            ;; define the related *FOO-REGISTER-NAMES* variable.
            (defregset (name &rest regs)
@@ -547,16 +553,17 @@
       (registers
        (let* ((sc-name (sc-name sc))
               (name-vec (cond ((member sc-name *byte-sc-names*)
-                               *byte-register-names*)
+                               +byte-register-names+)
                               ((member sc-name *word-sc-names*)
-                               *word-register-names*)
+                               +word-register-names+)
                               ((member sc-name *dword-sc-names*)
-                               *dword-register-names*)
+                               +dword-register-names+)
                               ((member sc-name *qword-sc-names*)
-                               *qword-register-names*))))
+                               +qword-register-names+))))
          (or (and name-vec
+                  (evenp offset)
                   (< -1 offset (length name-vec))
-                  (svref name-vec offset))
+                  (svref name-vec (ash offset -1)))
              ;; FIXME: Shouldn't this be an ERROR?
              (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
       (float-registers (format nil "FLOAT~D" offset))
