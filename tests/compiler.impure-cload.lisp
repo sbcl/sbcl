@@ -584,3 +584,8 @@
 
 (defparameter *circular-cons-with-a-vector-cdr*
   #1=#((a .  #1#)))
+
+(sb-int:defconstant-eqx foo-vector #(a b c d "hi") #'equalp)
+(defun f (&optional (v foo-vector)) (list v))
+(test-util:with-test (:name :optional-default-hairy-defconstant)
+  (assert (eq (first (f)) foo-vector)))

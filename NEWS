@@ -6,6 +6,9 @@ changes relative to sbcl-1.3.19:
   * bug fix: the low-level debugger would erroneously print - or not print
     as the case may be - "(bad-address)" for some objects depending whether
     the --dynamic-space-size argument was used at Lisp startup
+  * bug fix: a DEFCONSTANT with a non non-eql-comparable object as the value
+    could cause miscompilation if that constant appeared as the default
+    expression for an &OPTIONAL binding
 
 changes in sbcl-1.3.19 relative to sbcl-1.3.18:
   * enhancement: specialized arrays can be printed readably without using

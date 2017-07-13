@@ -468,7 +468,12 @@
                                   default-vars default-vals
                                   (if supplied-p (list default nil) (list default))
                                   name)
-          (let* ((default `',(constant-form-value default))
+          (let* ((value (constant-form-value default))
+                 ;; One-and-only-once-more: MAYBE-EMIT-MAKE-LOAD-FORMS has a similar test.
+                 (namedp-not-eql-comparable
+                  (and (symbolp default)
+                       (not (typep value '(or symbol character number)))))
+                 (default (if namedp-not-eql-comparable default `',value))
                  (defaults (if supplied-p (list default nil) (list default))))
             ;; DEFAULT can contain a reference to a
             ;; to-be-optimized-away function/block/tag, so better to
