@@ -46,26 +46,6 @@
       (give-up-ir1-transform
        "The function doesn't have a fixed argument count.")))))
 
-;;;; SYMBOL-VALUE &co
-(defun derive-symbol-value-type (lvar node)
-  (if (constant-lvar-p lvar)
-      (let* ((sym (lvar-value lvar))
-             (var (maybe-find-free-var sym))
-             (local-type (when var
-                           (let ((*lexenv* (node-lexenv node)))
-                             (lexenv-find var type-restrictions))))
-             (global-type (info :variable :type sym)))
-        (if local-type
-            (type-intersection local-type global-type)
-            global-type))
-      *universal-type*))
-
-(defoptimizer (symbol-value derive-type) ((symbol) node)
-  (derive-symbol-value-type symbol node))
-
-(defoptimizer (symbol-global-value derive-type) ((symbol) node)
-  (derive-symbol-value-type symbol node))
-
 ;;;; list hackery
 
 ;;; Translate CxR into CAR/CDR combos.

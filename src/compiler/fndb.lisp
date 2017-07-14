@@ -107,7 +107,8 @@
 
 ;;; This is not FLUSHABLE, since it's required to signal an error if
 ;;; unbound.
-(defknown (symbol-value) (symbol) t ())
+(defknown (symbol-value) (symbol) t ()
+  :derive-type #'symeval-derive-type)
 (defknown about-to-modify-symbol-value (symbol t &optional t t) null
   ())
 ;;; From CLHS, "If the symbol is globally defined as a macro or a
@@ -1591,7 +1592,8 @@
 
 ;;;; miscellaneous extensions
 
-(defknown symbol-global-value (symbol) t ())
+(defknown symbol-global-value (symbol) t ()
+  :derive-type #'symeval-derive-type)
 (defknown set-symbol-global-value (symbol t) t ()
   :derive-type #'result-type-last-arg)
 

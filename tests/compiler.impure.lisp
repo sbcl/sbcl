@@ -2376,26 +2376,25 @@
 (defglobal **global-symbol-value-test-var** 0)
 
 (test-util:with-test (:name :symbol-value-type-derivation)
-  (let ((fun (compile
-              nil
-              `(lambda ()
-                 *symbol-value-test-var*))))
+  (let ((fun (compile nil `(lambda () *symbol-value-test-var*))))
     (assert (equal '(function () (values unsigned-byte &optional))
                    (%simple-fun-type fun))))
-  (let ((fun (compile
-              nil
-              `(lambda ()
-                 **global-symbol-value-test-var**))))
+  (let ((fun (compile nil `(lambda () **global-symbol-value-test-var**))))
     (assert (equal '(function () (values unsigned-byte &optional))
                    (%simple-fun-type fun))))
-  (let ((fun (compile
-              nil
-              `(lambda (*symbol-value-test-var*)
-                 (declare (fixnum *symbol-value-test-var*))
-                 (symbol-value '*symbol-value-test-var*))))
-        (ufix (type-specifier (specifier-type `(and unsigned-byte fixnum)))))
-    (assert (equal `(function (,ufix) (values ,ufix &optional))
-                   (%simple-fun-type fun))))
+  (let ((ufix (type-specifier (specifier-type `(and unsigned-byte fixnum)))))
+    ;; Test a free type decl
+    (let ((fun (compile nil `(lambda ()
+                               (declare (fixnum *symbol-value-test-var*))
+                               (symbol-value '*symbol-value-test-var*)))))
+      (assert (equal `(function () (values ,ufix &optional))
+                     (%simple-fun-type fun))))
+    ;; Test a bound type decl
+    (let ((fun (compile nil `(lambda (*symbol-value-test-var*)
+                               (declare (fixnum *symbol-value-test-var*))
+                               (symbol-value '*symbol-value-test-var*)))))
+      (assert (equal `(function (,ufix) (values ,ufix &optional))
+                     (%simple-fun-type fun)))))
   (let ((fun (compile
               nil
               `(lambda ()
