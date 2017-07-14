@@ -76,8 +76,9 @@
 ;;; catch tags are still a bad idea because EQ is used to compare
 ;;; tags, and EQ comparison on INTEGERs is unportable; but now it's a
 ;;; compiler warning instead of a failure to compile.)
-(defun foo ()
-  (catch 0 (print 1331)))
+(with-test (:name :integer-valued-catch-tag)
+  (defun foo ()
+    (catch 0 (print 1331))))
 
 ;;; Bug 150: In sbcl-0.7.1.15, compiling this code caused a failure in
 ;;; SB-C::ADD-TEST-CONSTRAINTS:
@@ -497,7 +498,7 @@
     (unwind-protect
          (progn
            (setq *bug204-test-status* nil)
-           (compile-file src)
+           (compile-file src :verbose nil :print nil)
            (assert (equal *bug204-test-status* '((:expanded :load-toplevel)
                                                  (:called :compile-toplevel)
                                                  (:expanded :compile-toplevel))))
@@ -516,7 +517,7 @@
     (unwind-protect
          (progn
            (setq *symbol-macrolet-test-status* nil)
-           (compile-file src)
+           (compile-file src :verbose nil :print nil)
            (assert (equal *symbol-macrolet-test-status*
                           '(2 1)))
            (setq *symbol-macrolet-test-status* nil)
@@ -929,6 +930,7 @@
                                 1 (make-instance 'broken-input-stream))
                        :test-broken)
                    (type-error (c)
+                     c
                      (return-from return :good))))
                :good)))
 
@@ -962,6 +964,7 @@
 
 ;;; No bogus warnings for calls to functions with complex lambda-lists.
 (defun complex-function-signature (&optional x &rest y &key z1 z2)
+  (declare (ignore z1 z2))
   (cons x y))
 (with-test (:name :complex-call-doesnt-warn)
   (checked-compile '(lambda (x) (complex-function-signature x :z1 1 :z2 2))))
@@ -1257,20 +1260,21 @@
                   (sb-kernel:specifier-type
                    (sb-kernel:%simple-fun-type fun))))))
              (test (type1 type2 form value-cell-p)
-             (let* ((lambda-form `(lambda ()
-                                    (load-time-value ,form)))
-                    (core-fun (checked-compile lambda-form))
-                    (core-type (funtype core-fun))
-                    (defun-form `(defun ,name ()
-                                   (load-time-value ,form)))
-                    (file-fun (progn
-                                (ctu:file-compile (list defun-form) :load t)
-                                (symbol-function name)))
-                    (file-type (funtype file-fun)))
-               (unless (subtypep core-type type1)
-                 (error "core: wanted ~S, got ~S" type1 core-type))
-               (unless (subtypep file-type type2)
-                 (error "file: wanted ~S, got ~S" type2 file-type)))))
+               (declare (ignore value-cell-p))
+               (let* ((lambda-form `(lambda ()
+                                      (load-time-value ,form)))
+                      (core-fun (checked-compile lambda-form))
+                      (core-type (funtype core-fun))
+                      (defun-form `(defun ,name ()
+                                     (load-time-value ,form)))
+                      (file-fun (let ((*error-output* (make-broadcast-stream)))
+                                  (ctu:file-compile (list defun-form) :load t)
+                                  (symbol-function name)))
+                      (file-type (funtype file-fun)))
+                 (unless (subtypep core-type type1)
+                   (error "core: wanted ~S, got ~S" type1 core-type))
+                 (unless (subtypep file-type type2)
+                   (error "file: wanted ~S, got ~S" type2 file-type)))))
       (let ((* 10))
         (test '(integer 11 11) 'number
               '(+ * 1) nil))
@@ -1319,6 +1323,7 @@
   (flet ((test (forms)
            (catch 'debug
              (let ((*debugger-hook* (lambda (condition if)
+                                      (declare (ignore if))
                                       (throw 'debug
                                         (if (typep condition 'serious-condition)
                                             :debug
@@ -1523,12 +1528,14 @@
               (types types (rest types)))
              ((null ltypes)
               (unless (null types)
+                #+nil
                 (format t "~&More types than ltypes in ~A, translating ~A.~%"
                         (template-name template)
                         function)
                 (return nil)))
            (when (null types)
              (unless (null ltypes)
+               #+nil
                (format t "~&More ltypes than types in ~A, translating ~A.~%"
                        (template-name template)
                        function)
@@ -1619,6 +1626,7 @@
       (assert (= e-count 4)))))
 
 ;;; bug #389 (Rick Taube sbcl-devel)
+(declaim (ftype function bes-j0 bes-j1))
 (defun bes-jn (unn ux)
    (let ((nn unn) (x ux))
      (let* ((n (floor (abs nn)))
@@ -2080,7 +2088,8 @@
 
 ;;; bug 417: toplevel NIL confusing source path logic
 (handler-case
-    (delete-file (compile-file "bug-417.lisp"))
+    (delete-file (let ((*error-output* (make-broadcast-stream)))
+                   (compile-file "bug-417.lisp" :verbose nil :print nil)))
   (sb-ext:code-deletion-note (e)
     (error e)))
 
@@ -2137,7 +2146,8 @@
          (progn
            (with-open-file (f lisp :direction :output)
              (prin1 `(setf *lambda* ,lambda) f))
-           (multiple-value-bind (fasl warn fail) (compile-file lisp)
+           (multiple-value-bind (fasl warn fail)
+               (compile-file lisp :verbose nil :print nil)
              (declare (ignore warn))
              (when fail
                (error "File-compiling ~S failed." lambda))
@@ -2486,7 +2496,8 @@
   ;; as source forms.
   (let* ((src "bug-943953.lisp")
          (obj (compile-file-pathname src)))
-    (unwind-protect (compile-file src)
+    (unwind-protect (let ((*error-output* (make-broadcast-stream)))
+                      (compile-file src :verbose nil :print nil))
       (ignore-errors (delete-file obj)))))
 
 (declaim (inline vec-1177703))
@@ -2614,8 +2625,9 @@
 (in-package :cl-user)
 
 (with-test (:name :merge-lambdas-dead-return)
-  (let ((fasl (compile-file "merge-lambdas.lisp"
-                            :print nil :verbose nil)))
+  (let ((fasl (let ((*error-output* (make-broadcast-stream)))
+                (compile-file "merge-lambdas.lisp"
+                              :print nil :verbose nil))))
     (ignore-errors (delete-file fasl))))
 
 (declaim (inline ensure-a-fun))
