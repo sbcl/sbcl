@@ -552,6 +552,7 @@
     (ecase sb
       (registers
        (let* ((sc-name (sc-name sc))
+              (index (ash offset -1))
               (name-vec (cond ((member sc-name *byte-sc-names*)
                                +byte-register-names+)
                               ((member sc-name *word-sc-names*)
@@ -562,8 +563,8 @@
                                +qword-register-names+))))
          (or (and name-vec
                   (evenp offset)
-                  (< -1 offset (length name-vec))
-                  (svref name-vec (ash offset -1)))
+                  (< -1 index (length name-vec))
+                  (svref name-vec index))
              ;; FIXME: Shouldn't this be an ERROR?
              (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
       (float-registers (format nil "FLOAT~D" offset))
