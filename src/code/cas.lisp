@@ -251,17 +251,13 @@ been defined. (See SB-EXT:CAS for more information.)
                 (when val (list val))
                 old
                 new
-                (let ((slow
-                        `(progn
-                           (about-to-modify-symbol-value ,symbol 'compare-and-swap ,new)
-                           (%compare-and-swap-symbol-value ,symbol ,old ,new))))
-                  (if cname
-                      (if (member (info :variable :kind cname) '(:special :global))
+                (if (and cname (member (info :variable :kind cname) '(:special :global)))
                           ;; We can generate the type-check reasonably.
-                          `(%compare-and-swap-symbol-value
-                            ',cname ,old (the ,(info :variable :type cname) ,new))
-                          slow)
-                      slow))
+                    `(%compare-and-swap-symbol-value
+                      ',cname ,old (the ,(info :variable :type cname) ,new))
+                    `(progn
+                       (about-to-modify-symbol-value ,symbol 'compare-and-swap ,new)
+                       (%compare-and-swap-symbol-value ,symbol ,old ,new)))
                 `(symbol-value ,symbol))))))
 
 (define-cas-expander svref (vector index)
