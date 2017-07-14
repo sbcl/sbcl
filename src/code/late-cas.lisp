@@ -135,8 +135,8 @@ that no other thread modified PLACE between the read and the write.
 Works on all CASable places."
   (multiple-value-bind (vars vals old new cas-form read-form)
       (get-cas-expansion place env)
-    `(let* (,@(mapcar 'list vars vals))
-       (loop for ,old = ,read-form
-             for ,new = (cdr ,old)
-             until (eq ,old (setf ,old ,cas-form))
-             finally (return (car ,old))))))
+    `(let* (,@(mapcar 'list vars vals)
+            (,old ,read-form))
+       (loop (let ((,new (cdr ,old)))
+               (when (eq ,old (setf ,old ,cas-form))
+                 (return (car (truly-the list ,old)))))))))
