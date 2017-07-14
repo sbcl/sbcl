@@ -1880,7 +1880,9 @@
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t
     ())
-(defknown %compare-and-swap-symbol-value (symbol t t) t
+(defknown (%compare-and-swap-symbol-value
+           #!+x86-64 %cas-symbol-global-value)
+    (symbol t t) t
     (unwind))
 (defknown (%atomic-dec-symbol-global-value %atomic-inc-symbol-global-value)
     (symbol fixnum) fixnum)

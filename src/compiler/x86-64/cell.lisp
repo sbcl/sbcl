@@ -121,6 +121,12 @@
   (let ((where (info :variable :wired-tls symbol)))
     (or (eq where :ALWAYS-THREAD-LOCAL) (integerp where))))
 
+(deftransform %compare-and-swap-symbol-value ((symbol old new)
+                                              ((constant-arg symbol) t t))
+  (if (eq (info :variable :kind (sb!c::lvar-value symbol)) :global)
+      `(%cas-symbol-global-value symbol old new)
+      (sb!c::give-up-ir1-transform)))
+
 (macrolet (;; Logic common to thread-aware SET and CAS. CELL is assigned
            ;; to the location that should be accessed to modify SYMBOL's
            ;; value either in the TLS or the symbol's value slot as follows:
@@ -178,6 +184,32 @@
         (inst cmp (reg-in-size rax :dword) unbound-marker-widetag)
         (inst jmp :e unbound)
         (move result rax))))
+
+  (define-vop (%cas-symbol-global-value)
+    (:translate %cas-symbol-global-value)
+    (:args (symbol :scs (descriptor-reg) :to (:result 0)
+                   :load-if (not (sc-is symbol immediate)))
+           (old :scs (descriptor-reg any-reg) :target rax)
+           (new :scs (descriptor-reg any-reg)))
+    (:temporary (:sc descriptor-reg :offset rax-offset
+                 :from (:argument 1) :to (:result 0)) rax)
+    (:results (result :scs (descriptor-reg any-reg)))
+    (:policy :fast-safe)
+    (:generator 10
+      (move rax old)
+      (if (sc-is symbol immediate)
+          ;; OAOO much? See (DEFINE-VOP (CELL-REF)).
+          (inst cmpxchg
+                (make-ea :qword :disp
+                         (let* ((symbol (tn-value symbol))
+                                (offset (- (* symbol-value-slot n-word-bytes)
+                                           other-pointer-lowtag)))
+                           (if (static-symbol-p symbol)
+                               (+ nil-value (static-symbol-offset symbol) offset)
+                               (make-fixup symbol :immobile-object offset))))
+                new :lock)
+          (inst cmpxchg (access-value-slot symbol) new :lock))
+      (move result rax)))
 
   #!+sb-thread
   (progn
