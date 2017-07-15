@@ -123,7 +123,7 @@
 
   (defconstant dynamic-space-start       #x30000000)
   (defconstant default-dynamic-space-size
-    (or (!read-dynamic-space-size) (expt 2 29))))
+    (or #.(!read-dynamic-space-size) (expt 2 29))))
 
 #!+(and sunos cheneygc) ; might as well start by trying the same numbers
 (progn
@@ -155,7 +155,7 @@
 
   (defconstant dynamic-space-start       #x30000000)
   (defconstant default-dynamic-space-size
-    (or (!read-dynamic-space-size) (expt 2 29))))
+    (or #.(!read-dynamic-space-size) (expt 2 29))))
 
 #!+netbsd ; Need a gap at 0x4000000 for shared libraries
 (progn
