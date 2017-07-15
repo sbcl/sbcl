@@ -58,6 +58,24 @@
                               :k 'x :k 'y))))
                  'x)))
 
+;;; Lexically binding a name that is 1) bound to a global symbol macro
+;;; 2) at home in a locked package
+
+(defpackage #:package-for-global-symbol-macro (:lock t))
+(cl:in-package #:package-for-global-symbol-macro)
+(cl:define-symbol-macro global-symbol-macro 1)
+(cl:in-package #:cl-user)
+
+(with-test (:name (let define-symbol-macro :locked package))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile
+       '(lambda () (let ((package-for-global-symbol-macro::global-symbol-macro 1))
+                     package-for-global-symbol-macro::global-symbol-macro))
+       :allow-failure t :allow-warnings t)
+    (declare (ignore fun))
+    (assert failure-p)
+    (assert warnings)))
+
 ;;; As reported by Alexey Dejneka (sbcl-devel 2002-01-30), in
 ;;; sbcl-0.7.1 plus his patch (i.e. essentially sbcl-0.7.1.2), the
 ;;; compiler barfed on this, blowing up in FIND-IN-PHYSENV looking for
