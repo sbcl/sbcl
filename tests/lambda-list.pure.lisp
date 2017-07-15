@@ -47,7 +47,7 @@
     (error-p (&rest foo &rest bar))
     (error-p (&rest foo &optional bar))))
 
-(with-test (:name :supplied-p-order)
+(with-test (:name (:lambda-list :supplied-p-order 1))
   (let ((* 10))
     (assert (eql ((lambda (&key (x * *)) () x)) 10))
     (assert (eql ((lambda (&key (y * *) (x *)) () x) :y 1) t))
@@ -65,13 +65,11 @@
     (assert (eql (destructuring-bind (&optional (y * *) (x *)) '(1) x) t))
     (assert (eql (destructuring-bind (&optional (x *) (y * *)) () x) 10))))
 
-(with-test (:name :supplied-p-order)
-  (assert-no-signal
-   (compile nil '(lambda ()
-                  (destructuring-bind (&optional (x nil xp)) '()
-                    (declare (ignore x xp))
-                    nil)))
-   warning))
+(with-test (:name (:lambda-list :supplied-p-order 2))
+  (checked-compile '(lambda ()
+                     (destructuring-bind (&optional (x nil xp)) '()
+                       (declare (ignore x xp))
+                       nil))))
 
 (with-test (:name :aux-not-destructured)
   (assert-error (sb-c::parse-lambda-list
