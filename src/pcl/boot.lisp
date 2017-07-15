@@ -385,30 +385,61 @@ bootstrapping.
   ()
   (:default-initargs :references (list '(:ansi-cl :section (3 4 2)))))
 
+(defun generic-function-lambda-list-error (format-control &rest format-arguments)
+  (error 'generic-function-lambda-list-error
+         :format-control format-control
+         :format-arguments format-arguments))
+
 (defun check-gf-lambda-list (lambda-list)
-  (flet ((verify-each-atom-or-singleton (kind args)
-           ;; PARSE-LAMBDA-LIST validates the skeleton,
-           ;; so just check for incorrect use of defaults.
-           ;; This works for both &OPTIONAL and &KEY.
-           (dolist (arg args)
-             (or (not (listp arg))
-                 (null (cdr arg))
-                 (error 'generic-function-lambda-list-error
-                    :format-control
-                    "~@<invalid ~A argument specifier ~S ~_in the ~
-generic function lambda list ~S~:>"
-                    :format-arguments (list kind arg lambda-list))))))
-    (multiple-value-bind (llks required optional rest keys)
-        (parse-lambda-list
-         lambda-list
-         :accept (lambda-list-keyword-mask
-                    '(&optional &rest &key &allow-other-keys))
-         :condition-class 'generic-function-lambda-list-error
-         :context "a generic function lambda list")
-      (declare (ignore llks required rest))
+  (binding* ((context "a generic function lambda list")
+             ((llks required optional rest keys)
+              (parse-lambda-list
+               lambda-list
+               :accept (lambda-list-keyword-mask
+                        '(&optional &rest &key &allow-other-keys))
+               :condition-class 'generic-function-lambda-list-error
+               :context context))
+             (seen-names (sb-c::make-repeated-name-check
+                          :context context
+                          :signal-via #'generic-function-lambda-list-error))
+             (seen-keywords (sb-c::make-repeated-name-check
+                             :kind "keyword"
+                             :context context
+                             :signal-via #'generic-function-lambda-list-error)))
+    (declare (ignore llks))
+    ;; PARSE-LAMBDA-LIST validates the skeleton, so just check for
+    ;; incorrect use of defaults.
+    (labels ((lose (kind arg)
+               (generic-function-lambda-list-error
+                "~@<Invalid ~A argument specifier ~S ~_in ~A ~:S~:>"
+                kind arg context lambda-list))
+             (verify-optional (spec)
+               (multiple-value-bind (name default suppliedp defaultp)
+                   (parse-optional-arg-spec spec)
+                 (declare (ignore default suppliedp))
+                 (when defaultp
+                   (lose '&optional spec))
+                 name))
+             (verify-key (spec)
+               (multiple-value-bind (keyword name default suppliedp defaultp)
+                   (parse-key-arg-spec spec)
+                 (declare (ignore default suppliedp))
+                 (when defaultp
+                   (lose '&key spec))
+                 (funcall seen-keywords keyword)
+                 name))
+             (check-names (names)
+               (dolist (name names)
+                 (sb-c::check-variable-name-for-binding
+                  name
+                  :context context
+                  :signal-via #'generic-function-lambda-list-error)
+                 (funcall seen-names name))))
       ;; no defaults or supplied-p vars allowed for &OPTIONAL or &KEY
-      (verify-each-atom-or-singleton '&optional optional)
-      (verify-each-atom-or-singleton '&key keys))))
+      (check-names required)
+      (when rest (check-names rest))
+      (check-names (mapcar #'verify-optional optional))
+      (check-names (mapcar #'verify-key keys)))))
 
 (defun check-method-lambda (method-lambda context)
   (unless (typep method-lambda '(cons (eql lambda)))
