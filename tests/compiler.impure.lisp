@@ -76,9 +76,13 @@
 ;;; catch tags are still a bad idea because EQ is used to compare
 ;;; tags, and EQ comparison on INTEGERs is unportable; but now it's a
 ;;; compiler warning instead of a failure to compile.)
-(with-test (:name :integer-valued-catch-tag)
-  (defun foo ()
-    (catch 0 (print 1331))))
+(with-test (:name (compile catch :integer-valued-tag :bug-132))
+  (multiple-value-bind (fun failure-p warnings style-warnings)
+      (checked-compile '(lambda () (catch 0 (print 1331 (make-broadcast-stream))))
+                       :allow-style-warnings t)
+    (declare (ignore failure-p warnings))
+    (funcall fun)
+    (assert style-warnings)))
 
 ;;; Bug 150: In sbcl-0.7.1.15, compiling this code caused a failure in
 ;;; SB-C::ADD-TEST-CONSTRAINTS:
