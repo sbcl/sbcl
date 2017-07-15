@@ -32,15 +32,15 @@
     (when (sb!xc:constantp symbol env)
       (let ((name (constant-form-value symbol env)))
         (when (symbolp name)
-          (case (deprecated-thing-p 'variable name)
-            ((:early :late)
-             (check-deprecated-thing 'variable name)
-             nil)
-            ;; In this case, there is a symbol-macro for NAME that
-            ;; will signal the FINAL-DEPRECATION-WARNING when
-            ;; ir1converted and the DEPRECATION-ERROR at runtime.
-            (:final
-             name)))))))
+          (let ((state (deprecated-thing-p 'variable name)))
+            (when (and state
+                       (or (not (boundp 'sb!c::*free-vars*))
+                           (not (gethash name sb!c::*free-vars*))))
+              (check-deprecated-thing 'variable name)
+              (when (and (neq state :final)
+                         (boundp 'sb!c::*free-vars*))
+                (setf (gethash symbol sb!c::*free-vars*)
+                      :deprecated)))))))))
 
 (defun symbol-value (symbol)
   "Return SYMBOL's current bound value."
@@ -49,7 +49,12 @@
 
 #-sb-xc-host
 (define-compiler-macro symbol-value (&whole form symbol &environment env)
-  (or (maybe-handle-deprecated-global-variable symbol env) form))
+  (maybe-handle-deprecated-global-variable symbol env)
+  ;; A variable which has :final deprecation state should never have a value.
+  ;; So the SYMBOL-[GLOBAL-]VALUE call will signal an unbound error.
+  ;; For the other 2 deprecation states the variable behaves as normal.
+  ;; The long and short of it is that in no case do we alter the form.
+  form)
 
 (defun boundp (symbol)
   "Return non-NIL if SYMBOL is bound to a value."
@@ -74,7 +79,8 @@ distinct from the global value. Can also be SETF."
 #-sb-xc-host
 (define-compiler-macro symbol-global-value (&whole form symbol
                                             &environment env)
-  (or (maybe-handle-deprecated-global-variable symbol env) form))
+  (maybe-handle-deprecated-global-variable symbol env)
+  form)
 
 (defun set-symbol-global-value (symbol new-value)
   (about-to-modify-symbol-value symbol 'set new-value)

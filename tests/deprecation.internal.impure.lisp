@@ -47,7 +47,8 @@
         ((:early :late)
          (assert (eq :deprecated (funcall function))))
         (:final
-         (assert-error (funcall function) deprecation-error))))
+         (assert-error (funcall function)
+                       (or deprecation-error cell-error)))))
     ;; Check the documentation.
     #+sb-doc
     (search-string (documentation name kind))))

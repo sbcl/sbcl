@@ -252,7 +252,9 @@
            (find-free-fun name context)))))
 
 (defun maybe-find-free-var (name)
-  (gethash name *free-vars*))
+  (let ((found (gethash name *free-vars*)))
+    (unless (eq found :deprecated)
+      found)))
 
 ;;; Return the LEAF node for a global variable reference to NAME. If
 ;;; NAME is already entered in *FREE-VARS*, then we just return the
@@ -260,16 +262,24 @@
 ;;; information from the global environment and enter it in
 ;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
 (declaim (ftype (sfunction (t) (or leaf cons heap-alien-info)) find-free-var))
-(defun find-free-var (name)
+(defun find-free-var (name &aux (existing (gethash name *free-vars*)))
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
-  (or (gethash name *free-vars*)
+  (or (when (and existing (neq existing :deprecated))
+        existing)
       (let ((kind (info :variable :kind name))
             (type (info :variable :type name))
             (where-from (info :variable :where-from name))
             (deprecation-state (deprecated-thing-p 'variable name)))
         (when (and (eq kind :unknown) (not deprecation-state))
           (note-undefined-reference name :variable))
+        ;; For deprecated vars, warn about LET and LAMBDA bindings, SETQ, and ref.
+        ;; Don't warn again if the name was already seen by the transform
+        ;; of SYMBOL[-GLOBAL]-VALUE.
+        (unless (eq existing :deprecated)
+          (case deprecation-state
+            ((:early :late)
+             (check-deprecated-thing 'variable name))))
         (setf (gethash name *free-vars*)
               (case kind
                 (:alien
@@ -700,20 +710,17 @@
                 ;; there's no need for us to accept ANSI's lameness when
                 ;; processing our own code, though.
                 #+sb-xc-host
-                (warn "reading an ignored variable: ~S" name)))
-             (t
-              ;; This case signals {EARLY,LATE}-DEPRECATION-WARNING
-              ;; for CONSTANT nodes in :EARLY and :LATE deprecation
-              ;; (constants in :FINAL deprecation are represented as
-              ;; symbol-macros).
-              (aver (memq (check-deprecated-thing 'variable name)
-                          '(nil :early :late)))))
+                (warn "reading an ignored variable: ~S" name))))
            (reference-leaf start next result var name))
           ((cons (eql macro)) ; symbol-macro
+           ;; FIXME: the following comment is probably wrong now.
+           ;; If we warn here on :early and :late deprecation
+           ;; then we get an extra warning somehow.
            ;; This case signals {EARLY,LATE,FINAL}-DEPRECATION-WARNING
            ;; for symbol-macros. Includes variables, constants,
            ;; etc. in :FINAL deprecation.
-           (check-deprecated-thing 'variable name)
+           (when (eq (deprecated-thing-p 'variable name) :final)
+             (check-deprecated-thing 'variable name))
            ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
            (ir1-convert start next result (cdr var)))
           (heap-alien-info

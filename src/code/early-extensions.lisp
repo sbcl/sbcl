@@ -1279,6 +1279,9 @@ NOTE: This interface is experimental and subject to change."
                     (deprecation-info-version info))
               (deprecation-info-replacements info)))))
 
+;;; Without a proclaimed type, the call is "untrusted" and so the compiler
+;;; would generate a post-call check that the function did not return.
+(declaim (ftype (function (t t t t t) nil) deprecation-error))
 (defun deprecation-error (software version namespace name replacements)
   #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
   (error 'deprecation-error
