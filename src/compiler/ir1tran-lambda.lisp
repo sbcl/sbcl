@@ -28,32 +28,28 @@
 (declaim (ftype (sfunction (t list &optional t) lambda-var) varify-lambda-arg))
 (defun varify-lambda-arg (name names-so-far &optional (context "lambda list"))
   (declare (inline member))
-  (unless (symbolp name) ;; FIXME: probably unreachable. Change to AVER?
-    (compiler-error "~S is not a symbol, and cannot be used as a variable." name))
+  (check-variable-name name)
   (when (member name names-so-far :test #'eq)
     (compiler-error "The variable ~S occurs more than once in the ~A."
                     name
                     context))
-  (let ((kind (info :variable :kind name)))
-    (cond ((keywordp name)
-           (compiler-error "~S is a keyword, and cannot be used as a local variable."
-                           name))
-          ((eq kind :constant)
-           (compiler-error "~@<~S names a defined constant, and cannot be used as a ~
-                            local variable.~:@>"
-                           name))
-          ((eq :global kind)
-           (compiler-error "~@<~S names a global lexical variable, and cannot be used ~
-                            as a local variable.~:@>"
-                           name))
-          ((eq kind :special)
-           (let ((specvar (find-free-var name)))
-             (make-lambda-var :%source-name name
-                              :type (leaf-type specvar)
-                              :where-from (leaf-where-from specvar)
-                              :specvar specvar)))
-          (t
-           (make-lambda-var :%source-name name)))))
+  (case (info :variable :kind name)
+    (:constant
+     (compiler-error "~@<~S names a defined constant, and cannot be ~
+                      used as a local variable.~:@>"
+                     name))
+    (:global
+     (compiler-error "~@<~S names a global lexical variable, and ~
+                      cannot be used as a local variable.~:@>"
+                     name))
+    (:special
+     (let ((specvar (find-free-var name)))
+       (make-lambda-var :%source-name name
+                        :type (leaf-type specvar)
+                        :where-from (leaf-where-from specvar)
+                        :specvar specvar)))
+    (t
+     (make-lambda-var :%source-name name))))
 
 ;;; Make the default keyword for a &KEY arg, checking that the keyword
 ;;; isn't already used by one of the VARS.

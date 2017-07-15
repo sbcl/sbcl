@@ -1297,6 +1297,7 @@ possibly temporarily, because it might be used internally."
 
                ;; misc. utilities used internally
                "DEFINE-FUNCTION-NAME-SYNTAX" "VALID-FUNCTION-NAME-P" ; should be SB!EXT?
+               "LEGAL-VARIABLE-NAME-P"
                "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
                "FUN-NAME-BLOCK-NAME"
                "FUN-NAME-INLINE-EXPANSION"

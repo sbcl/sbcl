@@ -19,6 +19,13 @@
 
 ;;;; internal utilities defined in terms of INFO
 
+(defun check-variable-name (name &optional (context "local variable"))
+  (unless (legal-variable-name-p name)
+    (compiler-error "~@<~S is ~:[not a symbol~;a keyword~] and cannot ~
+                     be used as a ~A.~@:>"
+                    name (keywordp name) context))
+  name)
+
 ;;; Check that NAME is a valid function name, returning the name if
 ;;; OK, and signalling an error if not. In addition to checking for
 ;;; basic well-formedness, we also check that symbol names are not NIL
@@ -27,13 +34,14 @@
   (typecase name
     (list
      (unless (legal-fun-name-p name)
-       (compiler-error "illegal function name: ~S" name)))
+       (compiler-error "~@<Illegal function name: ~S.~@:>" name)))
     (symbol
      (when (eq (info :function :kind name) :special-form)
-       (compiler-error "Special form is an illegal function name: ~S" name)))
+       (compiler-error "~@<Special form is an illegal function name: ~S.~@:>"
+                       name)))
     (t
-     (compiler-error "illegal function name: ~S" name)))
-  (values))
+     (compiler-error "~@<Illegal function name: ~S.~@:>" name)))
+  name)
 
 ;;; Record a new function definition, and check its legality.
 (defun proclaim-as-fun-name (name)
