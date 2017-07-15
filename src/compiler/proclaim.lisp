@@ -19,18 +19,6 @@
 (defvar *undefined-warnings*)
 (declaim (list *undefined-warnings*))
 
-;;; Look up some symbols in *FREE-VARS*, returning the var
-;;; structures for any which exist. If any of the names aren't
-;;; symbols, we complain.
-(declaim (ftype (function (list) list) get-old-vars))
-(defun get-old-vars (names)
-  (collect ((vars))
-    (dolist (name names (vars))
-      (unless (symbolp name)
-        (compiler-error "The name ~S is not a symbol." name))
-      (let ((old (gethash name *free-vars*)))
-        (when old (vars old))))))
-
 (declaim (ftype (function (list list) list)
                 process-handle-conditions-decl))
 (defun process-handle-conditions-decl (spec list)
