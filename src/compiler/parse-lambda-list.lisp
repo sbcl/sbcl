@@ -400,10 +400,11 @@
 ;;; DEFAULT should be specified as '* when parsing a DEFTYPE lambda-list.
 (defun parse-optional-arg-spec (spec &optional default)
   (etypecase spec
-    (symbol (values spec default nil))
+    (symbol (values spec default nil nil))
     (cons (values (car spec)
                   (if (cdr spec) (cadr spec) default)
-                  (cddr spec)))))
+                  (cddr spec)
+                  (when (cdr spec) t)))))
 
 ;;; Split a keyword argument specifier into the keyword, the bound variable
 ;;; or destructuring pattern, the default, and supplied-p var.
@@ -411,11 +412,12 @@
 ;;; DEFAULT should be specified as '* when parsing a DEFTYPE lambda-list.
 (defun parse-key-arg-spec (spec &optional default)
   (etypecase spec
-    (symbol (values (keywordicate spec) spec default nil))
-    (cons (destructuring-bind (var &optional (def default) . sup-p-var) spec
-              (if (symbolp var)
-                  (values (keywordicate var) var def sup-p-var)
-                  (values (car var) (cadr var) def sup-p-var))))))
+    (symbol (values (keywordicate spec) spec default nil nil))
+    (cons (destructuring-bind (var &optional (def default defaultp) . sup-p-var)
+              spec
+            (if (symbolp var)
+                (values (keywordicate var) var def sup-p-var defaultp)
+                (values (car var) (cadr var) def sup-p-var defaultp))))))
 
 ;;; Return a "twice abstracted" representation of DS-LAMBDA-LIST that removes
 ;;; all variable names, &AUX parameters, supplied-p variables, and defaults.

@@ -93,82 +93,48 @@
               (names-so-far)
               (aux-vars)
               (aux-vals))
-      (flet (;; PARSE-DEFAULT deals with defaults and supplied-p args
-             ;; for optionals and keywords args.
-             (parse-default (spec info)
-               (when (consp (cdr spec))
-                 (setf (arg-info-default info) (second spec))
-                 (when (consp (cddr spec))
-                   (let* ((supplied-p (third spec))
-                          (supplied-var (varify-lambda-arg supplied-p
-                                                           (names-so-far))))
-                     (setf (arg-info-supplied-p info) supplied-var)
-                     (names-so-far supplied-p))))))
-
-        (dolist (name required)
-          (let ((var (varify-lambda-arg name (names-so-far))))
-            (vars var)
-            (names-so-far name)))
-
+      (flet ((add-var (name)
+               (let ((var (varify-lambda-arg name (names-so-far))))
+                 (vars var)
+                 (names-so-far name)
+                 var))
+             (add-info (var kind &key (default nil defaultp) suppliedp-var key)
+               (let ((info (make-arg-info :kind kind)))
+                 (when defaultp
+                   (setf (arg-info-default info) default))
+                 (when suppliedp-var
+                   (setf (arg-info-supplied-p info)
+                         (varify-lambda-arg
+                          suppliedp-var (names-so-far)))
+                   (names-so-far suppliedp-var))
+                 (when key
+                   (setf (arg-info-key info) key))
+                 (setf (lambda-var-arg-info var) info))))
+        ;; Required
+        (mapc #'add-var required)
+        ;; Optional
         (dolist (spec optional)
-          (if (atom spec)
-              (let ((var (varify-lambda-arg spec (names-so-far))))
-                (setf (lambda-var-arg-info var)
-                      (make-arg-info :kind :optional))
-                (vars var)
-                (names-so-far spec))
-              (let* ((name (first spec))
-                     (var (varify-lambda-arg name (names-so-far)))
-                     (info (make-arg-info :kind :optional)))
-                (setf (lambda-var-arg-info var) info)
-                (vars var)
-                (names-so-far name)
-                (parse-default spec info))))
-
+          (multiple-value-bind (name default suppliedp-var defaultp)
+              (parse-optional-arg-spec spec)
+            (apply #'add-info (add-var name) :optional
+                   :suppliedp-var (first suppliedp-var)
+                   (when defaultp (list :default default)))))
+        ;; Rest/more
         (when rest/more
           (mapc (lambda (name kind)
-                  (let ((var (varify-lambda-arg name (names-so-far))))
-                    (setf (lambda-var-arg-info var) (make-arg-info :kind kind))
-                    (vars var)
-                    (names-so-far name)))
+                  (add-info (add-var name) kind))
                 rest/more (let ((morep (eq (ll-kwds-restp llks) '&more)))
                             (if morep '(:more-context :more-count) '(:rest)))))
-
+        ;; Keys
         (dolist (spec keys)
-          (cond
-           ((atom spec)
-            (let ((var (varify-lambda-arg spec (names-so-far))))
-              (setf (lambda-var-arg-info var)
-                    (make-arg-info :kind :keyword
-                                   :key (make-keyword-for-arg spec
-                                                              (vars)
-                                                              t)))
-              (vars var)
-              (names-so-far spec)))
-           ((atom (first spec))
-            (let* ((name (first spec))
-                   (var (varify-lambda-arg name (names-so-far)))
-                   (info (make-arg-info
-                          :kind :keyword
-                          :key (make-keyword-for-arg name (vars) t))))
-              (setf (lambda-var-arg-info var) info)
-              (vars var)
-              (names-so-far name)
-              (parse-default spec info)))
-           (t
-            (let ((head (first spec)))
-              (let* ((name (second head))
-                     (var (varify-lambda-arg name (names-so-far)))
-                     (info (make-arg-info
-                            :kind :keyword
-                            :key (make-keyword-for-arg (first head)
-                                                       (vars)
-                                                       nil))))
-                (setf (lambda-var-arg-info var) info)
-                (vars var)
-                (names-so-far name)
-                (parse-default spec info))))))
-
+          (multiple-value-bind (keyword name default suppliedp-var defaultp)
+              (parse-key-arg-spec spec)
+            (apply #'add-info (add-var name) :keyword
+                   :suppliedp-var (first suppliedp-var)
+                   :key (make-keyword-for-arg
+                         (or keyword name) (vars) (not keyword))
+                   (when defaultp (list :default default)))))
+        ;; Aux
         (dolist (spec aux)
           (multiple-value-bind (name val)
               (if (atom spec) spec (values (car spec) (cadr spec)))
