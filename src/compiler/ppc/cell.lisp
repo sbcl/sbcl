@@ -112,7 +112,7 @@
 ;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
 ;;; So SYMBOL-VALUE of NIL is NIL.
 (define-vop (symbol-global-value checked-cell-ref)
-  (:translate symbol-global-value)
+  (:translate sym-global-val)
   (:generator 9
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
@@ -123,7 +123,7 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate symbol-global-value))
+  (:translate sym-global-val))
 
 #!+sb-thread
 (progn
@@ -145,7 +145,7 @@
   ;; With Symbol-Value, we check that the value isn't the trap object. So
   ;; Symbol-Value of NIL is NIL.
   (define-vop (symbol-value)
-    (:translate symbol-value)
+    (:translate symeval)
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg) :to (:result 1)))
     (:results (value :scs (descriptor-reg any-reg)))
@@ -168,7 +168,7 @@
     ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
     ;; CSR, 2003-04-22
     (:policy :fast)
-    (:translate symbol-value)
+    (:translate symeval)
     (:generator 8
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx value thread-base-tn value)
@@ -181,9 +181,9 @@
 #!-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
-    (:translate symbol-value))
+    (:translate symeval))
   (define-vop (fast-symbol-value fast-symbol-global-value)
-    (:translate symbol-value))
+    (:translate symeval))
   (define-vop (set %set-symbol-global-value)))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell

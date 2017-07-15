@@ -4999,6 +4999,35 @@
                       (t 'sb!impl::string-ouch))))
        (give-up-ir1-transform))))
 
+(flet ((handle-deprecation (symbol)
+         (let ((state (deprecated-thing-p 'variable symbol)))
+           (when state
+             (check-deprecated-thing 'variable symbol)
+             (case state
+               ((:early :late)
+                (unless (gethash symbol *free-vars*)
+                  (setf (gethash symbol *free-vars*) :deprecated))))))))
+  (deftransform symbol-global-value ((symbol))
+    (or (when (constant-lvar-p symbol)
+          (let ((symbol (lvar-value symbol)))
+            (handle-deprecation symbol)
+            (case (info :variable :kind symbol)
+              ((:constant :global) symbol))))
+        `(sym-global-val symbol)))
+  (deftransform symbol-value ((symbol))
+    (or (when (constant-lvar-p symbol)
+          (let ((symbol (lvar-value symbol)))
+            (handle-deprecation symbol)
+            #+sb-xc-host
+            (case (info :variable :kind symbol)
+              ((:global :special) symbol)
+              ;; MOST-FOOative-<size>-FLOAT constants have go through SYMEVAL
+              ;; due to some voodoo that delays access until bootstrapped.
+              ((:constant) (if (boundp symbol) symbol)))
+            #-sb-xc-host
+            (case (info :variable :kind symbol)
+              ((:constant :global :special) symbol))))
+        `(symeval symbol))))
 (deftransform set ((symbol value) ((constant-arg symbol) *))
   (let* ((symbol (lvar-value symbol)))
     (case (info :variable :kind symbol)

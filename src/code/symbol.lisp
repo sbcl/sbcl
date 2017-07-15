@@ -17,44 +17,10 @@
 
 (declaim (maybe-inline get3 %put getf remprop %putf get-properties keywordp))
 
-;;; Used by [GLOBAL-]SYMBOL-VALUE compiler-macros:
-;;;
-;;; When SYMBOL is constant, check whether it names a deprecated
-;;; variable, potentially signaling a {EARLY,LATE}-DEPRECATION-WARNING
-;;; in the process. Furthermore, if the deprecation state is :FINAL,
-;;; replace FORM by SYMBOL, causing the symbol-macro on SYMBOL to
-;;; expand into a call to DEPRECATION-ERROR.
-;;;
-;;; See SB-IMPL:SETUP-VARIABLE-IN-FINAL-DEPRECATION.
-#-sb-xc-host
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun maybe-handle-deprecated-global-variable (symbol env)
-    (when (sb!xc:constantp symbol env)
-      (let ((name (constant-form-value symbol env)))
-        (when (symbolp name)
-          (let ((state (deprecated-thing-p 'variable name)))
-            (when (and state
-                       (or (not (boundp 'sb!c::*free-vars*))
-                           (not (gethash name sb!c::*free-vars*))))
-              (check-deprecated-thing 'variable name)
-              (when (and (neq state :final)
-                         (boundp 'sb!c::*free-vars*))
-                (setf (gethash symbol sb!c::*free-vars*)
-                      :deprecated)))))))))
-
 (defun symbol-value (symbol)
   "Return SYMBOL's current bound value."
   (declare (optimize (safety 1)))
   (symbol-value symbol))
-
-#-sb-xc-host
-(define-compiler-macro symbol-value (&whole form symbol &environment env)
-  (maybe-handle-deprecated-global-variable symbol env)
-  ;; A variable which has :final deprecation state should never have a value.
-  ;; So the SYMBOL-[GLOBAL-]VALUE call will signal an unbound error.
-  ;; For the other 2 deprecation states the variable behaves as normal.
-  ;; The long and short of it is that in no case do we alter the form.
-  form)
 
 (defun boundp (symbol)
   "Return non-NIL if SYMBOL is bound to a value."
@@ -75,12 +41,6 @@ in single-threaded builds: in multithreaded builds bound values are
 distinct from the global value. Can also be SETF."
   (declare (optimize (safety 1)))
   (symbol-global-value symbol))
-
-#-sb-xc-host
-(define-compiler-macro symbol-global-value (&whole form symbol
-                                            &environment env)
-  (maybe-handle-deprecated-global-variable symbol env)
-  form)
 
 (defun set-symbol-global-value (symbol new-value)
   (about-to-modify-symbol-value symbol 'set new-value)

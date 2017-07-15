@@ -191,3 +191,9 @@
                    (unpacked loc)
                    (setq prev-loc loc)))))
             (assert (equal (unpacked) test-list))))))))
+
+(with-test (:name :symbol-value-quoted-constant)
+  (let ((f (compile nil '(lambda () (symbol-value 'char-code-limit)))))
+    (assert (not (ctu:find-code-constants f :type 'symbol))))
+  (let ((f (compile nil '(lambda () (symbol-global-value 'char-code-limit)))))
+    (assert (not (ctu:find-code-constants f :type 'symbol)))))

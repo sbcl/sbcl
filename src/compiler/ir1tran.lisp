@@ -687,14 +687,14 @@
   (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
     (if (and (global-var-p var) (not (always-boundp name)))
-        ;; KLUDGE: If the variable may be unbound, convert using SYMBOL-VALUE
+        ;; KLUDGE: If the variable may be unbound, convert using SYMEVAL
         ;; which is not flushable, so that unbound dead variables signal an
         ;; error (bug 412, lp#722734): checking for null RESULT is not enough,
         ;; since variables can become dead due to later optimizations.
         (ir1-convert start next result
                      (if (eq (global-var-kind var) :global)
-                         `(symbol-global-value ',name)
-                         `(symbol-value ',name)))
+                         `(sym-global-val ',name)
+                         `(symeval ',name)))
         (etypecase var
           (leaf
            (cond
@@ -1038,18 +1038,19 @@
 ;;; instrumentation for?
 (defun step-form-p (form)
   (flet ((step-symbol-p (symbol)
-           (and (not (member (symbol-package symbol)
-                             (load-time-value
+           ;; Consistent treatment of *FOO* vs (SYMBOL-VALUE '*FOO*):
+           ;; we insert calls to SYMEVAL for most non-lexical
+           ;; variable references in order to avoid them being elided
+           ;; if the value is unused.
+           (if (member symbol '(symeval sym-global-val))
+               (not (constantp (second form)))
+               (not (member (symbol-package symbol)
+                            (load-time-value
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.
                               (mapcar #'find-package '(sb!c sb!int sb!impl
-                                                       sb!kernel sb!pcl)) t)))
-                ;; Consistent treatment of *FOO* vs (SYMBOL-VALUE '*FOO*):
-                ;; we insert calls to SYMBOL-VALUE for most non-lexical
-                ;; variable references in order to avoid them being elided
-                ;; if the value is unused.
-                (or (not (member symbol '(symbol-value symbol-global-value)))
-                    (not (constantp (second form)))))))
+                                                       sb!kernel sb!pcl))
+                             t))))))
     (and *allow-instrumenting*
          (policy *lexenv* (= insert-step-conditions 3))
          (listp form)
