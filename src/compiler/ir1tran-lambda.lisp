@@ -20,53 +20,74 @@
 ;;;; function representation" before you seriously mess with this
 ;;;; stuff.
 
-;;; Verify that the NAME is a legal name for a variable and return a
-;;; VAR structure for it, filling in info if it is globally special.
-;;; If it is losing, we punt with a COMPILER-ERROR. NAMES-SO-FAR is a
-;;; list of names which have previously been bound. If the NAME is in
-;;; this list, then we error out.
-(declaim (ftype (sfunction (t list &optional t) lambda-var) varify-lambda-arg))
-(defun varify-lambda-arg (name names-so-far &optional (context "lambda list"))
-  (declare (inline member))
-  (check-variable-name name)
-  (when (member name names-so-far :test #'eq)
-    (compiler-error "The variable ~S occurs more than once in the ~A."
-                    name
-                    context))
-  (case (info :variable :kind name)
-    (:constant
-     (compiler-error "~@<~S names a defined constant, and cannot be ~
-                      used as a local variable.~:@>"
-                     name))
-    (:global
-     (compiler-error "~@<~S names a global lexical variable, and ~
-                      cannot be used as a local variable.~:@>"
-                     name))
-    (:special
-     (let ((specvar (find-free-var name)))
-       (make-lambda-var :%source-name name
-                        :type (leaf-type specvar)
-                        :where-from (leaf-where-from specvar)
-                        :specvar specvar)))
-    (t
-     (make-lambda-var :%source-name name))))
+(declaim (ftype (sfunction * function) make-repeated-name-check))
+(defun make-repeated-name-check (&key
+                                   (kind "variable")
+                                   (context "lambda list")
+                                   (signal-via #'compiler-error))
+  (let ((seen '()))
+    (lambda (name)
+      (when (member name seen :test #'eq)
+        (funcall signal-via "~@<The ~A ~S occurs more than once in ~
+                             the ~A.~@:>"
+                 kind name context))
+      (push name seen)
+      name)))
 
-;;; Make the default keyword for a &KEY arg, checking that the keyword
-;;; isn't already used by one of the VARS.
-(declaim (ftype (sfunction (symbol list t) symbol) make-keyword-for-arg))
-(defun make-keyword-for-arg (symbol vars keywordify)
-  (let ((key (if (and keywordify (not (keywordp symbol)))
-                 (keywordicate symbol)
-                 symbol)))
-    (dolist (var vars)
-      (let ((info (lambda-var-arg-info var)))
-        (when (and info
-                   (eq (arg-info-kind info) :keyword)
-                   (eq (arg-info-key info) key))
-          (compiler-error
-           "The keyword ~S appears more than once in the lambda list."
-           key))))
-    key))
+;;; Verify that NAME is a legal name for a variable.
+(declaim (ftype (function (t &key
+                             (:context t) (:allow-special t) (:allow-symbol-macro t)
+                             (:signal-via (or symbol function)))
+                          (values symbol keyword))
+                check-variable-name-for-binding))
+(defun check-variable-name-for-binding (name
+                                        &key
+                                          context
+                                          (allow-special t)
+                                          (allow-symbol-macro t)
+                                          (signal-via #'compiler-error))
+  (check-variable-name name)
+  (flet ((lose (kind)
+           (funcall signal-via
+                    #+xc-host "~@<~/sb!impl:print-symbol-with-prefix/ names a ~
+                               ~A, and cannot be used in ~A.~:@>"
+                    #-xc-host "~@<~/sb-impl:print-symbol-with-prefix/ names a ~
+                              ~A, and cannot be used in ~A.~:@>"
+                    name kind context)))
+    (let ((kind (info :variable :kind name)))
+      (case kind
+        (:macro
+         (unless allow-symbol-macro
+           (program-assert-symbol-home-package-unlocked
+            :compile name (format nil "lexically binding global ~
+                                       symbol-macro ~~A in ~A"
+                                  context))))
+        ((:constant)
+         (lose "defined constant"))
+        ((:global)
+         (lose "global lexical variable"))
+        (:special
+         (unless allow-special
+           (lose "special variable"))))
+      (values name kind))))
+
+;;; Return a VAR structure for NAME, filling in info if it is globally
+;;; special. If it is losing, we punt with a COMPILER-ERROR.
+(declaim (ftype (sfunction (t &key (:context t) (:allow-symbol-macro t)) lambda-var)
+                varify-lambda-arg))
+(defun varify-lambda-arg (name &key (context "a lambda list") (allow-symbol-macro t))
+  (multiple-value-bind (name kind)
+      (check-variable-name-for-binding
+       name :context context :allow-symbol-macro allow-symbol-macro)
+   (case kind
+     (:special
+      (let ((variable (find-free-var name)))
+        (make-lambda-var :%source-name name
+                         :type (leaf-type variable)
+                         :where-from (leaf-where-from variable)
+                         :specvar variable)))
+     (t
+      (make-lambda-var :%source-name name)))))
 
 ;;; Parse a lambda list into a list of VAR structures, stripping off
 ;;; any &AUX bindings. Each arg name is checked for legality, and
@@ -83,16 +104,17 @@
 (declaim (ftype (sfunction (list) (values list boolean boolean list list))
                 make-lambda-vars))
 (defun make-lambda-vars (list)
-  (multiple-value-bind (llks required optional rest/more keys aux)
-      (parse-lambda-list list)
+  (binding* (((llks required optional rest/more keys aux)
+              (parse-lambda-list list))
+             (names (make-repeated-name-check))
+             (keywords (make-repeated-name-check :kind "keyword")))
     (collect ((vars)
-              (names-so-far)
               (aux-vars)
               (aux-vals))
       (flet ((add-var (name)
-               (let ((var (varify-lambda-arg name (names-so-far))))
+               (let ((var (varify-lambda-arg name)))
                  (vars var)
-                 (names-so-far name)
+                 (funcall names name)
                  var))
              (add-info (var kind &key (default nil defaultp) suppliedp-var key)
                (let ((info (make-arg-info :kind kind)))
@@ -100,9 +122,8 @@
                    (setf (arg-info-default info) default))
                  (when suppliedp-var
                    (setf (arg-info-supplied-p info)
-                         (varify-lambda-arg
-                          suppliedp-var (names-so-far)))
-                   (names-so-far suppliedp-var))
+                         (varify-lambda-arg suppliedp-var))
+                   (funcall names suppliedp-var))
                  (when key
                    (setf (arg-info-key info) key))
                  (setf (lambda-var-arg-info var) info))))
@@ -125,19 +146,18 @@
         (dolist (spec keys)
           (multiple-value-bind (keyword name default suppliedp-var defaultp)
               (parse-key-arg-spec spec)
+            (funcall keywords keyword)
             (apply #'add-info (add-var name) :keyword
                    :suppliedp-var (first suppliedp-var)
-                   :key (make-keyword-for-arg
-                         (or keyword name) (vars) (not keyword))
+                   :key keyword
                    (when defaultp (list :default default)))))
         ;; Aux
         (dolist (spec aux)
           (multiple-value-bind (name val)
               (if (atom spec) spec (values (car spec) (cadr spec)))
-            (let ((var (varify-lambda-arg name nil)))
+            (let ((var (varify-lambda-arg name)))
               (aux-vars var)
-              (aux-vals val)
-              (names-so-far name))))
+              (aux-vals val))))
 
         (values (vars) (ll-kwds-keyp llks) (ll-kwds-allowp llks)
                 (aux-vars) (aux-vals))))))

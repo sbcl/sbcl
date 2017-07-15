@@ -650,34 +650,22 @@ be a lambda expression."
                 extract-let-vars))
 (defun extract-let-vars (bindings context)
   (collect ((vars)
-            (vals)
-            (names))
-    (flet ((get-var (name)
-             (varify-lambda-arg name
-                                (if (eq context 'let*)
-                                    nil
-                                    (names))
-                                context)))
+            (vals))
+    (let ((names (make-repeated-name-check :context context)))
       (dolist (spec bindings)
-        (cond ((atom spec)
-               (let ((var (get-var spec)))
-                 (vars var)
-                 (names spec)
-                 (vals nil)))
-              (t
-               (unless (proper-list-of-length-p spec 1 2)
-                 (compiler-error "The ~S binding spec ~S is malformed."
-                                 context
-                                 spec))
-               (let* ((name (first spec))
-                      (var (get-var name)))
-                 (vars var)
-                 (names name)
-                 (vals (second spec)))))))
-    (dolist (name (names))
-      (when (eq (info :variable :kind name) :macro)
-        (program-assert-symbol-home-package-unlocked
-         :compile name "lexically binding symbol-macro ~A")))
+        (multiple-value-bind (name value)
+            (cond ((atom spec)
+                   (values spec nil))
+                  (t
+                   (unless (proper-list-of-length-p spec 1 2)
+                     (compiler-error "The ~S binding spec ~S is malformed."
+                                     context spec))
+                   (values (first spec) (second spec))))
+          (unless (eq context 'let*)
+            (funcall names name))
+          (vars (varify-lambda-arg
+                 name :context context :allow-symbol-macro nil))
+          (vals value))))
     (values (vars) (vals))))
 
 (def-ir1-translator let ((bindings &body body) start next result)
