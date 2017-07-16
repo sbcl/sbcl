@@ -1437,7 +1437,7 @@
 (load "package-ctor-bug.lisp")
 (assert (= (package-ctor-bug:test) 3))
 
-(with-test (:name (:defmethod (setf find-class) integer))
+(with-test (:name (defmethod (setf find-class) integer))
   (handler-bind ((warning #'muffle-warning))
   (mapcar #'eval
           '(
@@ -2586,7 +2586,7 @@
       (sb-mop:finalize-inheritance (find-class class1))
       (assert (not (sb-kernel:layout-invalid (sb-kernel:layout-of instance)))))))
 
-(with-test (:name :allocate-instance-on-symbol)
+(with-test (:name (allocate-instance :on symbol))
   (let ((class (gensym "CLASS-")))
     (eval `(defclass ,class () ()))
     (assert-error
@@ -2605,7 +2605,7 @@
 (with-test (:name :layouf-of-nil)
   (assert (eq (sb-kernel:layout-of nil) (sb-kernel:find-layout 'null))))
 
-(with-test (:name :defmethod-on-classless-type)
+(with-test (:name (defmethod :on-classless-type))
   (handler-bind ((timeout (lambda (condition)
                             (declare (ignore condition))
                             (error "Timeout"))))
