@@ -168,6 +168,32 @@
                t t "Required argument is not a symbol: (ARG T)")
     (test-case '(arg))))
 
+(with-test (:name (defmethod :lambda-list))
+  (flet ((test-case (lambda-list messages)
+           (multiple-value-bind
+                 (fun failure-p warnings style-warnings notes errors)
+               (checked-compile `(lambda () (defmethod ,(gensym) ,lambda-list))
+                                :allow-failure t)
+             (declare (ignore fun warnings style-warnings notes))
+             (assert failure-p)
+             (assert (= (length messages) (length errors)))
+             (loop for message in messages
+                for error in errors
+                do (assert (search message (princ-to-string error)))))))
+    (mapc
+     (lambda (spec) (apply #'test-case spec))
+     '(;; Invalid specialized required argument
+       (((x t t))         ("arg is not a non-NIL symbol or a list of two elements: (X T T)"))
+       ;; Repeated names and keywords
+       (((x t) (x t))     ("The variable X occurs more than once"))
+       (((x t) &rest x)   ("The variable X occurs more than once"))
+       ((&optional x x)   ("The variable X occurs more than once"))
+       ((&key x ((:y x))) ("The variable X occurs more than once"))
+       ((&key x ((:x y))) ("The keyword :X occurs more than once"))
+       ;; Illegal variable names
+       (((:pi t))         (":PI is a keyword and cannot be used"))
+       (((pi t))          ("COMMON-LISP:PI names a defined constant"))))))
+
 
 ;;; Explicit :metaclass option with structure-class and
 ;;; standard-class.

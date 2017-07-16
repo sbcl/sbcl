@@ -19,11 +19,11 @@
 
 ;;;; internal utilities defined in terms of INFO
 
-(defun check-variable-name (name &optional (context "local variable"))
+(defun check-variable-name (name &key (context "local variable") (signal-via #'compiler-error))
   (unless (legal-variable-name-p name)
-    (compiler-error "~@<~S is ~:[not a symbol~;a keyword~] and cannot ~
-                     be used as a ~A.~@:>"
-                    name (keywordp name) context))
+    (funcall signal-via "~@<~S is ~:[not a symbol~;a keyword~] and ~
+                         cannot be used as a ~A.~@:>"
+             name (keywordp name) context))
   name)
 
 ;;; Check that NAME is a valid function name, returning the name if

@@ -46,7 +46,7 @@
                                           (allow-special t)
                                           (allow-symbol-macro t)
                                           (signal-via #'compiler-error))
-  (check-variable-name name)
+  (check-variable-name name :signal-via signal-via)
   (flet ((lose (kind)
            (funcall signal-via
                     #+xc-host "~@<~/sb!impl:print-symbol-with-prefix/ names a ~
