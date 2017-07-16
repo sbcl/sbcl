@@ -2117,12 +2117,15 @@ used for a COMPLEX component.~:@>"
   (if (eql bound '*)
       bound
       (funcall inner-coerce-bound-fun bound type upperp)))
+
+(macrolet ((fp-const (name)
+             `(load-time-value (locally (declare (notinline symbol-value))
+                                 (symbol-value ',name)) t)))
 (defun inner-coerce-real-bound (bound type upperp)
   #+sb-xc-host (declare (ignore upperp))
   (let #+sb-xc-host ()
-       #-sb-xc-host
-       ((nl (load-time-value (symbol-value 'sb!xc:most-negative-long-float) t))
-        (pl (load-time-value (symbol-value 'sb!xc:most-positive-long-float) t)))
+       #-sb-xc-host ((nl (fp-const sb!xc:most-negative-long-float))
+                     (pl (fp-const sb!xc:most-positive-long-float)))
     (let ((nbound (if (consp bound) (car bound) bound))
           (consp (consp bound)))
       (ecase type
@@ -2150,11 +2153,10 @@ used for a COMPLEX component.~:@>"
 (defun inner-coerce-float-bound (bound type upperp)
   #+sb-xc-host (declare (ignore upperp))
   (let #+sb-xc-host ()
-       #-sb-xc-host
-       ((nd (load-time-value (symbol-value 'sb!xc:most-negative-double-float) t))
-        (pd (load-time-value (symbol-value 'sb!xc:most-positive-double-float) t))
-        (ns (load-time-value (symbol-value 'sb!xc:most-negative-single-float) t))
-        (ps (load-time-value (symbol-value 'sb!xc:most-positive-single-float) t)))
+       #-sb-xc-host ((nd (fp-const sb!xc:most-negative-double-float))
+                     (pd (fp-const sb!xc:most-positive-double-float))
+                     (ns (fp-const sb!xc:most-negative-single-float))
+                     (ps (fp-const sb!xc:most-positive-single-float)))
     (let ((nbound (if (consp bound) (car bound) bound))
           (consp (consp bound)))
       (ecase type
@@ -2182,6 +2184,7 @@ used for a COMPLEX component.~:@>"
                (when (> nbound pd) (return-from inner-coerce-float-bound pd))))
             (let ((result (coerce nbound 'double-float)))
               (if consp (list result) result)))))))))
+) ; end MACROLET
 (defun coerced-real-bound (bound type upperp)
   (coerce-bound bound type upperp #'inner-coerce-real-bound))
 (defun coerced-float-bound (bound type upperp)
