@@ -1445,11 +1445,11 @@ code to be loaded.
 (defstruct (loop-path
             (:copier nil)
             (:predicate nil))
-  names
-  preposition-groups
-  inclusive-permitted
-  function
-  user-data)
+  (names nil :read-only t)
+  (preposition-groups nil :read-only t)
+  (inclusive-permitted nil :read-only t)
+  (function nil :read-only t)
+  (user-data nil :read-only t))
 
 (defun add-loop-path (names function universe
                       &key preposition-groups inclusive-permitted user-data)
