@@ -254,7 +254,8 @@ bootstrapping.
     (error 'simple-program-error
            :format-control "illegal generic function name ~S"
            :format-arguments (list fun-name)))
-  (check-gf-lambda-list lambda-list)
+  (with-current-source-form (lambda-list)
+    (check-gf-lambda-list lambda-list))
   (let ((initargs ())
         (methods ()))
     (flet ((duplicate-option (name)
@@ -551,7 +552,8 @@ bootstrapping.
              ;; to change to accept that, so coerce.
              (env (sb-kernel:coerce-to-lexenv env))
              ((nil unspecialized-lambda-list specializers)
-              (parse-specialized-lambda-list lambda-list))
+              (with-current-source-form (lambda-list)
+                (parse-specialized-lambda-list lambda-list)))
              (*method-name* `(,name ,@qualifiers ,specializers))
              (method-lambda `(lambda ,unspecialized-lambda-list ,@body))
              ((method-function-lambda initargs new-lambda-list)
