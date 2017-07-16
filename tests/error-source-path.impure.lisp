@@ -93,6 +93,16 @@
   (assert-condition-source-paths (declare (1)) (1))
   (assert-condition-source-paths (declare (type integer) (1)) (2)))
 
+(with-test (:name (:source-path defgeneric :lambda-list))
+  (assert-condition-source-paths
+   (defgeneric foo (x x))
+   (2)))
+
+(with-test (:name (:source-path defmethod :lambda-list))
+  (assert-condition-source-paths
+   (defmethod foo (x x))
+   (2)))
+
 (defclass deprecated-class () ())
 (declaim (deprecated :early "1.0" (type deprecated-class)))
 (defgeneric using-deprecated (thing))
