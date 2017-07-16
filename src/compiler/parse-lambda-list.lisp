@@ -339,6 +339,48 @@
       (values (logior seen (if (oddp rest-bits) (bits &body) 0))
               required optional (or rest more) keys aux env whole))))
 
+;;; Check the variable names and keywords in the sections of the
+;;; lambda list for illegal and repeated ones.
+;;;
+;;; Can be wrapped around PARSE-LAMBDA-LIST like this:
+;;;
+;;;   (multiple-value-call #'check-lambda-list-names
+;;;     (parse-lambda-list ...)
+;;;     :context ...)
+(defun check-lambda-list-names (llks required optional rest keys aux env whole
+                                &key
+                                  (context "an ordinary lambda list")
+                                  (signal-via #'compiler-error)
+                                  (allow-symbol-macro t))
+  (let ((names (make-repeated-name-check :signal-via signal-via))
+        (keywords (make-repeated-name-check
+                   :kind "keyword" :signal-via signal-via)))
+    (flet ((check-name (name)
+             (check-variable-name-for-binding
+              name :context context :signal-via signal-via
+              :allow-symbol-macro allow-symbol-macro)
+             (funcall names name)))
+      (mapc #'check-name required)
+      (mapc (lambda (spec)
+              (multiple-value-bind (name default suppliedp-var)
+                  (parse-optional-arg-spec spec)
+                (declare (ignore default))
+                (check-name name)
+                (when suppliedp-var
+                  (check-name (first suppliedp-var)))))
+            optional)
+      (mapc #'check-name rest)
+      (mapc (lambda (spec)
+              (multiple-value-bind (keyword name default suppliedp-var)
+                  (parse-key-arg-spec spec)
+                (declare (ignore default))
+                (check-name name)
+                (when suppliedp-var
+                  (check-name (first suppliedp-var)))
+                (funcall keywords keyword)))
+            keys)))
+  (values llks required optional rest keys aux env whole))
+
 ;;; Construct an abstract representation of a destructuring lambda list
 ;;; from its source form, recursing as necessary.
 ;;; Warn if it looks like a default expression will cause pattern mismatch.

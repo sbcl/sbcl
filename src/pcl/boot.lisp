@@ -393,21 +393,16 @@ bootstrapping.
 
 (defun check-gf-lambda-list (lambda-list)
   (binding* ((context "a generic function lambda list")
-             ((llks required optional rest keys)
-              (parse-lambda-list
-               lambda-list
-               :accept (lambda-list-keyword-mask
-                        '(&optional &rest &key &allow-other-keys))
-               :condition-class 'generic-function-lambda-list-error
-               :context context))
-             (seen-names (sb-c::make-repeated-name-check
-                          :context context
-                          :signal-via #'generic-function-lambda-list-error))
-             (seen-keywords (sb-c::make-repeated-name-check
-                             :kind "keyword"
-                             :context context
-                             :signal-via #'generic-function-lambda-list-error)))
-    (declare (ignore llks))
+             ((nil nil optional nil keys)
+              (multiple-value-call #'check-lambda-list-names
+                (parse-lambda-list
+                 lambda-list
+                 :accept (lambda-list-keyword-mask
+                          '(&optional &rest &key &allow-other-keys))
+                 :condition-class 'generic-function-lambda-list-error
+                 :context context)
+                :context context
+                :signal-via #'generic-function-lambda-list-error)))
     ;; PARSE-LAMBDA-LIST validates the skeleton, so just check for
     ;; incorrect use of defaults.
     (labels ((lose (kind arg)
@@ -415,32 +410,14 @@ bootstrapping.
                 "~@<Invalid ~A argument specifier ~S ~_in ~A ~:S~:>"
                 kind arg context lambda-list))
              (verify-optional (spec)
-               (multiple-value-bind (name default suppliedp defaultp)
-                   (parse-optional-arg-spec spec)
-                 (declare (ignore default suppliedp))
-                 (when defaultp
-                   (lose '&optional spec))
-                 name))
+               (when (nth-value 3 (parse-optional-arg-spec spec))
+                 (lose '&optional spec)))
              (verify-key (spec)
-               (multiple-value-bind (keyword name default suppliedp defaultp)
-                   (parse-key-arg-spec spec)
-                 (declare (ignore default suppliedp))
-                 (when defaultp
-                   (lose '&key spec))
-                 (funcall seen-keywords keyword)
-                 name))
-             (check-names (names)
-               (dolist (name names)
-                 (sb-c::check-variable-name-for-binding
-                  name
-                  :context context
-                  :signal-via #'generic-function-lambda-list-error)
-                 (funcall seen-names name))))
+               (when (nth-value 4 (parse-key-arg-spec spec))
+                 (lose '&key spec))))
       ;; no defaults or supplied-p vars allowed for &OPTIONAL or &KEY
-      (check-names required)
-      (when rest (check-names rest))
-      (check-names (mapcar #'verify-optional optional))
-      (check-names (mapcar #'verify-key keys)))))
+      (mapc #'verify-optional optional)
+      (mapc #'verify-key keys))))
 
 (defun check-method-lambda (method-lambda context)
   (unless (typep method-lambda '(cons (eql lambda)))

@@ -661,10 +661,11 @@ be a lambda expression."
                      (compiler-error "The ~S binding spec ~S is malformed."
                                      context spec))
                    (values (first spec) (second spec))))
+          (check-variable-name-for-binding
+           name :context context :allow-symbol-macro nil)
           (unless (eq context 'let*)
             (funcall names name))
-          (vars (varify-lambda-arg
-                 name :context context :allow-symbol-macro nil))
+          (vars (varify-lambda-arg name))
           (vals value))))
     (values (vars) (vals))))
 

@@ -73,21 +73,17 @@
 
 ;;; Return a VAR structure for NAME, filling in info if it is globally
 ;;; special. If it is losing, we punt with a COMPILER-ERROR.
-(declaim (ftype (sfunction (t &key (:context t) (:allow-symbol-macro t)) lambda-var)
-                varify-lambda-arg))
-(defun varify-lambda-arg (name &key (context "a lambda list") (allow-symbol-macro t))
-  (multiple-value-bind (name kind)
-      (check-variable-name-for-binding
-       name :context context :allow-symbol-macro allow-symbol-macro)
-   (case kind
-     (:special
-      (let ((variable (find-free-var name)))
-        (make-lambda-var :%source-name name
-                         :type (leaf-type variable)
-                         :where-from (leaf-where-from variable)
-                         :specvar variable)))
-     (t
-      (make-lambda-var :%source-name name)))))
+(declaim (ftype (sfunction (symbol) lambda-var) varify-lambda-arg))
+(defun varify-lambda-arg (name)
+  (case (info :variable :kind name)
+    (:special
+     (let ((variable (find-free-var name)))
+       (make-lambda-var :%source-name name
+                        :type (leaf-type variable)
+                        :where-from (leaf-where-from variable)
+                        :specvar variable)))
+    (t
+     (make-lambda-var :%source-name name))))
 
 ;;; Parse a lambda list into a list of VAR structures, stripping off
 ;;; any &AUX bindings. Each arg name is checked for legality, and
@@ -104,17 +100,14 @@
 (declaim (ftype (sfunction (list) (values list boolean boolean list list))
                 make-lambda-vars))
 (defun make-lambda-vars (list)
-  (binding* (((llks required optional rest/more keys aux)
-              (parse-lambda-list list))
-             (names (make-repeated-name-check))
-             (keywords (make-repeated-name-check :kind "keyword")))
+  (multiple-value-bind (llks required optional rest/more keys aux)
+      (multiple-value-call #'check-lambda-list-names (parse-lambda-list list))
     (collect ((vars)
               (aux-vars)
               (aux-vals))
       (flet ((add-var (name)
                (let ((var (varify-lambda-arg name)))
                  (vars var)
-                 (funcall names name)
                  var))
              (add-info (var kind &key (default nil defaultp) suppliedp-var key)
                (let ((info (make-arg-info :kind kind)))
@@ -122,8 +115,7 @@
                    (setf (arg-info-default info) default))
                  (when suppliedp-var
                    (setf (arg-info-supplied-p info)
-                         (varify-lambda-arg suppliedp-var))
-                   (funcall names suppliedp-var))
+                         (varify-lambda-arg suppliedp-var)))
                  (when key
                    (setf (arg-info-key info) key))
                  (setf (lambda-var-arg-info var) info))))
@@ -146,7 +138,6 @@
         (dolist (spec keys)
           (multiple-value-bind (keyword name default suppliedp-var defaultp)
               (parse-key-arg-spec spec)
-            (funcall keywords keyword)
             (apply #'add-info (add-var name) :keyword
                    :suppliedp-var (first suppliedp-var)
                    :key keyword
