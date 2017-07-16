@@ -197,3 +197,10 @@
     (assert (not (ctu:find-code-constants f :type 'symbol))))
   (let ((f (compile nil '(lambda () (symbol-global-value 'char-code-limit)))))
     (assert (not (ctu:find-code-constants f :type 'symbol)))))
+
+(with-test (:name :set-fill-ptr-0-known-fancy-vector)
+  (let ((f (compile nil '(lambda (v)
+                          (declare (type (and vector (not simple-array)) v))
+                          (setf (fill-pointer v) 0)))))
+    ;; Should not have a call to %SET-FILL-POINTER
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
