@@ -16,31 +16,34 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defparameter *float-trap-alist*
-  (list (cons :underflow float-underflow-trap-bit)
-        (cons :overflow float-overflow-trap-bit)
-        (cons :inexact float-inexact-trap-bit)
-        (cons :invalid float-invalid-trap-bit)
-        (cons :divide-by-zero float-divide-by-zero-trap-bit)
-        #!+x86 (cons :denormalized-operand float-denormal-trap-bit)))
+(defconstant-eqx +float-trap-alist+
+    `((:underflow . ,float-underflow-trap-bit)
+      (:overflow . ,float-overflow-trap-bit)
+      (:inexact . ,float-inexact-trap-bit)
+      (:invalid . ,float-invalid-trap-bit)
+      (:divide-by-zero . ,float-divide-by-zero-trap-bit)
+      #!+x86 (:denormalized-operand . ,float-denormal-trap-bit))
+  #'equal)
 
-(defparameter *rounding-mode-alist*
-  (list (cons :nearest float-round-to-nearest)
-        (cons :zero float-round-to-zero)
-        (cons :positive-infinity float-round-to-positive)
-        (cons :negative-infinity float-round-to-negative)))
+(defconstant-eqx +rounding-mode-alist+
+    `((:nearest . ,float-round-to-nearest)
+      (:zero . ,float-round-to-zero)
+      (:positive-infinity . ,float-round-to-positive)
+      (:negative-infinity . ,float-round-to-negative))
+  #'equal)
 
 #!+x86
-(defparameter *precision-mode-alist*
-  (list (cons :24-bit float-precision-24-bit)
-        (cons :53-bit float-precision-53-bit)
-        (cons :64-bit float-precision-64-bit)))
+(defconstant-eqx +precision-mode-alist+
+    `((:24-bit . ,float-precision-24-bit)
+      (:53-bit . ,float-precision-53-bit)
+      (:64-bit . ,float-precision-64-bit))
+  #'equal)
 
 ;;; Return a mask with all the specified float trap bits set.
 (defun float-trap-mask (names)
   (reduce #'logior
           (mapcar (lambda (x)
-                    (or (cdr (assoc x *float-trap-alist*))
+                    (or (cdr (assoc x +float-trap-alist+))
                         (error "unknown float trap kind: ~S" x)))
                   names)))
 ) ; EVAL-WHEN
@@ -99,7 +102,7 @@ in effect."
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
     (when round-p
       (setf (ldb float-rounding-mode modes)
-            (or (cdr (assoc rounding-mode *rounding-mode-alist*))
+            (or (cdr (assoc rounding-mode +rounding-mode-alist+))
                 (error "unknown rounding mode: ~S" rounding-mode))))
     (when current-x-p
       (setf (ldb float-exceptions-byte modes)
@@ -114,7 +117,7 @@ in effect."
     #!+x86
     (when precisionp
       (setf (ldb float-precision-control modes)
-            (or (cdr (assoc precision *precision-mode-alist*))
+            (or (cdr (assoc precision +precision-mode-alist+))
                 (error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
     #!-(and darwin ppc)
@@ -135,19 +138,19 @@ sets the floating point modes to their current values (and thus is a no-op)."
                            ,@(mapcar (lambda (x)
                                        `(when (logtest bits ,(cdr x))
                                           (res ',(car x))))
-                                     *float-trap-alist*)
+                                     +float-trap-alist+)
                            (res))))
              (frob))))
     (let ((modes (floating-point-modes)))
       `(:traps ,(exc-keys (ldb float-traps-byte modes))
         :rounding-mode ,(car (rassoc (ldb float-rounding-mode modes)
-                                     *rounding-mode-alist*))
+                                     +rounding-mode-alist+))
         :current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
         :accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
         :fast-mode ,(logtest float-fast-bit modes)
         #!+x86 :precision
         #!+x86 ,(car (rassoc (ldb float-precision-control modes)
-                             *precision-mode-alist*))))))
+                             +precision-mode-alist+))))))
 
 ;;; FIXME: For some unknown reason, NetBSD/x86 won't run with the
 ;;; :INVALID trap enabled. That should be fixed, but not today...
@@ -176,15 +179,17 @@ sets the floating point modes to their current values (and thus is a no-op)."
 
 ;;; SIGFPE code to floating-point error
 #!-win32
-(defparameter *sigfpe-code-error-alist*
-  (list (cons sb!unix::fpe-intovf 'floating-point-overflow)
-        (cons sb!unix::fpe-intdiv 'division-by-zero)
-        (cons sb!unix::fpe-fltdiv 'division-by-zero)
-        (cons sb!unix::fpe-fltovf 'floating-point-overflow)
-        (cons sb!unix::fpe-fltund 'floating-point-underflow)
-        (cons sb!unix::fpe-fltres 'floating-point-inexact)
-        (cons sb!unix::fpe-fltinv 'floating-point-invalid-operation)
-        (cons sb!unix::fpe-fltsub 'floating-point-exception)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant-eqx +sigfpe-code-error-alist+
+    `((,sb!unix::fpe-intovf . floating-point-overflow)
+      (,sb!unix::fpe-intdiv . division-by-zero)
+      (,sb!unix::fpe-fltdiv . division-by-zero)
+      (,sb!unix::fpe-fltovf . floating-point-overflow)
+      (,sb!unix::fpe-fltund . floating-point-underflow)
+      (,sb!unix::fpe-fltres . floating-point-inexact)
+      (,sb!unix::fpe-fltinv . floating-point-invalid-operation)
+      (,sb!unix::fpe-fltsub . floating-point-exception))
+    #'equal))
 
 ;;; Signal the appropriate condition when we get a floating-point error.
 #!-win32
@@ -198,7 +203,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
        ;; platforms too, at least Linux doesn't seem to require it.
        #!+(or sunos (and hppa linux))
        (setf (ldb sb!vm::float-sticky-bits (floating-point-modes)) 0)
-       (error (or (cdr (assoc code *sigfpe-code-error-alist*))
+       (error (or (cdr (assoc code +sigfpe-code-error-alist+))
                   'floating-point-exception)
               :operation op
               :operands operands)))))
