@@ -98,7 +98,7 @@
 
 (sb!xc:defmacro loop-collect-rplacd
     (&environment env (head-var tail-var &optional user-head-var) form)
-  (setq form (sb!int:%macroexpand form env))
+  (setq form (%macroexpand form env))
   (flet ((cdr-wrap (form n)
            (declare (fixnum n))
            (do () ((<= n 4) (setq form `(,(case n
@@ -348,7 +348,7 @@ code to be loaded.
                                  (and (consp x)
                                       (or (neq (car x) 'car)
                                           (not (symbolp (cadr x)))
-                                          (not (symbolp (setq x (sb!int:%macroexpand x env)))))
+                                          (not (symbolp (setq x (%macroexpand x env)))))
                                       (cons x nil)))
                                (cdr val))
                        `(,val))))
@@ -490,7 +490,7 @@ code to be loaded.
 
 (defun loop-constant-fold-if-possible (form &optional expected-type)
   (let* ((constantp (sb!xc:constantp form))
-         (value (and constantp (sb!int:constant-form-value form))))
+         (value (and constantp (constant-form-value form))))
     (when (and constantp expected-type)
       (unless (sb!xc:typep value expected-type)
         (loop-warn "~@<The form ~S evaluated to ~S, which was not of ~
@@ -499,13 +499,10 @@ code to be loaded.
         (setq constantp nil value nil)))
     (values form constantp value)))
 
-(sb!xc:defmacro loop-body (prologue
-                                      before-loop
-                                      main-body
-                                      after-loop
-                                      epilogue)
+(defun gen-loop-body (prologue before-loop main-body after-loop epilogue)
   (unless (= (length before-loop) (length after-loop))
-    (error "LOOP-BODY called with non-synched before- and after-loop lists"))
+    ;; FIXME: should be (bug) ?
+    (error "GEN-LOOP-BODY called with non-synched before- and after-loop lists"))
   ;; All our work is done from these copies, working backwards from the end
   (let ((rbefore (reverse before-loop))
         (rafter (reverse after-loop)))
@@ -534,7 +531,7 @@ code to be loaded.
 
 (defun loop-error (format-string &rest format-args)
   #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
-  (error 'sb!int:simple-program-error
+  (error 'simple-program-error
          :format-control "~?~%current LOOP context:~{ ~S~}."
          :format-arguments (list format-string format-args (loop-context))))
 
@@ -622,13 +619,13 @@ code to be loaded.
         (*loop-collection-cruft* nil))
     (loop-iteration-driver)
     (loop-bind-block)
-    (let ((answer `(loop-body
-                     ,(nreverse *loop-prologue*)
-                     ,(nreverse *loop-before-loop*)
-                     ,(nreverse *loop-body*)
-                     ,(nreverse *loop-after-body*)
-                     ,(nreconc *loop-epilogue*
-                               (nreverse *loop-after-epilogue*)))))
+    (let ((answer (gen-loop-body
+                   (nreverse *loop-prologue*)
+                   (nreverse *loop-before-loop*)
+                   (nreverse *loop-body*)
+                   (nreverse *loop-after-body*)
+                   (nreconc *loop-epilogue*
+                            (nreverse *loop-after-epilogue*)))))
       (dolist (entry *loop-bind-stack*)
         (destructuring-bind (vars dcls desetq desetq-decls wrappers) entry
           (dolist (w wrappers)
@@ -762,7 +759,7 @@ code to be loaded.
                 (make-array 0 :element-type (type-specifier etype)))))
            #!+sb-unicode
            ((sb!xc:subtypep data-type 'extended-char)
-            (code-char sb!int:base-char-code-limit))
+            (code-char base-char-code-limit))
            ((sb!xc:subtypep data-type 'character)
             #\x)
            (t
@@ -944,7 +941,7 @@ code to be loaded.
         ((symbolp name)
          (unless (or (sb!xc:subtypep t dtype)
                      (and (eq (find-package :cl) (symbol-package name))
-                          (eq :special (sb!int:info :variable :kind name))))
+                          (eq :special (info :variable :kind name))))
            (let ((dtype `(type ,(if initialization
                                     dtype
                                     (type-for-default-init dtype step-var-p))
@@ -1205,7 +1202,7 @@ code to be loaded.
   (loop-disallow-conditional :repeat)
   (let* ((form (loop-get-form))
          (count (and (constantp form) ; FIXME: lexical environment constants
-                     (sb!int:constant-form-value form)))
+                     (constant-form-value form)))
          (type (cond ((not (realp count))
                       'integer)
                      ((plusp count)
@@ -1454,13 +1451,13 @@ code to be loaded.
 (defun add-loop-path (names function universe
                       &key preposition-groups inclusive-permitted user-data)
   (declare (type loop-universe universe))
-  (let* ((names (sb!int:ensure-list names))
+  (let* ((names (ensure-list names))
          (ht (loop-universe-path-keywords universe))
          (lp (make-loop-path
               :names (mapcar #'symbol-name names)
               :function function
               :user-data user-data
-              :preposition-groups (mapcar #'sb!int:ensure-list preposition-groups)
+              :preposition-groups (mapcar #'ensure-list preposition-groups)
               :inclusive-permitted inclusive-permitted)))
     (dolist (name names)
       (setf (gethash (symbol-name name) ht) lp))
@@ -1678,7 +1675,7 @@ code to be loaded.
                       (%decl (find indexv *loop-declarations*
                                    :key #'type-declaration-of
                                    :from-end t)))
-                  (sb!int:aver (eq decl %decl))
+                  (aver (eq decl %decl))
                   (when decl
                     (setf (cadr decl)
                           `(and real ,(cadr decl))))))))
@@ -1760,7 +1757,7 @@ code to be loaded.
 ||#
 
 (defun loop-hash-table-iteration-path (variable data-type prep-phrases
-                                       &key (which (sb!int:missing-arg)))
+                                       &key (which (missing-arg)))
   (declare (type (member :hash-key :hash-value) which))
   (cond ((or (cdr prep-phrases) (not (member (caar prep-phrases) '(:in :of))))
          (loop-error "Too many prepositions!"))
@@ -1816,7 +1813,7 @@ code to be loaded.
   (cond ((and prep-phrases (cdr prep-phrases))
          (loop-error "Too many prepositions!"))
         ((and prep-phrases (not (member (caar prep-phrases) '(:in :of))))
-         (sb!int:bug "Unknown preposition ~S." (caar prep-phrases))))
+         (bug "Unknown preposition ~S." (caar prep-phrases))))
   (unless (symbolp variable)
     (loop-error "Destructuring is not valid for package symbol iteration."))
   (let ((pkg-var (gensym "LOOP-PKGSYM-"))
