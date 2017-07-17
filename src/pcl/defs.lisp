@@ -100,7 +100,6 @@
          (error "~S is neither a type nor a specializer." specl))))
 
 (defun type-class (type)
-  (declare (special *the-class-t*))
   (setq type (type-from-specializer type))
   (if (atom type)
       (if (eq type t)
@@ -180,7 +179,7 @@
                (subtypep (convert-to-system-type type1)
                          (convert-to-system-type type2))))))))
 
-(defvar *built-in-class-symbols* ())
+(define-load-time-global *built-in-class-symbols* ())
 
 (defun get-built-in-class-symbol (class-name)
   (or (cadr (assq class-name *built-in-class-symbols*))
@@ -206,7 +205,7 @@
 ;;; Grovel over SB-KERNEL::*!BUILT-IN-CLASSES* in order to set
 ;;; SB-PCL:*BUILT-IN-CLASSES*.
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
-(defvar *built-in-classes*
+(define-load-time-global *built-in-classes*
   (labels ((direct-supers (class)
              (/noshow "entering DIRECT-SUPERS" (classoid-name class))
              (if (typep class 'built-in-classoid)

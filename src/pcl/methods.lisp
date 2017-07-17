@@ -167,9 +167,9 @@
   (declare (ignore slot-names method-cell))
   (initialize-method-function initargs method))
 
-(defvar *the-class-generic-function*
+(define-load-time-global *the-class-generic-function*
   (find-class 'generic-function))
-(defvar *the-class-standard-generic-function*
+(define-load-time-global *the-class-standard-generic-function*
   (find-class 'standard-generic-function))
 
 (defmethod shared-initialize :before
@@ -795,7 +795,7 @@
         (setq x (cdr x)
               y (cdr y))))
 
-(defvar *std-cam-methods* nil)
+(define-load-time-global *std-cam-methods* nil)
 
 (defun compute-applicable-methods-emf (generic-function)
   (if (eq **boot-state** 'complete)
@@ -936,15 +936,15 @@
           (update-accessor-info *new-class*)
           (map-all-classes #'update-accessor-info 'slot-object)))))
 
-(defvar *standard-slot-value-using-class-method* nil)
-(defvar *standard-setf-slot-value-using-class-method* nil)
-(defvar *standard-slot-boundp-using-class-method* nil)
-(defvar *condition-slot-value-using-class-method* nil)
-(defvar *condition-setf-slot-value-using-class-method* nil)
-(defvar *condition-slot-boundp-using-class-method* nil)
-(defvar *structure-slot-value-using-class-method* nil)
-(defvar *structure-setf-slot-value-using-class-method* nil)
-(defvar *structure-slot-boundp-using-class-method* nil)
+(define-load-time-global *standard-slot-value-using-class-method* nil)
+(define-load-time-global *standard-setf-slot-value-using-class-method* nil)
+(define-load-time-global *standard-slot-boundp-using-class-method* nil)
+(define-load-time-global *condition-slot-value-using-class-method* nil)
+(define-load-time-global *condition-setf-slot-value-using-class-method* nil)
+(define-load-time-global *condition-slot-boundp-using-class-method* nil)
+(define-load-time-global *structure-slot-value-using-class-method* nil)
+(define-load-time-global *structure-setf-slot-value-using-class-method* nil)
+(define-load-time-global *structure-slot-boundp-using-class-method* nil)
 
 (defun standard-svuc-method (type)
   (case type

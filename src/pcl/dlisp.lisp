@@ -30,14 +30,14 @@
 ;;;; these symbols are bound.
 
 (declaim (list *dfun-arg-symbols*))
-(defvar *dfun-arg-symbols* '(.ARG0. .ARG1. .ARG2. .ARG3.))
+(define-load-time-global *dfun-arg-symbols* '(.ARG0. .ARG1. .ARG2. .ARG3.))
 
 (defun dfun-arg-symbol (arg-number)
   (or (nth arg-number *dfun-arg-symbols*)
       (format-symbol *pcl-package* ".ARG~A." arg-number)))
 
 (declaim (list *slot-vector-symbols*))
-(defvar *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
+(define-load-time-global *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
 
 (defun slot-vector-symbol (arg-number)
   (or (nth arg-number *slot-vector-symbols*)

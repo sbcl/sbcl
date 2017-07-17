@@ -256,7 +256,7 @@
     (setq **standard-method-classes**
           (mapcar (lambda (name)
                     (symbol-value (make-class-symbol name)))
-                  *standard-method-class-names*))
+                  +standard-method-class-names+))
 
     (flet ((make-method-combination (class-name)
              (let* ((class (find-class class-name))

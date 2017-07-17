@@ -1987,7 +1987,7 @@ bootstrapping.
                            macro.~@:>"
           :format-arguments (list fun-name)))
 
-(defvar *sgf-wrapper*
+(define-load-time-global *sgf-wrapper*
   (!boot-make-wrapper (!early-class-size 'standard-generic-function)
                       'standard-generic-function))
 
@@ -2185,11 +2185,12 @@ bootstrapping.
            (!bootstrap-slot-index 'global-writer-method s)
            (!bootstrap-slot-index 'global-boundp-method s))))
 
-(defvar *standard-method-class-names*
+(defconstant-eqx +standard-method-class-names+
   '(standard-method standard-reader-method
     standard-writer-method standard-boundp-method
     global-reader-method global-writer-method
-    global-boundp-method))
+    global-boundp-method)
+  #'equal)
 
 (declaim (list **standard-method-classes**))
 (defglobal **standard-method-classes** nil)

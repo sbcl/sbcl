@@ -86,7 +86,7 @@
 ;;; *FGENS* stores all the function generators we have so far. Each
 ;;; element is a FGEN structure as implemented below. Don't ever touch this
 ;;; list by hand, use LOOKUP-FGEN, and ENSURE-FGEN.
-(defvar *fgens* (make-hash-table :test #'equal :synchronized t))
+(define-load-time-global *fgens* (make-hash-table :test #'equal :synchronized t))
 
 (defun ensure-fgen (test gensyms generator generator-lambda system)
   (with-locked-system-table (*fgens*)

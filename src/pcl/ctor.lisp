@@ -529,8 +529,8 @@
 ;;; SHARED-INITIALIZE methods.  One cannot initialize these variables
 ;;; to the right values here because said functions don't exist yet
 ;;; when this file is first loaded.
-(defvar *the-system-ii-method* nil)
-(defvar *the-system-si-method* nil)
+(define-load-time-global *the-system-ii-method* nil)
+(define-load-time-global *the-system-si-method* nil)
 
 (defun install-optimized-constructor (ctor)
   (with-world-lock ()

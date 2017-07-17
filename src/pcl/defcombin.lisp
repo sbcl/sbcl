@@ -163,7 +163,7 @@
       `(load-long-defcombin ',type-name ',documentation #',function
                             ',args-option (sb-c:source-location)))))
 
-(defvar *long-method-combination-functions* (make-hash-table :test 'eq))
+(define-load-time-global *long-method-combination-functions* (make-hash-table :test 'eq))
 
 (defun load-long-defcombin
     (type-name doc function args-lambda-list source-location)

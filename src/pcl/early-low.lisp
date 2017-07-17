@@ -79,7 +79,8 @@
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))
 
-(declaim (special *the-class-t*
+#-sb-xc-host
+(declaim (global  *the-class-t*
                   *the-class-vector* *the-class-symbol*
                   *the-class-string* *the-class-sequence*
                   *the-class-rational* *the-class-ratio*

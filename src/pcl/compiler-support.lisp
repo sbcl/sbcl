@@ -58,7 +58,7 @@
               (error () "<illegal syntax>")))
         `(defmethod ,name "<illegal syntax>"))))
 
-(defvar sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
+(define-load-time-global sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
 
 (defmacro define-internal-pcl-function-name-syntax (name (var) &body body)
   `(progn

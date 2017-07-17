@@ -198,7 +198,7 @@
 ;;; This needs to be used recursively, in case a non-trivial user
 ;;; defined ADD/REMOVE-DIRECT-METHOD method ends up calling another
 ;;; function using the same lock.
-(defvar *specializer-lock* (sb-thread:make-mutex :name "Specializer lock"))
+(define-load-time-global *specializer-lock* (sb-thread:make-mutex :name "Specializer lock"))
 
 (defmethod add-direct-method :around ((specializer specializer) method)
   ;; All the actions done under this lock are done in an order
@@ -280,7 +280,8 @@
 ;;; This table is shared between threads, so needs to be synchronized.
 ;;; (though insertions are only performed when holding the specializer-lock,
 ;;; so the preceding claim is probably overly paranoid.)
-(defvar *class-eq-specializer-methods* (make-hash-table :test 'eq :synchronized t))
+(define-load-time-global *class-eq-specializer-methods*
+    (make-hash-table :test 'eq :synchronized t))
 
 (defmethod specializer-method-table ((specializer class-eq-specializer))
   *class-eq-specializer-methods*)

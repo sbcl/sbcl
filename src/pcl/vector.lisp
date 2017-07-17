@@ -49,16 +49,16 @@
 
 ;;; Used for interning parts of SLOT-NAME-LISTS, as part of
 ;;; PV-TABLE interning -- just to save space.
-(defvar *slot-name-lists* (make-hash-table :test 'equal))
+(define-load-time-global *slot-name-lists* (make-hash-table :test 'equal))
 
 ;;; Used for interning PV-TABLES, keyed by the SLOT-NAME-LISTS
 ;;; used.
-(defvar *pv-tables* (make-hash-table :test 'equal))
+(define-load-time-global *pv-tables* (make-hash-table :test 'equal))
 
 ;;; ...and one lock to rule them. Lock because for certain (rare)
 ;;; cases this lock might be grabbed in the course of method dispatch
 ;;; -- and mostly this is already under the *world-lock*
-(defvar *pv-lock*
+(define-load-time-global *pv-lock*
   (sb-thread:make-mutex :name "pv table index lock"))
 
 (defun intern-pv-table (&key slot-name-lists)
