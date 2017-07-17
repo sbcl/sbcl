@@ -1,5 +1,5 @@
 (in-package "SB!IMPL")
-(define-multibyte-mapper *ucs-to-eucjp-table*
+(define-multibyte-mapper +ucs-to-eucjp-table+
      ((#xa1 #x8fa2c2)
       (#xa2 #xa1f1)
       (#xa3 #xa1f2)
@@ -13011,7 +13011,7 @@
       (#xff9f #x8edf)
       (#xffe3 #xa1b1)
       (#xffe5 #xa1ef)))
-(define-multibyte-mapper *eucjp-to-ucs-table*
+(define-multibyte-mapper +eucjp-to-ucs-table+
      ((#x8ea1 #xff61)
       (#x8ea2 #xff62)
       (#x8ea3 #xff63)
@@ -26021,7 +26021,7 @@
       (#x8fede1 #x9fa2)
       (#x8fede2 #x9fa3)
       (#x8fede3 #x9fa5)))
-(define-multibyte-mapper *ucs-to-sjis-table*
+(define-multibyte-mapper +ucs-to-sjis-table+
      ((#xa2 #x8191)
       (#xa3 #x8192)
       (#xa5 #x5c)
@@ -35303,7 +35303,7 @@
       (#xffe3 #x8150)
       (#xffe4 #xfa55)
       (#xffe5 #x818f)))
-(define-multibyte-mapper *sjis-to-ucs-table*
+(define-multibyte-mapper +sjis-to-ucs-table+
      ((#xa1 #xff61)
       (#xa2 #xff62)
       (#xa3 #xff63)

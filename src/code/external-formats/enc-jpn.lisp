@@ -8,13 +8,13 @@
   (declare (optimize speed (safety 0))
            (type fixnum code))
   (if (<= code #x7F) code
-      (get-multibyte-mapper *ucs-to-eucjp-table* code)))
+      (get-multibyte-mapper +ucs-to-eucjp-table+ code)))
 
 (defun eucjp-to-ucs (code)
   (declare (optimize speed (safety 0))
            (type fixnum code))
   (if (<= code #x7F) code
-      (get-multibyte-mapper *eucjp-to-ucs-table* code)))
+      (get-multibyte-mapper +eucjp-to-ucs-table+ code)))
 
 (defun mb-len-as-eucjp (code)
   (declare (optimize speed (safety 0))
@@ -41,13 +41,13 @@
   (declare (optimize speed (safety 0))
            (type fixnum code))
   (if (<= code #x7F) code
-      (get-multibyte-mapper *ucs-to-sjis-table* code)))
+      (get-multibyte-mapper +ucs-to-sjis-table+ code)))
 
 (defun sjis-to-ucs (code)
   (declare (optimize speed (safety 0))
            (type fixnum code))
   (if (<= code #x7F) code
-      (get-multibyte-mapper *sjis-to-ucs-table* code)))
+      (get-multibyte-mapper +sjis-to-ucs-table+ code)))
 
 (defun mb-len-as-sjis (code)
   (declare (optimize speed (safety 0))

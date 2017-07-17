@@ -3,7 +3,13 @@
 (defmacro define-multibyte-mapper (name list)
   (let ((list (sort (copy-list list) #'< :key #'car))
         (hi (loop for x in list maximize (max (car x) (cadr x)))))
-    `(defparameter ,name
+    ;; FIXME: should be defconstant, but genesis is too eager to evaluate
+    ;; the symbol at cold-load time when it does not yet have a value
+    ;; [References to global constants are compiled into LOAD-TIME-VALUE,
+    ;; but we can't execute target code that assigns the constant,
+    ;; nor know at each use site whether the value expression was able
+    ;; to be computed and dumped using only facilities of the xc host]
+    `(define-load-time-global ,name
        (make-array '(,(length list) 2)
                    :element-type '(integer 0 ,hi)
                    :initial-contents ',list))))

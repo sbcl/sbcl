@@ -12,13 +12,13 @@
   (declare (optimize speed (safety 0))
            (type fixnum code))
   (if (<= code #x7f) code
-      (get-multibyte-mapper *ucs-to-gbk-table* code)))
+      (get-multibyte-mapper +ucs-to-gbk-table+ code)))
 
 (defun gbk-to-ucs (code)
   (declare (optimize speed (safety 0))
            (type fixnum code))
   (if (<= code #x7f) code
-      (get-multibyte-mapper *gbk-to-ucs-table* code)))
+      (get-multibyte-mapper +gbk-to-ucs-table+ code)))
 
 (defun mb-len-as-gbk (code)
   (declare (optimize speed (safety 0))
