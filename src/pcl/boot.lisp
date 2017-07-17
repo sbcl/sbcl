@@ -392,6 +392,7 @@ bootstrapping.
          :format-arguments format-arguments))
 
 (defun check-gf-lambda-list (lambda-list)
+  (declare (muffle-conditions compiler-note))
   (binding* ((context "a generic function lambda list")
              ((nil nil optional nil keys)
               (multiple-value-call #'check-lambda-list-names
