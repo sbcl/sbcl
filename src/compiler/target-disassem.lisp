@@ -1859,7 +1859,7 @@
 (defun note (note dstate)
   (declare (type (or string function) note)
            (type disassem-state dstate))
-  (push note (dstate-notes dstate)))
+  (setf (dstate-notes dstate) (nconc (dstate-notes dstate) (list note))))
 
 (defun prin1-short (thing stream)
   (with-print-restrictions
