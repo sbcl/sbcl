@@ -251,7 +251,7 @@
 
 (defun print-cond (value stream dstate)
   (declare (ignore dstate))
-  (princ (svref *condition-name-vec* value) stream))
+  (princ (svref sb!vm::+condition-name-vec+ value) stream))
 
 (defun use-label (value dstate)
   (let* ((value (if (consp value)

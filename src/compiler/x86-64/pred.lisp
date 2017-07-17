@@ -42,7 +42,7 @@
        (setf not-p (not not-p)))
      (flet ((negate-condition (name)
               (let ((code (logxor 1 (conditional-opcode name))))
-                (aref *condition-name-vec* code))))
+                (aref +condition-name-vec+ code))))
        (cond ((null (rest flags))
               (inst jmp
                     (if not-p
@@ -122,7 +122,7 @@
        (when not-p (pop flags))
        (flet ((negate-condition (name)
                 (let ((code (logxor 1 (conditional-opcode name))))
-                  (aref *condition-name-vec* code)))
+                  (aref +condition-name-vec+ code)))
               (load-immediate (dst constant-tn
                                &optional (sc (sc-name (tn-sc dst))))
                 ;; Can't use ZEROIZE, since XOR will affect the flags.

@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(*condition-name-vec* conditional-opcode
+  (import '(conditional-opcode
             register-p ; FIXME: rename to GPR-P
             make-ea ea-disp width-bits) 'sb!vm)
   ;; Imports from SB-VM into this package
@@ -233,7 +233,7 @@
                (dstate-put-inst-prop
                 dstate (elt '(fs-segment-prefix gs-segment-prefix) value))))
 
-(defparameter *conditions*
+(defconstant-eqx +conditions+
   '((:o . 0)
     (:no . 1)
     (:b . 2) (:nae . 2) (:c . 2)
@@ -249,23 +249,24 @@
     (:l . 12) (:nge . 12)
     (:nl . 13) (:ge . 13)
     (:le . 14) (:ng . 14)
-    (:nle . 15) (:g . 15)))
-(defparameter *condition-name-vec*
-  (let ((vec (make-array 16 :initial-element nil)))
-    (dolist (cond *conditions*)
-      (when (null (aref vec (cdr cond)))
-        (setf (aref vec (cdr cond)) (car cond))))
-    vec))
+    (:nle . 15) (:g . 15))
+  #'equal)
+(defconstant-eqx sb!vm::+condition-name-vec+
+  #.(let ((vec (make-array 16 :initial-element nil)))
+      (dolist (cond +conditions+ vec)
+        (when (null (aref vec (cdr cond)))
+          (setf (aref vec (cdr cond)) (car cond)))))
+  #'equalp)
 
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf sb!assem:*assem-scheduler-p* nil))
 
-(define-arg-type condition-code :printer *condition-name-vec*)
+(define-arg-type condition-code :printer sb!vm::+condition-name-vec+)
 
 (defun conditional-opcode (condition)
-  (cdr (assoc condition *conditions* :test #'eq)))
+  (cdr (assoc condition +conditions+ :test #'eq)))
 
 ;;;; disassembler instruction formats
 

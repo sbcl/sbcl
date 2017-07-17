@@ -39,7 +39,7 @@
   (:generator 0
      (flet ((negate-condition (name)
               (let ((code (logxor 1 (conditional-opcode name))))
-                (aref *condition-name-vec* code))))
+                (aref +condition-name-vec+ code))))
        (aver (null (rest flags)))
        (inst jmp
              (if not-p

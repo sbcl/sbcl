@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(*condition-name-vec* conditional-opcode
+  (import '(conditional-opcode
             register-p xmm-register-p ; FIXME: rename REGISTER-P to GPR-P
             make-ea ea-disp) 'sb!vm)
   ;; Imports from SB-VM into this package
@@ -264,7 +264,7 @@
   :prefilter #'prefilter-reg/mem
   :printer #'print-xmmreg/mem)
 
-(defparameter *conditions*
+(defconstant-eqx +conditions+
   '((:o . 0)
     (:no . 1)
     (:b . 2) (:nae . 2) (:c . 2)
@@ -280,13 +280,14 @@
     (:l . 12) (:nge . 12)
     (:nl . 13) (:ge . 13)
     (:le . 14) (:ng . 14)
-    (:nle . 15) (:g . 15)))
-(defparameter *condition-name-vec*
-  (let ((vec (make-array 16 :initial-element nil)))
-    (dolist (cond *conditions*)
-      (when (null (aref vec (cdr cond)))
-        (setf (aref vec (cdr cond)) (car cond))))
-    vec))
+    (:nle . 15) (:g . 15))
+  #'equal)
+(defconstant-eqx sb!vm::+condition-name-vec+
+  #.(let ((vec (make-array 16 :initial-element nil)))
+      (dolist (cond +conditions+ vec)
+        (when (null (aref vec (cdr cond)))
+          (setf (aref vec (cdr cond)) (car cond)))))
+  #'equalp)
 
 ;;; SSE shuffle patterns. The names end in the number of bits of the
 ;;; immediate byte that are used to encode the pattern and the radix
@@ -307,11 +308,10 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf sb!assem:*assem-scheduler-p* nil))
 
-(define-arg-type condition-code
-  :printer *condition-name-vec*)
+(define-arg-type condition-code :printer sb!vm::+condition-name-vec+)
 
 (defun conditional-opcode (condition)
-  (cdr (assoc condition *conditions* :test #'eq)))
+  (cdr (assoc condition +conditions+ :test #'eq)))
 
 ;;;; disassembler instruction formats
 
@@ -845,12 +845,14 @@
 
 ;; XMM comparison instruction
 
-(defparameter *sse-conditions* #(:eq :lt :le :unord :neq :nlt :nle :ord))
+(defconstant-eqx +sse-conditions+
+    #(:eq :lt :le :unord :neq :nlt :nle :ord)
+  #'equalp)
 
 (define-arg-type sse-condition-code
   ;; Inherit the prefilter from IMM-BYTE to READ-SUFFIX the byte.
   :type 'imm-byte
-  :printer *sse-conditions*)
+  :printer +sse-conditions+)
 
 (define-instruction-format (string-op 8
                                      :include simple
@@ -2893,7 +2895,7 @@
                       :printer `(,name-prefix imm ,name-suffix
                                  :tab reg ", " reg/mem))
                   (:emitter
-                   (let ((code (position op *sse-conditions*)))
+                   (let ((code (position op +sse-conditions+)))
                      (aver code)
                      (emit-regular-sse-inst segment x y ,prefix ,opcode
                                             :remaining-bytes 1)

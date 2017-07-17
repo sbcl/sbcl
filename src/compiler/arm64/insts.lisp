@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(*condition-name-vec* conditional-opcode
+  (import '(conditional-opcode
             add-sub-immediate-p fixnum-add-sub-immediate-p
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
@@ -30,7 +30,7 @@
 (setf *disassem-inst-alignment-bytes* 4)
 
 
-(defparameter *conditions*
+(defconstant-eqx +conditions+
   '((:eq . 0)
     (:ne . 1)
     (:cs . 2) (:hs . 2)
@@ -45,14 +45,15 @@
     (:lt . 11)
     (:gt . 12)
     (:le . 13)
-    (:al . 14)))
+    (:al . 14))
+  #'equal)
 
-(defparameter *condition-name-vec*
-  (let ((vec (make-array 16 :initial-element nil)))
-    (dolist (cond *conditions*)
-      (when (null (aref vec (cdr cond)))
-        (setf (aref vec (cdr cond)) (car cond))))
-    vec))
+(defconstant-eqx sb!vm::+condition-name-vec+
+  #.(let ((vec (make-array 16 :initial-element nil)))
+      (dolist (cond +conditions+ vec)
+        (when (null (aref vec (cdr cond)))
+          (setf (aref vec (cdr cond)) (car cond)))))
+  #'equalp)
 
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
@@ -60,10 +61,10 @@
   (setf *assem-scheduler-p* nil))
 
 (defun conditional-opcode (condition)
-  (cdr (assoc condition *conditions* :test #'eq)))
+  (cdr (assoc condition +conditions+ :test #'eq)))
 
 (defun invert-condition (condition)
-  (aref *condition-name-vec*
+  (aref sb!vm::+condition-name-vec+
         (logxor 1 (conditional-opcode condition))))
 
 ;;;; disassembler field definitions
