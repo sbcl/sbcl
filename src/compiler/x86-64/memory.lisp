@@ -39,7 +39,12 @@
   (:args (object :scs (descriptor-reg)
                  :load-if (not (and (sc-is object immediate)
                                     (symbolp (tn-value object)))))
-         (value :scs (descriptor-reg any-reg immediate)))
+         (value :scs (descriptor-reg any-reg)
+                :load-if (not (and (sc-is value immediate)
+                                   (typep (tn-value value)
+                                          '(or symbol
+                                               character
+                                               (signed-byte 32)))))))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
