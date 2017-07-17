@@ -36,12 +36,20 @@
           (t
            (loadw value object offset lowtag)))))
 (define-vop (cell-set)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+  (:args (object :scs (descriptor-reg)
+                 :load-if (not (and (sc-is object immediate)
+                                    (symbolp (tn-value object)))))
+         (value :scs (descriptor-reg any-reg immediate)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (storew value object offset lowtag)))
+    (let ((value (encode-value-if-immediate value)))
+      (cond ((sc-is object immediate)
+             ;; this sanity-check is meta-compile-time statically assertable
+             (aver (eq offset symbol-value-slot))
+             (inst mov (symbol-slot-addr (tn-value object) offset) value))
+            (t
+             (storew value object offset lowtag))))))
 
 ;;; X86 special
 (define-vop (cell-xadd)
