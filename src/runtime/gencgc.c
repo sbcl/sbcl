@@ -4348,7 +4348,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
         fflush(stdout);
     }
     coalesce_similar_objects();
-    if (verbose)
+    if (gc_coalesce_string_literals && verbose)
         printf("done]\n");
 
     prepare_for_final_gc();
