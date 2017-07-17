@@ -197,18 +197,11 @@
     (:policy :fast-safe)
     (:generator 10
       (move rax old)
-      (if (sc-is symbol immediate)
-          ;; OAOO much? See (DEFINE-VOP (CELL-REF)).
-          (inst cmpxchg
-                (make-ea :qword :disp
-                         (let* ((symbol (tn-value symbol))
-                                (offset (- (* symbol-value-slot n-word-bytes)
-                                           other-pointer-lowtag)))
-                           (if (static-symbol-p symbol)
-                               (+ nil-value (static-symbol-offset symbol) offset)
-                               (make-fixup symbol :immobile-object offset))))
-                new :lock)
-          (inst cmpxchg (access-value-slot symbol) new :lock))
+      (inst cmpxchg
+            (if (sc-is symbol immediate)
+                (symbol-slot-addr (tn-value symbol) symbol-value-slot)
+                (access-value-slot symbol))
+            new :lock)
       (move result rax)))
 
   #!+sb-thread

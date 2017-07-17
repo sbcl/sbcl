@@ -12,6 +12,13 @@
 
 (in-package "SB!VM")
 
+(defun symbol-slot-addr (symbol slot)
+  (make-ea :qword :disp
+           (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
+             (if (static-symbol-p symbol)
+                 (+ nil-value (static-symbol-offset symbol) offset)
+                 (make-fixup symbol :immobile-object offset)))))
+
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
 (define-vop (cell-ref)
@@ -22,15 +29,12 @@
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (if (sc-is object immediate)
-        (inst mov value
-              (make-ea :qword :disp
-                       (let* ((symbol (tn-value object))
-                              (offset (- (* offset n-word-bytes) lowtag)))
-                         (if (static-symbol-p symbol)
-                             (+ nil-value (static-symbol-offset symbol) offset)
-                             (make-fixup symbol :immobile-object offset)))))
-        (loadw value object offset lowtag))))
+    (cond ((sc-is object immediate)
+           ;; this sanity-check is meta-compile-time statically assertable
+           (aver (eq offset symbol-value-slot))
+           (inst mov value (symbol-slot-addr (tn-value object) offset)))
+          (t
+           (loadw value object offset lowtag)))))
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
