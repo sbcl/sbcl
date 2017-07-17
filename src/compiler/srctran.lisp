@@ -4999,37 +4999,37 @@
                       (t 'sb!impl::string-ouch))))
        (give-up-ir1-transform))))
 
-(flet ((handle-deprecation (symbol)
-         (let ((state (deprecated-thing-p 'variable symbol)))
-           (when state
-             (check-deprecated-thing 'variable symbol)
-             (case state
-               ((:early :late)
-                (unless (gethash symbol *free-vars*)
-                  (setf (gethash symbol *free-vars*) :deprecated))))))))
+(flet ((xform (symbol match-kind fallback)
+         (when (constant-lvar-p symbol)
+           (let* ((symbol (lvar-value symbol))
+                  (kind (info :variable :kind symbol))
+                  (state (deprecated-thing-p 'variable symbol)))
+             (when state
+               (check-deprecated-thing 'variable symbol)
+               (case state
+                 ((:early :late)
+                  (unless (gethash symbol *free-vars*)
+                    (setf (gethash symbol *free-vars*) :deprecated)))))
+             ;; :global in the MEMQ test is redundant if match-kind is :global
+             ;; but it's harmless and a convenient way to express this.
+             (when (or (eq kind match-kind) (memq kind '(:constant :global)))
+               (return-from xform symbol))))
+         fallback))
   (deftransform symbol-global-value ((symbol))
-    (block nil
-      (when (constant-lvar-p symbol)
-        (let ((symbol (lvar-value symbol)))
-          (handle-deprecation symbol)
-          (case (info :variable :kind symbol)
-            ((:constant :global) (return symbol)))))
-      `(sym-global-val symbol)))
+    (xform symbol :global `(sym-global-val symbol)))
   (deftransform symbol-value ((symbol))
-    (block nil
-      (when (constant-lvar-p symbol)
-        (let ((symbol (lvar-value symbol)))
-          (handle-deprecation symbol)
-          (case (info :variable :kind symbol)
-            ((:constant :global :special) (return symbol)))))
-      `(symeval symbol))))
-(deftransform set ((symbol value) ((constant-arg symbol) *))
-  (let* ((symbol (lvar-value symbol)))
-    (case (info :variable :kind symbol)
-      ((:constant :global :special)
-       `(setq ,symbol value))
-      (t
-       (give-up-ir1-transform)))))
+    (xform symbol :special `(symeval symbol))))
+
+(flet ((xform (symbol match-kind)
+         (let* ((symbol (lvar-value symbol))
+                (kind (info :variable :kind symbol)))
+           (if (or (eq kind match-kind) (memq kind '(:constant :global))) ; as above
+               `(setq ,symbol value)
+               (give-up-ir1-transform)))))
+  (deftransform set-symbol-global-value ((symbol value) ((constant-arg symbol) *))
+    (xform symbol :global))
+  (deftransform set ((symbol value) ((constant-arg symbol) *))
+    (xform symbol :special)))
 
 (deftransforms (prin1-to-string princ-to-string) ((object) (number))
   `(stringify-object object))

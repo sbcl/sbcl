@@ -204,3 +204,10 @@
                           (setf (fill-pointer v) 0)))))
     ;; Should not have a call to %SET-FILL-POINTER
     (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
+
+(with-test (:name :set-symbol-value-of-defglobal)
+  (let ((s 'sb-c::*recognized-declarations*))
+    (assert (eq (sb-int:info :variable :kind s) :global)) ; verify precondition
+    (let ((f (compile nil `(lambda () (setf (symbol-value ',s) nil)))))
+      ;; Should not have a call to SET-SYMBOL-GLOBAL-VALUE>
+      (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn))))))
