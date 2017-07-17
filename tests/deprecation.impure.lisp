@@ -14,7 +14,7 @@
 
 ;;;; Helpers
 
-(defun check-deprecated-thing (namespace name state make-body
+(defun test (namespace name state make-body
                                &key replacements
                                     (call t)
                                     (expected-warning-count '(eql 1))
@@ -132,20 +132,20 @@
                                         :replacement ,replacement)))
 
                     (with-test (:name (deprecated variable ,tag ,state))
-                      (check-deprecated-thing
+                      (test
                        'variable ',variable-name ,state
                        (lambda (name) `(,name))
                        :replacements   '(,(string replacement))
                        :call           ,call
                        :check-describe ,check-describe)
                       ,@(when symbol-value
-                          `((check-deprecated-thing
+                          `((test
                              'variable ',variable-name ,state
                              (lambda (name) `((symbol-value ',name)))
                              :replacements   '(,(string replacement))
                              :call           ,call
                              :check-describe ,check-describe)
-                            (check-deprecated-thing
+                            (test
                              'variable ',variable-name ,state
                              (lambda (name) `((symbol-global-value ',name)))
                              :replacements   '(,(string replacement))
@@ -195,7 +195,7 @@
                                         :replacement ,replacement)))
 
                     (with-test (:name (deprecated function ,tag ,state))
-                      (check-deprecated-thing
+                      (test
                        'function ',function-name ,state
                        (lambda (name) `((,name)))
                        :replacements   '(,(string replacement))
@@ -249,7 +249,7 @@
                     (test-util:with-test (:name (deprecated type
                                                  ,@(sb-int:ensure-list tag)
                                                  ,state))
-                      (check-deprecated-thing
+                      (test
                        'type ',type-name ,state
                        (lambda (name)
                          `((let ((x))
@@ -285,14 +285,14 @@
              (deftype ,name () 'integer)
              (declaim (deprecated :early ("some-lib" "1.2.3") (type ,name)))))
     ;; Make sure the deprecation declaration works.
-    (check-deprecated-thing
+    (test
      'type name :early
      (lambda (name)
        `((typep 1 ',name)))
      :call nil)
     ;; Check that the declaration does not apply to an unrelated class
     ;; of the same name.
-    (check-deprecated-thing
+    (test
      'type name :early
      (lambda (name)
        `((make-instance ,(make-instance 'standard-class :name name))))
