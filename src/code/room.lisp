@@ -112,7 +112,7 @@
 
 ) ; EVAL-WHEN
 
-(defparameter *room-info*
+(define-load-time-global *room-info*
   ;; SAETP instances don't dump properly from XC (or possibly
   ;; normally), and we'd rather share structure with the master copy
   ;; if we can anyway, so...
