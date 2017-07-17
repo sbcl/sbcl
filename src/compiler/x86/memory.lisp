@@ -14,8 +14,6 @@
 
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
-;;; CELL-SETF is similar to CELL-SET, but delivers the new value as
-;;; the result.
 (define-vop (cell-ref)
   (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -30,32 +28,6 @@
   (:policy :fast-safe)
   (:generator 4
     (storew value object offset lowtag)))
-(define-vop (cell-setf)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg) :target result))
-  (:results (result :scs (descriptor-reg any-reg)))
-  (:variant-vars offset lowtag)
-  (:policy :fast-safe)
-  (:generator 4
-    (storew value object offset lowtag)
-    (move result value)))
-
-;;; Define accessor VOPs for some cells in an object. If the operation
-;;; name is NIL, then that operation isn't defined. If the translate
-;;; function is null, then we don't define a translation.
-(defmacro define-cell-accessors (offset lowtag
-                                        ref-op ref-trans set-op set-trans)
-  `(progn
-     ,@(when ref-op
-         `((define-vop (,ref-op cell-ref)
-             (:variant ,offset ,lowtag)
-             ,@(when ref-trans
-                 `((:translate ,ref-trans))))))
-     ,@(when set-op
-         `((define-vop (,set-op cell-setf)
-             (:variant ,offset ,lowtag)
-             ,@(when set-trans
-                 `((:translate ,set-trans))))))))
 
 ;;; X86 special
 (define-vop (cell-xadd)
