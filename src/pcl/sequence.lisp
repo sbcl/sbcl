@@ -466,9 +466,9 @@
           (endp (gensym "ENDP"))
           (elt (gensym "ELT"))
           (seq (gensym "SEQ")))
-      (push `(let ((,seq ,(car of-phrase)))) sb-loop::*loop-wrappers*)
+      (push `(let ((,seq ,(car of-phrase)))) (sb-loop::wrappers sb-loop::*loop*))
       (push `(sequence:with-sequence-iterator (,it ,lim ,f-e ,step ,endp ,elt) (,seq))
-            sb-loop::*loop-wrappers*)
+            (sb-loop::wrappers sb-loop::*loop*))
       `(((,variable nil ,data-type)) () () nil (funcall ,endp ,seq ,it ,lim ,f-e)
         (,variable (funcall ,elt ,seq ,it) ,it (funcall ,step ,seq ,it ,f-e))))))
 
