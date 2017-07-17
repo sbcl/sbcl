@@ -14,10 +14,22 @@
 
 ;;;; type format database
 
-(defun room-info-type-name (info)
-  (if (specialized-array-element-type-properties-p info)
-      (saetp-primitive-type-name info)
-      (room-info-name info)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (def!struct (room-info (:constructor make-room-info (name kind)))
+    ;; the name of this type
+    (name nil :type symbol :read-only t)
+    ;; kind of type (how to reconstitute an object)
+    (kind (missing-arg)
+          :type (member :other :tiny-other :closure :instance :list
+                        :code :vector-nil :weak-pointer)
+          :read-only t))
+  (!set-load-form-method room-info (:xc))
+
+  (defun room-info-type-name (info)
+    (if (specialized-array-element-type-properties-p info)
+        (saetp-primitive-type-name info)
+        (room-info-name info))))
 
 (eval-when (:compile-toplevel :execute)
 
@@ -31,26 +43,22 @@
                (not (member widetag '(t nil)))
                (not (eq name 'weak-pointer)))
       (setf (svref *meta-room-info* (symbol-value widetag))
-            (make-room-info :name name
-                            :kind (if (member name '(fdefn symbol))
-                                      :tiny-other
-                                      :other))))))
+            (make-room-info name (if (member name '(fdefn symbol))
+                                     :tiny-other
+                                     :other))))))
 
 (dolist (code (list #!+sb-unicode complex-character-string-widetag
                     complex-base-string-widetag simple-array-widetag
                     complex-bit-vector-widetag complex-vector-widetag
                     complex-array-widetag complex-vector-nil-widetag))
   (setf (svref *meta-room-info* code)
-        (make-room-info :name 'array-header
-                        :kind :other)))
+        (make-room-info 'array-header :other)))
 
 (setf (svref *meta-room-info* bignum-widetag)
-      (make-room-info :name 'bignum
-                      :kind :other))
+      (make-room-info 'bignum :other))
 
 (setf (svref *meta-room-info* closure-widetag)
-      (make-room-info :name 'closure
-                      :kind :closure))
+      (make-room-info 'closure :closure))
 
 (dotimes (i (length *specialized-array-element-type-properties*))
   (let ((saetp (aref *specialized-array-element-type-properties* i)))
@@ -58,27 +66,21 @@
       (setf (svref *meta-room-info* (saetp-typecode saetp)) saetp))))
 
 (setf (svref *meta-room-info* simple-array-nil-widetag)
-      (make-room-info :name 'simple-array-nil
-                      :kind :vector-nil))
+      (make-room-info 'simple-array-nil :vector-nil))
 
 (setf (svref *meta-room-info* code-header-widetag)
-      (make-room-info :name 'code
-                      :kind :code))
+      (make-room-info 'code :code))
 
 (setf (svref *meta-room-info* instance-widetag)
-      (make-room-info :name 'instance
-                      :kind :instance))
+      (make-room-info 'instance :instance))
 
 (setf (svref *meta-room-info* funcallable-instance-widetag)
-      (make-room-info :name 'funcallable-instance
-                      :kind :closure))
+      (make-room-info 'funcallable-instance :closure))
 
 (setf (svref *meta-room-info* weak-pointer-widetag)
-      (make-room-info :name 'weak-pointer
-                      :kind :weak-pointer))
+      (make-room-info 'weak-pointer :weak-pointer))
 
-(let ((cons-info (make-room-info :name 'cons
-                                 :kind :list)))
+(let ((cons-info (make-room-info 'cons :list)))
   ;; A cons consists of two words, both of which may be either a
   ;; pointer or immediate data.  According to the runtime this means
   ;; either a fixnum, a character, an unbound-marker, a single-float

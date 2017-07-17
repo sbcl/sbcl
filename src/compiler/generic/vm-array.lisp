@@ -184,15 +184,6 @@
   #-sb-xc-host
   '#.*vector-without-complex-typecode-infos*)
 
-(def!struct (room-info) ; FIXME: find a better home for this
-  ;; the name of this type
-  (name nil :type symbol)
-  ;; kind of type (how to reconstitute an object)
-  (kind (missing-arg)
-        :type (member :other :tiny-other :closure :instance :list
-                      :code :vector-nil :weak-pointer)))
-(!set-load-form-method room-info (:xc))
-
 ;;; Return the shift amount needed to turn length into bits
 (defun saetp-n-bits-shift (saetp)
   (max (1- (integer-length (saetp-n-bits saetp)))
