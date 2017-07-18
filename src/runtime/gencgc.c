@@ -3739,9 +3739,16 @@ collect_garbage(generation_index_t last_gen)
     else
         auto_gc_trigger = bytes_allocated + (dynamic_space_size - bytes_allocated)/2;
 
-    if(gencgc_verbose)
-        fprintf(stderr,"Next gc when %"OS_VM_SIZE_FMT" bytes have been consed\n",
-                auto_gc_trigger);
+    if(gencgc_verbose) {
+#define MESSAGE ("Next gc when %"OS_VM_SIZE_FMT" bytes have been consed\n")
+        char buf[64];
+        int n;
+        // fprintf() can - and does - cause deadlock here.
+        // snprintf() seems to work fine.
+        n = snprintf(buf, sizeof buf, MESSAGE, auto_gc_trigger);
+        ignore_value(write(2, buf, n));
+#undef MESSAGE
+    }
 
     /* If we did a big GC (arbitrarily defined as gen > 1), release memory
      * back to the OS.

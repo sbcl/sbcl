@@ -12,6 +12,9 @@ changes relative to sbcl-1.3.19:
     expression for an &OPTIONAL binding
   * bug fix: generic function lambda lists are now checked for repeated
     and otherwise illegal entries. (lp#1704114)
+  * bug fix: setting gencgc_verbose = 1 could cause deadlock in fprintf()
+    depending on the platform's stdio implementation. The relevant code
+    has been changed to use snprintf() and write() instead.
 
 changes in sbcl-1.3.19 relative to sbcl-1.3.18:
   * enhancement: specialized arrays can be printed readably without using

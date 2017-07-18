@@ -470,4 +470,14 @@ struct lisp_startup_options {
     int prefix##done = 0;                               \
     for (; !prefix##done; finally_do, prefix##done = 1)
 
+// casting to void is no longer enough to suppress a warning about unused
+// results of libc functions declared with warn_unused_result.
+// from http://git.savannah.gnu.org/cgit/gnulib.git/tree/lib/ignore-value.h
+#if 3 < __GNUC__ + (4 <= __GNUC_MINOR__)
+# define ignore_value(x) \
+      (__extension__ ({ __typeof__ (x) __x = (x); (void) __x; }))
+#else
+# define ignore_value(x) ((void) (x))
+#endif
+
 #endif /* _SBCL_RUNTIME_H_ */
