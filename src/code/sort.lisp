@@ -427,8 +427,6 @@
               (length-1 (length vector-1))
               (length-2 (length vector-2))
               (result (make-sequence result-type (+ length-1 length-2))))
-         (declare (vector vector-1 vector-2) ; FIXME: this looks redundant,
-                  (fixnum length-1 length-2)) ; as does this.
          (if (and (simple-vector-p result)
                   (simple-vector-p vector-1)
                   (simple-vector-p vector-2))
