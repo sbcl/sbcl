@@ -171,46 +171,41 @@
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
 
-(declaim (type attribute-table *constituent-trait-table*))
-(defglobal *constituent-trait-table*
-  (make-array base-char-code-limit
-              :element-type '(unsigned-byte 8)
-              :initial-element +char-attr-constituent+))
-
-(defun !set-constituent-trait (char trait)
-  (aver (typep char 'base-char))
-  (setf (elt *constituent-trait-table* (char-code char))
-        trait))
-
-(defun !cold-init-constituent-trait-table ()
-  (!set-constituent-trait #\: +char-attr-package-delimiter+)
-  (!set-constituent-trait #\. +char-attr-constituent-dot+)
-  (!set-constituent-trait #\+ +char-attr-constituent-sign+)
-  (!set-constituent-trait #\- +char-attr-constituent-sign+)
-  (!set-constituent-trait #\/ +char-attr-constituent-slash+)
-  (do ((i (char-code #\0) (1+ i)))
-      ((> i (char-code #\9)))
-    (!set-constituent-trait (code-char i) +char-attr-constituent-digit+))
-  (!set-constituent-trait #\E +char-attr-constituent-expt+)
-  (!set-constituent-trait #\F +char-attr-constituent-expt+)
-  (!set-constituent-trait #\D +char-attr-constituent-expt+)
-  (!set-constituent-trait #\S +char-attr-constituent-expt+)
-  (!set-constituent-trait #\L +char-attr-constituent-expt+)
-  (!set-constituent-trait #\e +char-attr-constituent-expt+)
-  (!set-constituent-trait #\f +char-attr-constituent-expt+)
-  (!set-constituent-trait #\d +char-attr-constituent-expt+)
-  (!set-constituent-trait #\s +char-attr-constituent-expt+)
-  (!set-constituent-trait #\l +char-attr-constituent-expt+)
-  (!set-constituent-trait #\Space +char-attr-invalid+)
-  (!set-constituent-trait #\Newline +char-attr-invalid+)
-  (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
-                   return-char-code rubout-char-code))
-    (!set-constituent-trait (code-char c) +char-attr-invalid+)))
+(defconstant +constituent-trait-table+
+  #.(let ((a (!make-specialized-array base-char-code-limit '(unsigned-byte 8))))
+      (fill a +char-attr-constituent+)
+      (flet ((!set-constituent-trait (char trait)
+               (aver (typep char 'base-char))
+               (setf (elt a (char-code char)) trait)))
+        (!set-constituent-trait #\: +char-attr-package-delimiter+)
+        (!set-constituent-trait #\. +char-attr-constituent-dot+)
+        (!set-constituent-trait #\+ +char-attr-constituent-sign+)
+        (!set-constituent-trait #\- +char-attr-constituent-sign+)
+        (!set-constituent-trait #\/ +char-attr-constituent-slash+)
+        (do ((i (char-code #\0) (1+ i)))
+            ((> i (char-code #\9)))
+          (!set-constituent-trait (code-char i) +char-attr-constituent-digit+))
+        (!set-constituent-trait #\E +char-attr-constituent-expt+)
+        (!set-constituent-trait #\F +char-attr-constituent-expt+)
+        (!set-constituent-trait #\D +char-attr-constituent-expt+)
+        (!set-constituent-trait #\S +char-attr-constituent-expt+)
+        (!set-constituent-trait #\L +char-attr-constituent-expt+)
+        (!set-constituent-trait #\e +char-attr-constituent-expt+)
+        (!set-constituent-trait #\f +char-attr-constituent-expt+)
+        (!set-constituent-trait #\d +char-attr-constituent-expt+)
+        (!set-constituent-trait #\s +char-attr-constituent-expt+)
+        (!set-constituent-trait #\l +char-attr-constituent-expt+)
+        (!set-constituent-trait #\Space +char-attr-invalid+)
+        (!set-constituent-trait #\Newline +char-attr-invalid+)
+        (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
+                         return-char-code rubout-char-code))
+          (!set-constituent-trait (code-char c) +char-attr-invalid+)))
+      a))
 
 (declaim (inline get-constituent-trait))
 (defun get-constituent-trait (char)
   (if (typep char 'base-char)
-      (elt *constituent-trait-table* (char-code char))
+      (elt +constituent-trait-table+ (char-code char))
       +char-attr-constituent+))
 
 ;;;; Readtable Operations
@@ -1903,7 +1898,6 @@ extended <package-name>::<form-in-package> syntax."
 ;;;; reader initialization code
 
 (defun !reader-cold-init ()
-  (!cold-init-constituent-trait-table)
   (!cold-init-standard-readtable))
 
 (defmethod print-object ((readtable readtable) stream)
