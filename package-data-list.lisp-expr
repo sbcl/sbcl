@@ -1051,10 +1051,6 @@ possibly temporarily, because it might be used internally."
                "%MACROEXPAND"
                "%MACROEXPAND-1"
 
-               ;; I'm not convinced that FDEFINITIONs are the ideal
-               ;; solution, so exposing ways to peek into the system
-               ;; seems undesirable, since it makes it harder to get
-               ;; rid of FDEFINITIONs entirely later.
                "*SETF-FDEFINITION-HOOK*"
 
                ;; error-reporting facilities
