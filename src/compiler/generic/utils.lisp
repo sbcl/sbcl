@@ -48,12 +48,10 @@
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
 (defun static-fdefn-offset (name)
-  (let ((static-syms (length +static-symbols+))
-        (static-fun-index (position name +static-fdefns+)))
-    (unless static-fun-index
-      (error "~S isn't a static function." name))
-    (+ (* static-syms (pad-data-block symbol-size))
-       (* (length sb!vm::+c-callable-fdefns+) (pad-data-block fdefn-size))
+  (let ((static-fun-index
+         (or (position name #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+))
+             (error "~S isn't a static function." name))))
+    (+ (* (length +static-symbols+) (pad-data-block symbol-size))
        (pad-data-block (1- symbol-size))
        (- list-pointer-lowtag)
        (* static-fun-index (pad-data-block fdefn-size))
