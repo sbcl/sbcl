@@ -642,7 +642,7 @@
               (destructuring-bind (arg1 arg2 arg3 arg4)
                   (mapcar #'make-gpr '(3 4 5 6))
                 (load-address-into arg1 (static-fdefn-fun-addr 'enter-alien-callback))
-                (loadw arg1 arg1 0 0)
+                (loadw arg1 arg1)
                 (inst li arg2 (fixnumize index))
                 (inst addi arg3 stack-pointer (- arg-store-pos))
                 (inst addi arg4 stack-pointer (- return-area-pos)))
@@ -788,7 +788,7 @@
                          (inst ori reg reg low))))
                 ;; Setup the args
                 (load-address-into arg1 (static-fdefn-fun-addr 'enter-alien-callback))
-                (loadw arg1 arg1 fdefn-fun-slot other-pointer-lowtag)
+                (loadw arg1 arg1)
                 (inst li arg2 (fixnumize index))
                 (inst addi arg3 sp n-foreign-linkage-area-bytes)
                 ;; FIXME: This was (- (* RETURN-AREA-SIZE N-WORD-BYTES)), while

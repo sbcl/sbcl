@@ -484,7 +484,7 @@
                    (bug "Unknown alien floating point type: ~S" type)))))
         ;; arg0 to FUNCALL3 (function)
         (load-immediate-word r0-tn (static-fdefn-fun-addr 'enter-alien-callback))
-        (loadw r0-tn r0-tn 0 0)
+        (loadw r0-tn r0-tn)
         ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
         (inst mov r1-tn (fixnumize index))
         ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
