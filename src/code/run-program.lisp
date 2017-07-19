@@ -149,10 +149,10 @@
                      (not (zerop (ldb (byte 1 7) status)))))))))
 
 ;;;; process control stuff
-(defvar *active-processes* nil
+(define-load-time-global *active-processes* nil
   "List of process structures for all active processes.")
 
-(defvar *active-processes-lock*
+(define-load-time-global *active-processes-lock*
   (sb-thread:make-mutex :name "Lock for active processes."))
 
 ;;; *ACTIVE-PROCESSES* can be accessed from multiple threads so a

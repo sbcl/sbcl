@@ -12,7 +12,7 @@
 (in-package "SB!ALIEN")
 
 ;;; Used to serialize modifications to *shared-objects*.
-(defvar *shared-objects-lock*
+(define-load-time-global *shared-objects-lock*
   (sb!thread:make-mutex :name "shared object list lock"))
 
 (define-unsupported-fun load-foreign

@@ -225,8 +225,8 @@ an error in that case."
 ;; A thread is eligible for gc iff it has finished and there are no
 ;; more references to it. This list is supposed to keep a reference to
 ;; all running threads.
-(defvar *all-threads* ())
-(defvar *all-threads-lock* (make-mutex :name "all threads lock"))
+(sb!ext:define-load-time-global *all-threads* ())
+(sb!ext:define-load-time-global *all-threads-lock* (make-mutex :name "all threads lock"))
 
 (defvar *default-alloc-signal* nil)
 
@@ -279,8 +279,8 @@ created and old ones may exit at any time."
   #!-sb-thread
   0)
 
-(defvar *initial-thread* nil)
-(defvar *make-thread-lock*)
+(sb!ext:define-load-time-global *initial-thread* nil)
+(sb!ext:define-load-time-global *make-thread-lock* nil)
 
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")

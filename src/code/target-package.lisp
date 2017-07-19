@@ -48,7 +48,7 @@
 ;;;; sufficient, though interaction between parallel intern and use-package
 ;;;; needs to be considered with some care.
 
-(defvar *package-graph-lock*)
+(define-load-time-global *package-graph-lock* nil)
 
 (defun call-with-package-graph (function)
   (declare (function function))

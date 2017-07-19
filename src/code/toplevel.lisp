@@ -75,7 +75,7 @@ been specified on the command-line.")
                 (call-exit-hooks)))
          (%exit)))))
 
-(defvar *exit-lock*)
+(define-load-time-global *exit-lock* nil)
 (defvar *exit-in-process* nil)
 (declaim (type (or null real) *exit-timeout*))
 (defvar *exit-timeout* 60

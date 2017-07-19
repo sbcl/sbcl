@@ -182,7 +182,7 @@ from now. For timers with a repeat interval it returns true."
 
 ;;; The scheduler
 
-(defvar *scheduler-lock* (sb!thread:make-mutex :name "Scheduler lock"))
+(define-load-time-global *scheduler-lock* (sb!thread:make-mutex :name "Scheduler lock"))
 
 (defmacro with-scheduler-lock ((&optional) &body body)
   ;; Don't let the SIGALRM handler mess things up.

@@ -188,7 +188,7 @@ statistics are appended to it."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defvar *already-in-gc* (sb!thread:make-mutex :name "GC lock"))
+(define-load-time-global *already-in-gc* (sb!thread:make-mutex :name "GC lock"))
 
 (defun sub-gc (&key (gen 0))
   (cond (*gc-inhibit*
