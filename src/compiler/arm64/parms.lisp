@@ -126,12 +126,6 @@
         *pseudo-atomic-interrupted*)
     *allocation-pointer*
      ;; interrupt handling
-
-
-     ;; Needed for callbacks to work across saving cores. see
-     ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
-     ;; details.
-     sb!alien::*enter-alien-callback*
      #!+gencgc *restart-lisp-function*
      ,@+common-static-symbols+)
   #'equalp)

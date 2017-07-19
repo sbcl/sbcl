@@ -57,6 +57,13 @@
        (* static-fun-index (pad-data-block fdefn-size))
        other-pointer-lowtag)))
 
+;;; Return absolute address of the 'fun' slot in static fdefn NAME.
+(defun static-fdefn-fun-addr (name)
+  (+ nil-value
+     (static-fdefn-offset name)
+     (- other-pointer-lowtag)
+     (ash fdefn-fun-slot word-shift)))
+
 ;;; Return the (byte) offset from NIL to the raw-addr slot of the
 ;;; fdefn object for the static function NAME.
 (defun static-fun-offset (name)

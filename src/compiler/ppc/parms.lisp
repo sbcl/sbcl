@@ -175,13 +175,7 @@
 ;;;
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-     #!+gencgc *restart-lisp-function*
-
-     ;; CLH: 20060210 Taken from x86-64/parms.lisp per JES' suggestion
-     ;; Needed for callbacks to work across saving cores. see
-     ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
-     ;; details.
-     sb!alien::*enter-alien-callback*)
+     #!+gencgc *restart-lisp-function*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

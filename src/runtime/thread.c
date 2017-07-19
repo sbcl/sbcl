@@ -594,7 +594,7 @@ callback_wrapper_trampoline(
     WITH_GC_AT_SAFEPOINTS_ONLY()
 #endif
     {
-       funcall3(SymbolValue(ENTER_ALIEN_CALLBACK, 0), arg0, arg1, arg2);
+       funcall3(StaticSymbolFunction(ENTER_ALIEN_CALLBACK), arg0, arg1, arg2);
 
     }
 }

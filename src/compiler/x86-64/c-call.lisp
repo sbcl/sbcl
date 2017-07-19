@@ -447,15 +447,7 @@
         #!-sb-thread
         (progn
           ;; arg0 to FUNCALL3 (function)
-          ;;
-          ;; Indirect the access to ENTER-ALIEN-CALLBACK through
-          ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
-          ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
-          ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
-          ;; to rebind the variable. -- JES, 2006-01-01
-          (inst mov rdi (+ nil-value (static-symbol-offset
-                                      'sb!alien::*enter-alien-callback*)))
-          (loadw rdi rdi symbol-value-slot other-pointer-lowtag)
+          (inst mov rdi (make-ea :qword :disp (static-fdefn-fun-addr 'enter-alien-callback)))
           ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
           (inst mov rsi (fixnumize index))
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)

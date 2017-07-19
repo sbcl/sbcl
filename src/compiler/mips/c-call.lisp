@@ -435,6 +435,7 @@ and a pointer to the arguments."
             (inst sw ra sp (- n-frame-bytes n-word-bytes))
 
             ;; Setup the args and make the call.
+            ;;  FIXME- should go through the static fdefn for enter-alien-callback
             (inst li a0 (get-lisp-obj-address #'enter-alien-callback))
             (inst li t9 (foreign-symbol-address "funcall3"))
             (inst li a1 (fixnumize index))

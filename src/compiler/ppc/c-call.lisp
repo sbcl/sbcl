@@ -641,9 +641,8 @@
 
               (destructuring-bind (arg1 arg2 arg3 arg4)
                   (mapcar #'make-gpr '(3 4 5 6))
-                (load-address-into arg1 (+ nil-value (static-symbol-offset
-                                                      'sb!alien::*enter-alien-callback*)))
-                (loadw arg1 arg1 symbol-value-slot other-pointer-lowtag)
+                (load-address-into arg1 (static-fdefn-fun-addr 'enter-alien-callback))
+                (loadw arg1 arg1 0 0)
                 (inst li arg2 (fixnumize index))
                 (inst addi arg3 stack-pointer (- arg-store-pos))
                 (inst addi arg4 stack-pointer (- return-area-pos)))
@@ -788,27 +787,8 @@
                          (inst lis reg high)
                          (inst ori reg reg low))))
                 ;; Setup the args
-
-                ;; CLH 2006/02/10 -Following JES' logic in
-                ;; x86-64/c-call.lisp, we need to access
-                ;; ENTER-ALIEN-CALLBACK through the symbol-value slot
-                ;; of SB-ALIEN::*ENTER-ALIEN-CALLBACK* to ensure that
-                ;; it works if GC moves ENTER-ALIEN-CALLBACK.
-                ;;
-                ;; old way:
-                ;; (load-address-into arg1 (get-lisp-obj-address #'enter-alien-callback))
-
-                ;; new way:
-                ;; (load-symbol arg1 'sb!alien::*enter-alien-callback*)
-                ;;
-                ;; whoops: can't use load-symbol here as null-tn might
-                ;; not be loaded with the proper value as we are
-                ;; coming in from C code. Use nil-value constant
-                ;; instead, following the logic in x86-64/c-call.lisp.
-                (load-address-into arg1 (+ nil-value (static-symbol-offset
-                                                      'sb!alien::*enter-alien-callback*)))
-                (loadw arg1 arg1 symbol-value-slot other-pointer-lowtag)
-
+                (load-address-into arg1 (static-fdefn-fun-addr 'enter-alien-callback))
+                (loadw arg1 arg1 fdefn-fun-slot other-pointer-lowtag)
                 (inst li arg2 (fixnumize index))
                 (inst addi arg3 sp n-foreign-linkage-area-bytes)
                 ;; FIXME: This was (- (* RETURN-AREA-SIZE N-WORD-BYTES)), while
