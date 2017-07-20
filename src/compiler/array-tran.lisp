@@ -826,7 +826,11 @@
                                     elt-spec))
                     ;; For the default initial element, only warn if
                     ;; any array elements are initialized using it.
-                    ((not (eql c-length 0))
+                    ((and (not (eql c-length 0))
+                          ;; If it's coming from the source transform,
+                          ;; then fill-array means it was supplied initial-contents
+                          (not (lvar-matches-calls (combination-lvar call)
+                                                   '(make-array-header* fill-array))))
                      (compiler-style-warn "The default initial element ~S is not a ~S."
                                           default-initial-element
                                           elt-spec))))

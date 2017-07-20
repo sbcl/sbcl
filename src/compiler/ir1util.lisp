@@ -2419,6 +2419,16 @@ is :ANY, the function name is not checked."
          (or (not arg-count)
              (= arg-count (length (combination-args use)))))))
 
+;;; In (a (b lvar)) (lvar-matches-calls lvar '(b a)) would return T
+(defun lvar-matches-calls (lvar dest-fun-names)
+  (loop for fun in dest-fun-names
+        for dest = (principal-lvar-dest lvar)
+        when (or (not (combination-p dest))
+                 (neq fun (combination-fun-source-name dest nil)))
+        return nil
+        do (setf lvar (combination-lvar dest))
+        finally (return t)))
+
 ;;; True if the optional has a rest-argument.
 (defun optional-rest-p (opt)
   (dolist (var (optional-dispatch-arglist opt) nil)

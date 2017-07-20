@@ -6492,3 +6492,13 @@
     (assert (not (funcall fun -1)))
     (assert (funcall fun 1))
     (assert (funcall fun 0))))
+
+(with-test (:name :initial-contents-element-type-mismatch)
+  (assert
+   (equalp
+    (funcall
+     (checked-compile `(lambda (x)
+                         (make-array '(1 2) :element-type 'list
+                                            :initial-contents x)))
+     '(((1 2) (3 4))))
+    #2A(((1 2) (3 4))))))
