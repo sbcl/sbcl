@@ -1296,9 +1296,6 @@
               "The array type is ambiguous; must call ~
                ARRAY-HAS-FILL-POINTER-P at runtime.")))))))
 
-(deftransform %set-fill-pointer ((vector fill-pointer) (complex-vector (eql 0)))
-  `(setf (%array-fill-pointer vector) 0))
-
 (deftransform check-bound ((array dimension index) * * :node node)
   ;; This is simply to avoid multiple evaluation of INDEX by the
   ;; translator, it's easier to wrap it in a lambda from DEFTRANSFORM
