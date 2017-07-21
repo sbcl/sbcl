@@ -6444,7 +6444,9 @@
                        (logbitp (the (eql 1) p1)
                                 (the fixnum p2)))) 1 2)))
 
-(with-test (:name :reducing-constants)
+(with-test (:name :reducing-constants
+                  ;; x86 delays FPE signalling
+                  :fails-on :x86)
   (assert (eql (funcall (checked-compile
                        `(lambda (x)
                           (* 4.457268f31 4 x
