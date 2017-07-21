@@ -64,3 +64,10 @@
       (assert-error (test -1))
       (assert (= (test 0) 1))
       (assert-error (test 1)))))
+
+(with-test (:name :fill-pointer-transform)
+  (assert-error
+   (funcall (checked-compile `(lambda (x)
+                                (setf (fill-pointer x) 0)))
+            (make-array 2 :adjustable t))
+   type-error))
