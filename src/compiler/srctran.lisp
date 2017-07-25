@@ -5010,9 +5010,21 @@
                  ((:early :late)
                   (unless (gethash symbol *free-vars*)
                     (setf (gethash symbol *free-vars*) :deprecated)))))
-             ;; :global in the MEMQ test is redundant if match-kind is :global
+             ;; :global in the test below is redundant if match-kind is :global
              ;; but it's harmless and a convenient way to express this.
-             (when (or (eq kind match-kind) (memq kind '(:constant :global)))
+             ;; Note that some 3rd-party libraries use variations on DEFCONSTANT
+             ;; expanding into expressions such as:
+             ;;  (CL:DEFCONSTANT S (IF (BOUNDP 'S) (SYMBOL-VALUE 'S) (COMPUTE)))
+             ;; which means we have to use care if S in for-evaluation position would
+             ;; be converted to (LOAD-TIME-VALUE (SYMBOL-VALUE 'S)).
+             ;; When S's value is directly dumpable, it works fine, but otherwise
+             ;; it's dangerous. If the user wishes to avoid eager evaluation entirely,
+             ;; a local notinline declaration on SYMBOL-VALUE will do.
+             (when (or (eq kind match-kind)
+                       (eq kind :global)
+                       (and (eq kind :constant)
+                            (boundp symbol)
+                            (typep (symbol-value symbol) '(or number character symbol))))
                (return-from xform symbol))))
          fallback))
   (deftransform symbol-global-value ((symbol))
