@@ -1818,9 +1818,7 @@ code to be loaded.
 
 ;;;; ANSI LOOP
 
-;;; Due to what looks like a CMUCL bug, :compile-toplevel is necessary
-(eval-when (:load-toplevel :execute #+(and cmu sb-xc-host) :compile-toplevel)
-(defun !make-ansi-loop-universe ()
+(sb!ext:define-load-time-global *loop-ansi-universe*
   (let ((w (!make-standard-loop-universe
              :keywords '((named (loop-do-named))
                          (initially (loop-do-initially))
@@ -1904,7 +1902,7 @@ code to be loaded.
                    'loop-elements-iteration-path w
                    :preposition-groups '((:of :in))
                    :inclusive-permitted nil)
-    w)))
+    w))
 
 (defun loop-standard-expansion (keywords-and-forms environment universe)
   (if (and keywords-and-forms (symbolp (car keywords-and-forms)))
@@ -1915,7 +1913,7 @@ code to be loaded.
 (sb!xc:defmacro loop (&environment env &rest keywords-and-forms)
   (loop-standard-expansion keywords-and-forms
                            env
-                           (load-time-value (!make-ansi-loop-universe) t)))
+                           *loop-ansi-universe*))
 
 (sb!xc:defmacro loop-finish ()
   "Cause the iteration to terminate \"normally\", the same as implicit
@@ -1924,5 +1922,5 @@ UNTIL -- the epilogue code (if any) will be run, and any implicitly
 collected result will be returned as the value of the LOOP."
   '(go end-loop))
 
-(defun !unintern-symbols ()
-  `("SB-LOOP" add-loop-path))
+;;; Hack for clsql
+(define-symbol-macro *loop-epilogue* (epilogue *loop*))

@@ -49,6 +49,8 @@
            ,value)
        ,@doc)))
 
+(defmacro define-load-time-global (&rest args) `(defvar ,@args))
+
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
 ;;; Gray streams). In ANSI Common Lisp, an ANSI-STREAM is just a
