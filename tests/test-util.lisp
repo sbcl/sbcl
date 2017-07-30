@@ -136,7 +136,7 @@
       (log-msg "~@<~A ~S ~:_~A~:>"
                type test-name condition)
       (log-msg "~@<~A ~S ~:_due to ~S: ~4I~:_\"~A\"~:>"
-               type test-name condition condition))
+               type test-name (type-of condition) condition))
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
   (unless (stringp condition)
