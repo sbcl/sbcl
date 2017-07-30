@@ -135,20 +135,24 @@
                          '(unless (macro/special-guard-fun-p f))
                          '(progn))
                    (return f)))))
-            (restart-case (error 'undefined-function :name name)
-              (continue ()
-                :report (lambda (stream)
-                          (format stream "Retry using ~s." name)))
-              (use-value (value)
-                :report (lambda (stream)
-                          (format stream "Use specified function"))
-                :interactive read-evaluated-form
-                (when (functionp value)
-                  (return value))
-                (setf name (the ,(if (eq lookup-fn 'symbol-fdefn)
-                                     'symbol
-                                     t)
-                                value))))
+            (setf name
+                  (let ((name name))
+                    ;; Avoid making the initial NAME a value cell,
+                    ;; it will cons even if no restarts are reached
+                    (restart-case (error 'undefined-function :name name)
+                      (continue ()
+                        :report (lambda (stream)
+                                  (format stream "Retry using ~s." name)))
+                      (use-value (value)
+                        :report (lambda (stream)
+                                  (format stream "Use specified function"))
+                        :interactive read-evaluated-form
+                        (when (functionp value)
+                          (return value))
+                        (the ,(if (eq lookup-fn 'symbol-fdefn)
+                                  'symbol
+                                  t)
+                             value)))))
             (go retry))))))
 
 ;; Return T if FUNCTION is the error-signaling trampoline

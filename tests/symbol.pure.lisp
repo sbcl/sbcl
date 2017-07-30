@@ -52,3 +52,8 @@
                                        (cons symbol null))))
             (assert (typep name '(cons (eql :macro)
                                        (cons symbol null)))))))))
+
+(load "compiler-test-util.lisp")
+
+(with-test (:name :fdefinition-no-consing)
+  (ctu:assert-no-consing (fdefinition 'list)))
