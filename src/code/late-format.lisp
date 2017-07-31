@@ -199,7 +199,8 @@
                  (push `(,(car arg)
                          (args-exhausted ,control-string ,(cdr arg)))
                        optional))))
-        (return `(lambda (stream ,@required
+        (return `(named-lambda ,control-string
+                         (stream ,@required
                                  ,@(if optional '(&optional)) ,@optional
                                  &rest args)
                    (declare (ignorable stream args))
