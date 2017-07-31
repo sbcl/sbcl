@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.3.19:
+changes in sbcl-1.3.20 relative to sbcl-1.3.19:
   * minor incompatible change: DEF{GENERIC,METHOD} no longer accept some
     illegal lambda lists such as (defgeneric bar (foo &key foo)) or
     (defgeneric baz (t)) that were accepted before.
