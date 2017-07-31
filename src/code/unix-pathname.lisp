@@ -12,6 +12,7 @@
 (in-package "SB!IMPL")
 
 (defstruct (unix-host
+             (:copier nil)
              (:include host
                        (parse #'parse-unix-namestring)
                        (parse-native #'parse-native-unix-namestring)

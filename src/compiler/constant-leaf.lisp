@@ -26,6 +26,7 @@
                                                    (type (ctype-of value))
                                                    (%source-name '.anonymous.)
                                                    (where-from :defined)))
+                      (:copier nil)
                       (:include leaf))
   ;; the value of the constant
   (value (missing-arg) :type t)

@@ -77,7 +77,8 @@
       (list (constant-form-value form))
       nil))
 
-(defstruct (fgen (:constructor make-fgen (gensyms generator generator-lambda system)))
+(defstruct (fgen (:constructor make-fgen (gensyms generator generator-lambda system))
+                 (:copier nil))
   gensyms
   generator
   generator-lambda

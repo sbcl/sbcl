@@ -16,6 +16,7 @@
   (sb!xc:proclaim '(sb!ext:always-bound *current-thread*)))
 
 (defstruct (foreign-thread
+             (:copier nil)
              (:include thread)
              (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads
@@ -23,6 +24,7 @@ temporarily.")
 
 #!+(and sb-safepoint-strictly (not win32))
 (defstruct (signal-handling-thread
+             (:copier nil)
              (:include foreign-thread)
              (:conc-name "THREAD-"))
   "Asynchronous signal handling thread."

@@ -464,14 +464,14 @@ HOLDING-MUTEX-P."
 (sb!ext:defglobal **deadlock-lock** nil)
 
 #!+(or (not sb-thread) sb-futex)
-(defstruct (waitqueue (:constructor make-waitqueue (&key name)))
+(defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
   (name nil :type (or null thread-name))
   #!+(and sb-thread sb-futex)
   (token nil))
 
 #!+(and sb-thread (not sb-futex))
-(defstruct (waitqueue (:constructor make-waitqueue (&key name)))
+(defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
   (name nil :type (or null thread-name))
   ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
@@ -1014,7 +1014,8 @@ must be held by this thread during this call."
 
 ;;;; Semaphores
 
-(defstruct (semaphore (:constructor make-semaphore
+(defstruct (semaphore (:copier nil)
+                      (:constructor make-semaphore
                           (&key name ((:count %count) 0))))
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
@@ -1179,7 +1180,7 @@ on this semaphore, then N of them is woken up."
 
 ;;;; Job control, independent listeners
 
-(defstruct session
+(defstruct (session (:copier nil))
   (lock (make-mutex :name "session lock"))
   (threads nil)
   (interactive-threads nil)

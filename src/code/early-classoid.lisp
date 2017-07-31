@@ -21,6 +21,7 @@
 ;;; is declared to hold a DEFSTRUCT-DESCRIPTION.
 (def!struct (defstruct-description
              (:conc-name dd-)
+             (:copier nil)
              #-sb-xc-host (:pure t)
              (:constructor make-defstruct-description (null-lexenv-p name)))
   ;; name of the structure
@@ -106,7 +107,8 @@
 ;;; well, since the initialization of layout slots is hardcoded there.
 ;;;
 ;;; FIXME: ...it would be better to automate this, of course...
-(def!struct (layout #-sb-xc-host (:constructor #!+immobile-space nil))
+(def!struct (layout #-sb-xc-host (:constructor #!+immobile-space nil)
+                    (:copier nil))
   ;; a pseudo-random hash value for use by CLOS.
   (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
   ;; the class that this is a layout for
@@ -202,6 +204,7 @@
              (:include ctype
                        (class-info (type-class-or-lose 'classoid)))
              (:constructor nil)
+             (:copier nil)
              #-no-ansi-print-object
              (:print-object
               (lambda (class stream)
@@ -245,6 +248,7 @@
 ;;; referenced layouts. Users should never see them.
 (def!struct (undefined-classoid
              (:include classoid)
+             (:copier nil)
              (:constructor make-undefined-classoid (name))))
 
 ;;; BUILT-IN-CLASS is used to represent the standard classes that
@@ -258,6 +262,7 @@
 ;;; system operations (union, subtypep, etc.) should never encounter
 ;;; translated classes, only their translation.
 (def!struct (built-in-classoid (:include classoid)
+                               (:copier nil)
                                (:constructor make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
   ;; stands on its own; or it can be set to :INITIALIZING for a period
@@ -265,6 +270,7 @@
   (translation nil :type (or ctype (member nil :initializing))))
 
 (def!struct (condition-classoid (:include classoid)
+                                (:copier nil)
                                 (:constructor make-condition-classoid))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
@@ -295,6 +301,7 @@
 ;;; We use an indirection to allow forward referencing of class
 ;;; definitions with load-time resolution.
 (def!struct (classoid-cell
+             (:copier nil)
              (:constructor make-classoid-cell (name &optional classoid))
              #-no-ansi-print-object
              (:print-object (lambda (s stream)
@@ -339,10 +346,12 @@
 ;;; side does not need to distinguish between STANDARD-CLASS and
 ;;; FUNCALLABLE-STANDARD-CLASS.
 (def!struct (standard-classoid (:include classoid)
+                               (:copier nil)
                                (:constructor make-standard-classoid)))
 ;;; a metaclass for classes which aren't standardlike but will never
 ;;; change either.
 (def!struct (static-classoid (:include classoid)
+                             (:copier nil)
                              (:constructor make-static-classoid)))
 
 (declaim (freeze-type built-in-classoid condition-classoid

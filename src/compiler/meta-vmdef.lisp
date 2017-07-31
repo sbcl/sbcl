@@ -56,8 +56,7 @@
        ;; the cross-compiler, but to eval this during cross-compilation
        ;; would kill the cross-compiler.
        (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-         (let ((sb (,(if (eq kind :non-packed) 'copy-sb 'copy-finite-sb)
-                    ',sb)))
+         (let ((sb (copy-structure ',sb)))
            (setf *backend-sb-list*
                  (cons sb (remove ',name *backend-sb-list* :key #'sb-name)))))
        ,@(unless (eq kind :non-packed)
@@ -259,6 +258,7 @@
 ;;; operand or temporary at meta-compile time. Besides the obvious
 ;;; stuff, we also store the names of per-operand temporaries here.
 (def!struct (operand-parse
+             (:copier nil)
              #-sb-xc-host (:pure t))
   ;; name of the operand (which we bind to the TN)
   (name nil :type symbol)

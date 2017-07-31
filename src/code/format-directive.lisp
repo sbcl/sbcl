@@ -53,7 +53,7 @@
   (format-error-at* control-string offset complaint args))
 
 
-(defstruct format-directive
+(defstruct (format-directive (:copier nil))
   (string (missing-arg) :type simple-string)
   (start (missing-arg) :type (and unsigned-byte fixnum))
   (end (missing-arg) :type (and unsigned-byte fixnum))

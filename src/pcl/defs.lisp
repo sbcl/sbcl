@@ -503,6 +503,7 @@
 ;;; these functions can access the SLOT-INFO directly, avoiding the overhead
 ;;; of accessing a standard-instance.
 (defstruct (slot-info
+            (:copier nil)
             (:constructor make-slot-info
                 (&key slotd typecheck
                  (reader (uninitialized-accessor-function :reader slotd))

@@ -16,7 +16,8 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (def!struct (room-info (:constructor make-room-info (name kind)))
+  (def!struct (room-info (:constructor make-room-info (name kind))
+                         (:copier nil))
     ;; the name of this type
     (name nil :type symbol :read-only t)
     ;; kind of type (how to reconstitute an object)

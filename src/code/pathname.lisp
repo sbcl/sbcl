@@ -17,6 +17,7 @@
 ;;; pathname information into structure slot entries, and after
 ;;; translation the inverse (unparse) functions.
 (sb!xc:defstruct (host (:constructor nil)
+                       (:copier nil)
                        (:print-object
                         (lambda (host stream)
                           (print-unreadable-object
@@ -35,6 +36,7 @@
 
 (sb!xc:defstruct
             (logical-host
+             (:copier nil)
              (:print-object
               (lambda (logical-host stream)
                 (print-unreadable-object (logical-host stream :type t)
@@ -71,7 +73,7 @@
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
-(sb!xc:defstruct (pattern (:constructor make-pattern (pieces)))
+(sb!xc:defstruct (pattern (:constructor make-pattern (pieces)) (:copier nil))
   (pieces nil :type list))
 
 ;;;; PATHNAME structures
@@ -83,6 +85,7 @@
     '(member nil :unspecific :wild :unc)))
 
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
+                           (:copier nil)
                            (:constructor %%make-pathname
                                (host device directory name type version
                                 &aux (dir-hash (pathname-dir-hash directory))
@@ -127,6 +130,7 @@
 ;;; relations are mimicked using structures for efficiency.
 (sb!xc:defstruct (logical-pathname (:conc-name %logical-pathname-)
                                    (:include pathname)
+                                   (:copier nil)
                                    (:constructor %make-logical-pathname
                                     (host device directory name type version
                                      &aux (dir-hash (pathname-dir-hash directory))

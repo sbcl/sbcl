@@ -15,7 +15,7 @@
 
 (/show0 "code/alien-type.lisp 16")
 
-(sb!xc:defstruct (alien-value (:constructor %sap-alien (sap type)))
+(sb!xc:defstruct (alien-value (:copier nil) (:constructor %sap-alien (sap type)))
   (sap nil :type sb!sys:system-area-pointer)
   (type nil :type sb!alien::alien-type))
 (sb!xc:proclaim '(freeze-type alien-value))

@@ -488,6 +488,7 @@
 ;;; A TEMPLATE object represents a particular IR2 coding strategy for
 ;;; a known function.
 (def!struct (template (:constructor nil)
+                      (:copier nil)
                       #-sb-xc-host (:pure t))
   ;; the symbol name of this VOP. This is used when printing the VOP
   ;; and is also used to provide a handle for definition and
@@ -560,7 +561,7 @@
 ;;; A VOP-INFO object holds the constant information for a given
 ;;; virtual operation. We include TEMPLATE so that functions with a
 ;;; direct VOP equivalent can be translated easily.
-(def!struct (vop-info (:include template))
+(def!struct (vop-info (:include template) (:copier nil))
   ;; side effects of this VOP and side effects that affect the value
   ;; of this VOP
   (effects (missing-arg) :type attributes)
@@ -695,7 +696,7 @@
 
 ;;; The SB structure represents the global information associated with
 ;;; a storage base.
-(def!struct (sb)
+(def!struct (sb (:copier nil))
   ;; name, for printing and reference
   (name nil :type symbol)
   ;; the kind of storage base (which determines the packing
@@ -711,7 +712,7 @@
 
 ;;; A FINITE-SB holds information needed by the packing algorithm for
 ;;; finite SBs.
-(def!struct (finite-sb (:include sb))
+(def!struct (finite-sb (:include sb) (:copier nil))
   ;; the minimum number of location by which to grow this SB
   ;; if it is :unbounded
   (size-increment 1 :type index)

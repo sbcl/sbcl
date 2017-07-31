@@ -75,6 +75,7 @@
 ;;; also used in EQ comparisons to determined if two types have the
 ;;; "same kind".
 (def!struct (type-class
+             (:copier nil)
              #-no-ansi-print-object
              (:print-object (lambda (x stream)
                               (print-unreadable-object (x stream :type t)
@@ -222,6 +223,7 @@
 
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
+                   (:copier nil)
                    #-sb-xc-host (:pure t))
   ;; the class of this type
   ;;
@@ -688,6 +690,7 @@
 
 (in-package "SB!ALIEN")
 (def!struct (alien-type
+             (:copier nil)
              (:constructor make-alien-type
                            (&key class bits alignment
                             &aux (alignment
@@ -732,7 +735,8 @@
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type
-                               (class-info (type-class-or-lose 'function)))
+                      (class-info (type-class-or-lose 'function)))
+                     (:copier nil)
                      (:constructor
                       %make-fun-type (required optional rest
                                       keyp keywords allowp wild-args returns)))

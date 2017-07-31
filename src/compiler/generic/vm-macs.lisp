@@ -34,6 +34,7 @@
 
 (def!struct (prim-object-slot
              (:constructor make-slot (name rest-p offset special options))
+             (:copier nil)
              (:conc-name slot-))
   (name nil :type symbol :read-only t)
   (rest-p nil :type (member t nil) :read-only t)
@@ -43,7 +44,7 @@
   ;; referenced as special variables, this slot holds the name of that variable.
   (special nil :type symbol :read-only t))
 
-(def!struct (primitive-object)
+(def!struct (primitive-object (:copier nil))
   (name nil :type symbol :read-only t)
   (widetag nil :type symbol :read-only t)
   (lowtag nil :type symbol :read-only t)
@@ -212,7 +213,7 @@
 
 ;;; For a documentation, see CUT-TO-WIDTH.
 
-(defstruct modular-class
+(defstruct (modular-class (:copier nil))
   ;; hash: name -> { :GOOD | optimizer | ({modular-fun-info}*)}
   (funs (make-hash-table :test 'eq))
   ;; hash: modular-variant -> (prototype width)
@@ -235,7 +236,7 @@
      (aver signedp)
      *tagged-modular-class*)))
 
-(defstruct modular-fun-info
+(defstruct (modular-fun-info (:copier nil))
   (name (missing-arg) :type symbol)
   (width (missing-arg) :type (integer 0))
   (signedp (missing-arg) :type boolean)

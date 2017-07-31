@@ -60,6 +60,7 @@
                         (:include ,include-defstruct
                                   (class ',name)
                                   ,@overrides)
+                        (:copier nil)
                         (:constructor
                          ,(symbolicate "MAKE-" defstruct-name)
                          (&key class bits alignment
@@ -829,7 +830,7 @@
 
 ;;;; the RECORD type
 
-(def!struct (alien-record-field)
+(def!struct (alien-record-field (:copier nil))
   (name (missing-arg) :type symbol)
   (type (missing-arg) :type alien-type)
   (bits nil :type (or unsigned-byte null))
@@ -1088,6 +1089,7 @@
 ;;; these structures and LOCAL-ALIEN and friends communicate
 ;;; information about how that local alien is represented.
 (def!struct (local-alien-info
+             (:copier nil)
              (:constructor make-local-alien-info
                            (&key type force-to-memory-p
                             &aux (force-to-memory-p (or force-to-memory-p

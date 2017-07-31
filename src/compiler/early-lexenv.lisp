@@ -77,6 +77,7 @@
                     (print-unreadable-object (lexenv stream)
                       (write-string "NULL-LEXENV" stream))
                     (default-structure-print lexenv stream depth))))
+             (:copier nil)
              (:constructor make-null-lexenv ())
              (:constructor make-almost-null-lexenv (%policy handled-conditions))
              (:constructor make-package-lock-lexenv

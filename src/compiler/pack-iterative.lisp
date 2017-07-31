@@ -47,6 +47,7 @@
 ;;; Interference graph data structure
 (defstruct (ordered-set
             (:include sset)
+            (:copier nil)
             (:conc-name #:oset-))
   (members nil :type list))
 
@@ -71,6 +72,7 @@
 ;; vertex in an interference graph
 (def!struct (vertex
              (:include sset-element)
+             (:copier nil)
              (:constructor make-vertex (tn pack-type)))
   ;; incidence set, as an ordered list (for reproducibility)
   (incidence (make-ordered-set) :type ordered-set)
@@ -98,6 +100,7 @@
 
 ;; interference graph
 (def!struct (interference-graph
+             (:copier nil)
              (:constructor %make-interference-graph)
              (:conc-name #:ig-))
   ;; sorted set of yet-uncolored (and not necessarily spilled)

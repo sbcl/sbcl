@@ -493,6 +493,7 @@ between the ~A definition and the ~A definition"
 ;;; classes. Non-structure "typed" defstructs are a special case, and
 ;;; don't have a corresponding class.
 (def!struct (structure-classoid (:include classoid)
+                                (:copier nil)
                                 (:constructor %make-structure-classoid)))
 (defun make-structure-classoid (&key name)
   (mark-ctype-interned (%make-structure-classoid :name name)))

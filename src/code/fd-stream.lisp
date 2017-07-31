@@ -40,7 +40,8 @@
 ;;;;  (incf (buffer-tail buffer) n))
 ;;;;
 
-(defstruct (buffer (:constructor %make-buffer (sap length)))
+(defstruct (buffer (:constructor %make-buffer (sap length))
+                   (:copier nil))
   (sap (missing-arg) :type system-area-pointer :read-only t)
   (length (missing-arg) :type index :read-only t)
   (head 0 :type index)

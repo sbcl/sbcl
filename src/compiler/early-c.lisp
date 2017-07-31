@@ -234,7 +234,8 @@ the stack without triggering overflow protection.")
                 :format-arguments (list symbol)))
   (values))
 
-(def!struct (debug-name-marker (:print-function print-debug-name-marker)))
+(def!struct (debug-name-marker (:print-function print-debug-name-marker)
+                               (:copier nil)))
 
 (defvar *debug-name-level* 4)
 (defvar *debug-name-length* 12)
@@ -309,7 +310,7 @@ the stack without triggering overflow protection.")
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.
-(def!struct (heap-alien-info)
+(def!struct (heap-alien-info (:copier nil))
   ;; The type of this alien.
   (type (missing-arg) :type alien-type)
   ;; Its name.

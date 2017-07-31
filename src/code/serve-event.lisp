@@ -30,7 +30,8 @@
   ;; T if this descriptor is bogus.
   bogus)
 
-(defstruct (pollfds (:constructor make-pollfds (list)))
+(defstruct (pollfds (:constructor make-pollfds (list))
+                    (:copier nil))
   (list)
   ;; If using poll() we maintain, in addition to a list of HANDLER,
   ;; an (ALIEN (* STRUCT POLLFD)) to avoid creating it repeatedly.

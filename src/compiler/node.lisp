@@ -34,7 +34,7 @@
 ;;; that works only for compiling the compiler.
 
 ;;; "Lead-in" Control TRANsfer [to some node]
-(def!struct (ctran (:constructor make-ctran))
+(def!struct (ctran (:constructor make-ctran) (:copier nil))
   ;; an indication of the way that this continuation is currently used
   ;;
   ;; :UNUSED
@@ -69,7 +69,8 @@
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
 ;;; temporal storage.
-(def!struct (lvar (:constructor make-lvar (&optional dest)))
+(def!struct (lvar (:constructor make-lvar (&optional dest))
+                  (:copier nil))
   ;; The node which receives this value. NIL only temporarily.
   (dest nil :type (or node null))
   ;; cached type of this lvar's value. If NIL, then this must be
@@ -237,7 +238,7 @@
 (def!struct (cloop (:conc-name loop-)
                    (:predicate loop-p)
                    (:constructor make-loop)
-                   (:copier copy-loop))
+                   (:copier nil))
   ;; The kind of loop that this is.  These values are legal:
   ;;
   ;;    :OUTER
@@ -286,6 +287,7 @@
 (def!struct (cblock (:include sset-element)
                     (:constructor make-block (start))
                     (:constructor make-block-key)
+                    (:copier nil)
                     (:conc-name block-)
                     (:predicate block-p))
   ;; a list of all the blocks that are predecessors/successors of this
@@ -632,6 +634,7 @@
 ;;; continuation, although it is accessed by searching in the
 ;;; PHYSENV-NLX-INFO.
 (def!struct (nlx-info
+             (:copier nil)
              (:constructor make-nlx-info (cleanup
                                           exit
                                           &aux
@@ -678,6 +681,7 @@
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
 (def!struct (leaf (:include sset-element (number (incf *compiler-sset-counter*)))
+                  (:copier nil)
                   (:constructor nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
@@ -748,13 +752,14 @@
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.
 (def!struct (basic-var (:include leaf)
+                       (:copier nil)
                        (:constructor nil))
   ;; Lists of the set nodes for this variable.
   (sets () :type list))
 
 ;;; The GLOBAL-VAR structure represents a value hung off of the symbol
 ;;; NAME.
-(def!struct (global-var (:include basic-var))
+(def!struct (global-var (:include basic-var) (:copier nil))
   ;; kind of variable described
   (kind (missing-arg)
         :type (member :special :global-function :global :unknown)))
@@ -783,7 +788,8 @@
 ;;; INLINEP values are preserved.
 (def!struct (defined-fun (:include global-var
                                    (where-from :defined)
-                                   (kind :global-function)))
+                                   (kind :global-function))
+                         (:copier nil))
   ;; The values of INLINEP and INLINE-EXPANSION initialized from the
   ;; global environment.
   (inlinep nil :type inlinep)
@@ -807,7 +813,8 @@
 (def!struct (functional (:include leaf
                                   (%source-name '.anonymous.)
                                   (where-from :defined)
-                                  (type (specifier-type 'function))))
+                                  (type (specifier-type 'function)))
+                        (:copier nil))
   ;; (For public access to this slot, use LEAF-DEBUG-NAME.)
   ;;
   ;; the name of FUNCTIONAL for debugging purposes, or NIL if we
@@ -1011,7 +1018,7 @@
                      (:conc-name lambda-)
                      (:predicate lambda-p)
                      (:constructor make-lambda)
-                     (:copier copy-lambda))
+                     (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
   (vars nil :type list :read-only t)
   ;; If this function was ever a :OPTIONAL function (an entry-point
@@ -1124,7 +1131,7 @@
 ;;; arguments into a direct call to the appropriate entry-point
 ;;; function, so functions that are compiled together can avoid doing
 ;;; the dispatch.
-(def!struct (optional-dispatch (:include functional))
+(def!struct (optional-dispatch (:include functional) (:copier nil))
   ;; the original parsed argument list, for anyone who cares
   (arglist nil :type list)
   ;; true if &ALLOW-OTHER-KEYS was supplied
@@ -1173,7 +1180,7 @@
 ;;; LAMBDA-VARs during IR1 conversion. If we use one of these things,
 ;;; then the var will have to be massaged a bit before it is simple
 ;;; and lexical.
-(def!struct arg-info
+(def!struct (arg-info (:copier nil))
   ;; true if this arg is to be specially bound
   (specialp nil :type boolean)
   ;; the kind of argument being described. Required args only have arg
@@ -1232,7 +1239,7 @@
   explicit-value-cell
   )
 
-(def!struct (lambda-var (:include basic-var))
+(def!struct (lambda-var (:include basic-var) (:copier nil))
   (flags (lambda-var-attributes)
          :type attributes)
   ;; the CLAMBDA that this var belongs to. This may be null when we are
@@ -1313,7 +1320,7 @@
                  (:conc-name if-)
                  (:predicate if-p)
                  (:constructor make-if)
-                 (:copier copy-if))
+                 (:copier nil))
   ;; LVAR for the predicate
   (test (missing-arg) :type lvar)
   ;; the blocks that we execute next in true and false case,
@@ -1333,7 +1340,7 @@
                   (:conc-name set-)
                   (:predicate set-p)
                   (:constructor make-set)
-                  (:copier copy-set))
+                  (:copier nil))
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
@@ -1416,7 +1423,7 @@
                      (:conc-name return-)
                      (:predicate return-p)
                      (:constructor make-return)
-                     (:copier copy-return))
+                     (:copier nil))
   ;; the lambda we are returning from. Null temporarily during
   ;; ir1tran.
   (lambda nil :type (or clambda null))
@@ -1435,6 +1442,7 @@
 ;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
 ;;; type ASSERTED-TYPE.
 (def!struct (cast (:include valued-node)
+                  (:copier nil)
                   (:constructor %make-cast))
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
@@ -1477,7 +1485,8 @@
 ;;; DELETE-CAST deletes BOUND-CAST-CHECK
 ;;; GENERATE-TYPE-CHECKS ignores it, it never translates to a type check,
 ;;; %CHECK-BOUND does all the checking.
-(def!struct (bound-cast (:include cast (%type-check nil)))
+(def!struct (bound-cast (:include cast (%type-check nil))
+                        (:copier nil))
   ;; %check-bound combination before the cast
   (check (missing-arg) :type (or null combination))
   ;; Tells whether the type information is in a state where it can be
@@ -1490,7 +1499,7 @@
 ;;; VALID-CALLABLE-ARGUMENT so that it can be rerun in
 ;;; IR1-OPTIMIZE-CAST with better information.
 ;;; Also used by CALLABLE-CAST
-(def!struct (function-designator-cast (:include cast))
+(def!struct (function-designator-cast (:include cast) (:copier nil))
   (arg-count (missing-arg) :type index)
   (caller nil :type symbol))
 

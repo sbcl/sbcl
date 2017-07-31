@@ -92,7 +92,7 @@
 (defun globaldb-sxhashoid (name)
   (logand (sxhash name) sb!xc:most-positive-fixnum))
 
-(defstruct (info-hashtable (:conc-name info-env-))
+(defstruct (info-hashtable (:conc-name info-env-) (:copier nil))
   (storage (make-info-storage 30) :type simple-vector)
   (comparator #'equal :type function)
   (hash-function #'globaldb-sxhashoid :type function)

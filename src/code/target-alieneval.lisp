@@ -283,7 +283,7 @@ Examples:
                    (error
                     "cannot override the size of zero-dimensional arrays"))
                  (when (constantp size)
-                   (setf alien-type (copy-alien-array-type alien-type))
+                   (setf alien-type (copy-structure alien-type))
                    (setf (alien-array-type-dimensions alien-type)
                          (cons (constant-form-value size) (cdr dims)))))
                 (dims
@@ -868,7 +868,8 @@ way that the argument is passed.
 information we need to manipulate callbacks after their creation. Used for
 changing the lisp-side function they point to, invalidation, etc.")
 
-(defstruct callback-info
+(defstruct (callback-info
+            (:copier nil))
   specifier
   function ; NULL if invalid
   wrapper

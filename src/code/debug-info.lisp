@@ -372,6 +372,7 @@
 
 (def!struct (compiled-debug-info
              (:include debug-info)
+             (:copier nil)
              #-sb-xc-host (:pure t))
   ;; a SIMPLE-VECTOR of alternating DEBUG-FUN objects and fixnum
   ;; PCs, used to map PCs to functions, so that we can figure out what
