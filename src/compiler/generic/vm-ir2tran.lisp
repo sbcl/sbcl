@@ -99,7 +99,7 @@
                          `(ecase raw-type
                             ((t)
                              (vop init-slot node block object arg-tn
-                                  name (+ sb!vm:instance-slots-offset slot) lowtag))
+                                  name dx-p (+ sb!vm:instance-slots-offset slot) lowtag))
                             ,@(map 'list
                                (lambda (rsd)
                                  `(,(sb!kernel::raw-slot-data-raw-type rsd)
@@ -111,7 +111,7 @@
            (:dd
             (vop init-slot node block object
                  (emit-constant (sb!kernel::dd-layout-or-lose slot))
-                 name
+                 name dx-p
                  ;; Layout has no index if compact headers.
                  (or #!+compact-instance-header :layout sb!vm:instance-slots-offset)
                  lowtag))
@@ -148,7 +148,7 @@
                                              (sc-number-or-lose 'sb!vm::any-reg))))
                                     (vop make-funcallable-instance-tramp node block tn)
                                     tn)))))
-                     name slot lowtag))))))))
+                     name dx-p slot lowtag))))))))
   (unless (null args)
     (bug "Leftover args: ~S" args)))
 

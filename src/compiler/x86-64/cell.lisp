@@ -45,8 +45,9 @@
 
 ;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
 (define-vop (init-slot set-slot)
+  (:info name dx-p offset lowtag)
   (:generator 1
-    (progn name)
+    (progn name dx-p)
     (if (or #!+compact-instance-header
             (and (eq name '%make-structure-instance) (eql offset :layout)))
         ;; The layout is in the upper half of the header word.
