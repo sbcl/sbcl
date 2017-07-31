@@ -116,19 +116,19 @@ This is SETFable."
   ;;        The alien is allocated on the heap, and has infinite extent. The alien
   ;;        is allocated at load time, so the same piece of memory is used each time
   ;;        this form executes.
-  (/show "entering WITH-ALIEN" bindings)
+  (/noshow "entering WITH-ALIEN" bindings)
   (let (#!+c-stack-is-control-stack
         bind-alien-stack-pointer)
     (with-auxiliary-alien-types env
       (dolist (binding (reverse bindings))
-        (/show binding)
+        (/noshow binding)
         (destructuring-bind
             (symbol type &optional opt1 (opt2 nil opt2p))
             binding
-          (/show symbol type opt1 opt2)
+          (/noshow symbol type opt1 opt2)
           (let* ((alien-type (parse-alien-type type env))
                  (datap (not (alien-fun-type-p alien-type))))
-            (/show alien-type)
+            (/noshow alien-type)
             (multiple-value-bind (allocation initial-value)
                 (if opt2p
                     (values opt1 opt2)
@@ -139,7 +139,7 @@ This is SETFable."
                        (values opt1 nil))
                       (t
                        (values :local opt1))))
-              (/show allocation initial-value)
+              (/noshow allocation initial-value)
               (setf body
                     (ecase allocation
                       #+nil
@@ -155,14 +155,14 @@ This is SETFable."
                                    `((setq ,symbol ,initial-value)))
                                ,@body)))))
                       (:extern
-                       (/show0 ":EXTERN case")
+                       (/noshow0 ":EXTERN case")
                        `((symbol-macrolet
                              ((,symbol
                                 (%alien-value
                                  (foreign-symbol-sap ,initial-value ,datap) 0 ,alien-type)))
                            ,@body)))
                       (:local
-                       (/show0 ":LOCAL case")
+                       (/noshow0 ":LOCAL case")
                        (let* ((var (sb!xc:gensym "VAR"))
                               (initval (if initial-value (sb!xc:gensym "INITVAL")))
                               (info (make-local-alien-info :type alien-type))
@@ -177,7 +177,7 @@ This is SETFable."
                                     `((let ((,initval ,initial-value))
                                         ,@inner-body))
                                     inner-body)))
-                         (/show var initval info)
+                         (/noshow var initval info)
                          #!+c-stack-is-control-stack
                          (progn (setf bind-alien-stack-pointer t)
                                 `((let ((,var (make-local-alien ',info)))
@@ -195,9 +195,9 @@ This is SETFable."
                                ;; And in non-transformed case it
                                ;; performs finalization.
                                (dispose-local-alien ',info ,var))))))))))))
-      (/show "revised" body)
+      (/noshow "revised" body)
       (verify-local-auxiliaries-okay)
-      (/show0 "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
+      (/noshow0 "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
       `(symbol-macrolet ((&auxiliary-type-definitions&
                            ,(append *new-auxiliary-types*
                                     (auxiliary-type-definitions env))))
