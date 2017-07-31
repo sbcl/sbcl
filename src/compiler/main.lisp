@@ -2097,9 +2097,10 @@ SPEED and COMPILATION-SPEED optimization values, and the
 
 ;;;; Host compile time definitions
 #+sb-xc-host
-(defun compile-in-lexenv (name lambda lexenv)
+(defun compile-in-lexenv (lambda lexenv &rest rest)
   (declare (ignore lexenv))
-  (compile name lambda))
+  (aver (null rest))
+  (compile nil lambda))
 
 #+sb-xc-host
 (defun eval-tlf (form index &optional lexenv)

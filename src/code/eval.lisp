@@ -54,8 +54,8 @@
                              ;; anyone caring about performance should not
                              ;; be using EVAL.
                              (compiler-note #'muffle-warning))
-                (sb!c:compile-in-lexenv
-                 nil lambda lexenv *eval-source-info* *eval-tlf-index* (not call))))))
+                (sb!c:compile-in-lexenv lambda lexenv nil *eval-source-info*
+                                        *eval-tlf-index* (not call))))))
       (declare (function fun))
       (if call
           (funcall fun)

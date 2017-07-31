@@ -15,23 +15,11 @@
 
 ;;;; CL:COMPILE
 
-(defun get-lambda-to-compile (definition-designator)
-  (if (consp definition-designator)
-      definition-designator
-      (multiple-value-bind (definition env-p)
-                           (function-lambda-expression definition-designator)
-        (when env-p
-          (error "~S was defined in a non-null environment."
-                 definition-designator))
-        (unless definition
-          (error "can't find a definition for ~S" definition-designator))
-        definition)))
-
 ;;; Handle the nontrivial case of CL:COMPILE.
 ;;;
 ;;; If ERRORP is true signals an error immediately -- otherwise returns
 ;;; a function that will signal the error.
-(defun actually-compile (name definition *lexenv* source-info tlf errorp)
+(defun actually-compile (name form *lexenv* source-info tlf errorp)
   (let ((source-paths (when source-info *source-paths*)))
     (with-compilation-values
       (sb!xc:with-compilation-unit ()
@@ -47,7 +35,6 @@
                   ;; also have a source-paths already set up -- so drop
                   ;; the ones from WITH-COMPILATION-VALUES.
                   (*source-paths* (or source-paths *source-paths*))
-                  (form (get-lambda-to-compile definition))
                   (*source-info* (or source-info
                                   (make-lisp-source-info
                                    form :parent *source-info*)))
@@ -118,34 +105,21 @@
                               :message message
                               :source source)))))))))))
 
-(defun compile-in-lexenv (name definition lexenv
-                          &optional source-info tlf errorp)
-  (dx-flet ((really-compile (definition lexenv)
-              (actually-compile
-               name definition lexenv source-info tlf errorp)))
+(defun compile-in-lexenv (definition lexenv &optional name source-info tlf errorp)
+  (multiple-value-bind (sexpr lexenv)
+      (typecase definition
+        #!+sb-fasteval
+        (sb!interpreter:interpreted-function
+         (sb!interpreter:prepare-for-compile definition))
+        #!+sb-eval
+        (sb!eval:interpreted-function
+         (sb!eval:prepare-for-compile definition))
+        (t
+         (values definition lexenv)))
     (multiple-value-bind (compiled-definition warnings-p failure-p)
-        (typecase definition
-          #!+sb-fasteval
-          (sb!interpreter:interpreted-function
-           (multiple-value-call #'really-compile
-             (sb!interpreter:prepare-for-compile definition)))
-          #!+sb-eval
-          (sb!eval:interpreted-function
-           (multiple-value-call #'really-compile
-             (sb!eval:prepare-for-compile definition)))
-          (function
-           (values definition nil nil))
-          (t
-           (really-compile definition lexenv)))
+        (actually-compile name (the cons sexpr) lexenv source-info tlf errorp)
       (aver (typep compiled-definition 'compiled-function))
-      (let ((result (if (not name)
-                        compiled-definition
-                        (progn
-                          (if (and (symbolp name) (macro-function name))
-                              (setf (macro-function name) compiled-definition)
-                              (setf (fdefinition name) compiled-definition))
-                          name))))
-        (values result warnings-p failure-p)))))
+      (values compiled-definition warnings-p failure-p))))
 
 (defun compile (name &optional (definition (or (and (symbolp name)
                                                     (macro-function name))
@@ -168,7 +142,19 @@ WARNING occur during the compilation, and NIL otherwise.
 Tertiary value is true if any conditions of type ERROR, or WARNING that are
 not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 "
-  (compile-in-lexenv name definition (make-null-lexenv)))
+  (multiple-value-bind (compiled-definition warnings-p failure-p)
+      (if (compiled-function-p definition)
+          (values definition nil nil)
+          (compile-in-lexenv definition (make-null-lexenv) name))
+    (values (cond (name
+                   (if (and (symbolp name) (macro-function name))
+                       (setf (macro-function name) compiled-definition)
+                       (setf (fdefinition name) compiled-definition))
+                   name)
+                  (t
+                   compiled-definition))
+            warnings-p
+            failure-p)))
 
 (defun make-form-tracking-stream-observer (file-info)
    (lambda (arg1 arg2 arg3)

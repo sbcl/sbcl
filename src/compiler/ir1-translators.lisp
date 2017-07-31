@@ -328,10 +328,8 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
           (fail "The local macro argument list ~S is not a list."
                 arglist))
         `(,name macro .
-                ,(compile-in-lexenv
-                  nil
-                  (make-macro-lambda nil arglist body 'macrolet name)
-                  lexenv))))))
+                ,(compile-in-lexenv (make-macro-lambda nil arglist body 'macrolet name)
+                                    lexenv))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
