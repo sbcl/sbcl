@@ -698,7 +698,15 @@
     (let* ((sorted (sort dfuns #'< :key #'car))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
-       :name (component-name component)
+       ;; COMPONENT-NAME is often not useful, and sometimes completely fubar.
+       ;; Function names, on the other hand, are seldom unhelpful,
+       ;; so if there's only one function, pick that as the component name.
+       ;; Otherwise preserve whatever crummy name was already assigned.
+       :name (let* ((2comp (component-info component))
+                    (entries (sb!c::ir2-component-entries 2comp)))
+               (or (and (not (cdr entries))
+                        (sb!c::entry-info-name (car entries)))
+                   (component-name component)))
        :fun-map fun-map
        :tlf-number component-tlf-num
        :char-offset
