@@ -462,16 +462,24 @@
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
      (sc-number-or-lose 'immediate))
-    (symbol
-     ;; If #!+immobile-symbols, then ALL symbols are static in placement
-     ;; and in the sub-2GB space, therefore immediate constants.
-     ;; Otherwise, if #!+immobile-space, and either compilation is to memory
-     ;; and the symbol is in immobile-space, or if in the cross-compiler which
-     ;; dumps all symbols as immobile if possible, then it's immediate.
-     (when (or #!+(or immobile-symbols (and immobile-space (host-feature sb-xc-host))) t
-               #!+(and immobile-space (not (host-feature sb-xc-host)))
-               (and (sb!c::core-object-p sb!c::*compile-object*)
-                    (typep (get-lisp-obj-address value) '(signed-byte 32)))
+    (symbol ; Symbols in static and immobile space are immediate
+     (when (or ;; With #!+immobile-symbols, all symbols are in immobile-space.
+               ;; And the cross-compiler always uses immobile-space if enabled.
+               #!+(or immobile-symbols (and immobile-space (host-feature sb-xc-host))) t
+
+               ;; Otherwise, if #!-immobile-symbols, and the symbol was present
+               ;; in the initial core image as indicated by the symbol header, then
+               ;; it's in immobile-space. There is a way in which the bit can be wrong,
+               ;; but it's highly unlikely - the symbol would have to be uninterned from
+               ;; the loading SBCL, reallocated in dynamic space and re-interned into its
+               ;; initial package. All without breaking anything. Hence, unlikely.
+               ;; Also note that if compiling to memory, the symbol's current address
+               ;; is used to determine whether it's immediate.
+               #!+(and (not (host-feature sb-xc-host)) immobile-space (not immobile-symbols))
+               (or (logbitp +initial-core-symbol-bit+ (get-header-data value))
+                   (and (sb!c::core-object-p sb!c::*compile-object*)
+                        (typep (get-lisp-obj-address value) '(signed-byte 32))))
+
                (static-symbol-p value))
        (sc-number-or-lose 'immediate)))
     (single-float

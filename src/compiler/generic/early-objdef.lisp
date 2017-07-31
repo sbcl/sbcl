@@ -303,6 +303,11 @@
 ;; nonetheless, opportunities for sharing abound.
 (defconstant +vector-shareable-nonstd+ #x200)
 
+;;; This is so that COMPILE-FILE knows that things like :ALLOW-OTHER-KEYS
+;;; can be immediate constants.
+#!+(and immobile-space (not immobile-symbols))
+(defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
+
 #|
 ;; Run this in the SB-VM or SB!VM package once for each target feature combo.
 (defun rewrite-widetag-comments ()
