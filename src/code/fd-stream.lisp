@@ -536,7 +536,10 @@
 (defun synchronize-stream-output (stream)
   ;; If we're reading and writing on the same file, flush buffered
   ;; input and rewind file position accordingly.
-  (unless (fd-stream-dual-channel-p stream)
+  (unless (or (fd-stream-dual-channel-p stream)
+              (and
+               (eq (fd-stream-in stream) #'ill-in)
+               (eq (fd-stream-bin stream) #'ill-bin)))
     (let ((adjust (nth-value 1 (flush-input-buffer stream))))
       (unless (eql 0 adjust)
         (sb!unix:unix-lseek (fd-stream-fd stream) (- adjust) sb!unix:l_incr)))))
@@ -1919,8 +1922,10 @@
 ;;; and returns the input buffer, and the amount of flushed input in
 ;;; bytes.
 (defun flush-input-buffer (stream)
-  (let ((unread (length (fd-stream-instead stream))))
-    (setf (fill-pointer (fd-stream-instead stream)) 0)
+  (let* ((instead (fd-stream-instead stream))
+         (unread (length instead)))
+    ;; (setf fill-pointer) performs some checks and is slower
+    (setf (%array-fill-pointer instead) 0)
     (let ((ibuf (fd-stream-ibuf stream)))
       (if ibuf
           (let ((head (buffer-head ibuf))
