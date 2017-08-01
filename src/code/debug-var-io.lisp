@@ -178,15 +178,15 @@
 ;;; A somewhat bad (slow and not-very-squishy) compressor
 ;;; that gets between 15% and 20% space savings in debug blocks.
 ;;; Lengthy input may be compressible by as much as 3:1.
+#-sb-xc-host
+(declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+                lz-compress))
 (defun lz-compress (input)
-  #-sb-xc-host
-  (declare (type (simple-array (unsigned-byte 8) (*)) input))
   (let ((output (make-array (length input)
                             :element-type '(unsigned-byte 8)
                             :fill-pointer 0 :adjustable t))
         (tempbuf (make-array 8 :element-type '(unsigned-byte 8)
-                               :fill-pointer 0 :adjustable t))
-        (pos 0))
+                               :fill-pointer 0)))
     (flet ((compare (index1 index2 end &aux (start1 index1))
              (loop
               (when (or (eql index2 end)
@@ -194,7 +194,8 @@
                 (return-from compare (- index1 start1)))
               (incf index1)
               (incf index2))))
-      (loop while (< pos (length input))
+      (loop with pos of-type index = 0
+            while (< pos (length input))
             do
         (let ((match-start 0)
               (match-len 2))
@@ -238,6 +239,9 @@
       (aver (equalp input (lz-decompress result)))
       result)))
 
+#-sb-xc-host
+(declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+                lz-decompress))
 (defun lz-decompress (input)
   (let* ((length (length input))
          (output (make-array (* length 2)
