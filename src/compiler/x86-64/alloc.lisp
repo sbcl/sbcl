@@ -288,14 +288,15 @@
   (:node-var node)
   (:generator 10
    (maybe-pseudo-atomic stack-allocate-p
-    (let ((size (+ length closure-info-offset)))
+    (let* ((size (+ length closure-info-offset))
+           (header (logior (ash (1- size) n-widetag-bits) closure-widetag)))
       (allocation result (pad-data-block size) node stack-allocate-p
                   fun-pointer-lowtag)
-      (storew* (logior (ash (1- size) n-widetag-bits) closure-widetag)
+      (storew* #!-immobile-space header ; write the widetag and size
+               #!+immobile-space        ; ... plus the layout pointer
+               (progn (inst mov temp (logior (ash function-layout 32) header))
+                      temp)
                result 0 fun-pointer-lowtag (not stack-allocate-p)))
-    #!+immobile-space ; store layout in header word
-    (inst mov (make-ea-for-object-slot-half result 1/2 fun-pointer-lowtag)
-          function-layout)
     ;; These two instructions are within the scope of PSEUDO-ATOMIC.
     ;; This is due to scav_closure() assuming that it can always subtract
     ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
