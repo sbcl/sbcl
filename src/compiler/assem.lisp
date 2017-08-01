@@ -1270,6 +1270,8 @@
   "Emit an alignment restriction to the current segment."
   `(%emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,pattern))
 
+(declaim (ftype (sfunction (label &optional t index) (or null index))
+                label-position))
 (defun label-position (label &optional if-after delta)
   "Return the current position for LABEL. Chooser maybe-shrink functions
    should supply IF-AFTER and DELTA in order to ensure correct results."
