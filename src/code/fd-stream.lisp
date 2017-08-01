@@ -1634,7 +1634,13 @@
                               ,name sap head decode-break-reason))
                            (when (zerop (char-code char))
                              (return count))))
-                 (string (make-string length :element-type element-type)))
+                 (string (case element-type
+                           (base-char
+                            (make-string length :element-type 'base-char))
+                           (character
+                            (make-string length :element-type 'character))
+                           (t
+                            (make-string length :element-type element-type)))))
             (declare (ignorable stream)
                      (type index head length) ;; size
                      (type (unsigned-byte 8) byte)
