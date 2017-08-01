@@ -918,8 +918,7 @@ void scan_weak_pointers(void)
  * processed automatically; only the yougest generation is GC'd by
  * default. On the other hand, all applications will need an
  * occasional full GC anyway, so it's not that bad either.  */
-struct hash_table *weak_hash_tables_pending = NULL;
-struct hash_table *weak_hash_tables_done = NULL;
+struct hash_table *weak_hash_tables = NULL;
 
 /* Return true if OBJ has already survived the current GC. */
 static inline int pointer_survived_gc_yet(lispobj obj)
@@ -948,20 +947,20 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 #endif
 }
 
-static inline int survived_gc_yet_KEY(lispobj key, lispobj value) {
+static int survived_gc_yet_KEY(lispobj key, lispobj value) {
     return !is_lisp_pointer(key) || pointer_survived_gc_yet(key);
 }
-static inline int survived_gc_yet_VALUE(lispobj key, lispobj value) {
+static int survived_gc_yet_VALUE(lispobj key, lispobj value) {
     return !is_lisp_pointer(value) || pointer_survived_gc_yet(value);
 }
-static inline int survived_gc_yet_AND(lispobj key, lispobj value) {
+static int survived_gc_yet_AND(lispobj key, lispobj value) {
     int key_nonpointer = !is_lisp_pointer(key);
     int val_nonpointer = !is_lisp_pointer(value);
     if (key_nonpointer && val_nonpointer) return 1;
     return (key_nonpointer || pointer_survived_gc_yet(key))
         && (val_nonpointer || pointer_survived_gc_yet(value));
 }
-static inline int survived_gc_yet_OR(lispobj key, lispobj value) {
+static int survived_gc_yet_OR(lispobj key, lispobj value) {
     int key_nonpointer = !is_lisp_pointer(key);
     int val_nonpointer = !is_lisp_pointer(value);
     if (key_nonpointer || val_nonpointer) return 1;
@@ -996,10 +995,8 @@ get_array_data (lispobj array, int widetag, uword_t *length)
  * table. Phantom entries such as the hash table itself at index 0 and
  * the empty marker at index 1 were scavenged by scav_vector that
  * either called this function directly or arranged for it to be
- * called later by pushing the hash table onto weak_hash_tables_pending.
- * Return true if the entries need to be scavenged again in this GC cycle,
- * or false if they don't need to be */
-static boolean
+ * called later by pushing the hash table onto weak_hash_tables. */
+static void
 scav_hash_table_entries (struct hash_table *hash_table)
 {
     lispobj *kv_vector;
@@ -1046,7 +1043,6 @@ scav_hash_table_entries (struct hash_table *hash_table)
     /* Work through the KV vector. */
     int (*alivep_test)(lispobj,lispobj)
         = weak_hash_entry_alivep_fun[fixnum_value(hash_table->_weakness)];
-    boolean reprocess = 0;
 #define SCAV_ENTRIES(aliveness_predicate) \
     for (i = 1; i < next_vector_length; i++) {                                 \
         lispobj old_key = kv_vector[2*i];                                      \
@@ -1059,14 +1055,11 @@ scav_hash_table_entries (struct hash_table *hash_table)
                 lispobj new_key = kv_vector[2*i];                              \
                 if (old_key != new_key && new_key != empty_symbol)             \
                     hash_table->needs_rehash_p = T;                            \
-        }} else reprocess = 1; }
-
+    }}}
     if (alivep_test)
         SCAV_ENTRIES(alivep_test(old_key, value))
     else
         SCAV_ENTRIES(1)
-
-    return reprocess;
 }
 
 sword_t
@@ -1121,67 +1114,30 @@ scav_vector (lispobj *where, lispobj object)
         lose("hash_table table!=this table %x\n", hash_table->table);
     }
 
-    boolean live = 1;
-    if (hash_table->_weakness) {
-        /* If already in the deferral list, just return */
-        if (hash_table->next_weak_hash_table != NIL) goto done;
-        /* Peek at the vector to look for any k/v pair that isn't proven live.
-         * If all entries are live, scavenge the vector now. Otherwise defer. */
-        lispobj *next_vector;
-        uword_t next_vector_length;
-        uword_t i;
-        /* An assertion that 'next_vector' is non-NULL will be performed in
-         * scav_hash_table_entries and needn't be repeated here. */
-        next_vector = get_array_data(hash_table->next_vector,
-                                     SIMPLE_ARRAY_WORD_WIDETAG,
-                                     &next_vector_length);
-
-        /* "survived_p" is unswitched for a slight speedup. */
-#define TEST_LIVE(expr) \
-  for (i = 1; i < next_vector_length && (live = expr); i++) ; /* empty body */ break
-        switch (hash_table->_weakness) {
-        case 1: TEST_LIVE(survived_gc_yet_KEY(where[2*i], 0));
-        case 2: TEST_LIVE(survived_gc_yet_VALUE(0, where[2*i+1]));
-        case 3: TEST_LIVE(survived_gc_yet_AND(where[2*i], where[2*i+1]));
-        case 4: TEST_LIVE(survived_gc_yet_OR(where[2*i], where[2*i+1]));
-        }
-#undef TEST_LIVE
-    }
-    if (live) {
+    if (!hash_table->_weakness) {
         scav_hash_table_entries(hash_table);
     } else {
         /* Delay scavenging of this table by pushing it onto
-         * weak_hash_tables_pending (if it's not there already) for the weak
+         * weak_hash_tables (if it's not there already) for the weak
          * object phase. */
         if (hash_table->next_weak_hash_table == NIL) {
-            hash_table->next_weak_hash_table = (lispobj)weak_hash_tables_pending;
-            weak_hash_tables_pending = hash_table;
+            hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
+            weak_hash_tables = hash_table;
         }
     }
 
- done:
     return (CEILING(kv_length + 2, 2));
 }
 
 void
 scav_weak_hash_tables (void)
 {
-    struct hash_table *table, *predecessor = NULL, *successor;
+    struct hash_table *table;
 
     /* Scavenge entries whose triggers are known to survive. */
-    for (table = weak_hash_tables_pending; table != NULL; table = successor) {
-        boolean reprocess = scav_hash_table_entries(table);
-        successor = (struct hash_table *)table->next_weak_hash_table;
-        if (reprocess) { // keep it in the pending list
-            predecessor = table;
-        } else {         // remove it and push onto done list
-            if (predecessor)
-                predecessor->next_weak_hash_table = (lispobj)successor;
-            else
-                weak_hash_tables_pending = successor;
-            table->next_weak_hash_table = (lispobj)weak_hash_tables_done;
-            weak_hash_tables_done = table;
-        }
+    for (table = weak_hash_tables; table != NULL;
+         table = (struct hash_table *)table->next_weak_hash_table) {
+        scav_hash_table_entries(table);
     }
 }
 
@@ -1256,22 +1212,13 @@ scan_weak_hash_tables (void)
 {
     struct hash_table *table, *next;
 
-    // Objects in 'weak_hash_tables_done' have no dead entries.
-    // Just unchain them.
-    for (table = weak_hash_tables_done; table != NULL; table = next) {
-        next = (struct hash_table *)table->next_weak_hash_table;
-        table->next_weak_hash_table = NIL;
-    }
-    // Objects in 'weak_hash_tables_pending' have at least one entry
-    // that needs to be removed.
-    for (table = weak_hash_tables_pending; table != NULL; table = next) {
+    for (table = weak_hash_tables; table != NULL; table = next) {
         next = (struct hash_table *)table->next_weak_hash_table;
         table->next_weak_hash_table = NIL;
         scan_weak_hash_table(table);
     }
 
-    weak_hash_tables_pending = NULL;
-    weak_hash_tables_done = NULL;
+    weak_hash_tables = NULL;
 }
 
 
