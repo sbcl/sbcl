@@ -333,15 +333,22 @@
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
+    (progn name) ; possibly not used
     (maybe-pseudo-atomic stack-allocate-p
      (allocation result (pad-data-block words) node stack-allocate-p lowtag)
      (when type
-       (storew* (logior (ash (1- words) n-widetag-bits) type)
-                result 0 lowtag (not stack-allocate-p))))))
+       (let ((header (logior (ash (1- words) n-widetag-bits) type)))
+         (if (or #!+compact-instance-header
+                 (and (eq name '%make-structure-instance) stack-allocate-p))
+             ;; Write a :DWORD, not a :QWORD, because the high half will be
+             ;; filled in when the layout is stored. Can't use STOREW* though,
+             ;; because it tries to store as few bytes as possible,
+             ;; where this instruction must write exactly 4 bytes.
+             (inst mov (make-ea :dword :base result :disp (- lowtag)) header)
+             (storew* header result 0 lowtag (not stack-allocate-p))))))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
