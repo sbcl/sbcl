@@ -1116,7 +1116,7 @@
                                                                         :down
                                                                         :up)
                                                                     mode))
-                                            (tn-offset base) (tn-offset data)
+                                            pc-offset (tn-offset data)
                                             (ldb (byte 4 4) absolute-delta)
                                             opcode2 absolute-delta)))))
            ((integerp offset)
