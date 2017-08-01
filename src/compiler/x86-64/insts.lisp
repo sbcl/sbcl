@@ -16,6 +16,7 @@
   ;; Imports from this package into SB-VM
   (import '(conditional-opcode
             register-p xmm-register-p ; FIXME: rename REGISTER-P to GPR-P
+            ea-p sized-ea
             make-ea ea-disp) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::*byte-sc-names* sb!vm::*word-sc-names*
@@ -1067,6 +1068,11 @@
            (t
             (format stream "+~A" (ea-disp ea))))
          (write-char #\] stream))))
+
+(defun sized-ea (ea new-size)
+  (make-ea new-size
+           :base (ea-base ea) :index (ea-index ea) :scale (ea-scale ea)
+           :disp (ea-disp ea)))
 
 (defun emit-constant-tn-rip (segment constant-tn reg remaining-bytes)
   ;; AMD64 doesn't currently have a code object register to use as a

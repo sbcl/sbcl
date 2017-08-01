@@ -32,14 +32,14 @@
     (progn name) ; ignore it
     (generate-set-slot object value temp offset lowtag)))
 
-(defun generate-set-slot (object value temp offset lowtag)
+(defun generate-set-slot (object value temp offset lowtag &optional zeroed)
     (if (sc-is value immediate)
         (move-immediate (make-ea :qword
                                  :base object
                                  :disp (- (* offset n-word-bytes)
                                           lowtag))
                         (encode-value-if-immediate value)
-                        temp)
+                        temp zeroed)
         ;; Else, value not immediate.
         (storew value object offset lowtag)))
 
@@ -56,7 +56,7 @@
         (inst mov
               (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
               (reg-in-size value :dword))
-        (generate-set-slot object value temp offset lowtag))))
+        (generate-set-slot object value temp offset lowtag (not dx-p)))))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)

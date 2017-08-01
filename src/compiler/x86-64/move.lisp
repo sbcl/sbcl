@@ -80,7 +80,9 @@
   (any-reg descriptor-reg immediate)
   (any-reg descriptor-reg))
 
-(defun move-immediate (target val &optional tmp-tn)
+(defun move-immediate (target val &optional tmp-tn zeroed)
+  ;; Try to emit the smallest immediate operand if the destination word
+  ;; is already zeroed. Otherwise a :qword.
   (cond
     ;; If target is a register, we can just mov it there directly
     ((and (tn-p target)
@@ -91,6 +93,18 @@
            (t (inst mov target val))))
     ;; Likewise if the value is small enough.
     ((typep val '(or (signed-byte 32) #!+immobile-space fixup))
+     ;; This logic is similar to that of STOREW*.
+     ;; It would be nice to pull it all together in one place.
+     ;; The basic idea is that storing any byte-aligned 8-bit value
+     ;; should be a single byte write, etc.
+     (when (and zeroed (ea-p target))
+       (setq target (sized-ea target
+                              (typecase val
+                                ((unsigned-byte 8) :byte)
+                                ((unsigned-byte 16) :word)
+                                ;; signed-32 is no good, as it needs sign-extension.
+                                ((unsigned-byte 32) :dword)
+                                (t :qword)))))
      (inst mov target val))
     ;; Otherwise go through the temporary register
     (tmp-tn
