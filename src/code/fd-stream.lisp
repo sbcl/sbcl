@@ -127,7 +127,9 @@
   (dual-channel-p nil)
   ;; character position if known -- this may run into bignums, but
   ;; we probably should flip it into null then for efficiency's sake...
-  (output-column nil :type (or unsigned-byte null))
+  (output-column nil :type (or (and unsigned-byte
+                                    #!+64-bit index)
+                               null))
   ;; T if input is waiting on FD. :EOF if we hit EOF.
   (listen nil :type (member nil t :eof))
   ;; T if serve-event is allowed when this stream blocks
@@ -1499,7 +1501,8 @@
                                            (:full character))
           (if (eql byte #\Newline)
               (setf (fd-stream-output-column stream) 0)
-              (incf (fd-stream-output-column stream)))
+              (setf (fd-stream-output-column stream)
+                    (+ (truly-the unsigned-byte (fd-stream-output-column stream)) 1)))
         (let ((bits (char-code byte))
               (sap (buffer-sap obuf))
               (tail (buffer-tail obuf)))
