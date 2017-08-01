@@ -16,7 +16,7 @@
   ;; Imports from this package into SB-VM
   (import '(conditional-opcode
             register-p xmm-register-p ; FIXME: rename REGISTER-P to GPR-P
-            make-ea ea-disp) 'sb!vm)
+            make-ea ea-disp) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::*byte-sc-names* sb!vm::*word-sc-names*
             sb!vm::*dword-sc-names* sb!vm::*qword-sc-names*

@@ -19,7 +19,7 @@
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
             ldr-str-offset-encodable ldp-stp-offset-p
-            bic-mask extend lsl lsr asr ror @) 'sb!vm)
+            bic-mask extend lsl lsr asr ror @) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::*register-names*
             sb!vm::add-sub-immediate

@@ -13,7 +13,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(reg-tn-encoding) 'sb!vm)
+  (import '(reg-tn-encoding) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::zero sb!vm::registers sb!vm::float-registers
             sb!vm::single-reg sb!vm::double-reg
