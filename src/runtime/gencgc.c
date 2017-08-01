@@ -3177,7 +3177,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     gc_assert((generation != HIGHEST_NORMAL_GENERATION) || (raise == 0));
 
     /* Check if weak hash tables were processed in the previous GC. */
-    gc_assert(weak_hash_tables == NULL);
+    gc_assert(weak_hash_tables_pending == NULL);
 
     /* Initialize the weak pointer list. */
     weak_pointers = NULL;

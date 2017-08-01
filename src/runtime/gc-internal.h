@@ -177,7 +177,8 @@ extern sword_t (*sizetab[256])(lispobj *where);
   (is_cons_half(header)?2:sizetab[widetag_of(header)](where))
 
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
-extern struct hash_table *weak_hash_tables; /* in gc-common.c */
+extern struct hash_table *weak_hash_tables_pending; /* in gc-common.c */
+extern struct hash_table *weak_hash_tables_done; /* in gc-common.c */
 
 extern void heap_scavenge(lispobj *start, lispobj *limit);
 extern sword_t scavenge(lispobj *start, sword_t n_words);
