@@ -1666,18 +1666,16 @@
                    (declare (optimize (speed 3) (safety 0)))
                  (block output-nothing
                    (let* ((length (length string))
-                          (char-length (make-array (1+ length) :element-type 'index))
+                          (null-size (let* ((byte (code-char 0))
+                                            (bits (char-code byte)))
+                                       (declare (ignorable byte bits))
+                                       (the index ,out-size-expr)))
                           (buffer-length
                             (+ (loop for i of-type index below length
                                      for byte of-type character = (aref string i)
                                      for bits = (char-code byte)
-                                     sum (setf (aref char-length i)
-                                               (the index ,out-size-expr)) of-type index)
-                               (let* ((byte (code-char 0))
-                                      (bits (char-code byte)))
-                                 (declare (ignorable byte bits))
-                                 (setf (aref char-length length)
-                                       (the index ,out-size-expr)))))
+                                     sum (the index ,out-size-expr) of-type index)
+                               null-size))
                           (tail 0)
                           (,n-buffer (make-array buffer-length
                                                  :element-type '(unsigned-byte 8)))
@@ -1691,13 +1689,13 @@
                          (loop for i of-type index below length
                                for byte of-type character = (aref string i)
                                for bits = (char-code byte)
-                               for size of-type index = (aref char-length i)
+                               for size of-type index = ,out-size-expr
                                do (prog1
                                       ,out-expr
                                     (incf tail size)))
                          (let* ((bits 0)
                                 (byte (code-char bits))
-                                (size (aref char-length length)))
+                                (size null-size))
                            (declare (ignorable bits byte size))
                            ,out-expr)))
                      ,n-buffer))))))
