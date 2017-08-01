@@ -517,8 +517,7 @@
              :code code)
     (output-nothing ()
       :report (lambda (stream)
-                (format stream "~@<Skip output of this character.~@:>"))
-      (throw 'output-nothing nil))
+                (format stream "~@<Skip output of this character.~@:>")))
     (output-replacement (string)
       :report (lambda (stream)
                 (format stream "~@<Output replacement string.~@:>"))
@@ -527,13 +526,15 @@
                      (finish-output *query-io*)
                      (list (read *query-io*)))
       (let ((string (string string)))
-        (fd-sout stream (string string) 0 (length string)))
-      (throw 'output-nothing nil))))
+        (fd-sout stream (string string) 0 (length string))))))
 
-(defun external-format-encoding-error (stream code)
+(defun %external-format-encoding-error (stream code)
   (if (streamp stream)
       (stream-encoding-error-and-handle stream code)
       (c-string-encoding-error stream code)))
+
+(defmacro external-format-encoding-error (stream code)
+  `(return-from output-nothing (%external-format-encoding-error ,stream ,code)))
 
 (defun synchronize-stream-output (stream)
   ;; If we're reading and writing on the same file, flush buffered
@@ -567,7 +568,7 @@
          ;; FIXME: Why this here? Doesn't seem necessary.
          `(synchronize-stream-output ,stream-var))
       ,(if restart
-           `(catch 'output-nothing
+           `(block output-nothing
               ,@body
               (setf (buffer-tail obuf) (+ tail size)))
            `(progn
@@ -595,7 +596,7 @@
        ,(unless (eq (car buffering) :none)
           `(synchronize-stream-output ,stream-var))
        ,(if restart
-            `(catch 'output-nothing
+            `(block output-nothing
                ,@body
                (setf (buffer-tail obuf) (+ tail ,size)))
             `(progn
@@ -1473,7 +1474,7 @@
                            ;; STRING bounds have already been checked.
                            (optimize (safety 0)))
                   (,@(if output-restart
-                         `(catch 'output-nothing)
+                         `(block output-nothing)
                          `(progn))
                      (do* ()
                           ((or (= start end) (< (- len tail) 4)))
@@ -1485,7 +1486,7 @@
                          (setf (buffer-tail obuf) tail)
                          (incf start)))
                      (go flush))
-                  ;; Exited via CATCH: skip the current character.
+                  ;; Exited via RETURN-FROM OUTPUT-NOTHING: skip the current character.
                   (incf start))))
            flush
             (when (< start end)
@@ -1663,42 +1664,43 @@
               (t
                (locally
                    (declare (optimize (speed 3) (safety 0)))
-                 (let* ((length (length string))
-                        (char-length (make-array (1+ length) :element-type 'index))
-                        (buffer-length
-                          (+ (loop for i of-type index below length
-                                   for byte of-type character = (aref string i)
-                                   for bits = (char-code byte)
-                                   sum (setf (aref char-length i)
-                                             (the index ,out-size-expr)) of-type index)
-                             (let* ((byte (code-char 0))
-                                    (bits (char-code byte)))
-                               (declare (ignorable byte bits))
-                               (setf (aref char-length length)
-                                     (the index ,out-size-expr)))))
-                        (tail 0)
-                        (,n-buffer (make-array buffer-length
-                                               :element-type '(unsigned-byte 8)))
-                        stream)
-                   (declare (type index length buffer-length tail)
-                            (type null stream)
-                            (ignorable stream))
-                   (with-pinned-objects (,n-buffer)
-                     (let ((sap (vector-sap ,n-buffer)))
-                       (declare (system-area-pointer sap))
-                       (loop for i of-type index below length
-                             for byte of-type character = (aref string i)
-                             for bits = (char-code byte)
-                             for size of-type index = (aref char-length i)
-                             do (prog1
-                                    ,out-expr
-                                  (incf tail size)))
-                       (let* ((bits 0)
-                              (byte (code-char bits))
-                              (size (aref char-length length)))
-                         (declare (ignorable bits byte size))
-                         ,out-expr)))
-                   ,n-buffer)))))
+                 (block output-nothing
+                   (let* ((length (length string))
+                          (char-length (make-array (1+ length) :element-type 'index))
+                          (buffer-length
+                            (+ (loop for i of-type index below length
+                                     for byte of-type character = (aref string i)
+                                     for bits = (char-code byte)
+                                     sum (setf (aref char-length i)
+                                               (the index ,out-size-expr)) of-type index)
+                               (let* ((byte (code-char 0))
+                                      (bits (char-code byte)))
+                                 (declare (ignorable byte bits))
+                                 (setf (aref char-length length)
+                                       (the index ,out-size-expr)))))
+                          (tail 0)
+                          (,n-buffer (make-array buffer-length
+                                                 :element-type '(unsigned-byte 8)))
+                          stream)
+                     (declare (type index length buffer-length tail)
+                              (type null stream)
+                              (ignorable stream))
+                     (with-pinned-objects (,n-buffer)
+                       (let ((sap (vector-sap ,n-buffer)))
+                         (declare (system-area-pointer sap))
+                         (loop for i of-type index below length
+                               for byte of-type character = (aref string i)
+                               for bits = (char-code byte)
+                               for size of-type index = (aref char-length i)
+                               do (prog1
+                                      ,out-expr
+                                    (incf tail size)))
+                         (let* ((bits 0)
+                                (byte (code-char bits))
+                                (size (aref char-length length)))
+                           (declare (ignorable bits byte size))
+                           ,out-expr)))
+                     ,n-buffer))))))
 
       (let ((entry (%make-external-format
                     :names ',external-format
