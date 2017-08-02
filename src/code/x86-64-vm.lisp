@@ -64,7 +64,8 @@
   ;;      no named calls using the sequence "MOV RAX, imm32 ; CALL RAX"
   ;;      Hence SB!FASL::DO-COLD-FIXUP does not exactly mimic this logic.
   #!+immobile-space
-  (when (and (eq kind :absolute) (member flavor '(:named-call :immobile-object)))
+  (when (and (eq kind :absolute)
+             (member flavor '(:named-call :layout :immobile-object)))
     (let ((fixups (%code-fixups code)))
       ;; Sanctifying the code component will compact these into a bignum.
       (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))

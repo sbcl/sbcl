@@ -859,3 +859,26 @@
                                  other-pointer-lowtag))
           diff :lock)
     (move result diff)))
+
+(defknown layout-inherits-ref-eq (simple-vector index t) boolean (flushable))
+(define-vop (layout-inherits-ref-eq)
+  (:translate layout-inherits-ref-eq)
+  (:policy :fast-safe)
+  (:conditional :e)
+  (:args (vector :scs (descriptor-reg))
+         (index :scs (any-reg descriptor-reg immediate))
+         (thing :scs (descriptor-reg immediate)))
+  (:generator 1
+    (inst cmp
+          (if (sc-is index immediate)
+              (make-ea :dword :base vector
+                       :disp (+ (- other-pointer-lowtag)
+                                (ash (+ vector-data-offset (tn-value index))
+                                     word-shift)))
+              (make-ea :dword :base vector
+                       :disp (+ (- other-pointer-lowtag)
+                                (ash vector-data-offset word-shift))
+                       :index index :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
+          (if (sc-is thing immediate)
+              (make-fixup (tn-value thing) :layout)
+              thing))))

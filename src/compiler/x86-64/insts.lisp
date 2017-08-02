@@ -1532,7 +1532,7 @@
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
                                 '(:named-call :static-call :assembly-routine
-                                  :immobile-object :foreign)))
+                                  :layout :immobile-object :foreign)))
                    (maybe-emit-rex-prefix segment :dword nil nil dst)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
@@ -1562,7 +1562,7 @@
             ;; these should always end up in low memory.
             (aver (or (member (fixup-flavor src)
                               '(:foreign :foreign-dataref :symbol-tls-index
-                                :assembly-routine :immobile-object))
+                                :assembly-routine :layout :immobile-object))
                       (eq (ea-size dst) :dword)))
             (maybe-emit-rex-for-ea segment dst nil)
             (emit-byte segment #xC7)
@@ -1881,7 +1881,8 @@
       (emit-ea segment dst opcode :allow-constants allow-constants)
       (emit-byte segment src))
      ((or (integerp src)
-          (and (fixup-p src) (eq (fixup-flavor src) :immobile-object)))
+          (and (fixup-p src)
+               (memq (fixup-flavor src) '(:layout :immobile-object))))
       (maybe-emit-rex-for-ea segment dst nil)
       (cond ((accumulator-p dst)
              (emit-byte segment

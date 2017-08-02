@@ -482,6 +482,9 @@
 
                (static-symbol-p value))
        (sc-number-or-lose 'immediate)))
+    #!+immobile-space
+    (layout
+       (sc-number-or-lose 'immediate))
     (single-float
        (sc-number-or-lose
         (if (eql value 0f0) 'fp-single-zero 'fp-single-immediate)))
@@ -516,6 +519,9 @@
           (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
                         (make-fixup val :immobile-object)))
+          #!+immobile-space
+          (layout
+           (make-fixup val :layout))
           (character (if tag
                          (logior (ash (char-code val) n-widetag-bits)
                                  character-widetag)

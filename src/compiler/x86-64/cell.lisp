@@ -51,11 +51,11 @@
     (if (or #!+compact-instance-header
             (and (eq name '%make-structure-instance) (eql offset :layout)))
         ;; The layout is in the upper half of the header word.
-        ;; FIXME: It would be nice if FIXED-ALLOC could write the header word
-        ;; in one shot, but this is an acceptable workaround.
         (inst mov
               (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
-              (reg-in-size value :dword))
+              (if (sc-is value immediate)
+                  (make-fixup (tn-value value) :layout)
+                  (reg-in-size value :dword)))
         (generate-set-slot object value temp offset lowtag (not dx-p)))))
 
 (define-vop (compare-and-swap-slot)

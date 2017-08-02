@@ -684,6 +684,17 @@
                     ;; path is pretty heavy.
                     `(locally (declare (optimize (safety 0)))
                        (data-vector-ref (layout-inherits ,n-layout) ,depthoid)))
+                   (ancestor-layout-eq
+                    ;; Layouts are immediate constants in immobile space.
+                    ;; It would be far nicer if we had a pattern-matching pass
+                    ;; wherein the backend would recognize that
+                    ;; (eq (data-vector-ref ...) k) has a single instruction form,
+                    ;; but lacking that, force it into a single call
+                    ;; that a vop can translate.
+                    #!+immobile-space
+                    `(sb!vm::layout-inherits-ref-eq
+                      (layout-inherits ,n-layout) ,depthoid ,layout)
+                    #!-immobile-space `(eq ,get-ancestor ,layout))
                    (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
               `(and ,pred
@@ -698,7 +709,7 @@
                       ,(if abstract-base-p
                            `(eq (if ,deeper-p ,get-ancestor ,n-layout) ,layout)
                            `(cond ((eq ,n-layout ,layout) t)
-                                  (,deeper-p (eq ,get-ancestor ,layout))))))))
+                                  (,deeper-p ,ancestor-layout-eq)))))))
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
             ;; CONDITION, STREAM)

@@ -226,7 +226,8 @@
          (when (or (not use-immed-p)
                    #!+immobile-space
                    (let ((val (constant-value constant)))
-                     (and (symbolp val) (not (sb!vm:static-symbol-p val)))))
+                     (or (and (symbolp val) (not (sb!vm:static-symbol-p val)))
+                         (typep val 'layout))))
            (let ((constants (ir2-component-constants component)))
              (setf (tn-offset res) (fill-pointer constants))
              (vector-push-extend constant constants)))

@@ -204,3 +204,19 @@
     (let ((f (compile nil `(lambda () (setf (symbol-value ',s) nil)))))
       ;; Should not have a call to SET-SYMBOL-GLOBAL-VALUE>
       (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn))))))
+
+(with-test (:name :layout-constants
+                  :skipped-on '(not (and :x86-64 :immobile-space)))
+  (let ((addr-of-pathname-layout
+         (write-to-string
+          (sb-kernel:get-lisp-obj-address (sb-kernel:find-layout 'pathname))))
+        (count 0))
+    ;; The constant should appear in two CMP instructions
+    (dolist (line (split-string
+                   (with-output-to-string (s)
+                     (let ((sb-disassem:*disassem-location-column-width* 0))
+                       (disassemble 'pathnamep :stream s)))
+                   #\newline))
+      (when (and (search "CMP" line) (search addr-of-pathname-layout line))
+        (incf count)))
+    (assert (= count 2))))

@@ -1054,6 +1054,11 @@
          (aver (null name))
          (dump-fop 'fop-code-object-fixup fasl-output))
         #!+immobile-space
+        (:layout
+         (dump-non-immediate-object (classoid-name (layout-classoid name))
+                                    fasl-output)
+         (dump-fop 'fop-layout-fixup fasl-output))
+        #!+immobile-space
         (:immobile-object
          (dump-non-immediate-object (the symbol name) fasl-output)
          (dump-fop 'fop-immobile-obj-fixup fasl-output))

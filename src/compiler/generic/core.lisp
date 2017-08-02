@@ -78,7 +78,7 @@
                      (aver (null name))
                      (get-lisp-obj-address code))
                     #!+immobile-space
-                    (:immobile-object
+                    ((:immobile-object :layout)
                      (get-lisp-obj-address (the (or layout symbol) name)))
                     #!+immobile-code
                     (:named-call

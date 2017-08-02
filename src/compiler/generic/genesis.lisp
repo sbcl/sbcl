@@ -2911,14 +2911,25 @@ core and return a descriptor to it."
     (do-cold-fixup code-object offset value kind))) ; and re-push code-object
 
 #!+immobile-space
-(define-cold-fop (fop-immobile-obj-fixup)
-  (let ((obj (pop-stack))
-        (kind (pop-stack))
-        (code-object (pop-stack))
-        (offset (read-word-arg (fasl-input-stream))))
-    (do-cold-fixup code-object offset
-                   (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
-                   kind :immobile-object)))
+(progn
+  (define-cold-fop (fop-layout-fixup)
+    (let* ((obj (pop-stack))
+           (kind (pop-stack))
+           (code-object (pop-stack))
+           (offset (read-word-arg (fasl-input-stream)))
+           (cold-layout (or (gethash obj *cold-layouts*)
+                            (error "No cold-layout for ~S~%" obj))))
+      (do-cold-fixup code-object offset
+                     (descriptor-bits cold-layout)
+                     kind :immobile-object)))
+  (define-cold-fop (fop-immobile-obj-fixup)
+    (let ((obj (pop-stack))
+          (kind (pop-stack))
+          (code-object (pop-stack))
+          (offset (read-word-arg (fasl-input-stream))))
+      (do-cold-fixup code-object offset
+                     (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
+                     kind :immobile-object))))
 
 #!+immobile-code
 (define-cold-fop (fop-named-call-fixup)
