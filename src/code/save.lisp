@@ -17,6 +17,7 @@
 
 ;;;; SAVE-LISP-AND-DIE itself
 
+#!-gencgc
 (define-alien-routine "save" (boolean)
   (file c-string)
   (initial-fun (unsigned #.sb!vm:n-word-bits))

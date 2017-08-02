@@ -575,6 +575,7 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
     return file;
 }
 
+#ifdef LISP_FEATURE_CHENEYGC
 boolean
 save(char *filename, lispobj init_function, boolean prepend_runtime,
      boolean save_runtime_options, boolean compressed, int compression_level,
@@ -595,3 +596,4 @@ save(char *filename, lispobj init_function, boolean prepend_runtime,
                               save_runtime_options,
                               compressed ? compressed : COMPRESSION_LEVEL_NONE);
 }
+#endif
