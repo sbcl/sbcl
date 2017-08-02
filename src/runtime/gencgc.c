@@ -167,6 +167,9 @@ int gc_n_stack_pins;
 struct hopscotch_table pinned_objects;
 #endif
 
+/* This is always 0 except during gc_and_save() */
+lispobj lisp_init_function;
+
 /// Constants defined in gc-internal:
 ///   #define BOXED_PAGE_FLAG 1
 ///   #define UNBOXED_PAGE_FLAG 2
@@ -3421,9 +3424,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
 #ifdef LISP_FEATURE_SB_TRACEROOT
-    scavenge(&gc_object_watcher, 1);
+    if (gc_object_watcher) scavenge(&gc_object_watcher, 1);
 #endif
     scavenge_pinned_ranges();
+    /* The Lisp start function is stored in the core header, not a static
+     * symbol. It is passed to gc_and_save() in this C variable */
+    if (lisp_init_function) scavenge(&lisp_init_function, 1);
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
@@ -4317,8 +4323,7 @@ prepare_for_final_gc ()
 char gc_coalesce_string_literals = 0;
 
 /* Do a non-conservative GC, and then save a core with the initial
- * function being set to the value of the static symbol
- * SB!VM:RESTART-LISP-FUNCTION */
+ * function being set to the value of 'lisp_init_function' */
 void
 gc_and_save(char *filename, boolean prepend_runtime,
             boolean save_runtime_options, boolean compressed,
@@ -4370,12 +4375,12 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
-    save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0),
+    save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
                        compressed ? compression_level : COMPRESSION_LEVEL_NONE);
     /* Oops. Save still managed to fail. Since we've mangled the stack
      * beyond hope, there's not much we can do.
-     * (beyond FUNCALLing RESTART_LISP_FUNCTION, but I suspect that's
+     * (beyond FUNCALLing lisp_init_function, but I suspect that's
      * going to be rather unsatisfactory too... */
     lose("Attempt to save core after non-conservative GC failed.\n");
 }

@@ -148,8 +148,7 @@
 
      ;; interrupt handling
      *pseudo-atomic-atomic*
-     *pseudo-atomic-interrupted*
-     #!+gencgc *restart-lisp-function*)
+     *pseudo-atomic-interrupted*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

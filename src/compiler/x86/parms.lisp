@@ -250,10 +250,7 @@
      *fp-constant-l2t*
      *fp-constant-l2e*
      *fp-constant-lg2*
-     *fp-constant-ln2*
-
-     ;; For GC-AND-SAVE
-     *restart-lisp-function*)
+     *fp-constant-ln2*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

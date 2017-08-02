@@ -151,11 +151,7 @@
      *pseudo-atomic-bits*
 
      *allocation-pointer*
-     *binding-stack-pointer*
-
-     ;; For GC-AND-SAVE
-     *restart-lisp-function*
-     )
+     *binding-stack-pointer*)
   #'equalp)
 
 ;;; FIXME: with #!+immobile-space, this should be the empty list,

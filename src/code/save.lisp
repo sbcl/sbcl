@@ -37,7 +37,7 @@
   (application-type int))
 
 #!+gencgc
-(defvar sb!vm::*restart-lisp-function*)
+(define-alien-variable "lisp_init_function" (unsigned #.sb-vm:n-machine-word-bits))
 
 (define-condition save-condition (reference-condition)
   ()
@@ -214,9 +214,10 @@ sufficiently motivated to do lengthy fixes."
         ;; prior causes compilation to occur into immobile space.
         ;; Failing to see all immobile code would miss some relocs.
         (sb!kernel::choose-code-component-order root-structures))
-      ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
-      ;; access to it even after the GC has moved it.
-      (setf sb!vm::*restart-lisp-function* #'restart-lisp)
+      ;; Save the restart function. Logically a passed argument, but can't be,
+      ;; as it would require pinning around the whole save operation.
+      (with-pinned-objects (#'restart-lisp)
+        (setf lisp-init-function (get-lisp-obj-address #'restart-lisp)))
       ;; Do a destructive non-conservative GC, and then save a core.
       ;; A normal GC will leave huge amounts of storage unreclaimed
       ;; (over 50% on x86). This needs to be done by a single function
@@ -227,7 +228,8 @@ sufficiently motivated to do lengthy fixes."
                    (foreign-bool compression)
                    (or compression 0)
                    #!+win32 (ecase application-type (:console 0) (:gui 1))
-                   #!-win32 0))
+                   #!-win32 0)
+      (setf lisp-init-function 0)) ; only reach here on save error
     #!-gencgc
     (progn
       (if purify (purify :root-structures root-structures) (gc))

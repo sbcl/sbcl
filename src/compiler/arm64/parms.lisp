@@ -126,7 +126,6 @@
         *pseudo-atomic-interrupted*)
     *allocation-pointer*
      ;; interrupt handling
-     #!+gencgc *restart-lisp-function*
      ,@+common-static-symbols+)
   #'equalp)
 
