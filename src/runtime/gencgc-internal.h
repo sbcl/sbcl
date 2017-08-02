@@ -52,6 +52,15 @@ int gencgc_handle_wp_violation(void *);
   typedef unsigned short page_bytes_t;
 #endif
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+/* It is possible to enable fine-grained object pinning
+ * (versus page-level pinning) for any backend using gengc.
+ * The only "cost" is an extra test in from_space_p()
+ * which may or may not be worth it.
+ * But partial evacuation of pages is a generally nice feature */
+#  define PIN_GRANULARITY_LISPOBJ
+#endif
+
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently
  * not groveled from C code but hardcoded. Any changes to the
@@ -238,7 +247,7 @@ find_page_index(void *addr)
     return (-1);
 }
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#ifdef PIN_GRANULARITY_LISPOBJ
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;

@@ -59,8 +59,8 @@
 #include "genesis/layout.h"
 #include "gencgc.h"
 #include "hopscotch.h"
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-#include "genesis/cons.h"
+#ifdef GENCGC_IS_PRECISE
+#include "genesis/cons.h" /* for accessing *pinned-objects* */
 #endif
 #include "forwarding-ptr.h"
 
@@ -158,11 +158,13 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
-#ifndef GENCGC_IS_PRECISE
-struct hopscotch_table pinned_objects;
+#ifdef LISP_FEATURE_SB_TRACEROOT
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
+#endif
+#ifdef PIN_GRANULARITY_LISPOBJ
 int gc_n_stack_pins;
+struct hopscotch_table pinned_objects;
 #endif
 
 /// Constants defined in gc-internal:
@@ -1850,9 +1852,7 @@ maybe_adjust_large_object(page_index_t first_page)
     return;
 }
 
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-#  define scavenge_pinned_ranges()
-#  define wipe_nonpinned_words()
+#ifdef PIN_GRANULARITY_LISPOBJ
 /* After scavenging of the roots is done, we go back to the pinned objects
  * and look within them for pointers. While heap_scavenge() could certainly
  * do this, it would potentially lead to extra work, since we can't know
@@ -1860,7 +1860,6 @@ maybe_adjust_large_object(page_index_t first_page)
  * no telltale forwarding-pointer. The easiest thing to do is defer all
  * pinned objects to a subsequent pass, as is done here.
  */
-#else
 static void
 scavenge_pinned_ranges()
 {
@@ -1999,6 +1998,9 @@ pin_object(lispobj object)
         }
     }
 }
+#else
+#  define scavenge_pinned_ranges()
+#  define wipe_nonpinned_words()
 #endif
 
 /* Take a possible pointer to a Lisp object and mark its page in the
@@ -2113,7 +2115,7 @@ preserve_pointer(void *addr)
             break;
     }
 
-#ifndef GENCGC_IS_PRECISE
+#ifdef PIN_GRANULARITY_LISPOBJ
     /* Do not do this for multi-page objects.  Those pages do not need
      * object wipeout anyway. */
     if (i == first_page) { // single-page object
@@ -3089,7 +3091,7 @@ write_protect_generation_pages(generation_index_t generation)
     }
 }
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#ifndef GENCGC_IS_PRECISE
 static void
 preserve_context_registers (void (*proc)(os_context_register_t), os_context_t *c)
 {
@@ -3208,7 +3210,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[new_space].alloc_large_start_page = 0;
 #endif
 
-#ifndef GENCGC_IS_PRECISE
+#ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_reset(&pinned_objects);
 #endif
     /* Before any pointers are preserved, the dont_move flags on the
@@ -3246,7 +3248,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * initiates GC.  If you ever call GC from inside an altstack
      * handler, you will lose. */
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#ifndef GENCGC_IS_PRECISE
     /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
         for_each_thread(th) {
@@ -3349,7 +3351,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Scavenge all the rest of the roots. */
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef GENCGC_IS_PRECISE
     /*
      * If not x86, we need to scavenge the interrupt context(s) and the
      * control stack.
@@ -3469,7 +3471,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables(0);
-#ifndef GENCGC_IS_PRECISE
+#ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_log_stats(&pinned_objects, "pins");
 #endif
 
@@ -3808,7 +3810,7 @@ gc_init(void)
 #endif
 
     hopscotch_init();
-#ifndef GENCGC_IS_PRECISE
+#ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
 #endif
