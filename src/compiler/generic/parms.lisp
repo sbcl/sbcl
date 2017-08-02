@@ -12,7 +12,14 @@
 
 (in-package "SB!VM")
 
+;;; When building the cross-compiler (and called by the host), read the
+;;; dynamic-space-size file.
+;;; When called by the cross-compiler (in the host), use the previously chosen value.
+;;; The target function is never called, but if omitted via #-sb-xc-host,
+;;; compilation of !GENCGC-SPACE-SETUP would issue an "undefined" warning.
 (defun !read-dynamic-space-size ()
+  (unless (member :sb-xc-host *features*)
+    (return-from !read-dynamic-space-size (symbol-value 'default-dynamic-space-size)))
   (with-open-file (f "output/dynamic-space-size.txt")
     (let ((line (read-line f)))
       (multiple-value-bind (number end)

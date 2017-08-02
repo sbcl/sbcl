@@ -36,7 +36,7 @@
                                         :directory
                                         '(:relative :up :up "output")
                                         :name name :type type)
-                                       sb!xc:*compile-file-truename*))
+                                       sb!xc:*compile-file-pathname*))
                     (read-ub8-vector (pathname)
                       (with-open-file (stream pathname
                                               :element-type '(unsigned-byte 8))

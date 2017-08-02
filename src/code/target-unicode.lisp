@@ -19,7 +19,7 @@
                        :directory
                        '(:relative :up :up "output")
                        :name "numerics" :type "lisp-expr")
-                      sb!xc:*compile-file-truename*)
+                      sb!xc:*compile-file-pathname*)
                      :direction :input
                      :element-type 'character)
       (read stream)))
@@ -34,7 +34,7 @@
                         :directory
                         '(:relative :up :up "output")
                         :name "blocks" :type "lisp-expr")
-                       sb!xc:*compile-file-truename*)
+                       sb!xc:*compile-file-pathname*)
                       :direction :input
                       :element-type 'character)
        (read stream))
@@ -48,7 +48,7 @@
                                        :directory
                                        '(:relative :up :up "output")
                                        :name "misc-properties" :type "lisp-expr")
-                                      sb!xc:*compile-file-truename*)
+                                      sb!xc:*compile-file-pathname*)
                                      :direction :input
                                      :element-type 'character)
                       (read stream)))
@@ -59,7 +59,7 @@
                                        :directory
                                        '(:relative :up :up "output")
                                        :name "confusables" :type "lisp-expr")
-                                      sb!xc:*compile-file-truename*)
+                                      sb!xc:*compile-file-pathname*)
                                      :direction :input
                                      :element-type 'character)
                       (read stream)))
@@ -70,7 +70,7 @@
                                        :directory
                                        '(:relative :up :up "output")
                                        :name "bidi-mirrors" :type "lisp-expr")
-                                      sb!xc:*compile-file-truename*)
+                                      sb!xc:*compile-file-pathname*)
                                      :direction :input
                                      :element-type 'character)
                       (read stream))))
@@ -757,7 +757,7 @@ only characters for which it returns T are collected."
                        :directory
                        '(:relative :up :up "output")
                        :name "titlecases" :type "lisp-expr")
-                      sb!xc:*compile-file-truename*)
+                      sb!xc:*compile-file-pathname*)
                      :direction :input
                      :element-type 'character)
         (read stream)))
@@ -769,7 +769,7 @@ only characters for which it returns T are collected."
                        :directory
                        '(:relative :up :up "output")
                        :name "foldcases" :type "lisp-expr")
-                      sb!xc:*compile-file-truename*)
+                      sb!xc:*compile-file-pathname*)
                      :direction :input
                      :element-type 'character)
         (read stream)))
@@ -1501,7 +1501,7 @@ it defaults to 80 characters"
                        :directory
                        '(:relative :up :up "output")
                        :name "other-collation-info" :type "lisp-expr")
-                      sb!xc:*compile-file-truename*)
+                      sb!xc:*compile-file-pathname*)
                      :direction :input
                      :element-type 'character)
       (read stream)))

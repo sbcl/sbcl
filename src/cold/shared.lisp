@@ -288,13 +288,11 @@
     ;; genesis to include in the cold core.
     :not-genesis))
 
-(defparameter *stems-and-flags* (read-from-file "build-order.lisp-expr"))
-
 (defvar *array-to-specialization* (make-hash-table :test #'eq))
 
 (defmacro do-stems-and-flags ((stem flags) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
-    `(dolist (,stem-and-flags *stems-and-flags*)
+    `(dolist (,stem-and-flags (get-stems-and-flags))
        (let ((,stem (first ,stem-and-flags))
              (,flags (rest ,stem-and-flags)))
          ,@body
@@ -337,8 +335,13 @@
     (concatenate 'string obj-prefix (stem-remap-target stem) obj-suffix)))
 (compile 'stem-object-path)
 
+(defvar *stems-and-flags* nil)
 ;;; Check for stupid typos in FLAGS list keywords.
-(let ((stems (make-hash-table :test 'equal)))
+(defun get-stems-and-flags ()
+ (when *stems-and-flags*
+   (return-from get-stems-and-flags *stems-and-flags*))
+ (setf *stems-and-flags* (read-from-file "build-order.lisp-expr"))
+ (let ((stems (make-hash-table :test 'equal)))
   (do-stems-and-flags (stem flags)
     ;; We do duplicate stem comparison based on the object path in
     ;; order to cover the case of stems with an :assem flag, which
@@ -358,6 +361,7 @@
       (when set-difference
         (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
                set-difference)))))
+  *stems-and-flags*)
 
 ;;;; tools to compile SBCL sources to create the cross-compiler
 
