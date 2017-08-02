@@ -161,11 +161,8 @@
 
                     ;; everything else which needs a separate
                     ;; existence in xc and target
-                    "BOOLE"
-                    "BUILT-IN-CLASS"
                     "BYTE" "BYTE-POSITION" "BYTE-SIZE"
                     "CHAR-CODE"
-                    "CLASS" "CLASS-NAME" "CLASS-OF"
                     "CODE-CHAR"
                     "COMPILE-FILE"
                     "COMPILE-FILE-PATHNAME"
@@ -180,8 +177,6 @@
                     "DEFINE-SETF-EXPANDER"
                     "DEFMACRO" "DEFSETF" "DEFSTRUCT" "DEFTYPE"
                     "DEPOSIT-FIELD" "DPB"
-                    "FBOUNDP" "FDEFINITION" "FMAKUNBOUND"
-                    "FIND-CLASS"
                     "GENSYM" "*GENSYM-COUNTER*"
                     "GET-SETF-EXPANSION"
                     "LDB" "LDB-TEST"
@@ -193,8 +188,6 @@
                     "MASK-FIELD"
                     "PROCLAIM"
                     "SPECIAL-OPERATOR-P"
-                    "STANDARD-CLASS"
-                    "STRUCTURE-CLASS"
                     "SUBTYPEP"
                     "TYPE-OF" "TYPEP"
                     "UPGRADED-ARRAY-ELEMENT-TYPE"

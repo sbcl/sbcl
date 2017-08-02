@@ -226,7 +226,7 @@ evaluated as a PROGN."
   (when (fboundp name)
     (warn 'redefinition-with-defun
           :name name :new-function def :new-location source-location))
-  (setf (sb!xc:fdefinition name) def)
+  (setf (fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF
   ;; FDEFINITION) do the load-time package lock checking before
