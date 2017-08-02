@@ -613,10 +613,14 @@ instance_scan(void (*proc)(lispobj*, sword_t),
   sword_t index;
 
   if (fixnump(layout_bitmap)) {
-      sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
-      for (index = 0; index < nslots ; index++, bitmap >>= 1)
-          if (bitmap & 1)
-              proc(instance_slots + index, 1);
+      if (layout_bitmap == make_fixnum(-1))
+          proc(instance_slots, nslots);
+      else {
+          sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
+          for (index = 0; index < nslots ; index++, bitmap >>= 1)
+              if (bitmap & 1)
+                  proc(instance_slots + index, 1);
+      }
   } else { /* huge bitmap */
       struct bignum * bitmap;
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
