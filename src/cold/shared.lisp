@@ -538,20 +538,3 @@
              (funcall *target-compile-file* filename))))
 (compile 'target-compile-file)
 
-(defun make-assembler-package (pkg-name)
-  (when (find-package pkg-name)
-    (delete-package pkg-name))
-  (let ((pkg (make-package pkg-name
-                           :use '("CL" "SB!INT" "SB!EXT" "SB!KERNEL" "SB!VM"
-                                  "SB!SYS" ; for SAP accessors
-                                  ;; Dependence of the assembler on the compiler
-                                  ;; feels a bit backwards, but assembly needs
-                                  ;; TN-SC, TN-OFFSET, etc. because the compiler
-                                  ;; doesn't speak the assembler's language.
-                                  ;; Rather vice-versa.
-                                  "SB!C"))))
-    ;; Both SB-ASSEM and SB-DISASSEM export these two symbols.
-    ;; Neither is shadowing-imported. If you need one, package-qualify it.
-    (shadow '("SEGMENT" "MAKE-SEGMENT") pkg)
-    (use-package '("SB!ASSEM" "SB!DISASSEM") pkg)
-    pkg))
