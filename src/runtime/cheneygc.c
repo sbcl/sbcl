@@ -442,7 +442,7 @@ void clear_auto_gc_trigger(void)
 
 #if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
     /* don't want to force whole space into swapping mode... */
-    os_validate(addr, length);
+    os_validate(NOT_MOVABLE, addr, length);
 #else
     os_protect(addr, length, OS_VM_PROT_ALL);
 #endif

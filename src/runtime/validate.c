@@ -28,7 +28,7 @@
 static void
 ensure_space(lispobj *start, uword_t size)
 {
-    if (os_validate((os_vm_address_t)start,(os_vm_size_t)size)==NULL) {
+    if (os_validate(NOT_MOVABLE, (os_vm_address_t)start, (os_vm_size_t)size)==NULL) {
         fprintf(stderr,
                 "ensure_space: failed to allocate %lu bytes at %p\n",
                 (long unsigned)size, start);

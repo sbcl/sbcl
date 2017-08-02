@@ -34,7 +34,7 @@ os_init(char *argv[], char *envp[])
 }
 
 os_vm_address_t
-os_validate(os_vm_address_t addr, os_vm_size_t len)
+os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_address_t actual;
     int flags = MAP_PRIVATE | MAP_ANONYMOUS;

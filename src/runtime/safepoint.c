@@ -53,7 +53,7 @@
 void
 alloc_gc_page()
 {
-    os_validate(GC_SAFEPOINT_PAGE_ADDR, 4);
+    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, 4);
 }
 
 void

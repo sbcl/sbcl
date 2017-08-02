@@ -312,7 +312,7 @@ static void * under_2gb_free_pointer=DYNAMIC_1_SPACE_END;
 #endif
 
 os_vm_address_t
-os_validate(os_vm_address_t addr, os_vm_size_t len)
+os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     os_vm_address_t actual;
@@ -328,7 +328,7 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
         return 0;               /* caller should check this */
     }
 
-    if (addr && (addr!=actual)) {
+    if (!movable && (addr!=actual)) {
         fprintf(stderr, "mmap: wanted %lu bytes at %p, actually mapped at %p\n",
                 (unsigned long) len, addr, actual);
         return 0;

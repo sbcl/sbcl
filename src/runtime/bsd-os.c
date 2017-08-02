@@ -127,11 +127,26 @@ os_context_sigmask_addr(os_context_t *context)
 }
 
 os_vm_address_t
-os_validate(os_vm_address_t addr, os_vm_size_t len)
+os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
 {
     int flags = MAP_PRIVATE | MAP_ANON;
 
-    if (addr)
+    /* FIXME: use of MAP_FIXED here looks decidedly wrong! (and not what we do
+     * in linux-os.c). Granted there are differences between *BSD and Linux,
+     * but on MAP_FIXED they agree: it destroys an existing mapping.
+
+     * macOS says:
+       If the memory region specified by addr and len overlaps pages of any existing
+       mapping(s), then the overlapped part of the existing mapping(s) will be discarded.
+
+     * FreeBSD says:
+       If MAP_EXCL is not specified, a successful MAP_FIXED request replaces any
+       previous mappings for the process' pages ...
+
+     * OpenBSD says:
+       Except for MAP_FIXED mappings, the system will never replace existing mappings. */
+
+    if (!movable && addr)
         flags |= MAP_FIXED;
 
 #ifdef __NetBSD__

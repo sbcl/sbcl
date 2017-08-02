@@ -638,7 +638,7 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
 #endif
     {
         os_invalidate(addr, length);
-        new_addr = os_validate(addr, length);
+        new_addr = os_validate(NOT_MOVABLE, addr, length);
         if (new_addr == NULL || new_addr != addr) {
             lose("remap_free_pages: page moved, 0x%08x ==> 0x%08x",
                  start, new_addr);

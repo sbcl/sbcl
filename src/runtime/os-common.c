@@ -63,7 +63,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
          * zero-filled. */
 
         os_invalidate(block_start, block_size);
-        addr = os_validate(block_start, block_size);
+        addr = os_validate(NOT_MOVABLE, block_start, block_size);
 
         if (addr == NULL || addr != block_start)
             lose("os_zero: block moved! 0x%08x ==> 0x%08x\n",
@@ -76,7 +76,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
 os_vm_address_t
 os_allocate(os_vm_size_t len)
 {
-    return os_validate((os_vm_address_t)NULL, len);
+    return os_validate(MOVABLE, (os_vm_address_t)NULL, len);
 }
 
 void

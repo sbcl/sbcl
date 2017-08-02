@@ -73,7 +73,11 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
  *
  * FIXME: There was some documentation for these functions in
  * "hp-ux.c" in the old CMU CL code. Perhaps move/merge it in here. */
-extern os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len);
+#define MOVABLE 1
+#define NOT_MOVABLE 0
+extern os_vm_address_t os_validate(boolean movable,
+                                   os_vm_address_t desired_addr,
+                                   os_vm_size_t len);
 
 #ifdef LISP_FEATURE_WIN32
 void* os_validate_recommit(os_vm_address_t addr, os_vm_size_t len);
