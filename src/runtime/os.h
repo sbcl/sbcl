@@ -79,7 +79,7 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 #define MOVABLE 1
 #define NOT_MOVABLE 0
 extern os_vm_address_t os_validate(boolean movable,
-                                   os_vm_address_t desired_addr,
+                                   os_vm_address_t addr,
                                    os_vm_size_t len);
 
 #ifdef LISP_FEATURE_WIN32
