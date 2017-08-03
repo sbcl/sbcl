@@ -683,6 +683,7 @@ elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
     printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
+    printf ' :relocatable-heap' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between
@@ -742,7 +743,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :fp-and-pc-standard-save' >> $ltf
+    printf ' :fp-and-pc-standard-save :relocatable-heap' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks :precise-arg-count-error :inline-constants' >> $ltf
@@ -751,6 +752,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf
     printf ' :compare-and-swap-vops :memory-barrier-vops :undefined-fun-restarts' >> $ltf
+    printf ' :relocatable-heap' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
