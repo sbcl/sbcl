@@ -681,10 +681,10 @@
              ;; Otherwise, defer to run-time.
              form))
         ((:or :and :not)
-         (sharing-cons
+         (recons
           form
           subj
-          (sharing-cons
+          (recons
            test
            key
            (sharing-mapcar
@@ -709,7 +709,7 @@
                   (t ,(nth 3 printer)))
           args))
         (:cond
-         (sharing-cons
+         (recons
           printer
           :cond
           (sharing-mapcar
@@ -719,7 +719,7 @@
                      (lambda (sub-printer)
                        (preprocess-conditionals sub-printer args))
                      (cdr clause))))
-               (sharing-cons
+               (recons
                 clause
                 (preprocess-test (find-first-field-name filtered-body)
                                  (car clause)
@@ -768,7 +768,7 @@
 ;;;; some simple functions that help avoid consing when we're just
 ;;;; recursively filtering things that usually don't change
 
-(defun sharing-cons (old-cons car cdr)
+(defun recons (old-cons car cdr)
   "If CAR is eq to the car of OLD-CONS and CDR is eq to the CDR, return
   OLD-CONS, otherwise return (cons CAR CDR)."
   (if (and (eq car (car old-cons)) (eq cdr (cdr old-cons)))
@@ -781,7 +781,7 @@
   as long as the results of calling FUN on the elements of LIST are
   eq to the original."
   (and list
-       (sharing-cons list
+       (recons list
                      (funcall fun (car list))
                      (sharing-mapcar fun (cdr list)))))
 

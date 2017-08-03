@@ -637,12 +637,6 @@
                (walk-form-internal (car form) :eval env)
                (walk-repeat-eval (cdr form) env))))
 
-(defun recons (x car cdr)
-  (if (or (not (eq (car x) car))
-          (not (eq (cdr x) cdr)))
-      (cons car cdr)
-      x))
-
 (defun relist (x &rest args)
   (if (null args)
       nil
