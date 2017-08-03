@@ -299,9 +299,7 @@ trans_code(struct code *code)
 
 #endif
 
-#ifdef LISP_FEATURE_X86
     gencgc_apply_code_fixups(code, new_code);
-#endif
 
     return new_code;
 }

@@ -283,10 +283,12 @@ void inflate_core_bytes(int fd, os_vm_offset_t offset,
 static lispobj expected_range_start, expected_range_end;
 static sword_t heap_adjustment;
 
-/* Define this to deliberately mess up the mapped address */
-#undef MOCK_MMAP_FAILURE
-
+/* Define this in CFLAGS as 1 to deliberately mess up the mapped address */
 #ifndef MOCK_MMAP_FAILURE
+#define MOCK_MMAP_FAILURE 0
+#endif
+
+#if !MOCK_MMAP_FAILURE
 #define maybe_fuzz_address(x) x
 #else
 /// "Pseudo-randomly" alter requested address for testing purposes so that
@@ -433,6 +435,9 @@ static void fixup_space(lispobj* where, uword_t len)
                 f->self = adjust_word(f->self);
                 adjust_pointers(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
             });
+            // Compute the address where the code "was" as the first argument
+            gencgc_apply_code_fixups((struct code*)((char*)where - heap_adjustment),
+                                     code);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             // Now that the packed integer comprising the list of fixup locations
             // has been fixed-up (if necessary), apply them to the code.
@@ -533,7 +538,7 @@ void relocate_heap(lispobj* want, lispobj* got, uword_t len)
   expected_range_start = (lispobj)want;
   expected_range_end = (lispobj)want + len;
   heap_adjustment = (lispobj)got - (lispobj)want;
-#if defined(MOCK_MMAP_FAILURE)
+#if MOCK_MMAP_FAILURE
   fprintf(stderr, "Relocating heap from [%p:%p] to [%p:%p]\n",
           want, (char*)want+len, got, (char*)got+len);
 #endif

@@ -222,6 +222,8 @@ extern page_index_t page_table_pages;
 /* forward declarations */
 #ifdef LISP_FEATURE_X86
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
+#else
+#define gencgc_apply_code_fixups(ignore1,ignore2)
 #endif
 
 sword_t update_dynamic_space_free_pointer(void);

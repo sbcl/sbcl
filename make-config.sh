@@ -651,6 +651,8 @@ if [ "$sbcl_arch" = "x86" ]; then
         # of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless.
         printf ' :os-provides-dlopen' >> $ltf
+    else
+        printf ' :relocatable-heap' >> $ltf
     fi
     if [ "$sbcl_os" = "openbsd" ]; then
         rm -f src/runtime/openbsd-sigcontext.h
