@@ -91,19 +91,7 @@
   (defconstant linkage-table-space-end   #x0b000000))
 
 #!+gencgc
-(progn
-  (defconstant linkage-table-space-start #x0a000000)
-  (defconstant linkage-table-space-end   #x0b000000)
-
-  (defconstant read-only-space-start     #x04000000)
-  (defconstant read-only-space-end       #x07ff8000)
-
-  (defconstant static-space-start        #x08000000)
-  (defconstant static-space-end          #x097fff00)
-
-  (defconstant dynamic-space-start       #x4f000000)
-  (defconstant default-dynamic-space-size
-    (or #.(!read-dynamic-space-size) (expt 2 29))))
+(!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
 (defconstant linkage-table-entry-size 16)
 
