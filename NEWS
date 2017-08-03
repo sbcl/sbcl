@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.3.20:
-  * enhancement: arm[64], pcc, and x86[-64] platforms are able to relocate
+  * enhancement: backends using the generational GC are able to relocate
     dynamic space anywhere the operating system places it.
     This feature can be disabled by removing :relocatable-heap from the
     build configuration. Not supported on Windows.

@@ -92,6 +92,9 @@
 
 ;;;; Description of the target address space.
 
+#!+gencgc ; sensibly small read-only and static spaces
+(!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
+
 ;;; Where to put the different spaces.  Must match the C code!
 #!+(and linux cheneygc)
 (progn
@@ -110,21 +113,6 @@
   (defconstant dynamic-1-space-start #x40000000)
   (defconstant dynamic-1-space-end   #x48000000))
 
-#!+(and linux gencgc) ; sensibly small read-only and static spaces
-(progn
-  (defconstant linkage-table-space-start #x0f800000)
-  (defconstant linkage-table-space-end   #x10000000)
-
-  (defconstant read-only-space-start     #x11000000)
-  (defconstant read-only-space-end       #x110ff000)
-
-  (defconstant static-space-start        #x11100000)
-  (defconstant static-space-end          #x111ff000)
-
-  (defconstant dynamic-space-start       #x30000000)
-  (defconstant default-dynamic-space-size
-    (or #.(!read-dynamic-space-size) (expt 2 29))))
-
 #!+(and sunos cheneygc) ; might as well start by trying the same numbers
 (progn
   (defconstant linkage-table-space-start #x0f800000)
@@ -142,22 +130,7 @@
   (defconstant dynamic-1-space-start     #x40000000)
   (defconstant dynamic-1-space-end       #x48000000))
 
-#!+(and sunos gencgc) ; sensibly small read-only and static spaces
-(progn
-  (defconstant linkage-table-space-start #x0f800000)
-  (defconstant linkage-table-space-end   #x10000000)
-
-  (defconstant read-only-space-start     #x11000000)
-  (defconstant read-only-space-end       #x110ff000)
-
-  (defconstant static-space-start        #x11100000)
-  (defconstant static-space-end          #x111ff000)
-
-  (defconstant dynamic-space-start       #x30000000)
-  (defconstant default-dynamic-space-size
-    (or #.(!read-dynamic-space-size) (expt 2 29))))
-
-#!+netbsd ; Need a gap at 0x4000000 for shared libraries
+#!+(and netbsd cheneygc) ; Need a gap at 0x4000000 for shared libraries
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)

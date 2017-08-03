@@ -710,7 +710,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
-        printf ' :gencgc' >> $ltf
+        printf ' :gencgc :relocatable-heap' >> $ltf
     else
         echo '***'
         echo '*** You are running SPARC on non-SunOS, non-Linux.  Since'
