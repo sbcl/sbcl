@@ -159,6 +159,13 @@
  ;;
  ; :cycle-counter
 
+ ;; Allow the main dynamic space to be allocated anywhere
+ ;; by the OS kernel regardless of the configuration-time value
+ ;; of dynamic-space-start.
+ ;; The downside is the potential need for startup-time relocation.
+ ;; Enabled by default if supported
+ ; :relocatable-heap
+
  ;; Build with support for an additional dynamic heap
  ;; differing from the main dynamic heap in two ways:
  ;;  1. it is guaranteed to reside below 4GB so that all pointers

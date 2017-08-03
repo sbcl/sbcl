@@ -288,6 +288,15 @@ static inline lispobj instance_layout(lispobj* instance_ptr) // native ptr
   return instance_ptr[1]; // the word following the header is the layout
 #endif
 }
+static inline lispobj fin_layout(lispobj* instance_ptr) // native ptr
+{
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+  return instance_ptr[0] >> 32; // the high half of the header is the layout
+#else
+  // first 4 words are: header, trampoline, fin-fun, layout
+  return instance_ptr[3];
+#endif
+}
 
 static inline struct cons *
 CONS(lispobj obj)

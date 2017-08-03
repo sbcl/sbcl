@@ -203,6 +203,8 @@
           "One of :GENCGC or :CHENEYGC must be enabled")
          ("(and sb-dynamic-core (not linkage-table))"
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
+         ("(and relocatable-heap (or (not gencgc) (not x86-64) win32))"
+          "Relocatable heap requires gencgc + x86-64 + not win32")
          ("(and sb-linkable-runtime (not sb-dynamic-core))"
           ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
          ("(and sb-linkable-runtime (not (or x86 x86-64)))"

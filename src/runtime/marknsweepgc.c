@@ -1287,7 +1287,6 @@ void immobile_space_coreparse(uword_t address, uword_t len)
           varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
         SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value = (lispobj)limit;
         compute_immobile_space_bound();
-        write_protect_immobile_space();
     } else {
         lose("unknown immobile subspace");
     }
@@ -1675,6 +1674,14 @@ struct layout* fix_object_layout(lispobj* obj)
     return native_layout;
 }
 
+static lispobj follow_fp(lispobj ptr)
+{
+  if (forwarding_pointer_p(native_pointer(ptr)))
+      return forwarding_pointer_value(native_pointer(ptr));
+  else
+      return ptr;
+}
+
 /// It's tricky to try to use the scavtab[] functions for fixing up moved
 /// objects, because scavenger functions might invoke transport functions.
 /// The best approach is to do an explicit switch over all object types.
@@ -1685,8 +1692,8 @@ static void fixup_space(lispobj* where, size_t n_words)
     lispobj header_word;
     int widetag;
     long size;
-    void fixup_immobile_refs(struct code*);
     int static_space_p = ((lispobj)where == STATIC_SPACE_START);
+    struct code* code;
 
     while (where < end) {
         gc_assert(!forwarding_pointer_p(where));
@@ -1715,12 +1722,13 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Fixup the constant pool.
           adjust_words(where+1, code_header_words(header_word)-1);
           // Fixup all embedded simple-funs
-          for_each_simple_fun(i, f, (struct code*)where, 1, {
+          code = (struct code*)where;
+          for_each_simple_fun(i, f, code, 1, {
               f->self = adjust_fun_entrypoint(f->self);
               adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
           });
-          if (((struct code*)where)->fixups)
-              fixup_immobile_refs((struct code*)where);
+          if (code->fixups)
+              fixup_immobile_refs(follow_fp, code->fixups, code);
           break;
         case CLOSURE_WIDETAG:
           where[1] = adjust_fun_entrypoint(where[1]);
@@ -2225,13 +2233,14 @@ void verify_immobile_page_protection(int keep_gen, int new_gen)
 // in immobile space.
 #include "forwarding-ptr.h"
 #ifdef LISP_FEATURE_X86_64
-void fixup_immobile_refs(struct code* code)
+void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
+                         lispobj fixups, struct code* code)
 {
-    struct varint_unpacker fixups;
-    varint_unpacker_init(&fixups, code->fixups);
+    struct varint_unpacker unpacker;
+    varint_unpacker_init(&unpacker, fixups);
     char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
     int prev_loc = 0, loc;
-    while (varint_unpack(&fixups, &loc) && loc != 0) {
+    while (varint_unpack(&unpacker, &loc) && loc != 0) {
         // For extra compactness, each loc is relative to the prior,
         // so that the magnitudes are smaller.
         loc += prev_loc;
@@ -2239,9 +2248,9 @@ void fixup_immobile_refs(struct code* code)
         int* fixup_where = (int*)(instructions + loc);
         lispobj ptr = (lispobj)(*fixup_where);
         if (is_lisp_pointer(ptr)) {
-            if (forwarding_pointer_p(native_pointer(ptr)))
-                *fixup_where = (int)
-                  forwarding_pointer_value(native_pointer(ptr));
+            lispobj fixed = fixup_lispobj(ptr);
+            if (fixed != ptr)
+                *fixup_where = fixed;
         } else {
             gc_assert(IMMOBILE_SPACE_START <= ptr &&
                       ptr < (IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE));

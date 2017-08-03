@@ -110,7 +110,8 @@
        ,@small-space-forms
        #!+immobile-space
        (defconstant immobile-fixedobj-subspace-size (* 24 1024 1024))
-       (defconstant dynamic-space-start ,(or dynamic-space-start* ptr))
+       (defconstant default-dynamic-space-start ,(or dynamic-space-start* ptr))
+       #!-relocatable-heap (defconstant dynamic-space-start default-dynamic-space-start)
        (defconstant default-dynamic-space-size
          (or ,(!read-dynamic-space-size)
              ,default-dynamic-space-size*

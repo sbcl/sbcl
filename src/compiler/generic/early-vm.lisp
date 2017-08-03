@@ -86,7 +86,7 @@
 #!+gencgc
 (defconstant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
-          (start dynamic-space-start))
+          (start default-dynamic-space-start))
       (dolist (other-start (list read-only-space-start static-space-start
                                  #!+linkage-table
                                  linkage-table-space-start))

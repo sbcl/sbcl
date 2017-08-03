@@ -20,6 +20,9 @@
 #include "sbcl.h"
 #include "runtime.h"
 
+#ifdef LISP_FEATURE_RELOCATABLE_HEAP
+extern uword_t DYNAMIC_SPACE_START;
+#endif
 /* Some standard preprocessor definitions and typedefs are needed from
  * the OS-specific #include files. This is an attempt to document
  * them on 20000729, by WHN the impatient reverse engineer.

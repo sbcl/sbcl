@@ -140,11 +140,12 @@
 
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
-#!+gencgc
-(defun current-dynamic-space-start () dynamic-space-start)
-#!-gencgc
 (defun current-dynamic-space-start ()
-  (extern-alien "current_dynamic_space" unsigned-long))
+  #!+(and gencgc relocatable-heap)
+  (extern-alien "DYNAMIC_SPACE_START" unsigned-long)
+  #!+(and gencgc (not relocatable-heap))
+  sb!vm:dynamic-space-start
+  #!-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
 (defun space-bounds (space)
   (declare (type spaces space))

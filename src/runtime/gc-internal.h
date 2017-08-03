@@ -243,6 +243,7 @@ extern boolean positive_bignum_logbitp(int,struct bignum*);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 
+extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);
 extern lispobj fdefn_raw_referent(struct fdefn *fdefn);
 
 static inline boolean immobile_space_p(lispobj obj)

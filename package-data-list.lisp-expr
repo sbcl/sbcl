@@ -3175,6 +3175,7 @@ structure representations"
                "CONTROL-STACK-POINTER-VALID-P"
                "DYNAMIC-SPACE-START" "DYNAMIC-SPACE-END"
                #!+gencgc("DEFAULT-DYNAMIC-SPACE-SIZE"
+                         "DEFAULT-DYNAMIC-SPACE-START"
                          "MAX-DYNAMIC-SPACE-END")
                #!-gencgc("DYNAMIC-0-SPACE-START"
                          "DYNAMIC-0-SPACE-END"

@@ -664,6 +664,17 @@ main(int argc, char *argv[], char *envp[])
             embedded_core_offset = offset;
     }
 
+    globals_init();
+
+    /* Doing this immediately after the core has been located
+     * and before any random malloc() calls occur improves the chance
+     * of mapping dynamic space at our preferred addres (if movable).
+     * If not movable, it was already mapped in allocate_spaces(). */
+    initial_function = load_core_file(core, embedded_core_offset);
+    if (initial_function == NIL) {
+        lose("couldn't find initial function\n");
+    }
+
 #if defined(SVR4) || defined(__linux__) || defined(__NetBSD__)
     tzset();
 #endif
@@ -674,12 +685,6 @@ main(int argc, char *argv[], char *envp[])
     if (!disable_lossage_handler_p)
         enable_lossage_handler();
 
-    globals_init();
-
-    initial_function = load_core_file(core, embedded_core_offset);
-    if (initial_function == NIL) {
-        lose("couldn't find initial function\n");
-    }
 #ifdef LISP_FEATURE_SB_DYNAMIC_CORE
     os_link_runtime();
 #endif
