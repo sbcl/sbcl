@@ -372,6 +372,18 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
     (declare (maybe-inline equal-aux))
     (equal-aux x y)))
 
+;;; Like EQUAL, but any two gensyms whose names are STRING= are equalish.
+(defun fun-names-equalish (x y)
+  (named-let recurse ((x x) (y y))
+    (cond ((eql x y) t) ; not performance-critical: don't inline %EQL here
+          ((consp x) (and (consp y)
+                          (recurse (car x) (car y))
+                          (recurse (cdr x) (cdr y))))
+          ((and (symbolp x) (not (symbol-package x)))
+           (and (symbolp y) (not (symbol-package y)) (string= x y)))
+          (t
+           (equal x y)))))
+
 ;;; EQUALP comparison of HASH-TABLE values
 (defun hash-table-equalp (x y)
   (declare (type hash-table x y))

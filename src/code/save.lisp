@@ -187,6 +187,27 @@ sufficiently motivated to do lengthy fixes."
         (return-from save-lisp-and-die))))
   (when (eql t compression)
     (setf compression -1))
+  ;; Share similar simple-fun arglists and types
+  ;; EQUALISH considers any two identically-spelled gensyms as EQ
+  (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
+                                       :test 'fun-names-equalish))
+        (type-hash (make-hash-table :test 'equal)))
+    (sb!vm::map-allocated-objects
+     (lambda (object widetag size)
+       (declare (ignore size))
+       (when (= widetag sb!vm:code-header-widetag)
+         (dotimes (i (sb!kernel:code-n-entries object))
+           (let* ((fun (sb!kernel:%code-entry-point object i))
+                  (arglist (%simple-fun-arglist fun))
+                  (type (sb!vm::%%simple-fun-type fun)))
+             (setf (%simple-fun-arglist fun)
+                   (or (gethash arglist arglist-hash)
+                       (setf (gethash arglist arglist-hash) arglist)))
+             (setf (sb!kernel:%simple-fun-type fun)
+                   (or (gethash type type-hash)
+                       (setf (gethash type type-hash) type)))))))
+     :all))
+  ;;
   (labels ((restart-lisp ()
              (handling-end-of-the-world
               (reinit)

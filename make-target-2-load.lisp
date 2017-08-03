@@ -125,21 +125,6 @@
     (format t "~&FUN-INFO: Collapsed ~D -> ~D~%"
             old-count (hash-table-count ht)))
 
-  ;; Share identical FUN-TYPEs.
-  (let ((ht (make-hash-table :test 'equal))
-        (raw-accessor
-         (compile nil '(lambda (f) (sb-vm::%%simple-fun-type f)))))
-    (sb-vm::map-allocated-objects
-     (lambda (obj type size)
-       (declare (ignore type size))
-       (when (sb-kernel:code-component-p obj)
-         (dotimes (i (sb-kernel:code-n-entries obj))
-           (let* ((f (sb-kernel:%code-entry-point obj i))
-                  (type (funcall raw-accessor f)))
-             (setf (sb-kernel:%simple-fun-type f)
-                   (or (gethash type ht) (setf (gethash type ht) type)))))))
-     :all))
-
   (sb-disassem::!compile-inst-printers)
 
   ;; Unintern no-longer-needed stuff before the possible PURIFY in

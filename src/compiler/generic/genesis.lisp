@@ -2710,64 +2710,6 @@ core and return a descriptor to it."
         (code (pop-stack)))
     (write-wordindexed code slot value)))
 
-(defvar *simple-fun-metadata* (make-hash-table :test 'equalp))
-
-;; Return an expression that can be used to coalesce type-specifiers
-;; and lambda lists attached to simple-funs. It doesn't have to be
-;; a "correct" host representation, just something that preserves EQUAL-ness.
-(defun make-equal-comparable-thing (descriptor)
-  (labels ((recurse (x)
-            (cond ((cold-null x) (return-from recurse nil))
-                  ((is-fixnum-lowtag (descriptor-lowtag x))
-                   (return-from recurse (descriptor-fixnum x)))
-                  #!+64-bit
-                  ((is-other-immediate-lowtag (descriptor-lowtag x))
-                   (let ((bits (descriptor-bits x)))
-                     (when (= (logand bits sb!vm:widetag-mask)
-                              sb!vm:single-float-widetag)
-                       (return-from recurse `(:ffloat-bits ,bits))))))
-            (ecase (descriptor-lowtag x)
-              (#.sb!vm:list-pointer-lowtag
-               (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
-              (#.sb!vm:other-pointer-lowtag
-               (ecase (logand (descriptor-bits (read-memory x)) sb!vm:widetag-mask)
-                   (#.sb!vm:symbol-widetag
-                    (if (cold-null (read-wordindexed x sb!vm:symbol-package-slot))
-                        (get-or-make-uninterned-symbol
-                         (base-string-from-core
-                          (read-wordindexed x sb!vm:symbol-name-slot)))
-                        (warm-symbol x)))
-                   #!-64-bit
-                   (#.sb!vm:single-float-widetag
-                    `(:ffloat-bits
-                      ,(read-bits-wordindexed x sb!vm:single-float-value-slot)))
-                   (#.sb!vm:double-float-widetag
-                    `(:dfloat-bits
-                      ,(read-bits-wordindexed x sb!vm:double-float-value-slot)
-                      #!-64-bit
-                      ,(read-bits-wordindexed
-                        x (1+ sb!vm:double-float-value-slot))))
-                   (#.sb!vm:bignum-widetag
-                    (bignum-from-core x))
-                   (#.sb!vm:simple-base-string-widetag
-                    (base-string-from-core x))
-                   ;; Why do function lambda lists have simple-vectors in them?
-                   ;; Because we expose all &OPTIONAL and &KEY default forms.
-                   ;; I think this is abstraction leakage, except possibly for
-                   ;; advertised constant defaults of NIL and such.
-                   ;; How one expresses a value as a sexpr should otherwise
-                   ;; be of no concern to a user of the code.
-                   (#.sb!vm:simple-vector-widetag
-                    (vector-from-core x #'recurse))))))
-           ;; Return a warm symbol whose name is similar to NAME, coaelescing
-           ;; all occurrences of #:.WHOLE. across all files, e.g.
-           (get-or-make-uninterned-symbol (name)
-             (let ((key `(:uninterned-symbol ,name)))
-               (or (gethash key *simple-fun-metadata*)
-                   (let ((symbol (make-symbol name)))
-                     (setf (gethash key *simple-fun-metadata*) symbol))))))
-    (recurse descriptor)))
-
 (defun fun-offset (code-object fun-index)
   (if (> fun-index 0)
       (bvref-32 (descriptor-mem code-object)
@@ -2800,15 +2742,8 @@ core and return a descriptor to it."
     #!-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
     (write-wordindexed fn sb!vm:simple-fun-self-slot fn)
     (write-wordindexed fn sb!vm:simple-fun-name-slot name)
-    (flet ((coalesce (sexpr) ; a warm symbol or a cold cons tree
-             (if (symbolp sexpr) ; will be cold-interned automatically
-                 sexpr
-                 (let ((representation (make-equal-comparable-thing sexpr)))
-                   (or (gethash representation *simple-fun-metadata*)
-                       (setf (gethash representation *simple-fun-metadata*)
-                             sexpr))))))
-      (write-wordindexed fn sb!vm:simple-fun-arglist-slot (coalesce arglist))
-      (write-wordindexed fn sb!vm:simple-fun-type-slot (coalesce type)))
+    (write-wordindexed fn sb!vm:simple-fun-arglist-slot arglist)
+    (write-wordindexed fn sb!vm:simple-fun-type-slot type)
     (write-wordindexed fn sb!vm::simple-fun-info-slot info)
     fn))
 
