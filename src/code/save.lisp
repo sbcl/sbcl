@@ -37,7 +37,7 @@
   (application-type int))
 
 #!+gencgc
-(define-alien-variable "lisp_init_function" (unsigned #.sb-vm:n-machine-word-bits))
+(define-alien-variable "lisp_init_function" (unsigned #.sb!vm:n-machine-word-bits))
 
 (define-condition save-condition (reference-condition)
   ()
