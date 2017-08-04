@@ -317,7 +317,7 @@ When ABORT is true, SBCL exits immediately by calling _exit(2) without
 unwinding stack, or calling exit hooks. Note that _exit(2) does not
 call atexit(3) functions unlike exit(3).
 
-Recursive calls to EXIT cause EXIT to behave as it ABORT was true.
+Recursive calls to EXIT cause EXIT to behave as if ABORT was true.
 
 TIMEOUT controls waiting for other threads to terminate when ABORT is
 NIL. Once current thread has been unwound and *EXIT-HOOKS* have been
