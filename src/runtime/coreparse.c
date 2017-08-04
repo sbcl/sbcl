@@ -803,6 +803,9 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                  * was changed, but people experimenting with patches
                  * don't necessarily update version.lisp-expr.) */
 
+                fprintf(stderr, "core was built for runtime '");
+                for (i = 0; i < remaining_len; ++i) putc(ptr[i], stderr);
+                fprintf(stderr, "' but this is '%s'\n", build_id);
                 lose("can't load .core for different runtime, sorry\n");
             }
 
