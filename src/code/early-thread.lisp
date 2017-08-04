@@ -41,3 +41,5 @@ in future versions."
   (%owner nil :type (or null thread))
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))
+
+(declaim (sb!ext:freeze-type mutex))
