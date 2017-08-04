@@ -370,19 +370,19 @@ static void fixup_space(lispobj* where, uword_t len)
     lispobj *end = (lispobj*)((char*)where + len);
     lispobj header_word;
     int widetag;
-    long size, nwords;
+    long nwords;
     lispobj layout, layout_slots_adjustp, bitmap;
     struct code* code;
 
-    for ( ; where < end ; where += size ) {
+    for ( ; where < end ; where += nwords ) {
         header_word = *where;
         if (is_cons_half(header_word)) {
             adjust_pointers(where, 2);
-            size = 2;
+            nwords = 2;
             continue;
         }
         widetag = widetag_of(header_word);
-        nwords = size = sizetab[widetag](where);
+        nwords = sizetab[widetag](where);
         switch (widetag) {
         case INSTANCE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -411,21 +411,23 @@ static void fixup_space(lispobj* where, uword_t len)
             if (!fixnump(bitmap) && layout_slots_adjustp)
                 bitmap = adjust_word(bitmap);
 
-            instance_scan(adjust_pointers, where+1, size-1, bitmap);
+            instance_scan(adjust_pointers, where+1, nwords-1, bitmap);
             continue;
-#if !(defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM))
         case FDEFN_WIDETAG:
             adjust_pointers(where+1, 2);
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-            // do nothing with word 3, because an immobile fdefn
-            // can only jump to immobile code.
-#else
-            // 'raw_addr' doesn't look like a pointer,
-            // so adjust_pointers() would ignore it.
+            // 'raw_addr' doesn't satisfy is_lisp_pointer() for x86,
+            // so adjust_pointers() would ignore it. Force adjustment if
+            // it points to dynamic space. For x86-64 with IMMOBILE_CODE,
+            // the fdefn can only point to immobile space,
+            // and it does so via a JMP instruction, so we must ignore it,
+            // lest it accidentally be adjusted (if somehow the next 8 bytes
+            // when interpreted as a word seemed to point to dynamic space
+            // though in fact it's an opcode followed by a 4 byte displacement).
+            // For all others, just adjust it here for uniformity.
+#ifndef LISP_FEATURE_IMMOBILE_CODE
             where[3] = adjust_word(where[3]);
 #endif
             continue;
-#endif
         case CODE_HEADER_WIDETAG:
             // Fixup the constant pool. The word at where+1 is a fixnum.
             adjust_pointers(where+2, code_header_words(header_word)-2);
@@ -445,15 +447,15 @@ static void fixup_space(lispobj* where, uword_t len)
                 fixup_immobile_refs(adjust_word, code->fixups, code);
 #endif
             continue;
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
         case CLOSURE_WIDETAG:
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
             // For x86[-64], the closure fun appears to be a fixnum,
             // and might need adjustment unless pointing to immobile code.
-            where[1] = adjust_word(where[1]);
-            // Fall into the general case; where[1] won't get re-adjusted
+            // Then fall into the general case; where[1] won't get re-adjusted
             // because it doesn't satisfy is_lisp_pointer().
-            break;
+            where[1] = adjust_word(where[1]);
 #endif
+            break;
         // Vectors require extra care because of EQ-based hashing.
         case SIMPLE_VECTOR_WIDETAG:
           if ((HeaderValue(*where) & 0xFF) == subtype_VectorValidHashing) {
@@ -494,12 +496,6 @@ static void fixup_space(lispobj* where, uword_t len)
         case WEAK_POINTER_WIDETAG:
         case RATIO_WIDETAG:
         case COMPLEX_WIDETAG:
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-        case CLOSURE_WIDETAG:
-#endif
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
-        case FDEFN_WIDETAG:
-#endif
             break;
 
         // Other

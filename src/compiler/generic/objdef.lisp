@@ -177,6 +177,16 @@
   (name :ref-trans fdefn-name
         :set-trans %set-fdefn-name :set-known ())
   (fun :type (or function null) :ref-trans fdefn-fun)
+  ;; raw-addr is used differently by the various backends:
+  ;; - Sparc and ARM store the same object as 'fun'
+  ;;   unless the function is non-simple, in which case
+  ;;   they store a descriptorized (fun-pointer lowtag)
+  ;;   pointer to the closure tramp
+  ;; - x86-64 with immobile-code feature stores a JMP instruction
+  ;;   to the function entry address. Special considerations
+  ;;   pertain to undefined functions, FINs, and closures.
+  ;; - all others store a native pointer to the function entry address
+  ;;   or closure tramp
   (raw-addr :c-type #!-alpha "char *" #!+alpha "u32"))
 
 ;;; a simple function (as opposed to hairier things like closures
