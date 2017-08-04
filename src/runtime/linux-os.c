@@ -444,11 +444,11 @@ os_install_interrupt_handlers(void)
 char *
 os_get_runtime_executable_path(int external)
 {
-    /* XXX: zero-init here is due to an apparent false positive with MSAN.
-       Everyone who's looked at this agrees that readlink() null-terminates
-       the array, or else it's not read at all if readlink() fails.
-       The sanitizer complaint actually occurs in copied_string().
-       It says "WARNING: MemorySanitizer: use-of-uninitialized-value" */
+    /* XXX: If this code is compiled with MSAN, all is well.
+       But if this code is compiled without MSAN, there is a false positive
+       in copied_string() unless we zero-initialize path[].
+       Basically if you want sanitization, the right thing is to compile
+       *all* the source code with the sanitizer, not just some of it. */
     char path[PATH_MAX + 1] = {0};
     int size;
 

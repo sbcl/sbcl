@@ -2032,7 +2032,13 @@ pin_object(lispobj object)
 // Problem: when code is allocated from a per-thread region,
 // does it ensure that the occupied pages are flagged as having code?
 
-static void
+#if defined(__GNUC__) && defined(MEMORY_SANITIZER)
+#define NO_SANITIZE_MEMORY __attribute__((no_sanitize_memory))
+#else
+#define NO_SANITIZE_MEMORY
+#endif
+
+static void NO_SANITIZE_MEMORY
 preserve_pointer(void *addr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
