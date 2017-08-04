@@ -442,7 +442,12 @@ os_install_interrupt_handlers(void)
 char *
 os_get_runtime_executable_path(int external)
 {
-    char path[PATH_MAX + 1];
+    /* XXX: zero-init here is due to an apparent false positive with MSAN.
+       Everyone who's looked at this agrees that readlink() null-terminates
+       the array, or else it's not read at all if readlink() fails.
+       The sanitizer complaint actually occurs in copied_string().
+       It says "WARNING: MemorySanitizer: use-of-uninitialized-value" */
+    char path[PATH_MAX + 1] = {0};
     int size;
 
     size = readlink("/proc/self/exe", path, sizeof(path)-1);

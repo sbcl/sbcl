@@ -3168,9 +3168,15 @@ move_pinned_pages_to_newspace()
     }
 }
 
+#if defined(__GNUC__) && defined(ADDRESS_SANITIZER)
+#define NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+#define NO_SANITIZE_ADDRESS
+#endif
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
-static void
+static void NO_SANITIZE_ADDRESS
 garbage_collect_generation(generation_index_t generation, int raise)
 {
     page_index_t i;
