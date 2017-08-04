@@ -3533,11 +3533,12 @@ initially undefined function references:~2%")
 ;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
 (defun sb-cold:genesis (&key object-file-names preload-file
                              core-file-name c-header-dir-name map-file-name
-                             symbol-table-file-name)
+                             symbol-table-file-name (verbose t))
   (declare (ignorable symbol-table-file-name))
   (declare (special core-file-name))
 
-  (format t
+  (when verbose
+    (format t
           "~&beginning GENESIS, ~A~%"
           (if core-file-name
             ;; Note: This output summarizing what we're doing is
@@ -3545,7 +3546,7 @@ initially undefined function references:~2%")
             ;; we're not e.g. also creating a header file when we
             ;; create a core.
             (format nil "creating core ~S" core-file-name)
-            (format nil "creating headers in ~S" c-header-dir-name)))
+            (format nil "creating headers in ~S" c-header-dir-name))))
 
   (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 

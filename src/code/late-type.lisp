@@ -1067,7 +1067,8 @@
                        ;; We can handle conditions at this point,
                        ;; but win32 can not perform i/o here because
                        ;; !MAKE-COLD-STDERR-STREAM has no implementation.
-                       #!-win32
+                       ;; FIXME: where is this coming from???
+                       #+nil
                        (progn (write-string "//caught: parse-unknown ")
                               (write spec)
                               (terpri)))))
