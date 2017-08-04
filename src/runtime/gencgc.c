@@ -386,7 +386,7 @@ count_write_protect_generation_pages(generation_index_t generation)
     for (i = 0; i < last_free_page; i++)
         if (!page_free_p(i)
             && (page_table[i].gen == generation)
-            && (page_table[i].write_protected == 1))
+            && page_table[i].write_protected)
             count++;
     return count;
 }
@@ -1331,10 +1331,10 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
                 bytes_found = GENCGC_CARD_BYTES;
         } else if (small_object &&
                    (page_table[first_page].allocated == page_type_flag) &&
-                   (page_table[first_page].large_object == 0) &&
+                   (!page_table[first_page].large_object) &&
                    (page_table[first_page].gen == gc_alloc_generation) &&
-                   (page_table[first_page].write_protected == 0) &&
-                   (page_table[first_page].dont_move == 0)) {
+                   (!page_table[first_page].write_protected) &&
+                   (!page_table[first_page].dont_move)) {
             bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
             if (bytes_found < nbytes) {
                 if (bytes_found > most_bytes_found)
@@ -1347,7 +1347,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
             continue;
         }
 
-        gc_assert(page_table[first_page].write_protected == 0);
+        gc_assert(!page_table[first_page].write_protected);
         for (last_page = first_page+1;
              ((last_page < page_table_pages) &&
               page_free_p(last_page) &&
@@ -1355,7 +1355,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
              last_page++) {
             bytes_found += GENCGC_CARD_BYTES;
             gc_assert(0 == page_bytes_used(last_page));
-            gc_assert(0 == page_table[last_page].write_protected);
+            gc_assert(!page_table[last_page].write_protected);
         }
 
         if (bytes_found > most_bytes_found) {
@@ -1532,7 +1532,7 @@ general_copy_large_object(lispobj object, word_t nwords, boolean boxedp)
              * pages as this should have been done before shrinking the
              * object. These pages shouldn't be write-protected, even if
              * boxed they should be zero filled. */
-            gc_assert(page_table[next_page].write_protected == 0);
+            gc_assert(!page_table[next_page].write_protected);
 
             old_bytes_used = page_bytes_used(next_page);
             page_table[next_page].allocated = FREE_PAGE_FLAG;
@@ -1834,7 +1834,7 @@ maybe_adjust_large_object(page_index_t first_page)
          * pages as this should have been done before shrinking the
          * object. These pages shouldn't be write protected as they
          * should be zero filled. */
-        gc_assert(page_table[next_page].write_protected == 0);
+        gc_assert(!page_table[next_page].write_protected);
 
         old_bytes_used = page_bytes_used(next_page);
         page_table[next_page].allocated = FREE_PAGE_FLAG;
@@ -2447,10 +2447,10 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
         if (page_boxed_p(i)
             && (page_bytes_used(i) != 0)
             && (page_table[i].gen == generation)
-            && ((page_table[i].write_protected == 0)
+            && (!page_table[i].write_protected
                 /* (This may be redundant as write_protected is now
                  * cleared before promotion.) */
-                || (page_table[i].dont_move == 1))) {
+                || page_table[i].dont_move)) {
             page_index_t last_page;
             int all_wp=1;
 
