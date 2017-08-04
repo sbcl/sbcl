@@ -422,8 +422,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 os_install_interrupt_handlers(void)
 {
+    if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
+    }
 
     /* OAOOM c.f. sunos-os.c.
      * Should we have a reusable function gc_install_interrupt_handlers? */

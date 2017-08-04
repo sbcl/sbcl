@@ -31,6 +31,8 @@
 # include <dlfcn.h>
 #endif
 
+/* Expose to Lisp the value of the preprocessor define. Don't touch! */
+int install_sig_memory_fault_handler = INSTALL_SIG_MEMORY_FAULT_HANDLER;
 
 /* Except for os_zero, these routines are only called by Lisp code.
  * These routines may also be replaced by os-dependent versions

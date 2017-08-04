@@ -83,10 +83,6 @@ enum {
     NUM_GENERATIONS
 };
 
-/* Should we use page protection to help avoid the scavenging of pages
- * that don't have pointers to younger generations? */
-boolean enable_page_protection = 1;
-
 /* Largest allocation seen since last GC. */
 os_vm_size_t large_allocation = 0;
 
@@ -2168,6 +2164,8 @@ update_page_write_prot(page_index_t page)
     gc_assert(!page_free_p(page));
     gc_assert(page_bytes_used(page) != 0);
 
+    if (!ENABLE_PAGE_PROTECTION) return 0;
+
     /* Skip if it's already write-protected, pinned, or unboxed */
     if (page_table[page].write_protected
         /* FIXME: What's the reason for not write-protecting pinned pages? */
@@ -2357,7 +2355,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
 
                     /* Now scan the pages and write protect those that
                      * don't have pointers to younger generations. */
-                    if (enable_page_protection) {
+                    if (ENABLE_PAGE_PROTECTION) {
                         for (j = i; j <= last_page; j++) {
                             num_wp += update_page_write_prot(j);
                         }
@@ -3239,7 +3237,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * which need to be scavenged. It also helps avoid unnecessary page
      * faults as forwarding pointers are written into them. They need to
      * be un-protected anyway before unmapping later. */
-    unprotect_oldspace();
+    if (ENABLE_PAGE_PROTECTION)
+        unprotect_oldspace();
 
     /* Scavenge the stacks' conservative roots. */
 
@@ -3722,7 +3721,7 @@ collect_garbage(generation_index_t last_gen)
 
     /* There's not much point in WPing pages in generation 0 as it is
      * never scavenged (except promoted pages). */
-    if ((gen_to_wp > 0) && enable_page_protection) {
+    if ((gen_to_wp > 0) && ENABLE_PAGE_PROTECTION) {
         /* Check that they are all empty. */
         for (i = 0; i < gen_to_wp; i++) {
             if (generations[i].bytes_allocated)
@@ -3945,7 +3944,8 @@ gencgc_pickup_dynamic(void)
     generations[gen].bytes_allocated = bytes_allocated;
 
     gc_alloc_update_all_page_tables(1);
-    write_protect_generation_pages(gen);
+    if (ENABLE_PAGE_PROTECTION)
+        write_protect_generation_pages(gen);
 }
 
 void

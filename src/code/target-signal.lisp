@@ -281,7 +281,10 @@
   #!-(or linux android)
   (enable-interrupt sigemt #'sigemt-handler)
   (enable-interrupt sigfpe #'sb!vm:sigfpe-handler :synchronous t)
-  (enable-interrupt sigbus #'sigbus-handler :synchronous t)
+  (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
+      (enable-interrupt sigbus #'sigbus-handler :synchronous t)
+      (write-string ";;;; SIGBUS handler not installed
+"))
   #!-(or linux android)
   (enable-interrupt sigsys #'sigsys-handler :synchronous t)
   #!-sb-wtimer

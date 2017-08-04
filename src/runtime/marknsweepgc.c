@@ -373,17 +373,19 @@ void update_immobile_nursery_bits()
   gc_assert((IMMOBILE_SPACE_END - (uword_t)immobile_scav_queue) / sizeof(int)
             >= QCAPACITY);
 
-  // Unprotect the in-use ranges. Any page could be written during scavenge
-  os_protect((os_vm_address_t)IMMOBILE_SPACE_START,
-             fixedobj_free_ptr - IMMOBILE_SPACE_START,
-             OS_VM_PROT_ALL);
+  if (ENABLE_PAGE_PROTECTION) {
+      // Unprotect the in-use ranges. Any page could be written during scavenge
+      os_protect((os_vm_address_t)IMMOBILE_SPACE_START,
+                 fixedobj_free_ptr - IMMOBILE_SPACE_START,
+                 OS_VM_PROT_ALL);
 
-  // varyobj_free_ptr is typically not page-aligned - only by random chance
-  // might it be. Additionally we need a page beyond that for the re-scan queue.
-  os_vm_address_t limit = (char*)immobile_scav_queue + IMMOBILE_CARD_BYTES;
-  os_protect((os_vm_address_t)(IMMOBILE_VARYOBJ_SUBSPACE_START),
-             limit - (os_vm_address_t)IMMOBILE_VARYOBJ_SUBSPACE_START,
-             OS_VM_PROT_ALL);
+      // varyobj_free_ptr is typically not page-aligned - only by random chance
+      // might it be. Additionally we need a page beyond that for the re-scan queue.
+      os_vm_address_t limit = (char*)immobile_scav_queue + IMMOBILE_CARD_BYTES;
+      os_protect((os_vm_address_t)(IMMOBILE_VARYOBJ_SUBSPACE_START),
+                 limit - (os_vm_address_t)IMMOBILE_VARYOBJ_SUBSPACE_START,
+                 OS_VM_PROT_ALL);
+  }
 
   for (page=0; page <= max_used_fixedobj_page ; ++page) {
       // any page whose free index changed contains nursery objects
@@ -723,6 +725,9 @@ void write_protect_immobile_space()
 
     set_immobile_space_hints();
 
+    if (!ENABLE_PAGE_PROTECTION)
+        return;
+
     // Now find contiguous ranges of pages that are protectable,
     // minimizing the number of system calls as much as possible.
     int i, start = -1, end = -1; // inclusive bounds on page indices
@@ -977,7 +982,8 @@ sweep_fixedobj_pages(int raise)
         // we try to do less work than for pages that need it.
         if (!(fixedobj_pages[page].gens & relevant_genmask)) {
             // Scan for old->young pointers, and WP if there are none.
-            if (!fixedobj_page_wp(page) && fixedobj_pages[page].gens > 1
+            if (ENABLE_PAGE_PROTECTION && !fixedobj_page_wp(page)
+                && fixedobj_pages[page].gens > 1
                 && can_wp_fixedobj_page(page, keep_gen, new_gen))
                 SET_WP_FLAG(page, WRITE_PROTECT);
             continue;
@@ -993,7 +999,7 @@ sweep_fixedobj_pages(int raise)
 
         // wp_it is 1 if we should try to write-protect it now.
         // If already write-protected, skip the tests.
-        int wp_it = !fixedobj_page_wp(page);
+        int wp_it = ENABLE_PAGE_PROTECTION && !fixedobj_page_wp(page);
         int gen;
         for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             if (fixnump(*obj)) { // was already a hole
@@ -1062,7 +1068,7 @@ sweep_varyobj_pages(int raise)
         int genmask = VARYOBJ_PAGE_GENS(page);
         if (!(genmask & relevant_genmask)) { // Has nothing in oldspace or newspace.
             // Scan for old->young pointers, and WP if there are none.
-            if (varyobj_page_touched(page)
+            if (ENABLE_PAGE_PROTECTION && varyobj_page_touched(page)
                 && varyobj_page_gens_augmented(page) > 1
                 && can_wp_varyobj_page(page, keep_gen, new_gen))
                 varyobj_page_touched_bits[(page - FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
@@ -1074,7 +1080,7 @@ sweep_varyobj_pages(int raise)
         int any_kept = 0; // was anything moved to the kept generation
         // wp_it is 1 if we should try to write-protect it now.
         // If already write-protected, skip the tests.
-        int wp_it = varyobj_page_touched(page);
+        int wp_it = ENABLE_PAGE_PROTECTION && varyobj_page_touched(page);
         lispobj* obj = varyobj_scan_start(page);
         int size, gen;
 
@@ -1228,8 +1234,9 @@ void immobile_space_coreparse(uword_t address, uword_t len)
                     fixedobj_pages[page].attr.parts.obj_size = size;
                     fixedobj_pages[page].attr.parts.obj_align
                       = immobile_obj_spacing(header, obj, size);
-                    fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
                     fixedobj_pages[page].gens |= 1 << __immobile_obj_gen_bits(obj);
+                    if (ENABLE_PAGE_PROTECTION)
+                        fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
                     break;
                 }
             }
@@ -1281,9 +1288,11 @@ void immobile_space_coreparse(uword_t address, uword_t len)
         }
         // Write-protect the pages occupied by the core file.
         // (There can be no inter-generation pointers.)
-        int page;
-        for (page = FIRST_VARYOBJ_PAGE ; page <= last_page ; ++page)
-          varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
+        if (ENABLE_PAGE_PROTECTION) {
+            int page;
+            for (page = FIRST_VARYOBJ_PAGE ; page <= last_page ; ++page)
+                varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
+        }
         SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value = (lispobj)limit;
         compute_immobile_space_bound();
     } else {

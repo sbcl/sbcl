@@ -23,6 +23,23 @@
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
 extern uword_t DYNAMIC_SPACE_START;
 #endif
+
+#if defined(LISP_FEATURE_GENCGC) && !defined(ENABLE_PAGE_PROTECTION)
+/* Should we use page protection to help avoid the scavenging of pages
+ * that don't have pointers to younger generations?
+ * You can change this to 0 if you want SBCL not to install the handlers
+ * for SIGSEGV and SIGBUS. That will slow down GC, but might be desirable
+ * for debugging or for exploring GC strategies such as remembered sets */
+#define ENABLE_PAGE_PROTECTION 1
+#endif
+
+#ifdef LISP_FEATURE_CHENEYGC
+#define INSTALL_SIG_MEMORY_FAULT_HANDLER 1
+#endif
+#ifdef LISP_FEATURE_GENCGC
+#define INSTALL_SIG_MEMORY_FAULT_HANDLER ENABLE_PAGE_PROTECTION
+#endif
+
 /* Some standard preprocessor definitions and typedefs are needed from
  * the OS-specific #include files. This is an attempt to document
  * them on 20000729, by WHN the impatient reverse engineer.
