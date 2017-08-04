@@ -1230,7 +1230,7 @@
                  '("ASR" "LSR" "LSL" "ROR"                     ; ARM
                    "T"                                         ; Sparc "trap"
                    "AND" "OR" "NOT" "PUSH" "POP" "SET" "LOOP"  ; x86
-                   "BREAK" "BYTE" "MOVE")                      ; generic
+                   "BREAK" "BYTE" "CALL" "WORD" "MOVE")        ; generic
                  :test #'string=)))
     (values (funcall (if create 'intern 'find-symbol)
                      (if conflictp
