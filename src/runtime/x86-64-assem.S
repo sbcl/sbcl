@@ -33,6 +33,14 @@
 #define GNAME(var) _##var
 #endif
 
+#if POSITION_INDEPENDENT_ASM
+#define PIC_CALL(x) x@PLT
+#define PIC_VAR(x) x(%rip)
+#else
+#define PIC_CALL(x) x
+#define PIC_VAR(x) x
+#endif
+
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
  * want alignment in bytes. */
 #if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__OpenBSD__) || defined __NetBSD__ || defined(__sun) || defined _WIN64 || defined(__DragonFly__)
@@ -107,7 +115,7 @@ GNAME(call_into_lisp_first_time):
 #if defined(LISP_FEATURE_DARWIN)
 	movq    GSYM(GNAME(all_threads)),%rax
 #else
-        movq    GNAME(all_threads),%rax
+        movq    PIC_VAR(GNAME(all_threads)),%rax
 #endif
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
@@ -167,9 +175,9 @@ Lstack:
 #ifdef LISP_FEATURE_DARWIN
 	mov	GSYM(GNAME(specials)),%rdi
 #else
-	mov	specials,%rdi
+	mov	PIC_VAR(specials),%rdi
 #endif
-	call    GNAME(pthread_getspecific)
+	call    PIC_CALL(GNAME(pthread_getspecific))
 	mov	%rax,%r12
 #endif
 #endif
@@ -393,7 +401,7 @@ GNAME(arch_scrub_control_stack):
 #ifdef LISP_FEATURE_DARWIN
 	mov	GSYM(GNAME(os_vm_page_size)),%r9
 #else
-	mov	os_vm_page_size,%r9
+	mov	PIC_VAR(os_vm_page_size),%r9
 #endif
 	lea	(%rsi,%r9), %r8
 	lea	(%rdx,%r9), %r9
