@@ -186,13 +186,16 @@
     ;; Save the return-pc.
     (popw rbp-tn (frame-word-offset return-pc-save-offset))))
 
+(defun emit-lea (target source disp)
+  (if (eql disp 0)
+      (inst mov target source)
+      (inst lea target (make-ea :qword :base source :disp disp))))
+
 (define-vop (xep-setup-sp)
   (:generator 1
-    (inst lea rsp-tn
-          (make-ea :qword :base rbp-tn
-                          :disp (- (* n-word-bytes
+    (emit-lea rsp-tn rbp-tn     (- (* n-word-bytes
                                       (- (sb-allocated-size 'stack)
-                                         sp->fp-offset)))))))
+                                         sp->fp-offset))))))
 
 ;;; This is emitted directly before either a known-call-local, call-local,
 ;;; or a multiple-call-local. All it does is allocate stack space for the
@@ -1202,11 +1205,10 @@
     (inst jmp DONE)
 
     JUST-ALLOC-FRAME
-    (inst lea rsp-tn
-          (make-ea :qword :base rbp-tn
-                   :disp (* n-word-bytes
+    (emit-lea rsp-tn rbp-tn
+                         (* n-word-bytes
                             (- sp->fp-offset
-                               (sb-allocated-size 'stack)))))
+                               (sb-allocated-size 'stack))))
 
     DONE))
 
