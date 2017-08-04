@@ -1186,9 +1186,8 @@ void gc_init_immobile()
     n_bitmap_elts = (n_varyobj_pages + 31) / 32;
     int request = n_bitmap_elts * sizeof (int)
                 + n_varyobj_pages * (sizeof (short)+sizeof (char));
-    char* varyobj_page_tables = malloc(request);
+    char* varyobj_page_tables = calloc(1, request);
     gc_assert(varyobj_page_tables);
-    memset(varyobj_page_tables, 0, request);
     varyobj_page_touched_bits = (unsigned int*)varyobj_page_tables;
     // The conservative value for 'touched' is 1.
     memset(varyobj_page_touched_bits, 0xff, n_bitmap_elts * sizeof (int));
