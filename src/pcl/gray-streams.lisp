@@ -51,49 +51,41 @@
 (defmethod stream-element-type ((non-stream t))
   (error 'type-error :datum non-stream :expected-type 'stream))
 
-(defgeneric pcl-open-stream-p (stream)
+(fmakunbound 'open-stream-p)
+
+(defgeneric open-stream-p (stream)
   (:documentation
    "Return true if STREAM is not closed. A default method is provided
   by class FUNDAMENTAL-STREAM which returns true if CLOSE has not been
   called on the stream."))
 
-(defmethod pcl-open-stream-p ((stream ansi-stream))
+(defmethod open-stream-p ((stream ansi-stream))
   (ansi-stream-open-stream-p stream))
 
-(defmethod pcl-open-stream-p ((stream fundamental-stream))
+(defmethod open-stream-p ((stream fundamental-stream))
   (stream-open-p stream))
 
-(defmethod pcl-open-stream-p ((stream stream))
+(defmethod open-stream-p ((stream stream))
   (bug-or-error stream 'open-stream-p))
 
-(defmethod pcl-open-stream-p ((non-stream t))
+(defmethod open-stream-p ((non-stream t))
   (error 'type-error :datum non-stream :expected-type 'stream))
-
-;;; bootstrapping hack
-(pcl-open-stream-p (make-string-output-stream))
-(setf (fdefinition 'open-stream-p) #'pcl-open-stream-p)
 
-(defgeneric pcl-close (stream &key abort)
+(fmakunbound 'close)
+
+(defgeneric close (stream &key abort)
   (:documentation
    "Close the given STREAM. No more I/O may be performed, but
   inquiries may still be made. If :ABORT is true, an attempt is made
   to clean up the side effects of having created the stream."))
 
-(defmethod pcl-close ((stream ansi-stream) &key abort)
+(defmethod close ((stream ansi-stream) &key abort)
   (ansi-stream-close stream abort))
 
-(defmethod pcl-close ((stream fundamental-stream) &key abort)
+(defmethod close ((stream fundamental-stream) &key abort)
   (declare (ignore abort))
   (setf (stream-open-p stream) nil)
   t)
-
-(progn
-  ;; KLUDGE: Get in a call to PCL-CLOSE with a string-output-stream before
-  ;; setting it as CLOSE. Otherwise using NAMED-LAMBDAs as DFUNs causes a
-  ;; vicious metacircle from FORMAT NIL somewhere in the compiler. This is
-  ;; enough to get the dispatch settled down before we need it.
-  (pcl-close (make-string-output-stream))
-  (setf (fdefinition 'close) #'pcl-close))
 
 (let ()
   (fmakunbound 'input-stream-p)
