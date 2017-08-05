@@ -225,16 +225,13 @@
 
 (defun real-add-named-method (generic-function-name qualifiers
                               specializers lambda-list &rest other-initargs)
-  (unless (and (fboundp generic-function-name)
-               (typep (fdefinition generic-function-name) 'generic-function))
-    (warn 'implicit-generic-function-warning :name generic-function-name))
   (let* ((existing-gf (find-generic-function generic-function-name nil))
          (generic-function
-          (if existing-gf
-              (ensure-generic-function
-               generic-function-name
-               :generic-function-class (class-of existing-gf))
-              (ensure-generic-function generic-function-name)))
+           (if existing-gf
+               (ensure-generic-function
+                generic-function-name
+                :generic-function-class (class-of existing-gf))
+               (ensure-generic-function generic-function-name)))
          (proto (method-prototype-for-gf generic-function-name)))
     ;; FIXME: Destructive modification of &REST list.
     (setf (getf (getf other-initargs 'plist) :name)

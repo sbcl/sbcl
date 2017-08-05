@@ -4,6 +4,7 @@ changes relative to sbcl-1.3.20:
     dynamic space anywhere the operating system places it.
     This feature can be disabled by removing :relocatable-heap from the
     build configuration. Not supported on Windows.
+  * enhancement: DEFMETHOD no longer signals IMPLICIT-GENERIC-FUNCTION-WARNING.
   * optimization: optimized external-format routines.
 
 changes in sbcl-1.3.20 relative to sbcl-1.3.19:
