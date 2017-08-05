@@ -223,7 +223,6 @@
 
   (show-and-call os-cold-init-or-reinit)
   (show-and-call !pathname-cold-init)
-  (show-and-call !debug-info-cold-init)
 
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)

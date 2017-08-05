@@ -393,16 +393,6 @@
   (tlf-number nil :type (or index null))
   (char-offset nil :type (or index null)))
 
-(defvar *!initial-debug-sources*)
-
-(defun !debug-info-cold-init ()
-  (let ((now (get-universal-time)))
-    (dolist (debug-source *!initial-debug-sources*)
-      (let* ((namestring (debug-source-namestring debug-source))
-             (timestamp (file-write-date namestring)))
-        (setf (debug-source-created debug-source) timestamp
-              (debug-source-compiled debug-source) now)))))
-
 ;;;; file reading
 ;;;;
 ;;;; When reading from a file, we have to keep track of some source

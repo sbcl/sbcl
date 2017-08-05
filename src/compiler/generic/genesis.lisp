@@ -464,10 +464,6 @@
 (declaim (special *!cold-toplevels* *!cold-defconstants*
                   *!cold-defuns* *cold-methods*))
 
-;;; the head of a list of DEBUG-SOURCEs which need to be patched when
-;;; the cold core starts up
-(defvar *current-debug-sources*)
-
 ;;; foreign symbol references
 (defparameter *cold-foreign-undefined-symbols* nil)
 
@@ -1740,8 +1736,6 @@ core and return a descriptor to it."
   (dump-symbol-info-vectors
    (attach-fdefinitions-to-symbols
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
-
-  (cold-set '*!initial-debug-sources* *current-debug-sources*)
 
   #!+x86
   (progn
@@ -3612,7 +3606,6 @@ initially undefined function references:~2%")
            ;; to adhere to the #\! convention for automatic uninterning.
            (*cold-methods* nil)
            (*!cold-toplevels* nil)
-           (*current-debug-sources* *nil-descriptor*)
            *cold-static-call-fixups*
            *cold-assembler-fixups*
            *cold-assembler-routines*
