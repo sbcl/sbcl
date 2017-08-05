@@ -3569,7 +3569,7 @@ initially undefined function references:~2%")
 
     (check-spaces)
 
-    (let* ((*foreign-symbol-placeholder-value* (if core-file-name nil 0))
+    (let  ((*foreign-symbol-placeholder-value* (if core-file-name nil 0))
            (*load-time-value-counter* 0)
            (*cold-fdefn-objects* (make-hash-table :test 'equal))
            (*cold-symbols* (make-hash-table :test 'eql)) ; integer keys
@@ -3593,8 +3593,8 @@ initially undefined function references:~2%")
                                      dynamic-core-space-id
                                      #!+gencgc sb!vm:default-dynamic-space-start
                                      #!-gencgc sb!vm:dynamic-0-space-start))
-           (*nil-descriptor* (make-nil-descriptor))
-           (*simple-vector-0-descriptor* (vector-in-core nil))
+           (*nil-descriptor*)
+           (*simple-vector-0-descriptor*)
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
@@ -3611,6 +3611,9 @@ initially undefined function references:~2%")
            *cold-assembler-routines*
            (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
+
+      (setf *nil-descriptor* (make-nil-descriptor)
+            *simple-vector-0-descriptor* (vector-in-core nil))
 
       ;; If we're given a preload file, it contains tramps and whatnot
       ;; that must be loaded before we create any FDEFNs.  It can in
