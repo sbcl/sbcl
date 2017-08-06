@@ -381,8 +381,8 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  (multiple-value-bind (foldable-call callable functional-args arg-types)
-      (make-foldable-call-check arg-types attributes)
+  (multiple-value-bind (callable-map arg-types)
+      (make-callable-map arg-types attributes)
     `(%defknown ',(if (and (consp name)
                            (not (legal-fun-name-p name)))
                       name
@@ -390,27 +390,22 @@
                 '(sfunction ,arg-types ,result-type)
                 (ir1-attributes ,@attributes)
                 (source-location)
-                :foldable-call-check ,foldable-call
-                :callable-check ,callable
-                :functional-args ,functional-args
+                :callable-map ,callable-map
                 ,@keys)))
 
-(defun make-foldable-call-check (arg-types attributes)
-  (let ((call (member 'call attributes))
-        (fold (member 'foldable attributes)))
-    (if (not call)
-        (values nil nil nil arg-types)
-        (multiple-value-bind (llks required optional rest keys)
-            (parse-lambda-list
-             arg-types
-             :context :function-type
-             :accept (lambda-list-keyword-mask
-                      '(&optional &rest &key &allow-other-keys))
-             :silent t)
-          (let (vars
-                call-vars
-                arg-count-specified)
-            (labels ((callable-p (x)
+(defun make-callable-map (arg-types attributes)
+  (if (member 'call attributes)
+      (multiple-value-bind (llks required optional rest keys)
+          (parse-lambda-list
+           arg-types
+           :context :function-type
+           :accept (lambda-list-keyword-mask
+                    '(&optional &rest &key &allow-other-keys))
+           :silent t)
+        (let (vars
+              call-vars
+              arg-count-specified)
+          (labels ((callable-p (x)
                      (member x '(callable function)))
                    (process-var (x &optional (name (gensym)))
                      (if (callable-p (if (consp x)
@@ -432,65 +427,53 @@
                      (and (consp x)
                           (callable-p (car x))
                           (eql (cadr x) '&rest))))
-              (let* (rest-var
-                     (lambda-list
-                       (cond ((find-if #'callable-rest-p required)
-                              (setf rest-var (gensym))
-                              `(,@(loop for var in required
-                                       collect (process-var var)
-                                       until (callable-rest-p var))
-                                &rest ,rest-var))
-                             (t
-                              `(,@(mapcar #'process-var required)
-                                ,@(and optional
-                                       `(&optional ,@(mapcar #'process-var optional)))
-                                ,@(and rest
-                                       `(&rest ,@(mapcar #'process-var rest)))
-                                ,@(and (ll-kwds-keyp llks)
-                                       `(&key ,@(loop for (key type) in keys
-                                                      for var = (gensym)
-                                                      do (process-var type var)
-                                                      collect `((,key ,var))))))))))
+            (let* (rest-var
+                   (lambda-list
+                     (cond ((find-if #'callable-rest-p required)
+                            (setf rest-var (gensym))
+                            `(,@(loop for var in required
+                                      collect (process-var var)
+                                      until (callable-rest-p var))
+                              &rest ,rest-var))
+                           (t
+                            `(,@(mapcar #'process-var required)
+                              ,@(and optional
+                                     `(&optional ,@(mapcar #'process-var optional)))
+                              ,@(and rest
+                                     `(&rest ,@(mapcar #'process-var rest)))
+                              ,@(and (ll-kwds-keyp llks)
+                                     `(&key ,@(loop for (key type) in keys
+                                                    for var = (gensym)
+                                                    do (process-var type var)
+                                                    collect `((,key ,var))))))))))
 
-                (assert call-vars)
-                (values
-                 (and fold
-                      `(lambda ,lambda-list
-                         (declare (ignore ,@vars))
-                         (and ,@(loop for (x) in call-vars
-                                      collect `(constant-fold-arg-p ,x)))))
-                 (and arg-count-specified
-                      `(lambda ,lambda-list
-                         (declare (ignore ,@vars))
-                         ,@(loop for (x arg-count) in call-vars
-                                 when arg-count
-                                 collect (if (eq arg-count '&rest)
-                                             `(valid-callable-argument ,x (length ,rest-var))
-                                             `(valid-callable-argument ,x ,arg-count)))))
-                 (let ((tests (loop for (x arg-count no-conversion) in call-vars
-                                    unless (eq no-conversion 'no-function-conversion)
-                                    collect `(when ,x
-                                               (push (cons ,x ,(if (eq arg-count '&rest)
-                                                                   `(length ,rest-var)
-                                                                   arg-count) )
-                                                     result)))))
-                   (when tests
-                     `(lambda ,lambda-list
-                        (declare (ignore ,@vars))
-                        (let (result)
-                          ,@tests
-                          result))))
-                 `(,@(mapcar #'process-type required)
-                   ,@(and optional
-                          `(&optional ,@(mapcar #'process-type optional)))
-                   ,@(and (ll-kwds-restp llks)
-                          `(&rest ,@rest))
-                   ,@(and (ll-kwds-keyp llks)
-                          `(&key
-                            ,@(loop for (key type) in keys
-                                    collect `(,key ,(process-type type)))))
-                   ,@(and (ll-kwds-allowp llks)
-                          '(&allow-other-keys)))))))))))
+              (assert call-vars)
+              (values
+               `(lambda (function ,@lambda-list)
+                  (declare (ignore ,@vars))
+                  ,@(loop for (x arg-count no-function-conversion) in call-vars
+                          collect `(funcall function
+                                            ,x
+                                            ,@(and arg-count
+                                                   `(:arg-count
+                                                     ,(if (eq arg-count '&rest)
+                                                          `(length ,rest-var)
+                                                          arg-count)))
+                                            ,@(and (eq no-function-conversion
+                                                       :no-function-conversion)
+                                                   `(:no-function-conversion t)))))
+               `(,@(mapcar #'process-type required)
+                 ,@(and optional
+                        `(&optional ,@(mapcar #'process-type optional)))
+                 ,@(and (ll-kwds-restp llks)
+                        `(&rest ,@rest))
+                 ,@(and (ll-kwds-keyp llks)
+                        `(&key
+                          ,@(loop for (key type) in keys
+                                  collect `(,key ,(process-type type)))))
+                 ,@(and (ll-kwds-allowp llks)
+                        '(&allow-other-keys))))))))
+      (values nil arg-types)))
 
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list

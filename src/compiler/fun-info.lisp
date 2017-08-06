@@ -160,15 +160,14 @@
   ;; If non-null, the index of the argument which becomes the result
   ;; of the function.
   (result-arg nil :type (or index null))
-  ;; For functions with attributes FOLDABLE & CALL check that the
-  ;; arguments declared as CALLABLE or FUNCTION are foldable as well.
-  (foldable-call-check nil :type (or function null))
-  ;; A function that is called with lvars to check that the functions
-  ;; passed to CALLABLE arguments have the right argument counts.
-  (callable-check nil :type (or function null))
+  ;; A function that maps over callable arguments,
+  ;; the function it calls should accept
+  ;; ((or null lvar) &key (arg-count (or null unsigned-byte))
+  ;;                      (no-function-conversion boolean))
+  ;; Used by MAP-CALLABLE-ARGUMENTS
+  (callable-map nil :type (or function null))
   ;; Customizing behavior of ASSERT-CALL-TYPE
-  (call-type-deriver nil :type (or function null))
-  (functional-args nil :type (or function null)))
+  (call-type-deriver nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

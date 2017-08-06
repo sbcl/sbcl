@@ -179,11 +179,13 @@
       (let ((type (info :function :type it))
             (info (info :function :info it)))
         (when (and (not *lossage-detected*)
-                   info
-                   (fun-info-callable-check info))
+                   info)
           (let ((*valid-fun-use-name* it))
-            (apply (fun-info-callable-check info)
-                   (resolve-key-args args type))))
+            (map-callable-arguments
+             (lambda (lvar &key arg-count &allow-other-keys)
+               (when arg-count
+                 (valid-callable-argument lvar arg-count)))
+             call)))
         ;; One more check for structure constructors:
         (when (typep type 'defstruct-description)
           (awhen (assq it (dd-constructors type))

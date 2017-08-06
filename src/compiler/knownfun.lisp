@@ -73,10 +73,8 @@
 (defun %defknown (names type attributes location
                   &key derive-type optimizer destroyed-constant-args result-arg
                        overwrite-fndb-silently
-                       foldable-call-check
-                       callable-check
-                       call-type-deriver
-                       functional-args)
+                       callable-map
+                       call-type-deriver)
   (let ((ctype (specifier-type type)))
     (dolist (name names)
       (unless overwrite-fndb-silently
@@ -103,10 +101,8 @@
                            :optimizer optimizer
                            :destroyed-constant-args destroyed-constant-args
                            :result-arg result-arg
-                           :foldable-call-check foldable-call-check
-                           :callable-check callable-check
-                           :call-type-deriver call-type-deriver
-                           :functional-args functional-args))
+                           :callable-map callable-map
+                           :call-type-deriver call-type-deriver))
       (if location
           (setf (getf (info :source-location :declaration name) 'defknown)
                 location)

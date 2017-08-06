@@ -1497,13 +1497,15 @@
     (cond ((not (ir1-attributep attr foldable))
            nil)
           ((ir1-attributep attr call)
-           (apply (fun-info-foldable-call-check info)
-                  (mapcar (lambda (lvar)
-                            (or (lvar-fun-name lvar t)
-                                (if (constant-lvar-p lvar)
-                                    (lvar-value lvar)
-                                    (return-from constant-fold-call-p nil))))
-                          args)))
+           (and (every (lambda (lvar)
+                         (or (lvar-fun-name lvar t)
+                             (constant-lvar-p lvar)))
+                       args)
+                (map-callable-arguments
+                 (lambda (lvar &key &allow-other-keys)
+                   (constant-fold-arg-p (or (lvar-fun-name lvar t)
+                                            (lvar-value lvar))))
+                 combination)))
           (t
            (every #'constant-lvar-p args)))))
 

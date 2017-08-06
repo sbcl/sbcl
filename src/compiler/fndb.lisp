@@ -1157,7 +1157,7 @@
   (character character &optional readtable (or readtable null)) (eql t)
   ())
 
-(defknown set-macro-character (character (callable 2 no-function-conversion)
+(defknown set-macro-character (character (callable 2 :no-function-conversion)
                                &optional t (or readtable null))
   (eql t)
   (call))
@@ -1170,7 +1170,7 @@
 ;;; test in reader.impure.lisp
 ;;;   The function NIL is called by SET-DISPATCH-MACRO-CHARACTER with three arguments, but wants exactly two.
 (defknown set-dispatch-macro-character
-  (character character (callable 3 no-function-conversion)
+  (character character (callable 3 :no-function-conversion)
    &optional (or readtable null)) (eql t)
   (call))
 (defknown get-dispatch-macro-character
@@ -1207,7 +1207,7 @@
   null
   ())
 (defknown set-pprint-dispatch
-  (type-specifier (callable 2 no-function-conversion)
+  (type-specifier (callable 2 :no-function-conversion)
    &optional real sb!pretty:pprint-dispatch-table)
   null
   (call))

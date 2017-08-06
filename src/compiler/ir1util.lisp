@@ -2448,3 +2448,17 @@ is :ANY, the function name is not checked."
   (and (policy call (eql preserve-single-use-debug-variables 3))
        (or (not (lambda-var-p var))
            (not (lambda-system-lambda-p (lambda-var-home var))))))
+
+;;; The function should accept
+;;; (lvar &key (arg-count (or null unsigned-byte)) (no-function-conversion boolean))
+(defun map-callable-arguments (function combination)
+  (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
+         (type (info :function :type comination-name))
+         (info (info :function :info comination-name))
+         (args (combination-args combination)))
+    (when (fun-info-callable-map info)
+      (apply (fun-info-callable-map info)
+             (lambda (lvar &rest args)
+               (when lvar
+                 (apply function lvar args)))
+             (resolve-key-args args type)))))

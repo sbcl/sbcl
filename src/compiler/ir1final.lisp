@@ -197,41 +197,37 @@
     (do-nodes (node nil block)
       (when (and (combination-p node)
                  (eq (combination-kind node) :known))
-        (let* ((comination-name (lvar-fun-name (combination-fun node) t))
-               (type (info :function :type comination-name))
-               (info (info :function :info comination-name))
-               (args (combination-args node)))
-          (when (and info
-                     (fun-info-functional-args info))
-            (let ((fun-lvars (apply (fun-info-functional-args info)
-                                    (resolve-key-args args type))))
-              (loop for (fun . arg-count) in fun-lvars
-                    ;; TODO: handle CASTS.
-                    ;; principal-lvar-use will return the REF but the
-                    ;; CAST itself needs to be replaced.
-                    for ref = (lvar-uses fun)
-                    when (ref-p ref)
-                    do
-                    (flet ((translate-two-args (name)
-                             (and (eql arg-count 2)
-                                  (neq comination-name 'reduce)
-                                  (cadr (assoc name *two-arg-functions*)))))
-                      (let* ((leaf (ref-leaf ref))
-                             (fun-name (and (constant-p leaf)
-                                            (constant-value leaf)))
-                             (replacement
-                               (cond ((and fun-name
-                                           (symbolp fun-name))
-                                      (or (translate-two-args fun-name)
-                                          fun-name))
-                                     ((and (global-var-p leaf)
-                                           (eq (global-var-kind leaf) :global-function))
-                                      (translate-two-args (global-var-%source-name leaf))))))
-                        (when replacement
-                          (change-ref-leaf
-                           ref
-                           (let ((*compiler-error-context* node))
-                             (find-free-fun replacement "ir1-finalize")))))))))
+        (let ((comination-name (lvar-fun-name (combination-fun node) t))
+              (args (combination-args node)))
+          (map-callable-arguments
+           (lambda (lvar &key arg-count no-function-conversion)
+             ;; TODO: handle CASTS.
+             ;; principal-lvar-use will return the REF but the
+             ;; CAST itself needs to be replaced.
+             (unless no-function-conversion
+               (let ((ref (lvar-uses lvar)))
+                 (when (ref-p ref)
+                   (flet ((translate-two-args (name)
+                            (and (eql arg-count 2)
+                                 (neq comination-name 'reduce)
+                                 (cadr (assoc name *two-arg-functions*)))))
+                     (let* ((leaf (ref-leaf ref))
+                            (fun-name (and (constant-p leaf)
+                                           (constant-value leaf)))
+                            (replacement
+                              (cond ((and fun-name
+                                          (symbolp fun-name))
+                                     (or (translate-two-args fun-name)
+                                         fun-name))
+                                    ((and (global-var-p leaf)
+                                          (eq (global-var-kind leaf) :global-function))
+                                     (translate-two-args (global-var-%source-name leaf))))))
+                       (when replacement
+                         (change-ref-leaf
+                          ref
+                          (let ((*compiler-error-context* node))
+                            (find-free-fun replacement "ir1-finalize"))))))))))
+           node)
           (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
                 (ref (lvar-uses (combination-fun node))))
             (when (and two-arg
