@@ -200,7 +200,7 @@
         (let ((comination-name (lvar-fun-name (combination-fun node) t))
               (args (combination-args node)))
           (map-callable-arguments
-           (lambda (lvar &key arg-count no-function-conversion)
+           (lambda (lvar &key arg-count no-function-conversion &allow-other-keys)
              ;; TODO: handle CASTS.
              ;; principal-lvar-use will return the REF but the
              ;; CAST itself needs to be replaced.

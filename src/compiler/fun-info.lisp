@@ -161,9 +161,6 @@
   ;; of the function.
   (result-arg nil :type (or index null))
   ;; A function that maps over callable arguments,
-  ;; the function it calls should accept
-  ;; ((or null lvar) &key (arg-count (or null unsigned-byte))
-  ;;                      (no-function-conversion boolean))
   ;; Used by MAP-CALLABLE-ARGUMENTS
   (callable-map nil :type (or function null))
   ;; Customizing behavior of ASSERT-CALL-TYPE

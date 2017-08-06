@@ -2450,15 +2450,21 @@ is :ANY, the function name is not checked."
            (not (lambda-system-lambda-p (lambda-var-home var))))))
 
 ;;; The function should accept
-;;; (lvar &key (arg-count (or null unsigned-byte)) (no-function-conversion boolean))
+;;; (lvar &key (arg-count (or null unsigned-byte)) (no-function-conversion boolean)
+;;;            (args argument-description*) (arg-lvars list-of-lvars))
+;;; where argument-description is either a position into arg-lvars or
+;;; (sequence position-into-arg-lvars)
 (defun map-callable-arguments (function combination)
   (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
          (type (info :function :type comination-name))
-         (info (info :function :info comination-name))
-         (args (combination-args combination)))
+         (info (info :function :info comination-name)))
     (when (fun-info-callable-map info)
-      (apply (fun-info-callable-map info)
-             (lambda (lvar &rest args)
-               (when lvar
-                 (apply function lvar args)))
-             (resolve-key-args args type)))))
+      (multiple-value-bind (args unknown) (resolve-key-args (combination-args combination) type)
+        (apply (fun-info-callable-map info)
+               (lambda (lvar &rest rest)
+                 (when lvar
+                   (apply function lvar :arg-lvars args
+                                        :unknown-keys unknown
+                                        rest)))
+               args)))))
+

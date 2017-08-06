@@ -5,6 +5,8 @@ changes relative to sbcl-1.3.20:
     This feature can be disabled by removing :relocatable-heap from the
     build configuration. Not supported on Windows.
   * enhancement: DEFMETHOD no longer signals IMPLICIT-GENERIC-FUNCTION-WARNING.
+  * enhancement: better type conflict detection for high order functions, e.g.
+    (find x "123" :test #'=)
   * optimization: optimized external-format routines.
 
 changes in sbcl-1.3.20 relative to sbcl-1.3.19:

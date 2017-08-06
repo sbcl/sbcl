@@ -2289,11 +2289,13 @@
                        (bound-cast-derived cast))
                    (values-subtypep (lvar-derived-type value)
                                     (cast-asserted-type cast)))
-          (when (function-designator-cast-p cast)
+          (when (and (function-designator-cast-p cast)
+                     lvar)
             (let ((*valid-fun-use-name* (function-designator-cast-caller cast))
                   (*lossage-fun* #'compiler-warn)
                   (*compiler-error-context* cast))
               (valid-callable-argument lvar
+                                       :arg-count
                                        (function-designator-cast-arg-count cast))))
 
           (delete-cast cast)

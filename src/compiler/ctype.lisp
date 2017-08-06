@@ -181,11 +181,7 @@
         (when (and (not *lossage-detected*)
                    info)
           (let ((*valid-fun-use-name* it))
-            (map-callable-arguments
-             (lambda (lvar &key arg-count &allow-other-keys)
-               (when arg-count
-                 (valid-callable-argument lvar arg-count)))
-             call)))
+            (map-callable-arguments #'valid-callable-argument call)))
         ;; One more check for structure constructors:
         (when (typep type 'defstruct-description)
           (awhen (assq it (dd-constructors type))
@@ -200,22 +196,24 @@
   (if (fun-type-keyp type)
       (let ((non-key (+ (length (fun-type-required type))
                         (length (fun-type-optional type))))
-            key-arguments)
+            key-arguments
+            unknown)
         (do ((key (nthcdr non-key args) (cddr key)))
             ((null key))
           (let ((k (first key))
                 (v (second key)))
-            (when (constant-lvar-p k)
-              (let* ((name (lvar-value k))
-                     (info (find name (fun-type-keywords type)
-                                 :key #'key-info-name)))
-                (when info
-                  (push name key-arguments)
-                  (push v key-arguments))))))
-
-        (nconc (subseq args 0 non-key)
-               (nreverse key-arguments)))
-      args))
+            (if (constant-lvar-p k)
+                (let* ((name (lvar-value k))
+                       (info (find name (fun-type-keywords type)
+                                   :key #'key-info-name)))
+                  (when info
+                    (push name key-arguments)
+                    (push v key-arguments)))
+                (setf unknown t))))
+        (values (nconc (subseq args 0 non-key)
+                       (nreverse key-arguments))
+                unknown))
+      (values args nil)))
 
 ;;; Return MIN, MAX, whether it contaions &optional/&key/&rest
 (defun fun-arg-limits (function)
@@ -249,77 +247,169 @@
                  (optional-dispatch-max-args function)
                  t))))
 
-(defun valid-callable-argument (lvar arg-count)
-  (when lvar
-    ;; Handle #'function,  'function and (lambda (x y))
-    (let* ((use (principal-lvar-use lvar))
-           (leaf (if (ref-p use)
-                     (ref-leaf use)
-                     (return-from valid-callable-argument nil)))
-           (defined-type (and (global-var-p leaf)
-                              (global-var-defined-type leaf)))
-           (lvar-type (or defined-type
-                          (lvar-type lvar)))
-           (fun-name (cond ((or (fun-type-p lvar-type)
-                                (functional-p leaf))
-                            (cond ((constant-lvar-p lvar)
-                                   #+sb-xc-host (bug "Can't call %FUN-NAME")
-                                   #-sb-xc-host (%fun-name (lvar-value lvar)))
-                                  ((and (lambda-p leaf)
-                                        (eq (lambda-kind leaf) :external))
-                                   (leaf-debug-name (lambda-entry-fun leaf)))
-                                  (t
-                                   (leaf-debug-name leaf))))
-                           ((constant-lvar-p lvar)
-                            (lvar-value lvar))
-                           (t
-                            (when *valid-callable-argument-assert-unknown-lvars*
-                              (assert-function-designator-lvar-type lvar
-                                                                    (specifier-type '(or function symbol))
-                                                                    arg-count
-                                                                    *valid-fun-use-name*
-                                                                    *policy*))
-                            (return-from valid-callable-argument nil))))
-           (type (cond ((fun-type-p lvar-type)
-                        lvar-type)
-                       ((symbolp fun-name)
-                        (proclaimed-ftype fun-name))
-                       (t
-                        leaf)))
-           (*lossage-fun* (if (and (not (eq (leaf-where-from leaf)
-                                            :defined-here))
-                                   (not (and (functional-p leaf)
-                                             (or (lambda-p leaf)
-                                                 (member (functional-kind leaf)
-                                                         '(:toplevel-xep)))))
-                                   (or (not fun-name)
-                                       (not (info :function :info fun-name))))
-                              #'compiler-style-warn
-                              *lossage-fun*)))
-      (multiple-value-bind (min max optional)
-          (fun-arg-limits type)
-        (cond
-          ((and (not min) (not max)))
-          ((not optional)
-           (when (/= arg-count min)
-             (note-lossage
-              "The function ~S is called by ~S with ~R argument~:P, but wants exactly ~R."
-              fun-name
-              *valid-fun-use-name*
-              arg-count min)))
-          ((< arg-count min)
-           (note-lossage
-            "The function ~S is called by ~S with ~R argument~:P, but wants at least ~R."
-            fun-name
-            *valid-fun-use-name*
-            arg-count min))
-          ((not max))
-          ((> arg-count max)
-           (note-lossage
-            "The function ~S called by ~S with ~R argument~:P, but wants at most ~R."
-            fun-name
-            *valid-fun-use-name*
-            arg-count max)))))))
+(defun lvar-fun-type (lvar &optional arg-count)
+  ;; Handle #'function,  'function and (lambda (x y))
+  (let* ((use (principal-lvar-use lvar))
+         (leaf (if (ref-p use)
+                   (ref-leaf use)
+                   (return-from lvar-fun-type nil)))
+         (defined-type (and (global-var-p leaf)
+                            (global-var-defined-type leaf)))
+         (lvar-type (or defined-type
+                        (lvar-type lvar)))
+         (fun-name (cond ((or (fun-type-p lvar-type)
+                              (functional-p leaf))
+                          (cond ((constant-lvar-p lvar)
+                                 #+sb-xc-host (bug "Can't call %FUN-NAME")
+                                 #-sb-xc-host (%fun-name (lvar-value lvar)))
+                                ((and (lambda-p leaf)
+                                      (eq (lambda-kind leaf) :external))
+                                 (leaf-debug-name (lambda-entry-fun leaf)))
+                                (t
+                                 (leaf-debug-name leaf))))
+                         ((constant-lvar-p lvar)
+                          (lvar-value lvar))
+                         (t
+                          (when (and *valid-callable-argument-assert-unknown-lvars*
+                                     arg-count)
+                            (assert-function-designator-lvar-type lvar
+                                                                  (specifier-type '(or function symbol))
+                                                                  arg-count
+                                                                  *valid-fun-use-name*
+                                                                  *policy*))
+                          (return-from lvar-fun-type nil))))
+         (type (cond ((fun-type-p lvar-type)
+                      lvar-type)
+                     ((symbolp fun-name)
+                      (proclaimed-ftype fun-name))
+                     (t
+                      leaf))))
+    (values type fun-name leaf)))
+
+(defun valid-callable-argument (lvar &key arg-count args arg-lvars unknown-keys &allow-other-keys)
+  (when arg-count
+    (multiple-value-bind (type fun-name leaf) (lvar-fun-type lvar arg-count)
+      (when type
+        (let* ((*lossage-fun*
+                 (if (and (neq (leaf-where-from leaf) :defined-here)
+                          (not (and (functional-p leaf)
+                                    (or (lambda-p leaf)
+                                        (member (functional-kind leaf)
+                                                '(:toplevel-xep)))))
+                          (or (not fun-name)
+                              (not (info :function :info fun-name))))
+                     #'compiler-style-warn
+                     *lossage-fun*)))
+          (multiple-value-bind (min max optional)
+              (fun-arg-limits type)
+            (cond
+              ((and (not min) (not max)))
+              ((not optional)
+               (when (/= arg-count min)
+                 (note-lossage
+                  "The function ~S is called by ~S with ~R argument~:P, but wants exactly ~R."
+                  fun-name
+                  *valid-fun-use-name*
+                  arg-count min)
+                 (return-from valid-callable-argument)))
+              ((< arg-count min)
+               (note-lossage
+                "The function ~S is called by ~S with ~R argument~:P, but wants at least ~R."
+                fun-name
+                *valid-fun-use-name*
+                arg-count min)
+               (return-from valid-callable-argument))
+              ((not max))
+              ((> arg-count max)
+               (note-lossage
+                "The function ~S called by ~S with ~R argument~:P, but wants at most ~R."
+                fun-name
+                *valid-fun-use-name*
+                arg-count max)
+               (return-from valid-callable-argument))))
+          (when args
+            (valid-arguments-to-callable fun-name args arg-lvars
+                                         (fun-type-first-n-types type arg-count)
+                                         unknown-keys)))))))
+
+(defun fun-type-first-n-types (type n)
+  (unless (or (not (fun-type-p type))
+              (fun-type-keyp type)
+              (fun-type-wild-args type))
+    (let (result)
+      (flet ((process (types)
+               (loop for x in types
+                     while (plusp n)
+                     do (decf n)
+                        (push x result))))
+        (process (fun-type-required type))
+        (process (fun-type-optional type))
+        (loop repeat n
+              do (push (fun-type-rest type) result)))
+      (nreverse result))))
+
+(defun valid-arguments-to-callable (fun args arg-lvars types
+                                    unknown-keys)
+  (if (typep args '(cons (cons (eql sequences))))
+      (loop for n in (cdar args)
+            do (valid-arguments-to-callable fun `((sequence ,n)) arg-lvars types unknown-keys))
+      (loop with key-fun
+            for arg in args
+            for expected-type in types
+            for sequencep = (and (consp arg)
+                                 (eql (car arg) 'sequence))
+            for n = (if sequencep
+                        (cadr arg)
+                        arg)
+            for lvar-type* = (lvar-type (nth n arg-lvars))
+            for lvar-type = (if sequencep
+                                (destructuring-bind (&key key) (cddr arg)
+                                  (let ((key (and (not unknown-keys)
+                                                  (or (not key)
+                                                      (loop for (key value) on (nthcdr key arg-lvars) by #'cddr
+                                                            unless (keywordp key) return nil
+                                                            when (eq key :key)
+                                                            return value
+                                                            finally (return t)))))
+                                        type)
+                                    (cond ((member key '(t identity))
+                                           (and (array-type-p lvar-type*)
+                                                (array-type-element-type lvar-type*)))
+                                          ((and (lvar-p key)
+                                                (setf (values type key-fun) (lvar-fun-type key))
+                                                (fun-type-p type)
+                                                (neq key-fun 'identity))
+                                           (single-value-type (fun-type-returns type))))))
+                                lvar-type*)
+            when (and lvar-type
+                      (neq lvar-type *wild-type*)
+                      (eq (type-intersection expected-type lvar-type)
+                          *empty-type*))
+            do (if sequencep
+                   (if (and key-fun
+                            (neq key-fun 'identity))
+                       (note-lossage
+                        "The function ~S called by ~S with the results~%of the :key function ~s of type ~S~%which conflict with ~S."
+                        fun
+                        *valid-fun-use-name*
+                        key-fun
+                        (type-specifier lvar-type)
+                        (type-specifier expected-type))
+                       (note-lossage
+                        "The function ~S called by ~S with the elements~%of the ~:R argument of type ~S~%which conflict with ~S."
+                        fun
+                        *valid-fun-use-name*
+                        n
+                        (type-specifier lvar-type*)
+                        (type-specifier expected-type)))
+                   (note-lossage
+                    "The function ~S called by ~S with the ~:R argument of type ~S,~%which conflicts with ~S."
+                    fun
+                    *valid-fun-use-name*
+                    n
+                    (type-specifier lvar-type*)
+                    (type-specifier expected-type)))
+               (return))))
 
 (defun check-structure-constructor-call (call dd ctor-ll-parts)
   (destructuring-bind (&optional req opt rest keys aux)

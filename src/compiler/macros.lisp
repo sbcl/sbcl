@@ -451,7 +451,7 @@
               (values
                `(lambda (function ,@lambda-list)
                   (declare (ignore ,@vars))
-                  ,@(loop for (x arg-count no-function-conversion) in call-vars
+                  ,@(loop for (x arg-count . options) in call-vars
                           collect `(funcall function
                                             ,x
                                             ,@(and arg-count
@@ -459,9 +459,9 @@
                                                      ,(if (eq arg-count '&rest)
                                                           `(length ,rest-var)
                                                           arg-count)))
-                                            ,@(and (eq no-function-conversion
-                                                       :no-function-conversion)
-                                                   `(:no-function-conversion t)))))
+                                            ,@(loop for (keyword value) on options by #'cddr
+                                                    collect keyword
+                                                    collect `',value))))
                `(,@(mapcar #'process-type required)
                  ,@(and optional
                         `(&optional ,@(mapcar #'process-type optional)))
