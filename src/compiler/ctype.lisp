@@ -181,7 +181,8 @@
         (when (and (not *lossage-detected*)
                    info)
           (let ((*valid-fun-use-name* it))
-            (map-callable-arguments #'valid-callable-argument call)))
+            (map-callable-arguments #'valid-callable-argument call)
+            (validate-test-and-test-not call)))
         ;; One more check for structure constructors:
         (when (typep type 'defstruct-description)
           (awhen (assq it (dd-constructors type))
@@ -190,26 +191,35 @@
           (*unwinnage-detected* (values nil nil))
           (t (values t t)))))
 
+(defun map-key-lvars (function args type)
+  (when (fun-type-keyp type)
+    (do* ((non-key (+ (length (fun-type-required type))
+                      (length (fun-type-optional type))))
+          unknown
+          (key (nthcdr non-key args) (cddr key)))
+         ((null key) unknown)
+      (let ((key (first key))
+            (value (second key)))
+        (if (constant-lvar-p key)
+            (let* ((name (lvar-value key))
+                   (info (find name (fun-type-keywords type)
+                               :key #'key-info-name)))
+              (when info
+                (funcall function name value)))
+            (setf unknown t))))))
+
 ;;; Turn constant LVARs in keyword arg positions to constants so that
 ;;; they can be passed to FUN-INFO-CALLABLE-CHECK.
 (defun resolve-key-args (args type)
   (if (fun-type-keyp type)
-      (let ((non-key (+ (length (fun-type-required type))
-                        (length (fun-type-optional type))))
-            key-arguments
-            unknown)
-        (do ((key (nthcdr non-key args) (cddr key)))
-            ((null key))
-          (let ((k (first key))
-                (v (second key)))
-            (if (constant-lvar-p k)
-                (let* ((name (lvar-value k))
-                       (info (find name (fun-type-keywords type)
-                                   :key #'key-info-name)))
-                  (when info
-                    (push name key-arguments)
-                    (push v key-arguments)))
-                (setf unknown t))))
+      (let* ((non-key (+ (length (fun-type-required type))
+                         (length (fun-type-optional type))))
+             key-arguments
+             (unknown (map-key-lvars (lambda (key value)
+                                       (push key key-arguments)
+                                       (push value key-arguments))
+                                     args
+                                     type)))
         (values (nconc (subseq args 0 non-key)
                        (nreverse key-arguments))
                 unknown))
@@ -331,6 +341,31 @@
             (valid-arguments-to-callable fun-name args arg-lvars
                                          (fun-type-first-n-types type arg-count)
                                          unknown-keys)))))))
+
+(defun validate-test-and-test-not (combination)
+  (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
+         (info (info :function :info comination-name)))
+    (when (ir1-attributep (fun-info-attributes info) call)
+      (let (test
+            test-not
+            (null-type (specifier-type 'null)))
+        (map-key-lvars (lambda (key value)
+                         (when (and (not test)
+                                    (eq key :test))
+                           (setf test value))
+                         (when (and (not test-not)
+                                    (eq key :test-not))
+                           (setf test-not value)))
+                       (combination-args combination)
+                       (info :function :type comination-name))
+        (when (and test
+                   test-not
+                   (eq (type-intersection null-type (lvar-type test))
+                       *empty-type*)
+                   (eq (type-intersection null-type (lvar-type test-not))
+                       *empty-type*))
+          (note-lossage "~s: can't specify both :TEST and :TEST-NOT"
+                        *valid-fun-use-name*))))))
 
 (defun fun-type-first-n-types (type n)
   (unless (or (not (fun-type-p type))
