@@ -942,6 +942,9 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
          (argument-names arguments)
          (argument-specs (cddr specifier)))
     `(lambda (args-pointer result-pointer function)
+       ;; KLUDGE: the SAP shouldn't be consed but they are, don't
+       ;; bother anyone about that sad fact
+       (declare (muffle-conditions compiler-note))
        ;; FIXME: the saps are not gc safe
        (let ((args-sap (int-sap
                         (sb!kernel:get-lisp-obj-address args-pointer)))
@@ -1055,9 +1058,8 @@ one."
                            ,function
                            (or (gethash ',specifier *alien-callback-wrappers*)
                                (setf (gethash ',specifier *alien-callback-wrappers*)
-                                     (compile nil
-                                              ',(alien-callback-lisp-wrapper-lambda
-                                                 specifier result-type argument-types env))))
+                                     ,(alien-callback-lisp-wrapper-lambda
+                                       specifier result-type argument-types env)))
                            ,call-type)
       ',(parse-alien-type specifier env)))))
 
