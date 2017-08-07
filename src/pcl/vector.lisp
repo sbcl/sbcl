@@ -167,11 +167,10 @@
                                                        parameter-or-nil
                                                        env)))
                    (class (find-class class-name nil)))
-              (cond ((not (eq **boot-state** 'complete))
-                     (setq class nil))
+              (cond ((or (not (eq **boot-state** 'complete))
+                         (forward-referenced-class-p class))
+                     (setf class nil))
                     ((and class (not (class-finalized-p class)))
-                     ;; The class itself is never forward-referenced
-                     ;; here, but its superclasses may be.
                      (unless (try-finalize-inheritance class)
                        (when (boundp 'sb-c:*lexenv*)
                          (sb-c:compiler-notify
