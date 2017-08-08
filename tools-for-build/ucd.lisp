@@ -632,11 +632,10 @@ Length should be adjusted when the standard changes.")
 
 (defun parse-property (stream &optional name)
   (let ((result (make-array 1 :fill-pointer 0 :adjustable t)))
-    ;; FIXME: something in this loop provokes a warning from CLISP
     (loop for line = (read-line stream nil nil)
+       for entry = (subseq line 0 (position #\# line))
        ;; Deal with Blah=Blah in DerivedNormalizationProps.txt
        while (and line (not (position #\= (substitute #\Space #\= line :count 1))))
-       for entry = (subseq line 0 (position #\# line))
        when (and entry (string/= entry ""))
        do
          (destructuring-bind (start end)
