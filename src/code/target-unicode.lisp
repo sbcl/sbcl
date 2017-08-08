@@ -13,67 +13,21 @@
 
 (declaim (type simple-vector **special-numerics**))
 (sb!impl::defglobal **special-numerics**
-  #.(with-open-file (stream
-                     (merge-pathnames
-                      (make-pathname
-                       :directory
-                       '(:relative :up :up "output")
-                       :name "numerics" :type "lisp-expr")
-                      sb!xc:*compile-file-pathname*)
-                     :direction :input
-                     :element-type 'character)
-      (read stream)))
-
+  #.(sb-cold:read-from-file "output/numerics.lisp-expr"))
 
 (declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
 (sb!impl::defglobal **block-ranges**
   #.(sb!int:!coerce-to-specialized
-     (with-open-file (stream
-                      (merge-pathnames
-                       (make-pathname
-                        :directory
-                        '(:relative :up :up "output")
-                        :name "blocks" :type "lisp-expr")
-                       sb!xc:*compile-file-pathname*)
-                      :direction :input
-                      :element-type 'character)
-       (read stream))
+     (sb-cold:read-from-file "output/blocks.lisp-expr")
      '(unsigned-byte 32)))
 
 (macrolet ((unicode-property-init ()
              (let ((proplist-dump
-                    (with-open-file (stream
-                                     (merge-pathnames
-                                      (make-pathname
-                                       :directory
-                                       '(:relative :up :up "output")
-                                       :name "misc-properties" :type "lisp-expr")
-                                      sb!xc:*compile-file-pathname*)
-                                     :direction :input
-                                     :element-type 'character)
-                      (read stream)))
+                    (sb-cold:read-from-file "output/misc-properties.lisp-expr"))
                    (confusable-sets
-                    (with-open-file (stream
-                                     (merge-pathnames
-                                      (make-pathname
-                                       :directory
-                                       '(:relative :up :up "output")
-                                       :name "confusables" :type "lisp-expr")
-                                      sb!xc:*compile-file-pathname*)
-                                     :direction :input
-                                     :element-type 'character)
-                      (read stream)))
+                    (sb-cold:read-from-file "output/confusables.lisp-expr"))
                    (bidi-mirroring-list
-                    (with-open-file (stream
-                                     (merge-pathnames
-                                      (make-pathname
-                                       :directory
-                                       '(:relative :up :up "output")
-                                       :name "bidi-mirrors" :type "lisp-expr")
-                                      sb!xc:*compile-file-pathname*)
-                                     :direction :input
-                                     :element-type 'character)
-                      (read stream))))
+                    (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
                `(progn
                   (sb!impl::defglobal **proplist-properties** ',proplist-dump)
                   (sb!impl::defglobal **confusables** ',confusable-sets)
@@ -751,28 +705,10 @@ only characters for which it returns T are collected."
 ;;; Unicode case algorithms
 ;; FIXME: Make these parts less redundant (macro?)
 (defparameter **special-titlecases**
-  '#.(with-open-file (stream
-                     (merge-pathnames
-                      (make-pathname
-                       :directory
-                       '(:relative :up :up "output")
-                       :name "titlecases" :type "lisp-expr")
-                      sb!xc:*compile-file-pathname*)
-                     :direction :input
-                     :element-type 'character)
-        (read stream)))
+  '#.(sb-cold:read-from-file "output/titlecases.lisp-expr"))
 
 (defparameter **special-casefolds**
-  '#.(with-open-file (stream
-                     (merge-pathnames
-                      (make-pathname
-                       :directory
-                       '(:relative :up :up "output")
-                       :name "foldcases" :type "lisp-expr")
-                      sb!xc:*compile-file-pathname*)
-                     :direction :input
-                     :element-type 'character)
-        (read stream)))
+  '#.(sb-cold:read-from-file "output/foldcases.lisp-expr"))
 
 (defun has-case-p (char)
   ;; Bit 6 is the Unicode case flag, as opposed to the Common Lisp one
@@ -1495,16 +1431,7 @@ it defaults to 80 characters"
 
 ;;; Collation
 (defconstant +maximum-variable-primary-element+
-  #.(with-open-file (stream
-                     (merge-pathnames
-                      (make-pathname
-                       :directory
-                       '(:relative :up :up "output")
-                       :name "other-collation-info" :type "lisp-expr")
-                      sb!xc:*compile-file-pathname*)
-                     :direction :input
-                     :element-type 'character)
-      (read stream)))
+  #.(sb-cold:read-from-file "output/other-collation-info.lisp-expr"))
 
 (defun unpack-collation-key (key)
   (declare (type (simple-array (unsigned-byte 32) (*)) key))
