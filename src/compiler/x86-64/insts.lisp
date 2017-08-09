@@ -1460,6 +1460,9 @@
      #!+sb-thread
      (emit-byte segment #xf0))))
 
+(define-instruction fs (segment)
+  (:printer byte ((op #x64)) nil))
+
 (define-instruction lock (segment)
   (:printer byte ((op #b11110000)) nil))
 

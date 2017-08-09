@@ -128,8 +128,8 @@
       (princ value stream)))
 
 ;;; Return either a MACHINE-EA or a register (a fixnum).
-;;; VALUE is a list of the mod and r/m fields of the instruction's ModRM byte.
-;;; Depending on VALUE, a SIB byte and/or displacement may be read.
+;;; MOD and R/M are the extracted bits from the instruction's ModRM byte.
+;;; Depending on MOD and R/M, a SIB byte and/or displacement may be read.
 ;;; The REX.B and REX.X from dstate are appropriately consumed.
 (defun prefilter-reg/mem (dstate mod r/m)
   (declare (type disassem-state dstate)

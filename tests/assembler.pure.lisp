@@ -121,3 +121,14 @@
     #+x86-64
     (try `(add ,rcx-tn ,(memref :qword)) "48034D00         ADD RCX, [$fp]")
     ))
+
+(with-test (:name :disassemble-fs-prefix :skipped-on '(not (or :x86-64)))
+  (let ((bytes (coerce '(#x64 #xF0 #x44 #x08 #x04 #x25 #x00 #x04 #x10 #x20)
+                       '(array (unsigned-byte 8) 1)))
+        (s (make-string-output-stream)))
+    (sb-sys:with-pinned-objects (bytes)
+      (sb-disassem::disassemble-memory (sb-sys:sap-int (sb-sys:vector-sap bytes))
+                                       (length bytes)
+                                       :stream s))
+    (assert (search "FS LOCK OR [#x20100400], R8B"
+                    (get-output-stream-string s)))))
