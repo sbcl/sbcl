@@ -32,7 +32,7 @@
 static inline int
 get_pseudo_atomic_atomic(struct thread *thread)
 {
-    return SymbolValue(PSEUDO_ATOMIC_BITS, thread) & (~1);
+    return (SymbolValue(PSEUDO_ATOMIC_BITS, thread) & (~1)) != 0;
 }
 
 static inline void
