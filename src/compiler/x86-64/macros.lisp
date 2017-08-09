@@ -177,10 +177,16 @@
          (inst push alloc-tn))
         (t
          (inst push size)))
-  (let ((f (make-fixup "alloc_tramp" :foreign)))
+  ;; This really would be better if it recognized TEMP-REG-TN as the "good" case
+  ;; rather than specializing on R11, which just happens to be the temp reg.
+  ;; But the assembly routine is hand-written, not generated, and it has to match,
+  ;; so there's not much that can be done to generalize it.
+  (let* ((to-r11 (location= result-tn r11-tn))
+         (f (make-fixup (if to-r11 "alloc_to_r11" "alloc_tramp") :foreign)))
     (inst call (cond #!+immobile-code (sb!c::*code-is-immobile* f)
-                     (t (inst mov alloc-tn f) alloc-tn))))
-  (inst pop result-tn)
+                     (t (inst mov alloc-tn f) alloc-tn)))
+    (unless to-r11
+      (inst pop result-tn)))
   (when lowtag
     (inst or (reg-in-size result-tn :byte) lowtag))
   (values))

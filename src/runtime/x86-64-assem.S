@@ -304,6 +304,48 @@ GNAME(alloc_tramp):
 	ret
 	SIZE(GNAME(alloc_tramp))
 
+
+	.align	align_16byte,0x90
+	.globl  GNAME(alloc_to_r11)
+	TYPE(GNAME(alloc_to_r11))
+GNAME(alloc_to_r11):
+	cld
+	push	%rbp		# Save old frame pointer.
+	mov	%rsp,%rbp	# Establish new frame.
+	and	$-32,%rsp
+	sub	$16*16,%rsp
+	map_all_xmm(stkxmmsave)
+	# Doing rax twice is to maintain 16-byte stack alignment.
+	push    %rax
+	push	%rax
+	push	%rcx
+	push	%rdx
+	push	%rsi
+	push	%rdi
+	push	%r8
+	push	%r9
+	push	%r10
+	push	%r11
+	# r12 through r15 are callee-saved
+	mov	16(%rbp),%rdi
+	call	GNAME(alloc)
+	mov	%rax,%r11       # move to result register
+	pop	%rax            # dummy. %rax gets popped again later
+	pop	%r10
+	pop	%r9
+	pop	%r8
+	pop	%rdi
+	pop	%rsi
+	pop	%rdx
+	pop	%rcx
+	pop	%rax
+	pop	%rax # corresponds to "extra" push
+	map_all_xmm(stkxmmload)
+	mov	%rbp,%rsp
+	pop	%rbp
+	retq    $8              # remove 8 bytes from the stack
+	SIZE(GNAME(alloc_to_r11))
+
 /*
  * fun-end breakpoint magic
  */
