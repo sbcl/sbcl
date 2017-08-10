@@ -114,10 +114,9 @@ debug_function_from_pc (struct code* code, void *pc)
 }
 
 static void
-print_string (lispobj *object)
+print_string (struct vector *vector)
 {
-  int tag = widetag_of(*object);
-  struct vector *vector = (struct vector *) object;
+  int tag = widetag_of(vector->header);
 
 #define doit(TYPE)                              \
   do {                                          \
@@ -147,12 +146,9 @@ print_string (lispobj *object)
 #undef doit
 }
 
-static int string_equal (lispobj *object, char *string)
+static int string_equal (struct vector *vector, char *string)
 {
-    int tag = widetag_of(*object);
-    struct vector *vector = (struct vector *) object;
-
-    if (tag != SIMPLE_BASE_STRING_WIDETAG)
+    if (widetag_of(vector->header) != SIMPLE_BASE_STRING_WIDETAG)
         return 0;
     return !strcmp((char *) vector->data, string);
 }
@@ -181,27 +177,27 @@ print_entry_name (lispobj name)
             if (symbol->package != NIL) {
                 struct package *pkg
                     = (struct package *) native_pointer(symbol->package);
-                lispobj pkg_name = pkg->_name;
-                if (string_equal(native_pointer(pkg_name), "COMMON-LISP"))
+                struct vector *pkg_name = VECTOR(pkg->_name);
+                if (string_equal(pkg_name, "COMMON-LISP"))
                     ;
-                else if (string_equal(native_pointer(pkg_name), "COMMON-LISP-USER")) {
+                else if (string_equal(pkg_name, "COMMON-LISP-USER")) {
                     fputs("CL-USER::", stdout);
                 }
-                else if (string_equal(native_pointer(pkg_name), "KEYWORD")) {
+                else if (string_equal(pkg_name, "KEYWORD")) {
                     putchar(':');
                 } else {
-                    print_string(native_pointer(pkg_name));
+                    print_string(pkg_name);
                     fputs("::", stdout);
                 }
             }
-            print_string(native_pointer(symbol->name));
+            print_string(VECTOR(symbol->name));
         } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
                    || widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
             ) {
             putchar('"');
-            print_string(object);
+            print_string((struct vector*)object);
             putchar('"');
         } else {
             printf("<??? type %d>", (int) widetag_of(*object));

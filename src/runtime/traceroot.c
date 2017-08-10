@@ -914,7 +914,7 @@ void prove_liveness(lispobj objects, int criterion)
 
 static boolean __attribute__((unused)) sym_stringeq(lispobj sym, const char *string, int len)
 {
-    struct vector* name = (struct vector*)native_pointer(SYMBOL(sym)->name);
+    struct vector* name = VECTOR(SYMBOL(sym)->name);
     return widetag_of(name->header) == SIMPLE_BASE_STRING_WIDETAG
         && fixnum_value(name->length) == len
         && !strcmp((char*)name->data, string);
