@@ -167,9 +167,8 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 static lispobj
 ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 {
-    struct layout *layout =
-      (struct layout *) native_pointer(((struct instance *)native_pointer(thing))->slots[0]);
-    lispobj pure = layout->pure;
+    lispobj layout = instance_layout(native_pointer(thing));
+    lispobj pure = LAYOUT(layout)->pure;
 
     switch (pure) {
     case T:
@@ -566,19 +565,18 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case INSTANCE_WIDETAG:
                 {
-                    struct layout *layout
-                        = (struct layout *)native_pointer(instance_layout(addr));
+                    lispobj lbitmap = LAYOUT(instance_layout(addr))->bitmap;
                     lispobj* slots = addr + 1;
                     long nslots = instance_length(*addr) | 1;
                     int index;
-                    if (fixnump(layout->bitmap)) {
-                      sword_t bitmap = (sword_t)layout->bitmap >> N_FIXNUM_TAG_BITS;
+                    if (fixnump(lbitmap)) {
+                      sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS;
                       for (index = 0; index < nslots ; index++, bitmap >>= 1)
                         if (bitmap & 1)
                           pscav(slots + index, 1, constant);
                     } else {
                       struct bignum * bitmap;
-                      bitmap = (struct bignum*)native_pointer(layout->bitmap);
+                      bitmap = (struct bignum*)native_pointer(lbitmap);
                       for (index = 0; index < nslots ; index++)
                         if (positive_bignum_logbitp(index, bitmap))
                           pscav(slots + index, 1, constant);

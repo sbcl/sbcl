@@ -153,7 +153,7 @@ static int find_ref(lispobj* source, lispobj target)
         // here we just go for clarity by abstracting out logbitp.
         layout = instance_layout(source);
         check_ptr(0, layout);
-        bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+        bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
         for(i=1; i<scan_limit; ++i)
             if (layout_bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
         return -1;
@@ -699,9 +699,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             layout = instance_layout(where);
             check_ptr(layout);
             // Partially initialized instance can't have nonzero words yet
-            bitmap = layout ?
-                ((struct layout*)(layout-INSTANCE_POINTER_LOWTAG))->bitmap :
-                make_fixnum(-1);
+            bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
             // If no raw slots, just scan without use of the bitmap.
             if (bitmap == make_fixnum(-1)) break;
             for(i=1; i<scan_limit; ++i)

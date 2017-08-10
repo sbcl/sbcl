@@ -396,7 +396,7 @@ static void fixup_space(lispobj* where, uword_t len)
             // Possibly adjust, but do not alter the in-memory value of, this layout.
             // instance_scan_interleaved() on this instance will actually adjust
             // the layout slot if needed.
-            bitmap = ((struct layout*)(adjust_word(layout)-INSTANCE_POINTER_LOWTAG))->bitmap;
+            bitmap = LAYOUT(adjust_word(layout))->bitmap;
 
             // If the layout of this instance resides at a higher address
             // than the instance itself, then the layout's pointer slots were

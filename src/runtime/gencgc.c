@@ -2884,8 +2884,7 @@ verify_range(lispobj *start, size_t words)
                 if (instance_layout(start)) {
                     sword_t nslots = instance_length(thing) | 1;
                     instance_scan(verify_range, start+1, nslots,
-                                  ((struct layout*)
-                                   native_pointer(instance_layout(start)))->bitmap);
+                                  LAYOUT(instance_layout(start))->bitmap);
                     count = 1 + nslots;
                 }
                 break;

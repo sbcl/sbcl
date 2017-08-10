@@ -449,8 +449,7 @@ static void brief_struct(lispobj obj)
 }
 
 #include "genesis/layout.h"
-static boolean tagged_slot_p(struct layout * layout,
-                               int slot_index)
+static boolean tagged_slot_p(struct layout *layout, int slot_index)
 {
   lispobj bitmap = layout->bitmap;
   sword_t fixnum = (sword_t)bitmap >> N_FIXNUM_TAG_BITS; // optimistically
@@ -466,12 +465,11 @@ static void print_struct(lispobj obj)
     struct instance *instance = (struct instance *)native_pointer(obj);
     unsigned int i;
     char buffer[16];
-    lispobj layout_obj =  instance_layout(native_pointer(obj));
-    print_obj("type: ", layout_obj);
-    struct layout * layout = (struct layout*)native_pointer(layout_obj);
+    lispobj layout = instance_layout(native_pointer(obj));
+    print_obj("type: ", layout);
     for (i=INSTANCE_DATA_START; i<instance_length(instance->header); i++) {
         sprintf(buffer, "slot %d: ", i);
-        if (layout != NULL && tagged_slot_p(layout, i)) {
+        if (layout && tagged_slot_p(LAYOUT(layout), i)) {
             print_obj(buffer, instance->slots[i]);
         } else {
             newline(NULL);

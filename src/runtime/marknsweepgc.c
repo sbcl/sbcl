@@ -812,6 +812,8 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
   switch (widetag) {
 #ifdef LISP_FEATURE_IMMOBILE_CODE
   case FDEFN_WIDETAG:
+    // the seemingly silly use of an array is because points_to_younger_p()
+    // expects to get address ranges, not individual objects
     funobj[0] = fdefn_raw_referent((struct fdefn*)obj);
     return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
@@ -819,10 +821,10 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
   case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
-    layout[0] = instance_layout(obj);
+    layout[0] = instance_layout(obj); // same as above
     if (range_points_to_younger_p(layout, layout+1, gen, keep_gen, new_gen))
         return 1;
-    lbitmap = ((struct layout*)native_pointer(layout[0]))->bitmap;
+    lbitmap = LAYOUT(layout[0])->bitmap;
     if (lbitmap != make_fixnum(-1)) {
         gc_assert(fixnump(lbitmap));  // No bignums (yet)
         sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS;
@@ -1675,8 +1677,7 @@ struct layout* fix_object_layout(lispobj* obj)
         layout = forwarding_pointer_value(native_pointer(layout));
         set_instance_layout(obj, layout);
     }
-    struct layout* native_layout = (struct layout*)
-        tempspace_addr(native_pointer(layout));
+    struct layout* native_layout = (struct layout*)tempspace_addr(LAYOUT(layout));
     gc_assert(widetag_of(native_layout->header) == INSTANCE_WIDETAG);
     gc_assert(instance_layout((lispobj*)native_layout) == LAYOUT_OF_LAYOUT);
     return native_layout;

@@ -2048,7 +2048,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
                 layout = instance_layout(where);
-                bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+                bitmap = LAYOUT(layout)->bitmap;
                 for(i=1; i<nwords; ++i)
                     if (layout_bitmap_logbitp(i-1, bitmap))
                         coalesce_obj(where+i, ht);
