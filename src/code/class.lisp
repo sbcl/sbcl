@@ -112,9 +112,11 @@
     (with-world-lock ()
       (let ((classoid (find-classoid name nil)))
         (or (and classoid (classoid-layout classoid))
-            (gethash name table)
-            (setf (gethash name table)
-                  (make-layout :classoid (or classoid (make-undefined-classoid name)))))))))
+            (values (ensure-gethash name table
+                                    (make-layout
+                                     :classoid
+                                     (or classoid
+                                         (make-undefined-classoid name))))))))))
 
 ;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
 ;;; INHERITS, DEPTHOID, and BITMAP.
@@ -418,17 +420,9 @@ between the ~A definition and the ~A definition"
   (let ((obj-info (make-hash-table :size (length objects)))
         (free-objs nil)
         (result nil))
-    (dolist (constraint constraints)
-      (let ((obj1 (car constraint))
-            (obj2 (cdr constraint)))
-        (let ((info2 (gethash obj2 obj-info)))
-          (if info2
-              (incf (first info2))
-              (setf (gethash obj2 obj-info) (list 1))))
-        (let ((info1 (gethash obj1 obj-info)))
-          (if info1
-              (push obj2 (rest info1))
-              (setf (gethash obj1 obj-info) (list 0 obj2))))))
+    (loop for (obj1 . obj2) in constraints do
+       (incf (first (ensure-gethash obj2 obj-info (list 0))))
+       (push obj2 (rest (ensure-gethash obj1 obj-info (list 0)))))
     (dolist (obj objects)
       (let ((info (gethash obj obj-info)))
         (when (or (not info) (zerop (first info)))

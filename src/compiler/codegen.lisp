@@ -313,7 +313,8 @@
   (declare (dynamic-extent constant-descriptor))
   (let ((constants *unboxed-constants*)
         (constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
-    (or (gethash constant (constant-table constants))
-        (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
-          (vector-push-extend (cons constant label) (constant-vector constants))
-          (setf (gethash constant (constant-table constants)) value)))))
+    (ensure-gethash
+     constant (constant-table constants)
+     (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
+       (vector-push-extend (cons constant label) (constant-vector constants))
+       value))))

@@ -107,10 +107,10 @@
               ;; Count NAME, but only once for each FUN.
               (unless (gethash name seen)
                 (setf (gethash name seen) t)
-                (incf (cdr (or (gethash name counts-by-name)
-                               (let ((cell (cons name 0)))
-                                 (push cell counts)
-                                 (setf (gethash name counts-by-name) cell))))))
+                (incf (cdr (ensure-gethash name counts-by-name
+                                           (let ((cell (cons name 0)))
+                                             (push cell counts)
+                                             cell)))))
               ;; Store (KIND NAME NUMBER) tuple for repacking.
               (setf (getf unpacked kind) (nconc (getf unpacked kind)
                                                 (list (cons name number)))))

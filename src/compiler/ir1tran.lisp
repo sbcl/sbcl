@@ -977,9 +977,8 @@
                    ;; Get an interned record cons for the path. A cons
                    ;; with the same object identity must be used for
                    ;; each instrument for the same block.
-                   (or (gethash path *code-coverage-records*)
-                       (setf (gethash path *code-coverage-records*)
-                             (cons path +code-coverage-unmarked+))))
+                   (ensure-gethash path *code-coverage-records*
+                                   (cons path +code-coverage-unmarked+)))
                   (next (make-ctran))
                   (*allow-instrumenting* nil))
               (push (ctran-block start)

@@ -1171,6 +1171,7 @@ possibly temporarily, because it might be used internally."
                ;; ..and macros..
                "COLLECT"
                "DO-ANONYMOUS" "DOVECTOR" "DOHASH" "DOPLIST"
+               "ENSURE-GETHASH"
                "NAMED-LET"
                "ONCE-ONLY"
                "DEFENUM"

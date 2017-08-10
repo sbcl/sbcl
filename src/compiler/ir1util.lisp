@@ -2031,9 +2031,7 @@ is :ANY, the function name is not checked."
       (when (and (not faslp) (simple-string-p object))
         (logically-readonlyize object nil))
       (if (and (boundp '*constants*) (coalescep object))
-          (or (gethash object *constants*)
-              (setf (gethash object *constants*)
-                    (make-it)))
+          (ensure-gethash object *constants* (make-it))
           (make-it)))))
 
 ;;; Return true if VAR would have to be closed over if environment
@@ -2467,4 +2465,3 @@ is :ANY, the function name is not checked."
                                         :unknown-keys unknown
                                         rest)))
                args)))))
-

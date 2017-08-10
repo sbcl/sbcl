@@ -227,9 +227,7 @@
 (defmethod print-object ((inst instruction) stream)
   (print-unreadable-object (inst stream :type t :identity t)
     #!+sb-show-assem
-    (princ (or (gethash inst *inst-ids*)
-               (setf (gethash inst *inst-ids*)
-                     (incf *next-inst-id*)))
+    (princ (ensure-gethash inst *inst-ids* (incf *next-inst-id*))
            stream)
     (format stream
             #!+sb-show-assem " emitter=~S" #!-sb-show-assem "emitter=~S"

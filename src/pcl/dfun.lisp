@@ -1641,8 +1641,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (let* ((key (car methods))
              (ht *effective-method-cache*)
              (ht-value (with-locked-system-table (ht)
-                         (or (gethash key ht)
-                             (setf (gethash key ht) (cons nil nil))))))
+                         (ensure-gethash key ht (cons nil nil)))))
         (if (and (null (cdr methods)) all-applicable-p ; the most common case
                  (null method-alist-p) wrappers-p (not function-p))
             (or (car ht-value)

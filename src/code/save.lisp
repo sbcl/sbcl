@@ -201,11 +201,9 @@ sufficiently motivated to do lengthy fixes."
                   (arglist (%simple-fun-arglist fun))
                   (type (sb!vm::%%simple-fun-type fun)))
              (setf (%simple-fun-arglist fun)
-                   (or (gethash arglist arglist-hash)
-                       (setf (gethash arglist arglist-hash) arglist)))
+                   (ensure-gethash arglist arglist-hash arglist))
              (setf (sb!kernel:%simple-fun-type fun)
-                   (or (gethash type type-hash)
-                       (setf (gethash type type-hash) type)))))))
+                   (ensure-gethash type type-hash type))))))
      :all))
   ;;
   (labels ((restart-lisp ()

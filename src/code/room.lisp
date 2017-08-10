@@ -480,13 +480,9 @@
           (unless (zerop total-count)
             (let* ((total-size (aref sizes i))
                    (name (room-info-type-name (aref *room-info* i)))
-                   (found (gethash name totals)))
-              (cond (found
-                     (incf (first found) total-size)
-                     (incf (second found) total-count))
-                    (t
-                     (setf (gethash name totals)
-                           (list total-size total-count name))))))))
+                   (found (ensure-gethash name totals (list 0 0 name))))
+              (incf (first found) total-size)
+              (incf (second found) total-count)))))
 
       (collect ((totals-list))
         (maphash (lambda (k v)
@@ -614,15 +610,12 @@
        (when (eql type instance-widetag)
          (incf total-objects)
          (let* ((classoid (layout-classoid (%instance-layout obj)))
-                (found (gethash classoid totals))
+                (found (ensure-gethash classoid totals (cons 0 0)))
                 (size size))
            (declare (fixnum size))
            (incf total-bytes size)
-           (cond (found
-                  (incf (the fixnum (car found)))
-                  (incf (the fixnum (cdr found)) size))
-                 (t
-                  (setf (gethash classoid totals) (cons 1 size)))))))
+           (incf (the fixnum (car found)))
+           (incf (the fixnum (cdr found)) size))))
      space)
 
     (collect ((totals-list))

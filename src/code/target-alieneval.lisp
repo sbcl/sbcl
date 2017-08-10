@@ -898,39 +898,38 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 (defun %alien-callback-sap (specifier result-type argument-types function wrapper
                             &optional call-type)
   (declare #!-x86 (ignore call-type))
-  (let ((key (list specifier function)))
-    (or (gethash key *alien-callbacks*)
-        (setf (gethash key *alien-callbacks*)
-              (let* ((index (fill-pointer *alien-callback-trampolines*))
-                     ;; Aside from the INDEX this is known at
-                     ;; compile-time, which could be utilized by
-                     ;; having the two-stage assembler tramp &
-                     ;; wrapper mentioned in [1] above: only the
-                     ;; per-function tramp would need assembler at
-                     ;; runtime. Possibly we could even pregenerate
-                     ;; the code and just patch the index in later.
-                     (assembler-wrapper
-                      (alien-callback-assembler-wrapper
-                       index result-type argument-types
-                       #!+x86
-                       (if (eq call-type :stdcall)
-                           (ceiling
-                            (apply #'+
-                                   (mapcar 'alien-type-word-aligned-bits
-                                           argument-types))
-                            8)
-                           0))))
-                (vector-push-extend
-                 (alien-callback-lisp-trampoline wrapper function)
-                 *alien-callback-trampolines*)
-                ;; Assembler-wrapper is static, so sap-taking is safe.
-                (let ((sap (vector-sap assembler-wrapper)))
-                  (push (cons sap (make-callback-info :specifier specifier
-                                                      :function function
-                                                      :wrapper wrapper
-                                                      :index index))
-                        *alien-callback-info*)
-                  sap))))))
+  (ensure-gethash
+   (list specifier function) *alien-callbacks*
+   (let* ((index (fill-pointer *alien-callback-trampolines*))
+          ;; Aside from the INDEX this is known at
+          ;; compile-time, which could be utilized by
+          ;; having the two-stage assembler tramp &
+          ;; wrapper mentioned in [1] above: only the
+          ;; per-function tramp would need assembler at
+          ;; runtime. Possibly we could even pregenerate
+          ;; the code and just patch the index in later.
+          (assembler-wrapper
+           (alien-callback-assembler-wrapper
+            index result-type argument-types
+            #!+x86
+            (if (eq call-type :stdcall)
+                (ceiling
+                 (apply #'+
+                        (mapcar 'alien-type-word-aligned-bits
+                                argument-types))
+                 8)
+                0))))
+     (vector-push-extend
+      (alien-callback-lisp-trampoline wrapper function)
+      *alien-callback-trampolines*)
+     ;; Assembler-wrapper is static, so sap-taking is safe.
+     (let ((sap (vector-sap assembler-wrapper)))
+       (push (cons sap (make-callback-info :specifier specifier
+                                           :function function
+                                           :wrapper wrapper
+                                           :index index))
+             *alien-callback-info*)
+       sap))))
 
 (defun alien-callback-lisp-trampoline (wrapper function)
   (declare (function wrapper) (optimize speed))
@@ -1056,10 +1055,10 @@ one."
     `(%sap-alien
       (%alien-callback-sap ',specifier ',result-type ',argument-types
                            ,function
-                           (or (gethash ',specifier *alien-callback-wrappers*)
-                               (setf (gethash ',specifier *alien-callback-wrappers*)
-                                     ,(alien-callback-lisp-wrapper-lambda
-                                       specifier result-type argument-types env)))
+                           (ensure-gethash
+                            ',specifier *alien-callback-wrappers*
+                            ,(alien-callback-lisp-wrapper-lambda
+                              specifier result-type argument-types env))
                            ,call-type)
       ',(parse-alien-type specifier env)))))
 

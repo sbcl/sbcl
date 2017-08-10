@@ -1496,9 +1496,7 @@ core and return a descriptor to it."
 ;; There is a subtlety of whether coalescing may occur across files
 ;; - the target compiler doesn't and couldn't - but here it doesn't matter.
 (defun get-uninterned-symbol (name)
-  (or (gethash name *uninterned-symbol-table*)
-      (let ((cold-symbol (allocate-symbol name)))
-        (setf (gethash name *uninterned-symbol-table*) cold-symbol))))
+  (ensure-gethash name *uninterned-symbol-table* (allocate-symbol name)))
 
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.

@@ -32,14 +32,10 @@
                    (return 2block)))))
            (link-2blocks (pred succ)
              (declare (type ir2-block pred succ))
-             (let ((info (gethash succ *2block-info*)))
-               (if info
-                   (pushnew pred (car info))
-                   (setf (gethash succ *2block-info*) (list (list pred)))))
-             (let ((info (gethash pred *2block-info*)))
-               (if info
-                   (pushnew succ (cdr info))
-                   (setf (gethash pred *2block-info*) (cons nil (list succ)))))))
+             (pushnew pred (car (ensure-gethash succ *2block-info*
+                                                (cons '() '()))))
+             (pushnew succ (cdr (ensure-gethash pred *2block-info*
+                                                (cons '() '()))))))
     (do-blocks (block component :both)
       (let ((succ (block-succ block))
             (last (block-last-2block block)))

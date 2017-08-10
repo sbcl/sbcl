@@ -114,8 +114,7 @@
                                 :test #'eq)))
     (declare (fixnum nclasses))
     (labels ((get-cpd (c)
-               (or (gethash c table)
-                   (setf (gethash c table) (make-cpd))))
+               (ensure-gethash c table (make-cpd)))
              (walk (c supers)
                (declare (special *allow-forward-referenced-classes-in-cpl-p*))
                (if (and (forward-referenced-class-p c)
@@ -307,4 +306,3 @@
           (chase (list cpd))))
 
       cycle-reasons)))
-

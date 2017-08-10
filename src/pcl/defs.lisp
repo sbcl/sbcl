@@ -607,9 +607,8 @@
   ;; Need to lock, so that two threads don't get non-EQ specializers
   ;; for an EQL object.
   (with-locked-system-table (*eql-specializer-table*)
-    (or (gethash object *eql-specializer-table*)
-        (setf (gethash object *eql-specializer-table*)
-              (make-instance 'eql-specializer :object object)))))
+    (ensure-gethash object *eql-specializer-table*
+                    (make-instance 'eql-specializer :object object))))
 
 (defclass class (dependent-update-mixin
                  definition-source-mixin

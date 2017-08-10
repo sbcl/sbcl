@@ -63,13 +63,12 @@
 
 (defun intern-pv-table (&key slot-name-lists)
   (flet ((intern-slot-names (slot-names)
-           (or (gethash slot-names *slot-name-lists*)
-               (setf (gethash slot-names *slot-name-lists*) slot-names)))
+           (ensure-gethash slot-names *slot-name-lists* slot-names))
          (%intern-pv-table (snl)
-           (or (gethash snl *pv-tables*)
-               (setf (gethash snl *pv-tables*)
-                     (make-pv-table :slot-name-lists snl
-                                    :pv-size (* 2 (reduce #'+ snl :key #'length)))))))
+           (ensure-gethash
+            snl *pv-tables*
+            (make-pv-table :slot-name-lists snl
+                           :pv-size (* 2 (reduce #'+ snl :key #'length))))))
     (sb-thread:with-mutex (*pv-lock*)
       (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
