@@ -523,6 +523,7 @@ attach_os_thread(init_thread_data *scribble)
     pthread_getattr_np(os, &attr);
 #endif
     pthread_attr_getstack(&attr, &stack_addr, &stack_size);
+    pthread_attr_destroy(&attr);
 #endif
 
     th->control_stack_start = stack_addr;
