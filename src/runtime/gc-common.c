@@ -58,7 +58,7 @@ os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 sword_t (*scavtab[256])(lispobj *where, lispobj object);
-lispobj (*transother[256])(lispobj object);
+static lispobj (*transother[64])(lispobj object);
 sword_t (*sizetab[256])(lispobj *where);
 struct weak_pointer *weak_pointers;
 
@@ -514,7 +514,8 @@ scav_other_pointer(lispobj *where, lispobj object)
 
     /* Object is a pointer into from space - not FP. */
     lispobj *first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
-    lispobj copy = transother[widetag_of(*first_pointer)](object);
+    int tag = widetag_of(*first_pointer);
+    lispobj copy = transother[other_immediate_lowtag_p(tag)?tag>>2:0](object);
 
     // If the object was large, then instead of transporting it,
     // gencgc might simply promote the pages and return the same pointer.

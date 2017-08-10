@@ -171,7 +171,6 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 }
 
 extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
-extern lispobj (*transother[256])(lispobj object);
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
   (is_cons_half(header)?2:sizetab[widetag_of(header)](where))

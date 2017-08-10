@@ -156,7 +156,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                     ;; trailing comma on the last item is OK in C
                     collect (subseq contents i (+ i 64))))))
   (let ((scavtab  (make-array 256 :initial-element nil))
-        (transtab (make-array 256 :initial-element nil))
+        (transtab (make-array 64  :initial-element nil))
         (sizetab  (make-array 256 :initial-element nil)))
     (dotimes (i 256)
       (cond ((eql 0 (logand i fixnum-tag-mask))
@@ -173,7 +173,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
     (dolist (entry *scav/trans/size*)
       (destructuring-bind (widetag scav &optional (trans scav) (size trans)) entry
         (setf (svref scavtab widetag) scav
-              (svref transtab widetag) trans
+              (svref transtab (ash widetag -2)) trans
               (svref sizetab widetag) size)))
     (flet ((write-table (decl prefix contents)
              (format stream "~A = {" decl)
@@ -182,11 +182,11 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                    do (format stream "~%  ")
                    do (format stream "~V@<~A~A~:[~;,~]~>"
                               (if (= (mod i 4) 3) 0 31)
-                              prefix (or x "lose") (< i 256)))
+                              prefix (or x "lose") (< i (length contents))))
              (format stream "~%};~%")))
       (write-table "sword_t (*scavtab[256])(lispobj *where, lispobj object)"
                    "scav_" scavtab)
-      (write-table "lispobj (*transother[256])(lispobj object)"
+      (write-table "static lispobj (*transother[64])(lispobj object)"
                    "trans_" transtab)
       (format stream "#define size_pointer size_immediate~%")
       (format stream "#define size_unboxed size_boxed~%")

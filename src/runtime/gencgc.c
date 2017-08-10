@@ -3831,7 +3831,6 @@ gc_init(void)
 #endif
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
-    transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
 
     /* The page structures are initialized implicitly when page_table
      * is allocated with "calloc" above. Formerly we had the following
