@@ -130,7 +130,13 @@
                       (ldb (byte 32 0) bits) (ldb (byte 32 32) bits))
     (format stream "~%}~%"))
 
-  (format stream "extern unsigned char lowtag_for_widetag[64];~%")
+  (format stream "extern unsigned char lowtag_for_widetag[64];
+static inline lispobj compute_lispobj(lispobj* base_addr) {
+  lispobj header = *base_addr;
+  return make_lispobj(base_addr,
+                      is_cons_half(header) ? LIST_POINTER_LOWTAG :
+                        lowtag_for_widetag[widetag_of(header)>>2]);~%}~%")
+
   (format stream "~%#ifdef WANT_SCAV_TRANS_SIZE_TABLES~%")
   (let ((a (make-array 64 :initial-element 0)))
     (dolist (entry *scav/trans/size*)

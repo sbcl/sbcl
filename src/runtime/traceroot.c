@@ -94,10 +94,7 @@ static void add_to_layer(lispobj* obj, int wordindex,
                          struct layer* layer, int* capacity)
 {
     // Resurrect the containing object's lowtag
-    lispobj word = *obj;
-    int lowtag = is_cons_half(word) ?
-      LIST_POINTER_LOWTAG : lowtag_for_widetag[widetag_of(word)>>2];
-    lispobj ptr = make_lispobj(obj, lowtag);
+    lispobj ptr = compute_lispobj(obj);
     int staticp = ptr <= STATIC_SPACE_END;
     int gen = staticp ? -1 : gen_of(ptr);
     if (heap_trace_verbose>2)
@@ -892,11 +889,7 @@ void gc_prove_liveness(void(*context_scanner)(),
     if (n_pins>0 && !is_lisp_pointer(pins[0])) {
         int i;
         for(i=n_pins-1; i>=0; --i) {
-            lispobj* obj = (lispobj*)pins[i];
-            lispobj header = *obj;
-            int lowtag = is_cons_half(header) ? LIST_POINTER_LOWTAG
-                : lowtag_for_widetag[widetag_of(header)>>2];
-            pins[i] = make_lispobj(obj, lowtag);
+            pins[i] = compute_lispobj((lispobj*)pins[i]);
         }
     }
     trace_paths(context_scanner, objects, n_pins, (lispobj*)pins, criterion);

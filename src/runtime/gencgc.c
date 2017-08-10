@@ -1983,8 +1983,9 @@ wipe_nonpinned_words()
  * the number of keys in the hashtable.
  */
 static void
-pin_object(lispobj object)
+pin_object(lispobj* base_addr)
 {
+    lispobj object = compute_lispobj(base_addr);
     if (!hopscotch_containsp(&pinned_objects, object)) {
         hopscotch_insert(&pinned_objects, object, 1);
         struct code* maybe_code = (struct code*)native_pointer(object);
@@ -2124,11 +2125,8 @@ preserve_pointer(void *addr)
     /* Do not do this for multi-page objects.  Those pages do not need
      * object wipeout anyway. */
     if (i == first_page) { // single-page object
-       lispobj word = *object_start;
-       int lowtag = is_cons_half(word) ?
-           LIST_POINTER_LOWTAG : lowtag_for_widetag[widetag_of(word)>>2];
-       pin_object(make_lispobj(object_start, lowtag));
-       page_table[i].has_pins = 1;
+        pin_object(object_start);
+        page_table[i].has_pins = 1;
     }
 #endif
 
