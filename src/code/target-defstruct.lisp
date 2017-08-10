@@ -103,8 +103,6 @@
 
   (let* ((classoid (find-classoid (dd-name dd)))
          (layout (classoid-layout classoid)))
-    (when (eq (dd-pure dd) t)
-      (setf (layout-pure layout) t))
     ;; Make a vector of EQUALP slots comparators, indexed by (- word-index data-start).
     ;; This has to be assigned to something regardless of whether there are
     ;; raw slots just in case someone mutates a layout which had raw

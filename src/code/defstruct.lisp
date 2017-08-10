@@ -682,8 +682,8 @@ unless :NAMED is also specified.")))
         (unless (option-present-p :conc-name)
           (setf (dd-conc-name dd) (string (gensymify* name "-"))))
         (unless (option-present-p :copier)
-          (setf (dd-copier-name dd) (symbolicate "COPY-" name))))))
-  dd)
+          (setf (dd-copier-name dd) (symbolicate "COPY-" name)))))
+    seen-options))
 
 ;;; Given name and options and slot descriptions (and possibly doc
 ;;; string at the head of slot descriptions) return a DD holding that
@@ -693,10 +693,10 @@ unless :NAMED is also specified.")))
               (if (listp name-and-options)
                   (values (car name-and-options) (cdr name-and-options))
                   (values name-and-options nil)))
-             (dd (make-defstruct-description null-env-p name)))
-    (parse-defstruct-options options dd)
+             (dd (make-defstruct-description null-env-p name))
+             (option-bits (parse-defstruct-options options dd)))
     (when (dd-include dd)
-      (frob-dd-inclusion-stuff dd))
+      (frob-dd-inclusion-stuff dd option-bits))
     (when (stringp (car slot-descriptions))
       (setf (dd-doc dd) (pop slot-descriptions)))
     (let* ((inherits
@@ -907,7 +907,7 @@ unless :NAMED is also specified.")))
 
 ;;; Process any included slots pretty much like they were specified.
 ;;; Also inherit various other attributes.
-(defun frob-dd-inclusion-stuff (dd)
+(defun frob-dd-inclusion-stuff (dd option-bits)
   (destructuring-bind (included-name &rest modified-slots) (dd-include dd)
     (let* ((type (dd-type dd))
            (included-structure
@@ -951,7 +951,10 @@ unless :NAMED is also specified.")))
 
       (incf (dd-length dd) (dd-length included-structure))
       (when (dd-class-p dd)
-        (when (eq (dd-pure dd) :unspecified)
+        ;; FIXME: This POSITION call should be foldable without read-time eval
+        ;; since literals are immutable, and +DD-OPTION-NAMES+ was initialized
+        ;; from a literal.
+        (unless (logbitp #.(position :pure +dd-option-names+) option-bits)
           (setf (dd-pure dd) (dd-pure included-structure))))
 
       (setf (dd-inherited-accessor-alist dd)

@@ -1133,7 +1133,6 @@ core and return a descriptor to it."
      :depthoid depthoid
      :length length
      :info *nil-descriptor*
-     :pure *nil-descriptor*
      :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
@@ -3782,7 +3781,7 @@ initially undefined function references:~2%")
             (dolist (obj structs)
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb!vm:primitive-object-name obj))))))
-        (dolist (class '(classoid hash-table layout package
+        (dolist (class '(classoid defstruct-description hash-table layout package
                          sb!c::compiled-debug-info sb!c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class)) stream)))

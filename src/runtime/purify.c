@@ -34,6 +34,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
+#include "genesis/defstruct-description.h"
 #include "genesis/hash-table.h"
 #include "gencgc.h"
 
@@ -167,18 +168,17 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 static lispobj
 ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 {
-    lispobj layout = instance_layout(native_pointer(thing));
-    lispobj pure = LAYOUT(layout)->pure;
-
-    switch (pure) {
-    case T:
-        return (ptrans_boxed(thing, header, 1));
-    case NIL:
-        return (ptrans_boxed(thing, header, 0));
-    default:
-        gc_abort();
-        return NIL; /* dummy value: return something ... */
+    constant = 0;
+    lispobj info = LAYOUT(instance_layout(native_pointer(thing)))->info;
+    if (info != NIL) {
+        lispobj pure = ((struct defstruct_description*)native_pointer(info))->pure;
+        if (pure != NIL && pure != T) {
+            gc_abort();
+            return NIL; /* dummy value: return something ... */
+        }
+        constant = (pure == T);
     }
+    return ptrans_boxed(thing, header, constant);
 }
 
 static lispobj

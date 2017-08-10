@@ -74,9 +74,13 @@
   ;; NIL if the option was given with no argument.
   (printer-fname nil :type (or cons symbol))
 
-  ;; the value of the :PURE option, or :UNSPECIFIED. This is only
-  ;; meaningful if DD-CLASS-P = T.
-  (pure :unspecified :type (member t nil :unspecified)))
+  ;; the value of the :PURE option, used by cheneygc when purifying.
+  ;; This is true if objects of this class are never modified to
+  ;; contain dynamic pointers in their slots or constant-like
+  ;; substructure (and hence can be copied into read-only space by
+  ;; PURIFY).
+  ;; This is only meaningful if DD-CLASS-P = T.
+  (pure nil :type (member t nil)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
 (!set-load-form-method defstruct-description (:host :xc :target))
 
@@ -147,13 +151,6 @@
   ;; If this layout has some kind of compiler meta-info, then this is
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.
   (info nil :type (or null defstruct-description))
-  ;; This is true if objects of this class are never modified to
-  ;; contain dynamic pointers in their slots or constant-like
-  ;; substructure (and hence can be copied into read-only space by
-  ;; PURIFY).
-  ;;
-  ;; This slot is known to the C runtime support code.
-  (pure nil :type (member t nil 0))
   ;; Map of raw slot indices.
   (bitmap +layout-all-tagged+ :type layout-bitmap)
   ;; Per-slot comparator for implementing EQUALP.
