@@ -2089,5 +2089,5 @@ void coalesce_similar_objects()
 #else
     // FIXME: implement
 #endif
-    hopscotch_delete(&ht);
+    hopscotch_destroy(&ht);
 }

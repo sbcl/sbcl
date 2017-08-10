@@ -854,9 +854,9 @@ static void trace_paths(void (*context_scanner)(),
         }
     } while (weak_pointers != NIL);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
-    hopscotch_delete(&inverted_heap);
-    hopscotch_delete(&visited);
-    hopscotch_delete(&targets);
+    hopscotch_destroy(&inverted_heap);
+    hopscotch_destroy(&visited);
+    hopscotch_destroy(&targets);
 }
 
 void gc_prove_liveness(void(*context_scanner)(),

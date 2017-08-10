@@ -366,7 +366,7 @@ void hopscotch_create(tableptr ht, int hashfun,
 }
 
 /* Delete the storage associated with 'ht' */
-void hopscotch_delete(tableptr ht)
+void hopscotch_destroy(tableptr ht)
 {
     if (ht->mem_size) { // Free it, zero-filling if ever used.
         cached_deallocate((char*)ht->keys, ht->count ? ht->mem_size : 0);
@@ -447,7 +447,7 @@ tableptr hopscotch_resize_up(tableptr ht)
                   break;
                 }
         }
-    } while (i >= 0 && (hopscotch_delete(&copy), 1));
+    } while (i >= 0 && (hopscotch_destroy(&copy), 1));
 
     // Zero-fill and release the old storage.
     cached_deallocate((char*)ht->keys, ht->mem_size);
@@ -455,7 +455,7 @@ tableptr hopscotch_resize_up(tableptr ht)
     // Move all of the data pointers from 'copy' into ht.
     // mem_size is passed to bzero() when resetting the table,
     // so definitely be sure to use the new, not the old.
-    // And of course _don't_ hopscotch_delete() copy when done.
+    // And of course _don't_ hopscotch_destroy() copy when done.
     ht->hash      = copy.hash;
     ht->mem_size  = copy.mem_size;
     ht->mask      = copy.mask;

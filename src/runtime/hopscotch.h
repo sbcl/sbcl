@@ -35,7 +35,7 @@ struct hopscotch_table {
 
 void hopscotch_init();
 void hopscotch_create(struct hopscotch_table*,int,int,int,char);
-void hopscotch_delete(struct hopscotch_table*);
+void hopscotch_destroy(struct hopscotch_table*);
 int hopscotch_insert(struct hopscotch_table*,uword_t,sword_t);
 int hopscotch_put(struct hopscotch_table*,uword_t,sword_t);
 sword_t hopscotch_get(struct hopscotch_table*,uword_t,sword_t);
