@@ -10,6 +10,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/layout.h"
 #include "genesis/package.h"
+#include "genesis/vector.h"
 #include "pseudo-atomic.h" // for get_alloc_pointer()
 
 #include <stdlib.h>
@@ -910,7 +911,6 @@ void prove_liveness(lispobj objects, int criterion)
 
 #include "genesis/package.h"
 #include "genesis/instance.h"
-#include "genesis/vector.h"
 
 static boolean __attribute__((unused)) sym_stringeq(lispobj sym, const char *string, int len)
 {

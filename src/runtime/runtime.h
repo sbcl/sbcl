@@ -298,30 +298,6 @@ static inline lispobj fin_layout(lispobj* instance_ptr) // native ptr
 #endif
 }
 
-static inline struct cons *
-CONS(lispobj obj)
-{
-  return (struct cons *)(obj - LIST_POINTER_LOWTAG);
-}
-
-static inline struct vector *
-VECTOR(lispobj obj)
-{
-  return (struct vector *)(obj - OTHER_POINTER_LOWTAG);
-}
-
-static inline struct symbol *
-SYMBOL(lispobj obj)
-{
-  return (struct symbol *)(obj - OTHER_POINTER_LOWTAG);
-}
-
-static inline struct fdefn *
-FDEFN(lispobj obj)
-{
-  return (struct fdefn *)(obj - OTHER_POINTER_LOWTAG);
-}
-
 /* Is the Lisp object obj something with pointer nature (as opposed to
  * e.g. a fixnum or character or unbound marker)? */
 static inline int
