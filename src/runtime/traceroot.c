@@ -697,7 +697,10 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             // mixed boxed/unboxed objects
             layout = instance_layout(where);
             check_ptr(layout);
-            bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+            // Partially initialized instance can't have nonzero words yet
+            bitmap = layout ?
+                ((struct layout*)(layout-INSTANCE_POINTER_LOWTAG))->bitmap :
+                make_fixnum(-1);
             // If no raw slots, just scan without use of the bitmap.
             if (bitmap == make_fixnum(-1)) break;
             for(i=1; i<scan_limit; ++i)
