@@ -1587,14 +1587,6 @@ copy_unboxed_object(lispobj object, sword_t nwords)
     return gc_general_copy_object(object, nwords, UNBOXED_PAGE_FLAG);
 }
 
-static lispobj
-trans_boxed_large(lispobj object)
-{
-    gc_assert(is_lisp_pointer(object));
-    return copy_large_object(object,
-                             (HeaderValue(*native_pointer(object)) | 1) + 1);
-}
-
 /*
  * weak pointers
  */
