@@ -220,6 +220,12 @@ extern void scavenge_control_stack(struct thread *th);
 extern void scrub_control_stack(void);
 extern void scrub_thread_control_stack(struct thread *);
 
+#ifdef LISP_FEATURE_X86
+void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
+#else
+#define gencgc_apply_code_fixups(ignore1,ignore2)
+#endif
+
 #include "fixnump.h"
 
 #ifdef LISP_FEATURE_GENCGC
