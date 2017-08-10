@@ -146,6 +146,16 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
 #endif
 }
 
+static inline void scav_pair(lispobj where[2])
+{
+    lispobj object = where[0];
+    if (is_lisp_pointer(object))
+        scav1(where, object);
+    object = where[1];
+    if (is_lisp_pointer(object))
+        scav1(where+1, object);
+}
+
 // Scavenge a block of memory from 'start' to 'end'
 // that may contain object headers.
 void heap_scavenge(lispobj *start, lispobj *end)
@@ -158,12 +168,8 @@ void heap_scavenge(lispobj *start, lispobj *end)
             /* It's some sort of header object or another. */
             object_ptr += (scavtab[widetag_of(object)])(object_ptr, object);
         else {  // it's a cons
-            if (is_lisp_pointer(object))
-                scav1(object_ptr, object);
-            object = *++object_ptr;
-            if (is_lisp_pointer(object))
-                scav1(object_ptr, object);
-            ++object_ptr;
+            scav_pair(object_ptr);
+            object_ptr += 2;
         }
     }
     // This assertion is usually the one that fails when something
@@ -1051,7 +1057,7 @@ scav_hash_table_entries (struct hash_table *hash_table)
         lispobj __attribute__((unused)) value = kv_vector[2*i+1];              \
         if (aliveness_predicate) {                                             \
             /* Scavenge the key and value. */                                  \
-            scavenge(&kv_vector[2*i], 2);                                      \
+            scav_pair(&kv_vector[2*i]);                                        \
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
             if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {   \
                 lispobj new_key = kv_vector[2*i];                              \
