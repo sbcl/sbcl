@@ -10,7 +10,7 @@
 # files for more information.
 
 ASFLAGS = -g -Wall -Wa,-xarch=v8plus
-LINKFLAGS += -v -rdynamic
+LINKFLAGS += -rdynamic
 NM = ./linux-nm
 
 ASSEM_SRC = sparc-assem.S ldso-stubs.S

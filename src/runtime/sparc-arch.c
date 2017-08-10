@@ -164,7 +164,6 @@ void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
  * Clear?
  */
 static unsigned int *skipped_break_addr, displaced_after_inst;
-static sigset_t orig_sigmask;
 
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
