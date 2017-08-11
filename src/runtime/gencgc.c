@@ -3905,17 +3905,21 @@ gencgc_pickup_dynamic(void)
         lispobj *first,*ptr= (lispobj *)page_address(page);
 
         if (!gencgc_partial_pickup || !page_free_p(page)) {
+          page_bytes_t bytes_used = GENCGC_CARD_BYTES;
           /* It is possible, though rare, for the saved page table
            * to contain free pages below alloc_ptr. */
           page_table[page].gen = gen;
-          set_page_bytes_used(page, GENCGC_CARD_BYTES);
+          if (gencgc_partial_pickup)
+              bytes_used = page_bytes_used(page);
+          else
+              set_page_bytes_used(page, GENCGC_CARD_BYTES);
           page_table[page].large_object = 0;
           page_table[page].write_protected = 0;
           page_table[page].write_protected_cleared = 0;
           page_table[page].dont_move = 0;
           set_page_need_to_zero(page, 1);
 
-          bytes_allocated += GENCGC_CARD_BYTES;
+          bytes_allocated += bytes_used;
         }
 
         if (!gencgc_partial_pickup) {

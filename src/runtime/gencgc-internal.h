@@ -140,6 +140,11 @@ struct page {
 };
 extern struct page *page_table;
 
+struct __attribute__((packed)) corefile_pte {
+  uword_t sso; // scan start offset
+  page_bytes_t bytes_used;
+};
+
 #ifndef CONDENSED_PAGE_TABLE
 
 // 32-bit doesn't need magic to reduce the size of scan_start_offset.

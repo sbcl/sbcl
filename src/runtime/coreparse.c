@@ -831,20 +831,26 @@ load_core_file(char *file, os_vm_offset_t file_offset)
 #ifdef LISP_FEATURE_GENCGC
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
         {
-            os_vm_size_t size = *ptr;
+            os_vm_size_t remaining = *ptr;
             os_vm_size_t fdoffset = (*(ptr+1) + 1) * (os_vm_page_size);
-            page_index_t offset = 0;
+            page_index_t page = 0, npages;
             ssize_t bytes_read;
-            word_t data[4096];
-            word_t word;
+            char data[8192];
+            // A corefile_pte is 10 bytes for x86-64
+            // Process an integral number of ptes on each read.
+            os_vm_size_t chunksize = sizeof (struct corefile_pte)
+                * (sizeof data / sizeof (struct corefile_pte));
             lseek(fd, fdoffset + file_offset, SEEK_SET);
-            while ((bytes_read = read(fd, data, (size < 4096 ? size : 4096 )))
-                    > 0)
-            {
+            bytes_read = read(fd, &npages, sizeof npages);
+            gc_assert(bytes_read == sizeof npages);
+            remaining -= sizeof npages;
+            while ((bytes_read = read(fd, data,
+                                      remaining < chunksize ? remaining : chunksize)) > 0) {
+
                 int i = 0;
-                size -= bytes_read;
+                remaining -= bytes_read;
                 while (bytes_read) {
-                    bytes_read -= sizeof(word_t);
+                    bytes_read -= sizeof(struct corefile_pte);
                     /* Ignore all zeroes. The size of the page table
                      * core entry was rounded up to os_vm_page_size
                      * during the save, and might now have more
@@ -852,14 +858,17 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                      *
                      * The low bits of each word are allocation flags.
                      */
-                    if ((word=data[i])) {
-                        set_page_scan_start_offset(offset, word & ~0x03);
-                        page_table[offset].allocated = word & 0x03;
-                    }
+                    struct corefile_pte pte;
+                    memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
+                    set_page_bytes_used(page, pte.bytes_used);
+                    set_page_scan_start_offset(page, pte.sso & ~0x03);
+                    page_table[page].allocated = pte.sso & 0x03;
+                    if (++page == npages) // break out of both loops
+                        goto done;
                     i++;
-                    offset++;
                 }
             }
+          done:
 
             gencgc_partial_pickup = 1;
             break;

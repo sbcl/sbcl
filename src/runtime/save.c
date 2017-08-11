@@ -363,28 +363,29 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 
 #ifdef LISP_FEATURE_GENCGC
     {
-        size_t size = (last_free_page*sizeof(sword_t)+os_vm_page_size-1)
-            &~(os_vm_page_size-1);
-        uword_t *data = calloc(size, 1);
-        if (data) {
-            uword_t word;
-            sword_t offset;
-            page_index_t i;
-            for (i = 0; i < last_free_page; i++) {
+        size_t true_size = sizeof last_free_page
+            + (last_free_page * sizeof(struct corefile_pte));
+        size_t rounded_size = CEILING(true_size, os_vm_page_size);
+        char* data = malloc(rounded_size);
+        gc_assert(data);
+        *(page_index_t*)data = last_free_page;
+        struct corefile_pte *ptes = (struct corefile_pte*)(data + sizeof(page_index_t));
+        page_index_t i;
+        for (i = 0; i < last_free_page; i++) {
                 /* Thanks to alignment requirements, the two low bits
                  * are always zero, so we can use them to store the
                  * allocation type -- region is always closed, so only
                  * the two low bits of allocation flags matter. */
-                word = page_scan_start_offset(i);
+                uword_t word = page_scan_start_offset(i);
                 gc_assert((word & 0x03) == 0);
-                data[i] = word | (0x03 & page_table[i].allocated);
-            }
-            write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
-            write_lispobj(4, file);
-            write_lispobj(size, file);
-            offset = write_bytes(file, (char *)data, size, core_start_pos);
-            write_lispobj(offset, file);
+                ptes[i].sso = word | (0x03 & page_table[i].allocated);
+                ptes[i].bytes_used = page_bytes_used(i);
         }
+        write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
+        write_lispobj(4, file);
+        write_lispobj(rounded_size, file);
+        sword_t offset = write_bytes(file, data, rounded_size, core_start_pos);
+        write_lispobj(offset, file);
     }
 #endif
 
