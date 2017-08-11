@@ -102,7 +102,7 @@
            (alien-funcall (extern-alien "hopscotch_log_stats"
                                         (function void system-area-pointer))
                           c-table)))
-      (alien-funcall (extern-alien "hopscotch_delete"
+      (alien-funcall (extern-alien "hopscotch_destroy"
                                    (function void system-area-pointer))
                      c-table))))
 
