@@ -1396,3 +1396,25 @@ redefinition."
 
   (compare-memory *c* 2 *acdf* 2 4) ; Array
   (compare-memory *c* 2 (make-struct-cdf) 2 4)) ; Structure
+
+(test-util:with-test (:name :recklessly-continuable-defstruct)
+  (flet ((redefine-defstruct (from to)
+           (eval from)
+           (handler-bind
+               ((error (lambda (c)
+                         (declare (ignore c))
+                         (return-from redefine-defstruct
+                           ;; RESTARTs are DX, don't return it.
+                           (not (null (find 'sb-kernel::recklessly-continue
+                                            (compute-restarts)
+                                            :key 'restart-name))))))
+                (warning #'muffle-warning))
+               (eval to))))
+    (assert (not (redefine-defstruct
+                  '(defstruct not-redefinable (a 0 :type sb-ext:word))
+                  '(defstruct not-redefinable (a)))))
+    (assert (redefine-defstruct
+             ;; Incompatible types has nothing to do with whether
+             ;; RECKLESSLY-CONTINUE is offered.
+             '(defstruct redefinable (a nil :type symbol))
+             '(defstruct redefinable (a nil :type cons))))))

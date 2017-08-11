@@ -1329,6 +1329,19 @@ or they must be declared locally notinline at each call site.~@:>"
          name moved retyped deleted)
         t))))
 
+;;; Return true if destructively modifying OLD-LAYOUT into NEW-LAYOUT
+;;; would be possible in as much as it won't harm the garbage collector.
+;;; Harm potentially results from turning a raw word into a tagged word.
+(defun mutable-layout-p (old-layout new-layout)
+  (let ((old-bitmap (layout-bitmap old-layout))
+        (new-bitmap (layout-bitmap new-layout)))
+    (assert (= old-bitmap (dd-bitmap (layout-info old-layout))))
+    (assert (= new-bitmap (dd-bitmap (layout-info new-layout))))
+    (dotimes (i (dd-length (layout-info old-layout)) t)
+      (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
+                 (not (logbitp i old-bitmap))) ; that was opaque bits
+        (return nil)))))
+
 ;;; This function is called when we are incompatibly redefining a
 ;;; structure CLASS to have the specified NEW-LAYOUT. We signal an
 ;;; error with some proceed options and return the layout that should
@@ -1349,6 +1362,9 @@ or they must be declared locally notinline at each call site.~@:>"
                          name))
        (register-layout new-layout))
       (recklessly-continue ()
+       :test (lambda (c)
+               (declare (ignore c))
+               (mutable-layout-p old-layout new-layout))
        :report (lambda (s)
                  (format s
                          "~@<Use the new definition of ~S as if it were ~
@@ -1358,14 +1374,6 @@ or they must be declared locally notinline at each call site.~@:>"
                          name))
        ;; classic CMU CL warning: "Any old ~S instances will be in a bad way.
        ;; I hope you know what you're doing..."
-       (register-layout new-layout
-                        :invalidate nil
-                        :destruct-layout old-layout))
-      (clobber-it ()
-       ;; FIXME: deprecated 2002-10-16, and since it's only interactive
-       ;; hackery instead of a supported feature, can probably be deleted
-       ;; in early 2003
-       :report "(deprecated synonym for RECKLESSLY-CONTINUE)"
        (register-layout new-layout
                         :invalidate nil
                         :destruct-layout old-layout))))
