@@ -340,7 +340,8 @@
     (maybe-pseudo-atomic stack-allocate-p
      (allocation result (pad-data-block words) node stack-allocate-p lowtag)
      (when type
-       (let ((header (logior (ash (1- words) n-widetag-bits) type)))
+       (let* ((widetag (if (typep type 'layout) instance-widetag type))
+              (header (logior (ash (1- words) n-widetag-bits) widetag)))
          (if (or #!+compact-instance-header
                  (and (eq name '%make-structure-instance) stack-allocate-p))
              ;; Write a :DWORD, not a :QWORD, because the high half will be
@@ -348,7 +349,11 @@
              ;; because it tries to store as few bytes as possible,
              ;; where this instruction must write exactly 4 bytes.
              (inst mov (make-ea :dword :base result :disp (- lowtag)) header)
-             (storew* header result 0 lowtag (not stack-allocate-p))))))))
+             (storew* header result 0 lowtag (not stack-allocate-p)))
+         (unless (eq type widetag) ; TYPE is actually a LAYOUT
+           (inst mov (make-ea :dword :base result :disp (+ 4 (- lowtag)))
+                 ;; XXX: should layout fixups use a name, not a layout object?
+                 (make-fixup type :layout))))))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

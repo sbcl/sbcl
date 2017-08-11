@@ -191,8 +191,12 @@
     (let* ((c-dd (lvar-value dd))
            (c-slot-specs (lvar-value slot-specs))
            (words (+ (dd-length c-dd) words)))
+      #!+immobile-space
+      (progn (aver (= type sb!vm:instance-widetag))
+             (emit-constant (setq type (sb!kernel::dd-layout-or-lose c-dd))))
       (emit-fixed-alloc node block name words type lowtag result lvar)
-      (emit-inits node block name result lowtag `((:dd . ,c-dd) ,@c-slot-specs) args)
+      (emit-inits node block name result lowtag
+                  `(#!-immobile-space (:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
 
 (defoptimizer (initialize-vector ir2-convert)
