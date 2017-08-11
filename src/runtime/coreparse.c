@@ -211,7 +211,7 @@ void inflate_core_bytes(int fd, os_vm_offset_t offset,
                         os_vm_address_t addr, int len)
 {
     z_stream stream;
-    unsigned char buf[ZLIB_BUFFER_SIZE];
+    unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
     int ret;
 
 # ifdef LISP_FEATURE_WIN32
@@ -269,6 +269,7 @@ void inflate_core_bytes(int fd, os_vm_offset_t offset,
     }
 
     inflateEnd(&stream);
+    free(buf);
 }
 # undef ZLIB_BUFFER_SIZE
 #endif

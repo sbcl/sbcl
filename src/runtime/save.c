@@ -94,7 +94,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
     } else if ((compression >= -1) && (compression <= 9)) {
 # define ZLIB_BUFFER_SIZE (1u<<16)
         z_stream stream;
-        unsigned char buf[ZLIB_BUFFER_SIZE];
+        unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
         unsigned char * written, * end;
         long total_written = 0;
         int ret;
@@ -125,6 +125,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
             }
         } while (stream.avail_out == 0);
         deflateEnd(&stream);
+        free(buf);
         printf("compressed %lu bytes into %lu at level %i\n",
                bytes, total_written, compression);
 # undef ZLIB_BUFFER_SIZE
