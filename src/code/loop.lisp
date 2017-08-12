@@ -413,7 +413,7 @@ code to be loaded.
   (vars)
 
 ;;; List of declarations being accumulated in parallel with
-;;; *LOOP-VARS*.
+;;; VARS.
   (declarations)
 
 ;;; Declarations for destructuring bindings
@@ -425,15 +425,15 @@ code to be loaded.
 
 ;;; list of wrapping forms, innermost first, which go immediately
 ;;; inside the current set of parallel bindings being accumulated in
-;;; *LOOP-VARS*. The wrappers are appended onto a body. E.g., this
-;;; list could conceivably have as its value
+;;; VARS. The wrappers are appended onto a body. E.g., this list could
+;;; conceivably have as its value
 ;;;   ((WITH-OPEN-FILE (G0001 G0002 ...))),
-;;; with G0002 being one of the bindings in *LOOP-VARS* (This is why
-;;; the wrappers go inside of the variable bindings).
+;;; with G0002 being one of the bindings in VARS (This is why the
+;;; wrappers go inside of the variable bindings).
   (wrappers)
 
-;;; This accumulates lists of previous values of *LOOP-VARS* and the
-;;; other lists above, for each new nesting of bindings. See
+;;; This accumulates lists of previous values of VARS and the other
+;;; lists above, for each new nesting of bindings. See
 ;;; LOOP-BIND-BLOCK.
   (bind-stack)
 
