@@ -878,15 +878,14 @@ conservative roots from the thread registers and interrupt contexts.
 Experimental: interface subject to change."
   (let ((fun (coerce function 'function))
         (seen (sb-int:alloc-xset)))
-    (flet ((call (part)
-             (when (and (member (sb-kernel:lowtag-of part)
-                                `(,sb-vm:instance-pointer-lowtag
-                                  ,sb-vm:list-pointer-lowtag
-                                  ,sb-vm:fun-pointer-lowtag
-                                  ,sb-vm:other-pointer-lowtag))
-                        (not (sb-int:xset-member-p part seen)))
-               (sb-int:add-to-xset part seen)
-               (funcall fun part))))
+    (labels ((call (part)
+               (when (and (is-lisp-pointer part)
+                          (not (sb-int:xset-member-p part seen)))
+                 (sb-int:add-to-xset part seen)
+                 (funcall fun part)))
+             (is-lisp-pointer (obj)
+               #+64-bit (= (logand (sb-kernel:get-lisp-obj-address part) 3) 3)
+               #-64-bit (oddp (sb-kernel:get-lisp-obj-address part))))
       (when ext
         (let ((table sb-pcl::*eql-specializer-table*))
           (call (sb-int:with-locked-system-table (table)
