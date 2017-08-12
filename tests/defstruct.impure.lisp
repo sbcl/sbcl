@@ -1373,8 +1373,8 @@ redefinition."
 ;; should match the platform's native order.
 (defun compare-memory (obj1 obj1-word-ofs obj2 obj2-word-ofs n-words)
   (with-pinned-objects (obj1 obj2)
-    (let ((sap1 (int-sap (- (get-lisp-obj-address obj1) (lowtag-of obj1))))
-          (sap2 (int-sap (- (get-lisp-obj-address obj2) (lowtag-of obj2)))))
+    (let ((sap1 (int-sap (logandc2 (get-lisp-obj-address obj1) sb-vm:lowtag-mask)))
+          (sap2 (int-sap (logandc2 (get-lisp-obj-address obj2) sb-vm:lowtag-mask))))
       (dotimes (i n-words)
         (let ((w1 (sap-ref-32 sap1 (ash (+ obj1-word-ofs i) sb-vm:word-shift)))
               (w2 (sap-ref-32 sap2 (ash (+ obj2-word-ofs i) sb-vm:word-shift))))

@@ -376,8 +376,8 @@
     (map-objects-in-range
      (lambda (obj type size)
        type
-       (when (hole-p (- (get-lisp-obj-address obj) (lowtag-of obj)))
-         (let ((hole (- (get-lisp-obj-address obj) (lowtag-of obj))))
+       (when (hole-p (logandc2 (get-lisp-obj-address obj) lowtag-mask))
+         (let ((hole (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
            (incf n-holes)
            (incf n-hole-bytes size)
            (format t "~X..~X ~6d~%" hole (+ hole size) size))))
