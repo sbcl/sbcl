@@ -237,7 +237,7 @@ void inflate_core_bytes(int fd, os_vm_offset_t offset,
     stream.next_out  = (void*)addr;
     stream.avail_out = len;
     do {
-        ssize_t count = read(fd, buf, sizeof(buf));
+        ssize_t count = read(fd, buf, ZLIB_BUFFER_SIZE);
         if (count < 0)
             lose("unable to read core file (errno = %i)\n", errno);
         stream.next_in = buf;

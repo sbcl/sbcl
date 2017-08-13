@@ -107,12 +107,12 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
         if (ret != Z_OK)
             lose("deflateInit: %i\n", ret);
         do {
-            stream.avail_out = sizeof(buf);
+            stream.avail_out = ZLIB_BUFFER_SIZE;
             stream.next_out = buf;
             ret = deflate(&stream, Z_FINISH);
             if (ret < 0) lose("zlib deflate error: %i... exiting\n", ret);
             written = buf;
-            end     = buf+sizeof(buf)-stream.avail_out;
+            end     = buf+ZLIB_BUFFER_SIZE-stream.avail_out;
             total_written += end - written;
             while (written < end) {
                 long count = fwrite(written, 1, end-written, file);
