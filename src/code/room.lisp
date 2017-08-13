@@ -495,7 +495,8 @@
 ;;; (space-name . totals-for-space), where totals-for-space is the list
 ;;; returned by TYPE-BREAKDOWN.
 (defun print-summary (spaces totals)
-  (let ((summary (make-hash-table :test 'eq)))
+  (let ((summary (make-hash-table :test 'eq))
+        (space-count (length spaces)))
     (dolist (space-total totals)
       (dolist (total (cdr space-total))
         (push (cons (car space-total) total)
@@ -511,7 +512,7 @@
                    (summary-totals (cons sum v))))
                summary)
 
-      (format t "~2&Summary of spaces: ~(~{~A ~}~)~%" spaces)
+      (format t "~2&Summary of space~P: ~(~{~A ~}~)~%" space-count spaces)
       (let ((summary-total-bytes 0)
             (summary-total-objects 0))
         (declare (unsigned-byte summary-total-bytes summary-total-objects))
@@ -530,10 +531,10 @@
                   (spaces (cons (car space-total) (first total)))))
               (format t "~%~A:~%    ~:D bytes, ~:D object~:P"
                       name total-bytes total-objects)
-              (dolist (space (spaces))
-                (format t ", ~W% ~(~A~)"
-                        (round (* (cdr space) 100) total-bytes)
-                        (car space)))
+              (unless (= 1 space-count)
+                (dolist (space (spaces))
+                  (format t ", ~D% ~(~A~)"
+                          (round (* (cdr space) 100) total-bytes) (car space))))
               (format t ".~%")
               (incf summary-total-bytes total-bytes)
               (incf summary-total-objects total-objects))))
