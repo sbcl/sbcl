@@ -66,14 +66,11 @@
                       :print-summary nil))
 
 (defun room-maximal-info ()
-  ;; FIXME: SB!VM:INSTANCE-USAGE calls suppressed until bug 344 is fixed
-  (room-intermediate-info)
-  ;; old way, could be restored when bug 344 fixed:
-  ;;x (room-minimal-info)
-  ;;x (sb!vm:memory-usage :count-spaces '(:static :dynamic))
-  ;;x (sb!vm:instance-usage :dynamic :top-n 10)
-  ;;x (sb!vm:instance-usage :static :top-n 10)
-  )
+  (let ((spaces '(:static :dynamic)))
+    (room-minimal-info)
+    (sb!vm:memory-usage :count-spaces spaces)
+    (dolist (space spaces)
+      (sb!vm:instance-usage space :top-n 10))))
 
 (defun room (&optional (verbosity :default))
   "Print to *STANDARD-OUTPUT* information about the state of internal
