@@ -24,6 +24,16 @@
              (- (sap-int (sb!c::dynamic-space-free-pointer))
                 (current-dynamic-space-start))))
 
+#!+immobile-space
+(defun immobile-space-usage ()
+  (binding* (((nil fixed-hole-bytes fixed-used-bytes)
+              (sb!vm::immobile-fragmentation-information :fixed))
+             ((nil variable-hole-bytes variable-used-bytes)
+              (sb!vm::immobile-fragmentation-information :variable))
+             (total-used-bytes (+ fixed-used-bytes variable-used-bytes))
+             (total-hole-bytes (+ fixed-hole-bytes variable-hole-bytes)))
+    (values total-used-bytes total-hole-bytes)))
+
 (defun static-space-usage ()
   (- (ash sb!vm:*static-space-free-pointer* sb!vm:n-fixnum-tag-bits)
      sb!vm:static-space-start))
@@ -47,36 +57,44 @@
 ;;;; ROOM
 
 (defun room-minimal-info ()
-  (multiple-value-bind (names name-width values value-width)
+  (multiple-value-bind (names name-width
+                        used-bytes used-bytes-width
+                        overhead-bytes)
       (loop for (nil name function) in sb!vm::**spaces**
-            for value = (funcall function)
+            for (space-used-bytes space-overhead-bytes)
+               = (multiple-value-list (funcall function))
             collect name into names
-            collect value into values
+            collect space-used-bytes into used-bytes
+            collect space-overhead-bytes into overhead-bytes
             maximizing (length name) into name-maximum
-            maximizing value into value-maximum
+            maximizing space-used-bytes into used-bytes-maximum
             finally (return (values
                              names name-maximum
-                             values (decimal-with-grouped-digits-width
-                                     value-maximum))))
+                             used-bytes (decimal-with-grouped-digits-width
+                                         used-bytes-maximum)
+                             overhead-bytes)))
     (loop for name in names
-          for value in values
-          do (format t "~V@<~A usage is:~> ~V:D bytes.~%"
-                     (+ name-width 10) name value-width value)))
+          for space-used-bytes in used-bytes
+          for space-overhead-bytes in overhead-bytes
+          do (format t "~V@<~A usage is:~> ~V:D bytes~@[ (~:D bytes ~
+                        overhead)~].~%"
+                     (+ name-width 10) name used-bytes-width space-used-bytes
+                     space-overhead-bytes)))
   #!+sb-thread
-  (format t
-          "Control and binding stack usage is for the current thread only.~%")
+  (format t "Control and binding stack usage is for the current thread ~
+             only.~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
           *gc-inhibit*))
 
 (defun room-intermediate-info ()
   (room-minimal-info)
-  (sb!vm:memory-usage :count-spaces '(:dynamic)
+  (sb!vm:memory-usage :count-spaces '(:dynamic #!+immobile-space :immobile)
                       :print-spaces t
                       :cutoff 0.05f0
                       :print-summary nil))
 
 (defun room-maximal-info ()
-  (let ((spaces '(:static :dynamic)))
+  (let ((spaces '(:dynamic #!+immobile-space :immobile :static)))
     (room-minimal-info)
     (sb!vm:memory-usage :count-spaces spaces)
     (dolist (space spaces)

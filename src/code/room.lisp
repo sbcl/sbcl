@@ -132,6 +132,8 @@
 
   (defglobal **heap-spaces**
     #1='((:dynamic   "Dynamic space"   sb!kernel:dynamic-usage)
+         #!+immobile-space
+         (:immobile  "Immobile space"  sb!kernel::immobile-space-usage)
          (:read-only "Read-only space" sb!kernel::read-only-space-usage)
          (:static    "Static space"    sb!kernel::static-space-usage)))
 
@@ -143,7 +145,7 @@
       (append #1# #2#)))
 
 (deftype spaces ()
-  `(member #!+immobile-space :immobile ,@(mapcar #'first **heap-spaces**)))
+  `(member ,@(mapcar #'first **heap-spaces**)))
 
 
 ;;;; MAP-ALLOCATED-OBJECTS
@@ -590,7 +592,7 @@
 ;;; The defaults print only summary information for dynamic space. If
 ;;; true, CUTOFF is a fraction of the usage in a report below which
 ;;; types will be combined as OTHER.
-(defun memory-usage (&key print-spaces (count-spaces '(:dynamic))
+(defun memory-usage (&key print-spaces (count-spaces '(:dynamic #!+immobile-space :immobile))
                           (print-summary t) cutoff)
   (declare (type (or single-float null) cutoff))
   (let* ((spaces (if (eq count-spaces t)
