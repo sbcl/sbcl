@@ -127,8 +127,24 @@
                                       ,(position info *specialized-array-element-type-properties*))
                                info))
                          *meta-room-info*))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (defglobal **heap-spaces**
+    #1='((:dynamic   "Dynamic space"   sb!kernel:dynamic-usage)
+         (:read-only "Read-only space" sb!kernel::read-only-space-usage)
+         (:static    "Static space"    sb!kernel::static-space-usage)))
+
+  (defglobal **stack-spaces**
+    #2='((:control-stack "Control stack" sb!kernel::control-stack-usage)
+         (:binding-stack "Binding stack" sb!kernel::binding-stack-usage)))
+
+  (defglobal **spaces**
+      (append #1# #2#)))
+
 (deftype spaces ()
-  '(member :static #!+immobile-space :immobile :dynamic :read-only))
+  `(member #!+immobile-space :immobile ,@(mapcar #'first **heap-spaces**)))
+
 
 ;;;; MAP-ALLOCATED-OBJECTS
 
@@ -580,7 +596,7 @@
                           (print-summary t) cutoff)
   (declare (type (or single-float null) cutoff))
   (let* ((spaces (if (eq count-spaces t)
-                     '(:static :dynamic :read-only)
+                     (mapcar #'first **heap-spaces**)
                      count-spaces))
          (totals (mapcar (lambda (space)
                            (cons space (type-breakdown space)))

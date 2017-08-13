@@ -47,11 +47,17 @@
 ;;;; ROOM
 
 (defun room-minimal-info ()
-  (format t "Dynamic space usage is:   ~10:D bytes.~%" (dynamic-usage))
-  (format t "Read-only space usage is: ~10:D bytes.~%" (read-only-space-usage))
-  (format t "Static space usage is:    ~10:D bytes.~%" (static-space-usage))
-  (format t "Control stack usage is:   ~10:D bytes.~%" (control-stack-usage))
-  (format t "Binding stack usage is:   ~10:D bytes.~%" (binding-stack-usage))
+  (multiple-value-bind (names name-width values)
+      (loop for (nil name function) in sb!vm::**spaces**
+            for value = (funcall function)
+            collect name into names
+            collect value into values
+            maximizing (length name) into name-maximum
+            finally (return (values names name-maximum values)))
+    (loop for name in names
+          for value in values
+          do (format t "~V@<~A usage is:~> ~10:D bytes.~%"
+                     (+ name-width 10) name value)))
   #!+sb-thread
   (format t
           "Control and binding stack usage is for the current thread only.~%")
