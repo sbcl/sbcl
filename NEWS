@@ -11,6 +11,8 @@ changes relative to sbcl-1.3.20:
   * enhancement: DEFMETHOD no longer signals IMPLICIT-GENERIC-FUNCTION-WARNING.
   * enhancement: better type conflict detection for high order functions, e.g.
     (find x "123" :test #'=)
+  * enhancement: the tabular output of ROOM is aligned dynamically, preventing
+    misaligned tables for larger sizes or counts.
   * optimization: optimized external-format routines.
 
 changes in sbcl-1.3.20 relative to sbcl-1.3.19:

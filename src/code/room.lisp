@@ -558,31 +558,36 @@
                 summary-total-bytes summary-total-objects)))))
 
 ;;; Report object usage for a single space.
-(defun report-space-total (space-total cutoff)
-  (declare (list space-total) (type (or single-float null) cutoff))
-  (format t "~2&Breakdown for ~(~A~) space:~%" (car space-total))
-  (let* ((types (cdr space-total))
-         (total-bytes (reduce #'+ (mapcar #'first types)))
-         (total-objects (reduce #'+ (mapcar #'second types)))
-         (cutoff-point (if cutoff
-                           (truncate (* (float total-bytes) cutoff))
-                           0))
-         (reported-bytes 0)
-         (reported-objects 0))
-    (declare (unsigned-byte total-objects total-bytes cutoff-point reported-objects
-                            reported-bytes))
-    (loop for (bytes objects name) in types do
-      (when (<= bytes cutoff-point)
-        (format t "  ~10:D bytes for ~9:D other object~2:*~P.~%"
-                (- total-bytes reported-bytes)
-                (- total-objects reported-objects))
-        (return))
-      (incf reported-bytes bytes)
-      (incf reported-objects objects)
-      (format t "  ~10:D bytes for ~9:D ~(~A~) object~2:*~P.~%"
-              bytes objects name))
-    (format t "  ~10:D bytes for ~9:D ~(~A~) object~2:*~P (space total.)~%"
-            total-bytes total-objects (car space-total))))
+(defun report-space-total (space-info cutoff)
+  (declare (list space-info) (type (or single-float null) cutoff))
+  (destructuring-bind (space . types) space-info
+    (format t "~2&Breakdown for ~(~A~) space:~%" space)
+    (let* ((total-bytes (reduce #'+ (mapcar #'first types)))
+           (bytes-width (decimal-with-grouped-digits-width total-bytes))
+           (total-objects (reduce #'+ (mapcar #'second types)))
+           (objects-width (decimal-with-grouped-digits-width total-objects))
+           (cutoff-point (if cutoff
+                             (truncate (* (float total-bytes) cutoff))
+                             0))
+           (reported-bytes 0)
+           (reported-objects 0))
+      (declare (unsigned-byte total-objects total-bytes cutoff-point
+                              reported-objects reported-bytes))
+      (flet ((type-usage (bytes objects name &optional note)
+               (format t "  ~V:D bytes for ~V:D ~(~A~) object~2:*~P~*~
+                          ~:[~; ~:*(~A)~]~%"
+                       bytes-width bytes objects-width objects name note)))
+        (loop for (bytes objects name) in types do
+             (when (<= bytes cutoff-point)
+               (type-usage (- total-bytes reported-bytes)
+                           (- total-objects reported-objects)
+                           "other")
+               (return))
+             (incf reported-bytes bytes)
+             (incf reported-objects objects)
+             (type-usage bytes objects name))
+        (terpri)
+        (type-usage total-bytes total-objects space "space total")))))
 
 ;;; Print information about the heap memory in use. PRINT-SPACES is a
 ;;; list of the spaces to print detailed information for.
@@ -634,36 +639,35 @@
            (incf (the fixnum (car found)))
            (incf (the fixnum (cdr found)) size))))
      space)
-
-    (collect ((totals-list))
-      (maphash (lambda (classoid what)
-                 (totals-list (cons (prin1-to-string
-                                     (classoid-proper-name classoid))
-                                    what)))
-               totals)
-      (let ((sorted (sort (totals-list) #'> :key #'cddr))
-            (printed-bytes 0)
-            (printed-objects 0))
-        (declare (unsigned-byte printed-bytes printed-objects))
-        (dolist (what (if top-n
-                          (subseq sorted 0 (min (length sorted) top-n))
-                          sorted))
-          (let ((bytes (cddr what))
-                (objects (cadr what)))
-            (incf printed-bytes bytes)
-            (incf printed-objects objects)
-            (format t "  ~A: ~:D bytes, ~:D object~:P.~%" (car what)
-                    bytes objects)))
-
+    (let* ((sorted (sort (%hash-table-alist totals) #'> :key #'cddr))
+           (interesting (if top-n
+                            (subseq sorted 0 (min (length sorted) top-n))
+                            sorted))
+           (bytes-width (decimal-with-grouped-digits-width total-bytes))
+           (objects-width (decimal-with-grouped-digits-width total-objects))
+           (types-width (reduce #'max interesting
+                                :key (lambda (x) (length (symbol-name (classoid-name (first x)))))
+                                :initial-value 0))
+           (printed-bytes 0)
+           (printed-objects 0))
+      (declare (unsigned-byte printed-bytes printed-objects))
+      (flet ((type-usage (type objects bytes)
+               (let ((name (etypecase type
+                             (string type)
+                             (classoid (symbol-name (classoid-name type))))))
+                 (format t "  ~V@<~A~> ~V:D bytes, ~V:D object~:P.~%"
+                         (1+ types-width) name bytes-width bytes
+                         objects-width objects))))
+        (loop for (type . (objects . bytes)) in interesting do
+             (incf printed-bytes bytes)
+             (incf printed-objects objects)
+             (type-usage type objects bytes))
         (let ((residual-objects (- total-objects printed-objects))
               (residual-bytes (- total-bytes printed-bytes)))
           (unless (zerop residual-objects)
-            (format t "  Other types: ~:D bytes, ~:D object~:P.~%"
-                    residual-bytes residual-objects))))
-
-      (format t "  ~:(~A~) instance total: ~:D bytes, ~:D object~:P.~%"
-              space total-bytes total-objects)))
-
+            (type-usage "Other types" residual-bytes residual-objects)))
+        (type-usage (format nil "~:(~A~) instance total" space)
+                    total-bytes total-objects))))
   (values))
 
 ;;;; PRINT-ALLOCATED-OBJECTS

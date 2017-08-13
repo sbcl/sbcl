@@ -47,17 +47,21 @@
 ;;;; ROOM
 
 (defun room-minimal-info ()
-  (multiple-value-bind (names name-width values)
+  (multiple-value-bind (names name-width values value-width)
       (loop for (nil name function) in sb!vm::**spaces**
             for value = (funcall function)
             collect name into names
             collect value into values
             maximizing (length name) into name-maximum
-            finally (return (values names name-maximum values)))
+            maximizing value into value-maximum
+            finally (return (values
+                             names name-maximum
+                             values (decimal-with-grouped-digits-width
+                                     value-maximum))))
     (loop for name in names
           for value in values
-          do (format t "~V@<~A usage is:~> ~10:D bytes.~%"
-                     (+ name-width 10) name value)))
+          do (format t "~V@<~A usage is:~> ~V:D bytes.~%"
+                     (+ name-width 10) name value-width value)))
   #!+sb-thread
   (format t
           "Control and binding stack usage is for the current thread only.~%")
