@@ -367,26 +367,57 @@
     (setf (%code-debug-info code) nil)
     code))
 
-(defun show-fragmentation ()
-  (let ((n-holes 0)
-        (n-hole-bytes 0)
-        (subspace-start
-         (+ immobile-space-start immobile-fixedobj-subspace-size))
-        (free-pointer *immobile-space-free-pointer*))
-    (map-objects-in-range
+(deftype immobile-subspaces ()
+  '(member :fixed :variable))
+
+(declaim (inline immobile-subspace-bounds))
+(defun immobile-subspace-bounds (subspace)
+  (case subspace
+    (:fixed (values immobile-space-start
+                    *immobile-fixedobj-free-pointer*))
+    (:variable (values (+ immobile-space-start
+                          immobile-fixedobj-subspace-size)
+                       *immobile-space-free-pointer*))))
+
+(declaim (ftype (sfunction (function &rest immobile-subspaces) null)
+                map-immobile-objects))
+(defun map-immobile-objects (function &rest subspaces)
+  (do-rest-arg ((subspace) subspaces)
+    (multiple-value-bind (start free-pointer)
+        (immobile-subspace-bounds subspace)
+      (map-objects-in-range
+       function (ash start (- n-fixnum-tag-bits)) free-pointer))))
+
+(declaim (ftype (function (immobile-subspaces) (values t t t &optional))
+                immobile-fragmentation-information))
+(defun immobile-fragmentation-information (subspace)
+  (binding* (((start free-pointer) (immobile-subspace-bounds subspace))
+             (used-bytes (- (ash free-pointer n-fixnum-tag-bits) start))
+             (holes '())
+             (hole-bytes 0))
+    (map-immobile-objects
      (lambda (obj type size)
-       type
-       (when (hole-p (logandc2 (get-lisp-obj-address obj) lowtag-mask))
-         (let ((hole (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
-           (incf n-holes)
-           (incf n-hole-bytes size)
-           (format t "~X..~X ~6d~%" hole (+ hole size) size))))
-     (ash subspace-start (- n-fixnum-tag-bits))
-     free-pointer)
-    (format t "       ~18d (total ~D holes)~%" n-hole-bytes n-holes)
-    (let ((total-space-used
-           (- (ash free-pointer n-fixnum-tag-bits) subspace-start)))
-      (values n-hole-bytes total-space-used
-              (* 100.0 (/ n-hole-bytes total-space-used))))))
+       (declare (ignore type))
+       (let ((address (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
+         (when (case subspace
+                 (:fixed (consp obj))
+                 (:variable (hole-p address)))
+           (push (cons address size) holes)
+           (incf hole-bytes size))))
+     subspace)
+    (values holes hole-bytes used-bytes)))
+
+(defun show-fragmentation (&key (subspaces '(:fixed :variable))
+                                (stream *standard-output*))
+  (dolist (subspace subspaces)
+    (format stream "~(~A~) subspace fragmentation:~%" subspace)
+    (multiple-value-bind (holes hole-bytes total-space-used)
+        (immobile-fragmentation-information subspace)
+      (loop for (start . size) in holes
+            do (format stream "~2@T~X..~X ~8:D~%" start (+ start size) size))
+      (format stream "~2@T~18@<~:D hole~:P~> ~8:D (~,2,2F% of ~:D ~
+                      bytes used)~%"
+              (length holes) hole-bytes
+              (/ hole-bytes total-space-used) total-space-used))))
 
 ) ; end PROGN

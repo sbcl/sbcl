@@ -408,14 +408,7 @@
                                     (eql (code-header-words obj) 2))
                                (consp obj))
                      (funcall fun obj type size))))
-         (let ((start immobile-space-start)
-               (end *immobile-fixedobj-free-pointer*))
-           (dotimes (pass 2)
-             (map-objects-in-range #'filter
-                                   (ash start (- n-fixnum-tag-bits))
-                                   end)
-             (setq start (+ immobile-space-start immobile-fixedobj-subspace-size)
-                   end *immobile-space-free-pointer*)))))
+         (map-immobile-objects #'filter :fixed :variable)))
 
       #!+gencgc
       (:dynamic
