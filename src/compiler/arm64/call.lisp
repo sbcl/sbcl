@@ -298,14 +298,12 @@
 ;;; thing this handles is allocation of the result temporaries.
 (define-vop (unknown-values-receiver)
   (:results
-   (start :scs (any-reg) :from (:save 0))
-   (count :scs (any-reg) :from (:save 1)))
-  (:temporary (:sc any-reg :offset ocfp-offset
-               :from :eval :to :save)
-              values-start)
-  (:temporary (:sc any-reg :offset nargs-offset
-               :from :eval :to :save)
-              nvals))
+   (start :scs (any-reg))
+   (count :scs (any-reg)))
+  (:temporary (:sc any-reg :offset ocfp-offset :from :result) values-start)
+  (:temporary (:sc any-reg :offset nargs-offset :from :result) nvals)
+  ;; Avoid being clobbered by RECEIVE-UNKNOWN-VALUES
+  (:temporary (:sc descriptor-reg :offset r0-offset :from :result) r0-temp))
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
@@ -629,7 +627,7 @@
   (:save-p t)
   (:move-args :local-call)
   (:info save callee target)
-  (:ignore args save)
+  (:ignore args save r0-temp)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:scs (interior-reg)) lip)
@@ -794,10 +792,12 @@
             step-instrumenting)
 
      (:ignore
-      ,@(when (eq return :fixed) '(ocfp-temp))
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
       ,@(unless variable '(args))
-      ,@(when (eq return :tail) '(old-fp)))
+      ,(ecase return
+         (:fixed 'ocfp-temp)
+         (:tail 'old-fp)
+         (:unknown 'r0-temp)))
 
      (:temporary (:sc descriptor-reg :offset lexenv-offset
                       :from (:argument ,(if (eq return :tail) 0 1))

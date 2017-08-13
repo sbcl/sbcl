@@ -6502,3 +6502,12 @@
                                             :initial-contents x)))
      '(((1 2) (3 4))))
     #2A(((1 2) (3 4))))))
+
+(with-test (:name :unknown-valuese-receiver-register-clobber)
+  (assert (= (funcall (checked-compile `(lambda ()
+                                          (let ((x (list 1)))
+                                            (declare (sb-int:truly-dynamic-extent x))
+                                            (progv '(*) x
+                                              (catch 'ct (the integer
+                                                              (eval (dotimes (i 1 42) 42)))))))))
+             42)))
