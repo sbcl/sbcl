@@ -122,5 +122,12 @@
   ;; (making this particular stupid).
   ;; But at least it's generally an improvement
   ;; to fail earlier than later in many cases.
-  (locally (declare (notinline sort))
-    (assert-error (sort () #'< :key 'and))))
+  (multiple-value-bind (fun failure-p warnings)
+      (checked-compile
+       '(lambda ()
+         (locally (declare (notinline sort))
+           (sort () #'< :key 'and)))
+       :allow-warnings t)
+    (declare (ignore failure-p))
+    (assert (= 1 (length warnings)))
+    (assert-error (funcall fun))))
