@@ -1231,6 +1231,12 @@ NOTE: This interface is experimental and subject to change."
 (defun print-type (stream type &optional colon at)
   (print-type-specifier stream (type-specifier type) colon at))
 
+(declaim (ftype (sfunction (index &key (:comma-interval (and (integer 1) index))) index)
+                decimal-with-grouped-digits-width))
+(defun decimal-with-grouped-digits-width (value &key (comma-interval 3))
+  (let ((digits (length (write-to-string value :base 10))))
+    (+ digits (floor (1- digits) comma-interval))))
+
 
 ;;;; etc.
 
