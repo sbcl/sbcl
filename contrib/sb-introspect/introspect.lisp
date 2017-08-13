@@ -884,8 +884,8 @@ Experimental: interface subject to change."
                  (sb-int:add-to-xset part seen)
                  (funcall fun part)))
              (is-lisp-pointer (obj)
-               #+64-bit (= (logand (sb-kernel:get-lisp-obj-address part) 3) 3)
-               #-64-bit (oddp (sb-kernel:get-lisp-obj-address part))))
+               #+64-bit (= (logand (sb-kernel:get-lisp-obj-address obj) 3) 3)
+               #-64-bit (oddp (sb-kernel:get-lisp-obj-address obj))))
       (when ext
         (let ((table sb-pcl::*eql-specializer-table*))
           (call (sb-int:with-locked-system-table (table)
