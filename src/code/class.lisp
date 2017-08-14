@@ -56,7 +56,8 @@
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
 (declaim (inline layout-for-std-class-p))
-(defun layout-for-std-class-p (x) (not (zerop (layout-%for-std-class-b x))))
+(defun layout-for-std-class-p (x)
+  (logtest (layout-%flags x) +pcl-object-layout-flag+))
 
 (defmethod print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)
@@ -127,14 +128,15 @@
 ;;; preexisting class slot value is OK, and if it's not initialized,
 ;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
 ;;; is no longer true, :UNINITIALIZED used instead.
-(declaim (ftype (function (layout classoid index simple-vector layout-depthoid layout-bitmap)
-                          layout)
-                %init-or-check-layout))
-(defun %init-or-check-layout (layout classoid length inherits depthoid bitmap)
+(declaim (ftype (function (layout classoid index fixnum simple-vector
+                           layout-depthoid layout-bitmap)
+                          layout) %init-or-check-layout))
+(defun %init-or-check-layout (layout classoid length flags inherits depthoid bitmap)
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
          (setf (layout-length layout) length
+               (layout-%flags layout) flags
                (layout-inherits layout) inherits
                (layout-depthoid layout) depthoid
                (layout-bitmap layout) bitmap
@@ -165,7 +167,15 @@
   (when (layout-invalid layout)
     (sb!c::compiler-error "can't dump reference to obsolete class: ~S"
                           (layout-classoid layout)))
-  (let ((name (classoid-name (layout-classoid layout))))
+  (let* ((classoid (layout-classoid layout))
+         (name (classoid-name classoid)))
+    (aver (= (layout-%flags layout)
+             (typecase classoid
+               (structure-classoid +structure-layout-flag+)
+               (condition-classoid +condition-layout-flag+)
+               (undefined-classoid
+                (bug "xc MAKE-LOAD-FORM on undefined layout"))
+               (t 0))))
     (unless name
       (sb!c::compiler-error "can't dump anonymous LAYOUT: ~S" layout))
     ;; Since LAYOUT refers to a class which refers back to the LAYOUT,
@@ -180,6 +190,7 @@
      `(%init-or-check-layout ',layout
                              ',(layout-classoid layout)
                              ',(layout-length layout)
+                             ',(layout-%flags layout)
                              ',(layout-inherits layout)
                              ',(layout-depthoid layout)
                              ',(layout-bitmap layout)))))
@@ -272,10 +283,10 @@ between the ~A definition and the ~A definition"
 ;;; Used by the loader to forward-reference layouts for classes whose
 ;;; definitions may not have been loaded yet. This allows type tests
 ;;; to be loaded when the type definition hasn't been loaded yet.
-(declaim (ftype (function (symbol index simple-vector layout-depthoid layout-bitmap)
+(declaim (ftype (function (symbol index fixnum simple-vector layout-depthoid layout-bitmap)
                           layout)
                 find-and-init-or-check-layout))
-(defun find-and-init-or-check-layout (name length inherits depthoid bitmap)
+(defun find-and-init-or-check-layout (name length flags inherits depthoid bitmap)
   (truly-the ; avoid an "assertion too complex to check" optimizer note
    (values layout &optional)
    (with-world-lock ()
@@ -284,6 +295,7 @@ between the ~A definition and the ~A definition"
                              (or (find-classoid name nil)
                                  (layout-classoid layout))
                              length
+                             flags
                              inherits
                              depthoid
                              bitmap)))))
@@ -1132,6 +1144,7 @@ between the ~A definition and the ~A definition"
                            -1)))
           (register-layout
            (find-and-init-or-check-layout name
+                                          0
                                           0
                                           inherits-vector
                                           depthoid

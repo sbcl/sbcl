@@ -99,6 +99,10 @@
 (def!type layout-clos-hash () `(integer 0 ,layout-clos-hash-limit))
 (declaim (ftype (sfunction () layout-clos-hash) random-layout-clos-hash))
 
+(defconstant +structure-layout-flag+  #b001)
+(defconstant +pcl-object-layout-flag+ #b010)
+(defconstant +condition-layout-flag+  #b100)
+
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
 ;;; type checking and garbage collection. Whenever a class is
@@ -113,6 +117,8 @@
 ;;; FIXME: ...it would be better to automate this, of course...
 (def!struct (layout #-sb-xc-host (:constructor #!+immobile-space nil)
                     (:copier nil))
+  ;; one +something-LAYOUT-FLAG+ bit or none of them
+  (%flags 0 :type fixnum :read-only nil)
   ;; a pseudo-random hash value for use by CLOS.
   (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
   ;; the class that this is a layout for
@@ -163,17 +169,7 @@
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.
-  (slot-table #(1 nil) :type simple-vector)
-  ;; True IFF the layout belongs to a standand-instance or a
-  ;; standard-funcallable-instance.
-  ;; Old comment was:
-  ;;   FIXME: If we unify wrappers and layouts this can go away, since
-  ;;   it is only used in SB-PCL::EMIT-FETCH-WRAPPERS, which can then
-  ;;   use INSTANCE-SLOTS-LAYOUT instead (if there is are no slot
-  ;;   layouts, there are no slots for it to pull.)
-  ;; But while that's conceivable, it still seems advantageous to have
-  ;; a single bit that decides whether something is STANDARD-OBJECT.
-  (%for-std-class-b 0 :type bit :read-only t))
+  (slot-table #(1 nil) :type simple-vector))
 (declaim (freeze-type layout))
 
 #!+(and immobile-space (host-feature sb-xc))

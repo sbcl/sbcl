@@ -1132,13 +1132,22 @@ core and return a descriptor to it."
      :inherits inherits
      :depthoid depthoid
      :length length
+     :%flags (let* ((inherit-names (listify-cold-inherits inherits))
+                    (second (second inherit-names)))
+               (make-fixnum-descriptor
+                 ;; Note similarity to FOP-LAYOUT here, but with extra
+                 ;; test for the subtree roots.
+                 (cond ((or (eq second 'structure-object) (eq name 'structure-object))
+                        +structure-layout-flag+)
+                       ((or (eq second 'condition) (eq name 'condition))
+                        +condition-layout-flag+)
+                       (t 0))))
      :info *nil-descriptor*
      :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
      :equalp-tests *simple-vector-0-descriptor*
      :source-location *nil-descriptor*
-     :%for-std-class-b (make-fixnum-descriptor 0)
      :slot-list *nil-descriptor*
      (if (member name '(null list symbol))
       ;; Assign an empty slot-table.  Why this is done only for three

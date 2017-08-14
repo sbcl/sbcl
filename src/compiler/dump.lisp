@@ -1292,6 +1292,9 @@
   (when (layout-invalid obj)
     (compiler-error "attempt to dump reference to obsolete class: ~S"
                     (layout-classoid obj)))
+  ;; STANDARD-OBJECT could in theory be dumpable, but nothing else,
+  ;; because all its subclasses can evolve to have new layouts.
+  (aver (not (logtest (layout-%flags obj) +pcl-object-layout-flag+)))
   (let ((name (classoid-name (layout-classoid obj))))
     ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name

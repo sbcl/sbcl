@@ -1445,9 +1445,11 @@ or they must be declared locally notinline at each call site.~@:>"
              (list (layout-classoid
                     (svref inherits (1- (length inherits))))))))
     (let* ((old-layout (or compiler-layout old-layout))
+           (flags (if (dd-alternate-metaclass info) 0 +structure-layout-flag+))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
               (make-layout :classoid classoid
+                           :%flags flags
                            :inherits inherits
                            :depthoid (length inherits)
                            :length (dd-length info)

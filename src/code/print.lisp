@@ -373,7 +373,8 @@ variable: an unreadable object representing the error is printed instead.")
       ;; Additionally, if the object is an obsolete CONDITION, don't crash.
       ;; (There is no update-instance protocol for conditions)
       (when (or (sb!kernel::undefined-classoid-p classoid)
-                (and (layout-invalid layout) (condition-classoid-p classoid)))
+                (and (layout-invalid layout)
+                     (logtest (layout-%flags layout) +condition-layout-flag+)))
         ;; not only is this unreadable, it's unprintable too.
         (return-from output-ugly-object
           (print-unreadable-object (object stream :identity t)

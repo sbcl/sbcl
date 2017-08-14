@@ -19,7 +19,13 @@
 (defun coerce-to-condition (datum default-type fun-name &rest arguments)
   (declare (explicit-check)
            (dynamic-extent arguments))
-  (cond ((typep datum 'condition)
+  (cond ((and (%instancep datum)
+              (let ((layout (%instance-layout datum)))
+                (logtest +condition-layout-flag+ (layout-%flags layout))
+                ;; An invalid layout will drop into the (MAKE-CONDITION) branch
+                ;; which rightly fails because ALLOCATE-CONDITION asserts that
+                ;; the first argument is a condition-designator, which it won't be.
+                (not (layout-invalid layout))))
          (when (and arguments (not (eq fun-name 'cerror)))
            (cerror "Ignore the additional arguments."
                    'simple-type-error
