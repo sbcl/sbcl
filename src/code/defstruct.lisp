@@ -1822,8 +1822,7 @@ or they must be declared locally notinline at each call site.~@:>"
          ;; With compact instance headers, slot 0 is a data slot.
          (slot-index sb!vm:instance-data-start))
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
-    ;; because none of the magical alternate-metaclass structures
-    ;; have copiers and predicates that "Just work"
+    ;; because alternate-metaclass structures can not have either.
     (case dd-type
       ;; We don't support inheritance of alternate metaclass stuff,
       ;; and it's not a general-purpose facility, so sanity check our
@@ -1863,7 +1862,6 @@ or they must be declared locally notinline at each call site.~@:>"
                 (metaclass-name (missing-arg))
                 (metaclass-constructor (missing-arg))
                 (dd-type (missing-arg))
-                predicate
                 (runtime-type-checks-p t))
 
   (declare (type (and list (not null)) slot-names))
@@ -1872,9 +1870,8 @@ or they must be declared locally notinline at each call site.~@:>"
                  superclass-name
                  metaclass-name
                  metaclass-constructor))
-  (declare (type symbol predicate))
   (declare (type (member structure funcallable-structure) dd-type))
-  (declare (ignore boa-constructor predicate runtime-type-checks-p))
+  (declare (ignore boa-constructor runtime-type-checks-p))
 
   (let* ((dd (make-dd-with-alternate-metaclass
               :class-name class-name
@@ -1896,7 +1893,6 @@ or they must be declared locally notinline at each call site.~@:>"
                 (metaclass-name (missing-arg))
                 (metaclass-constructor (missing-arg))
                 (dd-type (missing-arg))
-                predicate
                 (runtime-type-checks-p t))
 
   (declare (type (and list (not null)) slot-names))
@@ -1905,7 +1901,6 @@ or they must be declared locally notinline at each call site.~@:>"
                  superclass-name
                  metaclass-name
                  metaclass-constructor))
-  (declare (type symbol predicate))
   (declare (type (member structure funcallable-structure) dd-type))
 
   (let* ((dd (make-dd-with-alternate-metaclass
@@ -1973,14 +1968,6 @@ or they must be declared locally notinline at each call site.~@:>"
                                   ,slot-name)))
                        slot-names)
              ,object-gensym))
-
-         ;; predicate
-         ,@(when predicate
-             ;; Just delegate to the compiler's type optimization
-             ;; code, which knows how to generate inline type tests
-             ;; for the whole CMU CL INSTANCE menagerie.
-             `(defun ,predicate (,object-gensym)
-                (typep ,object-gensym ',class-name)))
 
          ;; Usually we AVER instead of ASSERT, but AVER isn't defined yet.
          ;; A naive reading of 'build-order' suggests it is,
