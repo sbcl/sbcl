@@ -1279,7 +1279,8 @@ constant shift greater than word length")))
   (:conditional :c)
   (:arg-types tagged-num (:constant (integer 0 #.(- 63 n-fixnum-tag-bits))))
   (:generator 4
-    (inst bt x (+ y n-fixnum-tag-bits))))
+    (let ((bit (+ y n-fixnum-tag-bits)))
+      (inst bt (if (<= bit 31) (reg-in-size x :dword) x) bit))))
 
 (define-vop (fast-logbitp/signed fast-conditional/signed)
   (:args (x :scs (signed-reg signed-stack))
