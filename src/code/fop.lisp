@@ -182,7 +182,7 @@
             (incf ptr)))))
     res))
 
-(!define-fop 45 (fop-layout (name inherits depthoid length bitmap))
+(!define-fop 45 :not-host (fop-layout (name inherits depthoid length bitmap))
   (find-and-init-or-check-layout name length inherits depthoid bitmap))
 
 ;; Allocate a CLOS object. This is used when the compiler detects that
@@ -742,6 +742,7 @@
                           specs))))
   (frob (#x6c t)
         (#x6d structure-object)
+        (#x6e condition)
         (#x6f definition-source-location)
         (#x70 sb!c::debug-fun)
         (#x71 sb!c::compiled-debug-fun)
