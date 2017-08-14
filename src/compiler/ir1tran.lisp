@@ -598,6 +598,8 @@
                       (reference-leaf start next result form))
                      (t
                       (reference-constant start next result form))))
+              ((not (proper-list-p form))
+               (compiler-error "~@<~S is not a proper list.~@:>" form))
               (t
                (ir1-convert-functoid start next result form)))))
     (values))

@@ -6520,3 +6520,18 @@
                                           (scale-float p1 27)))
                       1.0)
              1.3421773e8)))
+
+(with-test (:name (compile :call :dotted-list))
+  (flet ((test (form)
+           (multiple-value-bind (fun failure-p warnings style-warnings notes
+                                 compiler-errors)
+               (checked-compile `(lambda () ,form)
+                                :allow-failure t :allow-warnings t)
+             (declare (ignore fun warnings style-warnings notes))
+             (assert failure-p)
+             (assert (= 1 (length compiler-errors)))
+             (assert (search "is not a proper list."
+                             (princ-to-string (first compiler-errors)))))))
+    (test '(cons 1 . 2))
+    (test '((lambda (x) x) . 1))
+    (test '(let () . 1))))
