@@ -360,8 +360,7 @@
 (define-info-type (:type :compiler-layout)
   :type-spec (or layout null)
   :default (lambda (name)
-             (let ((class (find-classoid name nil)))
-               (when class (classoid-layout class)))))
+             (awhen (find-classoid name nil) (classoid-layout it))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun ftype-from-fdefn (name)
