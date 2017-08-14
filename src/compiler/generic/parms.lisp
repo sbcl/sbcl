@@ -66,6 +66,7 @@
           &key ((:dynamic-space-start dynamic-space-start*))
                ((:default-dynamic-space-size default-dynamic-space-size*))
                #!+immobile-space (immobile-space-size (* 128 1024 1024))
+               #!+immobile-space (immobile-code-space-size (* 104 1024 1024))
                ;; Smallest os_validate()able alignment; used as safepoint
                ;; page size.  Default suitable for POSIX platforms.
                (alignment            #x1000)
@@ -109,7 +110,8 @@
        ,@safepoint-page-forms
        ,@small-space-forms
        #!+immobile-space
-       (defconstant immobile-fixedobj-subspace-size (* 24 1024 1024))
+       (defconstant immobile-fixedobj-subspace-size
+         ,(- immobile-space-size immobile-code-space-size))
        (defconstant default-dynamic-space-start ,(or dynamic-space-start* ptr))
        #!-relocatable-heap (defconstant dynamic-space-start default-dynamic-space-start)
        (defconstant default-dynamic-space-size
