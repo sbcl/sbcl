@@ -1115,6 +1115,8 @@ core and return a descriptor to it."
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
 (defvar *cold-layout-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
+(defvar *cold-package-gspace*
+  (or #!+(and immobile-space 64-bit) '*immobile-fixedobj* '*dynamic*))
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
                           descriptor)
                 make-cold-layout))
@@ -1374,7 +1376,7 @@ core and return a descriptor to it."
         (package-layout (find-layout 'package))
         (target-pkg-list nil))
     (labels ((init-cold-package (name &optional docstring)
-               (let ((cold-package (allocate-struct (symbol-value *cold-layout-gspace*)
+               (let ((cold-package (allocate-struct (symbol-value *cold-package-gspace*)
                                                     (gethash 'package *cold-layouts*))))
                  (setf (gethash name *cold-package-symbols*)
                        (cons (cons nil nil) cold-package))

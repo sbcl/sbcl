@@ -496,10 +496,9 @@
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 
 (defun fun-word-offset (fun)
-  (ldb (byte (- sb!vm:n-word-bits
-                sb!vm:n-widetag-bits
+  (ldb (byte (- sb!vm:n-word-bits sb!vm:n-widetag-bits
                 ;; Chop off the layout
-                #!+immobile-space 32)
+                #!+(and 64-bit immobile-space) 32)
              sb!vm:n-widetag-bits)
        (sap-ref-word (int-sap (get-lisp-obj-address fun))
                      (- sb!vm:fun-pointer-lowtag))))

@@ -99,7 +99,7 @@
                         by sb!vm:n-word-bytes
               do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
         (setf (closure-header-word copy) ; Update the header
-              (logior #!+immobile-space (ash sb!vm:function-layout 32)
+              (logior #!+(and immobile-space 64-bit) (ash sb!vm:function-layout 32)
                       +closure-header-namedp+
                       (closure-header-word copy))))
       copy))

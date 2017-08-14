@@ -332,7 +332,9 @@
      (setf (sap-ref-word (int-sap addr) 0) word0
            (sap-ref-word (int-sap addr) n-word-bytes) word1)
      ;; 0-fill the remainder of the object
-     (system-area-ub64-fill 0 (int-sap addr) 2 (- (ash n-bytes (- word-shift)) 2))
+     (#!+64-bit system-area-ub64-fill
+      #!-64-bit system-area-ub32-fill
+      0 (int-sap addr) 2 (- (ash n-bytes (- word-shift)) 2))
      (%make-lisp-obj (logior addr lowtag)))))
 
 (defun allocate-immobile-vector (widetag length words)
@@ -350,8 +352,9 @@
   (allocate-immobile-vector simple-array-unsigned-byte-8-widetag n-elements
                             (ceiling n-elements n-word-bytes)))
 (defun allocate-immobile-word-vector (n-elements)
-  (allocate-immobile-vector simple-array-unsigned-byte-64-widetag n-elements
-                            n-elements))
+  (allocate-immobile-vector #!+64-bit simple-array-unsigned-byte-64-widetag
+                            #!-64-bit simple-array-unsigned-byte-32-widetag
+                            n-elements n-elements))
 
 ;;; This is called when we're already inside WITHOUT-GCing
 (defun allocate-immobile-code (n-boxed-words n-unboxed-bytes)

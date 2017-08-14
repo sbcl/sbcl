@@ -310,10 +310,10 @@
 (defknown fun-code-header (t) t (movable flushable))
 (defknown %make-lisp-obj (sb!vm:word) t (movable flushable))
 (defknown get-lisp-obj-address (t) sb!vm:word (movable flushable))
-(defknown fun-word-offset (function) (unsigned-byte #.(- sb!vm:n-word-bits
-                                                         sb!vm:n-widetag-bits
-                                                         ;; Exclude the layout
-                                                         #!+immobile-space 32))
+(defknown fun-word-offset (function)
+    (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits
+                        ;; Exclude the layout
+                        #!+(and 64-bit immobile-space) 32))
     (movable flushable))
 
 ;;;; 32-bit logical operations

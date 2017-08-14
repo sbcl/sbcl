@@ -691,10 +691,11 @@
                     ;; (eq (data-vector-ref ...) k) has a single instruction form,
                     ;; but lacking that, force it into a single call
                     ;; that a vop can translate.
-                    #!+immobile-space
-                    `(sb!vm::layout-inherits-ref-eq
+                    #!+(and immobile-space x86-64)
+                    `(sb!vm::layout-inherits-ref-eq ; only implemented on x86-64
                       (layout-inherits ,n-layout) ,depthoid ,layout)
-                    #!-immobile-space `(eq ,get-ancestor ,layout))
+                    #!-(and immobile-space x86-64)
+                    `(eq ,get-ancestor ,layout))
                    (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
               `(and ,pred

@@ -818,7 +818,6 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
 #endif
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
   case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
     layout[0] = instance_layout(obj); // same as above
@@ -836,7 +835,6 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
         return 0;
     }
     // FALLTHROUGH_INTENDED
-#endif
   }
   return range_points_to_younger_p(obj+1, obj+n_words, gen, keep_gen, new_gen);
 }
