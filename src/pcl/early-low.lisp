@@ -129,8 +129,8 @@
   :slot-names (slots #!-(and compact-instance-header x86-64) hash-code)
   :boa-constructor %make-standard-instance
   :superclass-name t
-  :metaclass-name standard-classoid
-  :metaclass-constructor make-standard-classoid
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
   :dd-type structure
   :runtime-type-checks-p nil)
 
@@ -145,8 +145,8 @@
   :slot-names (clos-slots #!-compact-instance-header hash-code)
   :boa-constructor %make-standard-funcallable-instance
   :superclass-name function
-  :metaclass-name standard-classoid
-  :metaclass-constructor make-standard-classoid
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure
   ;; Only internal implementation code will access these, and these
   ;; accesses (slot readers in particular) could easily be a
