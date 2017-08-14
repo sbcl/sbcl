@@ -367,8 +367,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         size_t true_size = sizeof last_free_page
             + (last_free_page * sizeof(struct corefile_pte));
         size_t rounded_size = CEILING(true_size, os_vm_page_size);
-        char* data = malloc(rounded_size);
-        gc_assert(data);
+        char* data = successful_malloc(rounded_size);
         *(page_index_t*)data = last_free_page;
         struct corefile_pte *ptes = (struct corefile_pte*)(data + sizeof(page_index_t));
         page_index_t i;
