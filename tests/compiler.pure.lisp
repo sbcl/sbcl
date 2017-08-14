@@ -6503,7 +6503,7 @@
      '(((1 2) (3 4))))
     #2A(((1 2) (3 4))))))
 
-(with-test (:name :unknown-valuese-receiver-register-clobber)
+(with-test (:name :unknown-values-receiver-register-clobber)
   (assert (= (funcall (checked-compile `(lambda ()
                                           (let ((x (list 1)))
                                             (declare (sb-int:truly-dynamic-extent x))
