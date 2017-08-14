@@ -1420,7 +1420,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (defun ensure-structure-class (info inherits old-context new-context
                                     &key compiler-layout)
   (declare (type defstruct-description info))
-  (multiple-value-bind (class old-layout)
+  (multiple-value-bind (classoid old-layout)
       (multiple-value-bind (class constructor)
           (acond ((cdr (dd-alternate-metaclass info))
                   (values (first it) (second it)))
@@ -1433,7 +1433,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                    (lambda (x)
                                      (sb!xc:typep x (classoid-name (find-classoid class)))))
                                (fdefinition constructor)))
-    (setf (classoid-direct-superclasses class)
+    (setf (classoid-direct-superclasses classoid)
           (case (dd-name info)
             ((ansi-stream
               fd-stream
@@ -1447,7 +1447,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (let* ((old-layout (or compiler-layout old-layout))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
-              (make-layout :classoid class
+              (make-layout :classoid classoid
                            :inherits inherits
                            :depthoid (length inherits)
                            :length (dd-length info)
@@ -1455,13 +1455,13 @@ or they must be declared locally notinline at each call site.~@:>"
                            :bitmap (dd-bitmap info)))))
       (cond
        ((not old-layout)
-        (values class new-layout nil))
+        (values classoid new-layout nil))
        ((not new-layout)
         ;; The assignment of INFO here can almost be deleted,
         ;; except for a few magical types that don't d.t.r.t. in cold-init:
         ;;  STRUCTURE-OBJECT, CONDITION, ALIEN-VALUE, INTERPRETED-FUNCTION
         (setf (layout-info old-layout) info)
-        (values class old-layout nil))
+        (values classoid old-layout nil))
        (;; This clause corresponds to an assertion in REDEFINE-LAYOUT-WARNING
         ;; of classic CMU CL. I moved it out to here because it was only
         ;; exercised in this code path anyway. -- WHN 19990510
@@ -1474,18 +1474,18 @@ or they must be declared locally notinline at each call site.~@:>"
                                  (layout-inherits new-layout)
                                  (layout-depthoid new-layout)
                                  (layout-bitmap new-layout))
-        (values class new-layout old-layout))
+        (values classoid new-layout old-layout))
        (t
         (let ((old-info (layout-info old-layout)))
           (if old-info
-             (cond ((redefine-structure-warning class old-info info)
-                    (values class new-layout old-layout))
+             (cond ((redefine-structure-warning classoid old-info info)
+                    (values classoid new-layout old-layout))
                    (t
                     (setf (layout-info old-layout) info)
-                    (values class old-layout nil)))
+                    (values classoid old-layout nil)))
              (progn
                (setf (layout-info old-layout) info)
-               (values class old-layout nil)))))))))
+               (values classoid old-layout nil)))))))))
 
 ;;; Return a list of pairs (name . index). Used for :TYPE'd
 ;;; constructors to find all the names that we have to splice in &
