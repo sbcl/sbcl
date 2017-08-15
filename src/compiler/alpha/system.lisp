@@ -13,15 +13,6 @@
 
 ;;;; type frobbing VOPs
 
-(define-vop (lowtag-of)
-  (:translate lowtag-of)
-  (:policy :fast-safe)
-  (:args (object :scs (any-reg descriptor-reg)))
-  (:results (result :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 1
-    (inst and object lowtag-mask result)))
-
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)

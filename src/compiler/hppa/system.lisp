@@ -3,15 +3,6 @@
 
 ;;;; Type frobbing VOPs
 
-(define-vop (lowtag-of)
-  (:translate lowtag-of)
-  (:policy :fast-safe)
-  (:args (object :scs (any-reg descriptor-reg) :target result))
-  (:results (result :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 1
-    (inst extru object 31 n-lowtag-bits result)))
-
 ;FIX this vop got instruction-exploded after mips convert, look at old hppa
 (define-vop (widetag-of)
   (:translate widetag-of)

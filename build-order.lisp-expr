@@ -113,9 +113,6 @@
  ("src/compiler/generic/early-objdef")
  ("src/code/early-array") ; needs "early-vm" numbers
 
- ;; "early-extensions" contains a call to TYPEP that is transformed into a call
- ;; to %OTHER-POINTER-WIDETAG, which is an ordinary inline function, and not
- ;; known to the cross-compiler until it has seen the DEFUN in 'kernel'
  ("src/code/kernel" :not-host)
  ;; This has the BARRIER stuff that the threading support needs,
  ;; required for some code in 'early-extensions'

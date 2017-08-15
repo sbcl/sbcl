@@ -105,3 +105,6 @@
 ;;; small to measure. -- JES, 2007-09-30
 (declaim (type cons *gc-epoch*))
 (!defglobal *gc-epoch* '(nil . nil))
+
+(declaim (inline lowtag-of))
+(defun lowtag-of (x) (logand (get-lisp-obj-address x) sb!vm:lowtag-mask))

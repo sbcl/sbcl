@@ -122,8 +122,6 @@
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
 
-(defknown lowtag-of (t) (unsigned-byte #.sb!vm:n-lowtag-bits)
-  (flushable movable))
 ;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags.
 ;;; When dealing with known other-pointers (dispatching on array
 ;;; element type for example), %OTHER-POINTER-WIDETAG is faster.

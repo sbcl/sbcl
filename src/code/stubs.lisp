@@ -19,7 +19,6 @@
   (def get-header-data)
   (def set-header-data (x val))
   (def get-closure-length)
-  (def lowtag-of)
   (def widetag-of)
   (def %other-pointer-widetag)
   (def vector-sap)
