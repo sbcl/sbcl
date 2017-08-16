@@ -189,7 +189,7 @@
   (defconstant immobile-varyobj-core-space-id 5)
   (defvar *immobile-space-map* nil))
 
-(defconstant max-core-space-id 5)
+(defconstant max-core-space-id (+ 3 #!+immobile-space 2))
 (defconstant deflated-core-space-id-flag 8)
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only

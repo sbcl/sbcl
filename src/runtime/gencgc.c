@@ -2415,7 +2415,6 @@ static struct new_area new_areas_2[NUM_NEW_AREAS];
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern unsigned int immobile_scav_queue_count;
 extern void
-  gc_init_immobile(),
   update_immobile_nursery_bits(),
   scavenge_immobile_roots(generation_index_t,generation_index_t),
   scavenge_immobile_newspace(),
@@ -3785,14 +3784,24 @@ collect_garbage(generation_index_t last_gen)
     SHOW("returning from collect_garbage");
 }
 
+/* Initialization of gencgc metadata is split into three steps:
+ * 1. gc_init() - allocation of a fixed-address space via mmap(),
+ *    failing which there's no reason to go on. (safepoint only)
+ * 2. gc_allocate_ptes() - page table entries
+ * 3. gencgc_pickup_dynamic() - calculation of scan start offsets
+ * Steps (2) and (3) are combined in self-build because there is
+ * no PAGE_TABLE_CORE_ENTRY_TYPE_CODE core entry. */
 void
 gc_init(void)
 {
-    page_index_t i;
-
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
     alloc_gc_page();
 #endif
+}
+
+void gc_allocate_ptes()
+{
+    page_index_t i;
 
     /* Compute the number of pages needed for the dynamic space.
      * Dynamic space size should be aligned on page size. */
@@ -3811,9 +3820,6 @@ gc_init(void)
      * unnecessary and did hurt startup time. */
     page_table = calloc(page_table_pages, sizeof(struct page));
     gc_assert(page_table);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    gc_init_immobile();
-#endif
 
     hopscotch_init();
 #ifdef PIN_GRANULARITY_LISPOBJ
@@ -3949,6 +3955,9 @@ gencgc_pickup_dynamic(void)
 void
 gc_initialize_pointers(void)
 {
+    /* !page_table_pages happens once only in self-build and not again */
+    if (!page_table_pages)
+        gc_allocate_ptes();
     gencgc_pickup_dynamic();
 }
 

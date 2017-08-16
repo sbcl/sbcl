@@ -171,12 +171,15 @@ lose:
     return -1;
 }
 
-/* If more platforms doesn't support overlapping mmap rename this
+#ifndef LISP_FEATURE_HPUX
+#define load_core_bytes(fd, where, addr, len) os_map(fd, where, addr, len)
+#else
+#define load_core_bytes(fd, where, addr, len) copy_core_bytes(fd, where, addr, len)
+/* If more platforms don't support overlapping mmap rename this
  * def to something like ifdef nommapoverlap */
 /* currently hpux only */
-#ifdef LISP_FEATURE_HPUX
-void copy_core_bytes(int fd, os_vm_offset_t offset,
-                     os_vm_address_t addr, int len)
+static void copy_core_bytes(int fd, os_vm_offset_t offset,
+                            os_vm_address_t addr, int len)
 {
   unsigned char buf[4096];
   int c,x;
@@ -205,10 +208,13 @@ void copy_core_bytes(int fd, os_vm_offset_t offset,
 }
 #endif
 
-#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+#ifndef LISP_FEATURE_SB_CORE_COMPRESSION
+# define inflate_core_bytes(fd,offset,addr,len) \
+    lose("This runtime was not built with zlib-compressed core support... aborting\n")
+#else
 # define ZLIB_BUFFER_SIZE (1u<<16)
-void inflate_core_bytes(int fd, os_vm_offset_t offset,
-                        os_vm_address_t addr, int len)
+static void inflate_core_bytes(int fd, os_vm_offset_t offset,
+                               os_vm_address_t addr, int len)
 {
     z_stream stream;
     unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
@@ -552,76 +558,100 @@ void relocate_heap(lispobj* want, lispobj* got, uword_t len)
 
 int merge_core_pages = -1;
 
-#ifdef LISP_FEATURE_LINUX
 os_vm_address_t anon_dynamic_space_start;
-#endif
 
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
     extern void immobile_space_coreparse(uword_t,uword_t);
-    struct ndir_entry *entry;
-    int compressed;
     extern void write_protect_immobile_space();
+    struct ndir_entry *entry;
 
-    FSHOW((stderr, "/process_directory(..), count=%d\n", count));
+    struct {
+        uword_t len;
+        uword_t base;
+    } spaces[MAX_CORE_SPACE_ID+1] = {
+        {0, 0}, // blank for space ID 0
+#ifdef LISP_FEATURE_GENCGC
+        {0, DYNAMIC_SPACE_START},
+#else
+        {0, 0},
+#endif
+        // This order is determined by constants in compiler/generic/genesis
+        {0, STATIC_SPACE_START},
+        {0, READ_ONLY_SPACE_START},
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        {0, IMMOBILE_SPACE_START},
+        {0, IMMOBILE_VARYOBJ_SUBSPACE_START}
+#endif
+    };
 
     for (entry = (struct ndir_entry *) ptr; --count>= 0; ++entry) {
-
-        compressed = 0;
         sword_t id = entry->identifier;
-        if (id <= (MAX_CORE_SPACE_ID | DEFLATED_CORE_SPACE_ID_FLAG)) {
-            if (id & DEFLATED_CORE_SPACE_ID_FLAG)
-                compressed = 1;
-            id &= ~(DEFLATED_CORE_SPACE_ID_FLAG);
-        }
-        sword_t offset = os_vm_page_size * (1 + entry->data_page);
-        uword_t corefile_addr = os_vm_page_size * entry->address;
-        os_vm_address_t addr = (os_vm_address_t)corefile_addr;
-        uword_t len = os_vm_page_size * entry->page_count;
-        if (len != 0) {
-#ifdef LISP_FEATURE_RELOCATABLE_HEAP
-            // If this entry is for the dynamic space,
-            // try to map the space now at the address
-            // specified in the core file.
+        uword_t addr = (os_vm_page_size * entry->address);
+        int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
+        id -= compressed;
+        if (id < 1 || id > MAX_CORE_SPACE_ID)
+            lose("unknown space ID %ld addr %p\n", id, addr);
+
+#ifndef LISP_FEATURE_RELOCATABLE_HEAP
+        int enforce_address = 1;
+#else
+        // Only enforce other spaces' addresses
+        int enforce_address = id != DYNAMIC_CORE_SPACE_ID;
+#endif
+        if (enforce_address) {
+            int fail;
+#ifdef LISP_FEATURE_CHENEYGC
             if (id == DYNAMIC_CORE_SPACE_ID) {
-                uword_t aligned_start;
-                addr = (os_vm_address_t)
-                    os_validate(MOVABLE,
-                                (os_vm_address_t)maybe_fuzz_address(corefile_addr),
-                                dynamic_space_size);
-                aligned_start = ((uword_t)addr + GENCGC_CARD_BYTES-1)
-                    & ~(GENCGC_CARD_BYTES-1);
-                DYNAMIC_SPACE_START = aligned_start;
-                if (aligned_start > (uword_t)addr) { // not card-aligned
-                    // This could happen only if the OS page size
-                    // is smaller than the GC card size.
-                    // Drop the final card and decrease the dynamic_space_size
-                    // to make the absolute end come out the same.
-                    dynamic_space_size -= GENCGC_CARD_BYTES;
-                    --page_table_pages;
-                }
-                addr = (os_vm_address_t)aligned_start;
-            }
+                if ((fail = (addr != DYNAMIC_0_SPACE_START) &&
+                            (addr != DYNAMIC_1_SPACE_START)) != 0)
+                    fprintf(stderr, "in core: %p; in runtime: %p or %p\n",
+                            (void*)addr,
+                            (void*)DYNAMIC_0_SPACE_START,
+                            (void*)DYNAMIC_1_SPACE_START);
+            } else
 #endif
-            FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
-                   len, len, (uword_t)addr));
-            if (compressed) {
-#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-                inflate_core_bytes(fd, offset + file_offset, addr, len);
-#else
-                lose("This runtime was not built with zlib-compressed core support... aborting\n");
-#endif
-            } else {
-#ifdef LISP_FEATURE_HPUX
-                copy_core_bytes(fd, offset + file_offset, addr, len);
-#else
-                os_map(fd, offset + file_offset, addr, len);
-#endif
-            }
+            if ((fail = (addr != spaces[id].base)) != 0)
+                fprintf(stderr, "in core: %p; in runtime: %p\n",
+                        (void*)addr, (void*)spaces[id].base);
+            char *names[MAX_CORE_SPACE_ID] = {
+              "DYNAMIC", "STATIC", "READ_ONLY", "IMMOBILE", "IMMOBILE"
+            };
+            if (fail)
+                lose("core/runtime address mismatch: %s_SPACE_START", names[id-1]);
         }
-        // Compute this only after we possibly affected 'addr' if relocatable
-        lispobj *free_pointer = (lispobj *) addr + entry->nwords;
+        spaces[id].base = (uword_t)addr;
+        uword_t len = os_vm_page_size * entry->page_count;
+        spaces[id].len = len;
+        if (id == DYNAMIC_CORE_SPACE_ID && len > dynamic_space_size) {
+            lose("dynamic space too small for core: %luKiB required, %luKiB available.\n",
+                 (unsigned long)len >> 10,
+                 (unsigned long)dynamic_space_size >> 10);
+        }
+        if (len != 0) {
+            uword_t __attribute__((unused)) aligned_start;
+#ifdef LISP_FEATURE_RELOCATABLE_HEAP
+            // Try to map at address requested by the core file.
+            if (id == DYNAMIC_CORE_SPACE_ID) {
+                addr = (uword_t)os_validate(MOVABLE,
+                                            (os_vm_address_t)maybe_fuzz_address(addr),
+                                            dynamic_space_size);
+                aligned_start = CEILING(addr, GENCGC_CARD_BYTES);
+                /* Misalignment can happen only if card size exceeds OS page.
+                 * Drop one card to avoid overrunning the allocated space */
+                if (aligned_start > addr) // not card-aligned
+                    dynamic_space_size -= GENCGC_CARD_BYTES;
+                DYNAMIC_SPACE_START = addr = aligned_start;
+            }
+#endif /* LISP_FEATURE_RELOCATABLE_HEAP */
+
+            sword_t offset = os_vm_page_size * (1 + entry->data_page);
+            if (compressed)
+                inflate_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
+             else
+                load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
+        }
 
 #ifdef MADV_MERGEABLE
         if ((merge_core_pages == 1)
@@ -629,105 +659,47 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
                 madvise(addr, len, MADV_MERGEABLE);
         }
 #endif
-        FSHOW((stderr, "/space id = %ld, free pointer = %p\n",
-               id, (uword_t)free_pointer));
 
-        switch (id) {
-        case DYNAMIC_CORE_SPACE_ID:
-            if (len > dynamic_space_size) {
-                fprintf(stderr,
-                        "dynamic space too small for core: %luKiB required, %luKiB available.\n",
-                        (unsigned long)len >> 10,
-                        (unsigned long)dynamic_space_size >> 10);
-                exit(1);
-            }
-#ifdef LISP_FEATURE_GENCGC
-#  ifdef LISP_FEATURE_RELOCATABLE_HEAP
-            if (DYNAMIC_SPACE_START != corefile_addr)
-                relocate_heap((lispobj*)corefile_addr, (lispobj*)addr, len);
-#  else
-            if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
-                fprintf(stderr, "in core: %p; in runtime: %p \n",
-                        (void*)addr, (void*)DYNAMIC_SPACE_START);
-                lose("core/runtime address mismatch: DYNAMIC_SPACE_START\n");
-            }
-#  endif
-#ifdef LISP_FEATURE_X86_64
-            tune_asm_routines_for_microarch(); // before WPing immobile space
-#endif
-#  ifdef LISP_FEATURE_IMMOBILE_SPACE
-            // Delayed until after dynamic space has been mapped
-            // so that writes into immobile space
-            // due to core relocation don't fault.
-            write_protect_immobile_space();
-#  endif
-#else
-            if ((addr != (os_vm_address_t)DYNAMIC_0_SPACE_START) &&
-                (addr != (os_vm_address_t)DYNAMIC_1_SPACE_START)) {
-                fprintf(stderr, "in core: %p; in runtime: %p or %p\n",
-                        (void*)addr,
-                        (void*)DYNAMIC_0_SPACE_START,
-                        (void*)DYNAMIC_1_SPACE_START);
-                lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START\n");
-            }
-#endif
+        if (id == DYNAMIC_CORE_SPACE_ID) {
+            /* 'addr' is the actual address if relocatable.
+             * For cheneygc, this will be whatever the GC was using
+             * at the time the core was saved.
+             * For gencgc we don't look at current_dynamic_space */
+            current_dynamic_space = (lispobj *)addr;
+
+            lispobj *free_pointer = (lispobj *) addr + entry->nwords;
+            /* FIXME: why not use set_alloc_pointer() ? */
 #if defined(ALLOCATION_POINTER)
             SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);
 #else
             dynamic_space_free_pointer = free_pointer;
 #endif
-            /* For stop-and-copy GC, this will be whatever the GC was
-             * using at the time. With GENCGC, this will always be
-             * space 0. (We checked above that for GENCGC,
-             * addr==DYNAMIC_SPACE_START.) */
-            current_dynamic_space = (lispobj *)addr;
-#ifdef LISP_FEATURE_LINUX
-            anon_dynamic_space_start = addr + len;
-            // This assertion is here because of the test in zero_pages_with_mmap()
-            // which trusts that if addr > anon_dynamic_space_start
-            // then addr did not come from any file mapping.
+            anon_dynamic_space_start = (os_vm_address_t)(addr + len);
+            /* This assertion safeguards the test in zero_pages_with_mmap()
+             * which trusts that if addr > anon_dynamic_space_start
+             * then addr did not come from any file mapping. */
             gc_assert((lispobj)anon_dynamic_space_start > STATIC_SPACE_END);
-#endif
-            break;
-        case STATIC_CORE_SPACE_ID:
-            if (addr != (os_vm_address_t)STATIC_SPACE_START) {
-                fprintf(stderr, "in core: %p - in runtime: %p\n",
-                        (void*)addr, (void*)STATIC_SPACE_START);
-                lose("core/runtime address mismatch: STATIC_SPACE_START\n");
-            }
-            break;
-        case READ_ONLY_CORE_SPACE_ID:
-            if (addr != (os_vm_address_t)READ_ONLY_SPACE_START) {
-                fprintf(stderr, "in core: %p - in runtime: %p\n",
-                        (void*)addr, (void*)READ_ONLY_SPACE_START);
-                lose("core/runtime address mismatch: READ_ONLY_SPACE_START\n");
-            }
-            break;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-         // Immobile space is subdivided into fixed-size and variable-size.
-         // There is no margin between the two, though for efficiency
-         // they are written separately to eliminate waste in the core file.
-        case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
-            if (addr != (os_vm_address_t)IMMOBILE_SPACE_START) {
-                fprintf(stderr, "in core: %p - in runtime: %p\n",
-                        (void*)addr, (void*)IMMOBILE_SPACE_START);
-                lose("core/runtime address mismatch: IMMOBILE_SPACE_START\n");
-            }
-            immobile_space_coreparse(IMMOBILE_SPACE_START, len);
-            break;
-        case IMMOBILE_VARYOBJ_CORE_SPACE_ID:
-            if (addr != (os_vm_address_t)IMMOBILE_VARYOBJ_SUBSPACE_START) {
-                fprintf(stderr, "in core: %p - in runtime: %p\n",
-                        (void*)addr, (void*)IMMOBILE_VARYOBJ_SUBSPACE_START);
-                lose("core/runtime address mismatch: IMMOBILE_VARYOBJ_SUBSPACE_START\n");
-            }
-            immobile_space_coreparse(IMMOBILE_VARYOBJ_SUBSPACE_START, len);
-            break;
-#endif
-        default:
-            lose("unknown space ID %ld addr %p\n", id, addr);
         }
     }
+
+#ifdef LISP_FEATURE_GENCGC
+    immobile_space_coreparse(spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len,
+                             spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
+#endif
+#ifdef LISP_FEATURE_RELOCATABLE_HEAP
+    if (DYNAMIC_SPACE_START != spaces[DYNAMIC_CORE_SPACE_ID].base)
+        relocate_heap((lispobj*)spaces[DYNAMIC_CORE_SPACE_ID].base,
+                      (lispobj*)DYNAMIC_SPACE_START,
+                      spaces[DYNAMIC_CORE_SPACE_ID].len);
+#endif
+#ifdef LISP_FEATURE_X86_64
+        tune_asm_routines_for_microarch(); // before WPing immobile space
+#endif
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        /* Delayed until after dynamic space has been mapped so that writes
+         * to immobile space due to core relocation don't fault. */
+        write_protect_immobile_space();
+#endif
 }
 
 lispobj
@@ -838,6 +810,10 @@ load_core_file(char *file, os_vm_offset_t file_offset)
 #ifdef LISP_FEATURE_GENCGC
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
         {
+            extern void gc_allocate_ptes();
+            // Allocation of PTEs is delayed 'til now so that calloc() doesn't
+            // consume addresses that would have been taken by a mapped space.
+            gc_allocate_ptes();
             os_vm_size_t remaining = *ptr;
             os_vm_size_t fdoffset = (*(ptr+1) + 1) * (os_vm_page_size);
             page_index_t page = 0, npages;
