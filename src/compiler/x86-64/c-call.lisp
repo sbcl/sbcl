@@ -397,7 +397,8 @@
                          (subseq *float-regs* 0 #!-win32 8 #!+win32 4))))
       (assemble (segment)
         ;; Make room on the stack for arguments.
-        (inst sub rsp (* n-word-bytes (length argument-types)))
+        (when argument-types
+          (inst sub rsp (* n-word-bytes (length argument-types))))
         ;; Copy arguments from registers to stack
         (dolist (type argument-types)
           (let ((integerp (not (alien-float-type-p type)))
