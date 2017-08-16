@@ -72,6 +72,8 @@ FILE * logfile;
 #  define dprintf(arg)
 #endif
 
+unsigned ASM_ROUTINES_END;
+
 // Inclusive bounds on highest in-use pages per subspace.
 low_page_index_t max_used_fixedobj_page, max_used_varyobj_page;
 
@@ -1293,6 +1295,13 @@ void immobile_space_coreparse(uword_t address, uword_t len)
                 varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
         }
         compute_immobile_space_bound();
+        struct code* code = (struct code*)address;
+        while (!code_n_funs(code)) {
+            gc_assert(widetag_of(code->header) == CODE_HEADER_WIDETAG);
+            code = (struct code*)
+              (lispobj*)code + sizetab[CODE_HEADER_WIDETAG]((lispobj*)code);
+        }
+        ASM_ROUTINES_END = (unsigned)(uword_t)code;
     } else {
         lose("unknown immobile subspace");
     }
@@ -1613,16 +1622,16 @@ static void adjust_words(lispobj *where, sword_t n_words)
     }
 }
 
-static lispobj adjust_fun_entrypoint(lispobj raw_entry)
+static lispobj adjust_fun_entrypoint(lispobj raw_addr)
 {
-    if (raw_entry > READ_ONLY_SPACE_END) {
-        // if not pointing read-only space, then it's neither closure_tramp
-        // nor funcallable_instance_tramp.
-        lispobj simple_fun = raw_entry - FUN_RAW_ADDR_OFFSET;
-        adjust_words(&simple_fun, 1);
-        return simple_fun + FUN_RAW_ADDR_OFFSET;
-    }
-    return raw_entry;  // otherwise it's one of those trampolines
+    // closure tramp and fin tramp don't have a simple-fun header.
+    // Do not examine the word where the header would be,
+    // since it could confuse adjust_words() by having a bit pattern
+    // resembling a FP. (It doesn't, but better safe than sorry)
+    if (raw_addr < ASM_ROUTINES_END) return raw_addr;
+    lispobj simple_fun = raw_addr - FUN_RAW_ADDR_OFFSET;
+    adjust_words(&simple_fun, 1);
+    return simple_fun + FUN_RAW_ADDR_OFFSET;
 }
 
 /// Fixup the fdefn at 'where' based on it moving by 'displacement'.

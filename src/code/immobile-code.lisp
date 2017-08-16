@@ -78,15 +78,10 @@
   (let ((ordering (make-array 10000 :adjustable t :fill-pointer 0))
         (hashset (make-hash-table :test 'eq)))
 
-    ;; Place static funs first so that their addresses are really permanent.
-    ;; This simplifies saving an image when dynamic space functions point to
-    ;; immobile space functions - the x86 call sequence requires two
-    ;; instructions, and the fixupper does not understand that.
-    ;; (It's not too hard to enhance it, but not worth the trouble)
-    (dovector (fun-name sb-vm:+static-fdefns+)
-      (let ((code (fun-code-header (symbol-function fun-name))))
-        (setf (gethash code hashset) t)
-        (vector-push-extend code ordering)))
+    ;; Place assembler routines first.
+    (dovector (code sb-fasl::*assembler-objects*)
+      (setf (gethash code hashset) t)
+      (vector-push-extend code ordering))
 
     (labels ((visit (thing)
                (typecase thing

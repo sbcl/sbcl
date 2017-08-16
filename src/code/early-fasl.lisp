@@ -127,6 +127,7 @@
 ;;;     with them. We can compare them with EQ.
 (declaim (type hash-table *assembler-routines*))
 (defglobal *assembler-routines* (make-hash-table :test 'eq))
+(defglobal *assembler-objects* nil)
 
 
 ;;;; the FOP database

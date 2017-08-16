@@ -222,6 +222,9 @@
 
 (with-test (:name :disassemble-assembly-routine)
   (let ((code
+         #+immobile-space
+         (elt sb-fasl::*assembler-objects* 0)
+         #-immobile-space
          (block nil
            (sb-vm::map-allocated-objects
             (lambda (obj type size)

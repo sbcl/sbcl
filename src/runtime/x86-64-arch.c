@@ -561,16 +561,16 @@ arch_set_fp_modes(unsigned int mxcsr)
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
 lispobj fdefn_raw_referent(struct fdefn* fdefn) {
+    extern unsigned ASM_ROUTINES_END;
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
         unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"
           + *(int*)((char*)&fdefn->raw_addr + 1);
         switch (((unsigned char*)&fdefn->raw_addr)[5]) {
         case 0x00: // no closure/fin trampoline
-          // If the target address is in read-only space, then it's a jump or call
-          // to an asm routine, and there is no corresponding simple-fun.
-          // While we could locate and return the code-object, it's difficult to,
-          // and there's no reason to - scavenging it is unnecessary.
-          return raw_fun >= IMMOBILE_SPACE_START ? raw_fun - FUN_RAW_ADDR_OFFSET : 0;
+          // If the target is an assembly routine, there is no simple-fun
+          // that corresponds to the entry point. The code is kept live
+          // by *ASSEMBLER-OBJECTS*. Otherwise, return the simple-fun.
+          return raw_fun < ASM_ROUTINES_END ? 0 : raw_fun - FUN_RAW_ADDR_OFFSET;
         case 0x48: // embedded funcallable instance trampoline
           return (raw_fun - (4<<WORD_SHIFT)) | FUN_POINTER_LOWTAG;
         case 0x90: // general closure/fin trampoline

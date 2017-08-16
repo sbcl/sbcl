@@ -52,5 +52,6 @@
   (def %caller-pc ())
   (def %code-code-size)
   (def %code-debug-info)
+  #!+(or x86 immobile-space) (def sb!vm::%code-fixups)
   (def %funcallable-instance-layout)
   (def %set-funcallable-instance-layout (x new-value)))

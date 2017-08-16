@@ -58,11 +58,8 @@
   ;; Note that:
   ;;  (1) :NAMED-CALL occurs in both :RELATIVE and :ABSOLUTE kinds.
   ;;      We can ignore the :RELATIVE kind.
-  ;;  (2) genesis does not need the :NAMED-CALL case,
-  ;;      because COMPILE-FILE always places code in immobile space,
-  ;;      and self-build does not use step instrumenting, so there are
-  ;;      no named calls using the sequence "MOV RAX, imm32 ; CALL RAX"
-  ;;      Hence SB!FASL::DO-COLD-FIXUP does not exactly mimic this logic.
+  ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
+  ;;      We don't record them.
   #!+immobile-space
   (when (and (eq kind :absolute)
              (member flavor '(:named-call :layout :immobile-object)))

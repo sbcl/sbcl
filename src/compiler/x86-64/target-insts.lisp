@@ -406,19 +406,13 @@
                (vector-push-extend (get-lisp-obj-address code) code-components)
                (vector-push-extend start-relocs-index code-components))))
 
-      ;; Assembler routines are in read-only space, and they can have
-      ;; relative jumps to immobile space.
+      ;; Assembler routines contain jumps to immobile code.
       ;; Since these code components do not contain simple-funs,
       ;; we have to group the routines by looking at addresses.
       (let ((asm-routines
-             (mapcar #'cdr (%hash-table-alist sb!fasl:*assembler-routines*)))
-            code-components)
-        (sb!vm::map-allocated-objects (lambda (obj type size)
-                                        (declare (ignore size))
-                                        (when (= type sb!vm:code-header-widetag)
-                                          (push obj code-components)))
-                                      :read-only)
-        (dolist (code (nreverse code-components))
+             (loop for addr being each hash-value of sb!fasl:*assembler-routines*
+                   collect addr)))
+        (dovector (code sb!fasl::*assembler-objects*)
           (let* ((text-origin (sap-int (code-instructions code)))
                  (text-end (+ text-origin (%code-code-size code)))
                  (relocs-index (fill-pointer relocs)))

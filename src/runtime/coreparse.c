@@ -652,9 +652,13 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
                 lose("core/runtime address mismatch: DYNAMIC_SPACE_START\n");
             }
 #  endif
+#ifdef LISP_FEATURE_X86_64
+            tune_asm_routines_for_microarch(); // before WPing immobile space
+#endif
 #  ifdef LISP_FEATURE_IMMOBILE_SPACE
             // Delayed until after dynamic space has been mapped
-            // so that writes into immobile space don't fault.
+            // so that writes into immobile space
+            // due to core relocation don't fault.
             write_protect_immobile_space();
 #  endif
 #else

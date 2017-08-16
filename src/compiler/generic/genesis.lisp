@@ -2041,6 +2041,7 @@ core and return a descriptor to it."
                  *cold-foreign-symbol-table*)
         (error "The foreign symbol ~S is undefined." name))))
 
+(defvar *cold-assembler-objects*) ; list of the code components
 (defvar *cold-assembler-routines*)
 
 (defvar *cold-assembler-fixups*)
@@ -2116,8 +2117,13 @@ core and return a descriptor to it."
               ;; Absolute fixups are recorded if within the object for x86.
               #!+x86 (and in-dynamic-space
                           (< obj-start-addr addr code-end-addr))
-              ;; Absolute :immobile-object fixups are recorded for x86-64.
-              #!+x86-64 (eq flavor :immobile-object))
+              ;; Absolute fixups on x86-64 do not refer to this code component,
+              ;; because we have RIP-relative addressing, but references to
+              ;; other immobile-space objects must be recorded.
+              ;; :STATIC-CALL absolute fixups are not saved because static space
+              ;; won't move, but :NAMED-CALL fixups are saved.
+              #!+x86-64
+              (member flavor '(:named-call :layout :immobile-object)))
              (:relative ; (used for arguments to X86 relative CALL instruction)
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (signed-byte 32)
@@ -2804,11 +2810,13 @@ core and return a descriptor to it."
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb!vm:code-constants-offset 2))
-         (des (allocate-cold-descriptor *read-only*
+         (des (allocate-cold-descriptor (or #!+immobile-space *immobile-varyobj*
+                                            *read-only*)
                                         (+ (ash header-n-words
                                                 sb!vm:word-shift)
                                            length)
                                         sb!vm:other-pointer-lowtag)))
+    (push des *cold-assembler-objects*)
     (write-header-word des header-n-words sb!vm:code-header-widetag)
     (write-wordindexed des
                        sb!vm:code-code-size-slot
@@ -2859,7 +2867,7 @@ core and return a descriptor to it."
                             (error "No cold-layout for ~S~%" obj))))
       (cold-fixup code-object offset
                   (descriptor-bits cold-layout)
-                  kind :immobile-object)))
+                  kind :layout)))
   (define-cold-fop (fop-immobile-obj-fixup)
     (let ((obj (pop-stack))
           (kind (pop-stack))
@@ -3628,6 +3636,7 @@ initially undefined function references:~2%")
            *cold-static-call-fixups*
            *cold-assembler-fixups*
            *cold-assembler-routines*
+           *cold-assembler-objects*
            (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
 
@@ -3663,6 +3672,13 @@ initially undefined function references:~2%")
       ;; Create SB!KERNEL::*TYPE-CLASSES* as an array of NIL
       (cold-set (cold-intern 'sb!kernel::*type-classes*)
                 (vector-in-core (make-list (length sb!kernel::*type-classes*))))
+
+      ;; Load the remaining assembler code into immobile space
+      #!+immobile-space
+      (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
+        (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
+          (cold-load file-name))
+        (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
 
       ;; Cold load.
       (dolist (file-name object-file-names)
@@ -3721,6 +3737,11 @@ initially undefined function references:~2%")
                            #!+x86-64 (number-to-core
                                       (sb!c::pack-code-fixup-locs
                                        (sort (cdr pair) #'<)))))
+      (when *cold-assembler-objects*
+        (unless (eq *read-only* ; "Stayin' Alive"
+                    (descriptor-gspace (car *cold-assembler-objects*)))
+          (cold-set (cold-intern '*assembler-objects*)
+                    (vector-in-core (nreverse *cold-assembler-objects*)))))
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)
