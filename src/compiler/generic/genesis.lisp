@@ -3723,37 +3723,17 @@ initially undefined function references:~2%")
       (finalize-load-time-value-noise)
 
       ;; Tell the target Lisp how much stuff we've allocated.
-      ;; ALLOCATE-COLD-DESCRIPTOR is a weird trick to locate a space's end,
-      ;; and it doesn't work on immobile space.
-      (cold-set 'sb!vm:*read-only-space-free-pointer*
-                (allocate-cold-descriptor *read-only*
-                                          0
-                                          sb!vm:even-fixnum-lowtag))
-      (cold-set 'sb!vm:*static-space-free-pointer*
-                (allocate-cold-descriptor *static*
-                                          0
-                                          sb!vm:even-fixnum-lowtag))
-      #!+immobile-space
-      (progn
-        (cold-set 'sb!vm:*immobile-fixedobj-free-pointer*
-                  (make-random-descriptor
-                   (ash (+ (gspace-word-address *immobile-fixedobj*)
-                           (gspace-free-word-index *immobile-fixedobj*))
-                        sb!vm:word-shift)))
-        ;; The upper bound of the varyobj subspace is delimited by
-        ;; a structure with no layout and no slots.
-        ;; This is necessary because 'coreparse' does not have the actual
-        ;; value of the free pointer, but the space must not contain any
-        ;; objects that look like conses (due to the tail of 0 words).
-        (let ((des (allocate-object *immobile-varyobj* 1 ; 1 word in total
-                                    sb!vm:instance-pointer-lowtag nil)))
-          (write-wordindexed/raw des 0 sb!vm:instance-widetag)
-          (write-wordindexed/raw des sb!vm:instance-slots-offset 0))
-        (cold-set 'sb!vm:*immobile-space-free-pointer*
-                  (make-random-descriptor
-                   (ash (+ (gspace-word-address *immobile-varyobj*)
-                           (gspace-free-word-index *immobile-varyobj*))
-                        sb!vm:word-shift))))
+      (flet ((free-pointer (space)
+               (make-random-descriptor
+                (+ (ash (gspace-free-word-index space) sb!vm:word-shift)
+                   (gspace-byte-address space)))))
+        (cold-set 'sb!vm:*read-only-space-free-pointer* (free-pointer *read-only*))
+        (cold-set 'sb!vm:*static-space-free-pointer* (free-pointer *static*))
+        #!+immobile-space
+        (progn (cold-set 'sb!vm:*immobile-fixedobj-free-pointer*
+                         (free-pointer *immobile-fixedobj*))
+               (cold-set 'sb!vm:*immobile-space-free-pointer*
+                         (free-pointer *immobile-varyobj*))))
 
       (/show "done setting free pointers")
 

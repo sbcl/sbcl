@@ -1243,28 +1243,17 @@ void immobile_space_coreparse(uword_t address, uword_t len)
         }
     } else if (address == IMMOBILE_VARYOBJ_SUBSPACE_START) {
         lispobj* obj = (lispobj*)address;
-        lispobj* limit = (lispobj*)(address + len);
+        lispobj* space_limit = (lispobj*)(address + len);
         int n_words;
         low_page_index_t last_page = 0;
+        // IMMOBILE_SPACE_FREE_POINTER should be current
+        // since static space is mmapped already.
+        lispobj* limit = (lispobj*)SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value;
+        gc_assert(limit != 0 /* would be zero if not mmapped yet */
+                  && limit < space_limit);
         for ( ; obj < limit ; obj += n_words ) {
+            gc_assert(other_immediate_lowtag_p(obj[0]));
             n_words = sizetab[widetag_of(*obj)](obj);
-            if (obj[1] == 0 && (obj[0] == INSTANCE_WIDETAG ||
-                                obj[0] == 0)) {
-                if (obj[0]) {
-                    // Round up to the next immobile page.
-                    lispobj page_end = CEILING((lispobj)obj, IMMOBILE_CARD_BYTES);
-                    n_words = (lispobj*)page_end - obj;
-                    obj[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
-                    obj[1] = make_fixnum(n_words - 2);
-                } else {
-                    // There are trailing zeros to fill the core file page.
-                    // This happens when the next object is exactly aligned
-                    // to an immobile page. There is no padding object.
-                    gc_assert(((lispobj)obj & (IMMOBILE_CARD_BYTES-1)) == 0);
-                }
-                limit = obj;
-                break;
-            }
             if (immobile_filler_p(obj)) {
                 // Holes were chained through the debug_info slot at save.
                 // Just update the head of the chain.
@@ -1286,6 +1275,16 @@ void immobile_space_coreparse(uword_t address, uword_t len)
                 }
             }
         }
+        // Write a padding object if necessary
+        if ((uword_t)limit & (IMMOBILE_CARD_BYTES-1)) {
+            int remainder = IMMOBILE_CARD_BYTES -
+              ((uword_t)limit & (IMMOBILE_CARD_BYTES-1));
+            limit[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
+            limit[1] = make_fixnum((remainder >> WORD_SHIFT) - 2);
+            int size = sizetab[SIMPLE_ARRAY_FIXNUM_WIDETAG](limit);
+            lispobj* padded_end = limit + size;
+            gc_assert(!((uword_t)padded_end & (IMMOBILE_CARD_BYTES-1)));
+        }
         // Write-protect the pages occupied by the core file.
         // (There can be no inter-generation pointers.)
         if (ENABLE_PAGE_PROTECTION) {
@@ -1293,7 +1292,6 @@ void immobile_space_coreparse(uword_t address, uword_t len)
             for (page = FIRST_VARYOBJ_PAGE ; page <= last_page ; ++page)
                 varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
         }
-        SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value = (lispobj)limit;
         compute_immobile_space_bound();
     } else {
         lose("unknown immobile subspace");
@@ -1374,12 +1372,6 @@ void prepare_immobile_space_for_save()
                    (nwords * N_WORD_BYTES) - offsetof(struct code, constants));
         } else
             assign_generation(obj, PSEUDO_STATIC_GENERATION);
-    }
-    if ((lispobj)limit & (IMMOBILE_CARD_BYTES-1)) { // Last page is partially used.
-        gc_assert(*limit == SIMPLE_ARRAY_FIXNUM_WIDETAG);
-        // Write an otherwise illegal object at the free pointer.
-        limit[0] = INSTANCE_WIDETAG; // 0 payload length
-        limit[1] = 0; // no layout
     }
 }
 
@@ -2187,12 +2179,6 @@ void defrag_immobile_space(int* components, boolean verbose)
     free_ptr = IMMOBILE_VARYOBJ_SUBSPACE_START + varyobj_tempspace.n_bytes;
     bzero((char*)free_ptr, old_free_ptr - free_ptr);
     SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value = free_ptr;
-    if (free_ptr & (IMMOBILE_CARD_BYTES-1)) { // unless page-aligned
-        int remainder = IMMOBILE_CARD_BYTES - (free_ptr & (IMMOBILE_CARD_BYTES-1));
-        ((lispobj*)free_ptr)[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
-        ((lispobj*)free_ptr)[1] = make_fixnum((remainder >> WORD_SHIFT) - 2);
-    }
-
     free(components);
 #if 0
     // It's easy to mess things up, so assert correctness before saving a core.
