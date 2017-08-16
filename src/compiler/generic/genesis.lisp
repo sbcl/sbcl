@@ -2077,8 +2077,8 @@ core and return a descriptor to it."
 
 (declaim (ftype (function (descriptor sb!vm:word sb!vm:word
                            keyword &optional keyword) descriptor)
-                do-cold-fixup))
-(defun do-cold-fixup (code-object after-header value kind &optional flavor)
+                cold-fixup))
+(defun cold-fixup (code-object after-header value kind &optional flavor)
   (declare (ignorable flavor))
   (let* ((offset-within-code-object (calc-offset code-object after-header))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
@@ -2137,15 +2137,16 @@ core and return a descriptor to it."
     (let* ((routine (car fixup))
            (value (lookup-assembler-reference routine)))
       (when value
-        (do-cold-fixup (second fixup) (third fixup) value (fourth fixup)))))
+        (cold-fixup (second fixup) (third fixup) value (fourth fixup)
+                    :assembly-routine))))
   ;; Static calls are very similar to assembler routine calls,
   ;; so take care of those too.
   (dolist (fixup *cold-static-call-fixups*)
     (destructuring-bind (name kind code offset) fixup
-      (do-cold-fixup code offset
-                     (cold-fun-entry-addr
-                      (cold-fdefn-fun (cold-fdefinition-object name)))
-                     kind))))
+      (cold-fixup code offset
+                  (cold-fun-entry-addr
+                   (cold-fdefn-fun (cold-fdefinition-object name)))
+                  kind :static-call))))
 
 #!+sb-dynamic-core
 (progn
@@ -2757,10 +2758,10 @@ core and return a descriptor to it."
   (let* ((symbol (pop-stack))
          (kind (pop-stack))
          (code-object (pop-stack)))
-    (do-cold-fixup code-object
-                   (read-word-arg (fasl-input-stream))
-                   (ensure-symbol-tls-index symbol)
-                   kind))) ; and re-push code-object
+    (cold-fixup code-object
+                (read-word-arg (fasl-input-stream))
+                (ensure-symbol-tls-index symbol)
+                kind))) ; and re-push code-object
 
 (define-cold-fop (fop-foreign-fixup)
   (let* ((kind (pop-stack))
@@ -2771,12 +2772,12 @@ core and return a descriptor to it."
     #!+sb-dynamic-core
     (let ((offset (read-word-arg (fasl-input-stream)))
           (value (dyncore-note-symbol sym nil)))
-      (do-cold-fixup code-object offset value kind)) ; and re-push code-object
+      (cold-fixup code-object offset value kind :foreign)) ; and re-push code-object
     #!- (and) (format t "Bad non-plt fixup: ~S~S~%" sym code-object)
     #!-sb-dynamic-core
     (let ((offset (read-word-arg (fasl-input-stream)))
           (value (cold-foreign-symbol-address sym)))
-      (do-cold-fixup code-object offset value kind)))) ; and re-push code-object
+      (cold-fixup code-object offset value kind :foreign)))) ; and re-push code-object
 
 #!+linkage-table
 (define-cold-fop (fop-foreign-dataref-fixup)
@@ -2789,7 +2790,7 @@ core and return a descriptor to it."
     #!+sb-dynamic-core
     (let ((offset (read-word-arg (fasl-input-stream)))
           (value (dyncore-note-symbol sym t)))
-      (do-cold-fixup code-object offset value kind)) ; and re-push code-object
+      (cold-fixup code-object offset value kind :foreign-dataref)) ; and re-push code-object
     #!-sb-dynamic-core
     (progn
       (maphash (lambda (k v)
@@ -2845,7 +2846,7 @@ core and return a descriptor to it."
          (code-object (pop-stack))
          (offset (read-word-arg (fasl-input-stream)))
          (value (descriptor-bits code-object)))
-    (do-cold-fixup code-object offset value kind))) ; and re-push code-object
+    (cold-fixup code-object offset value kind))) ; and re-push code-object
 
 #!+immobile-space
 (progn
@@ -2856,29 +2857,30 @@ core and return a descriptor to it."
            (offset (read-word-arg (fasl-input-stream)))
            (cold-layout (or (gethash obj *cold-layouts*)
                             (error "No cold-layout for ~S~%" obj))))
-      (do-cold-fixup code-object offset
-                     (descriptor-bits cold-layout)
-                     kind :immobile-object)))
+      (cold-fixup code-object offset
+                  (descriptor-bits cold-layout)
+                  kind :immobile-object)))
   (define-cold-fop (fop-immobile-obj-fixup)
     (let ((obj (pop-stack))
           (kind (pop-stack))
           (code-object (pop-stack))
           (offset (read-word-arg (fasl-input-stream))))
-      (do-cold-fixup code-object offset
-                     (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
-                     kind :immobile-object))))
+      (cold-fixup code-object offset
+                  (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
+                  kind :immobile-object))))
 
 #!+immobile-code
 (define-cold-fop (fop-named-call-fixup)
-  (let ((fdefn (cold-fdefinition-object (pop-stack)))
-          (kind (pop-stack))
-          (code-object (pop-stack))
-          (offset (read-word-arg (fasl-input-stream))))
-    (do-cold-fixup code-object offset
-                   (+ (descriptor-bits fdefn)
-                      (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
-                      (- sb!vm:other-pointer-lowtag))
-                   kind :named-call)))
+  (let* ((name (pop-stack))
+         (fdefn (cold-fdefinition-object name))
+         (kind (pop-stack))
+         (code-object (pop-stack))
+         (offset (read-word-arg (fasl-input-stream))))
+    (cold-fixup code-object offset
+                (+ (descriptor-bits fdefn)
+                   (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
+                   (- sb!vm:other-pointer-lowtag))
+                kind :named-call)))
 
 #!+immobile-code
 (define-cold-fop (fop-static-call-fixup)
@@ -3717,7 +3719,8 @@ initially undefined function references:~2%")
                            sb!vm::code-fixups-slot
                            #!+x86 (ub32-vector-in-core (cdr pair))
                            #!+x86-64 (number-to-core
-                                      (sb!c::pack-code-fixup-locs (cdr pair)))))
+                                      (sb!c::pack-code-fixup-locs
+                                       (sort (cdr pair) #'<)))))
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)
