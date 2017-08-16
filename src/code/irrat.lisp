@@ -162,7 +162,7 @@
         (error 'arguments-out-of-domain-error
                :operands (list base power)
                :operation 'expt
-               :references (list '(:ansi-cl :function expt)))
+               :references '((:ansi-cl :function expt)))
         (let ((result (1+ (* base power))))
           (if (and (floatp result) (float-nan-p result))
               (float 1 result)

@@ -350,7 +350,7 @@
 (defun err-if-unacceptable-function (object setter)
   (when (macro/special-guard-fun-p object)
     (error 'simple-reference-error
-           :references (list '(:ansi-cl :function fdefinition))
+           :references '((:ansi-cl :function fdefinition))
            :format-control "~S is not acceptable to ~S."
            :format-arguments (list object setter))))
 

@@ -43,8 +43,8 @@
     (reference-condition simple-error)
   ()
   (:default-initargs
-   :references (list '(:amop :generic-function allocate-instance)
-                     '(:amop :function set-funcallable-instance-function))))
+   :references '((:amop :generic-function allocate-instance)
+                 (:amop :function set-funcallable-instance-function))))
 
 (defun allocate-standard-funcallable-instance (wrapper)
   (let* ((slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
@@ -727,7 +727,7 @@
                 ~I~_when called with arguments ~2I~_~S.~:>"
              (no-primary-method-generic-function c)
              (no-primary-method-args c))))
-  (:default-initargs :references (list '(:ansi-cl :section (7 6 6 2)))))
+  (:default-initargs :references '((:ansi-cl :section (7 6 6 2)))))
 (defmethod no-primary-method (generic-function &rest args)
   (error 'no-primary-method :generic-function generic-function :args args))
 

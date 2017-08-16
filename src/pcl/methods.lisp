@@ -56,7 +56,7 @@
                   :format-control ,(coerce (format nil "~@<~A~@:>" control)
                                            'base-string)
                   :format-arguments (list ',name)
-                  :references (list '(:amop :initialization method))))))
+                  :references '((:amop :initialization method))))))
   (def reinitialize-instance ((method method) &rest initargs)
     "Method objects cannot be redefined by ~S.")
   (def change-class ((method method) new &rest initargs)
@@ -245,7 +245,7 @@
 (define-condition find-method-length-mismatch
     (reference-condition simple-error)
   ()
-  (:default-initargs :references (list '(:ansi-cl :function find-method))))
+  (:default-initargs :references '((:ansi-cl :function find-method))))
 
 (defun real-get-method (generic-function qualifiers specializers
                         &optional (errorp t)
@@ -469,7 +469,7 @@
 (define-condition print-object-stream-specializer (reference-condition simple-warning)
   ()
   (:default-initargs
-   :references (list '(:ansi-cl :function print-object))
+   :references '((:ansi-cl :function print-object))
    :format-control "~@<Specializing on the second argument to ~S has ~
                     unportable effects, and also interferes with ~
                     precomputation of print functions for exceptional ~

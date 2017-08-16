@@ -310,7 +310,7 @@ the file system."
            (error 'extension-failure
                   :format-control "Don't know how to ~S ~A"
                   :format-arguments (list 'ed x)
-                  :references (list '(:sbcl :variable *ed-functions*))))
+                  :references '((:sbcl :variable *ed-functions*))))
     (when (funcall fun x)
       (return t))))
 

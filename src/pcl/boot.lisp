@@ -384,7 +384,7 @@ bootstrapping.
 (define-condition generic-function-lambda-list-error
     (reference-condition simple-program-error)
   ()
-  (:default-initargs :references (list '(:ansi-cl :section (3 4 2)))))
+  (:default-initargs :references '((:ansi-cl :section (3 4 2)))))
 
 (defun generic-function-lambda-list-error (format-control &rest format-arguments)
   (error 'generic-function-lambda-list-error
@@ -969,8 +969,8 @@ bootstrapping.
          :format-control
          "~@<~S is not a valid parameter specializer name.~@:>"
          :format-arguments (list specializer-name)
-         :references (list '(:ansi-cl :macro defmethod)
-                           '(:ansi-cl :glossary "parameter specializer name"))))
+         :references '((:ansi-cl :macro defmethod)
+                       (:ansi-cl :glossary "parameter specializer name"))))
 
 (defun real-make-specializer-form-using-class/specializer
     (proto-generic-function proto-method specializer-name environment)
@@ -2910,7 +2910,7 @@ bootstrapping.
 (define-condition specialized-lambda-list-error
     (reference-condition simple-program-error)
   ()
-  (:default-initargs :references (list '(:ansi-cl :section (3 4 3)))))
+  (:default-initargs :references '((:ansi-cl :section (3 4 3)))))
 
 (defun specialized-lambda-list-error (format-control &rest format-arguments)
   (error 'specialized-lambda-list-error

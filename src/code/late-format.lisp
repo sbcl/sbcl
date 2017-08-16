@@ -78,7 +78,7 @@
          :second-relative (- (max pprint-offset justification-offset)
                              (min pprint-offset justification-offset)
                              1)
-         :references (list '(:ansi-cl :section (22 3 5 2))))))
+         :references '((:ansi-cl :section (22 3 5 2))))))
     (nreverse result)))
 
 (defun parse-directive (string start)
@@ -94,7 +94,7 @@
                (format-error-at*
                 string posn
                 "Parameters found after #\\: or #\\@ modifier" '()
-                :references (list '(:ansi-cl :section (22 3)))))))
+                :references '((:ansi-cl :section (22 3)))))))
       (loop
         (let ((char (get-char)))
           (cond ((or (char<= #\0 char #\9) (char= char #\+) (char= char #\-))
@@ -144,13 +144,13 @@
                  (if colonp
                      (format-error-at*
                       string posn "Too many colons supplied" '()
-                      :references (list '(:ansi-cl :section (22 3))))
+                      :references '((:ansi-cl :section (22 3))))
                      (setf colonp t)))
                 ((char= char #\@)
                  (if atsignp
                      (format-error-at*
                       string posn "Too many #\\@ characters supplied" '()
-                      :references (list '(:ansi-cl :section (22 3))))
+                      :references '((:ansi-cl :section (22 3))))
                      (setf atsignp t)))
                 (t
                  (when (and (char= (schar string (1- posn)) #\,)
@@ -1004,7 +1004,7 @@
              (format-error*
               "~D illegal directive~:P found inside justification block"
               (list count)
-              :references (list '(:ansi-cl :section (22 3 5 2)))))
+              :references '((:ansi-cl :section (22 3 5 2)))))
            ;; ANSI does not explicitly say that an error should be
            ;; signalled, but the @ modifier is not explicitly allowed
            ;; for ~> either.
@@ -1014,7 +1014,7 @@
               "@ modifier not allowed in close directive of ~
                justification block (i.e. ~~<...~~@>."
               '()
-              :references (list '(:ansi-cl :section (22 3 6 2)))))
+              :references '((:ansi-cl :section (22 3 6 2)))))
            (expand-format-justification segments colonp atsignp
                                         first-semi params)))
      remaining)))
@@ -1038,7 +1038,7 @@
                         "Cannot include format directives inside the ~
                          ~:[suffix~;prefix~] segment of ~~<...~~:>"
                         (list prefix-p)
-                        :references (list '(:ansi-cl :section (22 3 5 2))))
+                        :references '((:ansi-cl :section (22 3 5 2))))
                        (apply #'concatenate 'string list)))))
         (case (length segments)
           (0 (values prefix-default nil suffix-default))

@@ -1039,7 +1039,7 @@ implementation it is ~S." *!default-package-use-list*)
   ((function :initarg :function :reader name-conflict-function)
    (datum :initarg :datum :reader name-conflict-datum)
    (symbols :initarg :symbols :reader name-conflict-symbols))
-  (:default-initargs :references (list '(:ansi-cl :section (11 1 1 2 5))))
+  (:default-initargs :references '((:ansi-cl :section (11 1 1 2 5))))
   (:report
    (lambda (c s)
      (format s "~@<~S ~S causes name-conflicts in ~S between the ~

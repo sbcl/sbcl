@@ -42,7 +42,7 @@
 (define-condition save-condition (reference-condition)
   ()
   (:default-initargs
-   :references (list '(:sbcl :node "Saving a Core Image"))))
+   :references '((:sbcl :node "Saving a Core Image"))))
 
 (define-condition save-error (error save-condition)
   ()

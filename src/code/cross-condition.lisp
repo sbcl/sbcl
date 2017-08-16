@@ -48,10 +48,10 @@
 ;;; and replace these.
 (define-condition type-warning (reference-condition simple-warning)
   ()
-  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+  (:default-initargs :references '((:sbcl :node "Handling of Types"))))
 (define-condition type-style-warning (reference-condition simple-style-warning)
   ()
-  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+  (:default-initargs :references '((:sbcl :node "Handling of Types"))))
 
 (define-condition bug (simple-error)
   ()
@@ -86,7 +86,7 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
              (format s "~@<Duplicate definition for ~S found in ~
                         one file.~@:>"
                      (duplicate-definition-name c))))
-  (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+  (:default-initargs :references '((:ansi-cl :section (3 2 2 3)))))
 
 ;;; These should never be instantiated before the real definitions
 ;;; come in.

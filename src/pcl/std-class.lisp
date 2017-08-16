@@ -501,10 +501,10 @@
 
 (defmethod invalid-superclass ((class class) (superclass class))
   (error 'invalid-superclass :class class :superclass superclass
-         :references (list* '(:amop :generic-function validate-superclass)
-                            (and (typep superclass 'built-in-class)
-                                 (list '(:ansi-cl :system-class built-in-class)
-                                       '(:ansi-cl :section (4 3 7)))))))
+         :references `((:amop :generic-function validate-superclass)
+                       ,@(when (typep superclass 'built-in-class)
+                           '((:ansi-cl :system-class built-in-class)
+                             (:ansi-cl :section (4 3 7)))))))
 
 (defmethod shared-initialize :after ((class forward-referenced-class)
                                      slot-names &key &allow-other-keys)
@@ -922,7 +922,7 @@
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)
    (cpl :initarg :cpl :reader cpl-protocol-violation-cpl))
-  (:default-initargs :references (list '(:sbcl :node "Metaobject Protocol")))
+  (:default-initargs :references '((:sbcl :node "Metaobject Protocol")))
   (:report
    (lambda (c s)
      (format s "~@<Protocol violation: the ~S class ~S ~
@@ -1751,7 +1751,7 @@
                        :format-control ,(coerce (format nil "~@<~A~@:>" control)
                                                 'base-string)
                        :format-arguments (list (class-name class))
-                       :references (list '(:amop :initialization "Class"))))))
+                       :references '((:amop :initialization "Class"))))))
   (def initialize-instance ((class system-class) &rest initargs)
     "Cannot initialize an instance of ~S.")
   (def reinitialize-instance ((class system-class) &rest initargs)

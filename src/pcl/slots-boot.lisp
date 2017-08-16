@@ -68,8 +68,8 @@
 (defun instance-structure-protocol-error (slotd fun)
   (error 'instance-structure-protocol-error
          :slotd slotd :fun fun
-         :references (list `(:amop :generic-function ,fun)
-                           '(:amop :section (5 5 3)))))
+         :references `((:amop :generic-function ,fun)
+                       (:amop :section (5 5 3)))))
 
 (defun get-optimized-std-accessor-method-function (class slotd name)
   (cond

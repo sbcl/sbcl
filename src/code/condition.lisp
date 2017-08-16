@@ -808,7 +808,7 @@
 (define-condition duplicate-definition (reference-condition warning)
   ((name :initarg :name :reader duplicate-definition-name))
   (:report report-duplicate-definition)
-  (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+  (:default-initargs :references '((:ansi-cl :section (3 2 2 3)))))
 ;; To my thinking, DUPLICATE-DEFINITION should be the ancestor condition,
 ;; and not fatal. But changing the meaning of that concept would be a bad idea,
 ;; so instead there is a new condition for the softer variant, which does not
@@ -826,18 +826,18 @@
              (format s "~@<Destructive function ~S called on ~
                         constant data.~@:>"
                      (constant-modified-fun-name c))))
-  (:default-initargs :references (list '(:ansi-cl :special-operator quote)
-                                       '(:ansi-cl :section (3 2 2 3)))))
+  (:default-initargs :references '((:ansi-cl :special-operator quote)
+                                   (:ansi-cl :section (3 2 2 3)))))
 
 (define-condition package-at-variance (reference-condition simple-warning)
   ()
-  (:default-initargs :references (list '(:ansi-cl :macro defpackage)
-                                       '(:sbcl :variable *on-package-variance*))))
+  (:default-initargs :references '((:ansi-cl :macro defpackage)
+                                   (:sbcl :variable *on-package-variance*))))
 
 (define-condition package-at-variance-error (reference-condition simple-condition
                                              package-error)
   ()
-  (:default-initargs :references (list '(:ansi-cl :macro defpackage))))
+  (:default-initargs :references '((:ansi-cl :macro defpackage))))
 
 (define-condition defconstant-uneql (reference-condition error)
   ((name :initarg :name :reader defconstant-uneql-name)
@@ -850,31 +850,30 @@
              (defconstant-uneql-name condition)
              (defconstant-uneql-old-value condition)
              (defconstant-uneql-new-value condition))))
-  (:default-initargs :references (list '(:ansi-cl :macro defconstant)
-                                       '(:sbcl :node "Idiosyncrasies"))))
+  (:default-initargs :references '((:ansi-cl :macro defconstant)
+                                   (:sbcl :node "Idiosyncrasies"))))
 
 (define-condition array-initial-element-mismatch
     (reference-condition simple-warning)
   ()
   (:default-initargs
-      :references (list
-                   '(:ansi-cl :function make-array)
-                   '(:ansi-cl :function sb!xc:upgraded-array-element-type))))
+      :references '((:ansi-cl :function make-array)
+                    (:ansi-cl :function sb!xc:upgraded-array-element-type))))
 
 (define-condition type-warning (reference-condition simple-warning)
   ()
-  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+  (:default-initargs :references '((:sbcl :node "Handling of Types"))))
 (define-condition type-style-warning (reference-condition simple-style-warning)
   ()
-  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+  (:default-initargs :references '((:sbcl :node "Handling of Types"))))
 
 (define-condition local-argument-mismatch (reference-condition simple-warning)
   ()
-  (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+  (:default-initargs :references '((:ansi-cl :section (3 2 2 3)))))
 
 (define-condition format-args-mismatch (reference-condition)
   ()
-  (:default-initargs :references (list '(:ansi-cl :section (22 3 10 2)))))
+  (:default-initargs :references '((:ansi-cl :section (22 3 10 2)))))
 
 (define-condition format-too-few-args-warning
     (format-args-mismatch simple-warning)
@@ -897,7 +896,7 @@
 (define-condition structure-initarg-not-keyword
     (reference-condition simple-style-warning)
   ()
-  (:default-initargs :references (list '(:ansi-cl :section (2 4 8 13)))))
+  (:default-initargs :references '((:ansi-cl :section (2 4 8 13)))))
 
 #!+sb-package-locks
 (progn
@@ -1078,9 +1077,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                      "An attempt to access an array of element-type ~
                       NIL was made.  Congratulations!")))
   (:default-initargs
-      :references (list '(:ansi-cl :function sb!xc:upgraded-array-element-type)
-                        '(:ansi-cl :section (15 1 2 1))
-                        '(:ansi-cl :section (15 1 2 2)))))
+      :references '((:ansi-cl :function sb!xc:upgraded-array-element-type)
+                    (:ansi-cl :section (15 1 2 1))
+                    (:ansi-cl :section (15 1 2 2)))))
 
 (define-condition namestring-parse-error (parse-error)
   ((complaint :reader namestring-parse-error-complaint :initarg :complaint)
@@ -1168,7 +1167,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    :format-control  "Symbol ~/sb-impl:print-symbol-with-prefix/ cannot ~
                      be both the name of a type and the name of a ~
                      declaration"
-   :references (list '(:ansi-cl :section (3 8 21)))))
+   :references '((:ansi-cl :section (3 8 21)))))
 
 ;;; Single stepping conditions
 
