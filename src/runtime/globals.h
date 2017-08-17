@@ -68,6 +68,8 @@ extern lispobj *current_binding_stack_pointer;
  *  routines. */
 extern lispobj *dynamic_space_free_pointer;
 #endif
+extern lispobj* read_only_space_free_pointer;
+extern lispobj* static_space_free_pointer;
 extern os_vm_address_t anon_dynamic_space_start;
 
 # ifndef LISP_FEATURE_GENCGC

@@ -11,6 +11,20 @@
 
 (in-package "SB!IMPL")
 
+;;; Declare each of the free space pointers (except dynamic) as an alien var
+(define-alien-variable ("read_only_space_free_pointer"
+                        sb!vm:*read-only-space-free-pointer*)
+    system-area-pointer)
+(define-alien-variable ("static_space_free_pointer" sb!vm:*static-space-free-pointer*)
+  system-area-pointer)
+#+nil ;; TODO: should be #!+immobile-space
+(progn (define-alien-variable ("immobile_space_free_pointer"
+                               sb!vm:*immobile-space-free-pointer*)
+         system-area-pointer)
+       (define-alien-variable ("immobile_fixedobj_free_pointer"
+                               sb!vm:*immobile-fixedobj-free-pointer*)
+         system-area-pointer))
+
 (declaim (inline memmove))
 (define-alien-routine ("memmove" memmove) void
   (dest (* char))

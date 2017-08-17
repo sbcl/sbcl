@@ -25,7 +25,7 @@
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS
   (or
    (without-gcing
-     (let* ((pointer (ash *static-space-free-pointer* n-fixnum-tag-bits))
+     (let* ((pointer (sap-int *static-space-free-pointer*))
             (vector (logior pointer other-pointer-lowtag))
             (nbytes (pad-data-block (+ words vector-data-offset)))
             (new-pointer (+ pointer nbytes)))
@@ -35,8 +35,7 @@
          (store-word (fixnumize length)
                      vector vector-length-slot other-pointer-lowtag)
          (store-word 0 new-pointer)
-         (setf *static-space-free-pointer*
-               (ash new-pointer (- n-fixnum-tag-bits)))
+         (setf *static-space-free-pointer* (int-sap new-pointer))
          (%make-lisp-obj vector))))
    (error 'simple-storage-condition
           :format-control "Not enough memory left in static space to ~

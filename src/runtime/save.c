@@ -304,13 +304,13 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     output_space(file,
                  READ_ONLY_CORE_SPACE_ID,
                  (lispobj *)READ_ONLY_SPACE_START,
-                 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0),
+                 read_only_space_free_pointer,
                  core_start_pos,
                  core_compression_level);
     output_space(file,
                  STATIC_CORE_SPACE_ID,
                  (lispobj *)STATIC_SPACE_START,
-                 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0),
+                 static_space_free_pointer,
                  core_start_pos,
                  core_compression_level);
 #ifdef LISP_FEATURE_GENCGC

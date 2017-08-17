@@ -805,12 +805,10 @@ Experimental: interface subject to change."
                (let* ((addr (sb-kernel:get-lisp-obj-address object))
                       (space
                        (cond ((< sb-vm:read-only-space-start addr
-                                 (ash sb-vm:*read-only-space-free-pointer*
-                                      sb-vm:n-fixnum-tag-bits))
+                                 (sb-sys:sap-int sb-vm:*read-only-space-free-pointer*))
                               :read-only)
                              ((< sb-vm:static-space-start addr
-                                 (ash sb-vm:*static-space-free-pointer*
-                                      sb-vm:n-fixnum-tag-bits))
+                                 (sb-sys:sap-int sb-vm:*static-space-free-pointer*))
                               :static)
                              #+immobile-space
                              ((< sb-vm:immobile-space-start addr

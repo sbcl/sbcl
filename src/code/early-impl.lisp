@@ -21,8 +21,6 @@
                   *stdout*
                   *stderr*
                   *tty*
-                  sb!vm:*read-only-space-free-pointer*
-                  sb!vm:*static-space-free-pointer*
                   #!+immobile-space sb!vm:*immobile-fixedobj-free-pointer*
                   #!+immobile-space sb!vm:*immobile-space-free-pointer*
                   sb!vm:*current-catch-block*

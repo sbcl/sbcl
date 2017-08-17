@@ -3756,8 +3756,6 @@ initially undefined function references:~2%")
                (make-random-descriptor
                 (+ (ash (gspace-free-word-index space) sb!vm:word-shift)
                    (gspace-byte-address space)))))
-        (cold-set 'sb!vm:*read-only-space-free-pointer* (free-pointer *read-only*))
-        (cold-set 'sb!vm:*static-space-free-pointer* (free-pointer *static*))
         #!+immobile-space
         (progn (cold-set 'sb!vm:*immobile-fixedobj-free-pointer*
                          (free-pointer *immobile-fixedobj*))

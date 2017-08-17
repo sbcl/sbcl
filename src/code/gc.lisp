@@ -35,12 +35,10 @@
     (values total-used-bytes total-hole-bytes)))
 
 (defun static-space-usage ()
-  (- (ash sb!vm:*static-space-free-pointer* sb!vm:n-fixnum-tag-bits)
-     sb!vm:static-space-start))
+  (- (sap-int sb!vm:*static-space-free-pointer*) sb!vm:static-space-start))
 
 (defun read-only-space-usage ()
-  (- (ash sb!vm::*read-only-space-free-pointer* sb!vm:n-fixnum-tag-bits)
-     sb!vm:read-only-space-start))
+  (- (sap-int sb!vm:*read-only-space-free-pointer*) sb!vm:read-only-space-start))
 
 (defun control-stack-usage ()
   #!-stack-grows-downward-not-upward

@@ -150,8 +150,6 @@
     ;; one might expect) byte counts or SAPs. The reason seems to be
     ;; that by representing them this way, we can avoid consing
     ;; bignums.  -- WHN 2000-10-02
-    *read-only-space-free-pointer*
-    *static-space-free-pointer*
     *immobile-fixedobj-free-pointer*
     *immobile-space-free-pointer*
     *immobile-freelist*

@@ -1629,7 +1629,7 @@ lispobj *
 search_read_only_space(void *pointer)
 {
     lispobj *start = (lispobj *) READ_ONLY_SPACE_START;
-    lispobj *end = (lispobj *) SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
+    lispobj *end = read_only_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
     return gc_search_space(start, pointer);
@@ -1639,7 +1639,7 @@ lispobj *
 search_static_space(void *pointer)
 {
     lispobj *start = (lispobj *)STATIC_SPACE_START;
-    lispobj *end = (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
+    lispobj *end = static_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
     return gc_search_space(start, pointer);
@@ -2779,7 +2779,7 @@ verify_range(lispobj *start, size_t words)
     extern int valid_lisp_pointer_p(lispobj);
     int is_in_readonly_space =
         (READ_ONLY_SPACE_START <= (uword_t)start &&
-         (uword_t)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+         start < read_only_space_free_pointer);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     int is_in_immobile_space =
         (IMMOBILE_SPACE_START <= (uword_t)start &&
@@ -2797,10 +2797,10 @@ verify_range(lispobj *start, size_t words)
             page_index_t page_index = find_page_index((void*)thing);
             sword_t to_readonly_space =
                 (READ_ONLY_SPACE_START <= thing &&
-                 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+                 thing < (lispobj)read_only_space_free_pointer);
             sword_t to_static_space =
                 (STATIC_SPACE_START <= thing &&
-                 thing < SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+                 thing < (lispobj)static_space_free_pointer);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             sword_t to_immobile_space =
                 (IMMOBILE_SPACE_START <= thing &&
@@ -2912,8 +2912,8 @@ verify_range(lispobj *start, size_t words)
         }
     }
 }
-static uword_t verify_space(lispobj start, lispobj end) {
-    verify_range((lispobj*)start, (end-start)>>WORD_SHIFT);
+static uword_t verify_space(lispobj start, lispobj* end) {
+    verify_range((lispobj*)start, end-(lispobj*)start);
     return 0;
 }
 
@@ -2930,19 +2930,17 @@ verify_gc(void)
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
     verify_space(IMMOBILE_SPACE_START,
-                 SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0));
+                 (lispobj*)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0));
     verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START,
-                 SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+                 (lispobj*)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
 #endif
     struct thread *th;
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
-                     (lispobj)get_binding_stack_pointer(th));
+                     get_binding_stack_pointer(th));
     }
-    verify_space(READ_ONLY_SPACE_START,
-                 SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
-    verify_space(STATIC_SPACE_START,
-                 SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+    verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer);
+    verify_space(STATIC_SPACE_START, static_space_free_pointer);
     verify_dynamic_space();
 }
 
@@ -3408,10 +3406,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (gencgc_verbose > 1) {
         FSHOW((stderr,
                "/scavenge static space: %d bytes\n",
-               SymbolValue(STATIC_SPACE_FREE_POINTER,0) - STATIC_SPACE_START));
+               (uword_t)static_space_free_pointer - STATIC_SPACE_START));
     }
-    heap_scavenge((lispobj*)STATIC_SPACE_START,
-                  (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+    heap_scavenge((lispobj*)STATIC_SPACE_START, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as

@@ -110,10 +110,7 @@ collect_garbage(generation_index_t ignore)
      * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
     block_blockable_signals(&old);
 
-    current_static_space_free_pointer =
-        (lispobj *) ((unsigned long)
-                     SymbolValue(STATIC_SPACE_FREE_POINTER,0));
-
+    current_static_space_free_pointer = static_space_free_pointer;
 
     /* Set up from space and new space pointers. */
 
@@ -347,7 +344,7 @@ lispobj *
 search_read_only_space(void *pointer)
 {
     lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
+    lispobj* end = read_only_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
     return gc_search_space(start, pointer);
@@ -357,7 +354,7 @@ lispobj *
 search_static_space(void *pointer)
 {
     lispobj* start = (lispobj*)STATIC_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
+    lispobj* end = static_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
     return gc_search_space(start, pointer);

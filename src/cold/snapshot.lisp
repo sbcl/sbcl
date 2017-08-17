@@ -134,10 +134,7 @@
                              cl::*load-symbol-buffer*
                              cl::*load-symbol-buffer-size*
                              cl::in-index
-                             cl::in-buffer
-                             ;; These two are changed by PURIFY.
-                             cl::*static-space-free-pointer*
-                             cl::*static-space-end-pointer*)
+                             cl::in-buffer)
                       ))
       (setf (gethash symbol result) t))
     result))

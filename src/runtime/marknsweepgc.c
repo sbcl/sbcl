@@ -2134,8 +2134,7 @@ void defrag_immobile_space(int* components, boolean verbose)
 
     // Fix Lisp pointers in static, immobile, and dynamic spaces
     fixup_space((lispobj*)STATIC_SPACE_START,
-                (SYMBOL(STATIC_SPACE_FREE_POINTER)->value
-                 - STATIC_SPACE_START) >> WORD_SHIFT);
+                static_space_free_pointer - (lispobj*)STATIC_SPACE_START);
 
     // Objects in immobile space are physically at 'tempspace',
     // but logically at their natural address. Perform fixups

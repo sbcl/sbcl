@@ -219,10 +219,8 @@ regs_cmd(char **ptr)
 #ifdef LISP_FEATURE_GENCGC
     /* printf("DYNAMIC\t=\t%p\n", (void*)DYNAMIC_SPACE_START); */
 #else
-    printf("STATIC\t=\t%p   ",
-           (void*)SymbolValue(STATIC_SPACE_FREE_POINTER, thread));
-    printf("RDONLY\t=\t%p   ",
-           (void*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER, thread));
+    printf("STATIC\t=\t%p   ", static_space_free_pointer);
+    printf("RDONLY\t=\t%p   ", read_only_space_free_pointer);
     printf("DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
 #endif
 

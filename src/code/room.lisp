@@ -150,12 +150,6 @@
 
 ;;;; MAP-ALLOCATED-OBJECTS
 
-;;; Since they're represented as counts of words, we should never
-;;; need bignums to represent these:
-(declaim (type fixnum
-               *static-space-free-pointer*
-               *read-only-space-free-pointer*))
-
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
 (defun current-dynamic-space-start ()
@@ -170,10 +164,10 @@
   (ecase space
     (:static
      (values (int-sap static-space-start)
-             (int-sap (ash *static-space-free-pointer* n-fixnum-tag-bits))))
+             *static-space-free-pointer*))
     (:read-only
      (values (int-sap read-only-space-start)
-             (int-sap (ash *read-only-space-free-pointer* n-fixnum-tag-bits))))
+             *read-only-space-free-pointer*))
     #!+immobile-space
     (:immobile
      (values (int-sap immobile-space-start)

@@ -658,14 +658,19 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
         }
 #endif
 
-        if (id == DYNAMIC_CORE_SPACE_ID) {
+        lispobj *free_pointer = (lispobj *) addr + entry->nwords;
+        switch (id) {
+        case READ_ONLY_CORE_SPACE_ID:
+            read_only_space_free_pointer = free_pointer; break;
+        case STATIC_CORE_SPACE_ID:
+            static_space_free_pointer = free_pointer; break;
+        case DYNAMIC_CORE_SPACE_ID:
             /* 'addr' is the actual address if relocatable.
              * For cheneygc, this will be whatever the GC was using
              * at the time the core was saved.
              * For gencgc we don't look at current_dynamic_space */
             current_dynamic_space = (lispobj *)addr;
 
-            lispobj *free_pointer = (lispobj *) addr + entry->nwords;
             /* FIXME: why not use set_alloc_pointer() ? */
 #if defined(ALLOCATION_POINTER)
             SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);

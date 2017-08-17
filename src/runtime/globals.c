@@ -42,6 +42,8 @@ lispobj *current_binding_stack_pointer;
 /* The Object Formerly Known As current_dynamic_space_free_pointer */
 lispobj *dynamic_space_free_pointer;
 #endif
+lispobj* read_only_space_free_pointer;
+lispobj* static_space_free_pointer;
 os_vm_address_t anon_dynamic_space_start;
 
 #ifndef LISP_FEATURE_GENCGC /* GENCGC has its own way to record trigger */

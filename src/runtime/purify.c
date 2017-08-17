@@ -55,6 +55,8 @@ static lispobj *dynamic_space_purify_pointer;
 
 static lispobj *read_only_end, *static_end;
 
+/* These are private to purify, not to be confused with the external symbols
+ * named 'read_only_space_free_pointer', respectively 'static_space' */
 static lispobj *read_only_free, *static_free;
 
 static lispobj *pscav(lispobj *addr, long nwords, boolean constant);
@@ -639,10 +641,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
     dynamic_space_purify_pointer = dynamic_space_free_pointer;
 
-    read_only_end = read_only_free =
-        (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
-    static_end = static_free =
-        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
+    read_only_end = read_only_free = read_only_space_free_pointer;
+    static_end = static_free = static_space_free_pointer;
 
 #ifdef PRINTNOISE
     printf(" roots");
@@ -690,8 +690,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != UNBOUND_MARKER_WIDETAG
         && SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
       unsigned  read_only_space_size =
-          (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -
-          (lispobj *)READ_ONLY_SPACE_START;
+          read_only_space_free_pointer - (lispobj *)READ_ONLY_SPACE_START;
       fprintf(stderr,
               "scavenging read only space: %d bytes\n",
               read_only_space_size * sizeof(lispobj));
@@ -747,8 +746,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
     /* It helps to update the heap free pointers so that free_heap can
      * verify after it's done. */
-    SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free,0);
-    SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free,0);
+    read_only_space_free_pointer = read_only_free;
+    static_space_free_pointer = static_free;
 
     dynamic_space_free_pointer = current_dynamic_space;
     set_auto_gc_trigger(bytes_consed_between_gcs);
