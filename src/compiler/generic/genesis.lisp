@@ -1645,6 +1645,11 @@ core and return a descriptor to it."
     (cold-set t-symbol t-symbol))
   (dolist (sym sb!vm::+c-callable-fdefns+)
     (cold-fdefinition-object (cold-intern sym) nil *static*))
+
+  ;; With immobile-code, static-fdefns as a concept are useful -
+  ;; the implication is that the function's definition will not change.
+  ;; But the fdefn per se is not useful - callers refer to callees directly.
+  #!-immobile-code
   (dovector (sym sb!vm:+static-fdefns+)
     (let* ((fdefn (cold-fdefinition-object (cold-intern sym) nil *static*))
            (offset (- (+ (- (descriptor-bits fdefn)
