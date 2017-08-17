@@ -159,27 +159,35 @@
   sb!vm:dynamic-space-start
   #!-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
-(defun space-bounds (space)
+;;; Return the lower limit and current free-pointer of SPACE as fixnums
+;;; whose raw bits (at the register level) represent a pointer.
+;;; This makes it "off" by a factor of (EXPT 2 N-FIXNUM-TAG-BITS) - and/or
+;;; possibly negative - if you look at the value in Lisp,
+;;; but avoids potentially needing a bignum on 32-bit machines.
+;;; 64-bit machines have no problem since most current generation CPUs
+;;; use an address width that is narrower than 64 bits.
+;;; This function is private because of the wacky representation.
+(defun %space-bounds (space)
   (declare (type spaces space))
   (ecase space
     (:static
-     (values (int-sap static-space-start)
-             *static-space-free-pointer*))
+     (values (%make-lisp-obj static-space-start)
+             (%make-lisp-obj (sap-int *static-space-free-pointer*))))
     (:read-only
-     (values (int-sap read-only-space-start)
-             *read-only-space-free-pointer*))
+     (values (%make-lisp-obj read-only-space-start)
+             (%make-lisp-obj (sap-int *read-only-space-free-pointer*))))
     #!+immobile-space
     (:immobile
-     (values (int-sap immobile-space-start)
-             *immobile-space-free-pointer*))
+     (values (%make-lisp-obj immobile-space-start)
+             (%make-lisp-obj (sap-int *immobile-space-free-pointer*))))
     (:dynamic
-     (values (int-sap (current-dynamic-space-start))
-             (dynamic-space-free-pointer)))))
+     (values (%make-lisp-obj (current-dynamic-space-start))
+             (%make-lisp-obj (sap-int (dynamic-space-free-pointer)))))))
 
 ;;; Return the total number of bytes used in SPACE.
 (defun space-bytes (space)
-  (multiple-value-bind (start end) (space-bounds space)
-    (- (sap-int end) (sap-int start))))
+  (multiple-value-bind (start end) (%space-bounds space)
+    (ash (- end start) n-fixnum-tag-bits)))
 
 ;;; Round SIZE (in bytes) up to the next dualword boundary. A dualword
 ;;; is eight bytes on platforms with 32-bit word size and 16 bytes on
@@ -379,32 +387,35 @@
       (:static
        ;; Static space starts with NIL, which requires special
        ;; handling, as the header and alignment are slightly off.
-       (multiple-value-bind (start end) (space-bounds space)
+       (multiple-value-bind (start end) (%space-bounds space)
+         ;; This "8" is very magical. It happens to work for both
+         ;; word sizes, even though symbols differ in length
+         ;; (they can be either 6 or 7 words).
          (funcall fun nil symbol-widetag (* 8 n-word-bytes))
          (map-objects-in-range fun
-                               (%make-lisp-obj (+ (* 8 n-word-bytes)
-                                                  (sap-int start)))
-                               (%make-lisp-obj (sap-int end)))))
+                               (+ (ash (* 8 n-word-bytes) (- n-fixnum-tag-bits))
+                                  start)
+                               end)))
 
       ((:read-only #!-gencgc :dynamic)
        ;; Read-only space (and dynamic space on cheneygc) is a block
        ;; of contiguous allocations.
-       (multiple-value-bind (start end) (space-bounds space)
-         (map-objects-in-range fun
-                               (%make-lisp-obj (sap-int start))
-                               (%make-lisp-obj (sap-int end)))))
-
+       (multiple-value-bind (start end) (%space-bounds space)
+         (map-objects-in-range fun start end)))
       #!+immobile-space
       (:immobile
        ;; Filter out filler objects. These either look like cons cells
        ;; in fixedobj subspace, or code without enough header words
        ;; in varyobj subspace. (cf 'immobile_filler_p' in gc-internal.h)
        (dx-flet ((filter (obj type size)
-                   (unless (or (and (code-component-p obj)
-                                    (eql (code-header-words obj) 2))
-                               (consp obj))
+                   (unless (consp obj)
                      (funcall fun obj type size))))
-         (map-immobile-objects #'filter :fixed :variable)))
+         (map-immobile-objects #'filter :fixed))
+       (dx-flet ((filter (obj type size)
+                   (unless (and (code-component-p obj)
+                                (eql (code-header-words obj) 2))
+                     (funcall fun obj type size))))
+         (map-immobile-objects #'filter :variable)))
 
       #!+gencgc
       (:dynamic
@@ -667,9 +678,9 @@
   (declare (type (integer 0 99) percent) (type index pages)
            (type stream stream) (type spaces space)
            (type (or index null) type larger smaller count))
-  (multiple-value-bind (start-sap end-sap) (space-bounds space)
-    (let* ((space-start (sap-int start-sap))
-           (space-end (sap-int end-sap))
+  (multiple-value-bind (start end) (%space-bounds space)
+    (let* ((space-start (ash start n-fixnum-tag-bits))
+           (space-end (ash end n-fixnum-tag-bits))
            (space-size (- space-end space-start))
            (pagesize (get-page-size))
            (start (+ space-start (round (* space-size percent) 100)))

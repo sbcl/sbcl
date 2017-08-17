@@ -372,31 +372,27 @@
   '(member :fixed :variable))
 
 (declaim (inline immobile-subspace-bounds))
+;;; Return fixnums in the same fashion as %SPACE-BOUNDS.
 (defun immobile-subspace-bounds (subspace)
-  ;; FIXME: this is a goofy return convention - primary value is sane,
-  ;; secondary has funny bit-shifted representation.
-  (macrolet ((munge-sap (sym)
-               `(ash (sap-int ,sym) (- n-fixnum-tag-bits))))
-    (case subspace
-      (:fixed (values immobile-space-start
-                      (munge-sap *immobile-fixedobj-free-pointer*)))
-      (:variable (values (+ immobile-space-start immobile-fixedobj-subspace-size)
-                         (munge-sap *immobile-space-free-pointer*))))))
+  (case subspace
+    (:fixed (values (%make-lisp-obj immobile-space-start)
+                    (%make-lisp-obj (sap-int *immobile-fixedobj-free-pointer*))))
+    (:variable (values (%make-lisp-obj (+ immobile-space-start
+                                          immobile-fixedobj-subspace-size))
+                       (%make-lisp-obj (sap-int *immobile-space-free-pointer*))))))
 
 (declaim (ftype (sfunction (function &rest immobile-subspaces) null)
                 map-immobile-objects))
-(defun map-immobile-objects (function &rest subspaces)
+(defun map-immobile-objects (function &rest subspaces) ; Perform no filtering
   (do-rest-arg ((subspace) subspaces)
-    (multiple-value-bind (start free-pointer)
-        (immobile-subspace-bounds subspace)
-      (map-objects-in-range
-       function (ash start (- n-fixnum-tag-bits)) free-pointer))))
+    (multiple-value-bind (start end) (immobile-subspace-bounds subspace)
+      (map-objects-in-range function start end))))
 
 (declaim (ftype (function (immobile-subspaces) (values t t t &optional))
                 immobile-fragmentation-information))
 (defun immobile-fragmentation-information (subspace)
   (binding* (((start free-pointer) (immobile-subspace-bounds subspace))
-             (used-bytes (- (ash free-pointer n-fixnum-tag-bits) start))
+             (used-bytes (ash (- free-pointer start) n-fixnum-tag-bits))
              (holes '())
              (hole-bytes 0))
     (map-immobile-objects
