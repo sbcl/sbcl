@@ -470,7 +470,7 @@ static void fixup_space(lispobj* where, uword_t len)
               gc_assert(v->length > 0 &&
                         !(fixnum_value(v->length) & 1) &&  // length must be even
                         lowtag_of(v->data[0]) == INSTANCE_POINTER_LOWTAG);
-              lispobj* data = v->data;
+              lispobj* data = (lispobj*)v->data;
               adjust_pointers(&data[0], 1); // adjust the hash-table structure
               boolean needs_rehash = 0;
               int i;
@@ -615,7 +615,7 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
             if ((fail = (addr != spaces[id].base)) != 0)
                 fprintf(stderr, "in core: %p; in runtime: %p\n",
                         (void*)addr, (void*)spaces[id].base);
-            char *names[MAX_CORE_SPACE_ID] = {
+            char *names[] = {
               "DYNAMIC", "STATIC", "READ_ONLY", "IMMOBILE", "IMMOBILE"
             };
             if (fail)
@@ -656,7 +656,7 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 #ifdef MADV_MERGEABLE
         if ((merge_core_pages == 1)
             || ((merge_core_pages == -1) && compressed)) {
-                madvise(addr, len, MADV_MERGEABLE);
+            madvise((void *)addr, len, MADV_MERGEABLE);
         }
 #endif
 
@@ -682,7 +682,7 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
         }
     }
 
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
     immobile_space_coreparse(spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len,
                              spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
 #endif
