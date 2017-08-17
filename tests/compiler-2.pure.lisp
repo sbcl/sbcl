@@ -148,7 +148,7 @@
     (assert (ctu:find-named-callees f :name 'princ-to-string))))
 
 (with-test (:name :map-allocated-objects-no-consing
-                  :skipped-on :sb-fasteval
+                  :skipped-on :interpreter
                   :fails-on :ppc)
   (let ((n 0))
     (sb-int:dx-flet ((f (obj type size)
