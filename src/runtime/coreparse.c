@@ -558,8 +558,6 @@ void relocate_heap(lispobj* want, lispobj* got, uword_t len)
 
 int merge_core_pages = -1;
 
-os_vm_address_t anon_dynamic_space_start;
-
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {

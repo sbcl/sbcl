@@ -616,7 +616,6 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
     gc_assert((length % gencgc_release_granularity) == 0);
 
 #ifdef LISP_FEATURE_LINUX
-    extern os_vm_address_t anon_dynamic_space_start;
     // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
     // Linux treats it as a demand that the memory be 0-filled, or refreshed
     // from a file that backs the range. BSD takes it as a hint that you don't
