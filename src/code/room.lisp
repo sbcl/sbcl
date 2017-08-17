@@ -171,7 +171,7 @@
     #!+immobile-space
     (:immobile
      (values (int-sap immobile-space-start)
-             (int-sap (ash *immobile-space-free-pointer* n-fixnum-tag-bits))))
+             *immobile-space-free-pointer*))
     (:dynamic
      (values (int-sap (current-dynamic-space-start))
              (dynamic-space-free-pointer)))))

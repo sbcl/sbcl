@@ -3751,19 +3751,6 @@ initially undefined function references:~2%")
       (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)
 
-      ;; Tell the target Lisp how much stuff we've allocated.
-      (flet ((free-pointer (space)
-               (make-random-descriptor
-                (+ (ash (gspace-free-word-index space) sb!vm:word-shift)
-                   (gspace-byte-address space)))))
-        #!+immobile-space
-        (progn (cold-set 'sb!vm:*immobile-fixedobj-free-pointer*
-                         (free-pointer *immobile-fixedobj*))
-               (cold-set 'sb!vm:*immobile-space-free-pointer*
-                         (free-pointer *immobile-varyobj*))))
-
-      (/show "done setting free pointers")
-
       ;; Write results to files.
       (when map-file-name
         (with-open-file (stream map-file-name :direction :output :if-exists :supersede)

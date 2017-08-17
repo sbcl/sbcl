@@ -70,6 +70,10 @@ extern lispobj *dynamic_space_free_pointer;
 #endif
 extern lispobj* read_only_space_free_pointer;
 extern lispobj* static_space_free_pointer;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+extern lispobj* immobile_space_free_pointer;
+extern lispobj* immobile_fixedobj_free_pointer;
+#endif
 extern os_vm_address_t anon_dynamic_space_start;
 
 # ifndef LISP_FEATURE_GENCGC

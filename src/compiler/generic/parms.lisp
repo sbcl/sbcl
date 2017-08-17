@@ -146,13 +146,7 @@
 
 (defconstant-eqx +common-static-symbols+
   `(t
-    ;; free pointers.  Note that these are FIXNUM word counts, not (as
-    ;; one might expect) byte counts or SAPs. The reason seems to be
-    ;; that by representing them this way, we can avoid consing
-    ;; bignums.  -- WHN 2000-10-02
-    *immobile-fixedobj-free-pointer*
-    *immobile-space-free-pointer*
-    *immobile-freelist*
+    #!+immobile-space *immobile-freelist*
 
     ;; things needed for non-local-exit
     *current-catch-block*

@@ -323,13 +323,13 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     output_space(file,
                  IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
                  (lispobj *)IMMOBILE_SPACE_START,
-                 (lispobj *)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0),
+                 immobile_fixedobj_free_pointer,
                  core_start_pos,
                  core_compression_level);
     output_space(file,
                  IMMOBILE_VARYOBJ_CORE_SPACE_ID,
                  (lispobj *)IMMOBILE_VARYOBJ_SUBSPACE_START,
-                 (lispobj *)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0),
+                 immobile_space_free_pointer,
                  core_start_pos,
                  core_compression_level);
 #endif

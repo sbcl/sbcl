@@ -21,8 +21,6 @@
                   *stdout*
                   *stderr*
                   *tty*
-                  #!+immobile-space sb!vm:*immobile-fixedobj-free-pointer*
-                  #!+immobile-space sb!vm:*immobile-space-free-pointer*
                   sb!vm:*current-catch-block*
                   sb!vm::*current-unwind-protect-block*
                   sb!vm::*alien-stack-pointer*

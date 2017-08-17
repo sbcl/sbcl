@@ -2783,7 +2783,7 @@ verify_range(lispobj *start, size_t words)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     int is_in_immobile_space =
         (IMMOBILE_SPACE_START <= (uword_t)start &&
-         (uword_t)start < SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+         start < immobile_space_free_pointer);
 #endif
 
     lispobj *end = start + words;
@@ -2804,9 +2804,9 @@ verify_range(lispobj *start, size_t words)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             sword_t to_immobile_space =
                 (IMMOBILE_SPACE_START <= thing &&
-                 thing < SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0)) ||
+                 thing < (lispobj)immobile_fixedobj_free_pointer) ||
                 (IMMOBILE_VARYOBJ_SUBSPACE_START <= thing &&
-                 thing < SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+                 thing < (lispobj)immobile_space_free_pointer);
 #endif
 
             /* Does it point to the dynamic space? */
@@ -2929,10 +2929,8 @@ verify_gc(void)
     extern void __attribute__((weak)) check_varyobj_pages();
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
-    verify_space(IMMOBILE_SPACE_START,
-                 (lispobj*)SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0));
-    verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START,
-                 (lispobj*)SymbolValue(IMMOBILE_SPACE_FREE_POINTER,0));
+    verify_space(IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer);
+    verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer);
 #endif
     struct thread *th;
     for_each_thread(th) {

@@ -2085,10 +2085,10 @@ void coalesce_similar_objects()
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)IMMOBILE_SPACE_START,
-                   (lispobj*)SYMBOL(IMMOBILE_FIXEDOBJ_FREE_POINTER)->value,
+                   immobile_fixedobj_free_pointer,
                    (uword_t)&ht);
     coalesce_range((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-                   (lispobj*)SYMBOL(IMMOBILE_SPACE_FREE_POINTER)->value,
+                   immobile_space_free_pointer,
                    (uword_t)&ht);
 #endif
 #ifdef LISP_FEATURE_GENCGC

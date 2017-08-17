@@ -218,7 +218,7 @@ static lispobj lookup_symbol(char *name)
     /* Search immobile space. */
     if ((headerptr = search_for_symbol(name,
                                        IMMOBILE_SPACE_START,
-                                       SymbolValue(IMMOBILE_FIXEDOBJ_FREE_POINTER,0))))
+                                       (uword_t)immobile_fixedobj_free_pointer)))
         return make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
 #endif
 

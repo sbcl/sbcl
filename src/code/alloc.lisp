@@ -169,7 +169,7 @@
 
 (defun set-immobile-space-free-pointer (free-ptr)
   (declare (type (and fixnum unsigned-byte) free-ptr))
-  (setq *immobile-space-free-pointer* (ash free-ptr (- n-fixnum-tag-bits)))
+  (setq *immobile-space-free-pointer* (int-sap free-ptr))
   ;; When the free pointer is not page-aligned - it usually won't be -
   ;; then we create an unboxed array from the pointer to the page end
   ;; so that it appears as one contiguous object when scavenging.
@@ -187,8 +187,7 @@
   #!+immobile-space-debug
   (awhen *in-use-bits* (mark-range it hole (hole-size hole) nil))
   (let* ((hole-end (hole-end-address hole))
-         (end-is-free-ptr (eql (ash hole-end (- n-fixnum-tag-bits))
-                               *immobile-space-free-pointer*)))
+         (end-is-free-ptr (eql hole-end (sap-int *immobile-space-free-pointer*))))
     ;; First, ensure that no page's scan-start points to this hole.
     ;; For smaller-than-page objects, this will do nothing if the hole
     ;; was not the scan-start. For larger-than-page, we have to update
@@ -292,7 +291,7 @@
                              (add-to-freelist found)
                              (+ found remaining)))))) ; Consume the upper piece
               ;; 3. Extend the frontier.
-              (let* ((addr (ash *immobile-space-free-pointer* n-fixnum-tag-bits))
+              (let* ((addr (sap-int *immobile-space-free-pointer*))
                      (free-ptr (+ addr n-bytes)))
                 ;; The last page can't be used, because GC uses it as scratch space.
                 (when (> free-ptr (- immobile-space-end immobile-card-bytes))
@@ -374,12 +373,15 @@
 
 (declaim (inline immobile-subspace-bounds))
 (defun immobile-subspace-bounds (subspace)
-  (case subspace
-    (:fixed (values immobile-space-start
-                    *immobile-fixedobj-free-pointer*))
-    (:variable (values (+ immobile-space-start
-                          immobile-fixedobj-subspace-size)
-                       *immobile-space-free-pointer*))))
+  ;; FIXME: this is a goofy return convention - primary value is sane,
+  ;; secondary has funny bit-shifted representation.
+  (macrolet ((munge-sap (sym)
+               `(ash (sap-int ,sym) (- n-fixnum-tag-bits))))
+    (case subspace
+      (:fixed (values immobile-space-start
+                      (munge-sap *immobile-fixedobj-free-pointer*)))
+      (:variable (values (+ immobile-space-start immobile-fixedobj-subspace-size)
+                         (munge-sap *immobile-space-free-pointer*))))))
 
 (declaim (ftype (sfunction (function &rest immobile-subspaces) null)
                 map-immobile-objects))

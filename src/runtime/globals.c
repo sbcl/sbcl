@@ -44,6 +44,10 @@ lispobj *dynamic_space_free_pointer;
 #endif
 lispobj* read_only_space_free_pointer;
 lispobj* static_space_free_pointer;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+lispobj* immobile_space_free_pointer;
+lispobj* immobile_fixedobj_free_pointer;
+#endif
 os_vm_address_t anon_dynamic_space_start;
 
 #ifndef LISP_FEATURE_GENCGC /* GENCGC has its own way to record trigger */

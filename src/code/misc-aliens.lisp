@@ -17,7 +17,7 @@
     system-area-pointer)
 (define-alien-variable ("static_space_free_pointer" sb!vm:*static-space-free-pointer*)
   system-area-pointer)
-#+nil ;; TODO: should be #!+immobile-space
+#!+immobile-space
 (progn (define-alien-variable ("immobile_space_free_pointer"
                                sb!vm:*immobile-space-free-pointer*)
          system-area-pointer)

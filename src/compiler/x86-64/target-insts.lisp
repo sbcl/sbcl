@@ -490,7 +490,7 @@
       ;; so skip right over all fixedobj pages.
       (ash (+ immobile-space-start immobile-fixedobj-subspace-size)
            (- n-fixnum-tag-bits))
-      *immobile-space-free-pointer*)))
+      (%make-lisp-obj (sap-int *immobile-space-free-pointer*)))))
 
 (defun sb!vm::statically-link-core (&key callers exclude-callers
                                          callees exclude-callees

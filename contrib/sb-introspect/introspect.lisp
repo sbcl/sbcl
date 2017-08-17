@@ -812,8 +812,7 @@ Experimental: interface subject to change."
                               :static)
                              #+immobile-space
                              ((< sb-vm:immobile-space-start addr
-                                 (ash sb-vm:*immobile-space-free-pointer*
-                                      sb-vm:n-fixnum-tag-bits))
+                                 (sb-sys:sap-int sb-vm:*immobile-space-free-pointer*))
                               :immobile)
                              ((< (sb-kernel:current-dynamic-space-start) addr
                                  (sb-sys:sap-int (sb-kernel:dynamic-space-free-pointer)))

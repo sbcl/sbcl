@@ -566,21 +566,22 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
     struct ndir_entry *entry;
 
     struct {
-        uword_t len;
+        uword_t len; // length in pages
         uword_t base;
+        lispobj** pfree_pointer; // pointer to x_free_pointer
     } spaces[MAX_CORE_SPACE_ID+1] = {
-        {0, 0}, // blank for space ID 0
+        {0, 0, 0}, // blank for space ID 0
 #ifdef LISP_FEATURE_GENCGC
-        {0, DYNAMIC_SPACE_START},
+        {0, DYNAMIC_SPACE_START, 0},
 #else
-        {0, 0},
+        {0, 0, 0},
 #endif
         // This order is determined by constants in compiler/generic/genesis
-        {0, STATIC_SPACE_START},
-        {0, READ_ONLY_SPACE_START},
+        {0, STATIC_SPACE_START, &static_space_free_pointer},
+        {0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        {0, IMMOBILE_SPACE_START},
-        {0, IMMOBILE_VARYOBJ_SUBSPACE_START}
+        {0, IMMOBILE_SPACE_START, &immobile_fixedobj_free_pointer},
+        {0, IMMOBILE_VARYOBJ_SUBSPACE_START, &immobile_space_free_pointer}
 #endif
     };
 
@@ -660,10 +661,9 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
         switch (id) {
-        case READ_ONLY_CORE_SPACE_ID:
-            read_only_space_free_pointer = free_pointer; break;
-        case STATIC_CORE_SPACE_ID:
-            static_space_free_pointer = free_pointer; break;
+        default:
+            *spaces[id].pfree_pointer = free_pointer;
+            break;
         case DYNAMIC_CORE_SPACE_ID:
             /* 'addr' is the actual address if relocatable.
              * For cheneygc, this will be whatever the GC was using
