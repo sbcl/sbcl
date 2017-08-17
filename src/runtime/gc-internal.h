@@ -271,7 +271,7 @@ static inline low_page_index_t find_immobile_page_index(void *addr)
   return -1;
 }
 int immobile_obj_younger_p(lispobj,generation_index_t);
-void promote_immobile_obj(lispobj*,int);
+void enliven_immobile_obj(lispobj*,int);
 
 #define IMMOBILE_OBJ_VISITED_FLAG    0x10
 #define IMMOBILE_OBJ_GENERATION_MASK 0x0f // mask off the VISITED flag

@@ -129,7 +129,7 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
     } else if (immobile_space_p(object)) {
         lispobj *ptr = native_pointer(object);
         if (immobile_obj_gen_bits(ptr) == from_space)
-            promote_immobile_obj(ptr, 1);
+            enliven_immobile_obj(ptr, 1);
     }
 #else
     if (from_space_p(object)) {
@@ -648,7 +648,7 @@ scav_instance(lispobj *where, lispobj header)
         layout = native_pointer((lispobj)layout);
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         if (__immobile_obj_gen_bits(layout) == from_space)
-            promote_immobile_obj(layout, 1);
+            enliven_immobile_obj(layout, 1);
 #else
         if (forwarding_pointer_p(layout))
             layout = native_pointer(forwarding_pointer_value(layout));
