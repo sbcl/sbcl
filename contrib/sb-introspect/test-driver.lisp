@@ -329,9 +329,15 @@
     (tai t :heap '(:space :static))
   t)
 
+#+immobile-space
+(deftest allocation-information.2b
+    (tai '*print-base* :heap '(:space :immobile))
+  t)
+
 (deftest allocation-information.3
     (tai 42 :immediate nil)
   t)
+
 #+x86-64
 (deftest allocation-information.3b
     (tai 42s0 :immediate nil)
