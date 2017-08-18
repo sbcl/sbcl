@@ -52,13 +52,8 @@
     (move result rax)))
 
 #!+immobile-space
-(progn
-  (defconstant null-layout ; kludge
-    (logior (+ immobile-space-start (* 7 256)) instance-pointer-lowtag))
-  #-sb-xc-host
-  (aver (eql null-layout (get-lisp-obj-address (find-layout 'null))))
-  ;; ~20 instructions vs. 35
-  (define-vop (layout-of) ; no translation
+;; ~20 instructions vs. 35
+(define-vop (layout-of) ; no translation
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg))
            (layouts :scs (constant)))
@@ -97,8 +92,8 @@
                                           (- other-pointer-lowtag))))
       (inst jmp  done)
       NULL
-      (inst mov  result null-layout)
-      DONE)))
+      (inst mov  result (make-fixup (find-layout 'null) :layout))
+      DONE))
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
