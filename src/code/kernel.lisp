@@ -108,3 +108,8 @@
 
 (declaim (inline lowtag-of))
 (defun lowtag-of (x) (logand (get-lisp-obj-address x) sb!vm:lowtag-mask))
+
+;;; Unlike most other "Stub functions" that never called called except
+;;; by the interpreter, these two do get called, by MAKE-UNPORTABLE-FLOAT
+(defun make-single-float (x) (make-single-float x))
+(defun make-double-float (hi lo) (make-double-float hi lo))

@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (macrolet ((def (name &optional (args '(x)))
              `(defun ,name ,args
@@ -25,9 +25,9 @@
   (def binding-stack-pointer-sap  ())
   ;; x86 uses a plain old inline function for 'dynamic_space_free_pointer'
   ;; so there's no stub function for DYNAMIC-SPACE-FREE-POINTER.
-  #!-(or x86 x86-64) (def dynamic-space-free-pointer ())
+  #-(or x86 x86-64) (def dynamic-space-free-pointer ())
   (def control-stack-pointer-sap ())
-  (def sb!c:safe-fdefn-fun)
+  (def sb-c:safe-fdefn-fun)
   (def fun-subtype)
   (def simple-fun-p)
   (def %simple-fun-arglist)
@@ -37,15 +37,13 @@
   (def closurep)
   (def %closure-fun)
   (def %closure-index-ref (closure index))
-  (def sb!c::vector-length)
+  (def sb-c::vector-length)
   (def allocate-vector (type length words))
   (def make-array-header (type rank))
   (def code-instructions)
   (def code-header-ref (code-obj index))
   (def code-header-set (code-obj index new))
   (def %vector-raw-bits (object offset))
-  (def make-single-float)
-  (def make-double-float (hi lo))
   (def single-float-bits)
   (def double-float-high-bits)
   (def double-float-low-bits)
@@ -54,6 +52,6 @@
   (def %caller-pc ())
   (def %code-code-size)
   (def %code-debug-info)
-  #!+(or x86 immobile-space) (def sb!vm::%code-fixups)
+  #+(or x86 immobile-space) (def sb-vm::%code-fixups)
   (def %funcallable-instance-layout)
   (def %set-funcallable-instance-layout (x new-value)))

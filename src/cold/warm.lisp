@@ -121,6 +121,7 @@
                 "SRC;PCL;PRECOM2"))
       (other-srcs
               '("SRC;CODE;SETF-FUNS"
+                "SRC;CODE;STUBS"
                 ;; miscellaneous functionality which depends on CLOS
                 "SRC;CODE;LATE-CONDITION"
 
