@@ -6511,3 +6511,12 @@
                                               (catch 'ct (the integer
                                                               (eval (dotimes (i 1 42) 42)))))))))
              42)))
+
+
+(with-test (:name :single-float-bits-to-signed-stack)
+  (assert (= (funcall (checked-compile `(lambda (p1)
+                                          (declare (optimize (speed 0) (space 0))
+                                                   (type single-float p1))
+                                          (scale-float p1 27)))
+                      1.0)
+             1.3421773e8)))

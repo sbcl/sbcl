@@ -610,8 +610,9 @@
             (* (tn-offset temp) n-word-bytes)))))
 
 (define-vop (single-float-bits)
-  (:args (float :scs (single-reg descriptor-reg)
-                :load-if (not (sc-is float single-stack))))
+  (:args (float :scs (single-reg)
+                :load-if (not (and (sc-is bits signed-reg)
+                                   (sc-is float single-stack descriptor-reg)))))
   (:results (bits :scs (signed-reg)
                   :load-if (or (sc-is float descriptor-reg single-stack)
                                (not (sc-is bits signed-stack)))))
@@ -636,10 +637,8 @@
          (descriptor-reg
           (loadw bits float single-float-value-slot other-pointer-lowtag))))
       (signed-stack
-       (sc-case float
-         (single-reg
-          (inst stfs float (current-nfp-tn vop)
-                (* (tn-offset bits) n-word-bytes))))))))
+       (inst stfs float (current-nfp-tn vop)
+                (* (tn-offset bits) n-word-bytes))))))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
