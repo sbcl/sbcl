@@ -159,6 +159,12 @@
   sb!vm:dynamic-space-start
   #!-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
+#!+(or x86 x86-64)
+(progn
+  (declaim (inline dynamic-space-free-pointer))
+  (defun dynamic-space-free-pointer ()
+    (extern-alien "dynamic_space_free_pointer" system-area-pointer)))
+
 ;;; Return the lower limit and current free-pointer of SPACE as fixnums
 ;;; whose raw bits (at the register level) represent a pointer.
 ;;; This makes it "off" by a factor of (EXPT 2 N-FIXNUM-TAG-BITS) - and/or

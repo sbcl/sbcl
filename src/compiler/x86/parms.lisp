@@ -225,7 +225,6 @@
 ;;;
 ;;; pfw X86 doesn't have enough registers to keep these things there.
 ;;;     Note these spaces grow from low to high addresses.
-(defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
 (defconstant-eqx +static-symbols+
@@ -235,7 +234,6 @@
      ;; interrupt handling
      *pseudo-atomic-bits*
 
-     *allocation-pointer*
      *binding-stack-pointer*
 
      ;; the floating point constants

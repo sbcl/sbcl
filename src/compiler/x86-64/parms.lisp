@@ -140,7 +140,6 @@
 ;;; we could profitably keep these in registers on x86-64 now we have
 ;;; r8-r15 as well
 ;;;     Note these spaces grow from low to high addresses.
-(defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
 (defconstant-eqx +static-symbols+
@@ -150,7 +149,6 @@
      ;; interrupt handling
      *pseudo-atomic-bits*
 
-     *allocation-pointer*
      *binding-stack-pointer*)
   #'equalp)
 

@@ -36,9 +36,9 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-/* ALLOCATION_POINTER is x86 or RT.  Anyone want to do an RT port?   */
+/* ARM backends use ALLOCATION-POINTER, not dynamic_space_free_pointer */
 
-# if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
+# if !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
 /* The Object Formerly Known As current_dynamic_space_free_pointer */
 lispobj *dynamic_space_free_pointer;
 #endif

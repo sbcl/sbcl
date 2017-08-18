@@ -224,7 +224,7 @@ regs_cmd(char **ptr)
     printf("DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
 #endif
 
-#ifdef reg_ALLOC
+#ifndef ALLOCATION_POINTER
     printf("ALLOC\t=\t%p\n", (void*)dynamic_space_free_pointer);
 #else
     printf("ALLOC\t=\t%p\n", (void*)SymbolValue(ALLOCATION_POINTER, thread));

@@ -23,7 +23,9 @@
   (def %other-pointer-widetag)
   (def vector-sap)
   (def binding-stack-pointer-sap  ())
-  (def dynamic-space-free-pointer ())
+  ;; x86 uses a plain old inline function for 'dynamic_space_free_pointer'
+  ;; so there's no stub function for DYNAMIC-SPACE-FREE-POINTER.
+  #!-(or x86 x86-64) (def dynamic-space-free-pointer ())
   (def control-stack-pointer-sap ())
   (def sb!c:safe-fdefn-fun)
   (def fun-subtype)

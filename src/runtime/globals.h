@@ -58,7 +58,12 @@ extern lispobj *current_control_frame_pointer;
 extern lispobj *current_binding_stack_pointer;
 #endif
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+/* FIXME: the comment below this is obsolete. Most backends do want to use
+ * 'dynamic_space_free_pointer' contrary to the claim that it is only intended
+ * for cheneygc. The exact combinations of GC kind, architecture, and threads
+ * vs. no threads make it extremely confusing the figure out and document
+ * the state of things. Somebody should do that. */
+
 /* This is unused on X86 and X86_64, but is used as the global
  *  allocation pointer by the cheney GC, and, in some instances, as
  *  the global allocation pointer on PPC/GENCGC. This should probably
@@ -67,7 +72,6 @@ extern lispobj *current_binding_stack_pointer;
  *  bits, and is tightly coupled to reg_ALLOC by the assembly
  *  routines. */
 extern lispobj *dynamic_space_free_pointer;
-#endif
 extern lispobj *read_only_space_free_pointer;
 extern lispobj *static_space_free_pointer;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

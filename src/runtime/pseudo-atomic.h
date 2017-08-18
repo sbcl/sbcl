@@ -18,10 +18,8 @@
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
-#define set_alloc_pointer(value)                \
-    SetSymbolValue(ALLOCATION_POINTER, value, 0)
-#define get_alloc_pointer()                     \
-    SymbolValue(ALLOCATION_POINTER, 0)
+#define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
+#define get_alloc_pointer() (dynamic_space_free_pointer)
 
 #if defined(LISP_FEATURE_X86)
 #define LISPOBJ_ASM_SUFFIX "l"
