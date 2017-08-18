@@ -480,7 +480,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; LETTER-ATTRIBUTE is a local of SYMBOL-QUOTEP. It matches letters
 ;;; that don't need to be escaped (according to READTABLE-CASE.)
-(defparameter *attribute-names*
+(defglobal *attribute-names*
   `((number . number-attribute) (lowercase . lowercase-attribute)
     (uppercase . uppercase-attribute) (letter . letter-attribute)
     (sign . sign-attribute) (extension . extension-attribute)

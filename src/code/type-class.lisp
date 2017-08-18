@@ -630,9 +630,8 @@
 
 ;;; a list of all the float "formats" (i.e. internal representations;
 ;;; nothing to do with #'FORMAT), in order of decreasing precision
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *float-formats*
-    '(long-float double-float single-float short-float)))
+(defglobal *float-formats*
+    '(long-float double-float single-float short-float))
 
 ;;; The type of a float format.
 (deftype float-format () `(member ,@*float-formats*))

@@ -704,10 +704,10 @@ only characters for which it returns T are collected."
 
 ;;; Unicode case algorithms
 ;; FIXME: Make these parts less redundant (macro?)
-(defparameter **special-titlecases**
+(sb!ext:defglobal **special-titlecases**
   '#.(sb-cold:read-from-file "output/titlecases.lisp-expr"))
 
-(defparameter **special-casefolds**
+(sb!ext:defglobal **special-casefolds**
   '#.(sb-cold:read-from-file "output/foldcases.lisp-expr"))
 
 (defun has-case-p (char)

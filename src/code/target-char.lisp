@@ -284,7 +284,7 @@
   (frob))
 #+sb-xc-host (!character-name-database-cold-init)
 
-(defparameter *base-char-name-alist*
+(defglobal *base-char-name-alist*
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.

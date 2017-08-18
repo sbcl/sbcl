@@ -135,7 +135,7 @@
 
 ;;;; user-defined hash table tests
 
-(defvar *user-hash-table-tests* nil)
+(defglobal *user-hash-table-tests* nil)
 
 (defun register-hash-table-test (name hash-fun)
   (declare (symbol name) (function hash-fun))

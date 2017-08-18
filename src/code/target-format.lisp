@@ -332,29 +332,29 @@
                   (format-print-ordinal stream arg)
                   (format-print-cardinal stream arg)))))))
 
-(defparameter *cardinal-ones*
+(defglobal *cardinal-ones*
   #(nil "one" "two" "three" "four" "five" "six" "seven" "eight" "nine"))
 
-(defparameter *cardinal-tens*
+(defglobal *cardinal-tens*
   #(nil nil "twenty" "thirty" "forty"
         "fifty" "sixty" "seventy" "eighty" "ninety"))
 
-(defparameter *cardinal-teens*
+(defglobal *cardinal-teens*
   #("ten" "eleven" "twelve" "thirteen" "fourteen"  ;;; RAD
     "fifteen" "sixteen" "seventeen" "eighteen" "nineteen"))
 
-(defparameter *cardinal-periods*
+(defglobal *cardinal-periods*
   #("" " thousand" " million" " billion" " trillion" " quadrillion"
     " quintillion" " sextillion" " septillion" " octillion" " nonillion"
     " decillion" " undecillion" " duodecillion" " tredecillion"
     " quattuordecillion" " quindecillion" " sexdecillion" " septendecillion"
     " octodecillion" " novemdecillion" " vigintillion"))
 
-(defparameter *ordinal-ones*
+(defglobal *ordinal-ones*
   #(nil "first" "second" "third" "fourth"
         "fifth" "sixth" "seventh" "eighth" "ninth"))
 
-(defparameter *ordinal-tens*
+(defglobal *ordinal-tens*
   #(nil "tenth" "twentieth" "thirtieth" "fortieth"
         "fiftieth" "sixtieth" "seventieth" "eightieth" "ninetieth"))
 

@@ -242,11 +242,11 @@
                              collect
                              `(list ,@(loop for j below n-cells
                                             collect `(access ,depth ,j))))))))
-  (defparameter *fast-lexvar-reffers*
+  (define-load-time-global *fast-lexvar-reffers*
     (macrolet ((access (up across)
                  `(hlambda GET-VAR () (env) (ref ,up ,across))))
       (array-of 4 10))) ; for 4 scopes and 10 names per scope you can go fast
-  (defparameter *fast-lexvar-setters* ; These are lambdas, not handlers
+  (define-load-time-global *fast-lexvar-setters* ; These are lambdas, not handlers
     (macrolet ((access (up across)
                  `(named-lambda (eval SET-VAR) (form env sexpr)
                     (declare #.+handler-optimize+ (ignore sexpr))

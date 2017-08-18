@@ -192,7 +192,7 @@ from now. For timers with a repeat interval it returns true."
 (defun under-scheduler-lock-p ()
   (sb!thread:holding-mutex-p *scheduler-lock*))
 
-(defparameter *schedule* (make-priority-queue :key #'%timer-expire-time))
+(define-load-time-global *schedule* (make-priority-queue :key #'%timer-expire-time))
 
 (defun peek-schedule ()
   (priority-queue-maximum *schedule*))

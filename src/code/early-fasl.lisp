@@ -31,7 +31,7 @@
 ;;;   because they're hard to express portably and because the LOAD
 ;;;   code might reasonably use READ-LINE to get the value to compare
 ;;;   against.
-(defparameter *fasl-header-string-start-string* "# FASL")
+(defglobal *fasl-header-string-start-string* "# FASL")
 
 (macrolet ((define-fasl-format-features ()
              (let (;; master value for *F-P-A-F-F*
@@ -46,7 +46,7 @@
                   ;; abstract, not of this particular SBCL executable,
                   ;; so any flag in this list may or may not be present
                   ;; in the *FEATURES* list of this particular build.
-                  (defparameter *features-potentially-affecting-fasl-format*
+                  (defglobal *features-potentially-affecting-fasl-format*
                     ',fpaff)
                   ;; a string representing flags of *F-P-A-F-F* which
                   ;; are in this particular build
@@ -57,7 +57,7 @@
                   ;; reading from fasl files, and because we don't
                   ;; need to do anything sophisticated with its
                   ;; logical structure, just test it for equality.)
-                  (defparameter *features-affecting-fasl-format*
+                  (defglobal *features-affecting-fasl-format*
                     ,(let ((*print-pretty* nil))
                        (prin1-to-string
                         (sort

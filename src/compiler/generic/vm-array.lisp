@@ -55,8 +55,7 @@
 
 ;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
 ;; but not eval'd in the compiler.
-(defglobal *specialized-array-element-type-properties* nil)
-(setq *specialized-array-element-type-properties*
+(define-load-time-global *specialized-array-element-type-properties*
   (map 'simple-vector
        (lambda (args)
          (apply #'!make-saetp args))
@@ -169,7 +168,7 @@
 (!defglobal sb!kernel::*specialized-array-element-types*
             '#.sb!kernel::*specialized-array-element-types*)
 
-(defvar *vector-without-complex-typecode-infos*
+(define-load-time-global *vector-without-complex-typecode-infos*
   #+sb-xc-host
   (loop for saetp across *specialized-array-element-type-properties*
         for specifier = (saetp-specifier saetp)
