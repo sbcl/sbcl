@@ -26,7 +26,8 @@
         (or end length)
         (sequence-bounding-indices-bad-error seq start end))))
 
-(defglobal *sequence-keyword-info*
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *sequence-keyword-info*
     ;; (name default supplied-p adjustment new-type)
     `((count nil
              nil
@@ -79,7 +80,7 @@
       (test-not nil
                 nil
                 (and test-not (%coerce-callable-to-fun test-not))
-                (or null function))))
+                (or null function)))))
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring) (parse-body body t)
