@@ -50,6 +50,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "forwarding-ptr.h"
+#include "pseudo-atomic.h"
 #include "var-io.h"
 
 #include <stdlib.h>
@@ -2151,14 +2152,8 @@ void defrag_immobile_space(int* components, boolean verbose)
 
     // Dynamic space
     // We can safely ignore allocation region boundaries.
-    fixup_space((lispobj*)DYNAMIC_SPACE_START,
-                ((lispobj)
-#ifdef reg_ALLOC
-                dynamic_space_free_pointer
-#else
-                SymbolValue(ALLOCATION_POINTER,0)
-#endif
-                           - DYNAMIC_SPACE_START) >> WORD_SHIFT);
+    fixup_space(current_dynamic_space,
+                (lispobj*)get_alloc_pointer() - current_dynamic_space);
 
     // Copy the spaces back where they belong.
 

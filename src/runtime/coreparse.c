@@ -47,6 +47,7 @@
 #include "validate.h"
 #include "gc-internal.h"
 #include "runtime-options.h"
+#include "pseudo-atomic.h"
 
 #include <errno.h>
 
@@ -670,13 +671,8 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
              * at the time the core was saved.
              * For gencgc we don't look at current_dynamic_space */
             current_dynamic_space = (lispobj *)addr;
+            set_alloc_pointer((lispobj)free_pointer);
 
-            /* FIXME: why not use set_alloc_pointer() ? */
-#if defined(ALLOCATION_POINTER)
-            SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);
-#else
-            dynamic_space_free_pointer = free_pointer;
-#endif
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
             /* This assertion safeguards the test in zero_pages_with_mmap()
              * which trusts that if addr > anon_dynamic_space_start

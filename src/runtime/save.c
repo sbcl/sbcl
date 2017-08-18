@@ -35,6 +35,7 @@
 #include "gc-internal.h"
 #include "thread.h"
 #include "arch.h"
+#include "pseudo-atomic.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -333,30 +334,12 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  core_start_pos,
                  core_compression_level);
 #endif
-#ifdef reg_ALLOC
-#ifdef LISP_FEATURE_GENCGC
-    output_space(file,
-                 DYNAMIC_CORE_SPACE_ID,
-                 (lispobj *)DYNAMIC_SPACE_START,
-                 dynamic_space_free_pointer,
-                 core_start_pos,
-                 core_compression_level);
-#else
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  (lispobj *)current_dynamic_space,
-                 dynamic_space_free_pointer,
+                 (lispobj *)get_alloc_pointer(),
                  core_start_pos,
                  core_compression_level);
-#endif
-#else
-    output_space(file,
-                 DYNAMIC_CORE_SPACE_ID,
-                 (lispobj *)DYNAMIC_SPACE_START,
-                 (lispobj *)SymbolValue(ALLOCATION_POINTER,0),
-                 core_start_pos,
-                 core_compression_level);
-#endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(3, file);
