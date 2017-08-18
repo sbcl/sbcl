@@ -2935,7 +2935,7 @@ verify_gc(void)
     struct thread *th;
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
-                     get_binding_stack_pointer(th));
+                     (lispobj*)get_binding_stack_pointer(th));
     }
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer);
     verify_space(STATIC_SPACE_START, static_space_free_pointer);
