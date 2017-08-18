@@ -80,7 +80,13 @@ extern os_vm_address_t anon_dynamic_space_start;
 extern lispobj *current_auto_gc_trigger;
 # endif
 
+#if defined(LISP_FEATURE_GENCGC)
+#define current_dynamic_space ((lispobj*)(DYNAMIC_SPACE_START))
+#elif defined(LISP_FEATURE_CHENEYGC)
 extern lispobj *current_dynamic_space;
+#else
+#error "Which GC?"
+#endif
 
 extern void globals_init(void);
 

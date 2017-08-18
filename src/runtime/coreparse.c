@@ -666,11 +666,13 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
             *spaces[id].pfree_pointer = free_pointer;
             break;
         case DYNAMIC_CORE_SPACE_ID:
+#ifdef LISP_FEATURE_CHENEYGC
             /* 'addr' is the actual address if relocatable.
              * For cheneygc, this will be whatever the GC was using
              * at the time the core was saved.
-             * For gencgc we don't look at current_dynamic_space */
+             * For gencgc this is #defined as DYNAMIC_SPACE_START */
             current_dynamic_space = (lispobj *)addr;
+#endif
             set_alloc_pointer((lispobj)free_pointer);
 
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);

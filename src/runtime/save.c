@@ -336,7 +336,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #endif
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
-                 (lispobj *)current_dynamic_space,
+                 current_dynamic_space,
                  (lispobj *)get_alloc_pointer(),
                  core_start_pos,
                  core_compression_level);

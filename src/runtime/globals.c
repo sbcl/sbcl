@@ -54,10 +54,12 @@ os_vm_address_t anon_dynamic_space_start;
 lispobj *current_auto_gc_trigger;
 #endif
 
-/* For copying GCs, this points to the start of the dynamic space
- * currently in use (that will become the from_space when the next GC
- * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
+/* For cheneygc, this points to the start of the semi-space currently in use
+ * (that will become the from_space when the next GC is done).
+ * Gencgc defines it as DYNAMIC_SPACE_START via a C preprocessor macro. */
+#ifdef LISP_FEATURE_CHENEYGC
 lispobj *current_dynamic_space;
+#endif
 
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
 pthread_key_t specials=0;
