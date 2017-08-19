@@ -70,8 +70,12 @@
 #include "interr.h"
 #endif
 
-extern char *sbcl_home;
+#ifdef SBCL_PREFIX
 char *sbcl_home = SBCL_PREFIX"/lib/sbcl/";
+#else
+static char libpath[] = "../lib/sbcl";
+char *sbcl_home;
+#endif
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
@@ -640,6 +644,34 @@ main(int argc, char *argv[], char *envp[])
     gc_init();
 
     setup_locale();
+
+    #ifndef SBCL_PREFIX
+    /* If built without SBCL_PREFIX defined, then set 'sbcl_home' to
+     * "<here>/../lib/sbcl/" based on how this executable was invoked. */
+    {
+        char *exename = argv[0]; // Use as-it, not truenameified
+        char *slash = strrchr(exename, '/');
+        if (!slash) {
+            sbcl_home = libpath;
+        } else {
+            int prefixlen = slash - exename + 1; // keep the slash in the prefix
+            char *tail = exename + prefixlen - 4;
+            char *suffix = libpath;
+            sbcl_home = successful_malloc(prefixlen + sizeof libpath); // sizeof incl. nul
+            // Translate "{path/}bin/sbcl" => "{path/}lib/sbcl", otherwise
+            // "{path}/sbcl" => "{path}/../lib/sbcl" so that running "./sbcl" works
+            // if sitting in "bin".
+            if (prefixlen >= 4 && !strncmp(tail, "bin/", 4)
+                // chop "bin" only if a complete word: '/' or nothing to its left.
+                && (tail-1 < exename || tail[-1] == '/')) {
+                prefixlen -= 4; // remove "bin/"
+                suffix += 3; // don't append "../"
+            }
+            memcpy(sbcl_home, exename, prefixlen);
+            strcpy(sbcl_home+prefixlen, suffix);
+        }
+    }
+    #endif
 
     /* If no core file was specified, look for one. */
     if (!core) {

@@ -4,6 +4,9 @@ changes relative to sbcl-1.3.20:
     has been removed after a 15 year deprecation cycle. Use the new name,
     RECKLESSLY-CONTINUE. Note also that this restart is hidden if deemed unsafe
     due to altered placement of untagged slots in the structure.
+  * enhancement: the assignment of -DSBCL_PREFIX= in src/runtime/GNUmakefile
+    can be removed as a local patch, which results in an sbcl executable
+    that finds its core file relative to itself by looking in "../lib/sbcl".
   * enhancement: backends using the generational GC are able to relocate
     dynamic space anywhere the operating system places it.
     This feature can be disabled by removing :relocatable-heap from the
